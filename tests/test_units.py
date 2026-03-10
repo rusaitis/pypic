@@ -1,8 +1,10 @@
+import math
+
 import numpy as np
 import pytest
 from scipy import constants
 
-from pypic.units import Normalization
+from pypic.units import Normalization, PhysicsConstants, SpeciesInfo
 
 N_REF = 1e18
 
@@ -147,3 +149,135 @@ class TestArrayInputs:
         x = np.ones((3, 4))
         result = norm.to_si_b_field(x)
         assert result.shape == (3, 4)
+
+
+class TestPhysicsConstants:
+    def test_pic_normalized(self):
+        pc = PhysicsConstants.pic_normalized()
+        assert pc.c == 1.0
+        assert pc.epsilon_0 == 1.0
+        assert pc.mu_0 == 1.0
+
+    def test_mhd_normalized(self):
+        pc = PhysicsConstants.mhd_normalized()
+        assert math.isinf(pc.c)
+        assert pc.epsilon_0 == 1.0
+        assert pc.mu_0 == 1.0
+
+    def test_inv_c_squared_mhd(self):
+        assert PhysicsConstants.mhd_normalized().inv_c_squared() == 0.0
+
+    def test_inv_c_squared_pic(self):
+        assert PhysicsConstants.pic_normalized().inv_c_squared() == 1.0
+
+    def test_inv_c_squared_custom(self):
+        pc = PhysicsConstants(c=10.0, epsilon_0=1.0, mu_0=1.0)
+        np.testing.assert_allclose(pc.inv_c_squared(), 0.01, rtol=1e-15)
+
+    def test_electromagnetic_identity(self):
+        pc = PhysicsConstants.pic_normalized()
+        np.testing.assert_allclose(pc.c**2 * pc.mu_0 * pc.epsilon_0, 1.0, rtol=1e-15)
+
+    def test_frozen(self):
+        pc = PhysicsConstants.pic_normalized()
+        with pytest.raises(AttributeError):
+            pc.c = 2.0  # type: ignore[misc]
+
+
+class TestSpeciesInfoFromChargeMass:
+    def test_electron(self):
+        e = SpeciesInfo(name="e", charge=-1.0, mass=1 / 256)
+        assert e.charge_to_mass == -256.0
+
+    def test_ion(self):
+        ion = SpeciesInfo(name="ion", charge=1.0, mass=1.0)
+        assert ion.charge_to_mass == 1.0
+
+
+class TestSpeciesInfoFromQom:
+    def test_negative_qom(self):
+        e = SpeciesInfo(name="e", charge_to_mass=-256.0)
+        assert e.charge == -1.0
+        np.testing.assert_allclose(e.mass, 1.0 / 256, rtol=1e-15)
+
+    def test_positive_qom(self):
+        ion = SpeciesInfo(name="ion", charge_to_mass=256.0)
+        assert ion.charge == 1.0
+        np.testing.assert_allclose(ion.mass, 1.0 / 256, rtol=1e-15)
+
+    def test_fractional_qom(self):
+        s = SpeciesInfo(name="heavy", charge_to_mass=0.5)
+        assert s.charge == 1.0
+        assert s.mass == 2.0
+
+
+class TestSpeciesInfoValidation:
+    def test_no_params_raises(self):
+        with pytest.raises(ValueError, match="Must provide"):
+            SpeciesInfo(name="x")
+
+    def test_only_charge_raises(self):
+        with pytest.raises(ValueError, match="both charge and mass"):
+            SpeciesInfo(name="x", charge=1.0)
+
+    def test_only_mass_raises(self):
+        with pytest.raises(ValueError, match="both charge and mass"):
+            SpeciesInfo(name="x", mass=1.0)
+
+    def test_zero_qom_raises(self):
+        with pytest.raises(ValueError, match="Cannot decompose"):
+            SpeciesInfo(name="neutral", charge_to_mass=0.0)
+
+    def test_inconsistent_all_three_raises(self):
+        with pytest.raises(ValueError, match="Inconsistent"):
+            SpeciesInfo(name="bad", charge=1.0, mass=1.0, charge_to_mass=99.0)
+
+    def test_consistent_all_three_ok(self):
+        s = SpeciesInfo(name="ok", charge=2.0, mass=1.0, charge_to_mass=2.0)
+        assert s.charge_to_mass == 2.0
+
+
+class TestSpeciesInfoOptionalFields:
+    def test_defaults_are_none(self):
+        s = SpeciesInfo(name="e", charge=-1.0, mass=1.0)
+        assert s.temperature is None
+        assert s.thermal_velocity is None
+        assert s.drift_velocity is None
+        assert s.density is None
+        assert s.particles_per_cell is None
+
+    def test_temperature_preserved(self):
+        s = SpeciesInfo(name="e", charge=-1.0, mass=1.0, temperature=0.1)
+        assert s.temperature == 0.1
+
+    def test_density_preserved(self):
+        s = SpeciesInfo(name="e", charge=-1.0, mass=1.0, density=1.0)
+        assert s.density == 1.0
+
+    def test_drift_velocity_preserved(self):
+        v = (0.1, 0.0, 0.0)
+        s = SpeciesInfo(name="e", charge=-1.0, mass=1.0, drift_velocity=v)
+        assert s.drift_velocity == v
+
+    def test_thermal_velocity_scalar(self):
+        s = SpeciesInfo(name="e", charge=-1.0, mass=1.0, thermal_velocity=0.01)
+        assert s.thermal_velocity == 0.01
+
+    def test_thermal_velocity_vector3(self):
+        vth = (0.01, 0.02, 0.03)
+        s = SpeciesInfo(name="e", charge=-1.0, mass=1.0, thermal_velocity=vth)
+        assert s.thermal_velocity == vth
+
+    def test_particles_per_cell_int(self):
+        s = SpeciesInfo(name="e", charge=-1.0, mass=1.0, particles_per_cell=64)
+        assert s.particles_per_cell == 64
+
+    def test_particles_per_cell_tuple(self):
+        ppc = (8, 8, 8)
+        s = SpeciesInfo(name="e", charge=-1.0, mass=1.0, particles_per_cell=ppc)
+        assert s.particles_per_cell == ppc
+
+    def test_frozen(self):
+        s = SpeciesInfo(name="e", charge=-1.0, mass=1.0)
+        with pytest.raises(AttributeError):
+            s.name = "ion"  # type: ignore[misc]

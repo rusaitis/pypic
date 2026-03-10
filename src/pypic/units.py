@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from typing import Any
 
@@ -10,6 +11,7 @@ from numpy.typing import NDArray
 from scipy import constants
 
 type Numeric = float | np.floating[Any] | NDArray[np.floating[Any]]
+type Vector3 = tuple[float, float, float]
 
 
 @dataclass(frozen=True, slots=True)
@@ -512,3 +514,181 @@ class Normalization:
         1e+18
         """
         return x * self.density_ref
+
+
+@dataclass(frozen=True, slots=True)
+class PhysicsConstants:
+    r"""Simulation-frame physical constants in code units.
+
+    Stores the speed of light, vacuum permittivity, and vacuum permeability
+    as used inside the simulation. PIC codes typically normalize all three
+    to unity; MHD codes set $c = \infty$ to eliminate displacement current.
+
+    Parameters
+    ----------
+    c : float
+        Speed of light in code units.
+    epsilon_0 : float
+        Vacuum permittivity in code units.
+    mu_0 : float
+        Vacuum permeability in code units.
+
+    Examples
+    --------
+    >>> PhysicsConstants.pic_normalized().c
+    1.0
+    >>> PhysicsConstants.mhd_normalized().inv_c_squared()
+    0.0
+    """
+
+    c: float
+    epsilon_0: float
+    mu_0: float
+
+    @classmethod
+    def pic_normalized(cls) -> PhysicsConstants:
+        r"""Return PIC normalization where $c = \varepsilon_0 = \mu_0 = 1$.
+
+        Returns
+        -------
+        PhysicsConstants
+            PIC-normalized constants.
+
+        Examples
+        --------
+        >>> pc = PhysicsConstants.pic_normalized()
+        >>> pc.c, pc.epsilon_0, pc.mu_0
+        (1.0, 1.0, 1.0)
+        """
+        return cls(c=1.0, epsilon_0=1.0, mu_0=1.0)
+
+    @classmethod
+    def mhd_normalized(cls) -> PhysicsConstants:
+        r"""MHD normalization where $c = \infty$, eliminating displacement current.
+
+        Returns
+        -------
+        PhysicsConstants
+            MHD-normalized constants.
+
+        Examples
+        --------
+        >>> pc = PhysicsConstants.mhd_normalized()
+        >>> math.isinf(pc.c)
+        True
+        """
+        return cls(c=float("inf"), epsilon_0=1.0, mu_0=1.0)
+
+    def inv_c_squared(self) -> float:
+        r"""Return $1/c^2$, guarded against infinite $c$.
+
+        Returns ``0.0`` when $c = \infty$ (MHD limit) to avoid
+        ``inf * 0 = nan`` in displacement-current terms.
+
+        Returns
+        -------
+        float
+            $1/c^2$, or ``0.0`` if $c$ is infinite.
+
+        Examples
+        --------
+        >>> PhysicsConstants.pic_normalized().inv_c_squared()
+        1.0
+        >>> PhysicsConstants(c=10.0, epsilon_0=1.0, mu_0=1.0).inv_c_squared()
+        0.01
+        """
+        if math.isinf(self.c):
+            return 0.0
+        return 1.0 / self.c**2
+
+
+@dataclass(frozen=True, slots=True)
+class SpeciesInfo:
+    r"""Per-species metadata for a plasma simulation.
+
+    At minimum, provide either ``charge`` + ``mass`` or ``charge_to_mass``.
+    The missing quantities are inferred automatically:
+
+    - From charge + mass: $q/m$ is computed directly.
+    - From $q/m$ alone: convention is $|q| = 1$, $m = 1/|q/m|$.
+    - If all three are given, consistency is validated.
+
+    Parameters
+    ----------
+    name : str
+        Species label (e.g. ``"e"``, ``"ion"``).
+    charge : float | None
+        Charge in code units.
+    mass : float | None
+        Mass in code units.
+    charge_to_mass : float | None
+        Charge-to-mass ratio in code units.
+    temperature : float | None
+        Temperature in code units.
+    thermal_velocity : float | Vector3 | None
+        Scalar (isotropic) or per-component thermal velocity.
+    drift_velocity : Vector3 | None
+        Bulk drift velocity $(v_x, v_y, v_z)$.
+    density : float | None
+        Number density in code units.
+    particles_per_cell : int | tuple[int, int, int] | None
+        Particles per cell, uniform or per-direction.
+
+    Examples
+    --------
+    >>> e = SpeciesInfo(name="e", charge=-1.0, mass=1/256)
+    >>> e.charge_to_mass
+    -256.0
+    >>> ion = SpeciesInfo(name="ion", charge_to_mass=1.0)
+    >>> ion.charge, ion.mass
+    (1.0, 1.0)
+    """
+
+    name: str
+    charge: float | None = None
+    mass: float | None = None
+    charge_to_mass: float | None = None
+    temperature: float | None = None
+    thermal_velocity: float | Vector3 | None = None
+    drift_velocity: Vector3 | None = None
+    density: float | None = None
+    particles_per_cell: int | tuple[int, int, int] | None = None
+
+    def __post_init__(self) -> None:  # noqa: D105 — inference logic, not a public API
+        has_charge = self.charge is not None
+        has_mass = self.mass is not None
+        has_qom = self.charge_to_mass is not None
+
+        if has_charge and has_mass and not has_qom:
+            # Infer q/m from charge and mass
+            object.__setattr__(
+                self,
+                "charge_to_mass",
+                self.charge / self.mass,  # type: ignore[operator]  # narrowed above
+            )
+        elif has_qom and not has_charge and not has_mass:
+            assert self.charge_to_mass is not None  # narrowed by has_qom
+            qom = self.charge_to_mass
+            if qom == 0.0:
+                msg = (
+                    "Cannot decompose charge_to_mass=0 into charge and mass. "
+                    "Specify charge=0 and mass explicitly."
+                )
+                raise ValueError(msg)
+            object.__setattr__(self, "charge", math.copysign(1.0, qom))
+            object.__setattr__(self, "mass", 1.0 / abs(qom))
+        elif has_charge and has_mass and has_qom:
+            expected = self.charge / self.mass  # type: ignore[operator]
+            if not math.isclose(expected, self.charge_to_mass, rel_tol=1e-12):  # type: ignore[arg-type]
+                msg = (
+                    f"Inconsistent species parameters: "
+                    f"charge/mass={expected} != charge_to_mass={self.charge_to_mass}"
+                )
+                raise ValueError(msg)
+        elif not has_charge and not has_mass and not has_qom:
+            msg = "Must provide charge+mass or charge_to_mass (or all three)."
+            raise ValueError(msg)
+        else:
+            # Only one of charge/mass provided
+            msg = "Must provide both charge and mass, not just one."
+            raise ValueError(msg)
