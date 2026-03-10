@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import copy
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
 import numpy as np
 import xarray as xr
+from xarray import Dataset
 
 from pypic.coordinates.geometry import (
     CARTESIAN,  # noqa: F401 — used in doctests
@@ -169,29 +171,24 @@ def _default_aliases(geometry: CoordinateGeometry) -> dict[str, str]:
 def _build_grid_from_dataset(old_grid: GridInfo, new_ds: xr.Dataset) -> GridInfo:
     """Derive a reduced GridInfo from a sliced xr.Dataset."""
     axis_names = old_grid.geometry.axis_names[: len(old_grid.dimensions)]
-    surviving_dims: list[int] = []
-    new_dimensions: list[int] = []
-    new_spacing: list[float] = []
-    new_origin: list[float] = []
+    surviving: list[tuple[int, str]] = []
 
     for i, name in enumerate(axis_names):
         if name in new_ds.dims:
-            surviving_dims.append(i)
-            new_dimensions.append(int(new_ds.sizes[name]))
-            new_spacing.append(old_grid.spacing[i])
-            coord_vals = new_ds.coords[name].values
-            new_origin.append(float(coord_vals[0]) - 0.5 * old_grid.spacing[i])
+            surviving.append((i, name))
 
     new_boundary = None
     if old_grid.boundary is not None:
-        new_boundary = tuple(old_grid.boundary[i] for i in surviving_dims)
+        new_boundary = tuple(old_grid.boundary[i] for i, _ in surviving)
 
-    return GridInfo(
-        dimensions=tuple(new_dimensions),
-        spacing=tuple(new_spacing),
-        origin=tuple(new_origin),
-        geometry=old_grid.geometry,
-        dt=old_grid.dt,
+    return copy.replace(
+        old_grid,
+        dimensions=tuple(int(new_ds.sizes[name]) for _, name in surviving),
+        spacing=tuple(old_grid.spacing[i] for i, _ in surviving),
+        origin=tuple(
+            float(new_ds.coords[name].values[0]) - 0.5 * old_grid.spacing[i]
+            for i, name in surviving
+        ),
         boundary=new_boundary,
     )
 
@@ -365,6 +362,19 @@ class FieldDataset:
         """Raw xarray Dataset."""
         return self._ds
 
+    def _wrap_sliced(self, new_ds: Dataset) -> FieldDataset:
+        """Wrap a sliced xr.Dataset in a new FieldDataset, preserving metadata."""
+        new_grid = _build_grid_from_dataset(self._grid, new_ds)
+        return FieldDataset(
+            new_ds,
+            new_grid,
+            self._normalization,
+            species=self._species,
+            physics=self._physics,
+            metadata=self._metadata,
+            aliases={k: v for k, v in self._aliases.items() if v in new_ds.data_vars},
+        )
+
     def _resolve_key(self, key: str) -> str:
         """Resolve a field key through aliases to the canonical name."""
         if key in self._ds.data_vars:
@@ -372,7 +382,7 @@ class FieldDataset:
         canonical = self._aliases.get(key)
         if canonical is not None:
             return canonical
-        available = sorted(self.field_names())
+        available = sorted(self._ds.data_vars, key=str)
         alias_keys = sorted(self._aliases)
         msg = f"Field {key!r} not found. Available: {available}. Aliases: {alias_keys}."
         raise KeyError(msg)
@@ -442,7 +452,7 @@ class FieldDataset:
         >>> sorted(ds.field_names())
         ['B1', 'rho_c']
         """
-        return [str(k) for k in self._ds.data_vars]
+        return list(self._ds.data_vars)  # type: ignore[arg-type]  # xarray types Hashable, always str
 
     def sel(
         self,
@@ -471,17 +481,7 @@ class FieldDataset:
         """
         merged = dict(indexers) if indexers else {}
         merged.update(kwargs)
-        new_ds = self._ds.sel(merged, method=method)
-        new_grid = _build_grid_from_dataset(self._grid, new_ds)
-        return FieldDataset(
-            new_ds,
-            new_grid,
-            self._normalization,
-            species=self._species,
-            physics=self._physics,
-            metadata=self._metadata,
-            aliases={k: v for k, v in self._aliases.items() if v in new_ds.data_vars},
-        )
+        return self._wrap_sliced(self._ds.sel(merged, method=method))
 
     def isel(
         self,
@@ -505,17 +505,7 @@ class FieldDataset:
         """
         merged = dict(indexers) if indexers else {}
         merged.update(kwargs)
-        new_ds = self._ds.isel(merged)
-        new_grid = _build_grid_from_dataset(self._grid, new_ds)
-        return FieldDataset(
-            new_ds,
-            new_grid,
-            self._normalization,
-            species=self._species,
-            physics=self._physics,
-            metadata=self._metadata,
-            aliases={k: v for k, v in self._aliases.items() if v in new_ds.data_vars},
-        )
+        return self._wrap_sliced(self._ds.isel(merged))
 
 
 @runtime_checkable
@@ -546,15 +536,13 @@ class SimulationConfig:
     model_type : str
         Simulation type identifier (e.g. ``"pic"``, ``"mhd"``).
     grid : GridInfo
-        Grid metadata.
+        Grid metadata (includes coordinate geometry).
     normalization : Normalization
         Unit system.
     species : tuple[SpeciesInfo, ...]
         Species definitions (tuple for immutability).
     physics : dict[str, Any]
         Physics parameters.
-    geometry : CoordinateGeometry
-        Coordinate system.
     frame : str
         Reference frame label (e.g. ``"GSM"``, ``"simulation"``).
     metadata : dict[str, Any]
@@ -571,7 +559,7 @@ class SimulationConfig:
     ...     ),
     ...     normalization=Normalization.identity(),
     ...     species=(SpeciesInfo(name="e", charge=-1.0, mass=1.0),),
-    ...     physics={}, geometry=CARTESIAN, frame="simulation", metadata={},
+    ...     physics={}, frame="simulation", metadata={},
     ... )
     >>> cfg.model_name
     'test'
@@ -583,6 +571,5 @@ class SimulationConfig:
     normalization: Normalization
     species: tuple[SpeciesInfo, ...]
     physics: dict[str, Any]
-    geometry: CoordinateGeometry
     frame: str
     metadata: dict[str, Any]

@@ -293,12 +293,12 @@ class TestSimulationConfig:
             normalization=Normalization.identity(),
             species=(SpeciesInfo(name="e", charge=-1.0, mass=1.0),),
             physics={},
-            geometry=CARTESIAN,
             frame="simulation",
             metadata={},
         )
         assert cfg.model_name == "run1"
         assert cfg.species[0].name == "e"
+        assert cfg.grid.geometry is CARTESIAN
 
     def test_frozen(self):
         grid = GridInfo(
@@ -314,7 +314,6 @@ class TestSimulationConfig:
             normalization=Normalization.identity(),
             species=(),
             physics={},
-            geometry=CARTESIAN,
             frame="simulation",
             metadata={},
         )
