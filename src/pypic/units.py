@@ -25,7 +25,7 @@ class Normalization:
 
     Use the classmethods to construct standard normalizations:
 
-    - `pic_electron` / `pic_ion` / `pic_standard` for PIC codes
+    - `pic_electron` / `pic_standard` for PIC codes
     - `mhd_standard` for MHD codes
     - `identity` for data already in SI or dimensionless tests
 
@@ -51,7 +51,7 @@ class Normalization:
     Examples
     --------
     >>> norm = Normalization.identity()
-    >>> norm.normalize_length(3.0)
+    >>> norm.normalize("length", 3.0)
     3.0
     """
 
@@ -99,7 +99,7 @@ class Normalization:
         --------
         >>> from scipy.constants import m_e, e, c
         >>> norm = Normalization.pic_standard(1e18, m_e, e, c)
-        >>> bool(np.isclose(norm.normalize_velocity(c), 1.0, rtol=1e-12))
+        >>> bool(np.isclose(norm.normalize("velocity", c), 1.0, rtol=1e-12))
         True
         """
         omega_ref = np.sqrt(
@@ -149,36 +149,6 @@ class Normalization:
         True
         """
         return cls.pic_standard(n_e, constants.m_e, constants.e)
-
-    @classmethod
-    def pic_ion(cls, n_i: float, mass_i: float, charge_i: float) -> Normalization:
-        r"""PIC normalization using ion parameters.
-
-        Convenience wrapper around `pic_standard` with the given ion mass and
-        charge, using ``scipy.constants.c`` for the speed of light.
-
-        Parameters
-        ----------
-        n_i : float
-            Ion number density in m$^{-3}$.
-        mass_i : float
-            Ion mass in kg.
-        charge_i : float
-            Ion charge in Coulombs.
-
-        Returns
-        -------
-        Normalization
-            Ion-scale PIC normalization.
-
-        Examples
-        --------
-        >>> from scipy.constants import m_p, e
-        >>> norm = Normalization.pic_ion(1e18, m_p, e)
-        >>> norm.density_ref
-        1e+18
-        """
-        return cls.pic_standard(n_i, mass_i, charge_i)
 
     @classmethod
     def mhd_standard(cls, l_0: float, rho_0: float, b_0: float) -> Normalization:
@@ -249,271 +219,57 @@ class Normalization:
             charge_ref=1.0,
         )
 
-    # -- Conversion methods --------------------------------------------------
-
-    def normalize_length(self, x: Numeric) -> Numeric:
-        r"""Convert length from SI to code units.
+    def normalize(self, quantity: str, x: Numeric) -> Numeric:
+        r"""Convert a physical quantity from SI to code units.
 
         $$\hat{x} = x / x_{ref}$$
 
         Parameters
         ----------
+        quantity : str
+            Physical quantity name: ``"length"``, ``"time"``, ``"velocity"``,
+            ``"b_field"``, ``"e_field"``, or ``"density"``.
         x : Numeric
-            Length in meters.
+            Value in SI units.
 
         Returns
         -------
         Numeric
-            Length in code units.
+            Value in code units.
 
         Examples
         --------
-        >>> Normalization.identity().normalize_length(5.0)
+        >>> Normalization.identity().normalize("length", 5.0)
         5.0
         """
-        return x / self.length_ref
+        ref: float = getattr(self, f"{quantity}_ref")
+        return x / ref
 
-    def to_si_length(self, x: Numeric) -> Numeric:
-        r"""Convert length from code units to SI.
+    def to_si(self, quantity: str, x: Numeric) -> Numeric:
+        r"""Convert a physical quantity from code units to SI.
 
         $$x = \hat{x} \cdot x_{ref}$$
 
         Parameters
         ----------
+        quantity : str
+            Physical quantity name: ``"length"``, ``"time"``, ``"velocity"``,
+            ``"b_field"``, ``"e_field"``, or ``"density"``.
         x : Numeric
-            Length in code units.
+            Value in code units.
 
         Returns
         -------
         Numeric
-            Length in meters.
+            Value in SI units.
 
         Examples
         --------
-        >>> Normalization.identity().to_si_length(5.0)
+        >>> Normalization.identity().to_si("length", 5.0)
         5.0
         """
-        return x * self.length_ref
-
-    def normalize_time(self, x: Numeric) -> Numeric:
-        r"""Convert time from SI to code units.
-
-        $$\hat{t} = t / t_{ref}$$
-
-        Parameters
-        ----------
-        x : Numeric
-            Time in seconds.
-
-        Returns
-        -------
-        Numeric
-            Time in code units.
-
-        Examples
-        --------
-        >>> Normalization.identity().normalize_time(2.0)
-        2.0
-        """
-        return x / self.time_ref
-
-    def to_si_time(self, x: Numeric) -> Numeric:
-        r"""Convert time from code units to SI.
-
-        $$t = \hat{t} \cdot t_{ref}$$
-
-        Parameters
-        ----------
-        x : Numeric
-            Time in code units.
-
-        Returns
-        -------
-        Numeric
-            Time in seconds.
-
-        Examples
-        --------
-        >>> Normalization.identity().to_si_time(2.0)
-        2.0
-        """
-        return x * self.time_ref
-
-    def normalize_velocity(self, x: Numeric) -> Numeric:
-        r"""Convert velocity from SI to code units.
-
-        $$\hat{v} = v / v_{ref}$$
-
-        Parameters
-        ----------
-        x : Numeric
-            Velocity in m/s.
-
-        Returns
-        -------
-        Numeric
-            Velocity in code units.
-
-        Examples
-        --------
-        >>> Normalization.identity().normalize_velocity(10.0)
-        10.0
-        """
-        return x / self.velocity_ref
-
-    def to_si_velocity(self, x: Numeric) -> Numeric:
-        r"""Convert velocity from code units to SI.
-
-        $$v = \hat{v} \cdot v_{ref}$$
-
-        Parameters
-        ----------
-        x : Numeric
-            Velocity in code units.
-
-        Returns
-        -------
-        Numeric
-            Velocity in m/s.
-
-        Examples
-        --------
-        >>> Normalization.identity().to_si_velocity(10.0)
-        10.0
-        """
-        return x * self.velocity_ref
-
-    def normalize_b_field(self, x: Numeric) -> Numeric:
-        r"""Convert magnetic field from SI to code units.
-
-        $$\hat{B} = B / B_{ref}$$
-
-        Parameters
-        ----------
-        x : Numeric
-            Magnetic field in Tesla.
-
-        Returns
-        -------
-        Numeric
-            Magnetic field in code units.
-
-        Examples
-        --------
-        >>> Normalization.identity().normalize_b_field(0.5)
-        0.5
-        """
-        return x / self.b_field_ref
-
-    def to_si_b_field(self, x: Numeric) -> Numeric:
-        r"""Convert magnetic field from code units to SI.
-
-        $$B = \hat{B} \cdot B_{ref}$$
-
-        Parameters
-        ----------
-        x : Numeric
-            Magnetic field in code units.
-
-        Returns
-        -------
-        Numeric
-            Magnetic field in Tesla.
-
-        Examples
-        --------
-        >>> Normalization.identity().to_si_b_field(0.5)
-        0.5
-        """
-        return x * self.b_field_ref
-
-    def normalize_e_field(self, x: Numeric) -> Numeric:
-        r"""Convert electric field from SI to code units.
-
-        $$\hat{E} = E / E_{ref}$$
-
-        Parameters
-        ----------
-        x : Numeric
-            Electric field in V/m.
-
-        Returns
-        -------
-        Numeric
-            Electric field in code units.
-
-        Examples
-        --------
-        >>> Normalization.identity().normalize_e_field(100.0)
-        100.0
-        """
-        return x / self.e_field_ref
-
-    def to_si_e_field(self, x: Numeric) -> Numeric:
-        r"""Convert electric field from code units to SI.
-
-        $$E = \hat{E} \cdot E_{ref}$$
-
-        Parameters
-        ----------
-        x : Numeric
-            Electric field in code units.
-
-        Returns
-        -------
-        Numeric
-            Electric field in V/m.
-
-        Examples
-        --------
-        >>> Normalization.identity().to_si_e_field(100.0)
-        100.0
-        """
-        return x * self.e_field_ref
-
-    def normalize_density(self, x: Numeric) -> Numeric:
-        r"""Convert number density from SI to code units.
-
-        $$\hat{n} = n / n_{ref}$$
-
-        Parameters
-        ----------
-        x : Numeric
-            Number density in m$^{-3}$.
-
-        Returns
-        -------
-        Numeric
-            Number density in code units.
-
-        Examples
-        --------
-        >>> Normalization.identity().normalize_density(1e18)
-        1e+18
-        """
-        return x / self.density_ref
-
-    def to_si_density(self, x: Numeric) -> Numeric:
-        r"""Convert number density from code units to SI.
-
-        $$n = \hat{n} \cdot n_{ref}$$
-
-        Parameters
-        ----------
-        x : Numeric
-            Number density in code units.
-
-        Returns
-        -------
-        Numeric
-            Number density in m$^{-3}$.
-
-        Examples
-        --------
-        >>> Normalization.identity().to_si_density(1e18)
-        1e+18
-        """
-        return x * self.density_ref
+        ref: float = getattr(self, f"{quantity}_ref")
+        return x * ref
 
 
 @dataclass(frozen=True, slots=True)
@@ -654,7 +410,7 @@ class SpeciesInfo:
     density: float | None = None
     particles_per_cell: int | tuple[int, int, int] | None = None
 
-    def __post_init__(self) -> None:  # noqa: D105 — inference logic, not a public API
+    def __post_init__(self) -> None:
         if (
             self.charge is not None
             and self.mass is not None
