@@ -577,7 +577,7 @@ class PhysicsConstants:
         >>> math.isinf(pc.c)
         True
         """
-        return cls(c=float("inf"), epsilon_0=1.0, mu_0=1.0)
+        return cls(c=math.inf, epsilon_0=1.0, mu_0=1.0)
 
     def inv_c_squared(self) -> float:
         r"""Return $1/c^2$, guarded against infinite $c$.
@@ -655,40 +655,40 @@ class SpeciesInfo:
     particles_per_cell: int | tuple[int, int, int] | None = None
 
     def __post_init__(self) -> None:  # noqa: D105 — inference logic, not a public API
-        has_charge = self.charge is not None
-        has_mass = self.mass is not None
-        has_qom = self.charge_to_mass is not None
-
-        if has_charge and has_mass and not has_qom:
-            # Infer q/m from charge and mass
-            object.__setattr__(
-                self,
-                "charge_to_mass",
-                self.charge / self.mass,  # type: ignore[operator]  # narrowed above
-            )
-        elif has_qom and not has_charge and not has_mass:
-            assert self.charge_to_mass is not None  # narrowed by has_qom
-            qom = self.charge_to_mass
-            if qom == 0.0:
+        if (
+            self.charge is not None
+            and self.mass is not None
+            and self.charge_to_mass is None
+        ):
+            object.__setattr__(self, "charge_to_mass", self.charge / self.mass)
+        elif (
+            self.charge_to_mass is not None
+            and self.charge is None
+            and self.mass is None
+        ):
+            if self.charge_to_mass == 0.0:
                 msg = (
                     "Cannot decompose charge_to_mass=0 into charge and mass. "
                     "Specify charge=0 and mass explicitly."
                 )
                 raise ValueError(msg)
-            object.__setattr__(self, "charge", math.copysign(1.0, qom))
-            object.__setattr__(self, "mass", 1.0 / abs(qom))
-        elif has_charge and has_mass and has_qom:
-            expected = self.charge / self.mass  # type: ignore[operator]
-            if not math.isclose(expected, self.charge_to_mass, rel_tol=1e-12):  # type: ignore[arg-type]
+            object.__setattr__(self, "charge", math.copysign(1.0, self.charge_to_mass))
+            object.__setattr__(self, "mass", 1.0 / abs(self.charge_to_mass))
+        elif (
+            self.charge is not None
+            and self.mass is not None
+            and self.charge_to_mass is not None
+        ):
+            expected = self.charge / self.mass
+            if not math.isclose(expected, self.charge_to_mass, rel_tol=1e-12):
                 msg = (
                     f"Inconsistent species parameters: "
                     f"charge/mass={expected} != charge_to_mass={self.charge_to_mass}"
                 )
                 raise ValueError(msg)
-        elif not has_charge and not has_mass and not has_qom:
+        elif self.charge is None and self.mass is None and self.charge_to_mass is None:
             msg = "Must provide charge+mass or charge_to_mass (or all three)."
             raise ValueError(msg)
         else:
-            # Only one of charge/mass provided
-            msg = "Must provide both charge and mass, not just one."
+            msg = "Must provide charge+mass, charge_to_mass, or all three."
             raise ValueError(msg)
