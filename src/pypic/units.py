@@ -4,14 +4,13 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING
 
 import numpy as np
-from numpy.typing import NDArray
 from scipy import constants
 
-type Numeric = float | np.floating[Any] | NDArray[np.floating[Any]]
-type Vector3 = tuple[float, float, float]
+if TYPE_CHECKING:
+    from pypic.types import Numeric, Vector3
 
 _QUANTITIES = frozenset({"length", "time", "velocity", "b_field", "e_field", "density"})
 

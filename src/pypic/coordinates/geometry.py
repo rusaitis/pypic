@@ -4,12 +4,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 from numpy.typing import NDArray
 
-type Numeric = float | np.floating[Any] | NDArray[np.floating[Any]]
+if TYPE_CHECKING:
+    from pypic.types import Numeric
+
 type ScaleFactor = np.floating[Any] | NDArray[np.floating[Any]]
 type ScaleFactors = tuple[ScaleFactor, ScaleFactor, ScaleFactor]
 
@@ -103,6 +105,8 @@ class CoordinateGeometry:
             case GeometryType.CYLINDRICAL:
                 r = np.asarray(x1, dtype=np.float64)
                 return (_one, r, _one)
+            case _:
+                raise ValueError(f"Unknown geometry type: {self.type}")
 
 
 CARTESIAN = CoordinateGeometry(
