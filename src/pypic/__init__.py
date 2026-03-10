@@ -9,6 +9,7 @@ from pypic.coordinates import (
     CoordinateGeometry,
     GeometryType,
 )
+from pypic.readers import FieldDataset, GridInfo
 from pypic.units import Normalization, PhysicsConstants, SpeciesInfo
 
 __all__ = [
@@ -16,7 +17,9 @@ __all__ = [
     "CYLINDRICAL",
     "SPHERICAL",
     "CoordinateGeometry",
+    "FieldDataset",
     "GeometryType",
+    "GridInfo",
     "Normalization",
     "PhysicsConstants",
     "SpeciesInfo",
