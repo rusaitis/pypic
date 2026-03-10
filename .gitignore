@@ -1,0 +1,109 @@
+# Build directories
+build*/
+Debug*/
+Release*/
+data*/
+
+# Local build and notes
+#PLAN.md
+#NOTES.md
+#plan-*.md
+
+# Pixi / conda
+.pixi/
+*.conda
+*.tar.bz2
+
+# Test artifacts
+tests/*.png
+tests/*.csv
+tests/test_petsc_*/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+.eggs/
+pip-wheel-metadata/
+.venv/
+venv/
+.env
+.env.local
+.env.*.local
+.ipynb_checkpoints/
+
+# pytest / coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Linting / type-checking
+.mypy_cache/
+.dmypy.json
+.ruff_cache/
+
+# Eclipse IDE
+.cproject
+.project
+.settings/
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+compile_commands.json
+CTestTestfile.cmake
+Testing/
+install_manifest.txt
+Makefile
+
+# Compiled output
+*.o
+*.a
+*.so
+*.dylib
+
+# Scratch / local directories
+scratch*/
+.cache/
+
+# Tags files (ctags/gtags)
+tags
+TAGS
+.tags
+
+# macOS
+.DS_Store
+
+# VS Code
+.vscode/
+
+# JetBrains (CLion etc.)
+.idea/
+
+# Vim / Neovim
+*.swp
+*.swo
+*~
+.netrwhist
+*.un~
+Session.vim
+*.vim.session
+.nvim/
+.nvimrc.lua
+
+# LLM config
+CLAUDE.md
+CLAUDE.local.md
+.claude/
+.cursorrules
+.cursor/
+.copilot/
+copilot-instructions.md
+
+# Output and data files
+*.h5
+*.hdf5
+*.dat
+*.log
