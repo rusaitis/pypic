@@ -69,11 +69,11 @@ class CoordinateGeometry:
         Parameters
         ----------
         x1 : Numeric
-            First coordinate (x, r, or r depending on geometry).
+            First coordinate: $x$ (Cartesian), $r$ (spherical/cylindrical).
         x2 : Numeric
-            Second coordinate (y, θ, or φ).
+            Second coordinate: $y$ (Cartesian), $θ$ (spherical), $φ$ (cylindrical).
         x3 : Numeric
-            Third coordinate (z, φ, or z).
+            Third coordinate: $z$ (Cartesian), $φ$ (spherical), $z$ (cylindrical).
 
         Returns
         -------

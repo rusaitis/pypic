@@ -110,6 +110,7 @@ class Normalization:
         length_ref = c / omega_ref
         time_ref = 1.0 / omega_ref
         b_field_ref = reference_mass * omega_ref / reference_charge
+        # From E = -v x B with v_ref = c
         e_field_ref = c * b_field_ref
 
         return cls(
@@ -186,6 +187,7 @@ class Normalization:
             velocity_ref=float(v_a),
             b_field_ref=float(b_0),
             e_field_ref=float(v_a * b_0),
+            # Convert mass density → number density (reference species: proton)
             density_ref=float(rho_0 / constants.m_p),
             mass_ref=float(constants.m_p),
             charge_ref=float(constants.e),
@@ -434,6 +436,7 @@ class SpeciesInfo:
                     "Specify charge=0 and mass explicitly."
                 )
                 raise ValueError(msg)
+            # Convention: |q| = 1, sign from q/m, mass = 1/|q/m|
             object.__setattr__(self, "charge", math.copysign(1.0, self.charge_to_mass))
             object.__setattr__(self, "mass", 1.0 / abs(self.charge_to_mass))
         elif (
