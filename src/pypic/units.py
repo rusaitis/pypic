@@ -13,6 +13,8 @@ from scipy import constants
 type Numeric = float | np.floating[Any] | NDArray[np.floating[Any]]
 type Vector3 = tuple[float, float, float]
 
+_QUANTITIES = frozenset({"length", "time", "velocity", "b_field", "e_field", "density"})
+
 
 @dataclass(frozen=True, slots=True)
 class Normalization:
@@ -20,8 +22,7 @@ class Normalization:
 
     Every simulation uses a set of reference quantities to non-dimensionalize
     the equations. This class stores those reference values (all in SI) and
-    provides ``normalize_*`` / ``to_si_*`` method pairs for each physical
-    quantity.
+    provides ``normalize`` / ``to_si`` methods for each physical quantity.
 
     Use the classmethods to construct standard normalizations:
 
@@ -242,6 +243,9 @@ class Normalization:
         >>> Normalization.identity().normalize("length", 5.0)
         5.0
         """
+        if quantity not in _QUANTITIES:
+            msg = f"Unknown quantity {quantity!r}. Valid: {sorted(_QUANTITIES)}"
+            raise ValueError(msg)
         ref: float = getattr(self, f"{quantity}_ref")
         return x / ref
 
@@ -268,6 +272,9 @@ class Normalization:
         >>> Normalization.identity().to_si("length", 5.0)
         5.0
         """
+        if quantity not in _QUANTITIES:
+            msg = f"Unknown quantity {quantity!r}. Valid: {sorted(_QUANTITIES)}"
+            raise ValueError(msg)
         ref: float = getattr(self, f"{quantity}_ref")
         return x * ref
 
