@@ -1,24 +1,26 @@
-PyPIC
+# pypic
 
-TODO: Description and example run commands.
+A Python toolkit for reading, analyzing, and plotting plasma simulation output.
 
-## Test Commands
+## What's implemented
 
-  # Full suite (pytest tests + doctests + smoke)
-  uv run pytest -v
+- **`coordinates`** — Coordinate geometry definitions (Cartesian, cylindrical, spherical) with scale factors and Jacobians
+- **`units`** — Normalization system, physical constants, and species info for converting between code and SI units
+- **`readers`** — Base reader infrastructure: `FieldDataset` (xarray wrapper), `GridInfo`, and `SimulationReader` ABC
 
-  # Just the unit tests file
-  uv run pytest tests/test_units.py -v
+## Planned
 
-  # Just the doctests from source
-  uv run pytest src/pypic/units.py --doctest-modules -v
+- **Derived quantities** — Pure-function physics computations (Alfven speed, plasma beta, current density, etc.)
+- **Diagnostics** — Energy budgets, conservation checks, spectral analysis
+- **Selections** — Region descriptors (`PlaneSelection`, `BoxSelection`) that slice `FieldDataset`
+- **Concrete readers** — One module per simulation code (FLEKS, OpenGGCM, etc.)
+- **Plotting** — matplotlib-based visualization utilities
 
-  # Linting + formatting
-  uv run ruff check src tests
-  uv run ruff format --check src tests
+## Dev commands
 
-  # Type checking
-  uv run mypy src
-
-  # All at once
-  uv run ruff check src tests && uv run ruff format --check src tests && uv run mypy src && uv run pytest -v
+```sh
+uv run pytest -v                      # full suite (tests + doctests)
+uv run ruff check src tests           # lint
+uv run ruff format --check src tests  # format check
+uv run mypy src                       # type check
+```
