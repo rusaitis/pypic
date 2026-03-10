@@ -1,0 +1,66 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "pypic"
+version = "0.1.0"
+description = "Read, analyze, and plot plasma simulation output."
+requires-python = ">=3.13"
+dependencies = [
+    "numpy>=2.0",
+    "scipy>=1.14",
+    "xarray>=2024.6",
+    "h5py>=3.11",
+]
+
+[project.optional-dependencies]
+plot = ["matplotlib>=3.9"]
+lazy = ["dask>=2024.6"]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.8",
+    "mypy>=1.13",
+    "mkdocs-material>=9.5",
+    "mkdocstrings[python]>=0.27",
+]
+
+[tool.ruff]
+line-length = 88
+target-version = "py313"
+
+[tool.ruff.lint]
+select = [
+    "E", "W", "F",   # pycodestyle + pyflakes
+    "I",              # isort
+    "N",              # pep8-naming
+    "UP",             # pyupgrade
+    "B",              # flake8-bugbear
+    "SIM",            # flake8-simplify
+    "TCH",            # flake8-type-checking
+    "RUF",            # ruff-specific
+    "D",              # pydocstyle
+    "ANN",            # flake8-annotations
+    "PT",             # flake8-pytest-style
+    "NPY",            # numpy-specific
+]
+ignore = [
+    "D100",  # missing module docstring
+    "D104",  # missing package docstring
+]
+
+[tool.ruff.lint.pydocstyle]
+convention = "numpy"
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["D", "ANN"]
+
+[tool.mypy]
+strict = true
+python_version = "3.13"
+
+[tool.pytest.ini_options]
+testpaths = ["tests", "src"]
+addopts = "--doctest-modules --strict-markers -ra"

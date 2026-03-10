@@ -102,6 +102,12 @@ CLAUDE.local.md
 .copilot/
 copilot-instructions.md
 
+# MkDocs
+site/
+
+# uv
+uv.lock
+
 # Output and data files
 *.h5
 *.hdf5
