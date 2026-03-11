@@ -94,7 +94,7 @@ Session.vim
 .nvimrc.lua
 
 # LLM config
-CLAUDE.md
+#CLAUDE.md
 CLAUDE.local.md
 .claude/
 .cursorrules
