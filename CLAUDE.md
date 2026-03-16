@@ -117,3 +117,8 @@ See @TASKS.md for current implementation plan and progress.
 ## SCHEMA
 
 See @SCHEMA.md for the artchitecture between three modern overlaping projects in development: a Python PIC/MHD analysis/basic visualization tool, a Three.js/WebGPU 3D visualizer/analyzer, and a RUST MHD/PIC simulation code.
+
+## Equations
+
+- See @docs/equations.md for detailed physics equation formulas to use.
+- See @docs/conventions.md for the physics and grid conventions.

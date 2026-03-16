@@ -6,5 +6,12 @@ from pypic.readers.base import (
     SimulationConfig,
     SimulationReader,
 )
+from pypic.readers.config import load_config
 
-__all__ = ["FieldDataset", "GridInfo", "SimulationConfig", "SimulationReader"]
+__all__ = [
+    "FieldDataset",
+    "GridInfo",
+    "SimulationConfig",
+    "SimulationReader",
+    "load_config",
+]
