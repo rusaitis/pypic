@@ -1,7 +1,6 @@
 # Project: pypic
 
-A Python toolkit for reading, analyzing, and plotting plasma simulation output.
-Write code that reads like it was written by a physicist who cares about software craft, not by an LLM.
+See @README.md for the project information.
 
 ## Architecture
 
@@ -107,7 +106,10 @@ uv run ruff format --check src tests  # format check
 uv run mypy src                       # type check
 ```
 
-## Commits
+## Progress
 
-When asked to commit, give a very concise message and explain why, not just what. End with "Assisted-by: Claude [model version]".
-See TASKS.md for current implementation plan and progress.
+See @TASKS.md for current implementation plan and progress.
+
+## SCHEMA
+
+See @SCHEMA.md for the artchitecture between three modern overlaping projects in development: a Python PIC/MHD analysis/basic visualization tool, a Three.js/WebGPU 3D visualizer/analyzer, and a RUST MHD/PIC simulation code.

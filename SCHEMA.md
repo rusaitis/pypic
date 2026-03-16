@@ -185,7 +185,7 @@ density = 1.0                      # optional: initial number density (code unit
 
 Each species must have either (`charge` + `mass`) or `charge_to_mass`.
 Relationship: $v_{th} = \sqrt{T/m}$ (see thermal speed convention in
-`docs/conventions.md`).
+@docs/conventions.md).
 
 ### [physics]
 
