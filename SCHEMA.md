@@ -245,6 +245,10 @@ iPIC3D input to this schema.
 All projects use the same field names. Readers are responsible for
 mapping simulation-code-specific names to these canonical names.
 
+For physics equations and SI conversions, see
+[docs/equations.md](docs/equations.md). For convention details, see
+[docs/conventions.md](docs/conventions.md).
+
 ### Dual naming convention
 
 Vector field components use **numbered indices** (`B1`, `B2`, `B3`) as
@@ -272,11 +276,11 @@ geometry-appropriate aliases (e.g., `Br` → `B1` for spherical). The
 
 ### Fluid / moment quantities — densities
 
-| Canonical | Meaning | Units (normalized) | Present in |
-|-----------|---------|-------------------|------------|
-| `n_s0`, `n_s1`, ... | Number density per species | $n / n_{ref}$ | PIC, multi-fluid MHD |
-| `rho_c` | Total charge density | $\sum_s n_s q_s$ | PIC |
-| `rho_m` | Total mass density | $\sum_s n_s m_s$ | MHD, PIC (derived) |
+| Canonical | Meaning | Present in |
+|-----------|---------|------------|
+| `n_s0`, `n_s1`, ... | Number density per species | PIC, multi-fluid MHD |
+| `rho_c` | Total charge density | PIC |
+| `rho_m` | Total mass density | MHD, PIC (derived) |
 
 `rho_c` and `rho_m` are unambiguous — no overloaded `rho`. For the common
 two-species case, `n_e` and `n_i` are accepted as aliases for `n_s0` and
@@ -290,80 +294,70 @@ two-species case, `n_e` and `n_i` are accepted as aliases for `n_s0` and
 
 | Canonical | Cartesian alias | Meaning | Present in |
 |-----------|----------------|---------|------------|
-| `J1`, `J2`, `J3` | `Jx`, `Jy`, `Jz` | Current density $\mathbf{J} = \sum_s n_s q_s \mathbf{V}_s$ | PIC (deposited), MHD (∇×B) |
-| `V1`, `V2`, `V3` | `Vx`, `Vy`, `Vz` | Ion bulk velocity (PIC: 1st moment of $f_i$) / fluid velocity (MHD) | PIC (moments), MHD |
-| `Ve1`, `Ve2`, `Ve3` | `Vex`, `Vey`, `Vez` | Electron bulk velocity (PIC: 1st moment of $f_e$) | PIC |
-| `P` | — | Total scalar pressure: MHD fluid pressure; PIC: $P_e + P_i$ | MHD, PIC (moments) |
-| `Pe` | — | Electron scalar pressure $P_e = n_e T_e$ | PIC, two-fluid MHD |
-| `Pi` | — | Ion scalar pressure $P_i = n_i T_i$ | PIC, two-fluid MHD |
-| `Te` | — | Electron temperature (energy units: $T_e = P_e / n_e$) | PIC, two-fluid MHD |
-| `Ti` | — | Ion temperature (energy units: $T_i = P_i / n_i$) | PIC, two-fluid MHD |
-
-**Temperature convention:** Temperatures are in **energy units** throughout
-($T = P/n$, not $T = P/(nk_B)$). To convert to Kelvin, divide by $k_B$.
+| `J1`, `J2`, `J3` | `Jx`, `Jy`, `Jz` | Current density | PIC (deposited), MHD (∇×B) |
+| `V1`, `V2`, `V3` | `Vx`, `Vy`, `Vz` | Ion bulk velocity / fluid velocity | PIC (moments), MHD |
+| `Ve1`, `Ve2`, `Ve3` | `Vex`, `Vey`, `Vez` | Electron bulk velocity | PIC |
+| `P` | — | Total scalar pressure | MHD, PIC (moments) |
+| `Pe` | — | Electron scalar pressure | PIC, two-fluid MHD |
+| `Pi` | — | Ion scalar pressure | PIC, two-fluid MHD |
+| `Te` | — | Electron temperature (energy units) | PIC, two-fluid MHD |
+| `Ti` | — | Ion temperature (energy units) | PIC, two-fluid MHD |
 
 ### Thermodynamic quantities
 
-| Canonical | Meaning | Definition | Present in |
-|-----------|---------|-----------|------------|
-| `h` | Specific enthalpy (ideal gas) | $h = \gamma P / ((\gamma - 1) \rho_m)$ | MHD |
-| `h_rel` | Relativistic specific enthalpy | $h = c^2 + \gamma P / ((\gamma - 1) \rho_m)$ (constant-$\Gamma$ approx.) | Rel. MHD |
-| `s` | Specific entropy (isotropic) | $s = \ln(P / \rho_m^\gamma)$ (MHD) or $\ln(P / n^\gamma)$ (PIC) | MHD, PIC |
-| `s_e` | Electron entropy | $s_e = \ln(P_e / n_e^\gamma)$ | PIC |
-| `s_i` | Ion entropy | $s_i = \ln(P_i / n_i^\gamma)$ | PIC |
-| `s_gyro` | Gyrotropic entropy | $s = \ln(P_\parallel P_\perp^2 / n^5)$ | PIC (anisotropic) |
-| `e_int` | Specific internal energy | $e_{int} = P / ((\gamma - 1) \rho_m)$ | MHD |
-| `gamma_eos` | Adiabatic index | $\gamma = c_p / c_v$ | MHD (from physics config) |
-
-PIC entropy uses $\gamma = 5/3$ (3D) by default. The gyrotropic exponent
-of 5 is independent of $\gamma$ — it comes from the CGL invariants.
-See `docs/conventions.md` for full derivation.
+| Canonical | Meaning | Present in |
+|-----------|---------|------------|
+| `h` | Specific enthalpy (ideal gas) | MHD |
+| `h_rel` | Relativistic specific enthalpy | Rel. MHD |
+| `s` | Specific entropy (isotropic) | MHD, PIC |
+| `s_e` | Electron entropy | PIC |
+| `s_i` | Ion entropy | PIC |
+| `s_gyro` | Gyrotropic entropy | PIC (anisotropic) |
+| `e_int` | Specific internal energy | MHD |
+| `gamma_eos` | Adiabatic index | MHD (from physics config) |
 
 ### Energy and flux quantities
 
 | Canonical | Cartesian alias | Meaning | Present in |
 |-----------|----------------|---------|------------|
-| `S1`, `S2`, `S3` | `Sx`, `Sy`, `Sz` | Poynting flux $\mathbf{S} = \mathbf{E} \times \mathbf{B} / \mu_0$ | PIC, MHD |
-| `e_B` | — | Magnetic energy density $B^2 / (2\mu_0)$ | PIC, MHD |
-| `e_E` | — | Electric energy density $\epsilon_0 E^2 / 2$ | PIC |
-| `e_k` | — | Kinetic energy density $\frac{1}{2}\rho_m V^2$ | MHD, PIC (moments) |
-| `e_th` | — | Thermal energy density $P / (\gamma - 1)$ | MHD, PIC (moments) |
+| `S1`, `S2`, `S3` | `Sx`, `Sy`, `Sz` | Poynting flux | PIC, MHD |
+| `e_B` | — | Magnetic energy density | PIC, MHD |
+| `e_E` | — | Electric energy density | PIC |
+| `e_k` | — | Kinetic energy density | MHD, PIC (moments) |
+| `e_th` | — | Thermal energy density | MHD, PIC (moments) |
 
 ### Pressure tensor (PIC, anisotropic)
 
 | Canonical | Meaning | Present in |
 |-----------|---------|------------|
-| `P_par` | Pressure parallel to B: $P_\parallel = \hat{b} \cdot \mathbf{P} \cdot \hat{b}$ | PIC (from tensor) |
-| `P_perp` | Pressure perpendicular to B: $P_\perp = (Tr(\mathbf{P}) - P_\parallel) / 2$ | PIC (from tensor) |
+| `P_par` | Pressure parallel to B | PIC (from tensor) |
+| `P_perp` | Pressure perpendicular to B | PIC (from tensor) |
 | `Pij` | Full pressure tensor (6 independent components: P11, P12, P13, P22, P23, P33) | PIC |
-| `agyrotropy` | Agyrotropy measure $Q$ (deviation from gyrotropic symmetry) | PIC (derived) |
+| `agyrotropy` | Agyrotropy measure (deviation from gyrotropic symmetry) | PIC (derived) |
 
 ### Characteristic scales (derived)
 
 | Canonical | Meaning | Computed from |
 |-----------|---------|---------------|
-| `d_e` | Electron skin depth $c/\omega_{pe}$ | `n_e`, species |
-| `d_i` | Ion skin depth $c/\omega_{pi}$ | `n_i`, species |
-| `r_e` | Electron thermal gyroradius $v_{th,e}/\omega_{ce}$ | `Te`, `|B|`, species |
-| `r_i` | Ion thermal gyroradius $v_{th,i}/\omega_{ci}$ | `Ti`, `|B|`, species |
-| `omega_pe` | Electron plasma frequency $\sqrt{n_e e^2 / (\epsilon_0 m_e)}$ | `n_e`, species |
-| `omega_pi` | Ion plasma frequency $\sqrt{n_i Z^2 e^2 / (\epsilon_0 m_i)}$ | `n_i`, species |
-| `omega_ce` | Electron cyclotron frequency $\|e\|B / m_e$ (positive by convention) | `|B|`, species |
-| `omega_ci` | Ion cyclotron frequency $ZeB / m_i$ (positive by convention) | `|B|`, species |
-| `lambda_D` | Electron Debye length $\sqrt{\epsilon_0 T_e / (n_e e^2)}$ | `n_e`, `Te`, species |
-| `v_A` | Alfvén speed $B/\sqrt{\mu_0 \rho_m}$ | `|B|`, `rho_m` |
-| `v_th_e` | Electron thermal speed $\sqrt{T_e / m_e}$ (NRL convention) | `Te`, species |
-| `v_th_i` | Ion thermal speed $\sqrt{T_i / m_i}$ (NRL convention) | `Ti`, species |
-| `c_s` | Sound speed $\sqrt{\gamma P / \rho_m}$ (MHD; differs from ion acoustic $c_{ia}$) | `P`, `rho_m`, `gamma_eos` |
-| `v_ms` | Fast magnetosonic speed $\sqrt{v_A^2 + c_s^2}$ (perpendicular propagation) | `v_A`, `c_s` |
-| `M_A` | Alfvén Mach number $V / v_A$ | `|V|`, `v_A` |
-| `M_ms` | Magnetosonic Mach number $V / v_{ms}$ | `|V|`, `v_ms` |
-| `beta` | Plasma beta $2\mu_0 P / B^2$ | `P`, `|B|` |
-| `beta_e` | Electron beta $2\mu_0 P_e / B^2$ | `Pe`, `|B|` |
-| `beta_i` | Ion beta $2\mu_0 P_i / B^2$ | `Pi`, `|B|` |
-
-Convention details (thermal speed, cyclotron frequency, sound speed vs
-ion acoustic speed, magnetosonic dispersion) are in `docs/conventions.md`.
+| `d_e` | Electron skin depth | `n_e`, species |
+| `d_i` | Ion skin depth | `n_i`, species |
+| `r_e` | Electron thermal gyroradius | `Te`, `|B|`, species |
+| `r_i` | Ion thermal gyroradius | `Ti`, `|B|`, species |
+| `omega_pe` | Electron plasma frequency | `n_e`, species |
+| `omega_pi` | Ion plasma frequency | `n_i`, species |
+| `omega_ce` | Electron cyclotron frequency (positive by convention) | `|B|`, species |
+| `omega_ci` | Ion cyclotron frequency (positive by convention) | `|B|`, species |
+| `lambda_D` | Electron Debye length | `n_e`, `Te`, species |
+| `v_A` | Alfvén speed | `|B|`, `rho_m` |
+| `v_th_e` | Electron thermal speed (NRL convention) | `Te`, species |
+| `v_th_i` | Ion thermal speed (NRL convention) | `Ti`, species |
+| `c_s` | Sound speed (MHD) | `P`, `rho_m`, `gamma_eos` |
+| `v_ms` | Fast magnetosonic speed (perpendicular propagation) | `v_A`, `c_s` |
+| `M_A` | Alfvén Mach number | `|V|`, `v_A` |
+| `M_ms` | Magnetosonic Mach number | `|V|`, `v_ms` |
+| `beta` | Plasma beta | `P`, `|B|` |
+| `beta_e` | Electron beta | `Pe`, `|B|` |
+| `beta_i` | Ion beta | `Pi`, `|B|` |
 
 ### Other derived quantities
 
@@ -374,14 +368,10 @@ ion acoustic speed, magnetosonic dispersion) are in `docs/conventions.md`.
 | `\|J\|` | — | Current density magnitude | J1, J2, J3 |
 | `\|V\|` | — | Bulk velocity magnitude | V1, V2, V3 |
 | `div_B` | — | Divergence of B (should be ~0) | B1, B2, B3, grid |
-| `div_E` | — | Divergence of E ($= \rho_c / \epsilon_0$ by Gauss's law) | E1, E2, E3, grid |
-| `curl_B1`, `curl_B2`, `curl_B3` | `curl_Bx`, ... | Curl of B ($\propto \mathbf{J}$ in MHD) | B1, B2, B3, grid |
-| `vort1`, `vort2`, `vort3` | `vort_x`, ... | Fluid vorticity $(\nabla \times \mathbf{V})$ | V1, V2, V3, grid |
+| `div_E` | — | Divergence of E | E1, E2, E3, grid |
+| `curl_B1`, `curl_B2`, `curl_B3` | `curl_Bx`, ... | Curl of B | B1, B2, B3, grid |
+| `vort1`, `vort2`, `vort3` | `vort_x`, ... | Fluid vorticity | V1, V2, V3, grid |
 | `\|vort\|` | — | Vorticity magnitude | vort1, vort2, vort3 |
-
-Derived quantities are computed on demand in normalized (code) units —
-physical constants vanish ($\mu_0 = 1$, $\epsilon_0 = 1$ in PIC). SI
-conversion happens only at the output/visualization boundary.
 
 Scalar quantities (`n_s0`, `rho_m`, `P`, `Te`, `beta`, ...) use the same
 name regardless of geometry.

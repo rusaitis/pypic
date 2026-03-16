@@ -1,7 +1,8 @@
 # Physics Conventions
 
 Detailed physics conventions for derived quantities in pypic.
-These notes supplement the canonical field name tables in SCHEMA.md.
+These notes supplement the equation tables in [equations.md](equations.md)
+and the field name tables in [SCHEMA.md](../SCHEMA.md).
 When TASKS.md Steps 7-8 are implemented, the relevant sections
 will migrate into function docstrings in `derived.py`.
 
@@ -76,3 +77,29 @@ from the ion acoustic speed
 $c_{ia} = \sqrt{(T_e + \gamma_i T_i) / m_i}$ commonly used in kinetic
 theory (where $\gamma_e = 1$ for isothermal electrons, $\gamma_i = 3$
 for 1D adiabatic ions).
+
+## Gaussian vs SI-Rationalized Normalization
+
+Some PIC codes (notably iPIC3D) use **Gaussian CGS** normalization where
+Maxwell's equations carry explicit $4\pi$ factors: $\nabla \cdot \mathbf{E}
+= 4\pi\rho_c$, energy density $= B^2/(8\pi)$, Poynting flux $\propto
+\mathbf{E} \times \mathbf{B} / (4\pi)$. pypic's canonical form uses
+**SI-rationalized** normalization ($\mu_0 = \epsilon_0 = 1$, no $4\pi$):
+$\nabla \cdot \mathbf{E} = \rho_c$, energy density $= B^2/2$. The physics
+is identical — dimensionless quantities (beta, Mach numbers, entropy) are
+the same in both systems. We chose SI-rationalized as canonical because
+it eliminates $4\pi$ from every derived quantity ($B^2/2$ not $B^2/(8\pi)$,
+$\mathbf{E} \times \mathbf{B}$ not $\mathbf{E} \times \mathbf{B}/(4\pi)$),
+keeping the pure-function physics code free of bookkeeping constants.
+The conversion happens once in the reader. Key mapping: Gaussian
+density $\rho_G = \rho/(4\pi)$, Gaussian energy $B^2/(8\pi) \to B^2/2$.
+
+## Node-Centered Grid Convention
+
+iPIC3D outputs all fields on **nodes** (cell vertices), not cell centers.
+Domain boundaries $[0, L_x]$ are node positions; cell centers sit at
+half-grid offsets ($dx/2$, $3dx/2$, ...). The output array shape is
+$(N_{xc}+1) \times (N_{yc}+1) \times (N_{zc}+1)$ where $N_{xc}$ is the
+number of cells along each axis. No coordinate arrays are stored in the
+HDF5 files — the reader reconstructs node coordinates from the grid
+origin, spacing, and dimensions.

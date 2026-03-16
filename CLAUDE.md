@@ -77,6 +77,10 @@ def alfven_speed(b: NDArray, rho_m: NDArray) -> NDArray:
 
 Docs built with MkDocs Material + mkdocstrings.
 
+## Markdown
+
+- No `---` horizontal rules between sections — headings provide enough separation.
+
 ## Testing
 
 - One assert per test where practical. Descriptive test names.
