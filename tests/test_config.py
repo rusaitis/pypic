@@ -11,7 +11,7 @@ from scipy import constants
 from pypic.readers.config import load_config
 
 EXAMPLE_TOML = (
-    Path(__file__).resolve().parent.parent / "examples" / "ipic3d_double_harris.toml"
+    Path(__file__).resolve().parent.parent / "examples" / "ipic3d-double-harris.toml"
 )
 
 

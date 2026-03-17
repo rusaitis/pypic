@@ -113,3 +113,4 @@ uv.lock
 *.hdf5
 *.dat
 *.log
+examples/iPIC3D*

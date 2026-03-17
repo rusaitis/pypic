@@ -48,11 +48,11 @@ Each step produces something testable. No step starts until the previous step's 
 
 ## Phase 3: Integration
 
-- [ ] **Step 11: selections — PlaneSelection and BoxSelection**
+- [x] **Step 11: selections — PlaneSelection and BoxSelection**
   Frozen dataclasses with `apply(data) -> FieldDataset`. `PlaneSelection` (normal, index; `None` = midplane). `BoxSelection` (optional index ranges per axis).
 
-- [ ] **Step 12: readers/ipic3d — iPIC3D HDF5 reader**
-  `IPic3DReader` implementing `SimulationReader`. Maps iPIC3D names to canonical (Bx -> B1, etc.), constructs `GridInfo`/`Normalization`/`SpeciesInfo` from settings. Synthetic HDF5 fixtures for tests.
+- [x] **Step 12: readers/ipic3d — iPIC3D HDF5 reader**
+  `IPic3DParallelReader` (phdf5), `IPic3DSerialReader` (shdf5), and `IPic3DH5hutReader` (H5hut) implementing `SimulationReader`. Parses native `.inp` and `settings.hdf` configs, maps iPIC3D names to canonical (Bx -> B1), applies 4π Gaussian→SI-rationalized correction for phdf5/shdf5 (H5hut is already SI-rationalized), node-centered grid origin trick. H5hut reader handles ZYX→XYZ transpose, float32→float64 promotion, pressure tensor sign correction, and per-species fields. `ConservedQuantities` parser for both single-file (Format A) and multi-restart (Format B) diagnostics. `open_ipic3d()` auto-detects all three formats. Tested against real example data (2D, 3D, serial, h5hut) with cross-format validation.
 
 - [ ] **Step 13: FieldDataset — compute() and in_units()**
   `compute(name)` dispatches string to derived function ("|B|", "beta", "v_A", "M_A", "|vort|", "vort1"/"vort2"/"vort3", ...). `in_si(field)` for SI conversion. `in_units(field, unit_str)` for display units ("nT", "km/s").
@@ -106,8 +106,8 @@ Each step produces something testable. No step starts until the previous step's 
 | 8 | derived | omega_pe, d_i, r_i, lambda_D, v_th, c_s | ✅ |
 | 9 | diagnostics | L2 error, div B, field energy | ✅ |
 | 10 | coordinates | curl, div, grad (Cartesian) | ✅ |
-| 11 | selections | Plane, Box | — |
-| 12 | readers | iPIC3D HDF5 reader | — |
+| 11 | selections | Plane, Box | ✅ |
+| 12 | readers | iPIC3D HDF5 reader (phdf5, shdf5, h5hut) + ConservedQuantities | ✅ |
 | 13 | fields | compute(), in_units() | — |
 | 14 | plotting | 2D slices, comparison | — |
 | **—** | **—** | **Milestone: daily-use tool** | **—** |
