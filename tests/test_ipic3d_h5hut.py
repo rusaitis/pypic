@@ -71,6 +71,10 @@ class TestH5hutReader:
     def ds(self, reader):
         return reader.read_timestep(EXAMPLE_H5HUT, 202500)
 
+    @pytest.fixture(scope="class")
+    def ds_cycle0(self, reader):
+        return reader.read_timestep(EXAMPLE_H5HUT, 0)
+
     def test_available_timesteps(self, reader):
         steps = reader.available_timesteps(EXAMPLE_H5HUT)
         assert 202500 in steps
@@ -120,10 +124,34 @@ class TestH5hutReader:
     def test_divb_present(self, ds):
         assert ds.has_field("div_B")
 
-    def test_no_4pi_applied(self, ds):
+    def test_rho_no_4pi_applied(self, ds):
         # rho_c_s1 (ions) mean should be ~1.14, not 14.3 (which is 1.14*4π)
         mean_rho_ion = np.mean(ds["rho_c_s1"])
         assert_allclose(mean_rho_ion, 1.14, atol=0.05)
+
+    def test_electron_density_matches_rho_init(self, ds_cycle0):
+        # rhoINIT = 1.0 for electrons; cycle 0 should be close
+        mean_rho_e = np.mean(np.abs(ds_cycle0["rho_c_s0"]))
+        assert_allclose(mean_rho_e, 1.0, atol=0.1)
+
+    def test_pressure_consistent_with_init(self, ds_cycle0):
+        # After 4π correction, |Pxx_0/rho_0| ≈ vth_e² = 0.0225² = 5.06e-4
+        # Without correction it would be vth_e²/(4π) ≈ 4.0e-5
+        pxx = ds_cycle0["P11_s0"]
+        rho = ds_cycle0["rho_c_s0"]
+        measured_vx2 = np.mean(np.abs(pxx / rho))
+        vth_e_squared = 0.0225**2
+        # Ratio should be ~1.0 (not ~0.08 = 1/(4π))
+        ratio = measured_vx2 / vth_e_squared
+        assert ratio > 0.5, f"Pressure too low: {ratio:.3f}"
+        assert ratio < 3.0, f"Pressure too high: {ratio:.3f}"
+
+    def test_cycle0_has_fewer_fields(self, ds_cycle0):
+        # Cycle 0 has 30 fields (no N_s, EFx_s, divB, Qrem_s)
+        # but reader should still load available fields without error
+        assert ds_cycle0.has_field("B1")
+        assert ds_cycle0.has_field("rho_c_s0")
+        assert ds_cycle0.has_field("P11_s0")
 
 
 class TestOpenIpic3dH5hut:

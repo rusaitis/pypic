@@ -128,6 +128,31 @@ def per_species_pressure_canonical(component: str, species_index: int) -> str:
     return f"{canonical}_s{species_index}"
 
 
+def gaussian_pressure_to_si(p: FloatArray) -> FloatArray:
+    r"""Convert iPIC3D Gaussian pressure tensor to SI-rationalized.
+
+    iPIC3D stores $P_{stored} = P / (4\pi)$. Multiply by $4\pi$
+    to recover the SI-rationalized value.
+
+    Parameters
+    ----------
+    p : FloatArray
+        Pressure tensor component in iPIC3D Gaussian normalization.
+
+    Returns
+    -------
+    FloatArray
+        Pressure in SI-rationalized normalization.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> gaussian_pressure_to_si(np.array([1.0 / (4.0 * 3.141592653589793)]))
+    array([1.])
+    """
+    return p * FOUR_PI
+
+
 def gaussian_density_to_si(rho: FloatArray) -> FloatArray:
     r"""Convert iPIC3D Gaussian charge density to SI-rationalized.
 

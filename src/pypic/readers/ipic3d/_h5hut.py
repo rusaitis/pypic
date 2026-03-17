@@ -16,6 +16,7 @@ from pypic.readers.ipic3d._field_map import (
     _H5HUT_FIELD_MAP,
     _MOMENT_COMPONENT_MAP,
     _PRESSURE_COMPONENT_MAP,
+    gaussian_pressure_to_si,
     per_species_canonical,
     per_species_pressure_canonical,
 )
@@ -46,8 +47,10 @@ class IPic3DH5hutReader:
     named ``{SimulationName}-Fields_{cycle:06d}.h5``. Arrays are stored
     in ZYX order (``(nzc+1, nyc+1, nxc+1)``) and must be transposed.
 
-    Unlike phdf5/shdf5 formats, H5hut writes SI-rationalized values —
-    no 4π correction is needed.
+    H5hut stores densities and currents in SI-rationalized form (no 4π
+    correction needed), but the **pressure tensor** is stored divided by
+    4π (Gaussian convention). The reader applies the 4π correction to
+    pressure components only.
 
     Parameters
     ----------
@@ -109,8 +112,8 @@ class IPic3DH5hutReader:
         Returns
         -------
         FieldDataset
-            Field data with canonical names. No 4π correction applied
-            (H5hut is already SI-rationalized).
+            Field data with canonical names. Pressure tensor corrected
+            by 4π; densities and currents are already SI-rationalized.
         """
         fields_file = self._find_fields_file(path, step)
         fields: dict[str, FloatArray] = {}
@@ -160,6 +163,8 @@ class IPic3DH5hutReader:
                             and self._config.qom[s] < 0
                         ):
                             data = -data
+                        # Pressure tensor stored as P/(4π) — Gaussian convention
+                        data = gaussian_pressure_to_si(data)
                         fields[canon] = data
 
         # Compute totals by summing over species
