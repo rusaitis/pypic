@@ -20,17 +20,18 @@ See @README.md for the project information.
 - **Python 3.13+** — enables `copy.replace()` for frozen dataclasses, `type` statement (PEP 695), improved error messages.
 - **Tooling:** ruff (check + format, line length 88), uv, pytest with `--doctest-modules`, mypy strict.
 - **Type hints:** Required on public signatures. Modern syntax: `X | None`, `list[int]`, `tuple[float, ...]`.
-- **Type aliases:** `type Vector3 = tuple[float, float, float]` (PEP 695), not `TypeAlias`.
+- **Type aliases:** PEP 695 `type` statements, not `TypeAlias`. `FloatArray` for array signatures, `Vector3` for 3-tuples. Defined in `pypic/types.py`.
 - **Dataclasses:** `@dataclass(frozen=True, slots=True)` for immutable data. `copy.replace()` for modified copies.
-- **Thread safety:** Prefer immutable data (frozen dataclasses, tuples, frozensets) and pure functions. No shared mutable state across threads. Use `concurrent.futures` for parallelism, locks only for unavoidable mutations.
+- **Thread safety:** Prefer immutable data (frozen dataclasses, tuples, frozensets) and pure functions. No shared mutable state across threads. Expose internal dicts as `MappingProxyType` via properties. Use `concurrent.futures` for parallelism, locks only for unavoidable mutations.
 - **Enums:** `StrEnum` for string enumerations.
-- **Pattern matching:** `match/case` where it improves readability over if/elif chains.
+- **Pattern matching:** `match/case` where it improves readability over if/elif chains. After exhaustive enum matches, use `case _ as unreachable: assert_never(unreachable)` — not `raise ValueError`.
 - **Exception groups:** `ExceptionGroup` when a reader encounters multiple validation errors.
 - **Type alias imports:** Import from `pypic.types` inside `if TYPE_CHECKING:` blocks.
 - **Paths:** `pathlib.Path`, never `os.path`.
 - **TOML:** `tomllib` (stdlib), not `toml` or `tomli`.
 - **Scalars vs arrays:** `math` for scalar constants (`math.inf`, `math.isfinite`). `numpy` for array operations.
 - **Diagnostics:** No `print()` — use `logging` or return values.
+- **mypy + NumPy:** Some NumPy ufunc returns need `# type: ignore[no-any-return]` even with `FloatArray` (mixed scalar/array arithmetic). Don't add these preemptively — let mypy tell you which are needed.
 
 ## Naming
 
@@ -47,7 +48,7 @@ NumPy-style with `r"""` raw strings (for LaTeX). `$...$` inline, `$$...$$` displ
 Required sections: one-line summary, LaTeX equation (if applicable), Parameters, Returns, Examples (runnable doctest).
 
 ```python
-def alfven_speed(b: NDArray, rho_m: NDArray) -> NDArray:
+def alfven_speed(b: FloatArray, rho_m: FloatArray) -> FloatArray:
     r"""Compute the Alfvén speed.
 
     $$v_A = \frac{B}{\sqrt{\mu_0 \rho_m}}$$

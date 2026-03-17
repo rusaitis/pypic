@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import copy
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
+from types import MappingProxyType
+from typing import TYPE_CHECKING, Any, Protocol, assert_never, runtime_checkable
 
 import numpy as np
 import xarray as xr
@@ -19,10 +20,10 @@ from pypic.coordinates.geometry import (
 )
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
     from pathlib import Path
 
-    from numpy.typing import NDArray
-
+    from pypic.types import FloatArray
     from pypic.units import Normalization, SpeciesInfo
 
 
@@ -83,12 +84,12 @@ class GridInfo:
             )
             raise ValueError(msg)
 
-    def coordinate_arrays(self) -> tuple[NDArray[np.floating[Any]], ...]:
+    def coordinate_arrays(self) -> tuple[FloatArray, ...]:
         r"""Cell-centered coordinate arrays for each axis.
 
         Returns
         -------
-        tuple[NDArray[np.floating[Any]], ...]
+        tuple[FloatArray, ...]
             One 1-D array per axis: ``origin[i] + (arange(n) + 0.5) * dx[i]``.
 
         Examples
@@ -109,50 +110,29 @@ class GridInfo:
         )
 
 
-_CARTESIAN_ALIASES: dict[str, str] = {
-    "Bx": "B1",
-    "By": "B2",
-    "Bz": "B3",
-    "Ex": "E1",
-    "Ey": "E2",
-    "Ez": "E3",
-    "Jx": "J1",
-    "Jy": "J2",
-    "Jz": "J3",
-    "vx": "v1",
-    "vy": "v2",
-    "vz": "v3",
-}
+_FIELD_PREFIX_PAIRS = (
+    ("B", "B"),
+    ("E", "E"),
+    ("J", "J"),
+    ("V", "V"),
+    ("v", "V"),
+    ("Ve", "Ve"),
+    ("S", "S"),
+)
 
-_SPHERICAL_ALIASES: dict[str, str] = {
-    "Br": "B1",
-    "Btheta": "B2",
-    "Bphi": "B3",
-    "Er": "E1",
-    "Etheta": "E2",
-    "Ephi": "E3",
-    "Jr": "J1",
-    "Jtheta": "J2",
-    "Jphi": "J3",
-    "vr": "v1",
-    "vtheta": "v2",
-    "vphi": "v3",
-}
 
-_CYLINDRICAL_ALIASES: dict[str, str] = {
-    "Br": "B1",
-    "Bphi": "B2",
-    "Bz": "B3",
-    "Er": "E1",
-    "Ephi": "E2",
-    "Ez": "E3",
-    "Jr": "J1",
-    "Jphi": "J2",
-    "Jz": "J3",
-    "vr": "v1",
-    "vphi": "v2",
-    "vz": "v3",
-}
+def _build_aliases(suffixes: tuple[str, str, str]) -> dict[str, str]:
+    """Generate field name aliases for a coordinate system."""
+    aliases: dict[str, str] = {}
+    for alias_prefix, canonical_prefix in _FIELD_PREFIX_PAIRS:
+        for i, suffix in enumerate(suffixes, 1):
+            aliases[f"{alias_prefix}{suffix}"] = f"{canonical_prefix}{i}"
+    return aliases
+
+
+_CARTESIAN_ALIASES = _build_aliases(("x", "y", "z"))
+_SPHERICAL_ALIASES = _build_aliases(("r", "theta", "phi"))
+_CYLINDRICAL_ALIASES = _build_aliases(("r", "phi", "z"))
 
 
 def _default_aliases(geometry: CoordinateGeometry) -> dict[str, str]:
@@ -164,8 +144,8 @@ def _default_aliases(geometry: CoordinateGeometry) -> dict[str, str]:
             return dict(_SPHERICAL_ALIASES)
         case GeometryType.CYLINDRICAL:
             return dict(_CYLINDRICAL_ALIASES)
-        case _:
-            return {}
+        case _ as unreachable:
+            assert_never(unreachable)
 
 
 def _build_grid_from_dataset(old_grid: GridInfo, new_ds: xr.Dataset) -> GridInfo:
@@ -209,7 +189,7 @@ class FieldDataset:
         Grid metadata.
     normalization : Normalization
         Unit normalization for this data.
-    species : list[SpeciesInfo] | None
+    species : Sequence[SpeciesInfo] | None
         Species definitions, if applicable.
     physics : dict[str, Any] | None
         Physics parameters (e.g. resistivity, viscosity).
@@ -240,7 +220,7 @@ class FieldDataset:
         grid: GridInfo,
         normalization: Normalization,
         *,
-        species: list[SpeciesInfo] | None = None,
+        species: Sequence[SpeciesInfo] | None = None,
         physics: dict[str, Any] | None = None,
         metadata: dict[str, Any] | None = None,
         aliases: dict[str, str] | None = None,
@@ -248,7 +228,7 @@ class FieldDataset:
         self._ds = dataset
         self._grid = grid
         self._normalization = normalization
-        self._species = species if species is not None else []
+        self._species = tuple(species) if species is not None else ()
         self._physics = physics if physics is not None else {}
         self._metadata = metadata if metadata is not None else {}
 
@@ -261,11 +241,11 @@ class FieldDataset:
     @classmethod
     def from_arrays(
         cls,
-        fields: dict[str, NDArray[np.floating[Any]]],
+        fields: dict[str, FloatArray],
         grid: GridInfo,
         normalization: Normalization,
         *,
-        species: list[SpeciesInfo] | None = None,
+        species: Sequence[SpeciesInfo] | None = None,
         physics: dict[str, Any] | None = None,
         metadata: dict[str, Any] | None = None,
         aliases: dict[str, str] | None = None,
@@ -274,14 +254,14 @@ class FieldDataset:
 
         Parameters
         ----------
-        fields : dict[str, NDArray]
+        fields : dict[str, FloatArray]
             Mapping of field names to arrays. Shapes must match
             ``grid.dimensions``.
         grid : GridInfo
             Grid metadata.
         normalization : Normalization
             Unit normalization.
-        species : list[SpeciesInfo] | None
+        species : Sequence[SpeciesInfo] | None
             Species definitions, if applicable.
         physics : dict[str, Any] | None
             Physics parameters.
@@ -338,24 +318,24 @@ class FieldDataset:
         return self._normalization
 
     @property
-    def species(self) -> list[SpeciesInfo]:
+    def species(self) -> tuple[SpeciesInfo, ...]:
         """Species definitions."""
         return self._species
 
     @property
-    def physics(self) -> dict[str, Any]:
-        """Physics parameters."""
-        return self._physics
+    def physics(self) -> MappingProxyType[str, Any]:
+        """Physics parameters (read-only view)."""
+        return MappingProxyType(self._physics)
 
     @property
-    def metadata(self) -> dict[str, Any]:
-        """Arbitrary metadata."""
-        return self._metadata
+    def metadata(self) -> MappingProxyType[str, Any]:
+        """Arbitrary metadata (read-only view)."""
+        return MappingProxyType(self._metadata)
 
     @property
-    def aliases(self) -> dict[str, str]:
-        """Active field-name aliases."""
-        return self._aliases
+    def aliases(self) -> MappingProxyType[str, str]:
+        """Active field-name aliases (read-only view)."""
+        return MappingProxyType(self._aliases)
 
     @property
     def xr(self) -> xr.Dataset:
@@ -387,7 +367,7 @@ class FieldDataset:
         msg = f"Field {key!r} not found. Available: {available}. Aliases: {alias_keys}."
         raise KeyError(msg)
 
-    def __getitem__(self, key: str) -> NDArray[np.floating[Any]]:
+    def __getitem__(self, key: str) -> FloatArray:
         """Return field data as a NumPy array (zero-copy when possible).
 
         Parameters

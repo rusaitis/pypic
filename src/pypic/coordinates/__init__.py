@@ -1,4 +1,4 @@
-"""Coordinate geometry definitions."""
+"""Coordinate geometry definitions and discrete differential operators."""
 
 from pypic.coordinates.geometry import (
     CARTESIAN,
@@ -7,6 +7,7 @@ from pypic.coordinates.geometry import (
     CoordinateGeometry,
     GeometryType,
 )
+from pypic.coordinates.operators import curl, divergence, gradient
 
 __all__ = [
     "CARTESIAN",
@@ -14,4 +15,7 @@ __all__ = [
     "SPHERICAL",
     "CoordinateGeometry",
     "GeometryType",
+    "curl",
+    "divergence",
+    "gradient",
 ]

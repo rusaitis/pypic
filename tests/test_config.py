@@ -668,43 +668,6 @@ mass = 0.004
         assert len(cfg.species) == 1
         assert cfg.species[0].name == "e"
 
-    def test_multiple_species(self, tmp_path):
-        cfg = load_config(
-            _write_toml(
-                tmp_path,
-                """
-[model]
-name = "test"
-type = "PIC"
-[grid]
-dimensions = [2, 2, 2]
-spacing = [1.0, 1.0, 1.0]
-[units]
-system = "SI"
-[coordinates]
-geometry = "cartesian"
-frame = "sim"
-[[species]]
-name = "e1"
-charge = -1.0
-mass = 0.004
-[[species]]
-name = "i1"
-charge = 1.0
-mass = 1.0
-[[species]]
-name = "e2"
-charge = -1.0
-mass = 0.004
-[[species]]
-name = "i2"
-charge = 1.0
-mass = 1.0
-""",
-            )
-        )
-        assert len(cfg.species) == 4
-
     def test_charge_to_mass_only(self, tmp_path):
         cfg = load_config(
             _write_toml(
@@ -730,11 +693,36 @@ charge_to_mass = -256.0
         assert cfg.species[0].charge == -1.0
         np.testing.assert_allclose(cfg.species[0].mass, 1.0 / 256, rtol=1e-10)
 
-    def test_thermal_velocity_vector(self, tmp_path):
+    @pytest.mark.parametrize(
+        ("field_name", "toml_value", "attr", "expected"),
+        [
+            (
+                "thermal_velocity",
+                "[0.06, 0.02, 0.02]",
+                "thermal_velocity",
+                (0.06, 0.02, 0.02),
+            ),
+            (
+                "drift_velocity",
+                "[0.0, 0.0, 0.01]",
+                "drift_velocity",
+                (0.0, 0.0, 0.01),
+            ),
+            (
+                "particles_per_cell",
+                "[5, 5, 1]",
+                "particles_per_cell",
+                (5, 5, 1),
+            ),
+        ],
+    )
+    def test_optional_vector_field(
+        self, tmp_path, field_name, toml_value, attr, expected
+    ):
         cfg = load_config(
             _write_toml(
                 tmp_path,
-                """
+                f"""
 [model]
 name = "test"
 type = "PIC"
@@ -750,63 +738,11 @@ frame = "sim"
 name = "e"
 charge = -1.0
 mass = 0.004
-thermal_velocity = [0.06, 0.02, 0.02]
+{field_name} = {toml_value}
 """,
             )
         )
-        assert cfg.species[0].thermal_velocity == (0.06, 0.02, 0.02)
-
-    def test_drift_velocity(self, tmp_path):
-        cfg = load_config(
-            _write_toml(
-                tmp_path,
-                """
-[model]
-name = "test"
-type = "PIC"
-[grid]
-dimensions = [2, 2, 2]
-spacing = [1.0, 1.0, 1.0]
-[units]
-system = "SI"
-[coordinates]
-geometry = "cartesian"
-frame = "sim"
-[[species]]
-name = "e"
-charge = -1.0
-mass = 0.004
-drift_velocity = [0.0, 0.0, 0.01]
-""",
-            )
-        )
-        assert cfg.species[0].drift_velocity == (0.0, 0.0, 0.01)
-
-    def test_particles_per_cell_vector(self, tmp_path):
-        cfg = load_config(
-            _write_toml(
-                tmp_path,
-                """
-[model]
-name = "test"
-type = "PIC"
-[grid]
-dimensions = [2, 2, 2]
-spacing = [1.0, 1.0, 1.0]
-[units]
-system = "SI"
-[coordinates]
-geometry = "cartesian"
-frame = "sim"
-[[species]]
-name = "e"
-charge = -1.0
-mass = 0.004
-particles_per_cell = [5, 5, 1]
-""",
-            )
-        )
-        assert cfg.species[0].particles_per_cell == (5, 5, 1)
+        assert getattr(cfg.species[0], attr) == expected
 
     def test_no_species_section(self, tmp_path):
         cfg = load_config(

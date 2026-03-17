@@ -94,6 +94,47 @@ keeping the pure-function physics code free of bookkeeping constants.
 The conversion happens once in the reader. Key mapping: Gaussian
 density $\rho_G = \rho/(4\pi)$, Gaussian energy $B^2/(8\pi) \to B^2/2$.
 
+## Error Norms and Divergence
+
+### L2 norm: discrete, unweighted
+
+The relative L2 error $\varepsilon_{L_2} = \|\mathbf{a} - \mathbf{b}\|_2
+/ \|\mathbf{b}\|_2$ uses discrete sums without volume weighting. When
+computed and reference fields live on the same grid, $\Delta V$ appears
+identically in numerator and denominator and cancels. This matches the
+standard convention in convergence studies (LeVeque, *Finite Difference
+Methods for Ordinary and Partial Differential Equations*). Returns
+`inf` when the reference field is identically zero.
+
+### L-infinity norm: absolute, not relative
+
+$\varepsilon_{L_\infty} = \max |a_i - b_i|$ is absolute. A relative
+L∞ norm ($\max |a_i - b_i| / |b_i|$) is misleading near field nulls
+where $|b_i| \to 0$, which is common in reconnection regions and
+current sheets.
+
+### Field energy as volume integral
+
+`field_energy` computes $\sum f_{ijk} \cdot \Delta V$ (a volume
+integral), not $\sum f_{ijk}^2 \cdot \Delta V$ (an L2 norm squared).
+Pass an energy density field to get total energy, or a mass density to
+get total mass.
+
+### Boundary treatment for finite differences
+
+Divergence uses `np.gradient`, which applies second-order central
+differences in the interior and second-order one-sided (forward/backward)
+stencils at the first and last grid points. This is *not* periodic
+wrapping — periodic domains should pad ghost cells before calling
+the diagnostic functions.
+
+### Node-centered stencil
+
+All fields sit on the same node-centered grid (no stagger). The
+divergence stencil operates on co-located field components, consistent
+with the iPIC3D output convention (see Node-Centered Grid Convention
+below).
+
 ## Node-Centered Grid Convention
 
 iPIC3D outputs all fields on **nodes** (cell vertices), not cell centers.

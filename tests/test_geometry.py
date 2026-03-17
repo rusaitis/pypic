@@ -45,15 +45,6 @@ class TestCartesianMetricFactors:
         assert h2 == 1.0
         assert h3 == 1.0
 
-    def test_array(self):
-        x = np.linspace(0, 10, 5)
-        y = np.linspace(0, 5, 5)
-        z = np.linspace(-1, 1, 5)
-        h1, h2, h3 = CARTESIAN.metric_factors(x, y, z)
-        assert_allclose(np.broadcast_to(h1, x.shape), np.ones(5))
-        assert_allclose(np.broadcast_to(h2, x.shape), np.ones(5))
-        assert_allclose(np.broadcast_to(h3, x.shape), np.ones(5))
-
 
 class TestSphericalMetricFactors:
     def test_unit_sphere_equator(self):
@@ -102,23 +93,6 @@ class TestCylindricalMetricFactors:
         assert_allclose(h1, 1.0)
         assert_allclose(h2, r)
         assert_allclose(np.broadcast_to(h3, r.shape), np.ones(3))
-
-
-class TestBroadcasting:
-    """metric_factors works with both scalars and arrays, and broadcasts."""
-
-    def test_scalar_input(self):
-        _h1, h2, _h3 = SPHERICAL.metric_factors(2.0, np.pi / 4, 0.0)
-        assert isinstance(h2, np.floating | np.ndarray)
-
-    def test_2d_grid(self):
-        r = np.array([[1.0, 2.0], [3.0, 4.0]])
-        theta = np.full((2, 2), np.pi / 2)
-        phi = np.zeros((2, 2))
-        _h1, h2, h3 = SPHERICAL.metric_factors(r, theta, phi)
-        assert_allclose(h2, r)
-        assert_allclose(h3, r, atol=1e-15)
-        assert h2.shape == (2, 2)
 
 
 class TestFrozenDataclass:

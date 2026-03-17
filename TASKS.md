@@ -33,15 +33,15 @@ Each step produces something testable. No step starts until the previous step's 
   `load_config(path) -> SimulationConfig` via `tomllib`. Parses all SCHEMA.md sections: `[model]` -> name/type, `[grid]` -> `GridInfo`, `[units]` -> `Normalization`, `[coordinates]` -> `CoordinateGeometry` + frame, `[[species]]` -> `list[SpeciesInfo]`, `[physics]` -> dict. Optional: `[initial_conditions]`, `[output]` -> metadata.
 
 - [x] **Step 7: derived (part 1) — field-level quantities**
-  Pure NumPy functions: `magnetic_field_magnitude`, `electric_field_magnitude`, `current_density_magnitude`, `velocity_magnitude`, `plasma_beta`, `alfven_speed`, `poynting_flux`, `magnetic_energy_density`, `electric_energy_density`, `kinetic_energy_density`, `thermal_energy_density`, `internal_energy_density`, `enthalpy`, `relativistic_enthalpy`, `entropy`, `gyrotropic_entropy`.
+  Pure NumPy functions: `magnetic_field_magnitude`, `electric_field_magnitude`, `current_density_magnitude`, `velocity_magnitude`, `plasma_beta`, `alfven_speed`, `poynting_flux`, `magnetic_energy_density`, `electric_energy_density`, `kinetic_energy_density`, `thermal_energy_density`, `internal_energy`, `enthalpy`, `relativistic_enthalpy`, `entropy`, `gyrotropic_entropy`.
 
 - [x] **Step 8: derived (part 2) — characteristic scales**
   Species-dependent: `thermal_speed`, `gyrofrequency`, `plasma_frequency`, `skin_depth`, `gyroradius`, `debye_length`, `sound_speed`, `ion_acoustic_speed`, `magnetosonic_speed`, `alfven_mach`, `magnetosonic_mach`, `parallel_pressure`, `perpendicular_pressure`, `agyrotropy`. Verify against NRL Formulary.
 
-- [ ] **Step 9: diagnostics — comparison and validation**
+- [x] **Step 9: diagnostics — comparison and validation**
   `l2_relative_error`, `linf_error`, `field_difference`, `field_energy`, `div_b`, `max_div_b`, `div_e`. Cartesian central differences.
 
-- [ ] **Step 10: coordinates/operators — discrete differential operators**
+- [x] **Step 10: coordinates/operators — discrete differential operators**
   Geometry-aware `curl`, `div`, `grad`. Cartesian second-order central diffs; spherical/cylindrical raise `NotImplementedError`.
 
 ---
@@ -93,8 +93,8 @@ Each step produces something testable. No step starts until the previous step's 
 | 6 | readers | simulation.toml loader | ✅ |
 | 7 | derived | \|B\|, beta, v_A, Poynting flux, energies | ✅ |
 | 8 | derived | omega_pe, d_i, r_i, lambda_D, v_th, c_s | ✅ |
-| 9 | diagnostics | L2 error, div B, field energy | — |
-| 10 | coordinates | curl, div, grad (Cartesian) | — |
+| 9 | diagnostics | L2 error, div B, field energy | ✅ |
+| 10 | coordinates | curl, div, grad (Cartesian) | ✅ |
 | 11 | selections | Plane, Box | — |
 | 12 | readers | iPIC3D HDF5 reader | — |
 | 13 | fields | compute(), in_units() | — |

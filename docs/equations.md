@@ -98,6 +98,7 @@ see Mignone & McKinney (2007) for the variable-$\Gamma$ treatment.
 | `v_th_e` | Electron thermal speed [5] | $\sqrt{T_e / m_e}$ | -- |
 | `v_th_i` | Ion thermal speed [5] | $\sqrt{T_i / m_i}$ | -- |
 | `c_s` | Sound speed [6] | $\sqrt{\gamma P / \rho_m}$ | -- |
+| `c_ia` | Ion acoustic speed [6] | $\sqrt{(\gamma_e T_e + \gamma_i T_i) / m_i}$ | -- |
 | `v_ms` | Fast magnetosonic speed [7] | $\sqrt{v_A^2 + c_s^2}$ | -- |
 | `M_A` | Alfvén Mach number | $V / v_A$ | -- |
 | `M_ms` | Magnetosonic Mach number | $V / v_{ms}$ | -- |
@@ -139,3 +140,31 @@ See [conventions.md § Fast Magnetosonic Speed](conventions.md#fast-magnetosonic
 
 Differential operators use second-order central finite differences
 (Cartesian). Spherical and cylindrical geometries include metric factors.
+
+
+## 7. Diagnostics and Validation
+
+| Name | Description | Equation |
+|------|-------------|----------|
+| `l2_relative_error` | Discrete relative L2 norm | $\varepsilon_{L_2} = \sqrt{\sum_i (a_i - b_i)^2} / \sqrt{\sum_i b_i^2}$ |
+| `linf_error` | Absolute max-norm error | $\varepsilon_{L_\infty} = \max_i \|a_i - b_i\|$ |
+| `field_difference` | Pointwise signed difference | $\Delta f_i = a_i - b_i$ |
+| `field_energy` | Volume integral of a scalar field | $E = \sum_{i,j,k} f_{i,j,k} \cdot \Delta V$ where $\Delta V = \prod_k \Delta x_k$ |
+| `div_b` | Divergence of B | $\nabla \cdot \mathbf{B}$ (second-order central differences) |
+| `max_div_b` | Maximum absolute div B | $\max \|\nabla \cdot \mathbf{B}\|$ |
+| `div_e` | Divergence of E | $\nabla \cdot \mathbf{E}$ (second-order central differences) |
+
+[8] L2 norm is discrete and unweighted — volume factors cancel on the
+same grid (LeVeque convention). L∞ is absolute, not relative, to avoid
+division near field nulls.
+See [conventions.md § Error Norms and Divergence](conventions.md#error-norms-and-divergence).
+
+[9] **Richardson convergence testing.** For a $p$-th order scheme with
+grid spacing $h$, the truncation error scales as $O(h^p)$. Halving $h$
+reduces the error by a factor of $2^p$: a ratio of ~2 indicates first
+order, ~4 second order, ~8 fourth order. This is the standard method
+for verifying stencil order (Richardson 1911; LeVeque, *Finite Difference
+Methods for ODEs and PDEs*, §9.3). The convergence tests in
+`test_operators.py` use this approach with sinusoidal fields at three
+resolutions, checking interior points only to avoid the lower-order
+one-sided boundary stencils.

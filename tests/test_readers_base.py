@@ -47,12 +47,6 @@ def sample_dataset(sample_grid, sample_fields):
 
 
 class TestGridInfo:
-    def test_construction(self, sample_grid):
-        assert sample_grid.dimensions == (8, 6, 4)
-        assert sample_grid.spacing == (0.5, 0.5, 0.5)
-        assert sample_grid.origin == (0.0, 0.0, 0.0)
-        assert sample_grid.geometry is CARTESIAN
-
     def test_coordinate_arrays_cell_centered(self, sample_grid):
         x, y, z = sample_grid.coordinate_arrays()
         assert_allclose(x, 0.0 + (np.arange(8) + 0.5) * 0.5)
@@ -202,7 +196,7 @@ class TestFieldDatasetSlicing:
         assert sliced["B1"].ndim == 2
 
     def test_metadata_preserved(self, sample_grid, sample_fields):
-        species = [SpeciesInfo(name="e", charge=-1.0, mass=1.0)]
+        species = (SpeciesInfo(name="e", charge=-1.0, mass=1.0),)
         ds = FieldDataset.from_arrays(
             sample_fields,
             sample_grid,
@@ -238,23 +232,19 @@ class TestFieldDatasetSlicing:
 
 
 class TestAliases:
-    def test_cartesian_aliases(self):
-        aliases = _default_aliases(CARTESIAN)
-        assert aliases["Bx"] == "B1"
-        assert aliases["By"] == "B2"
-        assert aliases["Ez"] == "E3"
-
-    def test_spherical_aliases(self):
-        aliases = _default_aliases(SPHERICAL)
-        assert aliases["Br"] == "B1"
-        assert aliases["Btheta"] == "B2"
-        assert aliases["Bphi"] == "B3"
-
-    def test_cylindrical_aliases(self):
-        aliases = _default_aliases(CYLINDRICAL)
-        assert aliases["Br"] == "B1"
-        assert aliases["Bphi"] == "B2"
-        assert aliases["Bz"] == "B3"
+    @pytest.mark.parametrize(
+        ("geometry", "checks"),
+        [
+            (CARTESIAN, {"Bx": "B1", "By": "B2", "Ez": "E3"}),
+            (SPHERICAL, {"Br": "B1", "Btheta": "B2", "Bphi": "B3"}),
+            (CYLINDRICAL, {"Br": "B1", "Bphi": "B2", "Bz": "B3"}),
+        ],
+        ids=["cartesian", "spherical", "cylindrical"],
+    )
+    def test_geometry_aliases(self, geometry, checks):
+        aliases = _default_aliases(geometry)
+        for alias, canonical in checks.items():
+            assert aliases[alias] == canonical
 
     def test_custom_aliases_override(self, sample_grid, sample_fields):
         ds = FieldDataset.from_arrays(

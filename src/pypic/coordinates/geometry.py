@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, assert_never
 
 import numpy as np
 from numpy.typing import NDArray
@@ -105,8 +105,8 @@ class CoordinateGeometry:
             case GeometryType.CYLINDRICAL:
                 r = np.asarray(x1, dtype=np.float64)
                 return (_one, r, _one)
-            case _:
-                raise ValueError(f"Unknown geometry type: {self.type}")
+            case _ as unreachable:
+                assert_never(unreachable)
 
 
 CARTESIAN = CoordinateGeometry(

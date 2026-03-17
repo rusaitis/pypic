@@ -11,25 +11,23 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 if TYPE_CHECKING:
-    from typing import Any
-
-    from numpy.typing import NDArray
+    from pypic.types import FloatArray
 
 
 def _vector_magnitude(
-    c1: NDArray[np.floating[Any]],
-    c2: NDArray[np.floating[Any]],
-    c3: NDArray[np.floating[Any]],
-) -> NDArray[np.floating[Any]]:
+    c1: FloatArray,
+    c2: FloatArray,
+    c3: FloatArray,
+) -> FloatArray:
     """Compute the Euclidean magnitude of a 3-component vector field."""
-    return np.sqrt(c1**2 + c2**2 + c3**2)  # type: ignore[no-any-return]  # numpy ufunc returns NDArray
+    return np.sqrt(c1**2 + c2**2 + c3**2)
 
 
 def magnetic_field_magnitude(
-    b1: NDArray[np.floating[Any]],
-    b2: NDArray[np.floating[Any]],
-    b3: NDArray[np.floating[Any]],
-) -> NDArray[np.floating[Any]]:
+    b1: FloatArray,
+    b2: FloatArray,
+    b3: FloatArray,
+) -> FloatArray:
     r"""Compute the magnetic field magnitude.
 
     $$|\mathbf{B}| = \sqrt{B_1^2 + B_2^2 + B_3^2}$$
@@ -58,10 +56,10 @@ def magnetic_field_magnitude(
 
 
 def electric_field_magnitude(
-    e1: NDArray[np.floating[Any]],
-    e2: NDArray[np.floating[Any]],
-    e3: NDArray[np.floating[Any]],
-) -> NDArray[np.floating[Any]]:
+    e1: FloatArray,
+    e2: FloatArray,
+    e3: FloatArray,
+) -> FloatArray:
     r"""Compute the electric field magnitude.
 
     $$|\mathbf{E}| = \sqrt{E_1^2 + E_2^2 + E_3^2}$$
@@ -90,10 +88,10 @@ def electric_field_magnitude(
 
 
 def current_density_magnitude(
-    j1: NDArray[np.floating[Any]],
-    j2: NDArray[np.floating[Any]],
-    j3: NDArray[np.floating[Any]],
-) -> NDArray[np.floating[Any]]:
+    j1: FloatArray,
+    j2: FloatArray,
+    j3: FloatArray,
+) -> FloatArray:
     r"""Compute the current density magnitude.
 
     $$|\mathbf{J}| = \sqrt{J_1^2 + J_2^2 + J_3^2}$$
@@ -122,10 +120,10 @@ def current_density_magnitude(
 
 
 def velocity_magnitude(
-    v1: NDArray[np.floating[Any]],
-    v2: NDArray[np.floating[Any]],
-    v3: NDArray[np.floating[Any]],
-) -> NDArray[np.floating[Any]]:
+    v1: FloatArray,
+    v2: FloatArray,
+    v3: FloatArray,
+) -> FloatArray:
     r"""Compute the bulk velocity magnitude.
 
     $$|\mathbf{V}| = \sqrt{V_1^2 + V_2^2 + V_3^2}$$
@@ -154,9 +152,9 @@ def velocity_magnitude(
 
 
 def plasma_beta(
-    pressure: NDArray[np.floating[Any]],
-    b_magnitude: NDArray[np.floating[Any]],
-) -> NDArray[np.floating[Any]]:
+    pressure: FloatArray,
+    b_magnitude: FloatArray,
+) -> FloatArray:
     r"""Compute the plasma beta.
 
     $$\beta = \frac{2P}{B^2}$$
@@ -183,9 +181,9 @@ def plasma_beta(
 
 
 def alfven_speed(
-    b: NDArray[np.floating[Any]],
-    rho_m: NDArray[np.floating[Any]],
-) -> NDArray[np.floating[Any]]:
+    b: FloatArray,
+    rho_m: FloatArray,
+) -> FloatArray:
     r"""Compute the Alfvén speed.
 
     $$v_A = \frac{B}{\sqrt{\mu_0 \rho_m}}$$
@@ -210,12 +208,12 @@ def alfven_speed(
     >>> alfven_speed(np.array([1.0]), np.array([4.0]))
     array([0.5])
     """
-    return b / np.sqrt(rho_m)  # type: ignore[no-any-return]  # numpy ufunc returns NDArray
+    return b / np.sqrt(rho_m)
 
 
 def magnetic_energy_density(
-    b_magnitude: NDArray[np.floating[Any]],
-) -> NDArray[np.floating[Any]]:
+    b_magnitude: FloatArray,
+) -> FloatArray:
     r"""Compute the magnetic energy density.
 
     $$e_B = \frac{B^2}{2}$$
@@ -242,8 +240,8 @@ def magnetic_energy_density(
 
 
 def electric_energy_density(
-    e_magnitude: NDArray[np.floating[Any]],
-) -> NDArray[np.floating[Any]]:
+    e_magnitude: FloatArray,
+) -> FloatArray:
     r"""Compute the electric energy density.
 
     $$e_E = \frac{E^2}{2}$$
@@ -270,9 +268,9 @@ def electric_energy_density(
 
 
 def kinetic_energy_density(
-    rho_m: NDArray[np.floating[Any]],
-    v_magnitude: NDArray[np.floating[Any]],
-) -> NDArray[np.floating[Any]]:
+    rho_m: FloatArray,
+    v_magnitude: FloatArray,
+) -> FloatArray:
     r"""Compute the kinetic energy density.
 
     $$e_k = \frac{1}{2} \rho_m V^2$$
@@ -299,9 +297,9 @@ def kinetic_energy_density(
 
 
 def thermal_energy_density(
-    pressure: NDArray[np.floating[Any]],
+    pressure: FloatArray,
     gamma: float = 5.0 / 3.0,
-) -> NDArray[np.floating[Any]]:
+) -> FloatArray:
     r"""Compute the thermal energy density.
 
     $$e_{th} = \frac{P}{\gamma - 1}$$
@@ -328,16 +326,16 @@ def thermal_energy_density(
 
 
 def poynting_flux(
-    e1: NDArray[np.floating[Any]],
-    e2: NDArray[np.floating[Any]],
-    e3: NDArray[np.floating[Any]],
-    b1: NDArray[np.floating[Any]],
-    b2: NDArray[np.floating[Any]],
-    b3: NDArray[np.floating[Any]],
+    e1: FloatArray,
+    e2: FloatArray,
+    e3: FloatArray,
+    b1: FloatArray,
+    b2: FloatArray,
+    b3: FloatArray,
 ) -> tuple[
-    NDArray[np.floating[Any]],
-    NDArray[np.floating[Any]],
-    NDArray[np.floating[Any]],
+    FloatArray,
+    FloatArray,
+    FloatArray,
 ]:
     r"""Compute the Poynting flux vector.
 
@@ -381,11 +379,11 @@ def poynting_flux(
     return s1, s2, s3
 
 
-def internal_energy_density(
-    pressure: NDArray[np.floating[Any]],
-    rho_m: NDArray[np.floating[Any]],
+def internal_energy(
+    pressure: FloatArray,
+    rho_m: FloatArray,
     gamma: float = 5.0 / 3.0,
-) -> NDArray[np.floating[Any]]:
+) -> FloatArray:
     r"""Compute the specific internal energy.
 
     $$e_{int} = \frac{P}{(\gamma - 1) \rho_m}$$
@@ -407,17 +405,17 @@ def internal_energy_density(
     Examples
     --------
     >>> import numpy as np
-    >>> internal_energy_density(np.array([1.0]), np.array([1.0]))
+    >>> internal_energy(np.array([1.0]), np.array([1.0]))
     array([1.5])
     """
     return pressure / ((gamma - 1.0) * rho_m)
 
 
 def enthalpy(
-    pressure: NDArray[np.floating[Any]],
-    rho_m: NDArray[np.floating[Any]],
+    pressure: FloatArray,
+    rho_m: FloatArray,
     gamma: float = 5.0 / 3.0,
-) -> NDArray[np.floating[Any]]:
+) -> FloatArray:
     r"""Compute the specific enthalpy.
 
     $$h = \frac{\gamma P}{(\gamma - 1) \rho_m}$$
@@ -446,11 +444,11 @@ def enthalpy(
 
 
 def relativistic_enthalpy(
-    pressure: NDArray[np.floating[Any]],
-    rho_m: NDArray[np.floating[Any]],
+    pressure: FloatArray,
+    rho_m: FloatArray,
     gamma: float = 5.0 / 3.0,
     c: float = 1.0,
-) -> NDArray[np.floating[Any]]:
+) -> FloatArray:
     r"""Compute the relativistic specific enthalpy.
 
     $$h_{rel} = c^2 + \frac{\gamma P}{(\gamma - 1) \rho_m}$$
@@ -483,10 +481,10 @@ def relativistic_enthalpy(
 
 
 def entropy(
-    pressure: NDArray[np.floating[Any]],
-    density: NDArray[np.floating[Any]],
+    pressure: FloatArray,
+    density: FloatArray,
     gamma: float = 5.0 / 3.0,
-) -> NDArray[np.floating[Any]]:
+) -> FloatArray:
     r"""Compute the specific entropy.
 
     $$s = \ln\!\left(\frac{P}{\rho^\gamma}\right)$$
@@ -518,10 +516,10 @@ def entropy(
 
 
 def gyrotropic_entropy(
-    p_parallel: NDArray[np.floating[Any]],
-    p_perpendicular: NDArray[np.floating[Any]],
-    n: NDArray[np.floating[Any]],
-) -> NDArray[np.floating[Any]]:
+    p_parallel: FloatArray,
+    p_perpendicular: FloatArray,
+    n: FloatArray,
+) -> FloatArray:
     r"""Compute the gyrotropic entropy from CGL double-adiabatic invariants.
 
     $$s_{gyro} = \ln\!\left(\frac{P_\parallel P_\perp^2}{n^5}\right)$$
@@ -550,25 +548,23 @@ def gyrotropic_entropy(
     >>> gyrotropic_entropy(np.array([1.0]), np.array([1.0]), np.array([1.0]))
     array([0.])
     """
-    return np.log(p_parallel * p_perpendicular**2 / n**5)  # type: ignore[no-any-return]  # numpy ufunc returns NDArray
+    return np.log(p_parallel * p_perpendicular**2 / n**5)
 
 
 def _unit_vector(
-    b1: NDArray[np.floating[Any]],
-    b2: NDArray[np.floating[Any]],
-    b3: NDArray[np.floating[Any]],
-) -> tuple[
-    NDArray[np.floating[Any]], NDArray[np.floating[Any]], NDArray[np.floating[Any]]
-]:
+    b1: FloatArray,
+    b2: FloatArray,
+    b3: FloatArray,
+) -> tuple[FloatArray, FloatArray, FloatArray]:
     """Compute the unit vector of a 3-component vector field."""
     mag = _vector_magnitude(b1, b2, b3)
     return b1 / mag, b2 / mag, b3 / mag
 
 
 def thermal_speed(
-    temperature: NDArray[np.floating[Any]],
+    temperature: FloatArray,
     mass: float,
-) -> NDArray[np.floating[Any]]:
+) -> FloatArray:
     r"""Compute the thermal speed (NRL convention).
 
     $$v_{th} = \sqrt{T / m}$$
@@ -594,14 +590,14 @@ def thermal_speed(
     >>> thermal_speed(np.array([4.0]), mass=1.0)
     array([2.])
     """
-    return np.sqrt(temperature / mass)  # type: ignore[no-any-return]  # numpy ufunc returns NDArray
+    return np.sqrt(temperature / mass)  # type: ignore[no-any-return]
 
 
 def gyrofrequency(
-    b_magnitude: NDArray[np.floating[Any]],
+    b_magnitude: FloatArray,
     charge: float,
     mass: float,
-) -> NDArray[np.floating[Any]]:
+) -> FloatArray:
     r"""Compute the cyclotron (gyro) frequency.
 
     $$\omega_c = \frac{|q| B}{m}$$
@@ -628,14 +624,14 @@ def gyrofrequency(
     >>> gyrofrequency(np.array([2.0]), charge=-1.0, mass=1.0)
     array([2.])
     """
-    return np.abs(charge) * b_magnitude / mass  # type: ignore[no-any-return]  # numpy arithmetic returns NDArray
+    return np.abs(charge) * b_magnitude / mass  # type: ignore[no-any-return]
 
 
 def plasma_frequency(
-    density: NDArray[np.floating[Any]],
+    density: FloatArray,
     charge: float,
     mass: float,
-) -> NDArray[np.floating[Any]]:
+) -> FloatArray:
     r"""Compute the plasma frequency.
 
     $$\omega_p = \sqrt{\frac{n q^2}{m}}$$
@@ -662,15 +658,15 @@ def plasma_frequency(
     >>> plasma_frequency(np.array([1.0]), charge=1.0, mass=1.0)
     array([1.])
     """
-    return np.sqrt(density * charge**2 / mass)  # type: ignore[no-any-return]  # numpy ufunc returns NDArray
+    return np.sqrt(density * charge**2 / mass)  # type: ignore[no-any-return]
 
 
 def skin_depth(
-    density: NDArray[np.floating[Any]],
+    density: FloatArray,
     charge: float,
     mass: float,
     c: float = 1.0,
-) -> NDArray[np.floating[Any]]:
+) -> FloatArray:
     r"""Compute the skin depth (inertial length).
 
     $$d = \frac{c}{\omega_p}$$
@@ -701,11 +697,11 @@ def skin_depth(
 
 
 def gyroradius(
-    temperature: NDArray[np.floating[Any]],
-    b_magnitude: NDArray[np.floating[Any]],
+    temperature: FloatArray,
+    b_magnitude: FloatArray,
     charge: float,
     mass: float,
-) -> NDArray[np.floating[Any]]:
+) -> FloatArray:
     r"""Compute the thermal gyroradius (Larmor radius).
 
     $$r = \frac{v_{th}}{\omega_c} = \frac{\sqrt{m T}}{|q| B}$$
@@ -734,14 +730,14 @@ def gyroradius(
     >>> gyroradius(np.array([1.0]), np.array([1.0]), charge=1.0, mass=1.0)
     array([1.])
     """
-    return np.sqrt(mass * temperature) / (np.abs(charge) * b_magnitude)  # type: ignore[no-any-return]  # numpy ufunc returns NDArray
+    return np.sqrt(mass * temperature) / (np.abs(charge) * b_magnitude)  # type: ignore[no-any-return]
 
 
 def debye_length(
-    temperature: NDArray[np.floating[Any]],
-    density: NDArray[np.floating[Any]],
+    temperature: FloatArray,
+    density: FloatArray,
     charge: float,
-) -> NDArray[np.floating[Any]]:
+) -> FloatArray:
     r"""Compute the electron Debye length.
 
     $$\lambda_D = \sqrt{\frac{T}{n q^2}}$$
@@ -772,10 +768,10 @@ def debye_length(
 
 
 def sound_speed(
-    pressure: NDArray[np.floating[Any]],
-    rho_m: NDArray[np.floating[Any]],
+    pressure: FloatArray,
+    rho_m: FloatArray,
     gamma: float = 5.0 / 3.0,
-) -> NDArray[np.floating[Any]]:
+) -> FloatArray:
     r"""Compute the MHD sound speed.
 
     $$c_s = \sqrt{\frac{\gamma P}{\rho_m}}$$
@@ -804,12 +800,12 @@ def sound_speed(
 
 
 def ion_acoustic_speed(
-    temperature_e: NDArray[np.floating[Any]],
-    temperature_i: NDArray[np.floating[Any]],
+    temperature_e: FloatArray,
+    temperature_i: FloatArray,
     mass_i: float,
     gamma_e: float = 1.0,
     gamma_i: float = 3.0,
-) -> NDArray[np.floating[Any]]:
+) -> FloatArray:
     r"""Compute the ion acoustic speed.
 
     $$c_{ia} = \sqrt{\frac{\gamma_e T_e + \gamma_i T_i}{m_i}}$$
@@ -845,9 +841,9 @@ def ion_acoustic_speed(
 
 
 def magnetosonic_speed(
-    v_alfven: NDArray[np.floating[Any]],
-    c_sound: NDArray[np.floating[Any]],
-) -> NDArray[np.floating[Any]]:
+    v_alfven: FloatArray,
+    c_sound: FloatArray,
+) -> FloatArray:
     r"""Compute the fast magnetosonic speed (perpendicular propagation).
 
     $$v_{ms} = \sqrt{v_A^2 + c_s^2}$$
@@ -876,9 +872,9 @@ def magnetosonic_speed(
 
 
 def alfven_mach(
-    v_magnitude: NDArray[np.floating[Any]],
-    v_alfven: NDArray[np.floating[Any]],
-) -> NDArray[np.floating[Any]]:
+    v_magnitude: FloatArray,
+    v_alfven: FloatArray,
+) -> FloatArray:
     r"""Compute the Alfvén Mach number.
 
     $$M_A = \frac{V}{v_A}$$
@@ -905,9 +901,9 @@ def alfven_mach(
 
 
 def magnetosonic_mach(
-    v_magnitude: NDArray[np.floating[Any]],
-    v_magnetosonic: NDArray[np.floating[Any]],
-) -> NDArray[np.floating[Any]]:
+    v_magnitude: FloatArray,
+    v_magnetosonic: FloatArray,
+) -> FloatArray:
     r"""Compute the magnetosonic Mach number.
 
     $$M_{ms} = \frac{V}{v_{ms}}$$
@@ -934,16 +930,16 @@ def magnetosonic_mach(
 
 
 def parallel_pressure(
-    p11: NDArray[np.floating[Any]],
-    p22: NDArray[np.floating[Any]],
-    p33: NDArray[np.floating[Any]],
-    p12: NDArray[np.floating[Any]],
-    p13: NDArray[np.floating[Any]],
-    p23: NDArray[np.floating[Any]],
-    b1: NDArray[np.floating[Any]],
-    b2: NDArray[np.floating[Any]],
-    b3: NDArray[np.floating[Any]],
-) -> NDArray[np.floating[Any]]:
+    p11: FloatArray,
+    p22: FloatArray,
+    p33: FloatArray,
+    p12: FloatArray,
+    p13: FloatArray,
+    p23: FloatArray,
+    b1: FloatArray,
+    b2: FloatArray,
+    b3: FloatArray,
+) -> FloatArray:
     r"""Compute the pressure parallel to the magnetic field.
 
     $$P_\parallel = \hat{b} \cdot \mathbf{P} \cdot \hat{b}$$
@@ -973,6 +969,7 @@ def parallel_pressure(
     -------
     NDArray
         Parallel pressure in normalized units.
+        Returns NaN where $|B| = 0$ (undefined magnetic direction).
 
     Examples
     --------
@@ -985,7 +982,7 @@ def parallel_pressure(
     array([3.])
     """
     bh1, bh2, bh3 = _unit_vector(b1, b2, b3)
-    result: NDArray[np.floating[Any]] = (
+    result: FloatArray = (
         bh1**2 * p11
         + bh2**2 * p22
         + bh3**2 * p33
@@ -995,16 +992,16 @@ def parallel_pressure(
 
 
 def perpendicular_pressure(
-    p11: NDArray[np.floating[Any]],
-    p22: NDArray[np.floating[Any]],
-    p33: NDArray[np.floating[Any]],
-    p12: NDArray[np.floating[Any]],
-    p13: NDArray[np.floating[Any]],
-    p23: NDArray[np.floating[Any]],
-    b1: NDArray[np.floating[Any]],
-    b2: NDArray[np.floating[Any]],
-    b3: NDArray[np.floating[Any]],
-) -> NDArray[np.floating[Any]]:
+    p11: FloatArray,
+    p22: FloatArray,
+    p33: FloatArray,
+    p12: FloatArray,
+    p13: FloatArray,
+    p23: FloatArray,
+    b1: FloatArray,
+    b2: FloatArray,
+    b3: FloatArray,
+) -> FloatArray:
     r"""Compute the pressure perpendicular to the magnetic field.
 
     $$P_\perp = \frac{\mathrm{Tr}(\mathbf{P}) - P_\parallel}{2}$$
@@ -1034,6 +1031,7 @@ def perpendicular_pressure(
     -------
     NDArray
         Perpendicular pressure in normalized units.
+        Returns NaN where $|B| = 0$ (undefined magnetic direction).
 
     Examples
     --------
@@ -1047,28 +1045,31 @@ def perpendicular_pressure(
     """
     p_par = parallel_pressure(p11, p22, p33, p12, p13, p23, b1, b2, b3)
     trace = p11 + p22 + p33
-    result: NDArray[np.floating[Any]] = (trace - p_par) / 2.0
+    result: FloatArray = (trace - p_par) / 2.0
     return result
 
 
 def agyrotropy(
-    p11: NDArray[np.floating[Any]],
-    p22: NDArray[np.floating[Any]],
-    p33: NDArray[np.floating[Any]],
-    p12: NDArray[np.floating[Any]],
-    p13: NDArray[np.floating[Any]],
-    p23: NDArray[np.floating[Any]],
-    b1: NDArray[np.floating[Any]],
-    b2: NDArray[np.floating[Any]],
-    b3: NDArray[np.floating[Any]],
-) -> NDArray[np.floating[Any]]:
+    p11: FloatArray,
+    p22: FloatArray,
+    p33: FloatArray,
+    p12: FloatArray,
+    p13: FloatArray,
+    p23: FloatArray,
+    b1: FloatArray,
+    b2: FloatArray,
+    b3: FloatArray,
+) -> FloatArray:
     r"""Compute the agyrotropy measure (Swisdak 2016).
 
     $$Q = 1 - \frac{4 I_2}{I_1^2}$$
 
     where $I_1 = \mathrm{Tr}(\mathbf{P}) - P_\parallel$ and
-    $I_2 = (I_1^2 - \|\mathbf{P}_\perp\|_F^2) / 2$, with
-    $\mathbf{P}_\perp = \mathbf{P} - P_\parallel \hat{b}\hat{b}$.
+    $I_2 = (I_1^2 - \|\boldsymbol{\Pi}\|_F^2) / 2$, with
+    $\boldsymbol{\Pi} = (\mathbf{I} - \hat{b}\hat{b}) \cdot \mathbf{P}
+    \cdot (\mathbf{I} - \hat{b}\hat{b})$ the double-projected
+    perpendicular pressure tensor (Swisdak, J. Geophys. Res. Space
+    Physics, 121, 5549-5565, 2016).
 
     Bounded $[0, 1]$: 0 is gyrotropic, 1 is maximally agyrotropic.
     Returns NaN where $|B| = 0$ (undefined magnetic direction).
@@ -1137,7 +1138,7 @@ def agyrotropy(
 
     i_2 = (i_1**2 - n_f) / 2.0
 
-    result: NDArray[np.floating[Any]] = 1.0 - 4.0 * i_2 / i_1**2
+    result: FloatArray = 1.0 - 4.0 * i_2 / i_1**2
     return result
 
 
@@ -1154,7 +1155,7 @@ __all__ = [
     "gyrofrequency",
     "gyroradius",
     "gyrotropic_entropy",
-    "internal_energy_density",
+    "internal_energy",
     "ion_acoustic_speed",
     "kinetic_energy_density",
     "magnetic_energy_density",

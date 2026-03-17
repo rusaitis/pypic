@@ -7,3 +7,4 @@ from numpy.typing import NDArray
 
 type Numeric = float | np.floating[Any] | NDArray[np.floating[Any]]
 type Vector3 = tuple[float, float, float]
+type FloatArray = NDArray[np.floating[Any]]

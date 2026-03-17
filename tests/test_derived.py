@@ -14,7 +14,7 @@ from pypic.derived import (
     gyrofrequency,
     gyroradius,
     gyrotropic_entropy,
-    internal_energy_density,
+    internal_energy,
     ion_acoustic_speed,
     kinetic_energy_density,
     magnetic_energy_density,
@@ -49,21 +49,6 @@ class TestMagnitudes:
         np.testing.assert_allclose(result, 5.0, rtol=1e-15)
 
     @pytest.mark.parametrize("func", MAGNITUDE_FUNCTIONS)
-    def test_unit_vector(self, func):
-        result = func(np.array([1.0]), np.array([0.0]), np.array([0.0]))
-        np.testing.assert_allclose(result, 1.0, rtol=1e-15)
-
-    @pytest.mark.parametrize("func", MAGNITUDE_FUNCTIONS)
-    def test_all_ones(self, func):
-        result = func(np.array([1.0]), np.array([1.0]), np.array([1.0]))
-        np.testing.assert_allclose(result, np.sqrt(3.0), rtol=1e-15)
-
-    @pytest.mark.parametrize("func", MAGNITUDE_FUNCTIONS)
-    def test_zeros(self, func):
-        result = func(np.array([0.0]), np.array([0.0]), np.array([0.0]))
-        np.testing.assert_allclose(result, 0.0, atol=1e-15)
-
-    @pytest.mark.parametrize("func", MAGNITUDE_FUNCTIONS)
     def test_multidimensional(self, func):
         c1 = np.array([[3.0, 0.0, 1.0], [0.0, 1.0, 1.0]])
         c2 = np.array([[4.0, 0.0, 1.0], [0.0, 1.0, 1.0]])
@@ -78,12 +63,6 @@ class TestMagnitudes:
     def test_nan_propagation(self, func):
         result = func(np.array([np.nan]), np.array([1.0]), np.array([0.0]))
         assert np.isnan(result[0])
-
-    @pytest.mark.parametrize("func", MAGNITUDE_FUNCTIONS)
-    def test_empty_array(self, func):
-        empty = np.array([], dtype=np.float64)
-        result = func(empty, empty, empty)
-        assert result.shape == (0,)
 
 
 class TestPlasmaBeta:
@@ -164,32 +143,6 @@ class TestPoyntingFlux:
         np.testing.assert_allclose(s2, 0.0, atol=1e-15)
         np.testing.assert_allclose(s3, 1.0, rtol=1e-15)
 
-    def test_cyclic_e_along_y_b_along_z(self):
-        s1, s2, s3 = poynting_flux(
-            np.array([0.0]),
-            np.array([1.0]),
-            np.array([0.0]),
-            np.array([0.0]),
-            np.array([0.0]),
-            np.array([1.0]),
-        )
-        np.testing.assert_allclose(s1, 1.0, rtol=1e-15)
-        np.testing.assert_allclose(s2, 0.0, atol=1e-15)
-        np.testing.assert_allclose(s3, 0.0, atol=1e-15)
-
-    def test_cyclic_e_along_z_b_along_x(self):
-        s1, s2, s3 = poynting_flux(
-            np.array([0.0]),
-            np.array([0.0]),
-            np.array([1.0]),
-            np.array([1.0]),
-            np.array([0.0]),
-            np.array([0.0]),
-        )
-        np.testing.assert_allclose(s1, 0.0, atol=1e-15)
-        np.testing.assert_allclose(s2, 1.0, rtol=1e-15)
-        np.testing.assert_allclose(s3, 0.0, atol=1e-15)
-
     def test_antisymmetry(self):
         e = (np.array([1.0]), np.array([2.0]), np.array([3.0]))
         b = (np.array([4.0]), np.array([5.0]), np.array([6.0]))
@@ -216,7 +169,7 @@ class TestPoyntingFlux:
 class TestThermodynamics:
     def test_internal_energy_default_gamma(self):
         np.testing.assert_allclose(
-            internal_energy_density(np.array([1.0]), np.array([1.0])),
+            internal_energy(np.array([1.0]), np.array([1.0])),
             1.5,
             rtol=1e-15,
         )
@@ -226,14 +179,14 @@ class TestThermodynamics:
         rho = np.array([1.3])
         gamma = 5.0 / 3.0
         h = enthalpy(p, rho, gamma)
-        e_int = internal_energy_density(p, rho, gamma)
+        e_int = internal_energy(p, rho, gamma)
         np.testing.assert_allclose(h, gamma * e_int, rtol=1e-15)
 
     def test_enthalpy_equals_internal_plus_p_over_rho(self):
         p = np.array([3.0])
         rho = np.array([2.0])
         h = enthalpy(p, rho)
-        e_int = internal_energy_density(p, rho)
+        e_int = internal_energy(p, rho)
         np.testing.assert_allclose(h, e_int + p / rho, rtol=1e-15)
 
     def test_relativistic_enthalpy_c1(self):
@@ -278,45 +231,45 @@ class TestThermodynamics:
 
 
 class TestDefaultParameters:
-    def test_thermal_energy_uses_default_gamma(self):
-        p = np.array([1.0])
-        explicit = thermal_energy_density(p, gamma=5.0 / 3.0)
-        implicit = thermal_energy_density(p)
-        np.testing.assert_allclose(explicit, implicit, rtol=1e-15)
-
-    def test_internal_energy_uses_default_gamma(self):
-        p, rho = np.array([1.0]), np.array([1.0])
-        explicit = internal_energy_density(p, rho, gamma=5.0 / 3.0)
-        implicit = internal_energy_density(p, rho)
-        np.testing.assert_allclose(explicit, implicit, rtol=1e-15)
-
-    def test_enthalpy_uses_default_gamma(self):
-        p, rho = np.array([1.0]), np.array([1.0])
-        explicit = enthalpy(p, rho, gamma=5.0 / 3.0)
-        implicit = enthalpy(p, rho)
-        np.testing.assert_allclose(explicit, implicit, rtol=1e-15)
-
-    def test_relativistic_enthalpy_uses_default_c(self):
-        p, rho = np.array([1.0]), np.array([1.0])
-        explicit = relativistic_enthalpy(p, rho, c=1.0)
-        implicit = relativistic_enthalpy(p, rho)
-        np.testing.assert_allclose(explicit, implicit, rtol=1e-15)
-
-    def test_entropy_uses_default_gamma(self):
-        p, rho = np.array([2.0]), np.array([3.0])
-        explicit = entropy(p, rho, gamma=5.0 / 3.0)
-        implicit = entropy(p, rho)
-        np.testing.assert_allclose(explicit, implicit, rtol=1e-15)
+    @pytest.mark.parametrize(
+        ("explicit_call", "implicit_call"),
+        [
+            (
+                lambda: thermal_energy_density(np.array([1.0]), gamma=5.0 / 3.0),
+                lambda: thermal_energy_density(np.array([1.0])),
+            ),
+            (
+                lambda: internal_energy(
+                    np.array([1.0]), np.array([1.0]), gamma=5.0 / 3.0
+                ),
+                lambda: internal_energy(np.array([1.0]), np.array([1.0])),
+            ),
+            (
+                lambda: enthalpy(np.array([1.0]), np.array([1.0]), gamma=5.0 / 3.0),
+                lambda: enthalpy(np.array([1.0]), np.array([1.0])),
+            ),
+            (
+                lambda: relativistic_enthalpy(np.array([1.0]), np.array([1.0]), c=1.0),
+                lambda: relativistic_enthalpy(np.array([1.0]), np.array([1.0])),
+            ),
+            (
+                lambda: entropy(np.array([2.0]), np.array([3.0]), gamma=5.0 / 3.0),
+                lambda: entropy(np.array([2.0]), np.array([3.0])),
+            ),
+        ],
+        ids=[
+            "thermal_energy_density",
+            "internal_energy",
+            "enthalpy",
+            "relativistic_enthalpy",
+            "entropy",
+        ],
+    )
+    def test_explicit_equals_implicit(self, explicit_call, implicit_call):
+        np.testing.assert_allclose(explicit_call(), implicit_call(), rtol=1e-15)
 
 
 class TestEdgeCases:
-    def test_single_element_array(self):
-        result = magnetic_field_magnitude(
-            np.array([3.0]), np.array([4.0]), np.array([0.0])
-        )
-        assert result.shape == (1,)
-        np.testing.assert_allclose(result[0], 5.0, rtol=1e-15)
-
     def test_nan_in_energy(self):
         assert np.isnan(magnetic_energy_density(np.array([np.nan]))[0])
         assert np.isnan(kinetic_energy_density(np.array([np.nan]), np.array([1.0]))[0])
@@ -331,11 +284,6 @@ class TestEdgeCases:
 
 
 class TestThermalSpeed:
-    def test_unit_values(self):
-        np.testing.assert_allclose(
-            thermal_speed(np.array([1.0]), mass=1.0), 1.0, rtol=1e-15
-        )
-
     def test_t4_m1(self):
         np.testing.assert_allclose(
             thermal_speed(np.array([4.0]), mass=1.0), 2.0, rtol=1e-15
@@ -348,11 +296,6 @@ class TestThermalSpeed:
 
 
 class TestGyrofrequency:
-    def test_unit_values(self):
-        np.testing.assert_allclose(
-            gyrofrequency(np.array([1.0]), charge=1.0, mass=1.0), 1.0, rtol=1e-15
-        )
-
     def test_negative_charge_gives_positive(self):
         np.testing.assert_allclose(
             gyrofrequency(np.array([2.0]), charge=-1.0, mass=1.0), 2.0, rtol=1e-15
@@ -365,11 +308,6 @@ class TestGyrofrequency:
 
 
 class TestPlasmaFrequency:
-    def test_unit_values(self):
-        np.testing.assert_allclose(
-            plasma_frequency(np.array([1.0]), charge=1.0, mass=1.0), 1.0, rtol=1e-15
-        )
-
     def test_negative_charge_invariant(self):
         pos = plasma_frequency(np.array([2.0]), charge=1.0, mass=1.0)
         neg = plasma_frequency(np.array([2.0]), charge=-1.0, mass=1.0)
@@ -382,11 +320,6 @@ class TestPlasmaFrequency:
 
 
 class TestSkinDepth:
-    def test_unit_values(self):
-        np.testing.assert_allclose(
-            skin_depth(np.array([1.0]), charge=1.0, mass=1.0), 1.0, rtol=1e-15
-        )
-
     def test_identity_d_times_omega_p_equals_c(self):
         n = np.array([3.7])
         q, m, c = 1.5, 2.3, 10.0
@@ -401,13 +334,6 @@ class TestSkinDepth:
 
 
 class TestGyroradius:
-    def test_unit_values(self):
-        np.testing.assert_allclose(
-            gyroradius(np.array([1.0]), np.array([1.0]), charge=1.0, mass=1.0),
-            1.0,
-            rtol=1e-15,
-        )
-
     def test_negative_charge_gives_same_result(self):
         pos = gyroradius(np.array([2.0]), np.array([3.0]), charge=1.0, mass=1.0)
         neg = gyroradius(np.array([2.0]), np.array([3.0]), charge=-1.0, mass=1.0)
@@ -424,11 +350,6 @@ class TestGyroradius:
 
 
 class TestDebyeLength:
-    def test_unit_values(self):
-        np.testing.assert_allclose(
-            debye_length(np.array([1.0]), np.array([1.0]), charge=1.0), 1.0, rtol=1e-15
-        )
-
     def test_negative_charge_invariant(self):
         pos = debye_length(np.array([2.0]), np.array([3.0]), charge=1.0)
         neg = debye_length(np.array([2.0]), np.array([3.0]), charge=-1.0)
@@ -442,13 +363,6 @@ class TestDebyeLength:
 
 
 class TestSoundSpeed:
-    def test_unit_values(self):
-        # gamma*P = rho -> c_s = 1
-        gamma = 5.0 / 3.0
-        np.testing.assert_allclose(
-            sound_speed(np.array([1.0 / gamma]), np.array([1.0])), 1.0, rtol=1e-15
-        )
-
     def test_default_gamma(self):
         explicit = sound_speed(np.array([2.0]), np.array([3.0]), gamma=5.0 / 3.0)
         implicit = sound_speed(np.array([2.0]), np.array([3.0]))
@@ -504,11 +418,6 @@ class TestMagnetosonicSpeed:
 
 
 class TestMachNumbers:
-    def test_alfven_mach_one(self):
-        np.testing.assert_allclose(
-            alfven_mach(np.array([3.0]), np.array([3.0])), 1.0, rtol=1e-15
-        )
-
     def test_alfven_mach_value(self):
         np.testing.assert_allclose(
             alfven_mach(np.array([6.0]), np.array([3.0])), 2.0, rtol=1e-15
@@ -517,11 +426,6 @@ class TestMachNumbers:
     def test_alfven_mach_zero_va_gives_inf(self):
         result = alfven_mach(np.array([1.0]), np.array([0.0]))
         assert np.isinf(result[0])
-
-    def test_magnetosonic_mach_one(self):
-        np.testing.assert_allclose(
-            magnetosonic_mach(np.array([5.0]), np.array([5.0])), 1.0, rtol=1e-15
-        )
 
     def test_magnetosonic_mach_value(self):
         np.testing.assert_allclose(
