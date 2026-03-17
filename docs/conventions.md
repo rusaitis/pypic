@@ -144,3 +144,77 @@ $(N_{xc}+1) \times (N_{yc}+1) \times (N_{zc}+1)$ where $N_{xc}$ is the
 number of cells along each axis. No coordinate arrays are stored in the
 HDF5 files — the reader reconstructs node coordinates from the grid
 origin, spacing, and dimensions.
+
+## Relativistic Conventions
+
+These conventions apply when `physics.relativistic = true` in the
+simulation config, or when analyzing output from relativistic PIC codes
+(TRISTAN-MP, Zeltron, OSIRIS) or relativistic MHD codes. See
+[equations.md § 8](equations.md#8-relativistic-corrections) for the
+corresponding formulas.
+
+### Three-velocity vs four-velocity
+
+pypic supports two velocity representations:
+
+- **Three-velocity** `V1/V2/V3` ($v^i$): bounded by $c$, the standard
+  output of non-relativistic and semi-relativistic codes. Directly
+  interpretable as physical speed.
+
+- **Four-velocity** `u1/u2/u3` ($u^i = \gamma v^i$): unbounded, the
+  natural output of relativistic PIC codes (TRISTAN-MP, Zeltron, OSIRIS).
+  Numerically well-behaved at all speeds because there is no artificial
+  upper bound. The four-velocity is the spatial part of the 4-velocity
+  $u^\mu = \gamma(c, \mathbf{v})$.
+
+When four-velocity is available, derived quantities should compute the
+Lorentz factor from $\gamma = \sqrt{1 + u^2/c^2}$ and recover
+three-velocity as $v^i = u^i/\gamma$ only when needed.
+
+### Lorentz factor computation
+
+Two equivalent forms, with different numerical properties:
+
+- **From three-velocity:** $\gamma = 1/\sqrt{1 - v^2/c^2}$. Suffers
+  from catastrophic cancellation when $v \approx c$ (the subtraction
+  $1 - v^2/c^2$ loses precision). Adequate for mildly relativistic
+  flows ($\gamma \lesssim 10$).
+
+- **From four-velocity:** $\gamma = \sqrt{1 + u^2/c^2}$. No
+  cancellation — numerically stable at all Lorentz factors. Always
+  preferred when four-velocity data is available.
+
+The `lorentz_factor()` function accepts either form and selects the
+appropriate computation.
+
+### Magnetization parameter
+
+$\sigma = B^2 / (\rho_m c^2)$ (in normalized units with $\mu_0 = 1$).
+This is the fundamental dimensionless parameter in relativistic plasma
+physics, measuring the ratio of magnetic energy density to rest-mass
+energy density.
+
+- $\sigma \ll 1$: matter-dominated (non-relativistic MHD regime).
+  The non-relativistic Alfven speed $v_A = B/\sqrt{\rho_m}$ applies.
+- $\sigma \sim 1$: trans-relativistic. Full relativistic formulas needed.
+- $\sigma \gg 1$: magnetically dominated (pulsar winds, jets, relativistic
+  reconnection). The Alfven speed $v_A \to c$.
+
+$\sigma$ is analogous to $1/\beta$ in that both measure the importance
+of the magnetic field, but $\sigma$ compares to rest-mass energy while
+$\beta$ compares to thermal energy. In a cold, highly magnetized plasma
+$\sigma \gg 1$ and $\beta \ll 1$.
+
+### Relativistic speed composition
+
+Speeds do not add linearly in special relativity. The relativistic
+magnetosonic speed uses the composition formula:
+
+$$v_{ms}^2 = v_A^2 + c_s^2 - \frac{v_A^2 c_s^2}{c^2}$$
+
+This ensures $v_{ms} < c$ always, unlike the non-relativistic
+$v_{ms}^2 = v_A^2 + c_s^2$ which can exceed $c$ when $\sigma$ is large.
+In normalized units ($c = 1$) the formula simplifies to
+$v_{ms}^2 = v_A^2 + c_s^2 - v_A^2 c_s^2$. The non-relativistic limit
+is recovered when $v_A, c_s \ll c$, since the correction term
+$v_A^2 c_s^2 / c^2$ becomes negligible.

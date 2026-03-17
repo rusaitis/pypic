@@ -17,6 +17,9 @@ SI conversion boundaries. Temperatures are in energy units throughout
 - **[Fitz]** — Fitzpatrick, *Plasma Physics: An Introduction*
 - **[CGL]** — Chew, Goldberger & Low (1956), double-adiabatic theory
 - **[Jack]** — Jackson, *Classical Electrodynamics*
+- **[Lyub]** — Lyubarsky (2005), relativistic MHD waves
+- **[MigBo]** — Mignone & Bodo (2005), relativistic MHD Riemann solvers
+- **[MigMc]** — Mignone & McKinney (2007), relativistic enthalpy and EOS
 
 
 ## 1. Densities and Moments
@@ -168,3 +171,74 @@ Methods for ODEs and PDEs*, §9.3). The convergence tests in
 `test_operators.py` use this approach with sinusoidal fields at three
 resolutions, checking interior points only to avoid the lower-order
 one-sided boundary stencils.
+
+
+## 8. Relativistic Corrections
+
+Relativistic corrections become important in magnetically dominated
+plasmas ($\sigma \gg 1$), relativistic reconnection (pair plasmas,
+pulsar wind nebulae), and relativistic jets. The existing non-relativistic
+formulas (Sections 3, 5) are recovered when $\gamma \to 1$ and
+$\sigma \to 0$. See [conventions.md § Relativistic Conventions](conventions.md#relativistic-conventions)
+for velocity variable choices and numerical considerations.
+
+[10] Several characteristic scales in Section 5 have relativistic
+generalizations listed here. When `physics.relativistic = true` in the
+simulation config, `compute()` (Step 13) should use these forms
+automatically. The non-relativistic limit is always recovered by setting
+$\gamma_L = 1$ (or equivalently $v \ll c$, $\sigma \ll 1$).
+
+### 8.1 Bulk-Flow Quantities
+
+| Name | Description | Normalized | Notes |
+|------|-------------|------------|-------|
+| `gamma_L` | Lorentz factor (from 3-velocity) | $\gamma = 1/\sqrt{1 - v^2/c^2}$ | bounded $[1, \infty)$ |
+| `gamma_L` | Lorentz factor (from 4-velocity) | $\gamma = \sqrt{1 + u^2/c^2}$ | numerically preferred near $v \approx c$ |
+| `sigma` | Magnetization [MigBo] | $B^2 / (\rho_m c^2)$ | $\sigma \gg 1$: magnetically dominated |
+| `e_k` (rel.) | Rel. kinetic energy density | $(\gamma - 1)\rho_m c^2$ | recovers $\frac{1}{2}\rho_m v^2$ for $v \ll c$ |
+| `v_A` (rel.) | Rel. Alfven speed [Lyub] | $c\sqrt{\sigma/(1+\sigma)}$ | $\to c$ as $\sigma \to \infty$; $\to B/\sqrt{\rho_m}$ for $\sigma \ll 1$ |
+| `c_s` (rel.) | Rel. sound speed [MigMc] | $c\sqrt{\gamma_{eos} P / (\rho_m h_{rel})}$ | uses relativistic enthalpy $h_{rel}$ |
+| `v_ms` (rel.) | Rel. magnetosonic speed [MigBo] | $\sqrt{v_A^2 + c_s^2 - v_A^2 c_s^2/c^2}$ | perp. propagation; always $< c$ |
+
+In normalized units where $c = 1$: $\sigma = B^2/\rho_m$,
+$v_A = \sqrt{\sigma/(1+\sigma)}$, and the magnetosonic composition
+simplifies to $v_{ms}^2 = v_A^2 + c_s^2 - v_A^2 c_s^2$.
+
+### 8.2 Thermal Corrections
+
+Relevant when the thermal energy approaches the rest mass energy
+($T \gtrsim mc^2$), as in relativistic pair plasma reconnection
+or hot accretion flows.
+
+| Name | Rel. form | Notes |
+|------|-----------|-------|
+| `omega_c` | $\|q\|B / (\gamma m)$ | $\gamma$ = thermal Lorentz factor; particles gyrate slower |
+| `omega_p` | $\omega_p / \sqrt{\langle\gamma\rangle}$ | mean thermal $\langle\gamma\rangle$; reduces effective plasma frequency |
+| `v_th` | $v_{th}/\sqrt{1 + v_{th}^2/c^2}$ | practical cap at $c$; proper treatment uses Juttner distribution |
+
+The thermal corrections use the mean thermal Lorentz factor
+$\langle\gamma\rangle$, which for a relativistic Maxwellian (Juttner
+distribution) depends on the dimensionless temperature
+$\Theta = T/(mc^2)$. For $\Theta \ll 1$ the classical results are
+recovered; for $\Theta \gg 1$ the ultra-relativistic limit applies.
+
+### 8.3 Which Gamma?
+
+Three distinct Lorentz factors arise in plasma analysis:
+
+- **$\gamma_{bulk}$** — from the fluid (bulk) velocity $\mathbf{V}$.
+  This is what `lorentz_factor()` computes from the moment velocity
+  fields `V1/V2/V3` or `u1/u2/u3`. Used in relativistic kinetic energy,
+  Alfven speed, and Mach numbers.
+
+- **$\langle\gamma\rangle_{thermal}$** — the mean Lorentz factor of the
+  thermal distribution. Relevant for cyclotron and plasma frequency
+  corrections (Section 8.2). Not directly available from fluid moments;
+  approximated from temperature as $\langle\gamma\rangle \approx 1 +
+  (5/2)\Theta$ for $\Theta \ll 1$.
+
+- **$\gamma_{particle}$** — the per-particle Lorentz factor from the
+  full distribution function. Only available in full particle data, not
+  from the moment-based fields that pypic analyzes. Relevant for
+  particle-level diagnostics (energy spectra, acceleration studies)
+  but outside the scope of fluid/moment derived quantities.

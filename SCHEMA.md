@@ -197,12 +197,15 @@ matching `[model] type` is expected to be present.
 omega_pe_over_omega_ce = 3.0       # frequency ratio (sets B relative to density)
 theta = 0.5                        # implicitness parameter (0.5 = Crank-Nicolson)
 speed_of_light = 1.0               # normalized c (always 1.0 in standard PIC normalization)
+relativistic = false               # true if the code solved relativistic equations;
+                                   # derived quantities use relativistic formulas when set
 # ... any other PIC parameters the code needs to document
 
 [physics.mhd]                      # MHD-specific parameters
 gamma = 1.6667                     # adiabatic index
 resistivity = 0.0                  # η (0 = ideal)
 hall_term = false                  # include Hall physics?
+relativistic = false               # true for relativistic MHD (RMHD)
 # ... any other MHD parameters
 ```
 
@@ -297,6 +300,8 @@ two-species case, `n_e` and `n_i` are accepted as aliases for `n_s0` and
 | `J1`, `J2`, `J3` | `Jx`, `Jy`, `Jz` | Current density | PIC (deposited), MHD (∇×B) |
 | `V1`, `V2`, `V3` | `Vx`, `Vy`, `Vz` | Ion bulk velocity / fluid velocity | PIC (moments), MHD |
 | `Ve1`, `Ve2`, `Ve3` | `Vex`, `Vey`, `Vez` | Electron bulk velocity | PIC |
+| `u1`, `u2`, `u3` | `ux`, `uy`, `uz` | Four-velocity spatial components ($\gamma v^i$) | Relativistic PIC |
+| `gamma_L` | — | Bulk Lorentz factor | Rel. PIC, Rel. MHD (derived) |
 | `P` | — | Total scalar pressure | MHD, PIC (moments) |
 | `Pe` | — | Electron scalar pressure | PIC, two-fluid MHD |
 | `Pi` | — | Ion scalar pressure | PIC, two-fluid MHD |
@@ -358,6 +363,7 @@ two-species case, `n_e` and `n_i` are accepted as aliases for `n_s0` and
 | `beta` | Plasma beta | `P`, `|B|` |
 | `beta_e` | Electron beta | `Pe`, `|B|` |
 | `beta_i` | Ion beta | `Pi`, `|B|` |
+| `sigma` | Magnetization parameter | `|B|`, `rho_m`, `c` |
 
 ### Other derived quantities
 
@@ -401,6 +407,9 @@ output_{step:06d}.h5
 │   ├── rho_m [dataset, float64, shape (n1, n2, n3)]  # MHD: mass density
 │   ├── J1    [dataset, float64, shape (n1, n2, n3)]
 │   ├── ...
+│   ├── u1    [dataset, float64, shape (n1, n2, n3)]  # optional: four-velocity (rel. PIC)
+│   ├── u2    [dataset, float64, shape (n1, n2, n3)]
+│   ├── u3    [dataset, float64, shape (n1, n2, n3)]
 │
 ├── grid/                         # group: grid metadata
 │   ├── dimensions  [attr: (n1, n2, n3)]

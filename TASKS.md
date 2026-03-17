@@ -72,6 +72,17 @@ Each step produces something testable. No step starts until the previous step's 
 - [ ] **Step 16: selections — SphereSelection**
   Non-axis-aligned selection via `xr.where()`. Points outside sphere = NaN, grid shape preserved. NaN propagation in derived quantities and plotting.
 
+- [ ] **Step 18: derived (relativistic) — relativistic derived quantities**
+  `lorentz_factor()` (from three-velocity or four-velocity).
+  `magnetization()` ($\sigma = B^2/\rho_m c^2$).
+  Extend ~9 functions with optional `lorentz_factor` parameter:
+  `kinetic_energy_density`, `alfven_speed`, `sound_speed`,
+  `magnetosonic_speed`, `gyrofrequency`, `plasma_frequency`,
+  `skin_depth`, `gyroradius`, `thermal_speed`.
+  Add `u1/u2/u3` aliases in `_build_aliases`.
+  Priority: bulk-flow corrections first, thermal second.
+  Tests: γ→1 recovers non-relativistic; σ→∞ gives v_A→c.
+
 ---
 
 ## Phase 5: Documentation
@@ -102,4 +113,5 @@ Each step produces something testable. No step starts until the previous step's 
 | **—** | **—** | **Milestone: daily-use tool** | **—** |
 | 15 | coordinates | Frame transforms | — |
 | 16 | selections | Sphere (NaN masking) | — |
+| 18 | derived | lorentz_factor, magnetization, rel. corrections | — |
 | 17 | docs | MkDocs site | — |

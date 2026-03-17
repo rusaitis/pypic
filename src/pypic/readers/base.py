@@ -115,7 +115,7 @@ _FIELD_PREFIX_PAIRS = (
     ("E", "E"),
     ("J", "J"),
     ("V", "V"),
-    ("v", "V"),
+    ("v", "V"),  # lowercase convenience alias
     ("Ve", "Ve"),
     ("S", "S"),
 )
@@ -166,6 +166,7 @@ def _build_grid_from_dataset(old_grid: GridInfo, new_ds: xr.Dataset) -> GridInfo
         dimensions=tuple(int(new_ds.sizes[name]) for _, name in surviving),
         spacing=tuple(old_grid.spacing[i] for i, _ in surviving),
         origin=tuple(
+            # invert cell-center formula: coord[0] = origin + 0.5*spacing
             float(new_ds.coords[name].values[0]) - 0.5 * old_grid.spacing[i]
             for i, name in surviving
         ),

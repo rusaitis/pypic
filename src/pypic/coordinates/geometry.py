@@ -101,10 +101,10 @@ class CoordinateGeometry:
             case GeometryType.SPHERICAL:
                 r = np.asarray(x1, dtype=np.float64)
                 theta = np.asarray(x2, dtype=np.float64)
-                return (_one, r, r * np.sin(theta))
+                return (_one, r, r * np.sin(theta))  # ds² = dr² + r²dθ² + r²sin²θ dφ²
             case GeometryType.CYLINDRICAL:
                 r = np.asarray(x1, dtype=np.float64)
-                return (_one, r, _one)
+                return (_one, r, _one)  # ds² = dr² + r²dφ² + dz²
             case _ as unreachable:
                 assert_never(unreachable)
 
