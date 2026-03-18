@@ -67,4 +67,7 @@ python_version = "3.13"
 
 [tool.pytest.ini_options]
 testpaths = ["tests", "src"]
-addopts = "--doctest-modules --strict-markers -ra"
+addopts = "--doctest-modules --strict-markers -ra -m 'not slow'"
+markers = [
+    "slow: long-running tests (deselected by default, run with: pytest -m slow)",
+]

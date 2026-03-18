@@ -1,0 +1,189 @@
+"""OpenGGCM simulation reader implementing the SimulationReader protocol."""
+
+from __future__ import annotations
+
+import logging
+import re
+from typing import TYPE_CHECKING
+
+import numpy as np
+import xarray as xr
+
+from pypic.coordinates.geometry import CARTESIAN
+from pypic.readers.base import FieldDataset, GridInfo
+from pypic.readers.openggcm._field_io import read_3df_file
+from pypic.readers.openggcm._field_map import (
+    DEFAULT_SKIP,
+    convert_fields_to_si,
+)
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    from pypic.readers.openggcm._grid import OpenGGCMGrid
+    from pypic.types import FloatArray
+    from pypic.units import Normalization
+
+log = logging.getLogger(__name__)
+
+_3DF_PATTERN = re.compile(r"\.3df\.(\d+)$")
+
+
+class OpenGGCMReader:
+    """Read OpenGGCM .3df field output on a non-uniform grid.
+
+    Parameters
+    ----------
+    grid : OpenGGCMGrid
+        Parsed grid definition.
+    prefix : str
+        Filename prefix (e.g. ``"gc012"`` for ``gc012.3df.006300``).
+    normalization : Normalization | None
+        If provided, data is normalized from SI to code units.  If
+        ``None``, data is returned in SI.
+    """
+
+    def __init__(
+        self,
+        grid: OpenGGCMGrid,
+        prefix: str,
+        normalization: Normalization | None = None,
+    ) -> None:
+        self._grid = grid
+        self._prefix = prefix
+        self._normalization = normalization
+
+    @property
+    def grid(self) -> OpenGGCMGrid:
+        """The OpenGGCM non-uniform grid."""
+        return self._grid
+
+    def available_timesteps(self, path: Path) -> list[int]:
+        """Return sorted list of available timestep indices.
+
+        Scans for ``{prefix}.3df.*`` files under *path*.
+
+        Parameters
+        ----------
+        path : Path
+            Directory containing .3df files.
+
+        Returns
+        -------
+        list[int]
+            Sorted timestep indices.
+        """
+        steps: list[int] = []
+        pattern = f"{self._prefix}.3df.*"
+        for entry in path.glob(pattern):
+            m = _3DF_PATTERN.search(entry.name)
+            if m:
+                steps.append(int(m.group(1)))
+        return sorted(steps)
+
+    def read_timestep(self, path: Path, step: int) -> FieldDataset:
+        """Read all fields for a single timestep.
+
+        Parameters
+        ----------
+        path : Path
+            Directory containing .3df files.
+        step : int
+            Timestep index (e.g. 6300).
+
+        Returns
+        -------
+        FieldDataset
+            Field data with canonical names in SI (or normalized) units.
+        """
+        filename = path / f"{self._prefix}.3df.{step:06d}"
+        if not filename.exists():
+            msg = f"File not found: {filename}"
+            raise FileNotFoundError(msg)
+
+        raw_fields, ts, nx, ny, nz = read_3df_file(
+            filename,
+            skip=DEFAULT_SKIP,
+        )
+
+        # Verify grid dimensions match
+        if (nx, ny, nz) != (self._grid.nx, self._grid.ny, self._grid.nz):
+            msg = (
+                f"Dimension mismatch: file ({nx}, {ny}, {nz}) vs "
+                f"grid ({self._grid.nx}, {self._grid.ny}, {self._grid.nz})"
+            )
+            raise ValueError(msg)
+
+        si_fields = convert_fields_to_si(raw_fields)
+
+        if self._normalization is not None:
+            norm = self._normalization
+            for name, data in si_fields.items():
+                si_fields[name] = _normalize_field(name, data, norm)
+
+        # Build xr.Dataset with non-uniform coordinates
+        dim_names = ["x", "y", "z"]
+        coords = {
+            "x": self._grid.x,
+            "y": self._grid.y,
+            "z": self._grid.z,
+        }
+        data_vars = {
+            name: xr.DataArray(data=arr, dims=dim_names)
+            for name, arr in si_fields.items()
+        }
+        dataset = xr.Dataset(data_vars, coords=coords)
+
+        # Build approximate GridInfo (mean spacing)
+        grid_info = _make_grid_info(self._grid)
+
+        return FieldDataset(
+            dataset,
+            grid_info,
+            self._normalization or _identity_normalization(),
+            metadata={"step": step, "timestep": ts, "prefix": self._prefix},
+        )
+
+
+def _make_grid_info(grid: OpenGGCMGrid) -> GridInfo:
+    """Create an approximate GridInfo from a non-uniform grid.
+
+    ``GridInfo`` requires uniform spacing, so we use mean spacing as an
+    approximation.  The true non-uniform coordinates live in the
+    ``xr.Dataset`` coords.
+    """
+    dx = (grid.x[-1] - grid.x[0]) / max(grid.nx - 1, 1)
+    dy = (grid.y[-1] - grid.y[0]) / max(grid.ny - 1, 1)
+    dz = (grid.z[-1] - grid.z[0]) / max(grid.nz - 1, 1)
+    return GridInfo(
+        dimensions=(grid.nx, grid.ny, grid.nz),
+        spacing=(float(np.abs(dx)), float(np.abs(dy)), float(np.abs(dz))),
+        origin=(float(grid.x[0]), float(grid.y[0]), float(grid.z[0])),
+        geometry=CARTESIAN,
+    )
+
+
+def _normalize_field(
+    name: str,
+    data: FloatArray,
+    norm: Normalization,
+) -> FloatArray:
+    """Normalize a single SI field to code units."""
+    if name in ("V1", "V2", "V3"):
+        return norm.normalize("velocity", data)  # type: ignore[return-value]
+    if name in ("B1", "B2", "B3"):
+        return norm.normalize("b_field", data)  # type: ignore[return-value]
+    if name == "rho_m":
+        return data / (norm.density_ref * norm.mass_ref)
+    if name == "n_s0":
+        return norm.normalize("density", data)  # type: ignore[return-value]
+    if name == "P":
+        return data / (norm.density_ref * norm.mass_ref * norm.velocity_ref**2)
+    return data
+
+
+def _identity_normalization() -> Normalization:
+    """Lazy import to avoid circular dependency."""
+    from pypic.units import Normalization
+
+    return Normalization.identity()
