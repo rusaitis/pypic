@@ -81,9 +81,9 @@ class TestPlasmaBeta:
         pressure = b**2 / 2.0
         np.testing.assert_allclose(plasma_beta(pressure, b), 1.0, rtol=1e-15)
 
-    def test_zero_b_gives_inf(self):
+    def test_zero_b_gives_nan(self):
         result = plasma_beta(np.array([1.0]), np.array([0.0]))
-        assert np.isinf(result[0])
+        assert np.isnan(result[0])
 
 
 class TestAlfvenSpeed:
@@ -97,9 +97,9 @@ class TestAlfvenSpeed:
             alfven_speed(np.array([1.0]), np.array([1.0])), 1.0, rtol=1e-15
         )
 
-    def test_zero_density_gives_inf(self):
+    def test_zero_density_gives_nan(self):
         result = alfven_speed(np.array([1.0]), np.array([0.0]))
-        assert np.isinf(result[0])
+        assert np.isnan(result[0])
 
 
 class TestEnergyDensities:
@@ -423,18 +423,18 @@ class TestMachNumbers:
             alfven_mach(np.array([6.0]), np.array([3.0])), 2.0, rtol=1e-15
         )
 
-    def test_alfven_mach_zero_va_gives_inf(self):
+    def test_alfven_mach_zero_va_gives_nan(self):
         result = alfven_mach(np.array([1.0]), np.array([0.0]))
-        assert np.isinf(result[0])
+        assert np.isnan(result[0])
 
     def test_magnetosonic_mach_value(self):
         np.testing.assert_allclose(
             magnetosonic_mach(np.array([10.0]), np.array([5.0])), 2.0, rtol=1e-15
         )
 
-    def test_magnetosonic_mach_zero_vms_gives_inf(self):
+    def test_magnetosonic_mach_zero_vms_gives_nan(self):
         result = magnetosonic_mach(np.array([1.0]), np.array([0.0]))
-        assert np.isinf(result[0])
+        assert np.isnan(result[0])
 
 
 # Shared fixtures for pressure tensor tests

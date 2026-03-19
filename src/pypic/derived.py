@@ -14,6 +14,17 @@ if TYPE_CHECKING:
     from pypic.types import FloatArray
 
 
+def _safe_divide(
+    numerator: FloatArray,
+    denominator: FloatArray,
+) -> FloatArray:
+    """Divide, returning nan where the denominator is zero."""
+    out = np.full_like(numerator, np.nan, dtype=np.float64)
+    nonzero = denominator != 0
+    np.divide(numerator, denominator, out=out, where=nonzero)
+    return out
+
+
 def _vector_magnitude(
     c1: FloatArray,
     c2: FloatArray,
@@ -177,7 +188,7 @@ def plasma_beta(
     >>> plasma_beta(np.array([1.0]), np.array([1.0]))
     array([2.])
     """
-    return 2.0 * pressure / b_magnitude**2
+    return _safe_divide(2.0 * pressure, b_magnitude**2)
 
 
 def alfven_speed(
@@ -208,7 +219,7 @@ def alfven_speed(
     >>> alfven_speed(np.array([1.0]), np.array([4.0]))
     array([0.5])
     """
-    return b / np.sqrt(rho_m)
+    return _safe_divide(b, np.sqrt(np.maximum(rho_m, 0.0)))
 
 
 def magnetic_energy_density(
@@ -408,7 +419,7 @@ def internal_energy(
     >>> internal_energy(np.array([1.0]), np.array([1.0]))
     array([1.5])
     """
-    return pressure / ((gamma - 1.0) * rho_m)
+    return _safe_divide(pressure, (gamma - 1.0) * rho_m)
 
 
 def enthalpy(
@@ -440,7 +451,7 @@ def enthalpy(
     >>> enthalpy(np.array([1.0]), np.array([1.0]))
     array([2.5])
     """
-    return gamma * pressure / ((gamma - 1.0) * rho_m)
+    return _safe_divide(gamma * pressure, (gamma - 1.0) * rho_m)
 
 
 def relativistic_enthalpy(
@@ -512,7 +523,8 @@ def entropy(
     >>> entropy(np.array([1.0]), np.array([1.0]))
     array([0.])
     """
-    return np.log(pressure / density**gamma)
+    ratio = _safe_divide(pressure, density**gamma)
+    return np.where(ratio > 0, np.log(np.maximum(ratio, np.finfo(float).tiny)), np.nan)
 
 
 def gyrotropic_entropy(
@@ -548,7 +560,8 @@ def gyrotropic_entropy(
     >>> gyrotropic_entropy(np.array([1.0]), np.array([1.0]), np.array([1.0]))
     array([0.])
     """
-    return np.log(p_parallel * p_perpendicular**2 / n**5)
+    ratio = _safe_divide(p_parallel * p_perpendicular**2, n**5)
+    return np.where(ratio > 0, np.log(np.maximum(ratio, np.finfo(float).tiny)), np.nan)
 
 
 def _unit_vector(
@@ -556,9 +569,12 @@ def _unit_vector(
     b2: FloatArray,
     b3: FloatArray,
 ) -> tuple[FloatArray, FloatArray, FloatArray]:
-    """Compute the unit vector of a 3-component vector field."""
+    """Compute the unit vector of a 3-component vector field.
+
+    Returns nan where the magnitude is zero.
+    """
     mag = _vector_magnitude(b1, b2, b3)
-    return b1 / mag, b2 / mag, b3 / mag
+    return _safe_divide(b1, mag), _safe_divide(b2, mag), _safe_divide(b3, mag)
 
 
 def thermal_speed(
@@ -730,7 +746,7 @@ def gyroradius(
     >>> gyroradius(np.array([1.0]), np.array([1.0]), charge=1.0, mass=1.0)
     array([1.])
     """
-    return np.sqrt(mass * temperature) / (np.abs(charge) * b_magnitude)  # type: ignore[no-any-return]
+    return _safe_divide(np.sqrt(mass * temperature), np.abs(charge) * b_magnitude)
 
 
 def debye_length(
@@ -764,7 +780,7 @@ def debye_length(
     >>> debye_length(np.array([1.0]), np.array([1.0]), charge=1.0)
     array([1.])
     """
-    return np.sqrt(temperature / (density * charge**2))
+    return np.sqrt(_safe_divide(temperature, density * charge**2))
 
 
 def sound_speed(
@@ -796,7 +812,7 @@ def sound_speed(
     >>> sound_speed(np.array([3.0]), np.array([5.0]))
     array([1.])
     """
-    return np.sqrt(gamma * pressure / rho_m)
+    return np.sqrt(_safe_divide(gamma * pressure, rho_m))
 
 
 def ion_acoustic_speed(
@@ -897,7 +913,7 @@ def alfven_mach(
     >>> alfven_mach(np.array([2.0]), np.array([1.0]))
     array([2.])
     """
-    return v_magnitude / v_alfven
+    return _safe_divide(v_magnitude, v_alfven)
 
 
 def magnetosonic_mach(
@@ -926,7 +942,7 @@ def magnetosonic_mach(
     >>> magnetosonic_mach(np.array([5.0]), np.array([5.0]))
     array([1.])
     """
-    return v_magnitude / v_magnetosonic
+    return _safe_divide(v_magnitude, v_magnetosonic)
 
 
 def parallel_pressure(
@@ -1138,7 +1154,7 @@ def agyrotropy(
 
     i_2 = (i_1**2 - n_f) / 2.0
 
-    result: FloatArray = 1.0 - 4.0 * i_2 / i_1**2
+    result: FloatArray = 1.0 - _safe_divide(4.0 * i_2, i_1**2)
     return result
 
 

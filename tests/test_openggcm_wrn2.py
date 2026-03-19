@@ -8,6 +8,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+from pypic.readers.openggcm._field_map import convert_fields_to_si
 from pypic.readers.openggcm._wrn2 import (
     _build_exp_lut,
     _classify_rle_bytes,
@@ -343,7 +344,24 @@ class TestDecompressFieldVectorized:
         np.testing.assert_array_equal(result, expected)
 
 
-@pytest.mark.slow
+class TestConvertFieldsPassthrough:
+    """Unknown fields pass through convert_fields_to_si with native names."""
+
+    def test_unknown_field_included(self) -> None:
+        raw = {
+            "vx": np.ones(10),
+            "custom_field": np.full(10, 42.0),
+        }
+        si = convert_fields_to_si(raw)
+        assert "V1" in si
+        np.testing.assert_array_equal(si["custom_field"], 42.0)
+
+    def test_unknown_field_not_converted(self) -> None:
+        raw = {"unknown_thing": np.array([1.0, 2.0, 3.0])}
+        si = convert_fields_to_si(raw)
+        np.testing.assert_array_equal(si["unknown_thing"], [1.0, 2.0, 3.0])
+
+
 @pytest.mark.skipif(
     not _EXAMPLE_3DF.exists(),
     reason="Example data not available",

@@ -13,8 +13,8 @@ from pypic.coordinates.geometry import CARTESIAN
 from pypic.readers._simple import (
     SimpleReader,
     _parse_file_pattern,
+    can_read_confidence,
     open_simple,
-    probe,
 )
 from pypic.readers.base import (
     GridInfo,
@@ -346,12 +346,14 @@ class TestFieldMapping:
         reader = SimpleReader(field_map=partial_map)
         ds = reader.read_timestep(mapped_dir, 0)
         assert ds.has_field("B1")
-        # Unmapped fields keep their native names
+        # Unmapped fields pass through with native names
         assert ds.has_field("density")
+        assert ds.has_field("magnetic_y")
+        assert ds.has_field("magnetic_z")
 
 
 class TestFieldsAtRoot:
-    def test_root_level_datasets(self, tmp_path: Path) -> None:
+    def test_explicit_root(self, tmp_path: Path) -> None:
         _write_h5(
             tmp_path / "output_000000.h5",
             _make_fields(),
@@ -361,6 +363,39 @@ class TestFieldsAtRoot:
         reader = SimpleReader(fields_group="")
         ds = reader.read_timestep(tmp_path, 0)
         assert ds.has_field("B1")
+
+    def test_default_falls_back_to_root(
+        self, tmp_path: Path,
+    ) -> None:
+        """Default fields_group='fields' falls back to root."""
+        _write_h5(
+            tmp_path / "output_000000.h5",
+            _make_fields(),
+            fields_group="",
+            grid_attrs=_grid_attrs(),
+        )
+        # Default SimpleReader — no fields_group override
+        reader = SimpleReader()
+        ds = reader.read_timestep(tmp_path, 0)
+        assert ds.has_field("B1")
+
+    def test_scalars_skipped_without_field_map(
+        self, tmp_path: Path,
+    ) -> None:
+        """Scalar datasets at root are not read as fields."""
+        filepath = tmp_path / "output_000000.h5"
+        with h5py.File(filepath, "w") as f:
+            f.create_dataset("B1", data=np.ones(DIMS))
+            f.create_dataset("step", data=42)  # scalar
+            f.create_dataset("x", data=np.arange(4.0))  # 1-D
+            g = f.create_group("grid")
+            for k, v in _grid_attrs().items():
+                g.attrs[k] = v
+        reader = SimpleReader()
+        ds = reader.read_timestep(tmp_path, 0)
+        assert ds.has_field("B1")
+        assert not ds.has_field("step")
+        assert not ds.has_field("x")
 
 
 class TestMissingMetadataError:
@@ -383,32 +418,38 @@ class TestOpenSimple:
     def test_with_hdf5_metadata(
         self, canonical_dir: Path,
     ) -> None:
-        reader, config = open_simple(canonical_dir)
-        assert config.model_name == "test_sim"
-        assert config.model_type == "MHD"
-        assert config.grid.dimensions == DIMS
+        sim = open_simple(canonical_dir)
+        assert sim.model_name == "test_sim"
+        assert sim.model_type == "MHD"
+        assert sim.grid.dimensions == DIMS
 
-        ds = reader.read_timestep(canonical_dir, 0)
+        ds = sim.read(step=0)
         assert ds.has_field("B1")
 
     def test_with_explicit_config(
         self, bare_dir: Path,
     ) -> None:
         config = _sample_config()
-        reader, returned_config = open_simple(
-            bare_dir, config=config,
-        )
-        assert returned_config is config
-        ds = reader.read_timestep(bare_dir, 0)
+        sim = open_simple(bare_dir, config=config)
+        assert sim.config is config
+        ds = sim.read(step=0)
         assert ds.grid.dimensions == DIMS
 
     def test_with_explicit_grid(
         self, bare_dir: Path,
     ) -> None:
         grid = _sample_grid()
-        reader, config = open_simple(bare_dir, grid=grid)
-        assert config.grid.dimensions == DIMS
-        ds = reader.read_timestep(bare_dir, 0)
+        sim = open_simple(bare_dir, grid=grid)
+        assert sim.grid.dimensions == DIMS
+        ds = sim.read(step=0)
+        assert ds.has_field("B1")
+
+    def test_tuple_unpacking_still_works(
+        self, canonical_dir: Path,
+    ) -> None:
+        reader, config = open_simple(canonical_dir)
+        assert config.model_name == "test_sim"
+        ds = reader.read_timestep(canonical_dir, 0)
         assert ds.has_field("B1")
 
     def test_no_files_raises(self, tmp_path: Path) -> None:
@@ -491,9 +532,9 @@ frame = "simulation"
         assert ds.has_field("B1")
 
 
-class TestProbe:
+class TestCanReadConfidence:
     def test_empty_dir(self, tmp_path: Path) -> None:
-        assert probe(tmp_path) == 0.0
+        assert can_read_confidence(tmp_path) == 0.0
 
     def test_generic_h5(self, tmp_path: Path) -> None:
         _write_h5(
@@ -501,7 +542,7 @@ class TestProbe:
             {"x": np.zeros(4)},
             fields_group="",
         )
-        assert probe(tmp_path) > 0.0
+        assert can_read_confidence(tmp_path) > 0.0
 
     def test_canonical_h5(self, tmp_path: Path) -> None:
         _write_h5(
@@ -509,13 +550,122 @@ class TestProbe:
             _make_fields(),
             grid_attrs=_grid_attrs(),
         )
-        score = probe(tmp_path)
+        score = can_read_confidence(tmp_path)
         assert score >= 0.5
 
     def test_not_a_directory(self, tmp_path: Path) -> None:
         f = tmp_path / "file.txt"
         f.touch()
-        assert probe(f) == 0.0
+        assert can_read_confidence(f) == 0.0
+
+
+class TestCustomReadRaw:
+    def test_subclass_bypasses_hdf5(
+        self, tmp_path: Path,
+    ) -> None:
+        """Custom _read_raw returns arrays without reading files."""
+
+        class InMemoryReader(SimpleReader):
+            def _read_raw(
+                self, filepath: Any,
+            ) -> dict[str, np.ndarray]:
+                return _make_fields()
+
+        reader = InMemoryReader(grid=_sample_grid())
+        ds = reader.read_timestep(tmp_path, 0)
+        assert ds.has_field("B1")
+        assert ds.has_field("rho_m")
+        assert ds.grid.dimensions == DIMS
+        expected = _make_fields()
+        assert_allclose(ds["B1"], expected["B1"])
+
+    def test_field_map_applied_after_read_raw(
+        self, tmp_path: Path,
+    ) -> None:
+        """field_map renames native names from _read_raw."""
+        rng = np.random.default_rng(77)
+        native_data = {
+            "mag_x": rng.standard_normal(DIMS),
+            "mag_y": rng.standard_normal(DIMS),
+            "mag_z": rng.standard_normal(DIMS),
+        }
+
+        class NativeReader(SimpleReader):
+            def _read_raw(
+                self, filepath: Any,
+            ) -> dict[str, np.ndarray]:
+                return dict(native_data)
+
+        reader = NativeReader(
+            field_map={
+                "mag_x": "B1",
+                "mag_y": "B2",
+                "mag_z": "B3",
+            },
+            grid=_sample_grid(),
+        )
+        ds = reader.read_timestep(tmp_path, 0)
+        assert ds.has_field("B1")
+        assert ds.has_field("Bx")
+        assert not ds.has_field("mag_x")
+        assert_allclose(ds["B1"], native_data["mag_x"])
+
+    def test_missing_grid_raises(
+        self, tmp_path: Path,
+    ) -> None:
+        """Custom _read_raw without grid raises ValueError."""
+
+        class NoFileReader(SimpleReader):
+            def _read_raw(
+                self, filepath: Any,
+            ) -> dict[str, np.ndarray]:
+                return _make_fields()
+
+        reader = NoFileReader()
+        with pytest.raises(ValueError, match="grid"):
+            reader.read_timestep(tmp_path, 0)
+
+    def test_config_provides_grid(
+        self, tmp_path: Path,
+    ) -> None:
+        """config can provide grid for custom _read_raw."""
+
+        class NoFileReader(SimpleReader):
+            def _read_raw(
+                self, filepath: Any,
+            ) -> dict[str, np.ndarray]:
+                return _make_fields()
+
+        config = _sample_config()
+        reader = NoFileReader(config=config)
+        ds = reader.read_timestep(tmp_path, 0)
+        assert ds.grid.dimensions == DIMS
+        assert ds.physics["gamma"] == pytest.approx(5.0 / 3.0)
+
+    def test_transposed_hdf5(
+        self, tmp_path: Path,
+    ) -> None:
+        """Custom _read_raw can transpose arrays from HDF5."""
+        rng = np.random.default_rng(42)
+        original = rng.standard_normal(DIMS)
+        filepath = tmp_path / "output_000000.h5"
+        with h5py.File(filepath, "w") as f:
+            f.create_dataset("B1", data=original.T)
+
+        class TransposedReader(SimpleReader):
+            def _read_raw(
+                self, filepath: Any,
+            ) -> dict[str, np.ndarray]:
+                with h5py.File(filepath, "r") as f:
+                    return {
+                        name: np.asarray(f[name]).T
+                        for name in f
+                        if isinstance(f[name], h5py.Dataset)
+                    }
+
+        reader = TransposedReader(grid=_sample_grid())
+        ds = reader.read_timestep(tmp_path, 0)
+        assert_allclose(ds["B1"], original)
 
 
 class TestProtocolCompliance:

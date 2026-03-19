@@ -23,14 +23,17 @@ class TestL2RelativeError:
             l2_relative_error(computed, reference), expected, rtol=1e-15
         )
 
+    @pytest.mark.filterwarnings("ignore::RuntimeWarning")
     def test_zero_reference_gives_inf(self):
         result = l2_relative_error(np.array([1.0]), np.array([0.0]))
         assert np.isinf(result)
 
+    @pytest.mark.filterwarnings("ignore::RuntimeWarning")
     def test_both_zero_gives_nan(self):
         result = l2_relative_error(np.array([0.0]), np.array([0.0]))
         assert np.isnan(result)
 
+    @pytest.mark.filterwarnings("ignore::RuntimeWarning")
     def test_multidimensional(self):
         a = np.ones((3, 4))
         b = np.zeros((3, 4))

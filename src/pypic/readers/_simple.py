@@ -13,8 +13,10 @@ To add a reader for your simulation code, either:
 2. **Subclass** and override ``_read_raw`` for non-standard layouts::
 
        class TristanReader(SimpleReader):
-           def _read_raw(self, f, step):
-               return {k: np.array(f[k]) for k in f}
+           def _read_raw(self, filepath):
+               with h5py.File(filepath, "r") as f:
+                   return {k: np.array(f[k]).T for k in f
+                           if isinstance(f[k], h5py.Dataset)}
 
 3. **Register** for auto-detection via ``open_simulation``::
 
@@ -42,12 +44,13 @@ from pypic.coordinates.geometry import (
     SPHERICAL,
     CoordinateGeometry,
 )
-from pypic.readers.base import FieldDataset, GridInfo, SimulationConfig
+from pypic.readers.base import FieldDataset, GridInfo, SimulationConfig, TabularData
 from pypic.units import Normalization
 
 if TYPE_CHECKING:
     from pathlib import Path
 
+    from pypic.readers._registry import Simulation
     from pypic.types import FloatArray
     from pypic.units import SpeciesInfo
 
@@ -119,10 +122,7 @@ def _read_grid_attrs(f: h5py.File) -> GridInfo | None:
     boundary: tuple[str, ...] | None = None
     if "boundary" in attrs:
         raw = attrs["boundary"]
-        boundary = tuple(
-            b.decode() if isinstance(b, bytes) else str(b)
-            for b in raw
-        )
+        boundary = tuple(b.decode() if isinstance(b, bytes) else str(b) for b in raw)
 
     return GridInfo(
         dimensions=dims,
@@ -241,14 +241,16 @@ class SimpleReader:
         return sorted(steps)
 
     def read_timestep(
-        self, path: Path, step: int,
+        self,
+        path: Path,
+        step: int,
     ) -> FieldDataset:
         """Read field data for a single timestep.
 
         Parameters
         ----------
         path : Path
-            Directory containing the HDF5 files.
+            Directory containing the data files.
         step : int
             Timestep index.
 
@@ -260,21 +262,42 @@ class SimpleReader:
         Raises
         ------
         FileNotFoundError
-            If the expected file does not exist.
+            If the expected file does not exist (default I/O path).
         ValueError
-            If grid metadata is missing from both the HDF5 file
+            If grid metadata is missing from both the file
             and ``config``.
         """
-        filename = path / self._file_pattern.format(step=step)
-        if not filename.exists():
-            msg = f"File not found: {filename}"
+        filepath = path / self._file_pattern.format(step=step)
+
+        if not self._is_read_raw_overridden() and not filepath.exists():
+            msg = f"File not found: {filepath}"
             raise FileNotFoundError(msg)
 
-        with h5py.File(filename, "r") as f:
-            fields = self._read_fields(f)
-            grid = self._resolve_grid(f, filename)
-            normalization = self._resolve_normalization(f)
-            metadata = self._read_metadata(f, step)
+        raw = self._read_raw(filepath)
+        fields = self._apply_field_map(raw)
+
+        if self._is_read_raw_overridden():
+            grid = self._grid
+            if grid is None and self._config is not None:
+                grid = self._config.grid
+            if grid is None:
+                msg = (
+                    "Custom _read_raw requires grid metadata. "
+                    "Pass grid=GridInfo(...) or "
+                    "config=SimulationConfig(...)."
+                )
+                raise ValueError(msg)
+            normalization = (
+                self._normalization
+                or (self._config.normalization if self._config else None)
+                or Normalization.identity()
+            )
+            metadata: dict[str, Any] = {"step": step}
+        else:
+            with h5py.File(filepath, "r") as f:
+                grid = self._resolve_grid(f, filepath)
+                normalization = self._resolve_normalization(f)
+                metadata = self._read_metadata(f, step)
 
         physics: dict[str, Any] = {}
         species: tuple[SpeciesInfo, ...] = ()
@@ -291,33 +314,108 @@ class SimpleReader:
             metadata=metadata,
         )
 
-    def _read_fields(
-        self, f: h5py.File,
+    def _read_raw(
+        self,
+        filepath: Path,
     ) -> dict[str, FloatArray]:
-        """Read field arrays from the configured HDF5 group."""
-        group: h5py.Group | h5py.File
-        if self._fields_group:
-            if self._fields_group not in f:
-                msg = (
-                    f"Group {self._fields_group!r} not found in "
-                    f"{f.filename}. Available: {list(f.keys())}"
-                )
-                raise KeyError(msg)
-            group = f[self._fields_group]
-        else:
-            group = f
+        r"""Read raw arrays from a single file.
 
+        Returns arrays keyed by **native** field names (before
+        ``field_map`` is applied).  The parent class handles renaming,
+        grid resolution, and ``FieldDataset`` construction.
+
+        Override this method to support non-standard file formats
+        (binary, NetCDF, transposed HDF5, multi-file, etc.).  When
+        overridden, grid metadata must come from ``grid=`` or
+        ``config=`` — the framework will not try to read HDF5
+        attributes.
+
+        Parameters
+        ----------
+        filepath : Path
+            Full path to the data file.
+
+        Returns
+        -------
+        dict[str, FloatArray]
+            Arrays keyed by native (pre-mapping) field names.
+        """
+        with h5py.File(filepath, "r") as f:
+            group = self._resolve_fields_group(f)
+            if self._field_map is not None:
+                return self._read_mapped_native(group)
+            return self._read_all_arrays(group)
+
+    def _apply_field_map(
+        self,
+        raw: dict[str, FloatArray],
+    ) -> dict[str, FloatArray]:
+        """Rename native field names to canonical using ``field_map``."""
+        if self._field_map is None:
+            return raw
+        return {self._field_map.get(k, k): v for k, v in raw.items()}
+
+    def _is_read_raw_overridden(self) -> bool:
+        """Check whether a subclass overrides ``_read_raw``."""
+        return type(self)._read_raw is not SimpleReader._read_raw
+
+    def _resolve_fields_group(
+        self,
+        f: h5py.File,
+    ) -> h5py.Group | h5py.File:
+        """Resolve the HDF5 group containing field datasets.
+
+        Tries ``fields_group`` first; falls back to root when the
+        group is ``"fields"`` and doesn't exist.
+        """
+        if not self._fields_group:
+            return f
+        if self._fields_group in f:
+            return f[self._fields_group]
+        if self._fields_group != "fields":
+            msg = (
+                f"Group {self._fields_group!r} not found in "
+                f"{f.filename}. Available: {list(f.keys())}"
+            )
+            raise KeyError(msg)
+        # "fields" not found → fall back to root silently
+        return f
+
+    def _read_mapped_native(
+        self,
+        group: h5py.Group | h5py.File,
+    ) -> dict[str, FloatArray]:
+        """Read all datasets from the group, return native names.
+
+        Mapped fields are included unconditionally.  Unmapped fields
+        are included only when they have ndim >= 2 (skipping scalars
+        and 1-D coordinate arrays).
+        """
+        assert self._field_map is not None
+        mapped_native = set(self._field_map.keys())
         fields: dict[str, FloatArray] = {}
         for name in group:
-            if not isinstance(group[name], h5py.Dataset):
+            ds = group[name]
+            if not isinstance(ds, h5py.Dataset):
                 continue
-            canonical = name
-            if self._field_map is not None:
-                canonical = self._field_map.get(name, name)
-            data: FloatArray = np.asarray(
-                group[name], dtype=np.float64,
-            )
-            fields[canonical] = data
+            if name not in mapped_native and ds.ndim < 2:
+                continue
+            fields[name] = np.asarray(ds, dtype=np.float64)
+        return fields
+
+    def _read_all_arrays(
+        self,
+        group: h5py.Group | h5py.File,
+    ) -> dict[str, FloatArray]:
+        """Read all datasets with ndim >= 2 (skip scalars, coords)."""
+        fields: dict[str, FloatArray] = {}
+        for name in group:
+            ds = group[name]
+            if not isinstance(ds, h5py.Dataset):
+                continue
+            if ds.ndim < 2:
+                continue
+            fields[name] = np.asarray(ds, dtype=np.float64)
         return fields
 
     def _resolve_grid(
@@ -341,7 +439,8 @@ class SimpleReader:
         raise ValueError(msg)
 
     def _resolve_normalization(
-        self, f: h5py.File,
+        self,
+        f: h5py.File,
     ) -> Normalization:
         """Get normalization: explicit > config > identity."""
         if self._normalization is not None:
@@ -363,8 +462,44 @@ class SimpleReader:
             meta["step"] = int(f.attrs["step"])
         return meta
 
+    def available_auxiliary(self, path: Path) -> list[str]:
+        """Return names of available auxiliary datasets.
 
-def probe(path: Path) -> float:
+        Default returns ``[]``.  Subclasses may override.
+
+        Parameters
+        ----------
+        path : Path
+            Simulation output directory.
+
+        Returns
+        -------
+        list[str]
+        """
+        return []
+
+    def load_auxiliary(self, path: Path, name: str) -> TabularData:
+        """Load a named auxiliary dataset.
+
+        Default raises ``KeyError``.  Subclasses may override.
+
+        Parameters
+        ----------
+        path : Path
+            Simulation output directory.
+        name : str
+            Dataset name.
+
+        Raises
+        ------
+        KeyError
+            Always, unless overridden by a subclass.
+        """
+        msg = f"No auxiliary dataset {name!r}"
+        raise KeyError(msg)
+
+
+def can_read_confidence(path: Path) -> float:
     """Estimate confidence that *path* contains canonical HDF5 output.
 
     Low confidence by design — specific readers (iPIC3D, BATSRUS)
@@ -373,7 +508,7 @@ def probe(path: Path) -> float:
     Parameters
     ----------
     path : Path
-        Directory to probe.
+        Directory to check.
 
     Returns
     -------
@@ -395,7 +530,7 @@ def probe(path: Path) -> float:
             if "grid" in f:
                 score += 0.2
     except Exception:
-        log.debug("Failed to probe %s", h5_file, exc_info=True)
+        log.debug("Failed to read %s", h5_file, exc_info=True)
 
     return min(score, 1.0)
 
@@ -410,8 +545,14 @@ def open_simple(
     config: SimulationConfig | None = None,
     config_path: Path | None = None,
     fields_group: str = "fields",
-) -> tuple[SimpleReader, SimulationConfig]:
+) -> Simulation:
     """Open a directory of HDF5 files.
+
+    Returns a `Simulation` object::
+
+        sim = open_simple(path, field_map={...})
+        sim.steps               # [0, 100, 200]
+        ds = sim.read(step=100)
 
     Metadata resolution (each level overrides the next):
 
@@ -445,9 +586,10 @@ def open_simple(
 
     Returns
     -------
-    tuple[SimpleReader, SimulationConfig]
-        ``(reader, config)`` pair.
+    Simulation
+        Wraps the reader, config, and path.
     """
+    from pypic.readers._registry import Simulation
     from pypic.readers.config import load_config
 
     path_obj = path if hasattr(path, "glob") else __import__("pathlib").Path(path)
@@ -466,7 +608,7 @@ def open_simple(
             config=config,
             fields_group=fields_group,
         )
-        return reader, config
+        return Simulation(reader, config, path_obj)
 
     # Auto-detect from first HDF5 file + explicit args
     glob_pat, _ = _parse_file_pattern(file_pattern)
@@ -515,10 +657,10 @@ def open_simple(
         config=auto_config,
         fields_group=fields_group,
     )
-    return reader, auto_config
+    return Simulation(reader, auto_config, path_obj)
 
 
 # Self-register with the reader registry
 from pypic.readers._registry import register_reader as _register_reader  # noqa: E402
 
-_register_reader("simple", probe, open_simple)
+_register_reader("simple", can_read_confidence, open_simple)  # type: ignore[arg-type]

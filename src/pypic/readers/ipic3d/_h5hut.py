@@ -9,8 +9,9 @@ from typing import TYPE_CHECKING
 import h5py  # type: ignore[import-untyped]
 import numpy as np
 
-from pypic.readers.base import FieldDataset
+from pypic.readers.base import FieldDataset, TabularData
 from pypic.readers.ipic3d._config import IPic3DConfig, to_simulation_config
+from pypic.readers.ipic3d._conserved import detect_conserved, load_ipic3d_auxiliary
 from pypic.readers.ipic3d._field_map import (
     _FIELD_NAME_MAP,
     _H5HUT_FIELD_MAP,
@@ -126,15 +127,20 @@ class IPic3DH5hutReader:
             block = step_group["Block"]
             available = set(block.keys())
 
+            # Track which native keys are consumed by known-field logic
+            consumed: set[str] = set()
+
             # Electromagnetic fields (Bx→B1, Ex→E1, etc.)
             for ipic_name, canon_name in _FIELD_NAME_MAP.items():
                 if ipic_name in available:
                     fields[canon_name] = _read_field(block, ipic_name)
+                    consumed.add(ipic_name)
 
             # H5hut-specific fields (Vfx→V1, divB→div_B)
             for ipic_name, canon_name in _H5HUT_FIELD_MAP.items():
                 if ipic_name in available:
                     fields[canon_name] = _read_field(block, ipic_name)
+                    consumed.add(ipic_name)
 
             # Per-species charge density and currents
             # Stored as rho/(4pi) and J/(4pi) -- Gaussian convention
@@ -144,6 +150,7 @@ class IPic3DH5hutReader:
                 if rho_key in available:
                     canon = per_species_canonical("rho", s)
                     fields[canon] = gaussian_density_to_si(_read_field(block, rho_key))
+                    consumed.add(rho_key)
 
                 # Current density: Jx_{s} → J1_s{s}, etc.
                 for comp in ("Jx", "Jy", "Jz"):
@@ -153,6 +160,7 @@ class IPic3DH5hutReader:
                         fields[canon] = gaussian_current_to_si(
                             _read_field(block, j_key)
                         )
+                        consumed.add(j_key)
 
                 # Pressure tensor: Pxx_{s} → P11_s{s}, etc.
                 for pcomp in _PRESSURE_COMPONENT_MAP:
@@ -176,6 +184,11 @@ class IPic3DH5hutReader:
                         # Pressure tensor stored as P/(4π) — Gaussian convention
                         data = gaussian_pressure_to_si(data)
                         fields[canon] = data
+                        consumed.add(p_key)
+
+            # Pass through unknown fields with native names, no conversion
+            for native_name in available - consumed:
+                fields[native_name] = _read_field(block, native_name)
 
         # Compute totals by summing over species
         for moment_comp, canon_total in _MOMENT_COMPONENT_MAP.items():
@@ -198,3 +211,11 @@ class IPic3DH5hutReader:
             physics=dict(sc.physics),
             metadata={**dict(sc.metadata), "step": step},
         )
+
+    def available_auxiliary(self, path: Path) -> list[str]:
+        """Return names of auxiliary datasets at *path*."""
+        return detect_conserved(path)
+
+    def load_auxiliary(self, path: Path, name: str) -> TabularData:
+        """Load a named auxiliary dataset from *path*."""
+        return load_ipic3d_auxiliary(path, name)

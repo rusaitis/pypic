@@ -8,7 +8,7 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 
-def probe(path: Path) -> float:
+def can_read_confidence(path: Path) -> float:
     """Estimate confidence that *path* contains BATSRUS output.
 
     Detection signals (additive, capped at 1.0):
@@ -22,7 +22,7 @@ def probe(path: Path) -> float:
     Parameters
     ----------
     path : Path
-        Directory to probe.
+        Directory to check.
 
     Returns
     -------

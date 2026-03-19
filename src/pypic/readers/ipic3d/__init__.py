@@ -13,11 +13,12 @@ from pypic.readers.ipic3d._config import (
 )
 from pypic.readers.ipic3d._conserved import (
     ConservedQuantities,
+    conserved_to_tabular,
     load_conserved_quantities,
 )
 from pypic.readers.ipic3d._h5hut import IPic3DH5hutReader
 from pypic.readers.ipic3d._parallel import IPic3DParallelReader
-from pypic.readers.ipic3d._probe import probe
+from pypic.readers.ipic3d._probe import can_read_confidence
 from pypic.readers.ipic3d._serial import IPic3DSerialReader
 
 if TYPE_CHECKING:
@@ -31,11 +32,12 @@ __all__ = [
     "IPic3DH5hutReader",
     "IPic3DParallelReader",
     "IPic3DSerialReader",
+    "can_read_confidence",
+    "conserved_to_tabular",
     "load_conserved_quantities",
     "open_ipic3d",
     "parse_inp",
     "parse_settings_hdf",
-    "probe",
     "to_simulation_config",
     "to_toml",
 ]
@@ -115,4 +117,4 @@ def open_ipic3d(
 # Self-register with the reader registry
 from pypic.readers._registry import register_reader as _register_reader  # noqa: E402
 
-_register_reader("ipic3d", probe, open_ipic3d)
+_register_reader("ipic3d", can_read_confidence, open_ipic3d)

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import copy
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Any, Protocol, assert_never, runtime_checkable
 
@@ -554,3 +554,126 @@ class SimulationConfig:
     physics: dict[str, Any]
     frame: str
     metadata: dict[str, Any]
+
+
+@dataclass(frozen=True, slots=True)
+class TabularData:
+    r"""Generic columnar container for auxiliary time-series data.
+
+    Stores named 1-D arrays sharing a common length, with optional
+    index column designation.  Used for conserved quantities, solver
+    diagnostics, virtual satellite probes, etc.
+
+    Parameters
+    ----------
+    name : str
+        Dataset label (e.g. ``"conserved_quantities"``).
+    columns : dict[str, FloatArray]
+        Column name → 1-D array mapping.  All arrays must have
+        the same length.
+    index_column : str | None
+        Which column serves as the index (e.g. ``"cycle"``).
+        ``None`` means row-indexed.
+    metadata : dict[str, Any]
+        Source info (reader name, file path, etc.).
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> tab = TabularData(
+    ...     name="diagnostics",
+    ...     columns={"cycle": np.array([0.0, 1.0, 2.0]),
+    ...              "energy": np.array([1.0, 0.9, 0.8])},
+    ...     index_column="cycle",
+    ... )
+    >>> tab["energy"]
+    array([1. , 0.9, 0.8])
+    >>> len(tab)
+    3
+    >>> "cycle" in tab
+    True
+    >>> tab.column_names
+    ['cycle', 'energy']
+    """
+
+    name: str
+    columns: dict[str, FloatArray]
+    index_column: str | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        if not self.columns:
+            return
+        lengths = {k: len(v) for k, v in self.columns.items()}
+        unique_lengths = set(lengths.values())
+        if len(unique_lengths) > 1:
+            msg = f"All columns must have equal length, got {lengths}"
+            raise ValueError(msg)
+        if self.index_column is not None and self.index_column not in self.columns:
+            msg = (
+                f"index_column {self.index_column!r} not found "
+                f"in columns: {sorted(self.columns)}"
+            )
+            raise ValueError(msg)
+
+    def __getitem__(self, key: str) -> FloatArray:
+        """Return a column by name.
+
+        Parameters
+        ----------
+        key : str
+            Column name.
+
+        Returns
+        -------
+        FloatArray
+
+        Raises
+        ------
+        KeyError
+            If *key* is not a column name.
+        """
+        try:
+            return self.columns[key]
+        except KeyError:
+            msg = f"Column {key!r} not found. Available: {sorted(self.columns)}"
+            raise KeyError(msg) from None
+
+    def __contains__(self, key: object) -> bool:
+        """Check whether *key* is a column name."""
+        return key in self.columns
+
+    def __len__(self) -> int:
+        """Return the number of rows (common array length)."""
+        if not self.columns:
+            return 0
+        return len(next(iter(self.columns.values())))
+
+    @property
+    def column_names(self) -> list[str]:
+        """Sorted list of column names."""
+        return sorted(self.columns)
+
+    @property
+    def index(self) -> FloatArray:
+        """Index array: the designated index column, or ``np.arange(len)``."""
+        if self.index_column is not None:
+            return self.columns[self.index_column]
+        return np.arange(len(self), dtype=np.float64)
+
+
+@runtime_checkable
+class AuxiliaryDataReader(Protocol):
+    """Opt-in protocol for readers that provide auxiliary tabular data.
+
+    Readers implement this alongside ``SimulationReader`` to advertise
+    and load non-field data (conserved quantities, diagnostics, probes).
+    """
+
+    def available_auxiliary(self, path: Path) -> list[str]:
+        """Return names of auxiliary datasets discoverable at *path*."""
+        ...
+
+    def load_auxiliary(self, path: Path, name: str) -> TabularData:
+        """Load a named auxiliary dataset from *path*."""
+        ...

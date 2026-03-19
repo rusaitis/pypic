@@ -8,8 +8,9 @@ from typing import TYPE_CHECKING
 import h5py  # type: ignore[import-untyped]
 import numpy as np
 
-from pypic.readers.base import FieldDataset
+from pypic.readers.base import FieldDataset, TabularData
 from pypic.readers.ipic3d._config import IPic3DConfig, to_simulation_config
+from pypic.readers.ipic3d._conserved import detect_conserved, load_ipic3d_auxiliary
 from pypic.readers.ipic3d._field_map import (
     _FIELD_NAME_MAP,
     _MOMENT_COMPONENT_MAP,
@@ -175,3 +176,11 @@ class IPic3DSerialReader:
             physics=dict(sc.physics),
             metadata={**dict(sc.metadata), "step": step},
         )
+
+    def available_auxiliary(self, path: Path) -> list[str]:
+        """Return names of auxiliary datasets at *path*."""
+        return detect_conserved(path)
+
+    def load_auxiliary(self, path: Path, name: str) -> TabularData:
+        """Load a named auxiliary dataset from *path*."""
+        return load_ipic3d_auxiliary(path, name)

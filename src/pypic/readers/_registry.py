@@ -5,16 +5,23 @@ from __future__ import annotations
 import logging
 import threading
 from dataclasses import dataclass
+from pathlib import Path
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
-    from pathlib import Path
+    from collections.abc import Callable, Iterator
 
-    from pypic.readers.base import SimulationConfig, SimulationReader
+    from pypic.readers.base import (
+        FieldDataset,
+        GridInfo,
+        SimulationConfig,
+        SimulationReader,
+        TabularData,
+    )
+    from pypic.units import Normalization, SpeciesInfo
 
-    type ProbeFunction = Callable[[Path], float]
+    type CanReadFunction = Callable[[Path], float]
     type ReaderFactory = Callable[..., tuple[SimulationReader, SimulationConfig]]
 
 log = logging.getLogger(__name__)
@@ -24,20 +31,21 @@ _lock = threading.Lock()
 
 @dataclass(frozen=True, slots=True)
 class ReaderEntry:
-    """A registered reader with its detection probe and factory.
+    """A registered reader with its format detector and factory.
 
     Parameters
     ----------
     name : str
         Short identifier (e.g. ``"ipic3d"``, ``"batsrus"``).
-    probe : ProbeFunction
-        Callable that returns a confidence score in ``[0.0, 1.0]``.
+    can_read_confidence : CanReadFunction
+        Returns a confidence score in ``[0.0, 1.0]`` that *path*
+        contains data readable by this reader.
     factory : ReaderFactory
         Callable that opens a simulation directory.
     """
 
     name: str
-    probe: ProbeFunction
+    can_read_confidence: CanReadFunction
     factory: ReaderFactory
 
 
@@ -46,7 +54,7 @@ _REGISTRY: dict[str, ReaderEntry] = {}
 
 def register_reader(
     name: str,
-    probe: ProbeFunction,
+    can_read_confidence: CanReadFunction,
     factory: ReaderFactory,
 ) -> None:
     """Register a reader for auto-detection.
@@ -58,17 +66,21 @@ def register_reader(
     ----------
     name : str
         Short identifier (e.g. ``"ipic3d"``).
-    probe : ProbeFunction
+    can_read_confidence : CanReadFunction
         Returns confidence in ``[0.0, 1.0]`` that *path* contains
-        data readable by this reader.  Must be lightweight (filesystem
-        glob only, no actual I/O).
+        data readable by this reader.  Must be lightweight
+        (filesystem glob only, no actual I/O).
     factory : ReaderFactory
         ``factory(path, **kwargs) -> (reader, config)``.
     """
     with _lock:
         if name in _REGISTRY:
             log.warning("Overwriting existing reader %r", name)
-        _REGISTRY[name] = ReaderEntry(name=name, probe=probe, factory=factory)
+        _REGISTRY[name] = ReaderEntry(
+            name=name,
+            can_read_confidence=can_read_confidence,
+            factory=factory,
+        )
 
 
 def unregister_reader(name: str) -> None:
@@ -92,13 +104,197 @@ def registered_readers() -> MappingProxyType[str, ReaderEntry]:
     return MappingProxyType(_REGISTRY)
 
 
+class Simulation:
+    """Ergonomic wrapper around a simulation reader, config, and path.
+
+    Returned by `open_simulation`.  Provides direct access to config
+    properties and reads timesteps without repeating the data path.
+
+    Supports tuple unpacking for backwards compatibility::
+
+        sim = open_simulation(path)            # preferred
+        reader, config = open_simulation(path) # still works
+
+    Parameters
+    ----------
+    reader : SimulationReader
+        The underlying reader instance.
+    config : SimulationConfig
+        Parsed simulation metadata.
+    path : Path
+        Data directory (remembered for ``read`` / ``steps``).
+
+    Examples
+    --------
+    >>> from unittest.mock import MagicMock
+    >>> r = MagicMock()
+    >>> r.available_timesteps.return_value = [0, 10]
+    >>> from pypic.readers.base import SimulationConfig, GridInfo
+    >>> from pypic.coordinates.geometry import CARTESIAN
+    >>> from pypic.units import Normalization, SpeciesInfo
+    >>> cfg = SimulationConfig(
+    ...     model_name="test", model_type="PIC",
+    ...     grid=GridInfo(
+    ...         dimensions=(4,), spacing=(1.0,), origin=(0.0,),
+    ...         geometry=CARTESIAN,
+    ...     ),
+    ...     normalization=Normalization.identity(),
+    ...     species=(SpeciesInfo(name="e", charge=-1.0, mass=1.0),),
+    ...     physics={}, frame="sim", metadata={},
+    ... )
+    >>> sim = Simulation(r, cfg, path="/tmp")
+    >>> sim.model_name
+    'test'
+    >>> sim.steps
+    [0, 10]
+    """
+
+    def __init__(
+        self,
+        reader: SimulationReader,
+        config: SimulationConfig,
+        path: Path | str,
+    ) -> None:
+        self._reader = reader
+        self._config = config
+        self._path = Path(path)
+        self._steps: list[int] | None = None
+
+    @property
+    def reader(self) -> SimulationReader:
+        """The underlying reader instance."""
+        return self._reader
+
+    @property
+    def config(self) -> SimulationConfig:
+        """Full simulation configuration."""
+        return self._config
+
+    @property
+    def path(self) -> Path:
+        """Data directory."""
+        return self._path
+
+    @property
+    def model_name(self) -> str:
+        """Simulation code name (e.g. ``"iPIC3D"``)."""
+        return self._config.model_name
+
+    @property
+    def model_type(self) -> str:
+        """Model type (e.g. ``"PIC"``, ``"MHD"``)."""
+        return self._config.model_type
+
+    @property
+    def grid(self) -> GridInfo:
+        """Grid metadata."""
+        return self._config.grid
+
+    @property
+    def normalization(self) -> Normalization:
+        """Unit normalization."""
+        return self._config.normalization
+
+    @property
+    def species(self) -> tuple[SpeciesInfo, ...]:
+        """Species definitions."""
+        return self._config.species
+
+    @property
+    def physics(self) -> MappingProxyType[str, Any]:
+        """Physics parameters (read-only view)."""
+        return MappingProxyType(self._config.physics)
+
+    @property
+    def steps(self) -> list[int]:
+        """Available timestep indices (cached after first access)."""
+        if self._steps is None:
+            self._steps = self._reader.available_timesteps(self._path)
+        return self._steps
+
+    def read(self, step: int) -> FieldDataset:
+        """Read field data for a single timestep.
+
+        Parameters
+        ----------
+        step : int
+            Timestep index.
+
+        Returns
+        -------
+        FieldDataset
+        """
+        return self._reader.read_timestep(self._path, step)
+
+    @property
+    def auxiliary_names(self) -> list[str]:
+        """Names of available auxiliary datasets, or ``[]`` if unsupported."""
+        from pypic.readers.base import AuxiliaryDataReader
+
+        if isinstance(self._reader, AuxiliaryDataReader):
+            return self._reader.available_auxiliary(self._path)
+        return []
+
+    def auxiliary(self, name: str) -> TabularData:
+        """Load a named auxiliary dataset.
+
+        Parameters
+        ----------
+        name : str
+            Dataset name (e.g. ``"conserved_quantities"``).
+
+        Returns
+        -------
+        TabularData
+
+        Raises
+        ------
+        TypeError
+            If the reader does not support auxiliary data.
+        """
+        from pypic.readers.base import AuxiliaryDataReader
+
+        if isinstance(self._reader, AuxiliaryDataReader):
+            return self._reader.load_auxiliary(self._path, name)
+        msg = (
+            f"Reader {type(self._reader).__name__!r} does not support "
+            f"auxiliary data (missing AuxiliaryDataReader protocol)"
+        )
+        raise TypeError(msg)
+
+    def __iter__(self) -> Iterator[SimulationReader | SimulationConfig]:
+        """Support ``reader, config = open_simulation(path)``."""
+        yield self._reader
+        yield self._config
+
+    def __repr__(self) -> str:
+        dims = "x".join(str(d) for d in self.grid.dimensions)
+        n_steps = len(self.steps) if self._steps is not None else "?"
+        return (
+            f"Simulation({self.model_name!r}, {self.model_type}, "
+            f"grid={dims}, steps={n_steps})"
+        )
+
+
 def open_simulation(
     path: Path | str,
     *,
     reader: str | ReaderFactory | None = None,
     **kwargs: Any,  # noqa: ANN401 — reader-specific kwargs
-) -> tuple[SimulationReader, SimulationConfig]:
+) -> Simulation:
     """Open a simulation directory, auto-detecting the format.
+
+    Returns a `Simulation` object that remembers the data path::
+
+        sim = open_simulation(path)
+        sim.model_name          # "iPIC3D"
+        sim.grid.dimensions     # (128, 64, 64)
+        sim.steps               # [0, 100, 200, ...]
+        ds = sim.read(step=100)
+
+    Also supports tuple unpacking for backwards compatibility::
+
+        reader, config = open_simulation(path)
 
     Parameters
     ----------
@@ -107,7 +303,7 @@ def open_simulation(
     reader : str | ReaderFactory | None
         How to select the reader:
 
-        - ``None`` (default) — probe all registered readers and pick
+        - ``None`` (default) — query all registered readers and pick
           the highest-confidence match.
         - ``str`` — look up a registered reader by name
           (e.g. ``"ipic3d"``).
@@ -119,9 +315,8 @@ def open_simulation(
 
     Returns
     -------
-    tuple[SimulationReader, SimulationConfig]
-        A ``(reader, config)`` pair ready for
-        ``reader.read_timestep(path, step)``.
+    Simulation
+        Wraps the reader, config, and path.
 
     Raises
     ------
@@ -130,13 +325,14 @@ def open_simulation(
     FileNotFoundError
         If auto-detection finds no matching reader.
     """
-    from pathlib import Path as _Path
+    path = Path(path)
 
-    path = _Path(path)
+    result: tuple[SimulationReader, SimulationConfig]
 
     # Explicit callable override
     if callable(reader) and not isinstance(reader, str):
-        return reader(path, **kwargs)
+        result = reader(path, **kwargs)
+        return Simulation(result[0], result[1], path)
 
     # Explicit name lookup
     if isinstance(reader, str):
@@ -145,15 +341,20 @@ def open_simulation(
             available = sorted(_REGISTRY)
             msg = f"No reader registered with name {reader!r}. Available: {available}"
             raise KeyError(msg)
-        return entry.factory(path, **kwargs)
+        result = entry.factory(path, **kwargs)
+        return Simulation(result[0], result[1], path)
 
-    # Auto-detect: run all probes, pick highest confidence
+    # Auto-detect: pick highest confidence
     scores: list[tuple[float, str]] = []
     for name, entry in sorted(_REGISTRY.items()):
         try:
-            confidence = entry.probe(path)
+            confidence = entry.can_read_confidence(path)
         except Exception:
-            log.debug("Probe %r raised an exception, skipping", name, exc_info=True)
+            log.debug(
+                "can_read_confidence %r raised, skipping",
+                name,
+                exc_info=True,
+            )
             continue
         if confidence > 0.0:
             scores.append((confidence, name))
@@ -161,8 +362,7 @@ def open_simulation(
     if not scores:
         registered = sorted(_REGISTRY)
         msg = (
-            f"No registered reader recognized {path}. "
-            f"Registered readers: {registered}"
+            f"No registered reader recognized {path}. Registered readers: {registered}"
         )
         raise FileNotFoundError(msg)
 
@@ -175,4 +375,5 @@ def open_simulation(
         best_confidence,
         path,
     )
-    return _REGISTRY[best_name].factory(path, **kwargs)
+    result = _REGISTRY[best_name].factory(path, **kwargs)
+    return Simulation(result[0], result[1], path)

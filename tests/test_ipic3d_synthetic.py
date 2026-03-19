@@ -14,10 +14,12 @@ import numpy as np
 import pytest
 from numpy.testing import assert_allclose
 
+from pypic.readers.base import AuxiliaryDataReader, TabularData
 from pypic.readers.ipic3d import (
     IPic3DH5hutReader,
     IPic3DParallelReader,
     IPic3DSerialReader,
+    conserved_to_tabular,
     load_conserved_quantities,
     open_ipic3d,
     parse_inp,
@@ -408,6 +410,33 @@ class TestH5hutReader:
         assert ds.has_field("div_B")
 
 
+class TestH5hutUnknownFieldPassthrough:
+    """Unknown fields in H5hut Block/ pass through with native names."""
+
+    def test_extra_field_included(self, tmp_path: Path) -> None:
+        import h5py  # type: ignore[import-untyped]
+
+        cfg = parse_inp(H5HUT_DIR / "SyntheticFixture.inp")
+        # Copy the real H5hut file and inject an extra dataset
+        src = next(iter(H5HUT_DIR.glob("*-Fields_000000.h5")))
+        dst = tmp_path / src.name
+        import shutil
+
+        shutil.copy2(src, dst)
+        with h5py.File(dst, "a") as f:
+            block = f["Step#0"]["Block"]
+            shape = block["Bx"]["0"].shape
+            block.create_group("CustomField")
+            block["CustomField"].create_dataset(
+                "0", data=np.full(shape, 99.0, dtype=np.float32),
+            )
+
+        reader = IPic3DH5hutReader(cfg)
+        ds = reader.read_timestep(tmp_path, 0)
+        assert ds.has_field("CustomField")
+        assert_allclose(ds["CustomField"], 99.0, atol=1e-5)
+
+
 class TestOpenIpic3dSynthetic:
     def test_detects_parallel(self):
         reader, config = open_ipic3d(PHDF5_DIR)
@@ -493,3 +522,122 @@ class TestConservedQuantitiesSyntheticFormatB:
     def test_particle_counts(self, cq):
         for arr in cq.species_npart:
             assert np.all(arr == 1000)
+
+
+class TestConservedToTabular:
+    """Test conversion from ConservedQuantities to TabularData."""
+
+    @pytest.fixture(scope="class")
+    def tab(self):
+        cq = load_conserved_quantities(DATA / "h5hut" / "info-conserved")
+        return conserved_to_tabular(cq)
+
+    def test_is_tabular_data(self, tab):
+        assert isinstance(tab, TabularData)
+
+    def test_name(self, tab):
+        assert tab.name == "conserved_quantities"
+
+    def test_index_column(self, tab):
+        assert tab.index_column == "cycle"
+
+    def test_scalar_columns_present(self, tab):
+        for col in (
+            "cycle",
+            "total_energy",
+            "electric_energy",
+            "magnetic_energy",
+            "kinetic_energy",
+            "momentum",
+        ):
+            assert col in tab
+
+    def test_species_columns_flattened(self, tab):
+        for s in range(2):
+            assert f"npart_s{s}" in tab
+            assert f"charge_s{s}" in tab
+            assert f"kinetic_energy_s{s}" in tab
+
+    def test_scalar_values_match(self, tab):
+        cq = load_conserved_quantities(DATA / "h5hut" / "info-conserved")
+        assert_allclose(tab["total_energy"], cq.total_energy)
+        assert_allclose(tab["electric_energy"], cq.electric_energy)
+        assert_allclose(tab["momentum"], cq.momentum)
+
+    def test_species_values_match(self, tab):
+        cq = load_conserved_quantities(DATA / "h5hut" / "info-conserved")
+        for s in range(len(cq.species_npart)):
+            assert_allclose(tab[f"npart_s{s}"], cq.species_npart[s])
+
+    def test_row_count(self, tab):
+        cq = load_conserved_quantities(DATA / "h5hut" / "info-conserved")
+        assert len(tab) == len(cq.cycle)
+
+
+class TestIPic3DAuxiliaryProtocol:
+    """Test that iPIC3D readers satisfy AuxiliaryDataReader."""
+
+    def test_parallel_is_auxiliary_reader(self):
+        assert isinstance(
+            IPic3DParallelReader,
+            type,
+        )
+        cfg = parse_inp(PHDF5_DIR / "synthetic.inp")
+        reader = IPic3DParallelReader(cfg)
+        assert isinstance(reader, AuxiliaryDataReader)
+
+    def test_serial_is_auxiliary_reader(self):
+        cfg = parse_inp(SHDF5_DIR / "synthetic_serial.inp")
+        reader = IPic3DSerialReader(cfg)
+        assert isinstance(reader, AuxiliaryDataReader)
+
+    def test_h5hut_is_auxiliary_reader(self):
+        cfg = parse_inp(H5HUT_DIR / "SyntheticFixture.inp")
+        reader = IPic3DH5hutReader(cfg)
+        assert isinstance(reader, AuxiliaryDataReader)
+
+
+class TestIPic3DAvailableAuxiliary:
+    """Test auxiliary detection on synthetic data directories."""
+
+    def test_phdf5_detects_conserved(self):
+        cfg = parse_inp(PHDF5_DIR / "synthetic.inp")
+        reader = IPic3DParallelReader(cfg)
+        names = reader.available_auxiliary(PHDF5_DIR)
+        assert "conserved_quantities" in names
+
+    def test_h5hut_detects_conserved(self):
+        cfg = parse_inp(H5HUT_DIR / "SyntheticFixture.inp")
+        reader = IPic3DH5hutReader(cfg)
+        names = reader.available_auxiliary(H5HUT_DIR)
+        assert "conserved_quantities" in names
+
+    def test_empty_dir_returns_empty(self, tmp_path):
+        cfg = parse_inp(PHDF5_DIR / "synthetic.inp")
+        reader = IPic3DParallelReader(cfg)
+        assert reader.available_auxiliary(tmp_path) == []
+
+
+class TestIPic3DLoadAuxiliary:
+    """Test loading auxiliary data through the reader interface."""
+
+    def test_phdf5_load_conserved(self):
+        cfg = parse_inp(PHDF5_DIR / "synthetic.inp")
+        reader = IPic3DParallelReader(cfg)
+        tab = reader.load_auxiliary(PHDF5_DIR, "conserved_quantities")
+        assert isinstance(tab, TabularData)
+        assert tab.name == "conserved_quantities"
+        assert "total_energy" in tab
+
+    def test_h5hut_load_conserved(self):
+        cfg = parse_inp(H5HUT_DIR / "SyntheticFixture.inp")
+        reader = IPic3DH5hutReader(cfg)
+        tab = reader.load_auxiliary(H5HUT_DIR, "conserved_quantities")
+        assert isinstance(tab, TabularData)
+        assert len(tab) > 0
+
+    def test_unknown_name_raises(self):
+        cfg = parse_inp(PHDF5_DIR / "synthetic.inp")
+        reader = IPic3DParallelReader(cfg)
+        with pytest.raises(KeyError, match="unknown_dataset"):
+            reader.load_auxiliary(PHDF5_DIR, "unknown_dataset")

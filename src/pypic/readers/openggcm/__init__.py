@@ -23,7 +23,7 @@ from typing import TYPE_CHECKING
 
 from pypic.readers.base import SimulationConfig
 from pypic.readers.openggcm._grid import OpenGGCMGrid, parse_grid_file
-from pypic.readers.openggcm._probe import probe
+from pypic.readers.openggcm._probe import can_read_confidence
 from pypic.readers.openggcm._reader import OpenGGCMReader, _make_grid_info
 from pypic.units import Normalization
 
@@ -35,9 +35,9 @@ log = logging.getLogger(__name__)
 __all__ = [
     "OpenGGCMGrid",
     "OpenGGCMReader",
+    "can_read_confidence",
     "open_openggcm",
     "parse_grid_file",
-    "probe",
 ]
 
 _3DF_PATTERN = re.compile(r"^(.+)\.3df\.\d+$")
@@ -126,4 +126,4 @@ def _detect_prefix(path: Path) -> str:
 # Self-register with the reader registry
 from pypic.readers._registry import register_reader as _register_reader  # noqa: E402
 
-_register_reader("openggcm", probe, open_openggcm)
+_register_reader("openggcm", can_read_confidence, open_openggcm)

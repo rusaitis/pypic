@@ -5,17 +5,19 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 from unittest.mock import MagicMock
 
+import numpy as np
 import pytest
 
 from pypic.readers._registry import (
     _REGISTRY,
     ReaderEntry,
+    Simulation,
     open_simulation,
     register_reader,
     registered_readers,
     unregister_reader,
 )
-from pypic.readers.base import SimulationConfig, SimulationReader
+from pypic.readers.base import SimulationConfig, SimulationReader, TabularData
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -34,7 +36,8 @@ def _clean_registry() -> None:  # type: ignore[misc]
 
 
 def _mock_factory(
-    path: Path, **_kwargs: Any,
+    path: Path,
+    **_kwargs: Any,
 ) -> _Result:
     """Dummy factory that returns mocks."""
     reader = MagicMock(spec=SimulationReader)
@@ -60,7 +63,8 @@ class TestRegisterUnregister:
             unregister_reader("no_such_reader")
 
     def test_register_overwrites_with_warning(
-        self, caplog: pytest.LogCaptureFixture,
+        self,
+        caplog: pytest.LogCaptureFixture,
     ) -> None:
         register_reader("dup", lambda _: 0.1, _mock_factory)
         with caplog.at_level("WARNING"):
@@ -71,18 +75,22 @@ class TestRegisterUnregister:
         readers = registered_readers()
         with pytest.raises(TypeError):
             readers["hack"] = ReaderEntry(  # type: ignore[index]
-                "hack", lambda _: 1.0, _mock_factory,
+                "hack",
+                lambda _: 1.0,
+                _mock_factory,
             )
 
 
 class TestOpenSimulationExplicitName:
     def test_open_with_reader_name(
-        self, tmp_path: Path,
+        self,
+        tmp_path: Path,
     ) -> None:
         called_with: list[Path] = []
 
         def factory(
-            path: Path, **_kw: Any,
+            path: Path,
+            **_kw: Any,
         ) -> _Result:
             called_with.append(path)
             return _mock_factory(path)
@@ -92,25 +100,30 @@ class TestOpenSimulationExplicitName:
         assert called_with == [tmp_path]
 
     def test_open_with_unknown_name_raises(
-        self, tmp_path: Path,
+        self,
+        tmp_path: Path,
     ) -> None:
         with pytest.raises(KeyError, match="nonexistent"):
             open_simulation(tmp_path, reader="nonexistent")
 
     def test_kwargs_forwarded_to_factory(
-        self, tmp_path: Path,
+        self,
+        tmp_path: Path,
     ) -> None:
         received_kwargs: dict[str, Any] = {}
 
         def factory(
-            path: Path, **kwargs: Any,
+            path: Path,
+            **kwargs: Any,
         ) -> _Result:
             received_kwargs.update(kwargs)
             return _mock_factory(path)
 
         register_reader("kwarg_test", lambda _: 0.5, factory)
         open_simulation(
-            tmp_path, reader="kwarg_test", normalization="custom",
+            tmp_path,
+            reader="kwarg_test",
+            normalization="custom",
         )
         assert received_kwargs["normalization"] == "custom"
 
@@ -120,7 +133,8 @@ class TestOpenSimulationCallable:
         called: list[Path] = []
 
         def my_reader(
-            path: Path, **_kw: Any,
+            path: Path,
+            **_kw: Any,
         ) -> _Result:
             called.append(path)
             return _mock_factory(path)
@@ -129,12 +143,14 @@ class TestOpenSimulationCallable:
         assert called == [tmp_path]
 
     def test_callable_receives_kwargs(
-        self, tmp_path: Path,
+        self,
+        tmp_path: Path,
     ) -> None:
         received: dict[str, Any] = {}
 
         def my_reader(
-            path: Path, **kwargs: Any,
+            path: Path,
+            **kwargs: Any,
         ) -> _Result:
             received.update(kwargs)
             return _mock_factory(path)
@@ -145,18 +161,21 @@ class TestOpenSimulationCallable:
 
 class TestOpenSimulationAutoDetect:
     def test_highest_confidence_wins(
-        self, tmp_path: Path,
+        self,
+        tmp_path: Path,
     ) -> None:
         calls: list[str] = []
 
         def factory_a(
-            path: Path, **_kw: Any,
+            path: Path,
+            **_kw: Any,
         ) -> _Result:
             calls.append("a")
             return _mock_factory(path)
 
         def factory_b(
-            path: Path, **_kw: Any,
+            path: Path,
+            **_kw: Any,
         ) -> _Result:
             calls.append("b")
             return _mock_factory(path)
@@ -172,23 +191,27 @@ class TestOpenSimulationAutoDetect:
         register_reader("zero", lambda _: 0.0, _mock_factory)
 
         with pytest.raises(
-            FileNotFoundError, match="No registered reader",
+            FileNotFoundError,
+            match="No registered reader",
         ):
             open_simulation(tmp_path)
 
     def test_alphabetical_tiebreak(
-        self, tmp_path: Path,
+        self,
+        tmp_path: Path,
     ) -> None:
         calls: list[str] = []
 
         def factory_a(
-            path: Path, **_kw: Any,
+            path: Path,
+            **_kw: Any,
         ) -> _Result:
             calls.append("alpha")
             return _mock_factory(path)
 
         def factory_b(
-            path: Path, **_kw: Any,
+            path: Path,
+            **_kw: Any,
         ) -> _Result:
             calls.append("beta")
             return _mock_factory(path)
@@ -200,7 +223,8 @@ class TestOpenSimulationAutoDetect:
         assert calls == ["alpha"]
 
     def test_probe_exception_skipped(
-        self, tmp_path: Path,
+        self,
+        tmp_path: Path,
     ) -> None:
         """Probe that raises is skipped, not crash."""
 
@@ -210,7 +234,8 @@ class TestOpenSimulationAutoDetect:
         calls: list[str] = []
 
         def good_factory(
-            path: Path, **_kw: Any,
+            path: Path,
+            **_kw: Any,
         ) -> _Result:
             calls.append("good")
             return _mock_factory(path)
@@ -222,103 +247,105 @@ class TestOpenSimulationAutoDetect:
         assert calls == ["good"]
 
     def test_string_path_accepted(
-        self, tmp_path: Path,
+        self,
+        tmp_path: Path,
     ) -> None:
         register_reader("str_test", lambda _: 0.5, _mock_factory)
         reader, _cfg = open_simulation(
-            str(tmp_path), reader="str_test",
+            str(tmp_path),
+            reader="str_test",
         )
         assert reader is not None
 
 
-class TestProbeIPic3D:
+class TestCanReadIPic3D:
     def test_empty_dir(self, tmp_path: Path) -> None:
-        from pypic.readers.ipic3d._probe import probe
+        from pypic.readers.ipic3d._probe import can_read_confidence
 
-        assert probe(tmp_path) == 0.0
+        assert can_read_confidence(tmp_path) == 0.0
 
     def test_inp_file(self, tmp_path: Path) -> None:
-        from pypic.readers.ipic3d._probe import probe
+        from pypic.readers.ipic3d._probe import can_read_confidence
 
         (tmp_path / "GEM.inp").touch()
-        assert probe(tmp_path) >= 0.5
+        assert can_read_confidence(tmp_path) >= 0.5
 
     def test_settings_hdf(self, tmp_path: Path) -> None:
-        from pypic.readers.ipic3d._probe import probe
+        from pypic.readers.ipic3d._probe import can_read_confidence
 
         (tmp_path / "settings.hdf").touch()
-        assert probe(tmp_path) >= 0.4
+        assert can_read_confidence(tmp_path) >= 0.4
 
     def test_h5hut_files(self, tmp_path: Path) -> None:
-        from pypic.readers.ipic3d._probe import probe
+        from pypic.readers.ipic3d._probe import can_read_confidence
 
         (tmp_path / "GEM-Fields_000100.h5").touch()
-        assert probe(tmp_path) >= 0.3
+        assert can_read_confidence(tmp_path) >= 0.3
 
     def test_not_a_directory(self, tmp_path: Path) -> None:
-        from pypic.readers.ipic3d._probe import probe
+        from pypic.readers.ipic3d._probe import can_read_confidence
 
         f = tmp_path / "file.txt"
         f.touch()
-        assert probe(f) == 0.0
+        assert can_read_confidence(f) == 0.0
 
 
-class TestProbeBATSRUS:
+class TestCanReadBATSRUS:
     def test_empty_dir(self, tmp_path: Path) -> None:
-        from pypic.readers.batsrus._probe import probe
+        from pypic.readers.batsrus._probe import can_read_confidence
 
-        assert probe(tmp_path) == 0.0
+        assert can_read_confidence(tmp_path) == 0.0
 
     def test_batl_file(self, tmp_path: Path) -> None:
-        from pypic.readers.batsrus._probe import probe
+        from pypic.readers.batsrus._probe import can_read_confidence
 
         (tmp_path / "3d__n00000001.batl").touch()
-        assert probe(tmp_path) >= 0.5
+        assert can_read_confidence(tmp_path) >= 0.5
 
     def test_param_in(self, tmp_path: Path) -> None:
-        from pypic.readers.batsrus._probe import probe
+        from pypic.readers.batsrus._probe import can_read_confidence
 
         (tmp_path / "PARAM.in").touch()
-        assert probe(tmp_path) >= 0.3
+        assert can_read_confidence(tmp_path) >= 0.3
 
     def test_header_plus_idl(self, tmp_path: Path) -> None:
-        from pypic.readers.batsrus._probe import probe
+        from pypic.readers.batsrus._probe import can_read_confidence
 
         (tmp_path / "3d__n00000001.h").touch()
         (tmp_path / "3d__n00000001_pe0000.idl").touch()
-        assert probe(tmp_path) >= 0.5
+        assert can_read_confidence(tmp_path) >= 0.5
 
     def test_out_file(self, tmp_path: Path) -> None:
-        from pypic.readers.batsrus._probe import probe
+        from pypic.readers.batsrus._probe import can_read_confidence
 
         (tmp_path / "3d__n00000001.out").touch()
-        assert probe(tmp_path) >= 0.3
+        assert can_read_confidence(tmp_path) >= 0.3
 
 
-class TestProbeOpenGGCM:
+class TestCanReadOpenGGCM:
     def test_empty_dir(self, tmp_path: Path) -> None:
-        from pypic.readers.openggcm._probe import probe
+        from pypic.readers.openggcm._probe import can_read_confidence
 
-        assert probe(tmp_path) == 0.0
+        assert can_read_confidence(tmp_path) == 0.0
 
     def test_grid_file_only(self, tmp_path: Path) -> None:
-        from pypic.readers.openggcm._probe import probe
+        from pypic.readers.openggcm._probe import can_read_confidence
 
         (tmp_path / "grid.001.dat").touch()
-        assert probe(tmp_path) == 0.5
+        assert can_read_confidence(tmp_path) == 0.5
 
     def test_3df_file_only(self, tmp_path: Path) -> None:
-        from pypic.readers.openggcm._probe import probe
+        from pypic.readers.openggcm._probe import can_read_confidence
 
         (tmp_path / "gc012.3df.006300").touch()
-        assert probe(tmp_path) == 0.5
+        assert can_read_confidence(tmp_path) == 0.5
 
     def test_full_match(self, tmp_path: Path) -> None:
-        from pypic.readers.openggcm._probe import probe
+        from pypic.readers.openggcm._probe import can_read_confidence
 
         (tmp_path / "grid.001.dat").touch()
         (tmp_path / "gc012.3df.006300").touch()
-        assert probe(tmp_path) == 1.0
+        assert can_read_confidence(tmp_path) == 1.0
 
 
 class TestBuiltinReadersRegistered:
@@ -330,7 +357,7 @@ class TestBuiltinReadersRegistered:
 
     def test_builtin_entries_have_probes(self) -> None:
         for name, entry in registered_readers().items():
-            assert callable(entry.probe), f"{name} probe"
+            assert callable(entry.can_read_confidence), f"{name}"
             assert callable(entry.factory), f"{name} factory"
 
 
@@ -346,3 +373,115 @@ class TestBATSRUSOutputFormat:
         from pypic.readers.batsrus import BATSRUSOutputFormat
 
         assert isinstance(BATSRUSOutputFormat.HDF5, str)
+
+
+class TestSimulationFacade:
+    def test_returns_simulation_object(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        register_reader("sim_test", lambda _: 0.5, _mock_factory)
+        sim = open_simulation(tmp_path, reader="sim_test")
+        assert isinstance(sim, Simulation)
+
+    def test_tuple_unpacking(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        register_reader("unpack", lambda _: 0.5, _mock_factory)
+        reader, config = open_simulation(tmp_path, reader="unpack")
+        assert isinstance(reader, SimulationReader)
+        assert isinstance(config, SimulationConfig)
+
+    def test_properties_delegate_to_config(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        register_reader("props", lambda _: 0.5, _mock_factory)
+        sim = open_simulation(tmp_path, reader="props")
+        assert sim.model_name == sim.config.model_name
+        assert sim.path == tmp_path
+
+    def test_read_delegates_to_reader(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        register_reader("read", lambda _: 0.5, _mock_factory)
+        sim = open_simulation(tmp_path, reader="read")
+        sim.read(step=0)
+        sim.reader.read_timestep.assert_called_once_with(
+            tmp_path,
+            0,
+        )
+
+    def test_steps_cached(self, tmp_path: Path) -> None:
+        register_reader("steps", lambda _: 0.5, _mock_factory)
+        sim = open_simulation(tmp_path, reader="steps")
+        sim.reader.available_timesteps.return_value = [0, 10]
+        first = sim.steps
+        second = sim.steps
+        assert first == [0, 10]
+        assert first is second
+        sim.reader.available_timesteps.assert_called_once()
+
+    def test_repr(self, tmp_path: Path) -> None:
+        register_reader("repr", lambda _: 0.5, _mock_factory)
+        sim = open_simulation(tmp_path, reader="repr")
+        sim.reader.available_timesteps.return_value = [0]
+        r = repr(sim)
+        assert "Simulation(" in r
+
+    def test_auxiliary_names_empty_for_basic_reader(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        register_reader("noaux", lambda _: 0.5, _mock_factory)
+        sim = open_simulation(tmp_path, reader="noaux")
+        assert sim.auxiliary_names == []
+
+    def test_auxiliary_raises_for_basic_reader(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        register_reader("noaux2", lambda _: 0.5, _mock_factory)
+        sim = open_simulation(tmp_path, reader="noaux2")
+        with pytest.raises(TypeError, match="auxiliary data"):
+            sim.auxiliary("anything")
+
+    def test_auxiliary_delegates_to_reader(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        tab = TabularData(
+            name="test_aux",
+            columns={"x": np.array([1.0, 2.0])},
+        )
+
+        def factory_with_aux(
+            path: Path,
+            **_kw: Any,
+        ) -> _Result:
+            reader = MagicMock(spec=SimulationReader)
+            reader.available_auxiliary = MagicMock(
+                return_value=["test_aux"],
+            )
+            reader.load_auxiliary = MagicMock(return_value=tab)
+            # Make isinstance check pass for AuxiliaryDataReader
+            reader.__class__ = type(
+                "AuxReader",
+                (),
+                {
+                    "available_auxiliary": lambda s, p: ["test_aux"],
+                    "load_auxiliary": lambda s, p, n: tab,
+                    "read_timestep": lambda s, p, st: None,
+                    "available_timesteps": lambda s, p: [],
+                },
+            )
+            config = MagicMock(spec=SimulationConfig)
+            return reader, config
+
+        register_reader("withaux", lambda _: 0.5, factory_with_aux)
+        sim = open_simulation(tmp_path, reader="withaux")
+        assert sim.auxiliary_names == ["test_aux"]
+        result = sim.auxiliary("test_aux")
+        assert result.name == "test_aux"

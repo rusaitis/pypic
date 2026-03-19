@@ -2,6 +2,7 @@
 
 from pypic.readers._registry import (
     ReaderEntry,
+    Simulation,
     open_simulation,
     register_reader,
     registered_readers,
@@ -9,10 +10,12 @@ from pypic.readers._registry import (
 )
 from pypic.readers._simple import SimpleReader, open_simple
 from pypic.readers.base import (
+    AuxiliaryDataReader,
     FieldDataset,
     GridInfo,
     SimulationConfig,
     SimulationReader,
+    TabularData,
 )
 from pypic.readers.batsrus import (
     BATSRUSConfig,
@@ -28,6 +31,7 @@ from pypic.readers.ipic3d import (
     IPic3DH5hutReader,
     IPic3DParallelReader,
     IPic3DSerialReader,
+    conserved_to_tabular,
     load_conserved_quantities,
     open_ipic3d,
     parse_inp,
@@ -40,6 +44,7 @@ from pypic.readers.openggcm import (
 )
 
 __all__ = [
+    "AuxiliaryDataReader",
     "BATSRUSConfig",
     "BATSRUSOutputFormat",
     "BATSRUSReader",
@@ -54,8 +59,11 @@ __all__ = [
     "OpenGGCMReader",
     "ReaderEntry",
     "SimpleReader",
+    "Simulation",
     "SimulationConfig",
     "SimulationReader",
+    "TabularData",
+    "conserved_to_tabular",
     "load_config",
     "load_conserved_quantities",
     "open_batsrus",

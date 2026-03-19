@@ -8,6 +8,8 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
+from pypic.readers.base import TabularData
+
 if TYPE_CHECKING:
     from pathlib import Path
 
@@ -254,3 +256,127 @@ def load_conserved_quantities(path: Path) -> ConservedQuantities:
         species_charge=tuple(species_charge),
         species_kinetic_energy=tuple(species_ke),
     )
+
+
+def conserved_to_tabular(cq: ConservedQuantities) -> TabularData:
+    """Convert a ``ConservedQuantities`` to a generic ``TabularData``.
+
+    Scalar fields map directly.  Per-species tuples are flattened to
+    ``"npart_s0"``, ``"charge_s0"``, ``"kinetic_energy_s0"``, etc.
+
+    Parameters
+    ----------
+    cq : ConservedQuantities
+        Typed iPIC3D conserved quantities.
+
+    Returns
+    -------
+    TabularData
+        Columnar representation with ``index_column="cycle"``.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> cq = ConservedQuantities(
+    ...     cycle=np.array([0.0, 1.0]),
+    ...     total_energy=np.array([5.0, 5.1]),
+    ...     electric_energy=np.array([1.0, 1.1]),
+    ...     magnetic_energy=np.array([2.0, 2.0]),
+    ...     kinetic_energy=np.array([2.0, 2.0]),
+    ...     momentum=np.array([0.1, 0.1]),
+    ...     species_npart=(np.array([100.0, 100.0]),),
+    ...     species_charge=(np.array([1.0, 1.0]),),
+    ...     species_kinetic_energy=(np.array([1.0, 1.0]),),
+    ... )
+    >>> tab = conserved_to_tabular(cq)
+    >>> "npart_s0" in tab
+    True
+    >>> tab.index_column
+    'cycle'
+    """
+    columns: dict[str, FloatArray] = {
+        "cycle": cq.cycle,
+        "total_energy": cq.total_energy,
+        "electric_energy": cq.electric_energy,
+        "magnetic_energy": cq.magnetic_energy,
+        "kinetic_energy": cq.kinetic_energy,
+        "momentum": cq.momentum,
+    }
+    for s, arr in enumerate(cq.species_npart):
+        columns[f"npart_s{s}"] = arr
+    for s, arr in enumerate(cq.species_charge):
+        columns[f"charge_s{s}"] = arr
+    for s, arr in enumerate(cq.species_kinetic_energy):
+        columns[f"kinetic_energy_s{s}"] = arr
+
+    return TabularData(
+        name="conserved_quantities",
+        columns=columns,
+        index_column="cycle",
+        metadata={"source": "iPIC3D ConservedQuantities"},
+    )
+
+
+def detect_conserved(path: Path) -> list[str]:
+    """Check whether conserved quantities data exists at *path*.
+
+    Parameters
+    ----------
+    path : Path
+        Simulation output directory.
+
+    Returns
+    -------
+    list[str]
+        ``["conserved_quantities"]`` if data found, else ``[]``.
+    """
+    if (path / "ConservedQuantities.txt").exists():
+        return ["conserved_quantities"]
+    if (path / "info-conserved").is_dir():
+        cq_files = list((path / "info-conserved").glob("ConservedQuantities*.txt"))
+        if cq_files:
+            return ["conserved_quantities"]
+    return []
+
+
+def load_ipic3d_auxiliary(
+    path: Path,
+    name: str,
+) -> TabularData:
+    """Load an iPIC3D auxiliary dataset by name.
+
+    Parameters
+    ----------
+    path : Path
+        Simulation output directory.
+    name : str
+        Dataset name.
+
+    Returns
+    -------
+    TabularData
+
+    Raises
+    ------
+    KeyError
+        If *name* is not recognized or data is not found.
+    """
+    if name != "conserved_quantities":
+        msg = f"Unknown iPIC3D auxiliary dataset {name!r}"
+        raise KeyError(msg)
+
+    cq_file = path / "ConservedQuantities.txt"
+    cq_dir = path / "info-conserved"
+
+    if cq_file.exists():
+        cq = load_conserved_quantities(cq_file)
+    elif cq_dir.is_dir():
+        cq = load_conserved_quantities(cq_dir)
+    else:
+        msg = (
+            f"No ConservedQuantities data found in {path}. "
+            f"Expected ConservedQuantities.txt or info-conserved/"
+        )
+        raise KeyError(msg)
+
+    return conserved_to_tabular(cq)

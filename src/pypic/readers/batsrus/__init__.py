@@ -27,7 +27,7 @@ from pypic.readers.batsrus._config import (
 from pypic.readers.batsrus._grid import assemble_uniform_hdf5, regrid_amr_hdf5
 from pypic.readers.batsrus._hdf5 import read_batl
 from pypic.readers.batsrus._header import BATSRUSHeader, parse_header
-from pypic.readers.batsrus._probe import probe
+from pypic.readers.batsrus._probe import can_read_confidence
 from pypic.readers.batsrus._reader import BATSRUSReader
 
 if TYPE_CHECKING:
@@ -47,11 +47,11 @@ __all__ = [
     "BATSRUSHeader",
     "BATSRUSOutputFormat",
     "BATSRUSReader",
+    "can_read_confidence",
     "extract_step_from_filename",
     "open_batsrus",
     "parse_header",
     "parse_param_in",
-    "probe",
     "to_simulation_config",
 ]
 
@@ -181,4 +181,4 @@ def _prefix_before_step(filename: str, suffix: str) -> str:
 # Self-register with the reader registry
 from pypic.readers._registry import register_reader as _register_reader  # noqa: E402
 
-_register_reader("batsrus", probe, open_batsrus)
+_register_reader("batsrus", can_read_confidence, open_batsrus)
