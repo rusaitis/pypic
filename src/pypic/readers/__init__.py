@@ -7,6 +7,7 @@ from pypic.readers._registry import (
     registered_readers,
     unregister_reader,
 )
+from pypic.readers._simple import SimpleReader, open_simple
 from pypic.readers.base import (
     FieldDataset,
     GridInfo,
@@ -52,6 +53,7 @@ __all__ = [
     "OpenGGCMGrid",
     "OpenGGCMReader",
     "ReaderEntry",
+    "SimpleReader",
     "SimulationConfig",
     "SimulationReader",
     "load_config",
@@ -59,6 +61,7 @@ __all__ = [
     "open_batsrus",
     "open_ipic3d",
     "open_openggcm",
+    "open_simple",
     "open_simulation",
     "parse_grid_file",
     "parse_inp",

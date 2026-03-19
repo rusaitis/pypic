@@ -46,6 +46,8 @@ _3DF_PATTERN = re.compile(r"^(.+)\.3df\.\d+$")
 def open_openggcm(
     path: Path,
     normalization: Normalization | None = None,
+    *,
+    config_path: Path | None = None,
 ) -> tuple[OpenGGCMReader, SimulationConfig]:
     """Auto-detect OpenGGCM files and return a reader + config.
 
@@ -57,6 +59,9 @@ def open_openggcm(
         Directory containing OpenGGCM output files.
     normalization : Normalization | None
         If provided, data is normalized from SI to code units.
+    config_path : Path | None
+        Explicit path to a ``grid.*.dat`` file.  When ``None``,
+        auto-detected from *path*.
 
     Returns
     -------
@@ -66,11 +71,15 @@ def open_openggcm(
         Simulation metadata.
     """
     # Find grid file
-    grid_files = list(path.glob("grid.*.dat"))
-    if not grid_files:
-        msg = f"No grid.*.dat file found in {path}"
-        raise FileNotFoundError(msg)
-    grid = parse_grid_file(grid_files[0])
+    if config_path is not None:
+        grid_file = config_path
+    else:
+        grid_files = list(path.glob("grid.*.dat"))
+        if not grid_files:
+            msg = f"No grid.*.dat file found in {path}"
+            raise FileNotFoundError(msg)
+        grid_file = grid_files[0]
+    grid = parse_grid_file(grid_file)
     log.info(
         "Grid: %d x %d x %d, x=[%.1f, %.1f] R_E",
         grid.nx,
@@ -95,7 +104,7 @@ def open_openggcm(
         physics={"gamma": 5.0 / 3.0},
         frame="GSM",
         metadata={
-            "grid_file": grid_files[0].name,
+            "grid_file": grid_file.name,
             "prefix": prefix,
             **dict(grid.metadata),
         },

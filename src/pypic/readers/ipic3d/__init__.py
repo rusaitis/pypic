@@ -48,6 +48,8 @@ def _has_h5hut_files(path: Path) -> bool:
 
 def open_ipic3d(
     path: Path,
+    *,
+    config_path: Path | None = None,
 ) -> tuple[SimulationReader, SimulationConfig]:
     """Auto-detect iPIC3D format and return the appropriate reader.
 
@@ -66,19 +68,28 @@ def open_ipic3d(
     ----------
     path : Path
         Simulation output directory.
+    config_path : Path | None
+        Explicit path to an ``.inp`` or ``settings.hdf`` file.
+        When ``None``, auto-detected from *path*.
 
     Returns
     -------
     tuple[SimulationReader, SimulationConfig]
-        A (reader, config) pair ready for ``reader.read_timestep(path, step)``.
+        A (reader, config) pair ready for
+        ``reader.read_timestep(path, step)``.
 
     Raises
     ------
     FileNotFoundError
         If no ``.inp`` or ``settings.hdf`` file is found.
     """
-    inp_files = list(path.glob("*.inp"))
-    if inp_files:
+    if config_path is not None:
+        suffix = config_path.suffix
+        if suffix == ".hdf":
+            cfg = parse_settings_hdf(config_path)
+        else:
+            cfg = parse_inp(config_path)
+    elif inp_files := list(path.glob("*.inp")):
         cfg = parse_inp(inp_files[0])
     elif (path / "settings.hdf").exists():
         cfg = parse_settings_hdf(path / "settings.hdf")

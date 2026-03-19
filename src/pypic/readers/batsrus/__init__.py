@@ -58,6 +58,8 @@ __all__ = [
 
 def open_batsrus(
     path: Path,
+    *,
+    config_path: Path | None = None,
 ) -> tuple[SimulationReader, SimulationConfig]:
     """Auto-detect BATSRUS output format and return a reader.
 
@@ -72,13 +74,17 @@ def open_batsrus(
     ----------
     path
         Directory containing BATSRUS output files.
+    config_path : Path | None
+        Explicit path to a ``PARAM.in`` file.  When ``None``,
+        auto-detected from *path*.
 
     Returns
     -------
     reader : SimulationReader
         A `BATSRUSReader` instance.
     config : SimulationConfig
-        Simulation configuration parsed from ``PARAM.in`` and/or headers.
+        Simulation configuration parsed from ``PARAM.in``
+        and/or headers.
 
     Raises
     ------
@@ -86,7 +92,7 @@ def open_batsrus(
         If no recognizable BATSRUS output is found.
     """
     path = Path(path)
-    param_file = path / "PARAM.in"
+    param_file = config_path or (path / "PARAM.in")
     batsrus_config = (
         parse_param_in(param_file) if param_file.exists() else BATSRUSConfig()
     )
