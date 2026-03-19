@@ -16,7 +16,15 @@ from pypic.readers._registry import (
     registered_readers,
     unregister_reader,
 )
-from pypic.readers.base import SimulationConfig, SimulationReader, TabularData
+from pypic.readers.base import (
+    FieldDataset,
+    GridInfo,
+    SimulationConfig,
+    SimulationReader,
+    TabularData,
+    supports_selective_read,
+)
+from pypic.units import Normalization
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -405,3 +413,108 @@ class TestSimulationFacade:
         assert sim.auxiliary_names == ["test_aux"]
         result = sim.auxiliary("test_aux")
         assert result.name == "test_aux"
+
+    def test_selective_reader_dispatch(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        """Simulation.read(fields=...) uses SelectiveReader protocol."""
+        from pypic.coordinates.geometry import CARTESIAN
+
+        grid = GridInfo(
+            dimensions=(2,),
+            spacing=(1.0,),
+            origin=(0.0,),
+            geometry=CARTESIAN,
+        )
+        norm = Normalization.identity()
+
+        class FullReader:
+            """Reader that supports selective I/O via fields= param."""
+
+            def __init__(self) -> None:
+                self.received_fields: set[str] | None = None
+
+            def read_timestep(
+                self,
+                path: Path,
+                step: int,
+                *,
+                fields: set[str] | None = None,
+            ) -> FieldDataset:
+                self.received_fields = fields
+                data = {"B1": np.ones(2), "B2": np.ones(2), "rho_c": np.zeros(2)}
+                if fields is not None:
+                    data = {k: v for k, v in data.items() if k in fields}
+                return FieldDataset.from_arrays(data, grid, norm)
+
+            def available_timesteps(self, path: Path) -> list[int]:
+                return [0]
+
+        full_reader = FullReader()
+        assert supports_selective_read(full_reader)
+
+        cfg = SimulationConfig(
+            model_name="test",
+            model_type="PIC",
+            grid=grid,
+            normalization=norm,
+            species=(),
+            physics={},
+            frame="sim",
+            metadata={},
+        )
+        sim = Simulation(full_reader, cfg, tmp_path)
+
+        # Selective read should pass fields through to reader
+        ds = sim.read(0, fields=["Bx"])
+        assert full_reader.received_fields == {"B1"}
+        assert ds.has_field("B1")
+
+    def test_basic_reader_fallback(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        """Simulation.read(fields=...) falls back to select_fields for basic readers."""
+        from pypic.coordinates.geometry import CARTESIAN
+
+        grid = GridInfo(
+            dimensions=(2,),
+            spacing=(1.0,),
+            origin=(0.0,),
+            geometry=CARTESIAN,
+        )
+        norm = Normalization.identity()
+
+        class BasicReader:
+            """Reader without fields= support."""
+
+            def read_timestep(self, path: Path, step: int) -> FieldDataset:
+                return FieldDataset.from_arrays(
+                    {"B1": np.ones(2), "B2": np.ones(2), "rho_c": np.zeros(2)},
+                    grid,
+                    norm,
+                )
+
+            def available_timesteps(self, path: Path) -> list[int]:
+                return [0]
+
+        basic_reader = BasicReader()
+        assert isinstance(basic_reader, SimulationReader)
+        assert not supports_selective_read(basic_reader)
+
+        cfg = SimulationConfig(
+            model_name="test",
+            model_type="PIC",
+            grid=grid,
+            normalization=norm,
+            species=(),
+            physics={},
+            frame="sim",
+            metadata={},
+        )
+        sim = Simulation(basic_reader, cfg, tmp_path)
+
+        # Should read all then filter
+        ds = sim.read(0, fields=["B1"])
+        assert sorted(ds.field_names()) == ["B1"]

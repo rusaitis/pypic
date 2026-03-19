@@ -602,9 +602,15 @@ class SimulationConfig:
     grid: GridInfo
     normalization: Normalization
     species: tuple[SpeciesInfo, ...]
-    physics: dict[str, Any]
+    physics: dict[str, Any]  # frozen at runtime via __post_init__
     frame: str
-    metadata: dict[str, Any]
+    metadata: dict[str, Any]  # frozen at runtime via __post_init__
+
+    def __post_init__(self) -> None:
+        # Wrap mutable dicts in read-only proxies to enforce true immutability.
+        # Callers pass plain dicts; frozen assignment uses object.__setattr__.
+        object.__setattr__(self, "physics", MappingProxyType(dict(self.physics)))
+        object.__setattr__(self, "metadata", MappingProxyType(dict(self.metadata)))
 
 
 @dataclass(frozen=True, slots=True)
@@ -648,24 +654,27 @@ class TabularData:
     """
 
     name: str
-    columns: dict[str, FloatArray]
+    columns: dict[str, FloatArray]  # frozen at runtime via __post_init__
     index_column: str | None = None
-    metadata: dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)  # frozen at runtime
 
     def __post_init__(self) -> None:
-        if not self.columns:
-            return
-        lengths = {k: len(v) for k, v in self.columns.items()}
-        unique_lengths = set(lengths.values())
-        if len(unique_lengths) > 1:
-            msg = f"All columns must have equal length, got {lengths}"
-            raise ValueError(msg)
+        # Validate before freezing
+        if self.columns:
+            lengths = {k: len(v) for k, v in self.columns.items()}
+            unique_lengths = set(lengths.values())
+            if len(unique_lengths) > 1:
+                msg = f"All columns must have equal length, got {lengths}"
+                raise ValueError(msg)
         if self.index_column is not None and self.index_column not in self.columns:
             msg = (
                 f"index_column {self.index_column!r} not found "
                 f"in columns: {sorted(self.columns)}"
             )
             raise ValueError(msg)
+        # Wrap mutable dicts in read-only proxies
+        object.__setattr__(self, "columns", MappingProxyType(dict(self.columns)))
+        object.__setattr__(self, "metadata", MappingProxyType(dict(self.metadata)))
 
     def __getitem__(self, key: str) -> FloatArray:
         """Return a column by name.
@@ -711,6 +720,33 @@ class TabularData:
         if self.index_column is not None:
             return self.columns[self.index_column]
         return np.arange(len(self), dtype=np.float64)
+
+
+def supports_selective_read(reader: SimulationReader) -> bool:
+    """Check whether *reader* accepts a ``fields`` keyword on ``read_timestep``.
+
+    Inspects the method signature once at dispatch time.  This is more
+    reliable than ``@runtime_checkable`` protocols (which only check
+    method names, not parameter signatures) and clearer than calling
+    ``inspect.signature`` inline at the call site.
+
+    Examples
+    --------
+    >>> class Selective:
+    ...     def read_timestep(self, path, step, *, fields=None): ...
+    ...     def available_timesteps(self, path): return []
+    >>> supports_selective_read(Selective())
+    True
+    >>> class Basic:
+    ...     def read_timestep(self, path, step): ...
+    ...     def available_timesteps(self, path): return []
+    >>> supports_selective_read(Basic())
+    False
+    """
+    import inspect
+
+    sig = inspect.signature(reader.read_timestep)
+    return "fields" in sig.parameters
 
 
 @runtime_checkable

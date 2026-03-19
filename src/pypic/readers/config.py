@@ -11,20 +11,9 @@ from scipy import constants
 if TYPE_CHECKING:
     from pathlib import Path
 
-from pypic.coordinates.geometry import (
-    CARTESIAN,
-    CYLINDRICAL,
-    SPHERICAL,
-    CoordinateGeometry,
-)
+from pypic.coordinates.geometry import GEOMETRY_BY_NAME, CoordinateGeometry
 from pypic.readers.base import GridInfo, SimulationConfig
 from pypic.units import Normalization, SpeciesInfo
-
-_GEOMETRY_MAP: dict[str, CoordinateGeometry] = {
-    "cartesian": CARTESIAN,
-    "spherical": SPHERICAL,
-    "cylindrical": CYLINDRICAL,
-}
 
 _DEFAULT_SPECIES_PARAMS: dict[str, tuple[float, float]] = {
     "electrons": (constants.m_e, constants.e),
@@ -154,9 +143,9 @@ def _parse_coordinates(
         raise ValueError("[coordinates] missing required key 'frame'")
 
     geom_str = raw["geometry"].lower()
-    geometry = _GEOMETRY_MAP.get(geom_str)
+    geometry = GEOMETRY_BY_NAME.get(geom_str)
     if geometry is None:
-        valid = ", ".join(sorted(_GEOMETRY_MAP))
+        valid = ", ".join(sorted(GEOMETRY_BY_NAME))
         raise ValueError(f"Unknown geometry {raw['geometry']!r}. Valid: {valid}")
 
     if "axis_labels" in raw:

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import inspect
 import logging
 import threading
 from dataclasses import dataclass
@@ -204,7 +203,7 @@ class Simulation:
     @property
     def physics(self) -> MappingProxyType[str, Any]:
         """Physics parameters (read-only view)."""
-        return MappingProxyType(self._config.physics)
+        return self._config.physics  # type: ignore[return-value]  # MappingProxyType at runtime
 
     @property
     def steps(self) -> list[int]:
@@ -218,6 +217,7 @@ class Simulation:
         step: int,
         *,
         fields: Iterable[str] | None = None,
+        **kwargs: Any,  # noqa: ANN401 — reader-specific params (e.g. target_resolution)
     ) -> FieldDataset:
         """Read field data for a single timestep.
 
@@ -230,29 +230,36 @@ class Simulation:
             names (``"B1"``) and geometry aliases (``"Bx"``).  Readers
             that support selective I/O skip unwanted datasets; others
             read all fields then filter.
+        **kwargs
+            Forwarded to readers that accept extra parameters
+            (e.g. ``target_resolution`` for BATSRUS).
 
         Returns
         -------
         FieldDataset
         """
-        if fields is None:
+        from pypic.readers.base import _default_aliases, supports_selective_read
+
+        if fields is None and not kwargs:
             return self._reader.read_timestep(self._path, step)
 
-        from pypic.readers.base import _default_aliases
+        canonical: set[str] | None = None
+        if fields is not None:
+            alias_map = _default_aliases(self._config.grid.geometry)
+            canonical = {alias_map.get(name, name) for name in fields}
 
-        alias_map = _default_aliases(self._config.grid.geometry)
-        canonical: set[str] = {alias_map.get(name, name) for name in fields}
-
-        sig = inspect.signature(self._reader.read_timestep)
-        if "fields" in sig.parameters:
+        if supports_selective_read(self._reader):
             return self._reader.read_timestep(  # type: ignore[call-arg]
                 self._path,
                 step,
                 fields=canonical,
+                **kwargs,
             )
 
         ds = self._reader.read_timestep(self._path, step)
-        return ds.select_fields(canonical)
+        if canonical is not None:
+            ds = ds.select_fields(canonical)
+        return ds
 
     @property
     def auxiliary_names(self) -> list[str]:

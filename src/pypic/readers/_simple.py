@@ -38,12 +38,7 @@ from typing import TYPE_CHECKING, Any
 import h5py  # type: ignore[import-untyped]
 import numpy as np
 
-from pypic.coordinates.geometry import (
-    CARTESIAN,
-    CYLINDRICAL,
-    SPHERICAL,
-    CoordinateGeometry,
-)
+from pypic.coordinates.geometry import CARTESIAN, GEOMETRY_BY_NAME
 from pypic.readers.base import FieldDataset, GridInfo, SimulationConfig, TabularData
 from pypic.units import Normalization
 
@@ -56,12 +51,6 @@ if TYPE_CHECKING:
     from pypic.units import SpeciesInfo
 
 log = logging.getLogger(__name__)
-
-_GEOMETRY_MAP: dict[str, CoordinateGeometry] = {
-    "cartesian": CARTESIAN,
-    "spherical": SPHERICAL,
-    "cylindrical": CYLINDRICAL,
-}
 
 
 def _parse_file_pattern(
@@ -116,7 +105,7 @@ def _read_grid_attrs(f: h5py.File) -> GridInfo | None:
     geo_name = attrs.get("geometry", "cartesian")
     if isinstance(geo_name, bytes):
         geo_name = geo_name.decode()
-    geometry = _GEOMETRY_MAP.get(str(geo_name), CARTESIAN)
+    geometry = GEOMETRY_BY_NAME.get(str(geo_name), CARTESIAN)
 
     dt = float(attrs["dt"]) if "dt" in attrs else None
 

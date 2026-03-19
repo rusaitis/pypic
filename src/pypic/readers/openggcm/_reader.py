@@ -207,14 +207,16 @@ def _normalize_field(
     norm: Normalization,
 ) -> FloatArray:
     """Normalize a single SI field to code units."""
-    if name in ("V1", "V2", "V3"):
-        return norm.normalize("velocity", data)  # type: ignore[return-value]
-    if name in ("B1", "B2", "B3"):
-        return norm.normalize("b_field", data)  # type: ignore[return-value]
-    if name == "rho_m":
-        return data / (norm.density_ref * norm.mass_ref)
-    if name == "n_s0":
-        return norm.normalize("density", data)  # type: ignore[return-value]
-    if name == "P":
-        return data / (norm.density_ref * norm.mass_ref * norm.velocity_ref**2)
-    return data
+    match name:
+        case "V1" | "V2" | "V3":
+            return norm.normalize("velocity", data)  # type: ignore[return-value]
+        case "B1" | "B2" | "B3":
+            return norm.normalize("b_field", data)  # type: ignore[return-value]
+        case "rho_m":
+            return data / (norm.density_ref * norm.mass_ref)
+        case "n_s0":
+            return norm.normalize("density", data)  # type: ignore[return-value]
+        case "P":
+            return data / (norm.density_ref * norm.mass_ref * norm.velocity_ref**2)
+        case _:
+            return data

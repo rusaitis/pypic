@@ -103,13 +103,13 @@ def open_batsrus(
     out_files = sorted(path.glob("*.out")) + sorted(path.glob("*.outs"))
 
     if batl_files:
-        output_format = "hdf5"
+        output_format = BATSRUSOutputFormat.HDF5
         prefix = _detect_prefix_batl(batl_files)
     elif h_files:
-        output_format = "idl"
+        output_format = BATSRUSOutputFormat.IDL
         prefix = _detect_prefix_h(h_files)
     elif out_files:
-        output_format = "out"
+        output_format = BATSRUSOutputFormat.OUT
         prefix = _detect_prefix_out(out_files)
     else:
         msg = f"No BATSRUS output files found in {path}"

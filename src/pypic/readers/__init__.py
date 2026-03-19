@@ -16,6 +16,7 @@ from pypic.readers.base import (
     SimulationConfig,
     SimulationReader,
     TabularData,
+    supports_selective_read,
 )
 from pypic.readers.batsrus import (
     BATSRUSConfig,
@@ -76,5 +77,6 @@ __all__ = [
     "parse_param_in",
     "register_reader",
     "registered_readers",
+    "supports_selective_read",
     "unregister_reader",
 ]

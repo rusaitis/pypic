@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import re
 from dataclasses import dataclass, field
+from types import MappingProxyType
 from typing import TYPE_CHECKING, Any
 
 import h5py  # type: ignore[import-untyped]
@@ -105,7 +106,10 @@ class IPic3DConfig:
     field_output_cycle: int
     case: str
     simulation_name: str
-    extra: dict[str, Any] = field(default_factory=dict)
+    extra: dict[str, Any] = field(default_factory=dict)  # frozen via __post_init__
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "extra", MappingProxyType(dict(self.extra)))
 
 
 def _parse_array_float(raw: str) -> tuple[float, ...]:

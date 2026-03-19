@@ -4,11 +4,11 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, assert_never
 
 import numpy as np
 
-from pypic.coordinates import CARTESIAN, CYLINDRICAL, SPHERICAL, CoordinateGeometry
+from pypic.coordinates import CARTESIAN, GEOMETRY_BY_NAME
 from pypic.readers.base import FieldDataset, GridInfo, SimulationConfig
 from pypic.readers.batsrus._config import BATSRUSConfig, to_simulation_config
 from pypic.readers.batsrus._field_map import (
@@ -35,11 +35,7 @@ if TYPE_CHECKING:
     from collections.abc import Iterable
     from pathlib import Path
 
-_GEOMETRY_MAP: dict[str, CoordinateGeometry] = {
-    "cartesian": CARTESIAN,
-    "spherical": SPHERICAL,
-    "cylindrical": CYLINDRICAL,
-}
+    from pypic.readers.batsrus import BATSRUSOutputFormat
 
 _STEP_RE = re.compile(r"_n(\d{8})")
 
@@ -59,7 +55,7 @@ class BATSRUSReader:
     def __init__(
         self,
         config: BATSRUSConfig,
-        output_format: str,
+        output_format: BATSRUSOutputFormat,
         prefix: str,
         *,
         geometry: str = "cartesian",
@@ -72,14 +68,19 @@ class BATSRUSReader:
 
     def available_timesteps(self, path: Path) -> list[int]:
         """Return sorted list of available timestep indices."""
+        from pypic.readers.batsrus import BATSRUSOutputFormat
+
         steps: set[int] = set()
 
-        if self._output_format == "hdf5":
-            pattern = f"{self._prefix}*.batl"
-        elif self._output_format == "idl":
-            pattern = f"{self._prefix}*.h"
-        else:
-            pattern = f"{self._prefix}*.out"
+        match self._output_format:
+            case BATSRUSOutputFormat.HDF5:
+                pattern = f"{self._prefix}*.batl"
+            case BATSRUSOutputFormat.IDL:
+                pattern = f"{self._prefix}*.h"
+            case BATSRUSOutputFormat.OUT:
+                pattern = f"{self._prefix}*.out"
+            case _ as unreachable:
+                assert_never(unreachable)
 
         for f in path.glob(pattern):
             m = _STEP_RE.search(f.stem)
@@ -117,22 +118,28 @@ class BATSRUSReader:
         FieldDataset
             Field data with canonical names, optionally converted to SI.
         """
+        from pypic.readers.batsrus import BATSRUSOutputFormat
+
         canonical_set = set(fields) if fields is not None else None
-        if self._output_format == "hdf5":
-            return self._read_hdf5(
-                path,
-                step,
-                fields=canonical_set,
-                target_resolution=target_resolution,
-            )
-        if self._output_format == "idl":
-            return self._read_idl(
-                path,
-                step,
-                fields=canonical_set,
-                target_resolution=target_resolution,
-            )
-        return self._read_out(path, step, fields=canonical_set)
+        match self._output_format:
+            case BATSRUSOutputFormat.HDF5:
+                return self._read_hdf5(
+                    path,
+                    step,
+                    fields=canonical_set,
+                    target_resolution=target_resolution,
+                )
+            case BATSRUSOutputFormat.IDL:
+                return self._read_idl(
+                    path,
+                    step,
+                    fields=canonical_set,
+                    target_resolution=target_resolution,
+                )
+            case BATSRUSOutputFormat.OUT:
+                return self._read_out(path, step, fields=canonical_set)
+            case _ as unreachable:
+                assert_never(unreachable)
 
     def _read_idl(
         self,
@@ -145,7 +152,7 @@ class BATSRUSReader:
         """Read per-cell IDL format."""
         header_file = self._find_file(path, step, ".h")
         header = parse_header(header_file)
-        geo = _GEOMETRY_MAP.get(header.geometry, CARTESIAN)
+        geo = GEOMETRY_BY_NAME.get(header.geometry, CARTESIAN)
 
         idl_files = self._find_idl_files(path, step)
         all_coords = []
@@ -234,7 +241,7 @@ class BATSRUSReader:
                     native_wanted.add(f)
 
         batl = read_batl(batl_file, fields=native_wanted)
-        geo = _GEOMETRY_MAP.get(self._geometry, CARTESIAN)
+        geo = GEOMETRY_BY_NAME.get(self._geometry, CARTESIAN)
 
         is_uniform = len(set(batl.refine_level)) <= 1
         if is_uniform:
@@ -294,7 +301,7 @@ class BATSRUSReader:
 
         # Determine geometry: .out files encode non-Cartesian as negative ndim
         is_cart = out_meta.get("is_cartesian", True)
-        geo = CARTESIAN if is_cart else _GEOMETRY_MAP.get(self._geometry, CARTESIAN)
+        geo = CARTESIAN if is_cart else GEOMETRY_BY_NAME.get(self._geometry, CARTESIAN)
 
         # Build fields dict with canonical names
         field_data: dict[str, np.ndarray] = {}

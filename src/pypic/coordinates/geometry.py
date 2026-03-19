@@ -126,3 +126,9 @@ CYLINDRICAL = CoordinateGeometry(
     axis_names=("r", "φ", "z"),
     axis_units=("length", "angle", "length"),
 )
+
+GEOMETRY_BY_NAME: dict[str, CoordinateGeometry] = {
+    "cartesian": CARTESIAN,
+    "spherical": SPHERICAL,
+    "cylindrical": CYLINDRICAL,
+}

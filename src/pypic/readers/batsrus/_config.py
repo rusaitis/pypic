@@ -4,17 +4,12 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
+from types import MappingProxyType
 from typing import TYPE_CHECKING, Any
 
-from pypic.coordinates import CARTESIAN, CYLINDRICAL, SPHERICAL, CoordinateGeometry
+from pypic.coordinates import CARTESIAN, GEOMETRY_BY_NAME
 from pypic.readers.base import GridInfo, SimulationConfig
 from pypic.units import Normalization
-
-_GEOMETRY_MAP: dict[str, CoordinateGeometry] = {
-    "cartesian": CARTESIAN,
-    "spherical": SPHERICAL,
-    "cylindrical": CYLINDRICAL,
-}
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -44,6 +39,13 @@ class BATSRUSConfig:
     use_splitb: bool = False
     divb_method: str = ""
     metadata: dict[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        # Wrap mutable dicts in read-only proxies
+        _freeze = MappingProxyType
+        object.__setattr__(self, "solar_wind", _freeze(dict(self.solar_wind)))
+        object.__setattr__(self, "start_time", _freeze(dict(self.start_time)))
+        object.__setattr__(self, "metadata", _freeze(dict(self.metadata)))
 
 
 def parse_param_in(path: Path) -> BATSRUSConfig:
@@ -230,7 +232,7 @@ def to_simulation_config(
     -------
     SimulationConfig
     """
-    geometry = _GEOMETRY_MAP.get(config.geometry, CARTESIAN)
+    geometry = GEOMETRY_BY_NAME.get(config.geometry, CARTESIAN)
 
     if grid is None:
         if header is not None:

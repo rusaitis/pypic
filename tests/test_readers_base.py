@@ -268,3 +268,78 @@ class TestSimulationReader:
                 return []
 
         assert isinstance(MyReader(), SimulationReader)
+
+    def test_supports_selective_read(self):
+        from collections.abc import Iterable
+
+        from pypic.readers.base import supports_selective_read
+
+        class WithFields:
+            def read_timestep(
+                self,
+                path: Path,
+                step: int,
+                *,
+                fields: Iterable[str] | None = None,
+            ) -> FieldDataset: ...
+
+            def available_timesteps(self, path: Path) -> list[int]:
+                return []
+
+        class WithoutFields:
+            def read_timestep(self, path: Path, step: int) -> FieldDataset: ...
+
+            def available_timesteps(self, path: Path) -> list[int]:
+                return []
+
+        assert supports_selective_read(WithFields())
+        assert not supports_selective_read(WithoutFields())
+
+
+class TestSimulationConfigImmutability:
+    def test_physics_not_mutable(self):
+        from pypic.readers.base import SimulationConfig
+        from pypic.units import Normalization, SpeciesInfo
+
+        cfg = SimulationConfig(
+            model_name="test",
+            model_type="PIC",
+            grid=GridInfo(
+                dimensions=(4,),
+                spacing=(1.0,),
+                origin=(0.0,),
+                geometry=CARTESIAN,
+            ),
+            normalization=Normalization.identity(),
+            species=(SpeciesInfo(name="e", charge=-1.0, mass=1.0),),
+            physics={"gamma": 5.0 / 3.0},
+            frame="sim",
+            metadata={"run_id": "abc"},
+        )
+        with pytest.raises(TypeError):
+            cfg.physics["gamma"] = 999  # type: ignore[index]
+        with pytest.raises(TypeError):
+            cfg.metadata["new_key"] = "bad"  # type: ignore[index]
+
+    def test_original_dict_not_shared(self):
+        from pypic.readers.base import SimulationConfig
+        from pypic.units import Normalization
+
+        orig = {"gamma": 5.0 / 3.0}
+        cfg = SimulationConfig(
+            model_name="test",
+            model_type="PIC",
+            grid=GridInfo(
+                dimensions=(4,),
+                spacing=(1.0,),
+                origin=(0.0,),
+                geometry=CARTESIAN,
+            ),
+            normalization=Normalization.identity(),
+            species=(),
+            physics=orig,
+            frame="sim",
+            metadata={},
+        )
+        orig["gamma"] = 999
+        assert cfg.physics["gamma"] == pytest.approx(5.0 / 3.0)
