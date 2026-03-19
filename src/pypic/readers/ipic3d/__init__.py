@@ -17,6 +17,7 @@ from pypic.readers.ipic3d._conserved import (
 )
 from pypic.readers.ipic3d._h5hut import IPic3DH5hutReader
 from pypic.readers.ipic3d._parallel import IPic3DParallelReader
+from pypic.readers.ipic3d._probe import probe
 from pypic.readers.ipic3d._serial import IPic3DSerialReader
 
 if TYPE_CHECKING:
@@ -34,6 +35,7 @@ __all__ = [
     "open_ipic3d",
     "parse_inp",
     "parse_settings_hdf",
+    "probe",
     "to_simulation_config",
     "to_toml",
 ]
@@ -97,3 +99,9 @@ def open_ipic3d(
         reader = IPic3DParallelReader(cfg)
 
     return reader, sim_config
+
+
+# Self-register with the reader registry
+from pypic.readers._registry import register_reader as _register_reader  # noqa: E402
+
+_register_reader("ipic3d", probe, open_ipic3d)

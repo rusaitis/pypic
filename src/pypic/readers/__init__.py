@@ -1,5 +1,12 @@
 """Simulation data readers and the FieldDataset container."""
 
+from pypic.readers._registry import (
+    ReaderEntry,
+    open_simulation,
+    register_reader,
+    registered_readers,
+    unregister_reader,
+)
 from pypic.readers.base import (
     FieldDataset,
     GridInfo,
@@ -8,6 +15,7 @@ from pypic.readers.base import (
 )
 from pypic.readers.batsrus import (
     BATSRUSConfig,
+    BATSRUSOutputFormat,
     BATSRUSReader,
     open_batsrus,
     parse_param_in,
@@ -32,6 +40,7 @@ from pypic.readers.openggcm import (
 
 __all__ = [
     "BATSRUSConfig",
+    "BATSRUSOutputFormat",
     "BATSRUSReader",
     "ConservedQuantities",
     "FieldDataset",
@@ -42,6 +51,7 @@ __all__ = [
     "IPic3DSerialReader",
     "OpenGGCMGrid",
     "OpenGGCMReader",
+    "ReaderEntry",
     "SimulationConfig",
     "SimulationReader",
     "load_config",
@@ -49,7 +59,11 @@ __all__ = [
     "open_batsrus",
     "open_ipic3d",
     "open_openggcm",
+    "open_simulation",
     "parse_grid_file",
     "parse_inp",
     "parse_param_in",
+    "register_reader",
+    "registered_readers",
+    "unregister_reader",
 ]

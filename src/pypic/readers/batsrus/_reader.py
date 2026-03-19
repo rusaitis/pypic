@@ -9,15 +9,6 @@ import numpy as np
 
 from pypic.coordinates import CARTESIAN, CYLINDRICAL, SPHERICAL, CoordinateGeometry
 from pypic.readers.base import FieldDataset, GridInfo, SimulationConfig
-
-_GEOMETRY_MAP: dict[str, CoordinateGeometry] = {
-    "cartesian": CARTESIAN,
-    "spherical": SPHERICAL,
-    "cylindrical": CYLINDRICAL,
-}
-
-if TYPE_CHECKING:
-    from pathlib import Path
 from pypic.readers.batsrus._config import BATSRUSConfig, to_simulation_config
 from pypic.readers.batsrus._field_map import (
     FIELD_NAME_MAP,
@@ -36,6 +27,15 @@ from pypic.readers.batsrus._hdf5 import read_batl
 from pypic.readers.batsrus._header import BATSRUSHeader, parse_header
 from pypic.readers.batsrus._idl import read_idl_cells, read_out_file
 from pypic.units import Normalization
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+_GEOMETRY_MAP: dict[str, CoordinateGeometry] = {
+    "cartesian": CARTESIAN,
+    "spherical": SPHERICAL,
+    "cylindrical": CYLINDRICAL,
+}
 
 _STEP_RE = re.compile(r"_n(\d{8})")
 

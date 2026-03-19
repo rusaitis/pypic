@@ -23,12 +23,12 @@ from typing import TYPE_CHECKING
 
 from pypic.readers.base import SimulationConfig
 from pypic.readers.openggcm._grid import OpenGGCMGrid, parse_grid_file
-from pypic.readers.openggcm._reader import OpenGGCMReader
+from pypic.readers.openggcm._probe import probe
+from pypic.readers.openggcm._reader import OpenGGCMReader, _make_grid_info
+from pypic.units import Normalization
 
 if TYPE_CHECKING:
     from pathlib import Path
-
-    from pypic.units import Normalization
 
 log = logging.getLogger(__name__)
 
@@ -37,6 +37,7 @@ __all__ = [
     "OpenGGCMReader",
     "open_openggcm",
     "parse_grid_file",
+    "probe",
 ]
 
 _3DF_PATTERN = re.compile(r"^(.+)\.3df\.\d+$")
@@ -84,15 +85,12 @@ def open_openggcm(
 
     reader = OpenGGCMReader(grid, prefix, normalization)
 
-    from pypic.readers.openggcm._reader import _make_grid_info
-    from pypic.units import Normalization as Norm
-
     grid_info = _make_grid_info(grid)
     config = SimulationConfig(
         model_name="OpenGGCM",
         model_type="MHD",
         grid=grid_info,
-        normalization=normalization or Norm.identity(),
+        normalization=normalization or Normalization.identity(),
         species=(),
         physics={"gamma": 5.0 / 3.0},
         frame="GSM",
@@ -114,3 +112,9 @@ def _detect_prefix(path: Path) -> str:
             return m.group(1)
     msg = f"No *.3df.* files found in {path}"
     raise FileNotFoundError(msg)
+
+
+# Self-register with the reader registry
+from pypic.readers._registry import register_reader as _register_reader  # noqa: E402
+
+_register_reader("openggcm", probe, open_openggcm)

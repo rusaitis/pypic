@@ -12,7 +12,9 @@ the appropriate reader.
 
 from __future__ import annotations
 
+import copy
 import re
+from enum import StrEnum
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -22,20 +24,34 @@ from pypic.readers.batsrus._config import (
     parse_param_in,
     to_simulation_config,
 )
+from pypic.readers.batsrus._grid import assemble_uniform_hdf5, regrid_amr_hdf5
+from pypic.readers.batsrus._hdf5 import read_batl
 from pypic.readers.batsrus._header import BATSRUSHeader, parse_header
+from pypic.readers.batsrus._probe import probe
 from pypic.readers.batsrus._reader import BATSRUSReader
 
 if TYPE_CHECKING:
     from pypic.readers.base import SimulationConfig, SimulationReader
 
+
+class BATSRUSOutputFormat(StrEnum):
+    """BATSRUS output file format."""
+
+    HDF5 = "hdf5"
+    IDL = "idl"
+    OUT = "out"
+
+
 __all__ = [
     "BATSRUSConfig",
     "BATSRUSHeader",
+    "BATSRUSOutputFormat",
     "BATSRUSReader",
     "extract_step_from_filename",
     "open_batsrus",
     "parse_header",
     "parse_param_in",
+    "probe",
     "to_simulation_config",
 ]
 
@@ -101,17 +117,11 @@ def open_batsrus(
         header = parse_header(h_files[0])
         geometry = header.geometry
 
-    # Store geometry on config for to_simulation_config
-    import copy
-
     batsrus_config = copy.replace(batsrus_config, geometry=geometry)
 
     reader = BATSRUSReader(batsrus_config, output_format, prefix, geometry=geometry)
 
     if batl_files and header is None:
-        from pypic.readers.batsrus._grid import assemble_uniform_hdf5, regrid_amr_hdf5
-        from pypic.readers.batsrus._hdf5 import read_batl
-
         batl = read_batl(batl_files[0])
         is_uniform = len(set(batl.refine_level)) <= 1
         if is_uniform:
@@ -160,3 +170,9 @@ def _prefix_before_step(filename: str, suffix: str) -> str:
     if m:
         return stem[: m.start() + 1]  # include trailing underscore
     return stem
+
+
+# Self-register with the reader registry
+from pypic.readers._registry import register_reader as _register_reader  # noqa: E402
+
+_register_reader("batsrus", probe, open_batsrus)

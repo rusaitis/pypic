@@ -16,13 +16,13 @@ from pypic.readers.openggcm._field_map import (
     DEFAULT_SKIP,
     convert_fields_to_si,
 )
+from pypic.units import Normalization
 
 if TYPE_CHECKING:
     from pathlib import Path
 
     from pypic.readers.openggcm._grid import OpenGGCMGrid
     from pypic.types import FloatArray
-    from pypic.units import Normalization
 
 log = logging.getLogger(__name__)
 
@@ -140,7 +140,7 @@ class OpenGGCMReader:
         return FieldDataset(
             dataset,
             grid_info,
-            self._normalization or _identity_normalization(),
+            self._normalization or Normalization.identity(),
             metadata={"step": step, "timestep": ts, "prefix": self._prefix},
         )
 
@@ -182,8 +182,3 @@ def _normalize_field(
     return data
 
 
-def _identity_normalization() -> Normalization:
-    """Lazy import to avoid circular dependency."""
-    from pypic.units import Normalization
-
-    return Normalization.identity()
