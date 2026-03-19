@@ -106,6 +106,9 @@ class OpenGGCMReader:
         -------
         FieldDataset
             Field data with canonical names in SI (or normalized) units.
+            ``metadata["is_uniform_grid"]`` is ``False`` — the grid is
+            non-uniform, so ``grid.spacing`` is a mean approximation.
+            Use the xarray coordinates for accurate spacing.
         """
         filename = path / f"{self._prefix}.3df.{step:06d}"
         if not filename.exists():
@@ -170,16 +173,22 @@ class OpenGGCMReader:
             dataset,
             grid_info,
             self._normalization or Normalization.identity(),
-            metadata={"step": step, "timestep": ts, "prefix": self._prefix},
+            metadata={
+                "step": step,
+                "timestep": ts,
+                "prefix": self._prefix,
+                "is_uniform_grid": False,
+            },
         )
 
 
 def _make_grid_info(grid: OpenGGCMGrid) -> GridInfo:
     """Create an approximate GridInfo from a non-uniform grid.
 
-    ``GridInfo`` requires uniform spacing, so we use mean spacing as an
-    approximation.  The true non-uniform coordinates live in the
-    ``xr.Dataset`` coords.
+    ``GridInfo`` requires uniform spacing, so we use **mean** spacing
+    as an approximation.  The true non-uniform coordinates live in the
+    ``xr.Dataset`` coords and should be used for any operation that
+    depends on accurate spacing (derivatives, interpolation).
     """
     dx = (grid.x[-1] - grid.x[0]) / max(grid.nx - 1, 1)
     dy = (grid.y[-1] - grid.y[0]) / max(grid.ny - 1, 1)

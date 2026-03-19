@@ -223,6 +223,77 @@ def gaussian_density_to_si(rho: FloatArray) -> FloatArray:
     return rho * FOUR_PI
 
 
+def compute_totals_and_filter(
+    field_data: dict[str, FloatArray],
+    nspec: int,
+    expanded: set[str] | None,
+    wanted: set[str] | None,
+) -> dict[str, FloatArray]:
+    """Sum per-species moments into totals and filter to wanted fields.
+
+    Computes total ``rho_c``, ``J1``, ``J2``, ``J3`` by summing the
+    per-species contributions already present in *field_data*.  Guards
+    against missing per-species keys (e.g. when a species lacks data).
+
+    Parameters
+    ----------
+    field_data : dict[str, FloatArray]
+        Field arrays keyed by canonical name.  Modified in place
+        (totals are added) before filtering.
+    nspec : int
+        Number of particle species.
+    expanded : set[str] | None
+        Expanded wanted set (includes per-species dependencies),
+        or ``None`` when all fields are wanted.
+    wanted : set[str] | None
+        Originally requested canonical field names, or ``None``
+        for all fields.
+
+    Returns
+    -------
+    dict[str, FloatArray]
+        Filtered field dict containing only *wanted* keys (or all
+        keys when *wanted* is ``None``).
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> data = {
+    ...     "rho_c_s0": np.array([1.0]),
+    ...     "rho_c_s1": np.array([2.0]),
+    ...     "J1_s0": np.array([0.5]),
+    ...     "J1_s1": np.array([0.3]),
+    ...     "J2_s0": np.array([0.1]),
+    ...     "J2_s1": np.array([0.2]),
+    ...     "J3_s0": np.array([0.0]),
+    ...     "J3_s1": np.array([0.4]),
+    ... }
+    >>> result = compute_totals_and_filter(data, 2, None, None)
+    >>> result["rho_c"]
+    array([3.])
+    >>> result["J1"]
+    array([0.8])
+    """
+    import numpy as np
+
+    for moment_comp, canon_total in _MOMENT_COMPONENT_MAP.items():
+        if expanded is not None and canon_total not in expanded:
+            continue
+        first_key = per_species_canonical(moment_comp, 0)
+        if first_key not in field_data:
+            continue
+        total = np.zeros_like(field_data[first_key])
+        for s in range(nspec):
+            key = per_species_canonical(moment_comp, s)
+            if key in field_data:
+                total = total + field_data[key]
+        field_data[canon_total] = total
+
+    if wanted is not None:
+        return {k: v for k, v in field_data.items() if k in wanted}
+    return field_data
+
+
 def gaussian_current_to_si(j: FloatArray) -> FloatArray:
     r"""Convert iPIC3D Gaussian current density to SI-rationalized.
 

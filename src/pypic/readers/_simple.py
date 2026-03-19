@@ -623,6 +623,7 @@ def open_simple(
     Simulation
         Wraps the reader, config, and path.
     """
+    # Deferred to avoid circular import: _registry imports _simple at module level
     from pypic.readers._registry import Simulation
     from pypic.readers.config import load_config
 

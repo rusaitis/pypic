@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import re
 from typing import TYPE_CHECKING, Any
 
@@ -27,6 +28,8 @@ from pypic.readers.batsrus._hdf5 import read_batl
 from pypic.readers.batsrus._header import BATSRUSHeader, parse_header
 from pypic.readers.batsrus._idl import read_idl_cells, read_out_file
 from pypic.units import Normalization
+
+log = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -344,6 +347,14 @@ class BATSRUSReader:
         if not candidates:
             msg = f"No {suffix} file found for step {step} in {path}"
             raise FileNotFoundError(msg)
+        if len(candidates) > 1:
+            log.warning(
+                "Multiple %s files for step %d: %s; using %s",
+                suffix,
+                step,
+                [c.name for c in candidates],
+                candidates[0].name,
+            )
         return candidates[0]
 
     def _find_idl_files(self, path: Path, step: int) -> list[Path]:

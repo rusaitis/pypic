@@ -445,6 +445,53 @@ class TestTargetResolutionIDL:
         assert ds["B1"].shape == (16, 16)
 
 
+class TestSelectiveReadIDL:
+    """Test selective field reading for IDL format."""
+
+    def test_subset_returns_only_requested(self) -> None:
+        reader, _ = open_batsrus(IDL_DIR)
+        ds = reader.read_timestep(IDL_DIR, 0, fields=["B1", "rho_m"])
+        assert set(ds.field_names()) == {"B1", "rho_m"}
+
+    def test_subset_values_match_full(self) -> None:
+        reader, _ = open_batsrus(IDL_DIR)
+        ds_full = reader.read_timestep(IDL_DIR, 0)
+        ds_sub = reader.read_timestep(IDL_DIR, 0, fields=["B1", "P"])
+        assert_allclose(ds_sub["B1"], ds_full["B1"], rtol=1e-15)
+        assert_allclose(ds_sub["P"], ds_full["P"], rtol=1e-15)
+
+    def test_none_reads_all(self) -> None:
+        reader, _ = open_batsrus(IDL_DIR)
+        ds = reader.read_timestep(IDL_DIR, 0, fields=None)
+        assert len(ds.field_names()) > 2
+
+
+class TestSelectiveReadHDF5:
+    """Test selective field reading for HDF5 BATL format."""
+
+    def test_subset_returns_only_requested(self) -> None:
+        reader, _ = open_batsrus(HDF5_DIR)
+        ds = reader.read_timestep(HDF5_DIR, 0, fields=["B1", "rho_m"])
+        assert set(ds.field_names()) == {"B1", "rho_m"}
+
+    def test_subset_values_match_full(self) -> None:
+        reader, _ = open_batsrus(HDF5_DIR)
+        ds_full = reader.read_timestep(HDF5_DIR, 0)
+        ds_sub = reader.read_timestep(HDF5_DIR, 0, fields=["B1", "P"])
+        assert_allclose(ds_sub["B1"], ds_full["B1"], rtol=1e-15)
+        assert_allclose(ds_sub["P"], ds_full["P"], rtol=1e-15)
+
+    def test_none_reads_all(self) -> None:
+        reader, _ = open_batsrus(HDF5_DIR)
+        ds = reader.read_timestep(HDF5_DIR, 0, fields=None)
+        assert len(ds.field_names()) > 2
+
+    def test_single_field(self) -> None:
+        reader, _ = open_batsrus(HDF5_DIR)
+        ds = reader.read_timestep(HDF5_DIR, 0, fields=["rho_m"])
+        assert ds.field_names() == ["rho_m"]
+
+
 class TestIsUniformIDL:
     """Test the uniform grid detection helper."""
 

@@ -299,7 +299,7 @@ def _assemble_hdf5_blocks(
         )
         fields: dict[str, FloatArray] = {}
         for vname in batl.var_names:
-            if vname in SKIP_FIELDS:
+            if vname in SKIP_FIELDS or vname not in batl.fields:
                 continue
             canonical = FIELD_NAME_MAP.get(vname, vname)
             fields[canonical] = np.full(dims, np.nan, dtype=np.float64)
@@ -330,7 +330,7 @@ def _assemble_hdf5_blocks(
 
     fields = {}
     for vname in batl.var_names:
-        if vname in SKIP_FIELDS:
+        if vname in SKIP_FIELDS or vname not in batl.fields:
             continue
         canonical = FIELD_NAME_MAP.get(vname, vname)
         fields[canonical] = np.full(dims, np.nan, dtype=np.float64)
@@ -351,7 +351,7 @@ def _assemble_hdf5_blocks(
         )
 
         for vname in batl.var_names:
-            if vname in SKIP_FIELDS:
+            if vname in SKIP_FIELDS or vname not in batl.fields:
                 continue
             canonical = FIELD_NAME_MAP.get(vname, vname)
             block_data = batl.fields[vname][ib]

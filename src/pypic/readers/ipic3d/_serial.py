@@ -13,7 +13,7 @@ from pypic.readers.ipic3d._config import IPic3DConfig, to_simulation_config
 from pypic.readers.ipic3d._conserved import detect_conserved, load_ipic3d_auxiliary
 from pypic.readers.ipic3d._field_map import (
     _FIELD_NAME_MAP,
-    _MOMENT_COMPONENT_MAP,
+    compute_totals_and_filter,
     expand_moment_dependencies,
     gaussian_current_to_si,
     gaussian_density_to_si,
@@ -179,18 +179,7 @@ class IPic3DSerialReader:
                 )
                 field_data[canon_rho] = gaussian_density_to_si(raw_rho)
 
-        # Compute totals by summing over species
-        for moment_comp, canon_total in _MOMENT_COMPONENT_MAP.items():
-            if expanded is not None and canon_total not in expanded:
-                continue
-            total = np.zeros_like(field_data[per_species_canonical(moment_comp, 0)])
-            for s in range(ns):
-                total = total + field_data[per_species_canonical(moment_comp, s)]
-            field_data[canon_total] = total
-
-        # Filter to originally requested fields
-        if wanted is not None:
-            field_data = {k: v for k, v in field_data.items() if k in wanted}
+        field_data = compute_totals_and_filter(field_data, ns, expanded, wanted)
 
         sc = self._sim_config
         return FieldDataset.from_arrays(

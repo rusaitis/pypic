@@ -15,8 +15,8 @@ from pypic.readers.ipic3d._conserved import detect_conserved, load_ipic3d_auxili
 from pypic.readers.ipic3d._field_map import (
     _FIELD_NAME_MAP,
     _H5HUT_FIELD_MAP,
-    _MOMENT_COMPONENT_MAP,
     _PRESSURE_COMPONENT_MAP,
+    compute_totals_and_filter,
     expand_moment_dependencies,
     gaussian_current_to_si,
     gaussian_density_to_si,
@@ -222,23 +222,7 @@ class IPic3DH5hutReader:
                     continue
                 field_data[native_name] = _read_field(block, native_name)
 
-        # Compute totals by summing over species
-        for moment_comp, canon_total in _MOMENT_COMPONENT_MAP.items():
-            if expanded is not None and canon_total not in expanded:
-                continue
-            first_key = per_species_canonical(moment_comp, 0)
-            if first_key not in field_data:
-                continue
-            total = np.zeros_like(field_data[first_key])
-            for s in range(nspec):
-                key = per_species_canonical(moment_comp, s)
-                if key in field_data:
-                    total = total + field_data[key]
-            field_data[canon_total] = total
-
-        # Filter to originally requested fields
-        if wanted is not None:
-            field_data = {k: v for k, v in field_data.items() if k in wanted}
+        field_data = compute_totals_and_filter(field_data, nspec, expanded, wanted)
 
         sc = self._sim_config
         return FieldDataset.from_arrays(

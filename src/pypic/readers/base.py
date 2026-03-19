@@ -198,6 +198,8 @@ class FieldDataset:
         Arbitrary metadata (run name, code version, etc.).
     aliases : dict[str, str] | None
         Extra field-name aliases merged with geometry defaults.
+        Aliases whose canonical target is absent from the dataset
+        are silently dropped (they become inactive).
 
     Examples
     --------
