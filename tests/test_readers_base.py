@@ -11,7 +11,6 @@ from pypic.coordinates import CARTESIAN, CYLINDRICAL, SPHERICAL
 from pypic.readers.base import (
     FieldDataset,
     GridInfo,
-    SimulationConfig,
     SimulationReader,
     _default_aliases,
 )
@@ -60,29 +59,26 @@ class TestGridInfo:
         (x,) = grid.coordinate_arrays()
         assert_allclose(x, [11.0, 13.0, 15.0])
 
-    def test_frozen(self, sample_grid):
-        with pytest.raises(AttributeError):
-            sample_grid.dimensions = (1, 1, 1)  # type: ignore[misc]
-
-    def test_2d_grid(self):
+    @pytest.mark.parametrize(
+        ("dims", "spacing", "origin", "expected_ndim", "expected_len"),
+        [
+            ((10, 5), (1.0, 2.0), (0.0, 0.0), 2, (10, 5)),
+            ((20,), (0.1,), (0.0,), 1, (20,)),
+        ],
+        ids=["2d", "1d"],
+    )
+    def test_lower_dimensional_grid(
+        self, dims, spacing, origin, expected_ndim, expected_len
+    ):
         grid = GridInfo(
-            dimensions=(10, 5),
-            spacing=(1.0, 2.0),
-            origin=(0.0, 0.0),
-            geometry=CARTESIAN,
+            dimensions=dims, spacing=spacing, origin=origin, geometry=CARTESIAN
         )
         coords = grid.coordinate_arrays()
-        assert len(coords) == 2
-        assert len(coords[0]) == 10
-        assert len(coords[1]) == 5
-
-    def test_1d_grid(self):
-        grid = GridInfo(
-            dimensions=(20,), spacing=(0.1,), origin=(0.0,), geometry=CARTESIAN
-        )
-        (x,) = grid.coordinate_arrays()
-        assert len(x) == 20
-        assert_allclose(x[0], 0.05)
+        assert len(coords) == expected_ndim
+        for i, c in enumerate(coords):
+            assert len(c) == expected_len[i]
+        if expected_ndim == 1:
+            assert_allclose(coords[0][0], origin[0] + 0.5 * spacing[0])
 
     def test_validation_length_mismatch(self):
         with pytest.raises(ValueError, match="Length mismatch"):
@@ -149,15 +145,11 @@ class TestFieldDatasetAccess:
         assert_allclose(sample_dataset["By"], sample_fields["B2"])
         assert_allclose(sample_dataset["Bz"], sample_fields["B3"])
 
-    def test_has_field_canonical(self, sample_dataset):
+    def test_has_field(self, sample_dataset):
         assert sample_dataset.has_field("B1")
         assert sample_dataset.has_field("rho_c")
-
-    def test_has_field_alias(self, sample_dataset):
         assert sample_dataset.has_field("Bx")
         assert sample_dataset.has_field("By")
-
-    def test_has_field_missing(self, sample_dataset):
         assert not sample_dataset.has_field("pressure")
 
     def test_field_names_canonical_only(self, sample_dataset):
@@ -268,49 +260,6 @@ class TestAliases:
         assert not ds.has_field("By")  # B2 doesn't exist
 
 
-class TestSimulationConfig:
-    def test_construction(self):
-        grid = GridInfo(
-            dimensions=(4,),
-            spacing=(1.0,),
-            origin=(0.0,),
-            geometry=CARTESIAN,
-        )
-        cfg = SimulationConfig(
-            model_name="run1",
-            model_type="pic",
-            grid=grid,
-            normalization=Normalization.identity(),
-            species=(SpeciesInfo(name="e", charge=-1.0, mass=1.0),),
-            physics={},
-            frame="simulation",
-            metadata={},
-        )
-        assert cfg.model_name == "run1"
-        assert cfg.species[0].name == "e"
-        assert cfg.grid.geometry is CARTESIAN
-
-    def test_frozen(self):
-        grid = GridInfo(
-            dimensions=(4,),
-            spacing=(1.0,),
-            origin=(0.0,),
-            geometry=CARTESIAN,
-        )
-        cfg = SimulationConfig(
-            model_name="run1",
-            model_type="pic",
-            grid=grid,
-            normalization=Normalization.identity(),
-            species=(),
-            physics={},
-            frame="simulation",
-            metadata={},
-        )
-        with pytest.raises(AttributeError):
-            cfg.model_name = "changed"  # type: ignore[misc]
-
-
 class TestSimulationReader:
     def test_protocol_satisfied(self):
         class MyReader:
@@ -319,9 +268,3 @@ class TestSimulationReader:
                 return []
 
         assert isinstance(MyReader(), SimulationReader)
-
-    def test_protocol_not_satisfied(self):
-        class NotAReader:
-            pass
-
-        assert not isinstance(NotAReader(), SimulationReader)

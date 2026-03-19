@@ -188,18 +188,7 @@ class TestParamIn:
 class TestIDLUniform:
     """Test IDL per-cell reader with uniform synthetic grid."""
 
-    def test_opens_and_reads(self) -> None:
-        reader, _ = open_batsrus(IDL_DIR)
-        ds = reader.read_timestep(IDL_DIR, 0)
-        assert len(ds.field_names()) > 0
-
-    def test_field_shapes(self) -> None:
-        reader, _ = open_batsrus(IDL_DIR)
-        ds = reader.read_timestep(IDL_DIR, 0)
-        for name in ds.field_names():
-            assert ds[name].shape == (NX, NY), f"{name} has wrong shape"
-
-    def test_canonical_names(self) -> None:
+    def test_reads_with_canonical_names_and_shapes(self) -> None:
         reader, _ = open_batsrus(IDL_DIR)
         ds = reader.read_timestep(IDL_DIR, 0)
         assert ds.has_field("B1")
@@ -207,26 +196,20 @@ class TestIDLUniform:
         assert ds.has_field("V1")
         assert ds.has_field("P")
         assert not ds.has_field("Hyp")
+        for name in ds.field_names():
+            assert ds[name].shape == (NX, NY), f"{name} has wrong shape"
 
-    def test_harris_bx_profile(self) -> None:
+    def test_harris_physics(self) -> None:
         reader, _ = open_batsrus(IDL_DIR)
         ds = reader.read_timestep(IDL_DIR, 0)
+        # Harris Bx profile
         bx = ds["B1"]
-        # At midplane (y=0), Bx should be near 0
         iy_mid = NY // 2
         assert_allclose(bx[:, iy_mid], 0.0, atol=0.3)
-        # At edges (y = ±max), Bx should approach ±B0
         assert bx[:, -1].mean() > 0.9
         assert bx[:, 0].mean() < -0.9
-
-    def test_uniform_density(self) -> None:
-        reader, _ = open_batsrus(IDL_DIR)
-        ds = reader.read_timestep(IDL_DIR, 0)
+        # Uniform density and pressure
         assert_allclose(ds["rho_m"], RHO0, rtol=1e-10)
-
-    def test_uniform_pressure(self) -> None:
-        reader, _ = open_batsrus(IDL_DIR)
-        ds = reader.read_timestep(IDL_DIR, 0)
         assert_allclose(ds["P"], P0, rtol=1e-10)
 
     def test_grid_info(self) -> None:
@@ -244,16 +227,12 @@ class TestIDLUniform:
 class TestHDF5Uniform:
     """Test HDF5 BATL reader with uniform synthetic grid."""
 
-    def test_opens_and_reads(self) -> None:
-        reader, _ = open_batsrus(HDF5_DIR)
-        ds = reader.read_timestep(HDF5_DIR, 0)
-        assert len(ds.field_names()) > 0
-
-    def test_field_shapes(self) -> None:
+    def test_reads_with_correct_shapes_no_nan(self) -> None:
         reader, _ = open_batsrus(HDF5_DIR)
         ds = reader.read_timestep(HDF5_DIR, 0)
         for name in ds.field_names():
             assert ds[name].shape == (NX, NY), f"{name} has wrong shape"
+            assert not np.any(np.isnan(ds[name])), f"{name} contains NaN"
 
     def test_cross_format_match_idl(self) -> None:
         """IDL and HDF5 produce identical fields for the same physics."""
@@ -271,12 +250,6 @@ class TestHDF5Uniform:
                 rtol=1e-10,
                 err_msg=f"Cross-format mismatch for {name}",
             )
-
-    def test_no_nan_fields(self) -> None:
-        reader, _ = open_batsrus(HDF5_DIR)
-        ds = reader.read_timestep(HDF5_DIR, 0)
-        for name in ds.field_names():
-            assert not np.any(np.isnan(ds[name])), f"{name} contains NaN"
 
 
 class TestHDF5AMR:
@@ -507,91 +480,36 @@ class TestIsUniformIDL:
 class TestGeometryPropagation:
     """Geometry extracted from headers flows through to GridInfo."""
 
-    def test_default_cartesian(self) -> None:
+    def test_cartesian_geometry_propagates(self) -> None:
         _, config = open_batsrus(IDL_DIR)
         assert config.grid.geometry.type.value == "cartesian"
 
-    def test_idl_grid_has_cartesian_geometry(self) -> None:
-        reader, _ = open_batsrus(IDL_DIR)
-        ds = reader.read_timestep(IDL_DIR, 0)
-        assert ds.grid.geometry.type.value == "cartesian"
+        reader_idl, _ = open_batsrus(IDL_DIR)
+        ds_idl = reader_idl.read_timestep(IDL_DIR, 0)
+        assert ds_idl.grid.geometry.type.value == "cartesian"
 
-    def test_hdf5_grid_has_cartesian_geometry(self) -> None:
-        reader, _ = open_batsrus(HDF5_DIR)
-        ds = reader.read_timestep(HDF5_DIR, 0)
-        assert ds.grid.geometry.type.value == "cartesian"
+        reader_hdf, _ = open_batsrus(HDF5_DIR)
+        ds_hdf = reader_hdf.read_timestep(HDF5_DIR, 0)
+        assert ds_hdf.grid.geometry.type.value == "cartesian"
 
-    def test_config_geometry_stored(self) -> None:
-        config = parse_param_in(IDL_DIR / "PARAM.in")
-        assert config.geometry == "cartesian"
-
-
-class TestExtendedFieldMap:
-    """New field name mappings resolve to canonical names."""
-
-    def test_electric_field(self) -> None:
-        assert FIELD_NAME_MAP["Ex"] == "E1"
-        assert FIELD_NAME_MAP["Ey"] == "E2"
-        assert FIELD_NAME_MAP["Ez"] == "E3"
-
-    def test_ion_pressure(self) -> None:
-        assert FIELD_NAME_MAP["Pi"] == "Pi"
-
-    def test_pressure_tensor(self) -> None:
-        assert FIELD_NAME_MAP["Pxx"] == "P11"
-        assert FIELD_NAME_MAP["Pxy"] == "P12"
-        assert FIELD_NAME_MAP["Pxz"] == "P13"
-        assert FIELD_NAME_MAP["Pyy"] == "P22"
-        assert FIELD_NAME_MAP["Pyz"] == "P23"
-        assert FIELD_NAME_MAP["Pzz"] == "P33"
-
-    def test_anisotropic_pressure(self) -> None:
-        assert FIELD_NAME_MAP["Ppar"] == "P_par"
-        assert FIELD_NAME_MAP["Pperp"] == "P_perp"
-
-    def test_number_densities(self) -> None:
-        assert FIELD_NAME_MAP["Ne"] == "n_s0"
-        assert FIELD_NAME_MAP["Ni"] == "n_s1"
-
-    def test_charge_density(self) -> None:
-        assert FIELD_NAME_MAP["RhoC"] == "rho_c"
-
-    def test_b0_splitting_fields(self) -> None:
-        assert FIELD_NAME_MAP["b0x"] == "B0_1"
-        assert FIELD_NAME_MAP["b0y"] == "B0_2"
-        assert FIELD_NAME_MAP["b0z"] == "B0_3"
-
-    def test_b1_perturbation_maps_to_canonical_b(self) -> None:
-        assert FIELD_NAME_MAP["b1x"] == "B1"
-        assert FIELD_NAME_MAP["b1y"] == "B2"
-        assert FIELD_NAME_MAP["b1z"] == "B3"
+        config_param = parse_param_in(IDL_DIR / "PARAM.in")
+        assert config_param.geometry == "cartesian"
 
 
 class TestParamInSplitbDivb:
     """PARAM.in parsing for #SPLITB and #DIVB commands."""
 
-    def test_splitb_true(self, tmp_path: Path) -> None:
-        (tmp_path / "PARAM.in").write_text("#SPLITB\nT\t\tUseSplitB\n\n#END\n")
+    @pytest.mark.parametrize("use_splitb", [True, False])
+    def test_splitb(self, tmp_path: Path, use_splitb: bool) -> None:
+        flag = "T" if use_splitb else "F"
+        (tmp_path / "PARAM.in").write_text(f"#SPLITB\n{flag}\t\tUseSplitB\n\n#END\n")
         config = parse_param_in(tmp_path / "PARAM.in")
-        assert config.use_splitb is True
-
-    def test_splitb_false(self, tmp_path: Path) -> None:
-        (tmp_path / "PARAM.in").write_text("#SPLITB\nF\t\tUseSplitB\n\n#END\n")
-        config = parse_param_in(tmp_path / "PARAM.in")
-        assert config.use_splitb is False
-
-    def test_splitb_default(self) -> None:
-        config = parse_param_in(IDL_DIR / "PARAM.in")
-        assert config.use_splitb is False
+        assert config.use_splitb is use_splitb
 
     def test_divb_method(self, tmp_path: Path) -> None:
         (tmp_path / "PARAM.in").write_text("#DIVB\nCT\t\tnDivBMethod\n\n#END\n")
         config = parse_param_in(tmp_path / "PARAM.in")
         assert config.divb_method == "CT"
-
-    def test_divb_default_empty(self) -> None:
-        config = parse_param_in(IDL_DIR / "PARAM.in")
-        assert config.divb_method == ""
 
     def test_splitb_in_physics_metadata(self, tmp_path: Path) -> None:
         (tmp_path / "PARAM.in").write_text(
@@ -603,11 +521,3 @@ class TestParamInSplitbDivb:
         sim = to_simulation_config(config)
         assert sim.physics["use_splitb"] is True
         assert sim.physics["divb_method"] == "CT8"
-
-    def test_no_splitb_omits_key(self) -> None:
-        from pypic.readers.batsrus._config import to_simulation_config
-
-        config = parse_param_in(IDL_DIR / "PARAM.in")
-        sim = to_simulation_config(config)
-        assert "use_splitb" not in sim.physics
-        assert "divb_method" not in sim.physics

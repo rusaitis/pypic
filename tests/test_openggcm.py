@@ -147,28 +147,22 @@ class TestFieldIO:
             assert name in fields
             assert fields[name].shape == (29, 16, 16)
 
-    def test_density_positive(self, all_fields) -> None:
+    def test_field_sanity_checks(self, all_fields) -> None:
         fields, *_ = all_fields
         assert fields["rr"].min() >= 0.0
-
-    def test_bfield_reasonable_range(self, all_fields) -> None:
-        fields, *_ = all_fields
         b_mag = np.sqrt(fields["bx1"] ** 2 + fields["by1"] ** 2 + fields["bz1"] ** 2)
-        assert b_mag.max() < 1e6  # sanity check: < 1 mT in nT
+        assert b_mag.max() < 1e6
 
 
 @pytest.mark.skipif(not _HAS_DATA, reason="Fixture data not available")
 class TestOpenGGCMReader:
     """Integration tests for the full reader pipeline."""
 
-    def test_open_openggcm(self, reader_cfg_ds) -> None:
-        _reader, cfg, _ds = reader_cfg_ds
+    def test_open_and_timesteps(self, reader_cfg_ds) -> None:
+        reader, cfg, _ds = reader_cfg_ds
         assert cfg.model_name == "OpenGGCM"
         assert cfg.model_type == "MHD"
         assert cfg.frame == "GSM"
-
-    def test_available_timesteps(self, reader_cfg_ds) -> None:
-        reader, _cfg, _ds = reader_cfg_ds
         steps = reader.available_timesteps(FIXTURE_DIR)
         assert 6300 in steps
         assert steps == sorted(steps)

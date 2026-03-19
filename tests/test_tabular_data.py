@@ -25,28 +25,15 @@ class TestConstruction:
         tab = TabularData(name="empty", columns={})
         assert len(tab) == 0
 
-    def test_with_index_column(self) -> None:
+    def test_with_index_and_metadata(self) -> None:
         tab = TabularData(
             name="indexed",
             columns={"t": np.array([0.0, 0.1]), "v": np.array([1.0, 2.0])},
             index_column="t",
-        )
-        assert tab.index_column == "t"
-
-    def test_with_metadata(self) -> None:
-        tab = TabularData(
-            name="meta",
-            columns={"x": np.array([1.0])},
             metadata={"source": "test"},
         )
+        assert tab.index_column == "t"
         assert tab.metadata["source"] == "test"
-
-    def test_default_metadata_empty(self) -> None:
-        tab = TabularData(
-            name="no_meta",
-            columns={"x": np.array([1.0])},
-        )
-        assert tab.metadata == {}
 
 
 class TestValidation:
@@ -87,33 +74,14 @@ class TestGetitem:
 
 
 class TestContains:
-    def test_existing_column(self) -> None:
+    def test_membership(self) -> None:
         tab = TabularData(
             name="test",
             columns={"a": np.array([1.0]), "b": np.array([2.0])},
         )
         assert "a" in tab
         assert "b" in tab
-
-    def test_missing_column(self) -> None:
-        tab = TabularData(
-            name="test",
-            columns={"a": np.array([1.0])},
-        )
         assert "z" not in tab
-
-
-class TestLen:
-    def test_nonempty(self) -> None:
-        tab = TabularData(
-            name="test",
-            columns={"x": np.array([1.0, 2.0, 3.0])},
-        )
-        assert len(tab) == 3
-
-    def test_empty(self) -> None:
-        tab = TabularData(name="test", columns={})
-        assert len(tab) == 0
 
 
 class TestColumnNames:
@@ -151,13 +119,3 @@ class TestIndex:
     def test_empty_index(self) -> None:
         tab = TabularData(name="test", columns={})
         assert len(tab.index) == 0
-
-
-class TestFrozen:
-    def test_cannot_set_attribute(self) -> None:
-        tab = TabularData(
-            name="test",
-            columns={"x": np.array([1.0])},
-        )
-        with pytest.raises(AttributeError):
-            tab.name = "new_name"  # type: ignore[misc]

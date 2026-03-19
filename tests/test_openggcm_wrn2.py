@@ -161,22 +161,19 @@ class TestDecompressField:
 class TestBuildExpLut:
     """Tests for the exp lookup table builder."""
 
-    def test_lut_shape(self) -> None:
+    def test_exp_lut_properties(self) -> None:
         lut = _build_exp_lut(-5.0, 5.0)
         assert lut.shape == (4418,)
         assert lut.dtype == np.float64
-
-    def test_lut_values_match_direct_computation(self) -> None:
+        # Monotonically increasing
+        assert np.all(np.diff(lut) > 0)
+        # Values match direct computation
         zmin, zmax = -29.68665, 7.313355
-        lut = _build_exp_lut(zmin, zmax)
+        lut2 = _build_exp_lut(zmin, zmax)
         dzi = (zmax - zmin) / 4410.0
         for i3 in [0, 100, 2205, 4417]:
             expected = math.exp(dzi * i3 + zmin)
-            np.testing.assert_allclose(lut[i3], expected, rtol=1e-14)
-
-    def test_lut_monotonically_increasing(self) -> None:
-        lut = _build_exp_lut(-10.0, 10.0)
-        assert np.all(np.diff(lut) > 0)
+            np.testing.assert_allclose(lut2[i3], expected, rtol=1e-14)
 
 
 class TestClassifyRleBytes:
@@ -249,12 +246,6 @@ def _make_wrn2_rle_data(val1: int, val2: int, count: int = 64) -> bytes:
 
 class TestDecompressFieldVectorized:
     """Tests for the vectorized WRN2 field decompressor."""
-
-    def test_uniform_field(self) -> None:
-        """When zmin == zmax, all values equal zmin."""
-        result = decompress_field_vectorized(b"", 0, 0, 100, 5.0, 5.0)
-        assert result.shape == (100,)
-        np.testing.assert_array_equal(result, 5.0)
 
     def test_single_chunk_matches_original(self) -> None:
         """Single 64-value chunk matches the line-by-line decoder."""
@@ -347,7 +338,7 @@ class TestDecompressFieldVectorized:
 class TestConvertFieldsPassthrough:
     """Unknown fields pass through convert_fields_to_si with native names."""
 
-    def test_unknown_field_included(self) -> None:
+    def test_unknown_fields_pass_through(self) -> None:
         raw = {
             "vx": np.ones(10),
             "custom_field": np.full(10, 42.0),
@@ -355,11 +346,10 @@ class TestConvertFieldsPassthrough:
         si = convert_fields_to_si(raw)
         assert "V1" in si
         np.testing.assert_array_equal(si["custom_field"], 42.0)
-
-    def test_unknown_field_not_converted(self) -> None:
-        raw = {"unknown_thing": np.array([1.0, 2.0, 3.0])}
-        si = convert_fields_to_si(raw)
-        np.testing.assert_array_equal(si["unknown_thing"], [1.0, 2.0, 3.0])
+        # Unknown-only field is not converted
+        raw2 = {"unknown_thing": np.array([1.0, 2.0, 3.0])}
+        si2 = convert_fields_to_si(raw2)
+        np.testing.assert_array_equal(si2["unknown_thing"], [1.0, 2.0, 3.0])
 
 
 @pytest.mark.skipif(

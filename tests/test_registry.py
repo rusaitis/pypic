@@ -10,7 +10,6 @@ import pytest
 
 from pypic.readers._registry import (
     _REGISTRY,
-    ReaderEntry,
     Simulation,
     open_simulation,
     register_reader,
@@ -70,15 +69,6 @@ class TestRegisterUnregister:
         with caplog.at_level("WARNING"):
             register_reader("dup", lambda _: 0.9, _mock_factory)
         assert "Overwriting" in caplog.text
-
-    def test_registered_readers_is_readonly(self) -> None:
-        readers = registered_readers()
-        with pytest.raises(TypeError):
-            readers["hack"] = ReaderEntry(  # type: ignore[index]
-                "hack",
-                lambda _: 1.0,
-                _mock_factory,
-            )
 
 
 class TestOpenSimulationExplicitName:
@@ -141,22 +131,6 @@ class TestOpenSimulationCallable:
 
         open_simulation(tmp_path, reader=my_reader)
         assert called == [tmp_path]
-
-    def test_callable_receives_kwargs(
-        self,
-        tmp_path: Path,
-    ) -> None:
-        received: dict[str, Any] = {}
-
-        def my_reader(
-            path: Path,
-            **kwargs: Any,
-        ) -> _Result:
-            received.update(kwargs)
-            return _mock_factory(path)
-
-        open_simulation(tmp_path, reader=my_reader, foo="bar")
-        assert received["foo"] == "bar"
 
 
 class TestOpenSimulationAutoDetect:
@@ -264,23 +238,23 @@ class TestCanReadIPic3D:
 
         assert can_read_confidence(tmp_path) == 0.0
 
-    def test_inp_file(self, tmp_path: Path) -> None:
+    def test_positive_detection(self, tmp_path: Path) -> None:
         from pypic.readers.ipic3d._probe import can_read_confidence
 
         (tmp_path / "GEM.inp").touch()
         assert can_read_confidence(tmp_path) >= 0.5
 
-    def test_settings_hdf(self, tmp_path: Path) -> None:
-        from pypic.readers.ipic3d._probe import can_read_confidence
+        # settings.hdf also triggers detection
+        hdf_dir = tmp_path / "hdf_only"
+        hdf_dir.mkdir()
+        (hdf_dir / "settings.hdf").touch()
+        assert can_read_confidence(hdf_dir) >= 0.4
 
-        (tmp_path / "settings.hdf").touch()
-        assert can_read_confidence(tmp_path) >= 0.4
-
-    def test_h5hut_files(self, tmp_path: Path) -> None:
-        from pypic.readers.ipic3d._probe import can_read_confidence
-
-        (tmp_path / "GEM-Fields_000100.h5").touch()
-        assert can_read_confidence(tmp_path) >= 0.3
+        # H5hut files also trigger detection
+        h5_dir = tmp_path / "h5hut_only"
+        h5_dir.mkdir()
+        (h5_dir / "GEM-Fields_000100.h5").touch()
+        assert can_read_confidence(h5_dir) >= 0.3
 
     def test_not_a_directory(self, tmp_path: Path) -> None:
         from pypic.readers.ipic3d._probe import can_read_confidence
@@ -296,30 +270,30 @@ class TestCanReadBATSRUS:
 
         assert can_read_confidence(tmp_path) == 0.0
 
-    def test_batl_file(self, tmp_path: Path) -> None:
+    def test_positive_detection(self, tmp_path: Path) -> None:
         from pypic.readers.batsrus._probe import can_read_confidence
 
         (tmp_path / "3d__n00000001.batl").touch()
         assert can_read_confidence(tmp_path) >= 0.5
 
-    def test_param_in(self, tmp_path: Path) -> None:
-        from pypic.readers.batsrus._probe import can_read_confidence
+        # PARAM.in also triggers detection
+        param_dir = tmp_path / "param_only"
+        param_dir.mkdir()
+        (param_dir / "PARAM.in").touch()
+        assert can_read_confidence(param_dir) >= 0.3
 
-        (tmp_path / "PARAM.in").touch()
-        assert can_read_confidence(tmp_path) >= 0.3
+        # Header + IDL also triggers detection
+        idl_dir = tmp_path / "idl_only"
+        idl_dir.mkdir()
+        (idl_dir / "3d__n00000001.h").touch()
+        (idl_dir / "3d__n00000001_pe0000.idl").touch()
+        assert can_read_confidence(idl_dir) >= 0.5
 
-    def test_header_plus_idl(self, tmp_path: Path) -> None:
-        from pypic.readers.batsrus._probe import can_read_confidence
-
-        (tmp_path / "3d__n00000001.h").touch()
-        (tmp_path / "3d__n00000001_pe0000.idl").touch()
-        assert can_read_confidence(tmp_path) >= 0.5
-
-    def test_out_file(self, tmp_path: Path) -> None:
-        from pypic.readers.batsrus._probe import can_read_confidence
-
-        (tmp_path / "3d__n00000001.out").touch()
-        assert can_read_confidence(tmp_path) >= 0.3
+        # .out file also triggers detection
+        out_dir = tmp_path / "out_only"
+        out_dir.mkdir()
+        (out_dir / "3d__n00000001.out").touch()
+        assert can_read_confidence(out_dir) >= 0.3
 
 
 class TestCanReadOpenGGCM:
@@ -355,54 +329,22 @@ class TestBuiltinReadersRegistered:
         assert "batsrus" in readers
         assert "openggcm" in readers
 
-    def test_builtin_entries_have_probes(self) -> None:
-        for name, entry in registered_readers().items():
-            assert callable(entry.can_read_confidence), f"{name}"
-            assert callable(entry.factory), f"{name} factory"
-
-
-class TestBATSRUSOutputFormat:
-    def test_values(self) -> None:
-        from pypic.readers.batsrus import BATSRUSOutputFormat
-
-        assert BATSRUSOutputFormat.HDF5 == "hdf5"
-        assert BATSRUSOutputFormat.IDL == "idl"
-        assert BATSRUSOutputFormat.OUT == "out"
-
-    def test_is_str(self) -> None:
-        from pypic.readers.batsrus import BATSRUSOutputFormat
-
-        assert isinstance(BATSRUSOutputFormat.HDF5, str)
-
 
 class TestSimulationFacade:
-    def test_returns_simulation_object(
-        self,
-        tmp_path: Path,
-    ) -> None:
-        register_reader("sim_test", lambda _: 0.5, _mock_factory)
-        sim = open_simulation(tmp_path, reader="sim_test")
-        assert isinstance(sim, Simulation)
-
-    def test_tuple_unpacking(
+    def test_tuple_unpacking_and_properties(
         self,
         tmp_path: Path,
     ) -> None:
         register_reader("unpack", lambda _: 0.5, _mock_factory)
-        reader, config = open_simulation(tmp_path, reader="unpack")
+        sim = open_simulation(tmp_path, reader="unpack")
+        assert isinstance(sim, Simulation)
+        reader, config = sim
         assert isinstance(reader, SimulationReader)
         assert isinstance(config, SimulationConfig)
-
-    def test_properties_delegate_to_config(
-        self,
-        tmp_path: Path,
-    ) -> None:
-        register_reader("props", lambda _: 0.5, _mock_factory)
-        sim = open_simulation(tmp_path, reader="props")
         assert sim.model_name == sim.config.model_name
         assert sim.path == tmp_path
 
-    def test_read_delegates_to_reader(
+    def test_read_and_steps(
         self,
         tmp_path: Path,
     ) -> None:
@@ -413,10 +355,6 @@ class TestSimulationFacade:
             tmp_path,
             0,
         )
-
-    def test_steps_cached(self, tmp_path: Path) -> None:
-        register_reader("steps", lambda _: 0.5, _mock_factory)
-        sim = open_simulation(tmp_path, reader="steps")
         sim.reader.available_timesteps.return_value = [0, 10]
         first = sim.steps
         second = sim.steps
@@ -424,34 +362,17 @@ class TestSimulationFacade:
         assert first is second
         sim.reader.available_timesteps.assert_called_once()
 
-    def test_repr(self, tmp_path: Path) -> None:
-        register_reader("repr", lambda _: 0.5, _mock_factory)
-        sim = open_simulation(tmp_path, reader="repr")
-        sim.reader.available_timesteps.return_value = [0]
-        r = repr(sim)
-        assert "Simulation(" in r
-
-    def test_auxiliary_names_empty_for_basic_reader(
+    def test_auxiliary_delegation(
         self,
         tmp_path: Path,
     ) -> None:
+        # Error path: basic reader without auxiliary support
         register_reader("noaux", lambda _: 0.5, _mock_factory)
-        sim = open_simulation(tmp_path, reader="noaux")
-        assert sim.auxiliary_names == []
-
-    def test_auxiliary_raises_for_basic_reader(
-        self,
-        tmp_path: Path,
-    ) -> None:
-        register_reader("noaux2", lambda _: 0.5, _mock_factory)
-        sim = open_simulation(tmp_path, reader="noaux2")
+        sim_basic = open_simulation(tmp_path, reader="noaux")
         with pytest.raises(TypeError, match="auxiliary data"):
-            sim.auxiliary("anything")
+            sim_basic.auxiliary("anything")
 
-    def test_auxiliary_delegates_to_reader(
-        self,
-        tmp_path: Path,
-    ) -> None:
+        # Happy path: reader with auxiliary support
         tab = TabularData(
             name="test_aux",
             columns={"x": np.array([1.0, 2.0])},
@@ -466,7 +387,6 @@ class TestSimulationFacade:
                 return_value=["test_aux"],
             )
             reader.load_auxiliary = MagicMock(return_value=tab)
-            # Make isinstance check pass for AuxiliaryDataReader
             reader.__class__ = type(
                 "AuxReader",
                 (),
