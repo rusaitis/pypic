@@ -1,0 +1,338 @@
+"""BATSRUS simulation reader."""
+
+from __future__ import annotations
+
+import re
+from typing import TYPE_CHECKING, Any
+
+import numpy as np
+
+from pypic.coordinates import CARTESIAN, CYLINDRICAL, SPHERICAL, CoordinateGeometry
+from pypic.readers.base import FieldDataset, GridInfo, SimulationConfig
+
+_GEOMETRY_MAP: dict[str, CoordinateGeometry] = {
+    "cartesian": CARTESIAN,
+    "spherical": SPHERICAL,
+    "cylindrical": CYLINDRICAL,
+}
+
+if TYPE_CHECKING:
+    from pathlib import Path
+from pypic.readers.batsrus._config import BATSRUSConfig, to_simulation_config
+from pypic.readers.batsrus._field_map import (
+    FIELD_NAME_MAP,
+    SKIP_FIELDS,
+    convert_fields_to_si,
+    is_normalized,
+)
+from pypic.readers.batsrus._grid import (
+    assemble_uniform_hdf5,
+    assemble_uniform_idl,
+    is_uniform_idl,
+    regrid_amr_hdf5,
+    regrid_amr_idl,
+)
+from pypic.readers.batsrus._hdf5 import read_batl
+from pypic.readers.batsrus._header import BATSRUSHeader, parse_header
+from pypic.readers.batsrus._idl import read_idl_cells, read_out_file
+from pypic.units import Normalization
+
+_STEP_RE = re.compile(r"_n(\d{8})")
+
+
+class BATSRUSReader:
+    """Read BATSRUS simulation output in IDL or HDF5 format.
+
+    Supports three output formats:
+
+    - **Per-cell IDL** (``.h`` + ``*_pe*.idl``): raw per-processor binary
+    - **Merged IDL** (``.out`` / ``.outs``): postprocessed snapshot files
+    - **HDF5 BATL** (``.batl``): block-structured HDF5
+
+    AMR grids are automatically regridded to the finest resolution.
+    """
+
+    def __init__(
+        self,
+        config: BATSRUSConfig,
+        output_format: str,
+        prefix: str,
+        *,
+        geometry: str = "cartesian",
+    ) -> None:
+        self._config = config
+        self._output_format = output_format
+        self._prefix = prefix
+        self._geometry = geometry
+        self._sim_config: SimulationConfig | None = None
+
+    def available_timesteps(self, path: Path) -> list[int]:
+        """Return sorted list of available timestep indices."""
+        steps: set[int] = set()
+
+        if self._output_format == "hdf5":
+            pattern = f"{self._prefix}*.batl"
+        elif self._output_format == "idl":
+            pattern = f"{self._prefix}*.h"
+        else:
+            pattern = f"{self._prefix}*.out"
+
+        for f in path.glob(pattern):
+            m = _STEP_RE.search(f.stem)
+            if m:
+                steps.add(int(m.group(1)))
+
+        return sorted(steps)
+
+    def read_timestep(
+        self,
+        path: Path,
+        step: int,
+        *,
+        target_resolution: float | None = None,
+    ) -> FieldDataset:
+        """Read field data for a single timestep.
+
+        Parameters
+        ----------
+        path
+            Directory containing the simulation output.
+        step
+            Timestep index.
+        target_resolution
+            Target cell size in code units for AMR regridding. When
+            ``None`` (default), regrids to the finest resolution. When
+            set, snapped to the nearest AMR level present in the data.
+            Ignored for uniform grids.
+
+        Returns
+        -------
+        FieldDataset
+            Field data with canonical names, optionally converted to SI.
+        """
+        if self._output_format == "hdf5":
+            return self._read_hdf5(path, step, target_resolution=target_resolution)
+        if self._output_format == "idl":
+            return self._read_idl(path, step, target_resolution=target_resolution)
+        return self._read_out(path, step)
+
+    def _read_idl(
+        self,
+        path: Path,
+        step: int,
+        *,
+        target_resolution: float | None = None,
+    ) -> FieldDataset:
+        """Read per-cell IDL format."""
+        header_file = self._find_file(path, step, ".h")
+        header = parse_header(header_file)
+        geo = _GEOMETRY_MAP.get(header.geometry, CARTESIAN)
+
+        idl_files = self._find_idl_files(path, step)
+        all_coords = []
+        all_dx = []
+        all_state = []
+        for idl_file in idl_files:
+            coords, dx, state = read_idl_cells(idl_file, header)
+            all_coords.append(coords)
+            all_dx.append(dx)
+            all_state.append(state)
+
+        coords = np.concatenate(all_coords, axis=0)
+        dx = np.concatenate(all_dx, axis=0)
+        state = np.concatenate(all_state, axis=0)
+
+        if is_uniform_idl(dx):
+            fields, grid = assemble_uniform_idl(
+                coords, dx, state, header.var_names, header.ndim, geometry=geo
+            )
+        else:
+            fields, grid = regrid_amr_idl(
+                coords,
+                dx,
+                state,
+                header.var_names,
+                header.ndim,
+                target_dx=target_resolution,
+                geometry=geo,
+            )
+
+        # Unit conversion
+        unit_names = self._parse_unit_names(header)
+        if unit_names and not is_normalized(header.unit_string):
+            fields = convert_fields_to_si(fields, header.var_names, unit_names)
+
+        normalization = Normalization.identity()
+        if self._sim_config is None:
+            self._sim_config = to_simulation_config(self._config, header, grid=grid)
+
+        physics: dict[str, Any] = {"gamma": self._config.gamma}
+        metadata: dict[str, Any] = {
+            "step": header.n_step,
+            "time": header.time,
+            "format": "idl",
+        }
+        if not is_uniform_idl(dx):
+            metadata["is_regridded"] = True
+
+        return FieldDataset.from_arrays(
+            fields,
+            grid,
+            normalization,
+            physics=physics,
+            metadata=metadata,
+        )
+
+    def _read_hdf5(
+        self,
+        path: Path,
+        step: int,
+        *,
+        target_resolution: float | None = None,
+    ) -> FieldDataset:
+        """Read HDF5 BATL format."""
+        batl_file = self._find_file(path, step, ".batl")
+        batl = read_batl(batl_file)
+        geo = _GEOMETRY_MAP.get(self._geometry, CARTESIAN)
+
+        is_uniform = len(set(batl.refine_level)) <= 1
+        if is_uniform:
+            fields, grid = assemble_uniform_hdf5(batl, geometry=geo)
+        else:
+            fields, grid = regrid_amr_hdf5(
+                batl, target_dx=target_resolution, geometry=geo
+            )
+
+        unit_names = batl.unit_names
+        unit_str = " ".join(unit_names)
+        if unit_names and not is_normalized(unit_str):
+            fields = convert_fields_to_si(fields, batl.var_names, unit_names)
+
+        normalization = Normalization.identity()
+        if self._sim_config is None:
+            self._sim_config = to_simulation_config(self._config, grid=grid)
+
+        physics: dict[str, Any] = {"gamma": self._config.gamma}
+        metadata: dict[str, Any] = {
+            "step": batl.n_step,
+            "time": batl.time,
+            "format": "hdf5",
+        }
+        if not is_uniform:
+            metadata["is_regridded"] = True
+
+        return FieldDataset.from_arrays(
+            fields,
+            grid,
+            normalization,
+            physics=physics,
+            metadata=metadata,
+        )
+
+    def _read_out(self, path: Path, step: int) -> FieldDataset:
+        """Read merged .out format."""
+        out_file = self._find_file(path, step, ".out")
+        coord, state, var_names, out_meta = read_out_file(out_file)
+
+        ndim = int(out_meta["ndim"])
+        dims = out_meta["dims"]
+
+        # Determine geometry: .out files encode non-Cartesian as negative ndim
+        is_cart = out_meta.get("is_cartesian", True)
+        geo = CARTESIAN if is_cart else _GEOMETRY_MAP.get(self._geometry, CARTESIAN)
+
+        # Build fields dict with canonical names
+        fields: dict[str, np.ndarray] = {}
+        for iv, vname in enumerate(var_names):
+            if vname in SKIP_FIELDS:
+                continue
+            canonical = FIELD_NAME_MAP.get(vname, vname)
+            fields[canonical] = state[iv]
+
+        # Build grid from coordinate arrays
+        spacing = tuple(
+            float(coord[d].flat[1] - coord[d].flat[0]) if dims[d] > 1 else 1.0
+            for d in range(ndim)
+        )
+        origin = tuple(float(coord[d].flat[0] - spacing[d] / 2) for d in range(ndim))
+
+        grid = GridInfo(
+            dimensions=dims,
+            spacing=spacing,
+            origin=origin,
+            geometry=geo,
+        )
+
+        normalization = Normalization.identity()
+        physics: dict[str, Any] = {"gamma": self._config.gamma}
+        metadata_out: dict[str, Any] = {
+            "step": out_meta.get("step", step),
+            "time": out_meta.get("time", 0.0),
+            "format": "out",
+        }
+
+        return FieldDataset.from_arrays(
+            fields,
+            grid,
+            normalization,
+            physics=physics,
+            metadata=metadata_out,
+        )
+
+    def _find_file(self, path: Path, step: int, suffix: str) -> Path:
+        """Find a file matching the prefix and step number."""
+        step_str = f"_n{step:08d}"
+        # Also try time-based naming: _t{time}_n{step}
+        candidates = list(path.glob(f"{self._prefix}*{step_str}*{suffix}"))
+        if not candidates:
+            # Try without prefix
+            candidates = list(path.glob(f"*{step_str}*{suffix}"))
+        if not candidates:
+            msg = f"No {suffix} file found for step {step} in {path}"
+            raise FileNotFoundError(msg)
+        return candidates[0]
+
+    def _find_idl_files(self, path: Path, step: int) -> list[Path]:
+        """Find all per-processor .idl files for a given step."""
+        step_str = f"_n{step:08d}"
+        # Also try time-based: _t{time}_n{step}
+        files = sorted(path.glob(f"*{step_str}*_pe*.idl"))
+        if not files:
+            # Try matching on time pattern
+            for h_file in path.glob(f"*_n{step:08d}.h"):
+                stem = h_file.stem
+                files = sorted(path.glob(f"{stem}_pe*.idl"))
+                if files:
+                    break
+        if not files:
+            # Broadest search: find any .idl files with this step number
+            files = sorted(f for f in path.glob("*.idl") if step_str in f.name)
+        if not files:
+            msg = f"No .idl files found for step {step} in {path}"
+            raise FileNotFoundError(msg)
+        return files
+
+    def _parse_unit_names(self, header: BATSRUSHeader) -> tuple[str, ...]:
+        """Extract per-variable unit strings from header.
+
+        The unit string in the header has format:
+        ``"timestamp; unit1 unit2 ... unitN"`` or just ``"unit1 unit2 ..."``.
+        There are also units for scalar parameters appended at the end.
+        """
+        raw = header.unit_string.strip()
+        if not raw or is_normalized(raw):
+            return ()
+        # Strip optional leading timestamp
+        if ";" in raw:
+            raw = raw.split(";", 1)[1].strip()
+        parts = raw.split()
+        # Skip leading "R" entries (reference coordinate units)
+        # then take n_plot_var entries
+        n_coord_units = 0
+        for p in parts:
+            if p == "R":
+                n_coord_units += 1
+            else:
+                break
+        var_units = parts[n_coord_units : n_coord_units + header.n_plot_var]
+        return tuple(var_units)

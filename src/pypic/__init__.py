@@ -54,6 +54,8 @@ from pypic.diagnostics import (
     max_div_b,
 )
 from pypic.readers import (
+    BATSRUSConfig,
+    BATSRUSReader,
     ConservedQuantities,
     FieldDataset,
     GridInfo,
@@ -63,8 +65,10 @@ from pypic.readers import (
     IPic3DSerialReader,
     load_config,
     load_conserved_quantities,
+    open_batsrus,
     open_ipic3d,
     parse_inp,
+    parse_param_in,
 )
 from pypic.selections import BoxSelection, PlaneSelection
 from pypic.units import Normalization, PhysicsConstants, SpeciesInfo
@@ -73,6 +77,8 @@ __all__ = [
     "CARTESIAN",
     "CYLINDRICAL",
     "SPHERICAL",
+    "BATSRUSConfig",
+    "BATSRUSReader",
     "BoxSelection",
     "ConservedQuantities",
     "CoordinateGeometry",
@@ -118,9 +124,11 @@ __all__ = [
     "magnetosonic_mach",
     "magnetosonic_speed",
     "max_div_b",
+    "open_batsrus",
     "open_ipic3d",
     "parallel_pressure",
     "parse_inp",
+    "parse_param_in",
     "perpendicular_pressure",
     "plasma_beta",
     "plasma_frequency",

@@ -21,6 +21,7 @@ import pytest
 from numpy.testing import assert_allclose
 from scipy import constants
 
+from pypic.readers.batsrus import open_batsrus
 from pypic.readers.ipic3d import open_ipic3d
 from pypic.readers.openggcm import open_openggcm
 from pypic.units import Normalization
@@ -30,7 +31,10 @@ log = logging.getLogger(__name__)
 _OPENERS = {
     "ipic3d": open_ipic3d,
     "openggcm": open_openggcm,
+    "batsrus": open_batsrus,
 }
+
+_BATSRUS_STEP_RE = re.compile(r"_n(\d{8})")
 
 
 def _detect_model(path: Path) -> str | None:
@@ -38,6 +42,14 @@ def _detect_model(path: Path) -> str | None:
         return "ipic3d"
     if list(path.glob("grid.*.dat")) and list(path.glob("*.3df.*")):
         return "openggcm"
+    has_param = (path / "PARAM.in").exists()
+    has_batl = bool(list(path.glob("*.batl")))
+    has_idl = bool(list(path.glob("*.h"))) and bool(list(path.glob("*_pe*.idl")))
+    has_out = bool(list(path.glob("*.out")))
+    if has_param and (has_batl or has_idl or has_out):
+        return "batsrus"
+    if has_batl or has_idl:
+        return "batsrus"
     return None
 
 
@@ -48,12 +60,18 @@ def _first_timestep(path: Path, model: str) -> int:
     if model == "openggcm":
         pattern = re.compile(r"\.3df\.(\d+)$")
         steps = sorted(
-            int(m.group(1))
-            for f in path.iterdir()
-            if (m := pattern.search(f.name))
+            int(m.group(1)) for f in path.iterdir() if (m := pattern.search(f.name))
         )
         if steps:
             return steps[0]
+    if model == "batsrus":
+        steps_b: list[int] = []
+        for f in path.iterdir():
+            m = _BATSRUS_STEP_RE.search(f.name)
+            if m:
+                steps_b.append(int(m.group(1)))
+        if steps_b:
+            return min(steps_b)
     return 0
 
 
@@ -101,9 +119,7 @@ def _discover(root: Path) -> list[tuple[str, Path]]:
     return found
 
 
-def _scan(
-    base: Path, current: Path, depth: int, out: list[tuple[str, Path]]
-) -> None:
+def _scan(base: Path, current: Path, depth: int, out: list[tuple[str, Path]]) -> None:
     """Recursively scan for simulation dirs, collecting into *out*."""
     for child in current.iterdir():
         if not child.is_dir():
@@ -199,9 +215,7 @@ class TestSmoke:
 
     def test_no_all_nan_fields(self, sim_dir: Path) -> None:
         ds = self._read(sim_dir)
-        all_nan = [
-            name for name in ds.field_names() if np.all(np.isnan(ds[name]))
-        ]
+        all_nan = [name for name in ds.field_names() if np.all(np.isnan(ds[name]))]
         assert not all_nan, f"All-NaN fields: {all_nan}"
 
     def test_no_all_zero_b_field(self, sim_dir: Path) -> None:

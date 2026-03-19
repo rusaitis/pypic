@@ -6,6 +6,12 @@ from pypic.readers.base import (
     SimulationConfig,
     SimulationReader,
 )
+from pypic.readers.batsrus import (
+    BATSRUSConfig,
+    BATSRUSReader,
+    open_batsrus,
+    parse_param_in,
+)
 from pypic.readers.config import load_config
 from pypic.readers.ipic3d import (
     ConservedQuantities,
@@ -25,6 +31,8 @@ from pypic.readers.openggcm import (
 )
 
 __all__ = [
+    "BATSRUSConfig",
+    "BATSRUSReader",
     "ConservedQuantities",
     "FieldDataset",
     "GridInfo",
@@ -38,8 +46,10 @@ __all__ = [
     "SimulationReader",
     "load_config",
     "load_conserved_quantities",
+    "open_batsrus",
     "open_ipic3d",
     "open_openggcm",
     "parse_grid_file",
     "parse_inp",
+    "parse_param_in",
 ]
