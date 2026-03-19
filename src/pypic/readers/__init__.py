@@ -7,12 +7,6 @@ from pypic.readers.base import (
     SimulationReader,
 )
 from pypic.readers.config import load_config
-from pypic.readers.openggcm import (
-    OpenGGCMGrid,
-    OpenGGCMReader,
-    open_openggcm,
-    parse_grid_file,
-)
 from pypic.readers.ipic3d import (
     ConservedQuantities,
     IPic3DConfig,
@@ -22,6 +16,12 @@ from pypic.readers.ipic3d import (
     load_conserved_quantities,
     open_ipic3d,
     parse_inp,
+)
+from pypic.readers.openggcm import (
+    OpenGGCMGrid,
+    OpenGGCMReader,
+    open_openggcm,
+    parse_grid_file,
 )
 
 __all__ = [

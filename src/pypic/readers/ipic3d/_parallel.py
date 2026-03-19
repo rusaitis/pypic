@@ -13,8 +13,11 @@ from pypic.readers.ipic3d._config import IPic3DConfig, to_simulation_config
 from pypic.readers.ipic3d._field_map import (
     _FIELD_NAME_MAP,
     _MOMENT_COMPONENT_MAP,
+    _PHDF5_DIAGONAL_PRESSURE,
+    _PHDF5_PRESSURE_MAP,
     gaussian_current_to_si,
     gaussian_density_to_si,
+    gaussian_pressure_to_si,
     per_species_canonical,
 )
 
@@ -113,6 +116,24 @@ class IPic3DParallelReader:
                 group = f[f"Moments/species_{s}"]
                 canon = per_species_canonical("rho", s)
                 fields[canon] = gaussian_density_to_si(np.array(group["rho"]))
+
+            # Pressure tensor (optional — not all runs export pressure)
+            p_path = (
+                path / f"Moments_{step_str}" / f"Pressure_species_{s}_{step_str}.h5"
+            )
+            if p_path.exists():
+                with h5py.File(p_path, "r") as f:
+                    group = f[f"Moments/species_{s}"]
+                    for phdf5_name, canon_base in _PHDF5_PRESSURE_MAP.items():
+                        if phdf5_name in group:
+                            canon = f"{canon_base}_s{s}"
+                            data = np.array(group[phdf5_name])
+                            if (
+                                phdf5_name in _PHDF5_DIAGONAL_PRESSURE
+                                and self._config.qom[s] < 0
+                            ):
+                                data = -data
+                            fields[canon] = gaussian_pressure_to_si(data)
 
         # Compute totals by summing over species
         for moment_comp, canon_total in _MOMENT_COMPONENT_MAP.items():

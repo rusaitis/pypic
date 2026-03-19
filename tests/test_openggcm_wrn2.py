@@ -208,11 +208,11 @@ class TestClassifyRleBytes:
         # checksum=57(lit), marker=234 consumed=78, space=32, newline=10
         raw = np.array([57, 234, 78, 32, 10], dtype=np.uint8)
         is_literal, is_consumed = _classify_rle_bytes(raw)
-        assert is_literal[0]       # 57 = literal
-        assert not is_literal[1]   # 234 = marker
-        assert not is_literal[2]   # 78 = consumed by marker
-        assert not is_literal[3]   # 32 = space
-        assert not is_literal[4]   # 10 = newline
+        assert is_literal[0]  # 57 = literal
+        assert not is_literal[1]  # 234 = marker
+        assert not is_literal[2]  # 78 = consumed by marker
+        assert not is_literal[3]  # 32 = space
+        assert not is_literal[4]  # 10 = newline
         assert is_consumed[2]
 
 
@@ -225,6 +225,7 @@ def _make_wrn2_data(
     Each chunk produces two lines terminated by space + newline.
     Supports a single chunk only (≤64 values).
     """
+
     def make_line(vals: list[int]) -> bytes:
         checksum = 33 + (sum(vals) % 92)
         # Build as: checksum literal, then all data literals, then space + newline
@@ -234,10 +235,9 @@ def _make_wrn2_data(
     return make_line(i1_vals) + make_line(i2_vals)
 
 
-def _make_wrn2_rle_data(
-    val1: int, val2: int, count: int = 64
-) -> bytes:
+def _make_wrn2_rle_data(val1: int, val2: int, count: int = 64) -> bytes:
     """Build WRN2-encoded bytes using RLE for uniform chunks."""
+
     def make_rle_line(val: int, n: int) -> bytes:
         checksum = 33 + ((val * n) % 92)
         rle_byte = 170 + n

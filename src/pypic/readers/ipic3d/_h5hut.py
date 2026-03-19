@@ -16,6 +16,8 @@ from pypic.readers.ipic3d._field_map import (
     _H5HUT_FIELD_MAP,
     _MOMENT_COMPONENT_MAP,
     _PRESSURE_COMPONENT_MAP,
+    gaussian_current_to_si,
+    gaussian_density_to_si,
     gaussian_pressure_to_si,
     per_species_canonical,
     per_species_pressure_canonical,
@@ -47,10 +49,10 @@ class IPic3DH5hutReader:
     named ``{SimulationName}-Fields_{cycle:06d}.h5``. Arrays are stored
     in ZYX order (``(nzc+1, nyc+1, nxc+1)``) and must be transposed.
 
-    H5hut stores densities and currents in SI-rationalized form (no 4π
-    correction needed), but the **pressure tensor** is stored divided by
-    4π (Gaussian convention). The reader applies the 4π correction to
-    pressure components only.
+    H5hut stores **all moment quantities** (density, current, pressure)
+    divided by 4π (Gaussian convention). The reader applies the 4π
+    correction to density, current, and pressure, matching the phdf5/shdf5
+    readers. Electromagnetic fields are unaffected.
 
     Parameters
     ----------
@@ -112,8 +114,8 @@ class IPic3DH5hutReader:
         Returns
         -------
         FieldDataset
-            Field data with canonical names. Pressure tensor corrected
-            by 4π; densities and currents are already SI-rationalized.
+            Field data with canonical names. Density, current, and
+            pressure tensor all corrected by 4π (Gaussian→SI-rationalized).
         """
         fields_file = self._find_fields_file(path, step)
         fields: dict[str, FloatArray] = {}
@@ -135,19 +137,22 @@ class IPic3DH5hutReader:
                     fields[canon_name] = _read_field(block, ipic_name)
 
             # Per-species charge density and currents
+            # Stored as rho/(4pi) and J/(4pi) -- Gaussian convention
             for s in range(nspec):
                 # Charge density: rho_{s} → rho_c_s{s}
                 rho_key = f"rho_{s}"
                 if rho_key in available:
                     canon = per_species_canonical("rho", s)
-                    fields[canon] = _read_field(block, rho_key)
+                    fields[canon] = gaussian_density_to_si(_read_field(block, rho_key))
 
                 # Current density: Jx_{s} → J1_s{s}, etc.
                 for comp in ("Jx", "Jy", "Jz"):
                     j_key = f"{comp}_{s}"
                     if j_key in available:
                         canon = per_species_canonical(comp, s)
-                        fields[canon] = _read_field(block, j_key)
+                        fields[canon] = gaussian_current_to_si(
+                            _read_field(block, j_key)
+                        )
 
                 # Pressure tensor: Pxx_{s} → P11_s{s}, etc.
                 for pcomp in _PRESSURE_COMPONENT_MAP:
@@ -157,12 +162,17 @@ class IPic3DH5hutReader:
                         data = _read_field(block, p_key)
                         # Negate diagonal for species with negative qom
                         # (iPIC3D stores rho*T which inherits the charge sign)
-                        if (
-                            pcomp in _DIAGONAL_PRESSURE
-                            and s < len(self._config.qom)
-                            and self._config.qom[s] < 0
-                        ):
-                            data = -data
+                        if pcomp in _DIAGONAL_PRESSURE:
+                            if s >= len(self._config.qom):
+                                log.warning(
+                                    "Species %d in HDF5 exceeds .inp species "
+                                    "count (%d); pressure sign correction "
+                                    "skipped",
+                                    s,
+                                    len(self._config.qom),
+                                )
+                            elif self._config.qom[s] < 0:
+                                data = -data
                         # Pressure tensor stored as P/(4π) — Gaussian convention
                         data = gaussian_pressure_to_si(data)
                         fields[canon] = data

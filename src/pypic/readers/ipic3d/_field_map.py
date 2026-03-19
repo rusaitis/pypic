@@ -101,6 +101,17 @@ _PRESSURE_COMPONENT_MAP: dict[str, str] = {
     "Pzz": "P33",
 }
 
+_PHDF5_PRESSURE_MAP: dict[str, str] = {
+    "pXX": "P11",
+    "pXY": "P12",
+    "pXZ": "P13",
+    "pYY": "P22",
+    "pYZ": "P23",
+    "pZZ": "P33",
+}
+
+_PHDF5_DIAGONAL_PRESSURE = {"pXX", "pYY", "pZZ"}
+
 
 def per_species_pressure_canonical(component: str, species_index: int) -> str:
     """Build canonical per-species pressure tensor field name.

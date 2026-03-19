@@ -300,9 +300,7 @@ def decompress_field_vectorized(
     literal_emitters = emitter_idx[~emitter_is_marker]
 
     emit_values[emitter_is_marker] = raw[marker_emitters + 1]
-    repeat_counts[emitter_is_marker] = (
-        raw[marker_emitters].astype(np.int32) - 170
-    )
+    repeat_counts[emitter_is_marker] = raw[marker_emitters].astype(np.int32) - 170
     emit_values[~emitter_is_marker] = raw[literal_emitters]
 
     # Phase 4: expand to full decoded stream

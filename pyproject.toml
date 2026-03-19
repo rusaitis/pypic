@@ -70,4 +70,5 @@ testpaths = ["tests", "src"]
 addopts = "--doctest-modules --strict-markers -ra -m 'not slow'"
 markers = [
     "slow: long-running tests (deselected by default, run with: pytest -m slow)",
+    "real_data: requires real simulation data in examples/",
 ]

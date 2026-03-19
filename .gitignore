@@ -113,4 +113,9 @@ uv.lock
 *.hdf5
 *.dat
 *.log
-examples/
+examples/*
+!examples/.gitkeep
+
+# Test fixture data (small, committed)
+!tests/data/
+!tests/data/**
