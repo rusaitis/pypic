@@ -1,0 +1,524 @@
+"""Tests for SimpleReader with synthetic HDF5 fixtures."""
+
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any
+
+import h5py  # type: ignore[import-untyped]
+import numpy as np
+import pytest
+from numpy.testing import assert_allclose
+
+from pypic.coordinates.geometry import CARTESIAN
+from pypic.readers._simple import (
+    SimpleReader,
+    _parse_file_pattern,
+    open_simple,
+    probe,
+)
+from pypic.readers.base import (
+    GridInfo,
+    SimulationConfig,
+    SimulationReader,
+)
+from pypic.units import Normalization
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+
+DIMS = (4, 3, 2)
+SPACING = (1.0, 2.0, 3.0)
+ORIGIN = (0.0, 0.0, 0.0)
+
+
+def _sample_grid() -> GridInfo:
+    return GridInfo(
+        dimensions=DIMS,
+        spacing=SPACING,
+        origin=ORIGIN,
+        geometry=CARTESIAN,
+    )
+
+
+def _sample_config(
+    grid: GridInfo | None = None,
+) -> SimulationConfig:
+    return SimulationConfig(
+        model_name="test_sim",
+        model_type="MHD",
+        grid=grid or _sample_grid(),
+        normalization=Normalization.identity(),
+        species=(),
+        physics={"gamma": 5.0 / 3.0},
+        frame="simulation",
+        metadata={},
+    )
+
+
+def _write_h5(
+    filepath: Path,
+    fields: dict[str, np.ndarray],
+    *,
+    fields_group: str = "fields",
+    grid_attrs: dict[str, Any] | None = None,
+    model: str | None = None,
+    model_type: str | None = None,
+    step: int | None = None,
+    time: float | None = None,
+) -> None:
+    """Write a synthetic HDF5 file."""
+    with h5py.File(filepath, "w") as f:
+        grp = f.create_group(fields_group) if fields_group else f
+        for name, data in fields.items():
+            grp.create_dataset(name, data=data)
+
+        if grid_attrs is not None:
+            g = f.create_group("grid")
+            for k, v in grid_attrs.items():
+                g.attrs[k] = v
+
+        if model is not None:
+            f.attrs["model"] = model
+        if model_type is not None:
+            f.attrs["model_type"] = model_type
+        if step is not None:
+            f.attrs["step"] = step
+        if time is not None:
+            f.attrs["time"] = time
+
+
+def _make_fields() -> dict[str, np.ndarray]:
+    """Small arrays with recognizable values."""
+    rng = np.random.default_rng(42)
+    return {
+        "B1": rng.standard_normal(DIMS),
+        "B2": rng.standard_normal(DIMS),
+        "B3": rng.standard_normal(DIMS),
+        "rho_m": np.abs(rng.standard_normal(DIMS)) + 0.1,
+    }
+
+
+def _grid_attrs() -> dict[str, Any]:
+    return {
+        "dimensions": list(DIMS),
+        "spacing": list(SPACING),
+        "origin": list(ORIGIN),
+        "geometry": "cartesian",
+    }
+
+
+@pytest.fixture
+def canonical_dir(tmp_path: Path) -> Path:
+    """Three timesteps with full metadata."""
+    fields = _make_fields()
+    for step in (0, 10, 20):
+        _write_h5(
+            tmp_path / f"output_{step:06d}.h5",
+            fields,
+            grid_attrs=_grid_attrs(),
+            model="test_sim",
+            model_type="MHD",
+            step=step,
+            time=step * 0.1,
+        )
+    return tmp_path
+
+
+@pytest.fixture
+def bare_dir(tmp_path: Path) -> Path:
+    """One timestep, no metadata — just fields."""
+    _write_h5(
+        tmp_path / "output_000000.h5",
+        _make_fields(),
+    )
+    return tmp_path
+
+
+@pytest.fixture
+def mapped_dir(tmp_path: Path) -> Path:
+    """One timestep with non-canonical field names."""
+    rng = np.random.default_rng(99)
+    native_fields = {
+        "magnetic_x": rng.standard_normal(DIMS),
+        "magnetic_y": rng.standard_normal(DIMS),
+        "magnetic_z": rng.standard_normal(DIMS),
+        "density": np.abs(rng.standard_normal(DIMS)) + 0.1,
+    }
+    _write_h5(
+        tmp_path / "output_000000.h5",
+        native_fields,
+        grid_attrs=_grid_attrs(),
+        model="custom_code",
+        model_type="MHD",
+        step=0,
+    )
+    return tmp_path
+
+
+class TestParseFilePattern:
+    def test_default_pattern(self) -> None:
+        glob_pat, regex = _parse_file_pattern(
+            "output_{step:06d}.h5",
+        )
+        assert glob_pat == "output_*.h5"
+        assert regex.match("output_000042.h5")
+        assert not regex.match("other_000042.h5")
+
+    def test_custom_pattern(self) -> None:
+        glob_pat, regex = _parse_file_pattern(
+            "fields_{step:04d}.hdf5",
+        )
+        assert glob_pat == "fields_*.hdf5"
+        m = regex.match("fields_0100.hdf5")
+        assert m is not None
+        assert m.group(1) == "0100"
+
+    def test_no_prefix(self) -> None:
+        glob_pat, _ = _parse_file_pattern("{step:08d}.h5")
+        assert glob_pat == "*.h5"
+
+
+class TestAvailableTimesteps:
+    def test_finds_all_steps(
+        self, canonical_dir: Path,
+    ) -> None:
+        reader = SimpleReader()
+        steps = reader.available_timesteps(canonical_dir)
+        assert steps == [0, 10, 20]
+
+    def test_empty_directory(self, tmp_path: Path) -> None:
+        reader = SimpleReader()
+        assert reader.available_timesteps(tmp_path) == []
+
+    def test_custom_pattern(self, tmp_path: Path) -> None:
+        for s in (5, 15):
+            _write_h5(
+                tmp_path / f"snap_{s:04d}.h5",
+                _make_fields(),
+                grid_attrs=_grid_attrs(),
+            )
+        reader = SimpleReader(
+            file_pattern="snap_{step:04d}.h5",
+        )
+        assert reader.available_timesteps(tmp_path) == [5, 15]
+
+
+class TestReadTimestepAutoDetect:
+    def test_reads_field_data(
+        self, canonical_dir: Path,
+    ) -> None:
+        reader = SimpleReader()
+        ds = reader.read_timestep(canonical_dir, 0)
+        assert ds.has_field("B1")
+        assert ds.has_field("B2")
+        assert ds.has_field("B3")
+        assert ds.has_field("rho_m")
+        assert ds["B1"].shape == DIMS
+
+    def test_field_values_match(
+        self, canonical_dir: Path,
+    ) -> None:
+        reader = SimpleReader()
+        ds = reader.read_timestep(canonical_dir, 0)
+        expected = _make_fields()
+        assert_allclose(ds["B1"], expected["B1"])
+
+    def test_grid_from_hdf5(
+        self, canonical_dir: Path,
+    ) -> None:
+        reader = SimpleReader()
+        ds = reader.read_timestep(canonical_dir, 0)
+        assert ds.grid.dimensions == DIMS
+        assert ds.grid.spacing == SPACING
+        assert ds.grid.origin == ORIGIN
+
+    def test_cartesian_aliases(
+        self, canonical_dir: Path,
+    ) -> None:
+        reader = SimpleReader()
+        ds = reader.read_timestep(canonical_dir, 0)
+        assert ds.has_field("Bx")
+        assert_allclose(ds["Bx"], ds["B1"])
+
+    def test_metadata_includes_step_and_time(
+        self, canonical_dir: Path,
+    ) -> None:
+        reader = SimpleReader()
+        ds = reader.read_timestep(canonical_dir, 10)
+        assert ds.metadata["step"] == 10
+        assert ds.metadata["time"] == pytest.approx(1.0)
+
+    def test_missing_file_raises(
+        self, canonical_dir: Path,
+    ) -> None:
+        reader = SimpleReader()
+        with pytest.raises(FileNotFoundError):
+            reader.read_timestep(canonical_dir, 999)
+
+
+class TestReadTimestepWithConfig:
+    def test_config_fallback_when_no_metadata(
+        self, bare_dir: Path,
+    ) -> None:
+        config = _sample_config()
+        reader = SimpleReader(config=config)
+        ds = reader.read_timestep(bare_dir, 0)
+        assert ds.grid.dimensions == DIMS
+        assert ds.has_field("B1")
+
+    def test_hdf5_metadata_takes_priority(
+        self, canonical_dir: Path,
+    ) -> None:
+        different_grid = GridInfo(
+            dimensions=(10, 10, 10),
+            spacing=(0.5, 0.5, 0.5),
+            origin=(1.0, 1.0, 1.0),
+            geometry=CARTESIAN,
+        )
+        config = _sample_config(grid=different_grid)
+        reader = SimpleReader(config=config)
+        ds = reader.read_timestep(canonical_dir, 0)
+        # HDF5 metadata wins
+        assert ds.grid.dimensions == DIMS
+        assert ds.grid.spacing == SPACING
+
+    def test_physics_from_config(
+        self, canonical_dir: Path,
+    ) -> None:
+        config = _sample_config()
+        reader = SimpleReader(config=config)
+        ds = reader.read_timestep(canonical_dir, 0)
+        assert ds.physics["gamma"] == pytest.approx(5.0 / 3.0)
+
+    def test_explicit_grid_without_config(
+        self, bare_dir: Path,
+    ) -> None:
+        grid = _sample_grid()
+        reader = SimpleReader(grid=grid)
+        ds = reader.read_timestep(bare_dir, 0)
+        assert ds.grid.dimensions == DIMS
+        assert ds.has_field("B1")
+
+    def test_explicit_grid_lower_priority_than_hdf5(
+        self, canonical_dir: Path,
+    ) -> None:
+        different_grid = GridInfo(
+            dimensions=(10, 10, 10),
+            spacing=(0.5, 0.5, 0.5),
+            origin=(1.0, 1.0, 1.0),
+            geometry=CARTESIAN,
+        )
+        reader = SimpleReader(grid=different_grid)
+        ds = reader.read_timestep(canonical_dir, 0)
+        # HDF5 metadata wins over explicit grid
+        assert ds.grid.dimensions == DIMS
+
+    def test_explicit_normalization(
+        self, canonical_dir: Path,
+    ) -> None:
+        norm = Normalization.identity()
+        reader = SimpleReader(normalization=norm)
+        ds = reader.read_timestep(canonical_dir, 0)
+        assert ds.normalization is norm
+
+
+class TestFieldMapping:
+    def test_maps_native_to_canonical(
+        self, mapped_dir: Path,
+    ) -> None:
+        field_map = {
+            "magnetic_x": "B1",
+            "magnetic_y": "B2",
+            "magnetic_z": "B3",
+            "density": "rho_m",
+        }
+        reader = SimpleReader(field_map=field_map)
+        ds = reader.read_timestep(mapped_dir, 0)
+        assert ds.has_field("B1")
+        assert ds.has_field("Bx")
+        assert ds.has_field("rho_m")
+
+    def test_unmapped_fields_pass_through(
+        self, mapped_dir: Path,
+    ) -> None:
+        partial_map = {"magnetic_x": "B1"}
+        reader = SimpleReader(field_map=partial_map)
+        ds = reader.read_timestep(mapped_dir, 0)
+        assert ds.has_field("B1")
+        # Unmapped fields keep their native names
+        assert ds.has_field("density")
+
+
+class TestFieldsAtRoot:
+    def test_root_level_datasets(self, tmp_path: Path) -> None:
+        _write_h5(
+            tmp_path / "output_000000.h5",
+            _make_fields(),
+            fields_group="",
+            grid_attrs=_grid_attrs(),
+        )
+        reader = SimpleReader(fields_group="")
+        ds = reader.read_timestep(tmp_path, 0)
+        assert ds.has_field("B1")
+
+
+class TestMissingMetadataError:
+    def test_no_grid_no_config_raises(
+        self, bare_dir: Path,
+    ) -> None:
+        reader = SimpleReader()
+        with pytest.raises(ValueError, match="grid"):
+            reader.read_timestep(bare_dir, 0)
+
+    def test_error_message_is_helpful(
+        self, bare_dir: Path,
+    ) -> None:
+        reader = SimpleReader()
+        with pytest.raises(ValueError, match="config"):
+            reader.read_timestep(bare_dir, 0)
+
+
+class TestOpenSimple:
+    def test_with_hdf5_metadata(
+        self, canonical_dir: Path,
+    ) -> None:
+        reader, config = open_simple(canonical_dir)
+        assert config.model_name == "test_sim"
+        assert config.model_type == "MHD"
+        assert config.grid.dimensions == DIMS
+
+        ds = reader.read_timestep(canonical_dir, 0)
+        assert ds.has_field("B1")
+
+    def test_with_explicit_config(
+        self, bare_dir: Path,
+    ) -> None:
+        config = _sample_config()
+        reader, returned_config = open_simple(
+            bare_dir, config=config,
+        )
+        assert returned_config is config
+        ds = reader.read_timestep(bare_dir, 0)
+        assert ds.grid.dimensions == DIMS
+
+    def test_with_explicit_grid(
+        self, bare_dir: Path,
+    ) -> None:
+        grid = _sample_grid()
+        reader, config = open_simple(bare_dir, grid=grid)
+        assert config.grid.dimensions == DIMS
+        ds = reader.read_timestep(bare_dir, 0)
+        assert ds.has_field("B1")
+
+    def test_no_files_raises(self, tmp_path: Path) -> None:
+        with pytest.raises(FileNotFoundError):
+            open_simple(tmp_path)
+
+    def test_no_metadata_no_config_raises(
+        self, bare_dir: Path,
+    ) -> None:
+        with pytest.raises(ValueError, match="grid"):
+            open_simple(bare_dir)
+
+    def test_simulation_toml_auto_discovery(
+        self, tmp_path: Path,
+    ) -> None:
+        _write_h5(
+            tmp_path / "output_000000.h5",
+            _make_fields(),
+        )
+        toml_content = """\
+[model]
+name = "toml_sim"
+type = "MHD"
+
+[grid]
+dimensions = [4, 3, 2]
+spacing = [1.0, 2.0, 3.0]
+origin = [0.0, 0.0, 0.0]
+
+[units]
+system = "SI"
+
+[coordinates]
+geometry = "cartesian"
+frame = "simulation"
+"""
+        (tmp_path / "simulation.toml").write_text(toml_content)
+        reader, config = open_simple(tmp_path)
+        assert config.model_name == "toml_sim"
+        assert config.grid.dimensions == DIMS
+        ds = reader.read_timestep(tmp_path, 0)
+        assert ds.has_field("B1")
+
+    def test_config_path_outside_data_dir(
+        self, tmp_path: Path,
+    ) -> None:
+        data_dir = tmp_path / "data"
+        data_dir.mkdir()
+        conf_dir = tmp_path / "configs"
+        conf_dir.mkdir()
+
+        _write_h5(data_dir / "output_000000.h5", _make_fields())
+
+        toml_content = """\
+[model]
+name = "remote_toml"
+type = "PIC"
+
+[grid]
+dimensions = [4, 3, 2]
+spacing = [1.0, 2.0, 3.0]
+origin = [0.0, 0.0, 0.0]
+
+[units]
+system = "SI"
+
+[coordinates]
+geometry = "cartesian"
+frame = "simulation"
+"""
+        toml_file = conf_dir / "simulation.toml"
+        toml_file.write_text(toml_content)
+
+        reader, config = open_simple(
+            data_dir, config_path=toml_file,
+        )
+        assert config.model_name == "remote_toml"
+        assert config.model_type == "PIC"
+        ds = reader.read_timestep(data_dir, 0)
+        assert ds.has_field("B1")
+
+
+class TestProbe:
+    def test_empty_dir(self, tmp_path: Path) -> None:
+        assert probe(tmp_path) == 0.0
+
+    def test_generic_h5(self, tmp_path: Path) -> None:
+        _write_h5(
+            tmp_path / "data.h5",
+            {"x": np.zeros(4)},
+            fields_group="",
+        )
+        assert probe(tmp_path) > 0.0
+
+    def test_canonical_h5(self, tmp_path: Path) -> None:
+        _write_h5(
+            tmp_path / "output.h5",
+            _make_fields(),
+            grid_attrs=_grid_attrs(),
+        )
+        score = probe(tmp_path)
+        assert score >= 0.5
+
+    def test_not_a_directory(self, tmp_path: Path) -> None:
+        f = tmp_path / "file.txt"
+        f.touch()
+        assert probe(f) == 0.0
+
+
+class TestProtocolCompliance:
+    def test_satisfies_simulation_reader(self) -> None:
+        reader = SimpleReader()
+        assert isinstance(reader, SimulationReader)
