@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import inspect
 import logging
 import threading
 from dataclasses import dataclass
@@ -10,7 +11,7 @@ from types import MappingProxyType
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Iterator
+    from collections.abc import Callable, Iterable, Iterator
 
     from pypic.readers.base import (
         FieldDataset,
@@ -212,19 +213,46 @@ class Simulation:
             self._steps = self._reader.available_timesteps(self._path)
         return self._steps
 
-    def read(self, step: int) -> FieldDataset:
+    def read(
+        self,
+        step: int,
+        *,
+        fields: Iterable[str] | None = None,
+    ) -> FieldDataset:
         """Read field data for a single timestep.
 
         Parameters
         ----------
         step : int
             Timestep index.
+        fields : Iterable[str] | None
+            When given, only these fields are read.  Accepts canonical
+            names (``"B1"``) and geometry aliases (``"Bx"``).  Readers
+            that support selective I/O skip unwanted datasets; others
+            read all fields then filter.
 
         Returns
         -------
         FieldDataset
         """
-        return self._reader.read_timestep(self._path, step)
+        if fields is None:
+            return self._reader.read_timestep(self._path, step)
+
+        from pypic.readers.base import _default_aliases
+
+        alias_map = _default_aliases(self._config.grid.geometry)
+        canonical: set[str] = {alias_map.get(name, name) for name in fields}
+
+        sig = inspect.signature(self._reader.read_timestep)
+        if "fields" in sig.parameters:
+            return self._reader.read_timestep(  # type: ignore[call-arg]
+                self._path,
+                step,
+                fields=canonical,
+            )
+
+        ds = self._reader.read_timestep(self._path, step)
+        return ds.select_fields(canonical)
 
     @property
     def auxiliary_names(self) -> list[str]:

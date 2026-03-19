@@ -14,11 +14,13 @@ from pypic.readers.base import FieldDataset, GridInfo
 from pypic.readers.openggcm._field_io import read_3df_file
 from pypic.readers.openggcm._field_map import (
     DEFAULT_SKIP,
+    FIELD_NAME_MAP,
     convert_fields_to_si,
 )
 from pypic.units import Normalization
 
 if TYPE_CHECKING:
+    from collections.abc import Iterable
     from pathlib import Path
 
     from pypic.readers.openggcm._grid import OpenGGCMGrid
@@ -81,8 +83,14 @@ class OpenGGCMReader:
                 steps.append(int(m.group(1)))
         return sorted(steps)
 
-    def read_timestep(self, path: Path, step: int) -> FieldDataset:
-        """Read all fields for a single timestep.
+    def read_timestep(
+        self,
+        path: Path,
+        step: int,
+        *,
+        fields: Iterable[str] | None = None,
+    ) -> FieldDataset:
+        """Read fields for a single timestep.
 
         Parameters
         ----------
@@ -90,6 +98,9 @@ class OpenGGCMReader:
             Directory containing .3df files.
         step : int
             Timestep index (e.g. 6300).
+        fields : Iterable[str] | None
+            When given, only read these canonical field names.  Skips
+            WRN2 decompression for unwanted native fields.
 
         Returns
         -------
@@ -101,9 +112,23 @@ class OpenGGCMReader:
             msg = f"File not found: {filename}"
             raise FileNotFoundError(msg)
 
+        skip = set(DEFAULT_SKIP)
+        wanted_canonical: set[str] | None = None
+        if fields is not None:
+            wanted_canonical = set(fields)
+            wanted_native: set[str] = set()
+            for native, canonical in FIELD_NAME_MAP.items():
+                if canonical in wanted_canonical:
+                    wanted_native.add(native)
+            # n_s0 is derived from "rr" in convert_fields_to_si
+            if "n_s0" in wanted_canonical:
+                wanted_native.add("rr")
+            # Skip known native fields that aren't wanted
+            skip = skip | (set(FIELD_NAME_MAP.keys()) - wanted_native)
+
         raw_fields, ts, nx, ny, nz = read_3df_file(
             filename,
-            skip=DEFAULT_SKIP,
+            skip=skip,
         )
 
         # Verify grid dimensions match
@@ -120,6 +145,10 @@ class OpenGGCMReader:
             norm = self._normalization
             for name, data in si_fields.items():
                 si_fields[name] = _normalize_field(name, data, norm)
+
+        # Filter to requested canonical fields
+        if wanted_canonical is not None:
+            si_fields = {k: v for k, v in si_fields.items() if k in wanted_canonical}
 
         # Build xr.Dataset with non-uniform coordinates
         dim_names = ["x", "y", "z"]
@@ -180,5 +209,3 @@ def _normalize_field(
     if name == "P":
         return data / (norm.density_ref * norm.mass_ref * norm.velocity_ref**2)
     return data
-
-

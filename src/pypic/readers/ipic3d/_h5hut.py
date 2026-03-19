@@ -17,6 +17,7 @@ from pypic.readers.ipic3d._field_map import (
     _H5HUT_FIELD_MAP,
     _MOMENT_COMPONENT_MAP,
     _PRESSURE_COMPONENT_MAP,
+    expand_moment_dependencies,
     gaussian_current_to_si,
     gaussian_density_to_si,
     gaussian_pressure_to_si,
@@ -25,6 +26,7 @@ from pypic.readers.ipic3d._field_map import (
 )
 
 if TYPE_CHECKING:
+    from collections.abc import Iterable
     from pathlib import Path
 
     from pypic.types import FloatArray
@@ -102,8 +104,14 @@ class IPic3DH5hutReader:
             raise FileNotFoundError(msg)
         return matches[0]
 
-    def read_timestep(self, path: Path, step: int) -> FieldDataset:
-        """Read all field and moment data for a single timestep.
+    def read_timestep(
+        self,
+        path: Path,
+        step: int,
+        *,
+        fields: Iterable[str] | None = None,
+    ) -> FieldDataset:
+        """Read field and moment data for a single timestep.
 
         Parameters
         ----------
@@ -111,6 +119,10 @@ class IPic3DH5hutReader:
             Simulation output directory.
         step : int
             Cycle number (e.g. 202500).
+        fields : Iterable[str] | None
+            When given, only read these canonical field names.
+            Dependencies (per-species fields needed for totals)
+            are expanded automatically and excluded from the result.
 
         Returns
         -------
@@ -119,7 +131,9 @@ class IPic3DH5hutReader:
             pressure tensor all corrected by 4π (Gaussian→SI-rationalized).
         """
         fields_file = self._find_fields_file(path, step)
-        fields: dict[str, FloatArray] = {}
+        field_data: dict[str, FloatArray] = {}
+
+        wanted: set[str] | None = set(fields) if fields is not None else None
 
         with h5py.File(fields_file, "r") as f:
             step_group = f["Step#0"]
@@ -127,20 +141,30 @@ class IPic3DH5hutReader:
             block = step_group["Block"]
             available = set(block.keys())
 
+            expanded: set[str] | None = (
+                expand_moment_dependencies(wanted, nspec)
+                if wanted is not None
+                else None
+            )
+
             # Track which native keys are consumed by known-field logic
             consumed: set[str] = set()
 
             # Electromagnetic fields (Bx→B1, Ex→E1, etc.)
             for ipic_name, canon_name in _FIELD_NAME_MAP.items():
                 if ipic_name in available:
-                    fields[canon_name] = _read_field(block, ipic_name)
                     consumed.add(ipic_name)
+                    if expanded is not None and canon_name not in expanded:
+                        continue
+                    field_data[canon_name] = _read_field(block, ipic_name)
 
             # H5hut-specific fields (Vfx→V1, divB→div_B)
             for ipic_name, canon_name in _H5HUT_FIELD_MAP.items():
                 if ipic_name in available:
-                    fields[canon_name] = _read_field(block, ipic_name)
                     consumed.add(ipic_name)
+                    if expanded is not None and canon_name not in expanded:
+                        continue
+                    field_data[canon_name] = _read_field(block, ipic_name)
 
             # Per-species charge density and currents
             # Stored as rho/(4pi) and J/(4pi) -- Gaussian convention
@@ -148,25 +172,32 @@ class IPic3DH5hutReader:
                 # Charge density: rho_{s} → rho_c_s{s}
                 rho_key = f"rho_{s}"
                 if rho_key in available:
-                    canon = per_species_canonical("rho", s)
-                    fields[canon] = gaussian_density_to_si(_read_field(block, rho_key))
                     consumed.add(rho_key)
+                    canon = per_species_canonical("rho", s)
+                    if expanded is None or canon in expanded:
+                        field_data[canon] = gaussian_density_to_si(
+                            _read_field(block, rho_key)
+                        )
 
                 # Current density: Jx_{s} → J1_s{s}, etc.
                 for comp in ("Jx", "Jy", "Jz"):
                     j_key = f"{comp}_{s}"
                     if j_key in available:
-                        canon = per_species_canonical(comp, s)
-                        fields[canon] = gaussian_current_to_si(
-                            _read_field(block, j_key)
-                        )
                         consumed.add(j_key)
+                        canon = per_species_canonical(comp, s)
+                        if expanded is None or canon in expanded:
+                            field_data[canon] = gaussian_current_to_si(
+                                _read_field(block, j_key)
+                            )
 
                 # Pressure tensor: Pxx_{s} → P11_s{s}, etc.
                 for pcomp in _PRESSURE_COMPONENT_MAP:
                     p_key = f"{pcomp}_{s}"
                     if p_key in available:
+                        consumed.add(p_key)
                         canon = per_species_pressure_canonical(pcomp, s)
+                        if expanded is not None and canon not in expanded:
+                            continue
                         data = _read_field(block, p_key)
                         # Negate diagonal for species with negative qom
                         # (iPIC3D stores rho*T which inherits the charge sign)
@@ -183,28 +214,35 @@ class IPic3DH5hutReader:
                                 data = -data
                         # Pressure tensor stored as P/(4π) — Gaussian convention
                         data = gaussian_pressure_to_si(data)
-                        fields[canon] = data
-                        consumed.add(p_key)
+                        field_data[canon] = data
 
             # Pass through unknown fields with native names, no conversion
             for native_name in available - consumed:
-                fields[native_name] = _read_field(block, native_name)
+                if expanded is not None and native_name not in expanded:
+                    continue
+                field_data[native_name] = _read_field(block, native_name)
 
         # Compute totals by summing over species
         for moment_comp, canon_total in _MOMENT_COMPONENT_MAP.items():
-            first_key = per_species_canonical(moment_comp, 0)
-            if first_key not in fields:
+            if expanded is not None and canon_total not in expanded:
                 continue
-            total = np.zeros_like(fields[first_key])
+            first_key = per_species_canonical(moment_comp, 0)
+            if first_key not in field_data:
+                continue
+            total = np.zeros_like(field_data[first_key])
             for s in range(nspec):
                 key = per_species_canonical(moment_comp, s)
-                if key in fields:
-                    total = total + fields[key]
-            fields[canon_total] = total
+                if key in field_data:
+                    total = total + field_data[key]
+            field_data[canon_total] = total
+
+        # Filter to originally requested fields
+        if wanted is not None:
+            field_data = {k: v for k, v in field_data.items() if k in wanted}
 
         sc = self._sim_config
         return FieldDataset.from_arrays(
-            fields,
+            field_data,
             sc.grid,
             sc.normalization,
             species=sc.species,

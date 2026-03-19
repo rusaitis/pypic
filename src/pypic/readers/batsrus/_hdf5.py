@@ -33,13 +33,20 @@ class BATLData:
     domain_max: tuple[float, ...]
 
 
-def read_batl(path: Path) -> BATLData:
+def read_batl(
+    path: Path,
+    *,
+    fields: set[str] | None = None,
+) -> BATLData:
     """Read a BATSRUS ``.batl`` HDF5 file.
 
     Parameters
     ----------
     path
         Path to the ``.batl`` file.
+    fields : set[str] | None
+        When given, only load these BATSRUS-native variable names.
+        Metadata and grid data are always read.
 
     Returns
     -------
@@ -68,13 +75,15 @@ def read_batl(path: Path) -> BATLData:
         refine_level = np.array(f["refine level"][:], dtype=np.int32)
         coord_db = np.array(f["Coord_DB"][:], dtype=np.float64)
 
-        fields: dict[str, FloatArray] = {}
+        field_data: dict[str, FloatArray] = {}
         for vname in var_names:
+            if fields is not None and vname not in fields:
+                continue
             if vname in f:
-                fields[vname] = np.array(f[vname][:], dtype=np.float64)
+                field_data[vname] = np.array(f[vname][:], dtype=np.float64)
 
     return BATLData(
-        fields=fields,
+        fields=field_data,
         var_names=var_names,
         unit_names=unit_names,
         bounding_box=bounding_box,

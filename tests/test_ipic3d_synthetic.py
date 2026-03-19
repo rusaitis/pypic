@@ -428,7 +428,8 @@ class TestH5hutUnknownFieldPassthrough:
             shape = block["Bx"]["0"].shape
             block.create_group("CustomField")
             block["CustomField"].create_dataset(
-                "0", data=np.full(shape, 99.0, dtype=np.float32),
+                "0",
+                data=np.full(shape, 99.0, dtype=np.float32),
             )
 
         reader = IPic3DH5hutReader(cfg)
@@ -595,6 +596,105 @@ class TestIPic3DAuxiliaryProtocol:
         cfg = parse_inp(H5HUT_DIR / "SyntheticFixture.inp")
         reader = IPic3DH5hutReader(cfg)
         assert isinstance(reader, AuxiliaryDataReader)
+
+
+class TestSelectiveReadPhdf5:
+    def test_b_fields_only(self):
+        cfg = parse_inp(PHDF5_DIR / "synthetic.inp")
+        reader = IPic3DParallelReader(cfg)
+        ds = reader.read_timestep(PHDF5_DIR, 0, fields={"B1", "B2", "B3"})
+        assert sorted(ds.field_names()) == ["B1", "B2", "B3"]
+
+    def test_values_match_full_read(self):
+        cfg = parse_inp(PHDF5_DIR / "synthetic.inp")
+        reader = IPic3DParallelReader(cfg)
+        full = reader.read_timestep(PHDF5_DIR, 0)
+        sub = reader.read_timestep(PHDF5_DIR, 0, fields={"B1"})
+        assert_allclose(sub["B1"], full["B1"])
+
+    def test_total_expands_dependencies(self):
+        """Requesting rho_c reads per-species rho and computes total."""
+        cfg = parse_inp(PHDF5_DIR / "synthetic.inp")
+        reader = IPic3DParallelReader(cfg)
+        ds = reader.read_timestep(PHDF5_DIR, 0, fields={"rho_c"})
+        assert ds.has_field("rho_c")
+        # Per-species fields are NOT in final result
+        assert not ds.has_field("rho_c_s0")
+        assert not ds.has_field("rho_c_s1")
+
+    def test_total_value_correct(self):
+        """Total computed from selective read matches full read."""
+        cfg = parse_inp(PHDF5_DIR / "synthetic.inp")
+        reader = IPic3DParallelReader(cfg)
+        full = reader.read_timestep(PHDF5_DIR, 0)
+        sub = reader.read_timestep(PHDF5_DIR, 0, fields={"rho_c"})
+        assert_allclose(sub["rho_c"], full["rho_c"])
+
+    def test_per_species_without_total(self):
+        cfg = parse_inp(PHDF5_DIR / "synthetic.inp")
+        reader = IPic3DParallelReader(cfg)
+        ds = reader.read_timestep(
+            PHDF5_DIR,
+            0,
+            fields={"rho_c_s0", "B1"},
+        )
+        assert ds.has_field("rho_c_s0")
+        assert ds.has_field("B1")
+        assert not ds.has_field("rho_c")
+
+
+class TestSelectiveReadShdf5:
+    def test_b_fields_only(self):
+        cfg = parse_inp(SHDF5_DIR / "synthetic_serial.inp")
+        reader = IPic3DSerialReader(cfg)
+        ds = reader.read_timestep(SHDF5_DIR, 0, fields={"B1", "B2", "B3"})
+        assert sorted(ds.field_names()) == ["B1", "B2", "B3"]
+
+    def test_total_value_correct(self):
+        cfg = parse_inp(SHDF5_DIR / "synthetic_serial.inp")
+        reader = IPic3DSerialReader(cfg)
+        full = reader.read_timestep(SHDF5_DIR, 0)
+        sub = reader.read_timestep(SHDF5_DIR, 0, fields={"J1"})
+        assert_allclose(sub["J1"], full["J1"])
+
+
+class TestSelectiveReadH5hut:
+    def test_b_fields_only(self):
+        cfg = parse_inp(H5HUT_DIR / "SyntheticFixture.inp")
+        reader = IPic3DH5hutReader(cfg)
+        ds = reader.read_timestep(H5HUT_DIR, 0, fields={"B1", "B2", "B3"})
+        assert sorted(ds.field_names()) == ["B1", "B2", "B3"]
+
+    def test_total_expands_dependencies(self):
+        cfg = parse_inp(H5HUT_DIR / "SyntheticFixture.inp")
+        reader = IPic3DH5hutReader(cfg)
+        ds = reader.read_timestep(H5HUT_DIR, 0, fields={"rho_c"})
+        assert ds.has_field("rho_c")
+        assert not ds.has_field("rho_c_s0")
+
+    def test_total_value_correct(self):
+        cfg = parse_inp(H5HUT_DIR / "SyntheticFixture.inp")
+        reader = IPic3DH5hutReader(cfg)
+        full = reader.read_timestep(H5HUT_DIR, 0)
+        sub = reader.read_timestep(H5HUT_DIR, 0, fields={"rho_c"})
+        assert_allclose(sub["rho_c"], full["rho_c"])
+
+    def test_em_and_moment_mix(self):
+        cfg = parse_inp(H5HUT_DIR / "SyntheticFixture.inp")
+        reader = IPic3DH5hutReader(cfg)
+        ds = reader.read_timestep(
+            H5HUT_DIR,
+            0,
+            fields={"B1", "rho_c_s0", "V1"},
+        )
+        assert sorted(ds.field_names()) == ["B1", "V1", "rho_c_s0"]
+
+    def test_none_reads_all(self):
+        cfg = parse_inp(H5HUT_DIR / "SyntheticFixture.inp")
+        reader = IPic3DH5hutReader(cfg)
+        full = reader.read_timestep(H5HUT_DIR, 0)
+        also_full = reader.read_timestep(H5HUT_DIR, 0, fields=None)
+        assert sorted(full.field_names()) == sorted(also_full.field_names())
 
 
 class TestIPic3DAvailableAuxiliary:

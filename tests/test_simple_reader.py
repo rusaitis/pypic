@@ -181,7 +181,8 @@ class TestParseFilePattern:
 
 class TestAvailableTimesteps:
     def test_finds_all_steps(
-        self, canonical_dir: Path,
+        self,
+        canonical_dir: Path,
     ) -> None:
         reader = SimpleReader()
         steps = reader.available_timesteps(canonical_dir)
@@ -206,7 +207,8 @@ class TestAvailableTimesteps:
 
 class TestReadTimestepAutoDetect:
     def test_reads_field_data(
-        self, canonical_dir: Path,
+        self,
+        canonical_dir: Path,
     ) -> None:
         reader = SimpleReader()
         ds = reader.read_timestep(canonical_dir, 0)
@@ -217,7 +219,8 @@ class TestReadTimestepAutoDetect:
         assert ds["B1"].shape == DIMS
 
     def test_field_values_match(
-        self, canonical_dir: Path,
+        self,
+        canonical_dir: Path,
     ) -> None:
         reader = SimpleReader()
         ds = reader.read_timestep(canonical_dir, 0)
@@ -225,7 +228,8 @@ class TestReadTimestepAutoDetect:
         assert_allclose(ds["B1"], expected["B1"])
 
     def test_grid_from_hdf5(
-        self, canonical_dir: Path,
+        self,
+        canonical_dir: Path,
     ) -> None:
         reader = SimpleReader()
         ds = reader.read_timestep(canonical_dir, 0)
@@ -234,7 +238,8 @@ class TestReadTimestepAutoDetect:
         assert ds.grid.origin == ORIGIN
 
     def test_cartesian_aliases(
-        self, canonical_dir: Path,
+        self,
+        canonical_dir: Path,
     ) -> None:
         reader = SimpleReader()
         ds = reader.read_timestep(canonical_dir, 0)
@@ -242,7 +247,8 @@ class TestReadTimestepAutoDetect:
         assert_allclose(ds["Bx"], ds["B1"])
 
     def test_metadata_includes_step_and_time(
-        self, canonical_dir: Path,
+        self,
+        canonical_dir: Path,
     ) -> None:
         reader = SimpleReader()
         ds = reader.read_timestep(canonical_dir, 10)
@@ -250,7 +256,8 @@ class TestReadTimestepAutoDetect:
         assert ds.metadata["time"] == pytest.approx(1.0)
 
     def test_missing_file_raises(
-        self, canonical_dir: Path,
+        self,
+        canonical_dir: Path,
     ) -> None:
         reader = SimpleReader()
         with pytest.raises(FileNotFoundError):
@@ -259,7 +266,8 @@ class TestReadTimestepAutoDetect:
 
 class TestReadTimestepWithConfig:
     def test_config_fallback_when_no_metadata(
-        self, bare_dir: Path,
+        self,
+        bare_dir: Path,
     ) -> None:
         config = _sample_config()
         reader = SimpleReader(config=config)
@@ -268,7 +276,8 @@ class TestReadTimestepWithConfig:
         assert ds.has_field("B1")
 
     def test_hdf5_metadata_takes_priority(
-        self, canonical_dir: Path,
+        self,
+        canonical_dir: Path,
     ) -> None:
         different_grid = GridInfo(
             dimensions=(10, 10, 10),
@@ -284,7 +293,8 @@ class TestReadTimestepWithConfig:
         assert ds.grid.spacing == SPACING
 
     def test_physics_from_config(
-        self, canonical_dir: Path,
+        self,
+        canonical_dir: Path,
     ) -> None:
         config = _sample_config()
         reader = SimpleReader(config=config)
@@ -292,7 +302,8 @@ class TestReadTimestepWithConfig:
         assert ds.physics["gamma"] == pytest.approx(5.0 / 3.0)
 
     def test_explicit_grid_without_config(
-        self, bare_dir: Path,
+        self,
+        bare_dir: Path,
     ) -> None:
         grid = _sample_grid()
         reader = SimpleReader(grid=grid)
@@ -301,7 +312,8 @@ class TestReadTimestepWithConfig:
         assert ds.has_field("B1")
 
     def test_explicit_grid_lower_priority_than_hdf5(
-        self, canonical_dir: Path,
+        self,
+        canonical_dir: Path,
     ) -> None:
         different_grid = GridInfo(
             dimensions=(10, 10, 10),
@@ -315,7 +327,8 @@ class TestReadTimestepWithConfig:
         assert ds.grid.dimensions == DIMS
 
     def test_explicit_normalization(
-        self, canonical_dir: Path,
+        self,
+        canonical_dir: Path,
     ) -> None:
         norm = Normalization.identity()
         reader = SimpleReader(normalization=norm)
@@ -325,7 +338,8 @@ class TestReadTimestepWithConfig:
 
 class TestFieldMapping:
     def test_maps_native_to_canonical(
-        self, mapped_dir: Path,
+        self,
+        mapped_dir: Path,
     ) -> None:
         field_map = {
             "magnetic_x": "B1",
@@ -340,7 +354,8 @@ class TestFieldMapping:
         assert ds.has_field("rho_m")
 
     def test_unmapped_fields_pass_through(
-        self, mapped_dir: Path,
+        self,
+        mapped_dir: Path,
     ) -> None:
         partial_map = {"magnetic_x": "B1"}
         reader = SimpleReader(field_map=partial_map)
@@ -365,7 +380,8 @@ class TestFieldsAtRoot:
         assert ds.has_field("B1")
 
     def test_default_falls_back_to_root(
-        self, tmp_path: Path,
+        self,
+        tmp_path: Path,
     ) -> None:
         """Default fields_group='fields' falls back to root."""
         _write_h5(
@@ -380,7 +396,8 @@ class TestFieldsAtRoot:
         assert ds.has_field("B1")
 
     def test_scalars_skipped_without_field_map(
-        self, tmp_path: Path,
+        self,
+        tmp_path: Path,
     ) -> None:
         """Scalar datasets at root are not read as fields."""
         filepath = tmp_path / "output_000000.h5"
@@ -400,14 +417,16 @@ class TestFieldsAtRoot:
 
 class TestMissingMetadataError:
     def test_no_grid_no_config_raises(
-        self, bare_dir: Path,
+        self,
+        bare_dir: Path,
     ) -> None:
         reader = SimpleReader()
         with pytest.raises(ValueError, match="grid"):
             reader.read_timestep(bare_dir, 0)
 
     def test_error_message_is_helpful(
-        self, bare_dir: Path,
+        self,
+        bare_dir: Path,
     ) -> None:
         reader = SimpleReader()
         with pytest.raises(ValueError, match="config"):
@@ -416,7 +435,8 @@ class TestMissingMetadataError:
 
 class TestOpenSimple:
     def test_with_hdf5_metadata(
-        self, canonical_dir: Path,
+        self,
+        canonical_dir: Path,
     ) -> None:
         sim = open_simple(canonical_dir)
         assert sim.model_name == "test_sim"
@@ -427,7 +447,8 @@ class TestOpenSimple:
         assert ds.has_field("B1")
 
     def test_with_explicit_config(
-        self, bare_dir: Path,
+        self,
+        bare_dir: Path,
     ) -> None:
         config = _sample_config()
         sim = open_simple(bare_dir, config=config)
@@ -436,7 +457,8 @@ class TestOpenSimple:
         assert ds.grid.dimensions == DIMS
 
     def test_with_explicit_grid(
-        self, bare_dir: Path,
+        self,
+        bare_dir: Path,
     ) -> None:
         grid = _sample_grid()
         sim = open_simple(bare_dir, grid=grid)
@@ -445,7 +467,8 @@ class TestOpenSimple:
         assert ds.has_field("B1")
 
     def test_tuple_unpacking_still_works(
-        self, canonical_dir: Path,
+        self,
+        canonical_dir: Path,
     ) -> None:
         reader, config = open_simple(canonical_dir)
         assert config.model_name == "test_sim"
@@ -457,13 +480,15 @@ class TestOpenSimple:
             open_simple(tmp_path)
 
     def test_no_metadata_no_config_raises(
-        self, bare_dir: Path,
+        self,
+        bare_dir: Path,
     ) -> None:
         with pytest.raises(ValueError, match="grid"):
             open_simple(bare_dir)
 
     def test_simulation_toml_auto_discovery(
-        self, tmp_path: Path,
+        self,
+        tmp_path: Path,
     ) -> None:
         _write_h5(
             tmp_path / "output_000000.h5",
@@ -494,7 +519,8 @@ frame = "simulation"
         assert ds.has_field("B1")
 
     def test_config_path_outside_data_dir(
-        self, tmp_path: Path,
+        self,
+        tmp_path: Path,
     ) -> None:
         data_dir = tmp_path / "data"
         data_dir.mkdir()
@@ -524,7 +550,8 @@ frame = "simulation"
         toml_file.write_text(toml_content)
 
         reader, config = open_simple(
-            data_dir, config_path=toml_file,
+            data_dir,
+            config_path=toml_file,
         )
         assert config.model_name == "remote_toml"
         assert config.model_type == "PIC"
@@ -561,13 +588,15 @@ class TestCanReadConfidence:
 
 class TestCustomReadRaw:
     def test_subclass_bypasses_hdf5(
-        self, tmp_path: Path,
+        self,
+        tmp_path: Path,
     ) -> None:
         """Custom _read_raw returns arrays without reading files."""
 
         class InMemoryReader(SimpleReader):
             def _read_raw(
-                self, filepath: Any,
+                self,
+                filepath: Any,
             ) -> dict[str, np.ndarray]:
                 return _make_fields()
 
@@ -580,7 +609,8 @@ class TestCustomReadRaw:
         assert_allclose(ds["B1"], expected["B1"])
 
     def test_field_map_applied_after_read_raw(
-        self, tmp_path: Path,
+        self,
+        tmp_path: Path,
     ) -> None:
         """field_map renames native names from _read_raw."""
         rng = np.random.default_rng(77)
@@ -592,7 +622,8 @@ class TestCustomReadRaw:
 
         class NativeReader(SimpleReader):
             def _read_raw(
-                self, filepath: Any,
+                self,
+                filepath: Any,
             ) -> dict[str, np.ndarray]:
                 return dict(native_data)
 
@@ -611,13 +642,15 @@ class TestCustomReadRaw:
         assert_allclose(ds["B1"], native_data["mag_x"])
 
     def test_missing_grid_raises(
-        self, tmp_path: Path,
+        self,
+        tmp_path: Path,
     ) -> None:
         """Custom _read_raw without grid raises ValueError."""
 
         class NoFileReader(SimpleReader):
             def _read_raw(
-                self, filepath: Any,
+                self,
+                filepath: Any,
             ) -> dict[str, np.ndarray]:
                 return _make_fields()
 
@@ -626,13 +659,15 @@ class TestCustomReadRaw:
             reader.read_timestep(tmp_path, 0)
 
     def test_config_provides_grid(
-        self, tmp_path: Path,
+        self,
+        tmp_path: Path,
     ) -> None:
         """config can provide grid for custom _read_raw."""
 
         class NoFileReader(SimpleReader):
             def _read_raw(
-                self, filepath: Any,
+                self,
+                filepath: Any,
             ) -> dict[str, np.ndarray]:
                 return _make_fields()
 
@@ -643,7 +678,8 @@ class TestCustomReadRaw:
         assert ds.physics["gamma"] == pytest.approx(5.0 / 3.0)
 
     def test_transposed_hdf5(
-        self, tmp_path: Path,
+        self,
+        tmp_path: Path,
     ) -> None:
         """Custom _read_raw can transpose arrays from HDF5."""
         rng = np.random.default_rng(42)
@@ -654,7 +690,8 @@ class TestCustomReadRaw:
 
         class TransposedReader(SimpleReader):
             def _read_raw(
-                self, filepath: Any,
+                self,
+                filepath: Any,
             ) -> dict[str, np.ndarray]:
                 with h5py.File(filepath, "r") as f:
                     return {
@@ -666,6 +703,133 @@ class TestCustomReadRaw:
         reader = TransposedReader(grid=_sample_grid())
         ds = reader.read_timestep(tmp_path, 0)
         assert_allclose(ds["B1"], original)
+
+
+class TestSelectFields:
+    def test_keeps_requested_fields(
+        self,
+        canonical_dir: Path,
+    ) -> None:
+        reader = SimpleReader()
+        ds = reader.read_timestep(canonical_dir, 0)
+        sub = ds.select_fields(["B1", "rho_m"])
+        assert sorted(sub.field_names()) == ["B1", "rho_m"]
+
+    def test_resolves_aliases(
+        self,
+        canonical_dir: Path,
+    ) -> None:
+        reader = SimpleReader()
+        ds = reader.read_timestep(canonical_dir, 0)
+        sub = ds.select_fields(["Bx"])
+        assert sub.has_field("B1")
+        assert sub.has_field("Bx")
+        assert sorted(sub.field_names()) == ["B1"]
+
+    def test_preserves_values(
+        self,
+        canonical_dir: Path,
+    ) -> None:
+        reader = SimpleReader()
+        ds = reader.read_timestep(canonical_dir, 0)
+        sub = ds.select_fields(["B1"])
+        assert_allclose(sub["B1"], ds["B1"])
+
+    def test_missing_field_raises(
+        self,
+        canonical_dir: Path,
+    ) -> None:
+        reader = SimpleReader()
+        ds = reader.read_timestep(canonical_dir, 0)
+        with pytest.raises(KeyError, match="nonexistent"):
+            ds.select_fields(["nonexistent"])
+
+    def test_preserves_metadata(
+        self,
+        canonical_dir: Path,
+    ) -> None:
+        reader = SimpleReader()
+        ds = reader.read_timestep(canonical_dir, 0)
+        sub = ds.select_fields(["B1"])
+        assert sub.grid.dimensions == ds.grid.dimensions
+        assert sub.normalization is ds.normalization
+
+
+class TestSelectiveRead:
+    def test_reads_only_requested_fields(
+        self,
+        canonical_dir: Path,
+    ) -> None:
+        reader = SimpleReader()
+        ds = reader.read_timestep(canonical_dir, 0, fields={"B1", "rho_m"})
+        assert sorted(ds.field_names()) == ["B1", "rho_m"]
+
+    def test_values_match_full_read(
+        self,
+        canonical_dir: Path,
+    ) -> None:
+        reader = SimpleReader()
+        full = reader.read_timestep(canonical_dir, 0)
+        sub = reader.read_timestep(canonical_dir, 0, fields={"B1"})
+        assert_allclose(sub["B1"], full["B1"])
+
+    def test_none_reads_all(
+        self,
+        canonical_dir: Path,
+    ) -> None:
+        reader = SimpleReader()
+        ds = reader.read_timestep(canonical_dir, 0, fields=None)
+        assert len(ds.field_names()) == 4
+
+    def test_with_field_map(
+        self,
+        mapped_dir: Path,
+    ) -> None:
+        field_map = {
+            "magnetic_x": "B1",
+            "magnetic_y": "B2",
+            "magnetic_z": "B3",
+            "density": "rho_m",
+        }
+        reader = SimpleReader(field_map=field_map)
+        ds = reader.read_timestep(mapped_dir, 0, fields={"B1", "rho_m"})
+        assert sorted(ds.field_names()) == ["B1", "rho_m"]
+
+    def test_single_field(
+        self,
+        canonical_dir: Path,
+    ) -> None:
+        reader = SimpleReader()
+        ds = reader.read_timestep(canonical_dir, 0, fields={"rho_m"})
+        assert ds.field_names() == ["rho_m"]
+
+
+class TestSelectiveReadViaSimulation:
+    def test_alias_resolution(
+        self,
+        canonical_dir: Path,
+    ) -> None:
+        sim = open_simple(canonical_dir)
+        ds = sim.read(step=0, fields=["Bx", "rho_m"])
+        assert ds.has_field("B1")
+        assert ds.has_field("rho_m")
+        assert not ds.has_field("B2")
+
+    def test_canonical_names(
+        self,
+        canonical_dir: Path,
+    ) -> None:
+        sim = open_simple(canonical_dir)
+        ds = sim.read(step=0, fields=["B1", "B2"])
+        assert sorted(ds.field_names()) == ["B1", "B2"]
+
+    def test_none_reads_all(
+        self,
+        canonical_dir: Path,
+    ) -> None:
+        sim = open_simple(canonical_dir)
+        ds = sim.read(step=0)
+        assert len(ds.field_names()) == 4
 
 
 class TestProtocolCompliance:

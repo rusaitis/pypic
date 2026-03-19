@@ -139,6 +139,40 @@ def per_species_pressure_canonical(component: str, species_index: int) -> str:
     return f"{canonical}_s{species_index}"
 
 
+def expand_moment_dependencies(
+    wanted: set[str],
+    nspec: int,
+) -> set[str]:
+    """Expand wanted field set to include per-species dependencies.
+
+    If a total field (e.g. ``"rho_c"``, ``"J1"``) is requested, the
+    per-species components needed to compute it are added.
+
+    Parameters
+    ----------
+    wanted : set[str]
+        Canonical field names requested by the caller.
+    nspec : int
+        Number of particle species.
+
+    Returns
+    -------
+    set[str]
+        Expanded set including all per-species dependencies.
+
+    Examples
+    --------
+    >>> sorted(expand_moment_dependencies({"rho_c", "B1"}, nspec=2))
+    ['B1', 'rho_c', 'rho_c_s0', 'rho_c_s1']
+    """
+    expanded = set(wanted)
+    for moment_comp, canon_total in _MOMENT_COMPONENT_MAP.items():
+        if canon_total in expanded:
+            for s in range(nspec):
+                expanded.add(per_species_canonical(moment_comp, s))
+    return expanded
+
+
 def gaussian_pressure_to_si(p: FloatArray) -> FloatArray:
     r"""Convert iPIC3D Gaussian pressure tensor to SI-rationalized.
 

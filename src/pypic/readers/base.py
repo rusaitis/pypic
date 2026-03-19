@@ -20,7 +20,7 @@ from pypic.coordinates.geometry import (
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Iterable, Sequence
     from pathlib import Path
 
     from pypic.types import FloatArray
@@ -434,6 +434,55 @@ class FieldDataset:
         ['B1', 'rho_c']
         """
         return list(self._ds.data_vars)  # type: ignore[arg-type]  # xarray types Hashable, always str
+
+    def select_fields(self, names: Iterable[str]) -> FieldDataset:
+        """Return a new FieldDataset containing only the specified fields.
+
+        Parameters
+        ----------
+        names : Iterable[str]
+            Field names to keep (canonical or alias).
+
+        Returns
+        -------
+        FieldDataset
+
+        Raises
+        ------
+        KeyError
+            If any name is not found.
+
+        Examples
+        --------
+        >>> import numpy as np
+        >>> from pypic.units import Normalization
+        >>> grid = GridInfo(
+        ...     dimensions=(2,), spacing=(1.0,), origin=(0.0,),
+        ...     geometry=CARTESIAN,
+        ... )
+        >>> ds = FieldDataset.from_arrays(
+        ...     {"B1": np.array([1.0, 2.0]), "B2": np.array([3.0, 4.0]),
+        ...      "rho_c": np.array([0.5, 0.5])},
+        ...     grid, Normalization.identity(),
+        ... )
+        >>> sub = ds.select_fields(["B1", "rho_c"])
+        >>> sorted(sub.field_names())
+        ['B1', 'rho_c']
+        """
+        resolved: set[str] = set()
+        for name in names:
+            resolved.add(self._resolve_key(name))
+
+        new_ds = self._ds[sorted(resolved)]
+        return FieldDataset(
+            new_ds,
+            self._grid,
+            self._normalization,
+            species=self._species,
+            physics=self._physics,
+            metadata=self._metadata,
+            aliases={k: v for k, v in self._aliases.items() if v in resolved},
+        )
 
     def sel(
         self,

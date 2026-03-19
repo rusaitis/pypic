@@ -29,6 +29,7 @@ from pypic.readers.batsrus._idl import read_idl_cells, read_out_file
 from pypic.units import Normalization
 
 if TYPE_CHECKING:
+    from collections.abc import Iterable
     from pathlib import Path
 
 _GEOMETRY_MAP: dict[str, CoordinateGeometry] = {
@@ -89,6 +90,7 @@ class BATSRUSReader:
         path: Path,
         step: int,
         *,
+        fields: Iterable[str] | None = None,
         target_resolution: float | None = None,
     ) -> FieldDataset:
         """Read field data for a single timestep.
@@ -99,6 +101,8 @@ class BATSRUSReader:
             Directory containing the simulation output.
         step
             Timestep index.
+        fields : Iterable[str] | None
+            When given, only include these canonical field names.
         target_resolution
             Target cell size in code units for AMR regridding. When
             ``None`` (default), regrids to the finest resolution. When
@@ -110,17 +114,29 @@ class BATSRUSReader:
         FieldDataset
             Field data with canonical names, optionally converted to SI.
         """
+        canonical_set = set(fields) if fields is not None else None
         if self._output_format == "hdf5":
-            return self._read_hdf5(path, step, target_resolution=target_resolution)
+            return self._read_hdf5(
+                path,
+                step,
+                fields=canonical_set,
+                target_resolution=target_resolution,
+            )
         if self._output_format == "idl":
-            return self._read_idl(path, step, target_resolution=target_resolution)
-        return self._read_out(path, step)
+            return self._read_idl(
+                path,
+                step,
+                fields=canonical_set,
+                target_resolution=target_resolution,
+            )
+        return self._read_out(path, step, fields=canonical_set)
 
     def _read_idl(
         self,
         path: Path,
         step: int,
         *,
+        fields: set[str] | None = None,
         target_resolution: float | None = None,
     ) -> FieldDataset:
         """Read per-cell IDL format."""
@@ -143,11 +159,11 @@ class BATSRUSReader:
         state = np.concatenate(all_state, axis=0)
 
         if is_uniform_idl(dx):
-            fields, grid = assemble_uniform_idl(
+            field_data, grid = assemble_uniform_idl(
                 coords, dx, state, header.var_names, header.ndim, geometry=geo
             )
         else:
-            fields, grid = regrid_amr_idl(
+            field_data, grid = regrid_amr_idl(
                 coords,
                 dx,
                 state,
@@ -160,7 +176,15 @@ class BATSRUSReader:
         # Unit conversion
         unit_names = self._parse_unit_names(header)
         if unit_names and not is_normalized(header.unit_string):
-            fields = convert_fields_to_si(fields, header.var_names, unit_names)
+            field_data = convert_fields_to_si(
+                field_data,
+                header.var_names,
+                unit_names,
+            )
+
+        # Filter to requested fields
+        if fields is not None:
+            field_data = {k: v for k, v in field_data.items() if k in fields}
 
         normalization = Normalization.identity()
         if self._sim_config is None:
@@ -176,7 +200,7 @@ class BATSRUSReader:
             metadata["is_regridded"] = True
 
         return FieldDataset.from_arrays(
-            fields,
+            field_data,
             grid,
             normalization,
             physics=physics,
@@ -188,25 +212,47 @@ class BATSRUSReader:
         path: Path,
         step: int,
         *,
+        fields: set[str] | None = None,
         target_resolution: float | None = None,
     ) -> FieldDataset:
         """Read HDF5 BATL format."""
         batl_file = self._find_file(path, step, ".batl")
-        batl = read_batl(batl_file)
+
+        # Compute native names to read from canonical wanted set
+        native_wanted: set[str] | None = None
+        if fields is not None:
+            native_wanted = set()
+            for native, canonical in FIELD_NAME_MAP.items():
+                if canonical in fields:
+                    native_wanted.add(native)
+            # Also include canonical names not in the map (pass-through)
+            for f in fields:
+                if f not in FIELD_NAME_MAP.values():
+                    native_wanted.add(f)
+
+        batl = read_batl(batl_file, fields=native_wanted)
         geo = _GEOMETRY_MAP.get(self._geometry, CARTESIAN)
 
         is_uniform = len(set(batl.refine_level)) <= 1
         if is_uniform:
-            fields, grid = assemble_uniform_hdf5(batl, geometry=geo)
+            field_data, grid = assemble_uniform_hdf5(batl, geometry=geo)
         else:
-            fields, grid = regrid_amr_hdf5(
+            field_data, grid = regrid_amr_hdf5(
                 batl, target_dx=target_resolution, geometry=geo
             )
 
         unit_names = batl.unit_names
         unit_str = " ".join(unit_names)
         if unit_names and not is_normalized(unit_str):
-            fields = convert_fields_to_si(fields, batl.var_names, unit_names)
+            field_data = convert_fields_to_si(
+                field_data,
+                batl.var_names,
+                unit_names,
+            )
+
+        # Filter to requested fields
+        if fields is not None:
+            field_data = {k: v for k, v in field_data.items() if k in fields}
 
         normalization = Normalization.identity()
         if self._sim_config is None:
@@ -222,14 +268,20 @@ class BATSRUSReader:
             metadata["is_regridded"] = True
 
         return FieldDataset.from_arrays(
-            fields,
+            field_data,
             grid,
             normalization,
             physics=physics,
             metadata=metadata,
         )
 
-    def _read_out(self, path: Path, step: int) -> FieldDataset:
+    def _read_out(
+        self,
+        path: Path,
+        step: int,
+        *,
+        fields: set[str] | None = None,
+    ) -> FieldDataset:
         """Read merged .out format."""
         out_file = self._find_file(path, step, ".out")
         coord, state, var_names, out_meta = read_out_file(out_file)
@@ -242,12 +294,14 @@ class BATSRUSReader:
         geo = CARTESIAN if is_cart else _GEOMETRY_MAP.get(self._geometry, CARTESIAN)
 
         # Build fields dict with canonical names
-        fields: dict[str, np.ndarray] = {}
+        field_data: dict[str, np.ndarray] = {}
         for iv, vname in enumerate(var_names):
             if vname in SKIP_FIELDS:
                 continue
             canonical = FIELD_NAME_MAP.get(vname, vname)
-            fields[canonical] = state[iv]
+            if fields is not None and canonical not in fields:
+                continue
+            field_data[canonical] = state[iv]
 
         # Build grid from coordinate arrays
         spacing = tuple(
@@ -272,7 +326,7 @@ class BATSRUSReader:
         }
 
         return FieldDataset.from_arrays(
-            fields,
+            field_data,
             grid,
             normalization,
             physics=physics,

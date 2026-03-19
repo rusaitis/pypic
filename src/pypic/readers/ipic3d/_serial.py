@@ -14,12 +14,14 @@ from pypic.readers.ipic3d._conserved import detect_conserved, load_ipic3d_auxili
 from pypic.readers.ipic3d._field_map import (
     _FIELD_NAME_MAP,
     _MOMENT_COMPONENT_MAP,
+    expand_moment_dependencies,
     gaussian_current_to_si,
     gaussian_density_to_si,
     per_species_canonical,
 )
 
 if TYPE_CHECKING:
+    from collections.abc import Iterable
     from pathlib import Path
 
     from pypic.types import FloatArray
@@ -116,8 +118,14 @@ class IPic3DSerialReader:
 
         return result
 
-    def read_timestep(self, path: Path, step: int) -> FieldDataset:
-        """Read all field and moment data for a single timestep.
+    def read_timestep(
+        self,
+        path: Path,
+        step: int,
+        *,
+        fields: Iterable[str] | None = None,
+    ) -> FieldDataset:
+        """Read field and moment data for a single timestep.
 
         Assembles global arrays from per-process files, applies 4π
         correction to densities and currents, and computes totals.
@@ -128,6 +136,8 @@ class IPic3DSerialReader:
             Simulation output directory.
         step : int
             Timestep index (e.g. 0, 10, 20).
+        fields : Iterable[str] | None
+            When given, only read these canonical field names.
 
         Returns
         -------
@@ -136,40 +146,55 @@ class IPic3DSerialReader:
         """
         proc_files = sorted(path.glob("proc*.hdf"))
         cycle_key = f"cycle_{step}"
-        fields: dict[str, FloatArray] = {}
+        ns = self._config.ns
+        wanted: set[str] | None = set(fields) if fields is not None else None
+        expanded: set[str] | None = (
+            expand_moment_dependencies(wanted, ns) if wanted is not None else None
+        )
+        field_data: dict[str, FloatArray] = {}
 
         # Electromagnetic fields
         for ipic_name, canon_name in _FIELD_NAME_MAP.items():
-            fields[canon_name] = self._assemble_field(
+            if expanded is not None and canon_name not in expanded:
+                continue
+            field_data[canon_name] = self._assemble_field(
                 proc_files, f"fields/{ipic_name}", cycle_key
             )
 
         # Per-species moments
-        ns = self._config.ns
         for s in range(ns):
             for comp in ("Jx", "Jy", "Jz"):
                 canon = per_species_canonical(comp, s)
+                if expanded is not None and canon not in expanded:
+                    continue
                 raw = self._assemble_field(
                     proc_files, f"moments/species_{s}/{comp}", cycle_key
                 )
-                fields[canon] = gaussian_current_to_si(raw)
+                field_data[canon] = gaussian_current_to_si(raw)
 
             canon_rho = per_species_canonical("rho", s)
-            raw_rho = self._assemble_field(
-                proc_files, f"moments/species_{s}/rho", cycle_key
-            )
-            fields[canon_rho] = gaussian_density_to_si(raw_rho)
+            if expanded is None or canon_rho in expanded:
+                raw_rho = self._assemble_field(
+                    proc_files, f"moments/species_{s}/rho", cycle_key
+                )
+                field_data[canon_rho] = gaussian_density_to_si(raw_rho)
 
         # Compute totals by summing over species
         for moment_comp, canon_total in _MOMENT_COMPONENT_MAP.items():
-            total = np.zeros_like(fields[per_species_canonical(moment_comp, 0)])
+            if expanded is not None and canon_total not in expanded:
+                continue
+            total = np.zeros_like(field_data[per_species_canonical(moment_comp, 0)])
             for s in range(ns):
-                total = total + fields[per_species_canonical(moment_comp, s)]
-            fields[canon_total] = total
+                total = total + field_data[per_species_canonical(moment_comp, s)]
+            field_data[canon_total] = total
+
+        # Filter to originally requested fields
+        if wanted is not None:
+            field_data = {k: v for k, v in field_data.items() if k in wanted}
 
         sc = self._sim_config
         return FieldDataset.from_arrays(
-            fields,
+            field_data,
             sc.grid,
             sc.normalization,
             species=sc.species,

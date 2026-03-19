@@ -48,6 +48,7 @@ from pypic.readers.base import FieldDataset, GridInfo, SimulationConfig, Tabular
 from pypic.units import Normalization
 
 if TYPE_CHECKING:
+    from collections.abc import Iterable
     from pathlib import Path
 
     from pypic.readers._registry import Simulation
@@ -244,6 +245,8 @@ class SimpleReader:
         self,
         path: Path,
         step: int,
+        *,
+        fields: Iterable[str] | None = None,
     ) -> FieldDataset:
         """Read field data for a single timestep.
 
@@ -253,6 +256,8 @@ class SimpleReader:
             Directory containing the data files.
         step : int
             Timestep index.
+        fields : Iterable[str] | None
+            When given, only read these canonical field names.
 
         Returns
         -------
@@ -268,15 +273,19 @@ class SimpleReader:
             and ``config``.
         """
         filepath = path / self._file_pattern.format(step=step)
+        is_custom = self._is_read_raw_overridden()
 
-        if not self._is_read_raw_overridden() and not filepath.exists():
+        if not is_custom and not filepath.exists():
             msg = f"File not found: {filepath}"
             raise FileNotFoundError(msg)
 
-        raw = self._read_raw(filepath)
-        fields = self._apply_field_map(raw)
+        canonical_set = set(fields) if fields is not None else None
 
-        if self._is_read_raw_overridden():
+        if is_custom:
+            raw = self._read_raw(filepath)
+            field_data = self._apply_field_map(raw)
+            if canonical_set is not None:
+                field_data = {k: v for k, v in field_data.items() if k in canonical_set}
             grid = self._grid
             if grid is None and self._config is not None:
                 grid = self._config.grid
@@ -294,6 +303,8 @@ class SimpleReader:
             )
             metadata: dict[str, Any] = {"step": step}
         else:
+            raw = self._read_raw(filepath, fields=canonical_set)
+            field_data = self._apply_field_map(raw)
             with h5py.File(filepath, "r") as f:
                 grid = self._resolve_grid(f, filepath)
                 normalization = self._resolve_normalization(f)
@@ -306,7 +317,7 @@ class SimpleReader:
             species = self._config.species
 
         return FieldDataset.from_arrays(
-            fields,
+            field_data,
             grid,
             normalization,
             species=species,
@@ -317,6 +328,8 @@ class SimpleReader:
     def _read_raw(
         self,
         filepath: Path,
+        *,
+        fields: set[str] | None = None,
     ) -> dict[str, FloatArray]:
         r"""Read raw arrays from a single file.
 
@@ -334,6 +347,10 @@ class SimpleReader:
         ----------
         filepath : Path
             Full path to the data file.
+        fields : set[str] | None
+            Canonical field names to read.  When ``None``, read all.
+            Only used by the base-class implementation; subclass
+            overrides may ignore this parameter.
 
         Returns
         -------
@@ -343,8 +360,8 @@ class SimpleReader:
         with h5py.File(filepath, "r") as f:
             group = self._resolve_fields_group(f)
             if self._field_map is not None:
-                return self._read_mapped_native(group)
-            return self._read_all_arrays(group)
+                return self._read_mapped_native(group, fields=fields)
+            return self._read_all_arrays(group, fields=fields)
 
     def _apply_field_map(
         self,
@@ -384,39 +401,56 @@ class SimpleReader:
     def _read_mapped_native(
         self,
         group: h5py.Group | h5py.File,
+        *,
+        fields: set[str] | None = None,
     ) -> dict[str, FloatArray]:
-        """Read all datasets from the group, return native names.
+        """Read datasets from the group, return native names.
 
         Mapped fields are included unconditionally.  Unmapped fields
         are included only when they have ndim >= 2 (skipping scalars
         and 1-D coordinate arrays).
+
+        When *fields* is given (canonical names), only datasets whose
+        canonical name is in the set are read.
         """
         assert self._field_map is not None
         mapped_native = set(self._field_map.keys())
-        fields: dict[str, FloatArray] = {}
+        result: dict[str, FloatArray] = {}
         for name in group:
             ds = group[name]
             if not isinstance(ds, h5py.Dataset):
                 continue
             if name not in mapped_native and ds.ndim < 2:
                 continue
-            fields[name] = np.asarray(ds, dtype=np.float64)
-        return fields
+            if fields is not None:
+                canonical = self._field_map.get(name, name)
+                if canonical not in fields:
+                    continue
+            result[name] = np.asarray(ds, dtype=np.float64)
+        return result
 
     def _read_all_arrays(
         self,
         group: h5py.Group | h5py.File,
+        *,
+        fields: set[str] | None = None,
     ) -> dict[str, FloatArray]:
-        """Read all datasets with ndim >= 2 (skip scalars, coords)."""
-        fields: dict[str, FloatArray] = {}
+        """Read datasets with ndim >= 2 (skip scalars, coords).
+
+        When *fields* is given (canonical names — same as dataset names
+        when no ``field_map``), only matching datasets are read.
+        """
+        result: dict[str, FloatArray] = {}
         for name in group:
             ds = group[name]
             if not isinstance(ds, h5py.Dataset):
                 continue
             if ds.ndim < 2:
                 continue
-            fields[name] = np.asarray(ds, dtype=np.float64)
-        return fields
+            if fields is not None and name not in fields:
+                continue
+            result[name] = np.asarray(ds, dtype=np.float64)
+        return result
 
     def _resolve_grid(
         self,

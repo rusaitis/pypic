@@ -46,8 +46,7 @@ def can_read_confidence(path: Path) -> float:
     if score == 0.0:
         # Only check heavier patterns if no strong signal yet
         has_fields_dir = next(
-            (d for d in path.iterdir()
-             if d.is_dir() and d.name.startswith("Fields_")),
+            (d for d in path.iterdir() if d.is_dir() and d.name.startswith("Fields_")),
             None,
         )
         if has_fields_dir is not None:
