@@ -10,6 +10,8 @@ import numpy as np
 from scipy import constants
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from pypic.types import Numeric, Vector3
 
 _QUANTITIES = frozenset({"length", "time", "velocity", "b_field", "e_field", "density"})
@@ -229,6 +231,39 @@ class Normalization:
         ref: float = getattr(self, f"{quantity}_ref")
         return ref
 
+    def si_factor(self, quantity: str) -> float:
+        r"""Return the SI conversion factor for a physical quantity.
+
+        Handles both base quantities (``"length"``, ``"b_field"``, etc.) and
+        compound quantities (``"pressure"``, ``"frequency"``, etc.) that are
+        products of base reference values.
+
+        Parameters
+        ----------
+        quantity : str
+            Physical quantity name — base or compound.
+
+        Returns
+        -------
+        float
+            Multiplicative factor: ``value_si = value_code * si_factor``.
+
+        Examples
+        --------
+        >>> Normalization.identity().si_factor("velocity")
+        1.0
+        >>> Normalization.identity().si_factor("dimensionless")
+        1.0
+        """
+        if quantity in _QUANTITIES:
+            return self._reference_value(quantity)
+        try:
+            return _COMPOUND_FACTORS[quantity](self)
+        except KeyError:
+            valid = sorted(_QUANTITIES | _COMPOUND_FACTORS.keys())
+            msg = f"Unknown quantity {quantity!r}. Valid: {valid}"
+            raise ValueError(msg) from None
+
     def normalize(self, quantity: str, x: Numeric) -> Numeric:
         r"""Convert a physical quantity from SI to code units.
 
@@ -278,6 +313,19 @@ class Normalization:
         5.0
         """
         return x * self._reference_value(quantity)
+
+
+_COMPOUND_FACTORS: dict[str, Callable[[Normalization], float]] = {
+    "dimensionless": lambda n: 1.0,
+    "pressure": lambda n: n.density_ref * n.mass_ref * n.velocity_ref**2,
+    "temperature": lambda n: n.mass_ref * n.velocity_ref**2,
+    "energy_density": lambda n: n.density_ref * n.mass_ref * n.velocity_ref**2,
+    "current_density": lambda n: n.charge_ref * n.density_ref * n.velocity_ref,
+    "frequency": lambda n: 1.0 / n.time_ref,
+    "mass_density": lambda n: n.density_ref * n.mass_ref,
+    "charge_density": lambda n: n.charge_ref * n.density_ref,
+    "poynting_flux": lambda n: n.e_field_ref * n.b_field_ref,
+}
 
 
 @dataclass(frozen=True, slots=True)

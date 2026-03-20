@@ -523,6 +523,81 @@ class FieldDataset:
         merged.update(kwargs)
         return self._wrap_sliced(self._ds.sel(merged, method=method))
 
+    def compute(self, name: str) -> FloatArray:
+        """Compute a derived quantity by name. Returns code units.
+
+        Parameters
+        ----------
+        name : str
+            Derived quantity name (e.g. ``"|B|"``, ``"beta"``, ``"v_A"``).
+            See ``pypic.compute.available_quantities()`` for the full list.
+
+        Returns
+        -------
+        FloatArray
+            Computed array in code units.
+
+        Examples
+        --------
+        >>> import numpy as np
+        >>> from pypic.units import Normalization
+        >>> grid = GridInfo(
+        ...     dimensions=(4, 3, 2), spacing=(1.0, 1.0, 1.0),
+        ...     geometry=CARTESIAN,
+        ... )
+        >>> ds = FieldDataset.from_arrays(
+        ...     {"B1": np.full((4,3,2), 3.0),
+        ...      "B2": np.full((4,3,2), 4.0),
+        ...      "B3": np.zeros((4,3,2))},
+        ...     grid, Normalization.identity(),
+        ... )
+        >>> ds.compute("|B|")[0, 0, 0]
+        np.float64(5.0)
+        """
+        from pypic.compute import compute_field
+
+        return compute_field(name, self)
+
+    def in_si(self, name: str) -> FloatArray:
+        """Return a field or derived quantity in SI units.
+
+        Parameters
+        ----------
+        name : str
+            Field or derived quantity name.
+
+        Returns
+        -------
+        FloatArray
+            Values in SI units.
+        """
+        from pypic.compute import compute_field, field_si_factor
+
+        data = self[name] if self.has_field(name) else compute_field(name, self)
+        factor = field_si_factor(name, self._normalization)
+        if factor == 1.0:
+            return data
+        return data * factor
+
+    def in_units(self, name: str, unit_str: str) -> FloatArray:
+        """Return a field or derived quantity in display units.
+
+        Parameters
+        ----------
+        name : str
+            Field or derived quantity name.
+        unit_str : str
+            Target unit (e.g. ``"nT"``, ``"km/s"``, ``"cm^-3"``).
+
+        Returns
+        -------
+        FloatArray
+            Values in the requested units.
+        """
+        from pypic.compute import display_unit_factor
+
+        return self.in_si(name) / display_unit_factor(unit_str)
+
     def isel(
         self,
         indexers: dict[str, Any] | None = None,

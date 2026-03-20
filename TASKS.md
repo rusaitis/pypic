@@ -60,7 +60,7 @@ Each step produces something testable. No step starts until the previous step's 
 
   **Registry and auto-detection:** Confidence-based `open_simulation()` with `ProbeResult` diagnostics, factory fallback (tries next-best reader if top candidate crashes, `ExceptionGroup` if all fail), `Simulation` facade with `probe_results` introspection, `describe()`, `refresh_steps()`, `first_step`/`last_step`. Selective I/O via `fields=` parameter. `AuxiliaryDataReader` protocol for tabular data. BATSRUS `.h` probe tightened to BATSRUS timestamp pattern (avoids C header false positives). `FieldDataset._resolve_key` suggests close matches on `KeyError`.
 
-- [ ] **Step 13: FieldDataset — compute() and in_units()**
+- [x] **Step 13: FieldDataset — compute() and in_units()**
   `compute(name)` dispatches string to derived function ("|B|", "beta", "v_A", "M_A", "|vort|", "vort1"/"vort2"/"vort3", ...). `in_si(field)` for SI conversion. `in_units(field, unit_str)` for display units ("nT", "km/s").
 
 - [ ] **Step 14: plotting/slices — basic 2D visualization**
@@ -98,6 +98,78 @@ Each step produces something testable. No step starts until the previous step's 
 
 ---
 
+## Phase 6: Regridding & Cross-Model Comparison
+
+- [ ] **Step 19: `pypic.regrid` — uniform-to-uniform interpolation**
+  `regrid(source, target_grid, *, method="linear") -> FieldDataset` using `scipy.interpolate.RegularGridInterpolator`. `align_grids(a, b) -> (FieldDataset, FieldDataset)` regrids both to the finer grid's intersection domain. `common_grid(a, b) -> GridInfo` computes that target. Cartesian only (raise `NotImplementedError` for spherical/cylindrical, matching `operators.py` pattern). NaN-fill outside source domain. Preserves normalization, species, physics metadata.
+  - *Not* a replacement for BATSRUS AMR regridding (block-avg/NN in `batsrus/_grid.py` operates on raw AMR cell data pre-FieldDataset; this module operates on assembled uniform grids via interpolation — different problems, different algorithms).
+
+- [ ] **Step 20: cross-grid comparison diagnostics**
+  `compare_fields(a, b, field, *, metric="l2") -> float` — aligns grids then computes error. `field_comparison_report(a, b, *, fields=None) -> dict[str, dict[str, float]]` — L2 + Linf for all common fields. These are the only diagnostics functions that touch FieldDataset (existing ones are pure-array); justified because cross-grid comparison inherently needs grid metadata.
+
+---
+
+## Phase 7: CLI
+
+- [ ] **Step 21: `pypic.cli` — core subcommands (typer)**
+  `pypic info <path>` (simulation metadata, steps, fields). `pypic fields <path> [--step N]` (canonical + alias field names). `pypic compare <path_a> <path_b> --step N --field FIELD [--metric l2|linf|both]` (numeric comparison, or table for all common fields when `--field` omitted). Entry point: `[project.scripts] pypic = "pypic.cli:app"`. Optional deps: `typer>=0.12`, `rich>=13.0` under `cli` extra.
+
+- [ ] **Step 22: `pypic plot` and `pypic plot-compare` CLI subcommands**
+  `pypic plot <path> --step N --field FIELD [--plane xy|xz|yz] [--index I] [--output FILE]` — reads, selects plane via `PlaneSelection`, resolves derived fields via `compute()`, calls `plot_field_slice`. `pypic plot-compare` — three-panel (A | B | difference). Plane shorthand: `--plane xy` → `PlaneSelection(normal="z")`. Diverging colormap for signed fields, sequential for positive-definite.
+
+---
+
+## Phase 8: VLasiator Reader
+
+- [ ] **Step 23: `pypic.readers.vlasiator` — VLSV reader via analysator**
+  `VLasiatorReader` implementing `SimulationReader`. Two-grid strategy: FSgrid fields (`fg_b`, `fg_e`) read directly as uniform arrays; DCCRG fields (`proton/vg_rho`, `proton/vg_v`, `proton/vg_p`) regridded to uniform at `target_resolution` (default: FSgrid resolution). DCCRG cell IDs encode position + refinement level — decode to (x, y, z, dx) then block-average/NN-repeat (like BATSRUS AMR pattern, not `pypic.regrid` which is for uniform→uniform).
+  Field mapping: `fg_b` → `B1/B2/B3`, `fg_e` → `E1/E2/E3`, `proton/vg_rho` → `n_s0`, `proton/vg_v` → `V1/V2/V3`, `proton/vg_p` (6 components) → pressure tensor. Species auto-detected from VLSV population names. Auto-detection: `.vlsv` extension + file signature. `open_vlasiator()` convenience function. Optional dep: `analysator` under `vlasiator` extra. All tests mock analysator.
+
+---
+
+## Phase 9: Modern I/O Formats
+
+- [ ] **Step 24: `pypic.io` — Zarr export/import for FieldDataset**
+  `to_zarr(fds, path)` leveraging `xr.Dataset.to_zarr()` + pypic metadata as group attrs (grid, normalization, species, physics). `from_zarr(path) -> FieldDataset` reconstructs everything. Round-trip guarantee. Default compression: zstd. Optional dep: `zarr>=3.0` under `zarr` extra.
+  **Field metadata:** `pypic.field_registry` module — dict mapping canonical names → `{units: str, long_name: str}` (e.g., `"B1" → {"units": "normalized", "long_name": "Magnetic field component 1"}`). Applied as xarray DataArray `.attrs` during `FieldDataset.from_arrays()`. Self-describing exports without adopting CF vocabulary (CF has no plasma physics coverage). `in_si()` updates attrs to SI unit strings.
+
+- [ ] **Step 25: `pypic.io` — Parquet/Arrow for ParticleData**
+  `particles_to_parquet(data, path)`, `particles_from_parquet(path) -> ParticleData`, `particles_to_arrow(data) -> pyarrow.Table` (zero-copy), `particles_from_arrow(table, ...) -> ParticleData`. Columnar storage: x/y/z/vx/vy/vz/charge/id columns. Species metadata in Parquet footer. Optional dep: `pyarrow>=17.0` under `arrow` extra.
+
+- [ ] **Step 26: `pypic convert` CLI subcommand**
+  `pypic convert <path> --step N --output DIR [--format zarr|parquet] [--fields F1,F2] [--target-resolution DX]`. Batch mode: `--all-steps`.
+
+---
+
+## Phase 10: Ecosystem Integration
+
+- [ ] **Step 27: `pypic.interop` — yt, PlasmaPy, SpacePy adapters**
+  `pypic.interop.yt`: `to_yt_dataset(fds) -> yt.StreamDataset` — maps canonical fields to yt field tuples, sets domain from GridInfo. Cartesian only.
+  `pypic.interop.plasmpy`: `to_plasmpy_plasma(fds, species_index) -> dict` — extracts density, temperature, |B| as `astropy.units.Quantity` (SI via `normalization.to_si()`). Dict, not PlasmaPy Plasma object (their API is unstable). `validate_against_plasmpy()` for cross-validation of derived quantities.
+  `pypic.interop.spacepy`: `from_spacepy_dm(dm, grid, normalization) -> FieldDataset` — converts SpacePy DataModel (CDF/ISTP) with user-provided grid and field map.
+  Optional deps: `yt>=4.3`, `plasmapy>=2024.7` + `astropy>=6.0`, `spacepy>=0.6` — each under its own extra. Each adapter is import-guarded with helpful install message. All tests mock external libraries.
+
+- [ ] **Step 28: ecosystem documentation page**
+  `docs/ecosystem.md` — positioning guide: pypic (multi-code reader unification + normalization + derived quantities), PlasmaPy (reference formulas + constants), SpacePy (spacecraft/observational data + CDF), yt (AMR visualization + volume rendering). Code examples for each adapter. "When to use which tool" decision guide.
+
+- [ ] **Step 29: `pypic.interop.spase` — SPASE XML metadata export**
+  `to_spase_xml(fds, *, resource_id, contact, description) -> str` generates a SPASE `NumericalData` XML document from FieldDataset metadata. Maps `simulation.toml` sections to SPASE elements: `[model]` → `SimulationRun`, `[grid]` → `SpatialDescription`, `[units]` → `Units` on each Parameter, `[[species]]` → `Particle` parameters, canonical fields → `Parameter` elements with `ParameterKey`/`Name`/`Description`/`Units`. `to_spase_file(fds, path, **kwargs)` writes to disk. No external deps (stdlib `xml.etree.ElementTree`). Enables publishing pypic-processed data to CDAWEB/VHO/CCMC archives. All tests use synthetic FieldDatasets.
+
+**Dependency graph:**
+
+```
+Steps 13-14 (compute/plot) ←── Step 22 (plot CLI)
+                           ←── Step 21 (CLI core) ←── Step 26 (convert CLI)
+Step 19 (regrid) ←── Step 20 (cross-grid diagnostics) ←── Step 21
+                 ←── Step 23 (VLasiator, for DCCRG context)
+Step 5 (FieldDataset) ←── Steps 24, 25 (Zarr/Arrow)
+                      ←── Step 27 (interop adapters)
+```
+
+Recommended implementation order: 19 → 20 → 21 → 22 → 23, with 24/25 parallelizable anytime, 26 after 21+24+25, 27–28 anytime after API stabilizes.
+
+---
+
 ## Summary
 
 | Step | Module | Delivers | Status |
@@ -114,10 +186,21 @@ Each step produces something testable. No step starts until the previous step's 
 | 10 | coordinates | curl, div, grad (Cartesian) | ✅ |
 | 11 | selections | Plane, Box | ✅ |
 | 12 | readers | iPIC3D, BATSRUS, OpenGGCM, Simple readers + registry + auto-detection | ✅ |
-| 13 | fields | compute(), in_units() | — |
+| 13 | fields | compute(), in_units() | ✅ |
 | 14 | plotting | 2D slices, comparison | — |
 | **—** | **—** | **Milestone: daily-use tool** | **—** |
 | 15 | coordinates | Frame transforms | — |
 | 16 | selections | Sphere (NaN masking) | — |
-| 18 | derived | lorentz_factor, magnetization, rel. corrections | — |
 | 17 | docs | MkDocs site | — |
+| 18 | derived | lorentz_factor, magnetization, rel. corrections | — |
+| 19 | regrid | `regrid()`, `align_grids()`, `common_grid()` | — |
+| 20 | diagnostics | `compare_fields()`, `field_comparison_report()` | — |
+| 21 | cli | `info`, `fields`, `compare` subcommands (typer) | — |
+| 22 | cli | `plot`, `plot-compare` subcommands | — |
+| 23 | readers | VLasiator VLSV reader (FSgrid + DCCRG regrid) | — |
+| 24 | io | Zarr export/import for FieldDataset | — |
+| 25 | io | Parquet/Arrow for ParticleData | — |
+| 26 | cli | `convert` subcommand | — |
+| 27 | interop | yt, PlasmaPy, SpacePy thin adapters | — |
+| 28 | docs | Ecosystem positioning page | — |
+| 29 | interop | SPASE XML metadata export | — |
