@@ -397,14 +397,9 @@ class BATSRUSReader:
         # Strip optional leading timestamp
         if ";" in raw:
             raw = raw.split(";", 1)[1].strip()
+        from itertools import takewhile
+
         parts = raw.split()
-        # Skip leading "R" entries (reference coordinate units)
-        # then take n_plot_var entries
-        n_coord_units = 0
-        for p in parts:
-            if p == "R":
-                n_coord_units += 1
-            else:
-                break
+        n_coord_units = sum(1 for _ in takewhile(lambda p: p == "R", parts))
         var_units = parts[n_coord_units : n_coord_units + header.n_plot_var]
         return tuple(var_units)

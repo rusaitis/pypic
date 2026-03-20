@@ -48,10 +48,7 @@ def _sample_config(
         model_type="MHD",
         grid=grid or _sample_grid(),
         normalization=Normalization.identity(),
-        species=(),
         physics={"gamma": 5.0 / 3.0},
-        frame="simulation",
-        metadata={},
     )
 
 
@@ -424,14 +421,6 @@ type = "MHD"
 [grid]
 dimensions = [4, 3, 2]
 spacing = [1.0, 2.0, 3.0]
-origin = [0.0, 0.0, 0.0]
-
-[units]
-system = "SI"
-
-[coordinates]
-geometry = "cartesian"
-frame = "simulation"
 """
         (tmp_path / "simulation.toml").write_text(toml_content)
         reader, config = open_simple(tmp_path)
@@ -459,14 +448,6 @@ type = "PIC"
 [grid]
 dimensions = [4, 3, 2]
 spacing = [1.0, 2.0, 3.0]
-origin = [0.0, 0.0, 0.0]
-
-[units]
-system = "SI"
-
-[coordinates]
-geometry = "cartesian"
-frame = "simulation"
 """
         toml_file = conf_dir / "simulation.toml"
         toml_file.write_text(toml_content)
@@ -514,6 +495,7 @@ class TestCustomReadRaw:
             def _read_raw(
                 self,
                 filepath: Any,
+                **kwargs: Any,
             ) -> dict[str, np.ndarray]:
                 return _make_fields()
 
@@ -541,6 +523,7 @@ class TestCustomReadRaw:
             def _read_raw(
                 self,
                 filepath: Any,
+                **kwargs: Any,
             ) -> dict[str, np.ndarray]:
                 return dict(native_data)
 
@@ -568,6 +551,7 @@ class TestCustomReadRaw:
             def _read_raw(
                 self,
                 filepath: Any,
+                **kwargs: Any,
             ) -> dict[str, np.ndarray]:
                 return _make_fields()
 
@@ -585,6 +569,7 @@ class TestCustomReadRaw:
             def _read_raw(
                 self,
                 filepath: Any,
+                **kwargs: Any,
             ) -> dict[str, np.ndarray]:
                 return _make_fields()
 
@@ -609,6 +594,7 @@ class TestCustomReadRaw:
             def _read_raw(
                 self,
                 filepath: Any,
+                **kwargs: Any,
             ) -> dict[str, np.ndarray]:
                 with h5py.File(filepath, "r") as f:
                     return {

@@ -65,6 +65,10 @@ class IPic3DConfig:
         Output format (``"phdf5"`` or ``"shdf5"``).
     field_output_cycle : int
         Field output frequency (cycles between dumps).
+    field_output_tag : str
+        Space-separated tags controlling which fields are written.
+    particles_output_cycle : int
+        Particle output frequency (cycles between dumps; <=0 = disabled).
     case : str
         Simulation case identifier.
     simulation_name : str
@@ -104,6 +108,8 @@ class IPic3DConfig:
     periodic_z: bool
     write_method: str
     field_output_cycle: int
+    field_output_tag: str
+    particles_output_cycle: int
     case: str
     simulation_name: str
     extra: dict[str, Any] = field(default_factory=dict)  # frozen via __post_init__
@@ -194,6 +200,20 @@ def parse_inp(path: Path) -> IPic3DConfig:
     lz = float(lz_s)
     ns = int(ns_s)
 
+    qom = _parse_array_float(qom_s)
+    if len(qom) != ns:
+        errors.append(
+            ValueError(f"qom has {len(qom)} entries, expected ns={ns}")
+        )
+    for key in ("uth", "vth", "wth", "u0", "v0", "w0"):
+        if key in kv and len(kv[key].split()) != ns:
+            n = len(kv[key].split())
+            errors.append(
+                ValueError(f"{key} has {n} entries, expected ns={ns}")
+            )
+    if errors:
+        raise ExceptionGroup("Validation errors in iPIC3D .inp file", errors)
+
     return IPic3DConfig(
         nxc=nxc,
         nyc=nyc,
@@ -216,7 +236,7 @@ def parse_inp(path: Path) -> IPic3DConfig:
             float(kv.get("B0z", "0.0")),
         ),
         ns=ns,
-        qom=_parse_array_float(qom_s),
+        qom=qom,
         uth=_parse_array_float(kv.get("uth", " ".join(["0.0"] * ns))),
         vth=_parse_array_float(kv.get("vth", " ".join(["0.0"] * ns))),
         wth=_parse_array_float(kv.get("wth", " ".join(["0.0"] * ns))),
@@ -232,6 +252,8 @@ def parse_inp(path: Path) -> IPic3DConfig:
         periodic_z=kv.get("PERIODICZ", "0") == "1",
         write_method=kv.get("WriteMethod", "phdf5"),
         field_output_cycle=int(kv.get("FieldOutputCycle", "0")),
+        field_output_tag=kv.get("FieldOutputTag", ""),
+        particles_output_cycle=int(kv.get("ParticlesOutputCycle", "0")),
         case=kv.get("Case", ""),
         simulation_name=kv.get("SimulationName", ""),
     )
@@ -345,6 +367,8 @@ def parse_settings_hdf(path: Path) -> IPic3DConfig:
         periodic_z=is_periodic_z,
         write_method="shdf5",  # settings.hdf only exists for serial output
         field_output_cycle=0,  # not stored in settings.hdf
+        field_output_tag="",  # not stored in settings.hdf
+        particles_output_cycle=0,  # not stored in settings.hdf
         case="",
         simulation_name="",
     )
@@ -421,6 +445,10 @@ def to_simulation_config(cfg: IPic3DConfig) -> SimulationConfig:
         metadata["simulation_name"] = cfg.simulation_name
     if cfg.field_output_cycle > 0:
         metadata["field_output_cycle"] = cfg.field_output_cycle
+    if cfg.field_output_tag:
+        metadata["field_output_tag"] = cfg.field_output_tag
+    if cfg.particles_output_cycle > 0:
+        metadata["particles_output_cycle"] = cfg.particles_output_cycle
 
     return SimulationConfig(
         model_name="iPIC3D",
@@ -429,7 +457,6 @@ def to_simulation_config(cfg: IPic3DConfig) -> SimulationConfig:
         normalization=Normalization.identity(),
         species=_build_species(cfg),
         physics=physics,
-        frame="simulation",
         metadata=metadata,
     )
 

@@ -101,6 +101,10 @@ class TestAlfvenSpeed:
         result = alfven_speed(np.array([1.0]), np.array([0.0]))
         assert np.isnan(result[0])
 
+    def test_negative_density_gives_nan(self):
+        result = alfven_speed(np.array([1.0]), np.array([-1.0]))
+        assert np.isnan(result[0])
+
 
 class TestEnergyDensities:
     def test_magnetic_energy(self):
@@ -228,6 +232,14 @@ class TestThermodynamics:
         expected = -5.0 * np.log(n)
         result = gyrotropic_entropy(np.array([1.0]), np.array([1.0]), n)
         np.testing.assert_allclose(result, expected, rtol=1e-15)
+
+    def test_entropy_negative_pressure_gives_nan(self):
+        result = entropy(np.array([-1.0]), np.array([1.0]))
+        assert np.isnan(result[0])
+
+    def test_gyrotropic_entropy_negative_pressure_gives_nan(self):
+        result = gyrotropic_entropy(np.array([-1.0]), np.array([1.0]), np.array([1.0]))
+        assert np.isnan(result[0])
 
 
 class TestDefaultParameters:

@@ -51,8 +51,14 @@ Each step produces something testable. No step starts until the previous step's 
 - [x] **Step 11: selections — PlaneSelection and BoxSelection**
   Frozen dataclasses with `apply(data) -> FieldDataset`. `PlaneSelection` (normal, index; `None` = midplane). `BoxSelection` (optional index ranges per axis).
 
-- [x] **Step 12: readers/ipic3d — iPIC3D HDF5 reader**
-  `IPic3DParallelReader` (phdf5), `IPic3DSerialReader` (shdf5), and `IPic3DH5hutReader` (H5hut) implementing `SimulationReader`. Parses native `.inp` and `settings.hdf` configs, maps iPIC3D names to canonical (Bx -> B1), applies 4π Gaussian→SI-rationalized correction for phdf5/shdf5 (H5hut is already SI-rationalized), node-centered grid origin trick. H5hut reader handles ZYX→XYZ transpose, float32→float64 promotion, pressure tensor sign correction, and per-species fields. `ConservedQuantities` parser for both single-file (Format A) and multi-restart (Format B) diagnostics. `open_ipic3d()` auto-detects all three formats. Tested against real example data (2D, 3D, serial, h5hut) with cross-format validation.
+- [x] **Step 12: readers — multi-format reader system**
+  Four readers implementing `SimulationReader`:
+  - **iPIC3D:** `IPic3DParallelReader` (phdf5), `IPic3DSerialReader` (shdf5), `IPic3DH5hutReader` (H5hut). Parses `.inp` and `settings.hdf` configs, maps iPIC3D names to canonical, 4π Gaussian→SI-rationalized correction, node-centered grid origin, ZYX→XYZ transpose, pressure tensor sign correction, per-species fields. `ConservedQuantities` parser (Format A + B). `open_ipic3d()` auto-detects all three formats.
+  - **BATSRUS:** `BATSRUSReader` for IDL per-cell and HDF5 BATL formats. AMR regridding to uniform grid, `target_resolution` parameter, `parse_param_in()`, `parse_header()`. Handles normalized and SI-unit outputs, split-B, geometry propagation.
+  - **OpenGGCM:** `OpenGGCMReader` for Fortran binary 3df files with custom grid parsing.
+  - **SimpleReader:** HDF5 files following the canonical schema directly.
+
+  **Registry and auto-detection:** Confidence-based `open_simulation()` with `ProbeResult` diagnostics, factory fallback (tries next-best reader if top candidate crashes, `ExceptionGroup` if all fail), `Simulation` facade with `probe_results` introspection, `describe()`, `refresh_steps()`, `first_step`/`last_step`. Selective I/O via `fields=` parameter. `AuxiliaryDataReader` protocol for tabular data. BATSRUS `.h` probe tightened to BATSRUS timestamp pattern (avoids C header false positives). `FieldDataset._resolve_key` suggests close matches on `KeyError`.
 
 - [ ] **Step 13: FieldDataset — compute() and in_units()**
   `compute(name)` dispatches string to derived function ("|B|", "beta", "v_A", "M_A", "|vort|", "vort1"/"vort2"/"vort3", ...). `in_si(field)` for SI conversion. `in_units(field, unit_str)` for display units ("nT", "km/s").
@@ -107,7 +113,7 @@ Each step produces something testable. No step starts until the previous step's 
 | 9 | diagnostics | L2 error, div B, field energy | ✅ |
 | 10 | coordinates | curl, div, grad (Cartesian) | ✅ |
 | 11 | selections | Plane, Box | ✅ |
-| 12 | readers | iPIC3D HDF5 reader (phdf5, shdf5, h5hut) + ConservedQuantities | ✅ |
+| 12 | readers | iPIC3D, BATSRUS, OpenGGCM, Simple readers + registry + auto-detection | ✅ |
 | 13 | fields | compute(), in_units() | — |
 | 14 | plotting | 2D slices, comparison | — |
 | **—** | **—** | **Milestone: daily-use tool** | **—** |

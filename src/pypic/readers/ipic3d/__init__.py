@@ -15,9 +15,11 @@ from pypic.readers.ipic3d._conserved import (
     ConservedQuantities,
     conserved_to_tabular,
     load_conserved_quantities,
+    load_species_quantities,
 )
 from pypic.readers.ipic3d._h5hut import IPic3DH5hutReader
 from pypic.readers.ipic3d._parallel import IPic3DParallelReader
+from pypic.readers.ipic3d._particles import detect_particle_steps, read_phdf5_particles
 from pypic.readers.ipic3d._probe import can_read_confidence
 from pypic.readers.ipic3d._serial import IPic3DSerialReader
 
@@ -34,10 +36,13 @@ __all__ = [
     "IPic3DSerialReader",
     "can_read_confidence",
     "conserved_to_tabular",
+    "detect_particle_steps",
     "load_conserved_quantities",
+    "load_species_quantities",
     "open_ipic3d",
     "parse_inp",
     "parse_settings_hdf",
+    "read_phdf5_particles",
     "to_simulation_config",
     "to_toml",
 ]

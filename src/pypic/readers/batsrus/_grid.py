@@ -148,11 +148,15 @@ def regrid_amr_idl(
             cell_dx = dx[ic]
             ratio = round(cell_dx / out_dx)
             idx_start = tuple(
-                round((coords[ic, d] - cell_dx / 2 - global_min[d]) / out_dx)
+                max(0, min(
+                    round((coords[ic, d] - cell_dx / 2 - global_min[d]) / out_dx),
+                    dims[d] - 1,
+                ))
                 for d in range(ndim)
             )
             slices = tuple(
-                slice(idx_start[d], idx_start[d] + ratio) for d in range(ndim)
+                slice(idx_start[d], min(idx_start[d] + ratio, dims[d]))
+                for d in range(ndim)
             )
             for iv, vname in enumerate(var_names):
                 if vname in SKIP_FIELDS:
@@ -175,11 +179,15 @@ def regrid_amr_idl(
                 # Coarse or equal: nearest-neighbor fill
                 ratio = round(cell_dx / out_dx)
                 idx_start = tuple(
-                    round((coords[ic, d] - cell_dx / 2 - global_min[d]) / out_dx)
+                    max(0, min(
+                        round((coords[ic, d] - cell_dx / 2 - global_min[d]) / out_dx),
+                        dims[d] - 1,
+                    ))
                     for d in range(ndim)
                 )
                 slices = tuple(
-                    slice(idx_start[d], idx_start[d] + ratio) for d in range(ndim)
+                    slice(idx_start[d], min(idx_start[d] + ratio, dims[d]))
+                    for d in range(ndim)
                 )
                 for iv, vname in enumerate(var_names):
                     if vname in SKIP_FIELDS:
@@ -357,13 +365,12 @@ def _assemble_hdf5_blocks(
             block_data = batl.fields[vname][ib]
 
             # HDF5 always stores (nK, nJ, nI) even for 2D (nK=1).
-            # Squeeze singleton dimensions from the collapsed axis,
-            # then reverse Fortran order to (x, y[, z]).
-            block_data = block_data.squeeze()
+            # Remove the collapsed axis explicitly, then reverse
+            # Fortran order to (x, y[, z]).
             if ndim == 3:
                 block_data = block_data.transpose(2, 1, 0)
             elif ndim == 2:
-                block_data = block_data.T
+                block_data = np.squeeze(block_data, axis=0).T
 
             if is_coarse:
                 # Upsample: nearest-neighbor repeat

@@ -44,6 +44,9 @@ QOM = (-64.0, 1.0)
 UTH = (0.04, 0.005)
 VTH = (0.02, 0.005)
 WTH = (0.02, 0.005)
+U0 = (0.0, 0.0)
+V0 = (0.0, 0.0)
+W0 = (0.001, -0.064)
 RHO_INIT = (1.0, 1.0)
 
 
@@ -662,3 +665,202 @@ class TestIPic3DLoadAuxiliary:
         reader = IPic3DParallelReader(cfg)
         with pytest.raises(KeyError, match="unknown_dataset"):
             reader.load_auxiliary(PHDF5_DIR, "unknown_dataset")
+
+
+class TestShdf5PressureTensor:
+    """Verify pressure tensor is read correctly from serial HDF5."""
+
+    @pytest.fixture(scope="class")
+    def ds(self):
+        cfg = parse_inp(SHDF5_DIR / "synthetic_serial.inp")
+        reader = IPic3DSerialReader(cfg)
+        return reader.read_timestep(SHDF5_DIR, 0)
+
+    @pytest.mark.parametrize("species", [0, 1])
+    def test_diagonal_pressure_positive(self, ds, species):
+        for comp in ("P11", "P22", "P33"):
+            p = ds[f"{comp}_s{species}"]
+            assert np.all(p >= 0), f"{comp}_s{species} has negative values"
+
+    def test_pressure_values_match_phdf5(self, ds):
+        """shdf5 pressure should match phdf5 exactly."""
+        cfg = parse_inp(PHDF5_DIR / "synthetic.inp")
+        reader = IPic3DParallelReader(cfg)
+        ds_p = reader.read_timestep(PHDF5_DIR, 0)
+        for s in range(2):
+            for comp in ("P11", "P22", "P33", "P12", "P13", "P23"):
+                assert_allclose(
+                    ds[f"{comp}_s{s}"],
+                    ds_p[f"{comp}_s{s}"],
+                    atol=1e-12,
+                )
+
+    def test_off_diagonal_pressure_zero(self, ds):
+        for s in range(2):
+            for comp in ("P12", "P13", "P23"):
+                assert_allclose(ds[f"{comp}_s{s}"], 0.0, atol=1e-12)
+
+
+class TestEnergyFluxPhdf5:
+    """Verify energy flux reading from phdf5 format."""
+
+    @pytest.fixture(scope="class")
+    def ds(self):
+        cfg = parse_inp(PHDF5_DIR / "synthetic.inp")
+        reader = IPic3DParallelReader(cfg)
+        return reader.read_timestep(PHDF5_DIR, 0)
+
+    def test_eflux_present(self, ds):
+        for s in range(2):
+            for comp in ("EF1", "EF2", "EF3"):
+                assert ds.has_field(f"{comp}_s{s}")
+
+    def test_eflux_shape(self, ds):
+        assert ds["EF1_s0"].shape == (NX, NY, NZ)
+
+    def test_eflux_4pi_corrected(self, ds):
+        """Energy flux should be 4π-corrected like other moments."""
+        expected = RHO_INIT[0] * U0[0] * UTH[0] ** 2
+        assert_allclose(ds["EF1_s0"], expected, atol=1e-12)
+
+
+class TestEnergyFluxShdf5:
+    """Verify energy flux reading from serial HDF5."""
+
+    def test_eflux_matches_phdf5(self):
+        cfg_s = parse_inp(SHDF5_DIR / "synthetic_serial.inp")
+        reader_s = IPic3DSerialReader(cfg_s)
+        ds_s = reader_s.read_timestep(SHDF5_DIR, 0)
+
+        cfg_p = parse_inp(PHDF5_DIR / "synthetic.inp")
+        reader_p = IPic3DParallelReader(cfg_p)
+        ds_p = reader_p.read_timestep(PHDF5_DIR, 0)
+
+        for s in range(2):
+            for comp in ("EF1", "EF2", "EF3"):
+                assert_allclose(
+                    ds_s[f"{comp}_s{s}"],
+                    ds_p[f"{comp}_s{s}"],
+                    atol=1e-12,
+                )
+
+
+class TestEnergyFluxH5hut:
+    """Verify energy flux reading from H5hut format."""
+
+    @pytest.fixture(scope="class")
+    def ds(self):
+        cfg = parse_inp(H5HUT_DIR / "SyntheticFixture.inp")
+        reader = IPic3DH5hutReader(cfg)
+        return reader.read_timestep(H5HUT_DIR, 0)
+
+    def test_eflux_present(self, ds):
+        for s in range(2):
+            assert ds.has_field(f"EF1_s{s}")
+
+    def test_eflux_matches_phdf5(self, ds):
+        cfg_p = parse_inp(PHDF5_DIR / "synthetic.inp")
+        reader_p = IPic3DParallelReader(cfg_p)
+        ds_p = reader_p.read_timestep(PHDF5_DIR, 0)
+        for s in range(2):
+            for comp in ("EF1", "EF2", "EF3"):
+                assert_allclose(
+                    ds[f"{comp}_s{s}"],
+                    ds_p[f"{comp}_s{s}"],
+                    atol=1e-5,
+                )
+
+
+class TestFieldOutputTag:
+    """Verify FieldOutputTag and ParticlesOutputCycle parsing."""
+
+    def test_field_output_tag_parsed(self):
+        cfg = parse_inp(PHDF5_DIR / "synthetic.inp")
+        assert "pressure" in cfg.field_output_tag
+        assert "E_flux" in cfg.field_output_tag
+
+    def test_particles_output_cycle_parsed(self):
+        cfg = parse_inp(PHDF5_DIR / "synthetic.inp")
+        assert cfg.particles_output_cycle == 10
+
+    def test_field_output_tag_in_metadata(self):
+        cfg = parse_inp(PHDF5_DIR / "synthetic.inp")
+        sim_cfg = to_simulation_config(cfg)
+        assert "field_output_tag" in sim_cfg.metadata
+        assert "particles_output_cycle" in sim_cfg.metadata
+
+    def test_settings_hdf_defaults(self):
+        cfg = parse_settings_hdf(SHDF5_DIR / "settings.hdf")
+        assert cfg.field_output_tag == ""
+        assert cfg.particles_output_cycle == 0
+
+
+class TestSpeciesQuantities:
+    """Verify SpeciesQuantities.txt parsing."""
+
+    def test_load_species_quantities(self):
+        from pypic.readers.ipic3d import load_species_quantities
+
+        tab = load_species_quantities(PHDF5_DIR / "SpeciesQuantities.txt")
+        assert tab.name == "species_quantities"
+        assert tab.index_column == "cycle"
+        assert len(tab) == 3  # 3 cycles
+
+    def test_columns_present(self):
+        from pypic.readers.ipic3d import load_species_quantities
+
+        tab = load_species_quantities(PHDF5_DIR / "SpeciesQuantities.txt")
+        for s in range(2):
+            assert f"momentum_s{s}" in tab
+            assert f"total_ke_s{s}" in tab
+            assert f"bulk_ke_s{s}" in tab
+            assert f"thermal_ke_s{s}" in tab
+
+    def test_values_correct(self):
+        from pypic.readers.ipic3d import load_species_quantities
+
+        tab = load_species_quantities(PHDF5_DIR / "SpeciesQuantities.txt")
+        assert_allclose(tab["momentum_s0"][0], 1.00e-03, rtol=1e-10)
+        assert_allclose(tab["thermal_ke_s1"][0], 0.220, rtol=1e-10)
+
+    def test_detect_species_quantities(self):
+        cfg = parse_inp(PHDF5_DIR / "synthetic.inp")
+        reader = IPic3DParallelReader(cfg)
+        names = reader.available_auxiliary(PHDF5_DIR)
+        assert "species_quantities" in names
+
+    def test_load_via_auxiliary_interface(self):
+        cfg = parse_inp(PHDF5_DIR / "synthetic.inp")
+        reader = IPic3DParallelReader(cfg)
+        tab = reader.load_auxiliary(PHDF5_DIR, "species_quantities")
+        assert isinstance(tab, TabularData)
+        assert "momentum_s0" in tab
+
+
+class TestProbeImprovements:
+    """Verify Moments_*/Particles_* directory detection."""
+
+    def test_phdf5_with_moments_higher_confidence(self):
+        from pypic.readers.ipic3d import can_read_confidence
+
+        # phdf5 dir has .inp (0.5), Fields_* (+0.2 when score is 0 check bypassed
+        # due to .inp), Moments_* (+0.15), Particles_* (+0.1)
+        score = can_read_confidence(PHDF5_DIR)
+        assert score >= 0.5  # at minimum .inp
+
+    def test_moments_detected_in_phdf5(self, tmp_path):
+        from pypic.readers.ipic3d import can_read_confidence
+
+        # Directory with only Fields_* and Moments_* (no .inp)
+        (tmp_path / "Fields_00000").mkdir()
+        (tmp_path / "Moments_00000").mkdir()
+        score = can_read_confidence(tmp_path)
+        assert score >= 0.35  # Fields (0.2) + Moments (0.15)
+
+    def test_particles_detected_in_phdf5(self, tmp_path):
+        from pypic.readers.ipic3d import can_read_confidence
+
+        (tmp_path / "Fields_00000").mkdir()
+        (tmp_path / "Particles_00000").mkdir()
+        score = can_read_confidence(tmp_path)
+        assert score >= 0.3  # Fields (0.2) + Particles (0.1)

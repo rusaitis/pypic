@@ -317,8 +317,85 @@ def conserved_to_tabular(cq: ConservedQuantities) -> TabularData:
     )
 
 
+def load_species_quantities(path: Path) -> TabularData:
+    """Parse iPIC3D ``SpeciesQuantities.txt`` into a ``TabularData``.
+
+    Format: one row per species per cycle. Columns:
+    ``cycle, species, momentum, total_ke, bulk_ke, thermal_ke``.
+
+    The output pivots per-species data into separate columns:
+    ``cycle, momentum_s0, total_ke_s0, bulk_ke_s0, thermal_ke_s0, ..._s1, ...``
+
+    Parameters
+    ----------
+    path : Path
+        Path to ``SpeciesQuantities.txt`` file.
+
+    Returns
+    -------
+    TabularData
+        Columnar representation with ``index_column="cycle"``.
+
+    Raises
+    ------
+    FileNotFoundError
+        If the file does not exist.
+    """
+    if not path.exists():
+        msg = f"SpeciesQuantities file not found: {path}"
+        raise FileNotFoundError(msg)
+
+    rows: list[list[float]] = []
+    with open(path) as fh:
+        for line in fh:
+            stripped = line.strip()
+            if not stripped or stripped.startswith("#") or stripped.startswith("-"):
+                continue
+            parts = stripped.split()
+            if len(parts) < 6:
+                continue
+            try:
+                rows.append([float(x) for x in parts])
+            except ValueError:
+                continue
+
+    if not rows:
+        msg = f"No data rows found in {path}"
+        raise ValueError(msg)
+
+    data = np.array(rows, dtype=np.float64)
+
+    # Determine species from the species column (col 1)
+    species_ids = sorted(set(int(x) for x in data[:, 1]))
+    cycles = sorted(set(data[:, 0]))
+    n_cycles = len(cycles)
+    cycle_arr = np.array(cycles, dtype=np.float64)
+
+    # Build cycle→row-index mapping per species
+    columns: dict[str, FloatArray] = {"cycle": cycle_arr}
+    for s in species_ids:
+        mask = data[:, 1] == s
+        s_data = data[mask]
+        # Sort by cycle
+        order = np.argsort(s_data[:, 0])
+        s_data = s_data[order]
+        # Ensure same cycle count (truncate to common set)
+        n = min(len(s_data), n_cycles)
+        columns[f"momentum_s{s}"] = s_data[:n, 2]
+        columns[f"total_ke_s{s}"] = s_data[:n, 3]
+        columns[f"bulk_ke_s{s}"] = s_data[:n, 4]
+        columns[f"thermal_ke_s{s}"] = s_data[:n, 5]
+
+    return TabularData(
+        name="species_quantities",
+        columns=columns,
+        index_column="cycle",
+        metadata={"source": "iPIC3D SpeciesQuantities"},
+    )
+
+
 def detect_conserved(path: Path) -> list[str]:
-    """Check whether conserved quantities data exists at *path*.
+    """Check whether auxiliary diagnostic data exists at *path*.
 
     Parameters
     ----------
@@ -328,15 +405,18 @@ def detect_conserved(path: Path) -> list[str]:
     Returns
     -------
     list[str]
-        ``["conserved_quantities"]`` if data found, else ``[]``.
+        Names of available auxiliary datasets.
     """
+    result: list[str] = []
     if (path / "ConservedQuantities.txt").exists():
-        return ["conserved_quantities"]
-    if (path / "info-conserved").is_dir():
+        result.append("conserved_quantities")
+    elif (path / "info-conserved").is_dir():
         cq_files = list((path / "info-conserved").glob("ConservedQuantities*.txt"))
         if cq_files:
-            return ["conserved_quantities"]
-    return []
+            result.append("conserved_quantities")
+    if (path / "SpeciesQuantities.txt").exists():
+        result.append("species_quantities")
+    return result
 
 
 def load_ipic3d_auxiliary(
@@ -361,22 +441,29 @@ def load_ipic3d_auxiliary(
     KeyError
         If *name* is not recognized or data is not found.
     """
-    if name != "conserved_quantities":
-        msg = f"Unknown iPIC3D auxiliary dataset {name!r}"
-        raise KeyError(msg)
+    if name == "conserved_quantities":
+        cq_file = path / "ConservedQuantities.txt"
+        cq_dir = path / "info-conserved"
 
-    cq_file = path / "ConservedQuantities.txt"
-    cq_dir = path / "info-conserved"
+        if cq_file.exists():
+            cq = load_conserved_quantities(cq_file)
+        elif cq_dir.is_dir():
+            cq = load_conserved_quantities(cq_dir)
+        else:
+            msg = (
+                f"No ConservedQuantities data found in {path}. "
+                f"Expected ConservedQuantities.txt or info-conserved/"
+            )
+            raise KeyError(msg)
 
-    if cq_file.exists():
-        cq = load_conserved_quantities(cq_file)
-    elif cq_dir.is_dir():
-        cq = load_conserved_quantities(cq_dir)
-    else:
-        msg = (
-            f"No ConservedQuantities data found in {path}. "
-            f"Expected ConservedQuantities.txt or info-conserved/"
-        )
-        raise KeyError(msg)
+        return conserved_to_tabular(cq)
 
-    return conserved_to_tabular(cq)
+    if name == "species_quantities":
+        sq_file = path / "SpeciesQuantities.txt"
+        if not sq_file.exists():
+            msg = f"No SpeciesQuantities.txt found in {path}"
+            raise KeyError(msg)
+        return load_species_quantities(sq_file)
+
+    msg = f"Unknown iPIC3D auxiliary dataset {name!r}"
+    raise KeyError(msg)

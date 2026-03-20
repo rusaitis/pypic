@@ -13,11 +13,16 @@ from pypic.readers.ipic3d._config import IPic3DConfig, to_simulation_config
 from pypic.readers.ipic3d._conserved import detect_conserved, load_ipic3d_auxiliary
 from pypic.readers.ipic3d._field_map import (
     _FIELD_NAME_MAP,
+    _PHDF5_DIAGONAL_PRESSURE,
+    _PHDF5_EFLUX_MAP,
+    _PHDF5_PRESSURE_MAP,
     compute_totals_and_filter,
     expand_moment_dependencies,
     gaussian_current_to_si,
     gaussian_density_to_si,
+    gaussian_pressure_to_si,
     per_species_canonical,
+    per_species_eflux_canonical,
 )
 
 if TYPE_CHECKING:
@@ -95,10 +100,14 @@ class IPic3DSerialReader:
         global_shape = (cfg.nxc + 1, cfg.nyc + 1, cfg.nzc + 1)
         result = np.zeros(global_shape, dtype=np.float64)
 
-        # Base local sizes (may not divide evenly)
+        # Base local sizes and remainders for uneven MPI decompositions.
+        # iPIC3D gives the first (N % P) ranks one extra cell.
         nxc_base = cfg.nxc // cfg.xlen
         nyc_base = cfg.nyc // cfg.ylen
         nzc_base = cfg.nzc // cfg.zlen
+        nxc_extra = cfg.nxc % cfg.xlen
+        nyc_extra = cfg.nyc % cfg.ylen
+        nzc_extra = cfg.nzc % cfg.zlen
 
         for proc_path in proc_files:
             with h5py.File(proc_path, "r") as f:
@@ -108,9 +117,9 @@ class IPic3DSerialReader:
                 data = np.array(f[group_path][cycle_key])
                 nx_local, ny_local, nz_local = data.shape
 
-                x0 = ix * nxc_base
-                y0 = iy * nyc_base
-                z0 = iz * nzc_base
+                x0 = ix * nxc_base + min(ix, nxc_extra)
+                y0 = iy * nyc_base + min(iy, nyc_extra)
+                z0 = iz * nzc_base + min(iz, nzc_extra)
 
                 result[x0 : x0 + nx_local, y0 : y0 + ny_local, z0 : z0 + nz_local] = (
                     data
@@ -145,6 +154,9 @@ class IPic3DSerialReader:
             Field data with canonical names and 4π corrections applied.
         """
         proc_files = sorted(path.glob("proc*.hdf"))
+        if not proc_files:
+            msg = f"No proc*.hdf files found in {path}"
+            raise FileNotFoundError(msg)
         cycle_key = f"cycle_{step}"
         ns = self._config.ns
         wanted: set[str] | None = set(fields) if fields is not None else None
@@ -178,6 +190,50 @@ class IPic3DSerialReader:
                     proc_files, f"moments/species_{s}/rho", cycle_key
                 )
                 field_data[canon_rho] = gaussian_density_to_si(raw_rho)
+
+            # Pressure tensor (optional — not all shdf5 runs include it)
+            want_p_s = expanded is None or any(
+                f"{cb}_s{s}" in expanded for cb in _PHDF5_PRESSURE_MAP.values()
+            )
+            if want_p_s:
+                for phdf5_name, canon_base in _PHDF5_PRESSURE_MAP.items():
+                    canon = f"{canon_base}_s{s}"
+                    if expanded is not None and canon not in expanded:
+                        continue
+                    group_path = f"moments/species_{s}/{phdf5_name}"
+                    # Check if the dataset exists in proc0
+                    try:
+                        with h5py.File(proc_files[0], "r") as f:
+                            if group_path not in f or cycle_key not in f[group_path]:
+                                continue
+                    except (KeyError, OSError):
+                        continue
+                    data = self._assemble_field(proc_files, group_path, cycle_key)
+                    if (
+                        phdf5_name in _PHDF5_DIAGONAL_PRESSURE
+                        and self._config.qom[s] < 0
+                    ):
+                        data = -data
+                    field_data[canon] = gaussian_pressure_to_si(data)
+
+            # Energy flux (optional)
+            want_ef_s = expanded is None or any(
+                f"{cb}_s{s}" in expanded for cb in _PHDF5_EFLUX_MAP.values()
+            )
+            if want_ef_s:
+                for ef_name, _ef_canon_base in _PHDF5_EFLUX_MAP.items():
+                    canon = per_species_eflux_canonical(ef_name, s)
+                    if expanded is not None and canon not in expanded:
+                        continue
+                    group_path = f"moments/species_{s}/{ef_name}"
+                    try:
+                        with h5py.File(proc_files[0], "r") as f:
+                            if group_path not in f or cycle_key not in f[group_path]:
+                                continue
+                    except (KeyError, OSError):
+                        continue
+                    data = self._assemble_field(proc_files, group_path, cycle_key)
+                    field_data[canon] = gaussian_pressure_to_si(data)
 
         field_data = compute_totals_and_filter(field_data, ns, expanded, wanted)
 

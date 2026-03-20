@@ -12,7 +12,7 @@ import xarray as xr
 from xarray import Dataset
 
 from pypic.coordinates.geometry import (
-    CARTESIAN,  # noqa: F401 — used in doctests
+    CARTESIAN,
     CYLINDRICAL,  # noqa: F401 — used in doctests
     SPHERICAL,  # noqa: F401 — used in doctests
     CoordinateGeometry,
@@ -58,13 +58,15 @@ class GridInfo:
 
     dimensions: tuple[int, ...]
     spacing: tuple[float, ...]
-    origin: tuple[float, ...]
-    geometry: CoordinateGeometry
+    origin: tuple[float, ...] = ()
+    geometry: CoordinateGeometry = CARTESIAN
     dt: float | None = None
     boundary: tuple[str, ...] | None = None
 
     def __post_init__(self) -> None:
         ndim = len(self.dimensions)
+        if not self.origin:
+            object.__setattr__(self, "origin", (0.0,) * ndim)
         if len(self.spacing) != ndim or len(self.origin) != ndim:
             msg = (
                 f"Length mismatch: dimensions({ndim}), "
@@ -77,6 +79,8 @@ class GridInfo:
         for i, s in enumerate(self.spacing):
             if s <= 0:
                 raise ValueError(f"spacing[{i}] must be > 0, got {s}")
+        if self.dt is not None and self.dt <= 0:
+            raise ValueError(f"dt must be > 0, got {self.dt}")
         if self.boundary is not None and len(self.boundary) != ndim:
             msg = (
                 f"boundary length ({len(self.boundary)}) "
@@ -246,7 +250,7 @@ class FieldDataset:
         cls,
         fields: dict[str, FloatArray],
         grid: GridInfo,
-        normalization: Normalization,
+        normalization: Normalization | None = None,
         *,
         species: Sequence[SpeciesInfo] | None = None,
         physics: dict[str, Any] | None = None,
@@ -262,8 +266,8 @@ class FieldDataset:
             ``grid.dimensions``.
         grid : GridInfo
             Grid metadata.
-        normalization : Normalization
-            Unit normalization.
+        normalization : Normalization | None
+            Unit normalization.  Defaults to ``Normalization.identity()``.
         species : Sequence[SpeciesInfo] | None
             Species definitions, if applicable.
         physics : dict[str, Any] | None
@@ -280,17 +284,15 @@ class FieldDataset:
         Examples
         --------
         >>> import numpy as np
-        >>> from pypic.units import Normalization
-        >>> grid = GridInfo(
-        ...     dimensions=(2,), spacing=(1.0,), origin=(0.0,),
-        ...     geometry=CARTESIAN,
-        ... )
-        >>> ds = FieldDataset.from_arrays(
-        ...     {"B1": np.array([1.0, 2.0])}, grid, Normalization.identity(),
-        ... )
+        >>> grid = GridInfo(dimensions=(2,), spacing=(1.0,))
+        >>> ds = FieldDataset.from_arrays({"B1": np.array([1.0, 2.0])}, grid)
         >>> ds["B1"]
         array([1., 2.])
         """
+        if normalization is None:
+            from pypic.units import Normalization as _Norm
+
+            normalization = _Norm.identity()
         ndim = len(grid.dimensions)
         dim_names = list(grid.geometry.axis_names[:ndim])
         coord_arrays = grid.coordinate_arrays()
@@ -368,6 +370,12 @@ class FieldDataset:
         available = sorted(self._ds.data_vars, key=str)
         alias_keys = sorted(self._aliases)
         msg = f"Field {key!r} not found. Available: {available}. Aliases: {alias_keys}."
+        import difflib
+
+        candidates = [str(v) for v in self._ds.data_vars] + list(self._aliases)
+        suggestions = difflib.get_close_matches(key, candidates, n=3, cutoff=0.5)
+        if suggestions:
+            msg += f" Did you mean: {suggestions}?"
         raise KeyError(msg)
 
     def __getitem__(self, key: str) -> FloatArray:
@@ -591,7 +599,6 @@ class SimulationConfig:
     ...     ),
     ...     normalization=Normalization.identity(),
     ...     species=(SpeciesInfo(name="e", charge=-1.0, mass=1.0),),
-    ...     physics={}, frame="simulation", metadata={},
     ... )
     >>> cfg.model_name
     'test'
@@ -601,10 +608,10 @@ class SimulationConfig:
     model_type: str
     grid: GridInfo
     normalization: Normalization
-    species: tuple[SpeciesInfo, ...]
-    physics: dict[str, Any]  # frozen at runtime via __post_init__
-    frame: str
-    metadata: dict[str, Any]  # frozen at runtime via __post_init__
+    species: tuple[SpeciesInfo, ...] = ()
+    physics: dict[str, Any] = field(default_factory=dict)  # frozen via __post_init__
+    frame: str = "simulation"
+    metadata: dict[str, Any] = field(default_factory=dict)  # frozen via __post_init__
 
     def __post_init__(self) -> None:
         # Wrap mutable dicts in read-only proxies to enforce true immutability.
@@ -720,6 +727,201 @@ class TabularData:
         if self.index_column is not None:
             return self.columns[self.index_column]
         return np.arange(len(self), dtype=np.float64)
+
+
+@dataclass(frozen=True, slots=True)
+class ParticleData:
+    r"""Container for particle data from a single species at one timestep.
+
+    Stores position and velocity as ``(N, 3)`` arrays with selective
+    loading: either can be ``None`` if not requested.  The ``charge``
+    array is **always** loaded because per-particle $q$ doubles as a
+    unique particle identifier (each particle's weight is unique at
+    full float64 precision in restart files).
+
+    Parameters
+    ----------
+    species_index : int
+        Zero-based species index.
+    species_name : str
+        Human-readable species name (e.g. ``"electrons"``).
+    position : FloatArray | None
+        Particle positions, shape ``(N, 3)``. ``None`` if not loaded.
+    velocity : FloatArray | None
+        Particle velocities, shape ``(N, 3)``. ``None`` if not loaded.
+    charge : FloatArray
+        Per-particle charge/weight, shape ``(N,)``. Always float64.
+    n_particles : int
+        Total particle count.
+    id : np.ndarray | None
+        Integer particle tracking IDs, shape ``(N,)``. ``None`` if not
+        available or not requested.
+    metadata : dict[str, Any]
+        Source info (file path, format, etc.).
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> pcl = ParticleData(
+    ...     species_index=0, species_name="electrons",
+    ...     position=np.zeros((10, 3)),
+    ...     velocity=np.ones((10, 3)),
+    ...     charge=np.full(10, -1.0),
+    ...     n_particles=10, metadata={},
+    ... )
+    >>> pcl.x.shape
+    (10,)
+    >>> len(pcl)
+    10
+    """
+
+    species_index: int
+    species_name: str
+    position: FloatArray | None
+    velocity: FloatArray | None
+    charge: FloatArray
+    n_particles: int
+    metadata: dict[str, Any]  # frozen at runtime via __post_init__
+    id: np.ndarray | None = None
+
+    def __post_init__(self) -> None:
+        if self.position is None and self.velocity is None:
+            msg = "At least one of position or velocity must be provided"
+            raise ValueError(msg)
+        if self.charge.dtype != np.float64:
+            msg = (
+                f"charge must be float64 (particle ID precision), "
+                f"got {self.charge.dtype}"
+            )
+            raise ValueError(msg)
+        if self.charge.shape != (self.n_particles,):
+            msg = (
+                f"charge shape {self.charge.shape} does not match "
+                f"n_particles ({self.n_particles},)"
+            )
+            raise ValueError(msg)
+        if self.position is not None and self.position.shape != (self.n_particles, 3):
+            msg = (
+                f"position shape {self.position.shape} does not match "
+                f"(n_particles, 3) = ({self.n_particles}, 3)"
+            )
+            raise ValueError(msg)
+        if self.velocity is not None and self.velocity.shape != (self.n_particles, 3):
+            msg = (
+                f"velocity shape {self.velocity.shape} does not match "
+                f"(n_particles, 3) = ({self.n_particles}, 3)"
+            )
+            raise ValueError(msg)
+        if self.id is not None and self.id.shape != (self.n_particles,):
+            msg = (
+                f"id shape {self.id.shape} does not match "
+                f"n_particles ({self.n_particles},)"
+            )
+            raise ValueError(msg)
+        object.__setattr__(self, "metadata", MappingProxyType(dict(self.metadata)))
+
+    @property
+    def x(self) -> FloatArray:
+        """X positions (view into ``position[:, 0]``)."""
+        if self.position is None:
+            msg = "position was not loaded"
+            raise ValueError(msg)
+        return self.position[:, 0]
+
+    @property
+    def y(self) -> FloatArray:
+        """Y positions (view into ``position[:, 1]``)."""
+        if self.position is None:
+            msg = "position was not loaded"
+            raise ValueError(msg)
+        return self.position[:, 1]
+
+    @property
+    def z(self) -> FloatArray:
+        """Z positions (view into ``position[:, 2]``)."""
+        if self.position is None:
+            msg = "position was not loaded"
+            raise ValueError(msg)
+        return self.position[:, 2]
+
+    @property
+    def vx(self) -> FloatArray:
+        """X velocities (view into ``velocity[:, 0]``)."""
+        if self.velocity is None:
+            msg = "velocity was not loaded"
+            raise ValueError(msg)
+        return self.velocity[:, 0]
+
+    @property
+    def vy(self) -> FloatArray:
+        """Y velocities (view into ``velocity[:, 1]``)."""
+        if self.velocity is None:
+            msg = "velocity was not loaded"
+            raise ValueError(msg)
+        return self.velocity[:, 1]
+
+    @property
+    def vz(self) -> FloatArray:
+        """Z velocities (view into ``velocity[:, 2]``)."""
+        if self.velocity is None:
+            msg = "velocity was not loaded"
+            raise ValueError(msg)
+        return self.velocity[:, 2]
+
+    def __len__(self) -> int:
+        return self.n_particles
+
+    def __repr__(self) -> str:
+        loaded = []
+        if self.position is not None:
+            loaded.append("position")
+        if self.velocity is not None:
+            loaded.append("velocity")
+        loaded.append("charge")
+        if self.id is not None:
+            loaded.append("id")
+        return (
+            f"ParticleData({self.species_name!r}, "
+            f"n={self.n_particles:,}, "
+            f"loaded=[{', '.join(loaded)}])"
+        )
+
+
+@runtime_checkable
+class ParticleDataReader(Protocol):
+    """Opt-in protocol for readers that provide particle data.
+
+    Readers implement this alongside ``SimulationReader`` to advertise
+    and load per-species particle arrays (position, velocity, charge).
+    """
+
+    def available_particle_steps(self, path: Path) -> list[int]:
+        """Return sorted timestep indices that have particle data."""
+        ...
+
+    def read_particles(
+        self,
+        path: Path,
+        step: int,
+        species: int,
+        *,
+        columns: Iterable[str] | None = None,
+    ) -> ParticleData:
+        """Load particle data for one species at one timestep.
+
+        Parameters
+        ----------
+        path : Path
+            Simulation output directory.
+        step : int
+            Timestep index.
+        species : int
+            Zero-based species index.
+        columns : Iterable[str] | None
+            Subset of ``{"position", "velocity"}`` to load.
+            ``None`` loads all.  ``charge`` is always loaded.
+        """
+        ...
 
 
 def supports_selective_read(reader: SimulationReader) -> bool:

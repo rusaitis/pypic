@@ -14,7 +14,6 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-import numpy as np
 from scipy import constants
 
 if TYPE_CHECKING:
@@ -108,24 +107,3 @@ def convert_fields_to_si(
     return si
 
 
-def apply_floor(
-    fields: dict[str, FloatArray],
-    density_floor: float = 1e-1,
-) -> None:
-    """Apply a density floor to avoid division by zero.
-
-    OpenGGCM data can have zero density in regions inside the inner
-    boundary.  This sets a minimum value in-place.
-
-    Parameters
-    ----------
-    fields : dict[str, FloatArray]
-        Fields dict (modified in-place).
-    density_floor : float
-        Minimum number density in m⁻³ (default: 0.1 m⁻³).
-    """
-    if "n_s0" in fields:
-        np.maximum(fields["n_s0"], density_floor, out=fields["n_s0"])
-    if "rho_m" in fields:
-        mass_floor = density_floor * constants.m_p
-        np.maximum(fields["rho_m"], mass_floor, out=fields["rho_m"])

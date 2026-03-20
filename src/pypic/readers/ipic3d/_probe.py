@@ -55,4 +55,24 @@ def can_read_confidence(path: Path) -> float:
         if next(path.glob("proc*.hdf"), None) is not None:
             score += 0.2
 
+    # Moments_* and Particles_* directories reinforce phdf5 detection
+    if score > 0.0 and score < 0.8:
+        has_moments = next(
+            (d for d in path.iterdir() if d.is_dir() and d.name.startswith("Moments_")),
+            None,
+        )
+        if has_moments is not None:
+            score += 0.15
+
+        has_particles = next(
+            (
+                d
+                for d in path.iterdir()
+                if d.is_dir() and d.name.startswith("Particles_")
+            ),
+            None,
+        )
+        if has_particles is not None:
+            score += 0.1
+
     return min(score, 1.0)

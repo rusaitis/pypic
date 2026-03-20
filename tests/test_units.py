@@ -114,11 +114,11 @@ class TestSpeciesInfoValidation:
             SpeciesInfo(name="x")
 
     def test_only_charge_raises(self):
-        with pytest.raises(ValueError, match="Must provide"):
+        with pytest.raises(ValueError, match="Incomplete species"):
             SpeciesInfo(name="x", charge=1.0)
 
     def test_only_mass_raises(self):
-        with pytest.raises(ValueError, match="Must provide"):
+        with pytest.raises(ValueError, match="Incomplete species"):
             SpeciesInfo(name="x", mass=1.0)
 
     def test_zero_qom_raises(self):

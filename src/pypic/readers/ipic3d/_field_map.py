@@ -112,6 +112,20 @@ _PHDF5_PRESSURE_MAP: dict[str, str] = {
 
 _PHDF5_DIAGONAL_PRESSURE = {"pXX", "pYY", "pZZ"}
 
+_H5HUT_DIAGONAL_PRESSURE = {"Pxx", "Pyy", "Pzz"}
+
+_PHDF5_EFLUX_MAP: dict[str, str] = {
+    "EFx": "EF1",
+    "EFy": "EF2",
+    "EFz": "EF3",
+}
+
+_H5HUT_EFLUX_MAP: dict[str, str] = {
+    "EFx": "EF1",
+    "EFy": "EF2",
+    "EFz": "EF3",
+}
+
 
 def per_species_pressure_canonical(component: str, species_index: int) -> str:
     """Build canonical per-species pressure tensor field name.
@@ -136,6 +150,32 @@ def per_species_pressure_canonical(component: str, species_index: int) -> str:
     'P23_s1'
     """
     canonical = _PRESSURE_COMPONENT_MAP[component]
+    return f"{canonical}_s{species_index}"
+
+
+def per_species_eflux_canonical(component: str, species_index: int) -> str:
+    """Build canonical per-species energy flux field name.
+
+    Parameters
+    ----------
+    component : str
+        iPIC3D energy flux component (``"EFx"``, ``"EFy"``, ``"EFz"``).
+    species_index : int
+        Zero-based species index.
+
+    Returns
+    -------
+    str
+        Canonical per-species name (e.g. ``"EF1_s0"``, ``"EF2_s1"``).
+
+    Examples
+    --------
+    >>> per_species_eflux_canonical("EFx", 0)
+    'EF1_s0'
+    >>> per_species_eflux_canonical("EFz", 1)
+    'EF3_s1'
+    """
+    canonical = _PHDF5_EFLUX_MAP[component]
     return f"{canonical}_s{species_index}"
 
 

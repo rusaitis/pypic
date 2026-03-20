@@ -221,6 +221,14 @@ class Normalization:
             charge_ref=1.0,
         )
 
+    def _reference_value(self, quantity: str) -> float:
+        """Look up the reference value for *quantity*, or raise ValueError."""
+        if quantity not in _QUANTITIES:
+            msg = f"Unknown quantity {quantity!r}. Valid: {sorted(_QUANTITIES)}"
+            raise ValueError(msg)
+        ref: float = getattr(self, f"{quantity}_ref")
+        return ref
+
     def normalize(self, quantity: str, x: Numeric) -> Numeric:
         r"""Convert a physical quantity from SI to code units.
 
@@ -244,11 +252,7 @@ class Normalization:
         >>> Normalization.identity().normalize("length", 5.0)
         5.0
         """
-        if quantity not in _QUANTITIES:
-            msg = f"Unknown quantity {quantity!r}. Valid: {sorted(_QUANTITIES)}"
-            raise ValueError(msg)
-        ref: float = getattr(self, f"{quantity}_ref")
-        return x / ref
+        return x / self._reference_value(quantity)
 
     def to_si(self, quantity: str, x: Numeric) -> Numeric:
         r"""Convert a physical quantity from code units to SI.
@@ -273,11 +277,7 @@ class Normalization:
         >>> Normalization.identity().to_si("length", 5.0)
         5.0
         """
-        if quantity not in _QUANTITIES:
-            msg = f"Unknown quantity {quantity!r}. Valid: {sorted(_QUANTITIES)}"
-            raise ValueError(msg)
-        ref: float = getattr(self, f"{quantity}_ref")
-        return x * ref
+        return x * self._reference_value(quantity)
 
 
 @dataclass(frozen=True, slots=True)
@@ -455,5 +455,17 @@ class SpeciesInfo:
             msg = "Must provide charge+mass or charge_to_mass (or all three)."
             raise ValueError(msg)
         else:
-            msg = "Must provide charge+mass, charge_to_mass, or all three."
+            provided = [
+                name
+                for name, val in [
+                    ("charge", self.charge),
+                    ("mass", self.mass),
+                    ("charge_to_mass", self.charge_to_mass),
+                ]
+                if val is not None
+            ]
+            msg = (
+                f"Incomplete species parameters: got {', '.join(provided)}. "
+                f"Provide charge+mass, charge_to_mass alone, or all three."
+            )
             raise ValueError(msg)

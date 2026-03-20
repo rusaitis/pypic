@@ -18,6 +18,18 @@ if TYPE_CHECKING:
     from pypic.types import FloatArray
 
 
+def _require_cartesian(geometry: GeometryType, operation: str) -> None:
+    """Raise if *geometry* is not Cartesian."""
+    match geometry:
+        case GeometryType.CARTESIAN:
+            return
+        case GeometryType.SPHERICAL | GeometryType.CYLINDRICAL:
+            msg = f"{operation} not implemented for {geometry.value} geometry"
+            raise NotImplementedError(msg)
+        case _ as unreachable:
+            assert_never(unreachable)
+
+
 def divergence(
     f1: FloatArray,
     f2: FloatArray,
@@ -68,18 +80,12 @@ def divergence(
     >>> np.max(np.abs(divergence(f, f, f, 1.0, 1.0, 1.0)))
     np.float64(0.0)
     """
-    match geometry:
-        case GeometryType.CARTESIAN:
-            df1_d1: FloatArray = np.gradient(f1, d1, axis=0)
-            df2_d2: FloatArray = np.gradient(f2, d2, axis=1)
-            df3_d3: FloatArray = np.gradient(f3, d3, axis=2)
-            result: FloatArray = df1_d1 + df2_d2 + df3_d3
-            return result
-        case GeometryType.SPHERICAL | GeometryType.CYLINDRICAL:
-            msg = f"divergence not implemented for {geometry.value} geometry"
-            raise NotImplementedError(msg)
-        case _ as unreachable:
-            assert_never(unreachable)
+    _require_cartesian(geometry, "divergence")
+    df1_d1: FloatArray = np.gradient(f1, d1, axis=0)
+    df2_d2: FloatArray = np.gradient(f2, d2, axis=1)
+    df3_d3: FloatArray = np.gradient(f3, d3, axis=2)
+    result: FloatArray = df1_d1 + df2_d2 + df3_d3
+    return result
 
 
 def curl(
@@ -139,23 +145,11 @@ def curl(
     >>> np.max(np.abs(c1))
     np.float64(0.0)
     """
-    match geometry:
-        case GeometryType.CARTESIAN:
-            curl_1: FloatArray = np.gradient(f3, d2, axis=1) - np.gradient(
-                f2, d3, axis=2
-            )
-            curl_2: FloatArray = np.gradient(f1, d3, axis=2) - np.gradient(
-                f3, d1, axis=0
-            )
-            curl_3: FloatArray = np.gradient(f2, d1, axis=0) - np.gradient(
-                f1, d2, axis=1
-            )
-            return (curl_1, curl_2, curl_3)
-        case GeometryType.SPHERICAL | GeometryType.CYLINDRICAL:
-            msg = f"curl not implemented for {geometry.value} geometry"
-            raise NotImplementedError(msg)
-        case _ as unreachable:
-            assert_never(unreachable)
+    _require_cartesian(geometry, "curl")
+    curl_1: FloatArray = np.gradient(f3, d2, axis=1) - np.gradient(f2, d3, axis=2)
+    curl_2: FloatArray = np.gradient(f1, d3, axis=2) - np.gradient(f3, d1, axis=0)
+    curl_3: FloatArray = np.gradient(f2, d1, axis=0) - np.gradient(f1, d2, axis=1)
+    return (curl_1, curl_2, curl_3)
 
 
 def gradient(
@@ -203,17 +197,11 @@ def gradient(
     >>> np.max(np.abs(g1))
     np.float64(0.0)
     """
-    match geometry:
-        case GeometryType.CARTESIAN:
-            df_d1: FloatArray = np.gradient(f, d1, axis=0)
-            df_d2: FloatArray = np.gradient(f, d2, axis=1)
-            df_d3: FloatArray = np.gradient(f, d3, axis=2)
-            return (df_d1, df_d2, df_d3)
-        case GeometryType.SPHERICAL | GeometryType.CYLINDRICAL:
-            msg = f"gradient not implemented for {geometry.value} geometry"
-            raise NotImplementedError(msg)
-        case _ as unreachable:
-            assert_never(unreachable)
+    _require_cartesian(geometry, "gradient")
+    df_d1: FloatArray = np.gradient(f, d1, axis=0)
+    df_d2: FloatArray = np.gradient(f, d2, axis=1)
+    df_d3: FloatArray = np.gradient(f, d3, axis=2)
+    return (df_d1, df_d2, df_d3)
 
 
 __all__ = [

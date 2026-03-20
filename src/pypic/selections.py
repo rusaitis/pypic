@@ -19,7 +19,8 @@ class PlaneSelection:
         Axis name perpendicular to the plane (e.g. ``"z"``, ``"θ"``).
     index : int | None
         Integer index along the normal axis. ``None`` selects the
-        midplane (``dimensions[axis] // 2``).
+        midplane (``dimensions[axis] // 2``). For even dimension
+        counts, this selects the lower midpoint.
 
     Examples
     --------

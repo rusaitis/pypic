@@ -100,7 +100,6 @@ def open_openggcm(
         model_type="MHD",
         grid=grid_info,
         normalization=normalization or Normalization.identity(),
-        species=(),
         physics={"gamma": 5.0 / 3.0},
         frame="GSM",
         metadata={

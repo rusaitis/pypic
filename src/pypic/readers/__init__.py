@@ -1,6 +1,7 @@
 """Simulation data readers and the FieldDataset container."""
 
 from pypic.readers._registry import (
+    ProbeResult,
     ReaderEntry,
     Simulation,
     open_simulation,
@@ -13,6 +14,8 @@ from pypic.readers.base import (
     AuxiliaryDataReader,
     FieldDataset,
     GridInfo,
+    ParticleData,
+    ParticleDataReader,
     SimulationConfig,
     SimulationReader,
     TabularData,
@@ -33,9 +36,11 @@ from pypic.readers.ipic3d import (
     IPic3DParallelReader,
     IPic3DSerialReader,
     conserved_to_tabular,
+    detect_particle_steps,
     load_conserved_quantities,
     open_ipic3d,
     parse_inp,
+    read_phdf5_particles,
 )
 from pypic.readers.openggcm import (
     OpenGGCMGrid,
@@ -58,6 +63,9 @@ __all__ = [
     "IPic3DSerialReader",
     "OpenGGCMGrid",
     "OpenGGCMReader",
+    "ParticleData",
+    "ParticleDataReader",
+    "ProbeResult",
     "ReaderEntry",
     "SimpleReader",
     "Simulation",
@@ -65,6 +73,7 @@ __all__ = [
     "SimulationReader",
     "TabularData",
     "conserved_to_tabular",
+    "detect_particle_steps",
     "load_config",
     "load_conserved_quantities",
     "open_batsrus",
@@ -75,6 +84,7 @@ __all__ = [
     "parse_grid_file",
     "parse_inp",
     "parse_param_in",
+    "read_phdf5_particles",
     "register_reader",
     "registered_readers",
     "supports_selective_read",

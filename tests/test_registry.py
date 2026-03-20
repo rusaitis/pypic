@@ -459,10 +459,6 @@ class TestSimulationFacade:
             model_type="PIC",
             grid=grid,
             normalization=norm,
-            species=(),
-            physics={},
-            frame="sim",
-            metadata={},
         )
         sim = Simulation(full_reader, cfg, tmp_path)
 
@@ -508,13 +504,219 @@ class TestSimulationFacade:
             model_type="PIC",
             grid=grid,
             normalization=norm,
-            species=(),
-            physics={},
-            frame="sim",
-            metadata={},
         )
         sim = Simulation(basic_reader, cfg, tmp_path)
 
         # Should read all then filter
         ds = sim.read(0, fields=["B1"])
         assert sorted(ds.field_names()) == ["B1"]
+
+
+class TestBatsrusProbeFilter:
+    def test_c_headers_not_detected(self, tmp_path: Path) -> None:
+        """C/C++ headers (reader.h, config.h) must not trigger BATSRUS."""
+        from pypic.readers.batsrus._probe import can_read_confidence
+
+        (tmp_path / "reader.h").touch()
+        (tmp_path / "config.h").touch()
+        assert can_read_confidence(tmp_path) == 0.0
+
+    def test_batsrus_headers_still_detected(self, tmp_path: Path) -> None:
+        from pypic.readers.batsrus._probe import can_read_confidence
+
+        (tmp_path / "3d__n00000001.h").touch()
+        assert can_read_confidence(tmp_path) >= 0.3
+
+
+class TestProbeResultDiagnostics:
+    def test_failure_message_contains_all_readers(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        _REGISTRY.clear()
+        register_reader("alpha", lambda _: 0.0, _mock_factory)
+        register_reader("beta", lambda _: 0.0, _mock_factory)
+
+        with pytest.raises(FileNotFoundError, match="alpha") as exc_info:
+            open_simulation(tmp_path)
+
+        msg = str(exc_info.value)
+        assert "alpha" in msg
+        assert "beta" in msg
+        assert "0.00" in msg
+
+    def test_probe_exception_shown_in_message(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        _REGISTRY.clear()
+
+        def broken_probe(_p: Path) -> float:
+            raise RuntimeError("disk on fire")
+
+        register_reader("broken", broken_probe, _mock_factory)
+
+        with pytest.raises(FileNotFoundError) as exc_info:
+            open_simulation(tmp_path)
+        assert "RuntimeError" in str(exc_info.value)
+
+
+class TestFactoryFallback:
+    def test_failing_factory_falls_through(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        """If highest-confidence reader's factory crashes, try next."""
+        calls: list[str] = []
+
+        def failing_factory(
+            path: Path,
+            **_kw: Any,
+        ) -> _Result:
+            raise RuntimeError("corrupt config")
+
+        def working_factory(
+            path: Path,
+            **_kw: Any,
+        ) -> _Result:
+            calls.append("working")
+            return _mock_factory(path)
+
+        register_reader("high", lambda _: 0.9, failing_factory)
+        register_reader("low", lambda _: 0.5, working_factory)
+
+        sim = open_simulation(tmp_path)
+        assert calls == ["working"]
+        assert isinstance(sim, Simulation)
+
+    def test_all_factories_fail_raises_exception_group(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        def failing_a(
+            path: Path,
+            **_kw: Any,
+        ) -> _Result:
+            raise ValueError("bad A")
+
+        def failing_b(
+            path: Path,
+            **_kw: Any,
+        ) -> _Result:
+            raise RuntimeError("bad B")
+
+        register_reader("fa", lambda _: 0.8, failing_a)
+        register_reader("fb", lambda _: 0.5, failing_b)
+
+        with pytest.raises(ExceptionGroup) as exc_info:
+            open_simulation(tmp_path)
+        assert len(exc_info.value.exceptions) == 2
+
+
+class TestProbeResultsOnSimulation:
+    def test_auto_detected_has_probe_results(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        register_reader("probe_a", lambda _: 0.5, _mock_factory)
+        register_reader("probe_b", lambda _: 0.0, _mock_factory)
+        sim = open_simulation(tmp_path)
+        assert sim.probe_results is not None
+        names = {pr.name for pr in sim.probe_results}
+        assert "probe_a" in names
+        assert "probe_b" in names
+
+    def test_explicit_reader_has_no_probe_results(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        register_reader("explicit", lambda _: 0.5, _mock_factory)
+        sim = open_simulation(tmp_path, reader="explicit")
+        assert sim.probe_results is None
+
+
+class TestDescribe:
+    def test_contains_key_info(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        from pypic.coordinates.geometry import CARTESIAN
+        from pypic.units import SpeciesInfo
+
+        grid = GridInfo(
+            dimensions=(128, 64, 64),
+            spacing=(0.5, 0.5, 0.5),
+            origin=(0.0, 0.0, 0.0),
+            geometry=CARTESIAN,
+        )
+        cfg = SimulationConfig(
+            model_name="iPIC3D",
+            model_type="PIC",
+            grid=grid,
+            normalization=Normalization.identity(),
+            species=(
+                SpeciesInfo(name="electrons", charge=-1.0, mass=1 / 256),
+                SpeciesInfo(name="ions", charge=1.0, mass=1.0),
+            ),
+        )
+        reader = MagicMock(spec=SimulationReader)
+        sim = Simulation(reader, cfg, tmp_path)
+        desc = sim.describe()
+        assert "iPIC3D" in desc
+        assert "PIC" in desc
+        assert "128 x 64 x 64" in desc
+        assert "electrons" in desc
+        assert "ions" in desc
+
+    def test_steps_shown_only_when_cached(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        register_reader("desc_test", lambda _: 0.5, _mock_factory)
+        sim = open_simulation(tmp_path, reader="desc_test")
+        assert "Steps" not in sim.describe()
+
+        sim.reader.available_timesteps.return_value = [0, 100, 200]
+        _ = sim.steps  # trigger caching
+        assert "Steps" in sim.describe()
+        assert "3 [0..200]" in sim.describe()
+
+
+class TestRefreshSteps:
+    def test_refresh_clears_cache(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        register_reader("refresh", lambda _: 0.5, _mock_factory)
+        sim = open_simulation(tmp_path, reader="refresh")
+        sim.reader.available_timesteps.return_value = [0, 10]
+        assert sim.steps == [0, 10]
+
+        sim.reader.available_timesteps.return_value = [0, 10, 20]
+        # Cached — still old
+        assert sim.steps == [0, 10]
+        # Refresh — gets new
+        assert sim.refresh_steps() == [0, 10, 20]
+
+
+class TestFirstLastStep:
+    def test_values(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        register_reader("fl", lambda _: 0.5, _mock_factory)
+        sim = open_simulation(tmp_path, reader="fl")
+        sim.reader.available_timesteps.return_value = [100, 200, 300]
+        assert sim.first_step == 100
+        assert sim.last_step == 300
+
+    def test_triggers_lazy_discovery(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        register_reader("lazy", lambda _: 0.5, _mock_factory)
+        sim = open_simulation(tmp_path, reader="lazy")
+        sim.reader.available_timesteps.return_value = [0, 50]
+        assert sim._steps is None  # not yet cached
+        _ = sim.first_step
+        assert sim._steps is not None

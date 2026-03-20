@@ -134,9 +134,13 @@ def _parse_model(raw: dict[str, Any]) -> tuple[str, str, dict[str, Any]]:
 def _parse_coordinates(
     raw: dict[str, Any],
 ) -> tuple[CoordinateGeometry, str]:
-    """Build a CoordinateGeometry and frame from ``[coordinates]``."""
+    """Build a CoordinateGeometry and frame from ``[coordinates]``.
+
+    Defaults to Cartesian geometry with ``"simulation"`` frame when
+    the section is missing or empty.
+    """
     if not raw:
-        raise ValueError("[coordinates] section is missing or empty")
+        return GEOMETRY_BY_NAME["cartesian"], "simulation"
     if "geometry" not in raw:
         raise ValueError("[coordinates] missing required key 'geometry'")
     if "frame" not in raw:
@@ -189,9 +193,12 @@ def _parse_grid(raw: dict[str, Any], geometry: CoordinateGeometry) -> GridInfo:
 
 
 def _parse_units(raw: dict[str, Any]) -> Normalization:
-    """Build a Normalization from ``[units]``."""
+    """Build a Normalization from ``[units]``.
+
+    Defaults to identity normalization when the section is missing or empty.
+    """
     if not raw:
-        raise ValueError("[units] section is missing or empty")
+        return Normalization.identity()
     if "system" not in raw:
         raise ValueError("[units] missing required key 'system'")
 

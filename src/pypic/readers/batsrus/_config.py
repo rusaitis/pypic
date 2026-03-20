@@ -111,7 +111,7 @@ def parse_param_in(path: Path) -> BATSRUSConfig:
             i += 2
             continue
 
-        if line == "#GRID" and i + 6 < len(lines):
+        if line == "#GRID" and i + 9 < len(lines):
             n_root[0] = int(_first_token(lines[i + 1]))
             n_root[1] = int(_first_token(lines[i + 2]))
             n_root[2] = int(_first_token(lines[i + 3]))
@@ -285,7 +285,6 @@ def to_simulation_config(
         model_type="MHD",
         grid=grid,
         normalization=normalization,
-        species=(),
         physics=physics,
         frame=frame,
         metadata=meta,

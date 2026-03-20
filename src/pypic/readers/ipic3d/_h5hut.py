@@ -14,6 +14,8 @@ from pypic.readers.ipic3d._config import IPic3DConfig, to_simulation_config
 from pypic.readers.ipic3d._conserved import detect_conserved, load_ipic3d_auxiliary
 from pypic.readers.ipic3d._field_map import (
     _FIELD_NAME_MAP,
+    _H5HUT_DIAGONAL_PRESSURE,
+    _H5HUT_EFLUX_MAP,
     _H5HUT_FIELD_MAP,
     _PRESSURE_COMPONENT_MAP,
     compute_totals_and_filter,
@@ -22,6 +24,7 @@ from pypic.readers.ipic3d._field_map import (
     gaussian_density_to_si,
     gaussian_pressure_to_si,
     per_species_canonical,
+    per_species_eflux_canonical,
     per_species_pressure_canonical,
 )
 
@@ -34,9 +37,6 @@ if TYPE_CHECKING:
 log = logging.getLogger(__name__)
 
 _FIELDS_PATTERN = re.compile(r"-Fields_(\d+)\.h5$")
-
-_DIAGONAL_PRESSURE = {"Pxx", "Pyy", "Pzz"}
-
 
 def _read_field(block: h5py.Group, name: str) -> FloatArray:
     """Read a single field dataset, transpose ZYX→XYZ, promote to float64."""
@@ -138,6 +138,14 @@ class IPic3DH5hutReader:
         with h5py.File(fields_file, "r") as f:
             step_group = f["Step#0"]
             nspec = int(step_group.attrs["nspec"][0])
+            if nspec != self._config.ns:
+                log.warning(
+                    "Species count mismatch: HDF5 has nspec=%d but "
+                    "config has ns=%d; using config value",
+                    nspec,
+                    self._config.ns,
+                )
+                nspec = self._config.ns
             block = step_group["Block"]
             available = set(block.keys())
 
@@ -201,7 +209,7 @@ class IPic3DH5hutReader:
                         data = _read_field(block, p_key)
                         # Negate diagonal for species with negative qom
                         # (iPIC3D stores rho*T which inherits the charge sign)
-                        if pcomp in _DIAGONAL_PRESSURE:
+                        if pcomp in _H5HUT_DIAGONAL_PRESSURE:
                             if s >= len(self._config.qom):
                                 log.warning(
                                     "Species %d in HDF5 exceeds .inp species "
@@ -215,6 +223,17 @@ class IPic3DH5hutReader:
                         # Pressure tensor stored as P/(4π) — Gaussian convention
                         data = gaussian_pressure_to_si(data)
                         field_data[canon] = data
+
+                # Energy flux: EFx_{s} → EF1_s{s}, etc.
+                for efcomp, _ef_canon_base in _H5HUT_EFLUX_MAP.items():
+                    ef_key = f"{efcomp}_{s}"
+                    if ef_key in available:
+                        consumed.add(ef_key)
+                        canon = per_species_eflux_canonical(efcomp, s)
+                        if expanded is not None and canon not in expanded:
+                            continue
+                        data = _read_field(block, ef_key)
+                        field_data[canon] = gaussian_pressure_to_si(data)
 
             # Pass through unknown fields with native names, no conversion
             for native_name in available - consumed:

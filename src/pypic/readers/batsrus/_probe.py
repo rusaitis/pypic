@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import re
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from pathlib import Path
+
+_BATSRUS_H_RE = re.compile(r"_[tn]\d{8}")
 
 
 def can_read_confidence(path: Path) -> float:
@@ -15,7 +18,7 @@ def can_read_confidence(path: Path) -> float:
 
     - ``PARAM.in``: +0.3
     - ``.batl`` files (HDF5 BATL): +0.5
-    - ``.h`` header files: +0.3
+    - ``.h`` header files with BATSRUS timestamp pattern: +0.3
     - ``*_pe*.idl`` per-cell files: +0.2
     - ``.out`` / ``.outs`` merged files: +0.3
 
@@ -40,7 +43,7 @@ def can_read_confidence(path: Path) -> float:
     if next(path.glob("*.batl"), None) is not None:
         score += 0.5
 
-    if next(path.glob("*.h"), None) is not None:
+    if any(_BATSRUS_H_RE.search(f.name) for f in path.glob("*.h")):
         score += 0.3
 
     if next(path.glob("*_pe*.idl"), None) is not None:

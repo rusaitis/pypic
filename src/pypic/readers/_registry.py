@@ -15,6 +15,7 @@ if TYPE_CHECKING:
     from pypic.readers.base import (
         FieldDataset,
         GridInfo,
+        ParticleData,
         SimulationConfig,
         SimulationReader,
         TabularData,
@@ -27,6 +28,25 @@ if TYPE_CHECKING:
 log = logging.getLogger(__name__)
 
 _lock = threading.Lock()
+
+
+@dataclass(frozen=True, slots=True)
+class ProbeResult:
+    """Result of a single reader's format probe.
+
+    Parameters
+    ----------
+    name : str
+        Reader name.
+    confidence : float
+        Confidence score in ``[0.0, 1.0]``.
+    error : str | None
+        Error message if the probe or factory raised, else ``None``.
+    """
+
+    name: str
+    confidence: float
+    error: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -140,7 +160,6 @@ class Simulation:
     ...     ),
     ...     normalization=Normalization.identity(),
     ...     species=(SpeciesInfo(name="e", charge=-1.0, mass=1.0),),
-    ...     physics={}, frame="sim", metadata={},
     ... )
     >>> sim = Simulation(r, cfg, path="/tmp")
     >>> sim.model_name
@@ -154,11 +173,14 @@ class Simulation:
         reader: SimulationReader,
         config: SimulationConfig,
         path: Path | str,
+        *,
+        probe_results: tuple[ProbeResult, ...] | None = None,
     ) -> None:
         self._reader = reader
         self._config = config
         self._path = Path(path)
         self._steps: list[int] | None = None
+        self._probe_results = probe_results
 
     @property
     def reader(self) -> SimulationReader:
@@ -206,11 +228,31 @@ class Simulation:
         return self._config.physics  # type: ignore[return-value]  # MappingProxyType at runtime
 
     @property
+    def probe_results(self) -> tuple[ProbeResult, ...] | None:
+        """Auto-detection probe results, or ``None`` if reader was explicit."""
+        return self._probe_results
+
+    @property
     def steps(self) -> list[int]:
         """Available timestep indices (cached after first access)."""
         if self._steps is None:
             self._steps = self._reader.available_timesteps(self._path)
         return self._steps
+
+    def refresh_steps(self) -> list[int]:
+        """Re-scan for available timesteps, clearing the cache."""
+        self._steps = None
+        return self.steps
+
+    @property
+    def first_step(self) -> int:
+        """First available timestep index."""
+        return self.steps[0]
+
+    @property
+    def last_step(self) -> int:
+        """Last available timestep index."""
+        return self.steps[-1]
 
     def read(
         self,
@@ -238,14 +280,24 @@ class Simulation:
         -------
         FieldDataset
         """
-        from pypic.readers.base import _default_aliases, supports_selective_read
+        from pypic.readers.base import (
+            _CARTESIAN_ALIASES,
+            _CYLINDRICAL_ALIASES,
+            _SPHERICAL_ALIASES,
+            supports_selective_read,
+        )
 
         if fields is None and not kwargs:
             return self._reader.read_timestep(self._path, step)
 
         canonical: set[str] | None = None
         if fields is not None:
-            alias_map = _default_aliases(self._config.grid.geometry)
+            alias_tables: dict[str, dict[str, str]] = {
+                "cartesian": _CARTESIAN_ALIASES,
+                "spherical": _SPHERICAL_ALIASES,
+                "cylindrical": _CYLINDRICAL_ALIASES,
+            }
+            alias_map = alias_tables[self._config.grid.geometry.type.value]
             canonical = {alias_map.get(name, name) for name in fields}
 
         if supports_selective_read(self._reader):
@@ -269,6 +321,55 @@ class Simulation:
         if isinstance(self._reader, AuxiliaryDataReader):
             return self._reader.available_auxiliary(self._path)
         return []
+
+    @property
+    def particle_steps(self) -> list[int]:
+        """Timesteps with particle data, or ``[]`` if unsupported."""
+        from pypic.readers.base import ParticleDataReader
+
+        if isinstance(self._reader, ParticleDataReader):
+            return self._reader.available_particle_steps(self._path)
+        return []
+
+    def particles(
+        self,
+        step: int,
+        species: int,
+        *,
+        columns: Iterable[str] | None = None,
+    ) -> ParticleData:
+        """Load particle data for a species at a timestep.
+
+        Parameters
+        ----------
+        step : int
+            Timestep index.
+        species : int
+            Zero-based species index.
+        columns : Iterable[str] | None
+            Subset of ``{"position", "velocity"}`` to load.
+            ``None`` loads all.  ``charge`` is always loaded.
+
+        Returns
+        -------
+        ParticleData
+
+        Raises
+        ------
+        TypeError
+            If the reader does not support particle data.
+        """
+        from pypic.readers.base import ParticleDataReader
+
+        if isinstance(self._reader, ParticleDataReader):
+            return self._reader.read_particles(
+                self._path, step, species, columns=columns
+            )
+        msg = (
+            f"Reader {type(self._reader).__name__!r} does not support "
+            f"particle data (missing ParticleDataReader protocol)"
+        )
+        raise TypeError(msg)
 
     def auxiliary(self, name: str) -> TabularData:
         """Load a named auxiliary dataset.
@@ -296,6 +397,38 @@ class Simulation:
             f"auxiliary data (missing AuxiliaryDataReader protocol)"
         )
         raise TypeError(msg)
+
+    def describe(self) -> str:
+        """Multi-line summary of the simulation (no I/O).
+
+        Returns
+        -------
+        str
+        """
+        dims = " x ".join(str(d) for d in self.grid.dimensions)
+        spacing = " x ".join(f"{s:.2f}" for s in self.grid.spacing)
+        geom = self.grid.geometry.type.value
+        lines = [
+            f"Simulation: {self.model_name} ({self.model_type})",
+            f"  Path:    {self._path}",
+            f"  Grid:    {dims} ({geom})",
+            f"  Spacing: {spacing}",
+        ]
+        if self._config.species:
+            species_parts = []
+            for sp in self._config.species:
+                if sp.charge_to_mass is not None:
+                    species_parts.append(f"{sp.name} (q/m={sp.charge_to_mass})")
+                else:
+                    species_parts.append(sp.name)
+            lines.append(f"  Species: {', '.join(species_parts)}")
+        if self._steps is not None:
+            if self._steps:
+                step_range = f"{self._steps[0]}..{self._steps[-1]}"
+            else:
+                step_range = "empty"
+            lines.append(f"  Steps:   {len(self._steps)} [{step_range}]")
+        return "\n".join(lines)
 
     def __iter__(self) -> Iterator[SimulationReader | SimulationConfig]:
         """Support ``reader, config = open_simulation(path)``."""
@@ -379,36 +512,56 @@ def open_simulation(
         result = entry.factory(path, **kwargs)
         return Simulation(result[0], result[1], path)
 
-    # Auto-detect: pick highest confidence
+    # Auto-detect: probe all readers, try factories in descending confidence
+    with _lock:
+        registry_snapshot = dict(_REGISTRY)
+    probe_results: list[ProbeResult] = []
     scores: list[tuple[float, str]] = []
-    for name, entry in sorted(_REGISTRY.items()):
+    for name, entry in sorted(registry_snapshot.items()):
         try:
             confidence = entry.can_read_confidence(path)
-        except Exception:
+        except Exception as exc:
+            probe_results.append(ProbeResult(name, 0.0, f"{type(exc).__name__}: {exc}"))
             log.debug(
                 "can_read_confidence %r raised, skipping",
                 name,
                 exc_info=True,
             )
             continue
+        probe_results.append(ProbeResult(name, confidence))
         if confidence > 0.0:
             scores.append((confidence, name))
 
+    frozen_probes = tuple(probe_results)
+
     if not scores:
-        registered = sorted(_REGISTRY)
-        msg = (
-            f"No registered reader recognized {path}. Registered readers: {registered}"
-        )
-        raise FileNotFoundError(msg)
+        lines = [f"No registered reader recognized {path}.", "", "Probe results:"]
+        for pr in sorted(frozen_probes, key=lambda p: p.name):
+            detail = f"  {pr.name}: {pr.confidence:.2f}"
+            if pr.error:
+                detail += f"  ({pr.error})"
+            lines.append(detail)
+        raise FileNotFoundError("\n".join(lines))
 
     # Highest confidence wins; alphabetical tiebreak for determinism
     scores.sort(key=lambda pair: (-pair[0], pair[1]))
-    best_confidence, best_name = scores[0]
-    log.info(
-        "Auto-detected reader %r (confidence %.2f) for %s",
-        best_name,
-        best_confidence,
-        path,
+
+    errors: list[Exception] = []
+    for confidence, name in scores:
+        try:
+            log.info(
+                "Trying reader %r (confidence %.2f) for %s",
+                name,
+                confidence,
+                path,
+            )
+            result = registry_snapshot[name].factory(path, **kwargs)
+            return Simulation(result[0], result[1], path, probe_results=frozen_probes)
+        except Exception as exc:
+            log.warning("Reader %r (confidence=%.2f) failed: %s", name, confidence, exc)
+            errors.append(exc)
+
+    raise ExceptionGroup(
+        f"All candidate readers failed for {path}",
+        errors,
     )
-    result = _REGISTRY[best_name].factory(path, **kwargs)
-    return Simulation(result[0], result[1], path)

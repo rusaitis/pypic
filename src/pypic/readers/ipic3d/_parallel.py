@@ -8,12 +8,13 @@ from typing import TYPE_CHECKING
 import h5py  # type: ignore[import-untyped]
 import numpy as np
 
-from pypic.readers.base import FieldDataset, TabularData
+from pypic.readers.base import FieldDataset, ParticleData, TabularData
 from pypic.readers.ipic3d._config import IPic3DConfig, to_simulation_config
 from pypic.readers.ipic3d._conserved import detect_conserved, load_ipic3d_auxiliary
 from pypic.readers.ipic3d._field_map import (
     _FIELD_NAME_MAP,
     _PHDF5_DIAGONAL_PRESSURE,
+    _PHDF5_EFLUX_MAP,
     _PHDF5_PRESSURE_MAP,
     compute_totals_and_filter,
     expand_moment_dependencies,
@@ -21,7 +22,9 @@ from pypic.readers.ipic3d._field_map import (
     gaussian_density_to_si,
     gaussian_pressure_to_si,
     per_species_canonical,
+    per_species_eflux_canonical,
 )
+from pypic.readers.ipic3d._particles import detect_particle_steps, read_phdf5_particles
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -139,10 +142,11 @@ class IPic3DParallelReader:
                     group = f[f"Moments/species_{s}"]
                     for comp in ("Jx", "Jy", "Jz"):
                         canon = per_species_canonical(comp, s)
-                        if expanded is None or canon in expanded:
-                            field_data[canon] = gaussian_current_to_si(
-                                np.array(group[comp])
-                            )
+                        if expanded is not None and canon not in expanded:
+                            continue
+                        field_data[canon] = gaussian_current_to_si(
+                            np.array(group[comp])
+                        )
 
             # Charge density
             rho_canon = per_species_canonical("rho", s)
@@ -180,6 +184,25 @@ class IPic3DParallelReader:
                                     data = -data
                                 field_data[canon] = gaussian_pressure_to_si(data)
 
+            # Energy flux (optional)
+            want_ef_s = expanded is None or any(
+                f"{cb}_s{s}" in expanded for cb in _PHDF5_EFLUX_MAP.values()
+            )
+            if want_ef_s:
+                ef_path = (
+                    path / f"Moments_{step_str}" / f"E_flux_species_{s}_{step_str}.h5"
+                )
+                if ef_path.exists():
+                    with h5py.File(ef_path, "r") as f:
+                        group = f[f"Moments/species_{s}"]
+                        for phdf5_name, _canon_base in _PHDF5_EFLUX_MAP.items():
+                            canon = per_species_eflux_canonical(phdf5_name, s)
+                            if expanded is not None and canon not in expanded:
+                                continue
+                            if phdf5_name in group:
+                                data = np.array(group[phdf5_name])
+                                field_data[canon] = gaussian_pressure_to_si(data)
+
         field_data = compute_totals_and_filter(field_data, ns, expanded, wanted)
 
         sc = self._sim_config
@@ -191,6 +214,38 @@ class IPic3DParallelReader:
             physics=dict(sc.physics),
             metadata={**dict(sc.metadata), "step": step},
         )
+
+    def available_particle_steps(self, path: Path) -> list[int]:
+        """Return sorted timestep indices that have particle data."""
+        return detect_particle_steps(path)
+
+    def read_particles(
+        self,
+        path: Path,
+        step: int,
+        species: int,
+        *,
+        columns: Iterable[str] | None = None,
+    ) -> ParticleData:
+        """Load particle data for one species at one timestep.
+
+        Parameters
+        ----------
+        path : Path
+            Simulation output directory.
+        step : int
+            Timestep index.
+        species : int
+            Zero-based species index.
+        columns : Iterable[str] | None
+            Subset of ``{"position", "velocity"}`` to load.
+            ``None`` loads all.  ``charge`` is always loaded.
+
+        Returns
+        -------
+        ParticleData
+        """
+        return read_phdf5_particles(path, step, species, self._config, columns=columns)
 
     def available_auxiliary(self, path: Path) -> list[str]:
         """Return names of auxiliary datasets at *path*."""

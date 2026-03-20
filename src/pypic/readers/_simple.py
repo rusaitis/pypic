@@ -13,7 +13,7 @@ To add a reader for your simulation code, either:
 2. **Subclass** and override ``_read_raw`` for non-standard layouts::
 
        class TristanReader(SimpleReader):
-           def _read_raw(self, filepath):
+           def _read_raw(self, filepath, **kwargs):
                with h5py.File(filepath, "r") as f:
                    return {k: np.array(f[k]).T for k in f
                            if isinstance(f[k], h5py.Dataset)}
@@ -270,9 +270,10 @@ class SimpleReader:
 
         canonical_set = set(fields) if fields is not None else None
 
+        raw = self._read_raw(filepath, fields=canonical_set)
+        field_data = self._apply_field_map(raw)
+
         if is_custom:
-            raw = self._read_raw(filepath)
-            field_data = self._apply_field_map(raw)
             if canonical_set is not None:
                 field_data = {k: v for k, v in field_data.items() if k in canonical_set}
             grid = self._grid
@@ -292,8 +293,6 @@ class SimpleReader:
             )
             metadata: dict[str, Any] = {"step": step}
         else:
-            raw = self._read_raw(filepath, fields=canonical_set)
-            field_data = self._apply_field_map(raw)
             with h5py.File(filepath, "r") as f:
                 grid = self._resolve_grid(f, filepath)
                 normalization = self._resolve_normalization(f)
@@ -613,10 +612,16 @@ def open_simple(
         Wraps the reader, config, and path.
     """
     # Deferred to avoid circular import: _registry imports _simple at module level
+    import pathlib
+
     from pypic.readers._registry import Simulation
     from pypic.readers.config import load_config
 
-    path_obj = path if hasattr(path, "glob") else __import__("pathlib").Path(path)
+    path_obj = pathlib.Path(path)
+
+    if path_obj.is_file():
+        msg = f"Expected a directory, got file: {path_obj}. Pass the parent directory."
+        raise ValueError(msg)
 
     # Try simulation.toml first
     if config is None:
@@ -668,9 +673,6 @@ def open_simple(
         model_type=model_type,
         grid=resolved_grid,
         normalization=resolved_norm,
-        species=(),
-        physics={},
-        frame="simulation",
         metadata={"file_pattern": file_pattern},
     )
     reader = SimpleReader(

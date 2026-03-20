@@ -164,6 +164,29 @@ class TestFieldDatasetAccess:
         with pytest.raises(KeyError, match="not found"):
             sample_dataset["nonexistent"]
 
+    def test_did_you_mean_close_match(self, sample_dataset):
+        """Typo 'rho' with 'rho_c' present should suggest close match."""
+        with pytest.raises(KeyError, match="Did you mean") as exc_info:
+            sample_dataset["rho"]
+        assert "rho_c" in str(exc_info.value)
+
+    def test_did_you_mean_alias_suggestion(self):
+        grid = GridInfo(
+            dimensions=(2,), spacing=(1.0,), origin=(0.0,), geometry=CARTESIAN
+        )
+        ds = FieldDataset.from_arrays(
+            {"B1": np.array([1.0, 2.0])}, grid, Normalization.identity()
+        )
+        with pytest.raises(KeyError, match="Did you mean") as exc_info:
+            ds["Bx1"]
+        msg = str(exc_info.value)
+        assert "Bx" in msg or "B1" in msg
+
+    def test_no_suggestion_for_unrelated_key(self, sample_dataset):
+        with pytest.raises(KeyError) as exc_info:
+            sample_dataset["completely_wrong_name"]
+        assert "Did you mean" not in str(exc_info.value)
+
 
 class TestFieldDatasetSlicing:
     def test_isel_scalar_reduces_dim(self, sample_dataset):
@@ -313,7 +336,6 @@ class TestSimulationConfigImmutability:
             normalization=Normalization.identity(),
             species=(SpeciesInfo(name="e", charge=-1.0, mass=1.0),),
             physics={"gamma": 5.0 / 3.0},
-            frame="sim",
             metadata={"run_id": "abc"},
         )
         with pytest.raises(TypeError):
@@ -336,10 +358,7 @@ class TestSimulationConfigImmutability:
                 geometry=CARTESIAN,
             ),
             normalization=Normalization.identity(),
-            species=(),
             physics=orig,
-            frame="sim",
-            metadata={},
         )
         orig["gamma"] = 999
         assert cfg.physics["gamma"] == pytest.approx(5.0 / 3.0)

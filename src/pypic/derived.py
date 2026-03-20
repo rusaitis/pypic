@@ -206,7 +206,8 @@ def alfven_speed(
     b : NDArray
         Magnetic field magnitude in normalized units.
     rho_m : NDArray
-        Mass density in normalized units.
+        Mass density in normalized units. Must be non-negative;
+        negative values produce NaN (via ``sqrt``).
 
     Returns
     -------
@@ -219,7 +220,7 @@ def alfven_speed(
     >>> alfven_speed(np.array([1.0]), np.array([4.0]))
     array([0.5])
     """
-    return _safe_divide(b, np.sqrt(np.maximum(rho_m, 0.0)))
+    return _safe_divide(b, np.sqrt(rho_m))
 
 
 def magnetic_energy_density(
@@ -524,7 +525,7 @@ def entropy(
     array([0.])
     """
     ratio = _safe_divide(pressure, density**gamma)
-    return np.where(ratio > 0, np.log(np.maximum(ratio, np.finfo(float).tiny)), np.nan)
+    return np.where(ratio > 0, np.log(ratio), np.nan)
 
 
 def gyrotropic_entropy(
@@ -561,7 +562,7 @@ def gyrotropic_entropy(
     array([0.])
     """
     ratio = _safe_divide(p_parallel * p_perpendicular**2, n**5)
-    return np.where(ratio > 0, np.log(np.maximum(ratio, np.finfo(float).tiny)), np.nan)
+    return np.where(ratio > 0, np.log(ratio), np.nan)
 
 
 def _unit_vector(
@@ -571,7 +572,9 @@ def _unit_vector(
 ) -> tuple[FloatArray, FloatArray, FloatArray]:
     """Compute the unit vector of a 3-component vector field.
 
-    Returns nan where the magnitude is zero.
+    Returns NaN where the magnitude is zero. These NaN values propagate
+    into downstream consumers (``parallel_pressure``, ``perpendicular_pressure``,
+    ``agyrotropy``) in zero-field regions.
     """
     mag = _vector_magnitude(b1, b2, b3)
     return _safe_divide(b1, mag), _safe_divide(b2, mag), _safe_divide(b3, mag)
