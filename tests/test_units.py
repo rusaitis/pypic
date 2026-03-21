@@ -142,6 +142,39 @@ class TestSpeciesInfoValidation:
             SpeciesInfo(name="bad", charge=-1.0, mass=-1.0)
 
 
+class TestCompoundSiFactors:
+    """Normalization.si_factor() handles compound quantity types correctly."""
+
+    @pytest.mark.parametrize(
+        ("quantity", "expected_fn"),
+        [
+            ("dimensionless", lambda n: 1.0),
+            ("pressure", lambda n: n.density_ref * n.mass_ref * n.velocity_ref**2),
+            ("temperature", lambda n: n.mass_ref * n.velocity_ref**2),
+            (
+                "energy_density",
+                lambda n: n.density_ref * n.mass_ref * n.velocity_ref**2,
+            ),
+            (
+                "current_density",
+                lambda n: n.charge_ref * n.density_ref * n.velocity_ref,
+            ),
+            ("frequency", lambda n: 1.0 / n.time_ref),
+            ("mass_density", lambda n: n.density_ref * n.mass_ref),
+            ("charge_density", lambda n: n.charge_ref * n.density_ref),
+            ("poynting_flux", lambda n: n.e_field_ref * n.b_field_ref),
+        ],
+    )
+    def test_compound_factor(self, norm, quantity, expected_fn):
+        result = norm.si_factor(quantity)
+        expected = expected_fn(norm)
+        assert result == pytest.approx(expected, rel=1e-12)
+
+    def test_unknown_compound_raises(self, norm):
+        with pytest.raises(ValueError, match="Unknown quantity"):
+            norm.si_factor("flux_capacitance")
+
+
 class TestNormalizationValidation:
     def test_zero_ref_raises(self):
         with pytest.raises(ValueError, match="length_ref must be positive"):

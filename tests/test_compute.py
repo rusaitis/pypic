@@ -12,62 +12,8 @@ from pypic.compute import (
 )
 from pypic.coordinates.geometry import SPHERICAL
 from pypic.readers.base import FieldDataset, GridInfo
-from pypic.units import Normalization, SpeciesInfo
-
-
-def _make_grid(shape: tuple[int, ...] = (4, 3, 2)) -> GridInfo:
-    return GridInfo(
-        dimensions=shape,
-        spacing=(1.0,) * len(shape),
-    )
-
-
-def _make_dataset(
-    fields: dict[str, np.ndarray],
-    *,
-    shape: tuple[int, ...] = (4, 3, 2),
-    species: list[SpeciesInfo] | None = None,
-    physics: dict | None = None,
-    normalization: Normalization | None = None,
-) -> FieldDataset:
-    grid = _make_grid(shape)
-    return FieldDataset.from_arrays(
-        fields,
-        grid,
-        normalization or Normalization.identity(),
-        species=species,
-        physics=physics,
-    )
-
-
-def _uniform_fields(shape: tuple[int, ...] = (4, 3, 2)) -> dict[str, np.ndarray]:
-    """Minimal field set for many derived quantities."""
-    return {
-        "B1": np.full(shape, 3.0),
-        "B2": np.full(shape, 4.0),
-        "B3": np.zeros(shape),
-        "E1": np.ones(shape),
-        "E2": np.full(shape, 2.0),
-        "E3": np.full(shape, 3.0),
-        "V1": np.full(shape, 0.6),
-        "V2": np.full(shape, 0.8),
-        "V3": np.zeros(shape),
-        "J1": np.ones(shape),
-        "J2": np.ones(shape),
-        "J3": np.ones(shape),
-        "rho_m": np.full(shape, 4.0),
-        "P": np.full(shape, 2.0),
-        "Pe": np.full(shape, 1.0),
-        "Pi": np.full(shape, 1.0),
-        "n_s0": np.full(shape, 10.0),
-        "n_s1": np.full(shape, 10.0),
-        "Te": np.full(shape, 0.5),
-        "Ti": np.full(shape, 0.5),
-    }
-
-
-ELECTRONS = SpeciesInfo(name="electrons", charge=-1.0, mass=1 / 256)
-IONS = SpeciesInfo(name="ions", charge=1.0, mass=1.0)
+from pypic.units import Normalization
+from tests._helpers import ELECTRONS, IONS, make_test_dataset
 
 
 class TestRegistryIntegrity:
@@ -110,7 +56,7 @@ class TestMagnitudes:
             fields[1]: np.full(shape, 4.0),
             fields[2]: np.zeros(shape),
         }
-        ds = _make_dataset(data, shape=shape)
+        ds = make_test_dataset(data, shape=shape)
         result = compute_field(name, ds)
         np.testing.assert_allclose(result, 5.0, rtol=1e-15)
 
@@ -125,7 +71,7 @@ class TestDependencyChains:
             "B3": np.zeros(shape),
             "P": np.full(shape, 25.0),
         }
-        ds = _make_dataset(data, shape=shape)
+        ds = make_test_dataset(data, shape=shape)
         result = compute_field("beta", ds)
         # beta = 2P / B^2 = 2*25 / 25 = 2
         np.testing.assert_allclose(result, 2.0, rtol=1e-15)
@@ -142,7 +88,7 @@ class TestDependencyChains:
             "B3": np.zeros(shape),
             "rho_m": np.full(shape, 1.0),
         }
-        ds = _make_dataset(data, shape=shape)
+        ds = make_test_dataset(data, shape=shape)
         result = compute_field("M_A", ds)
         # |V| = 5, v_A = 1/sqrt(1) = 1, M_A = 5
         np.testing.assert_allclose(result, 5.0, rtol=1e-15)
@@ -155,7 +101,7 @@ class TestDependencyChains:
             "V2": np.ones(shape),
             "V3": np.ones(shape),
         }
-        ds = _make_dataset(data, shape=shape)
+        ds = make_test_dataset(data, shape=shape)
         result = compute_field("|vort|", ds)
         # Uniform velocity → zero vorticity
         np.testing.assert_allclose(result, 0.0, atol=1e-15)
@@ -165,7 +111,7 @@ class TestDirectFieldPassthrough:
     def test_existing_field_returned_directly(self):
         shape = (2, 2, 2)
         b1 = np.full(shape, 42.0)
-        ds = _make_dataset({"B1": b1}, shape=shape)
+        ds = make_test_dataset({"B1": b1}, shape=shape)
         result = compute_field("B1", ds)
         np.testing.assert_array_equal(result, b1)
 
@@ -174,7 +120,7 @@ class TestSpeciesDependent:
     def test_omega_pe(self):
         shape = (2, 2, 2)
         data = {"n_s0": np.full(shape, 4.0)}
-        ds = _make_dataset(
+        ds = make_test_dataset(
             data,
             shape=shape,
             species=[ELECTRONS, IONS],
@@ -190,7 +136,7 @@ class TestSpeciesDependent:
             "B2": np.zeros(shape),
             "B3": np.zeros(shape),
         }
-        ds = _make_dataset(
+        ds = make_test_dataset(
             data,
             shape=shape,
             species=[ELECTRONS, IONS],
@@ -202,7 +148,7 @@ class TestSpeciesDependent:
     def test_skin_depth(self):
         shape = (2, 2, 2)
         data = {"n_s0": np.full(shape, 1.0)}
-        ds = _make_dataset(
+        ds = make_test_dataset(
             data,
             shape=shape,
             species=[ELECTRONS, IONS],
@@ -215,7 +161,7 @@ class TestSpeciesDependent:
     def test_thermal_speed(self):
         shape = (2, 2, 2)
         data = {"Te": np.full(shape, 4.0)}
-        ds = _make_dataset(
+        ds = make_test_dataset(
             data,
             shape=shape,
             species=[ELECTRONS, IONS],
@@ -232,7 +178,7 @@ class TestSpeciesDependent:
             "B2": np.zeros(shape),
             "B3": np.zeros(shape),
         }
-        ds = _make_dataset(
+        ds = make_test_dataset(
             data,
             shape=shape,
             species=[ELECTRONS, IONS],
@@ -247,7 +193,7 @@ class TestSpeciesDependent:
             "Te": np.full(shape, 1.0),
             "n_s0": np.full(shape, 1.0),
         }
-        ds = _make_dataset(
+        ds = make_test_dataset(
             data,
             shape=shape,
             species=[ELECTRONS, IONS],
@@ -259,7 +205,7 @@ class TestSpeciesDependent:
     def test_missing_species_raises(self):
         shape = (2, 2, 2)
         data = {"n_s0": np.full(shape, 1.0)}
-        ds = _make_dataset(data, shape=shape)
+        ds = make_test_dataset(data, shape=shape)
         with pytest.raises(ValueError, match="requires species"):
             compute_field("omega_pe", ds)
 
@@ -272,7 +218,7 @@ class TestGridDependent:
             "B2": np.ones(shape),
             "B3": np.ones(shape),
         }
-        ds = _make_dataset(data, shape=shape)
+        ds = make_test_dataset(data, shape=shape)
         result = compute_field("div_B", ds)
         np.testing.assert_allclose(result, 0.0, atol=1e-15)
 
@@ -283,7 +229,7 @@ class TestGridDependent:
             "B2": np.ones(shape),
             "B3": np.ones(shape),
         }
-        ds = _make_dataset(data, shape=shape)
+        ds = make_test_dataset(data, shape=shape)
         result = compute_field("curl_B1", ds)
         np.testing.assert_allclose(result, 0.0, atol=1e-15)
 
@@ -295,7 +241,7 @@ class TestPhysicsConfig:
             "P": np.full(shape, 3.0),
             "rho_m": np.full(shape, 3.0),
         }
-        ds = _make_dataset(data, shape=shape, physics={"gamma": 2.0})
+        ds = make_test_dataset(data, shape=shape, physics={"gamma": 2.0})
         result = compute_field("c_s", ds)
         # c_s = sqrt(gamma * P / rho_m) = sqrt(2 * 3 / 3) = sqrt(2)
         np.testing.assert_allclose(result, np.sqrt(2.0), rtol=1e-15)
@@ -306,7 +252,7 @@ class TestPhysicsConfig:
             "P": np.full(shape, 5.0),
             "rho_m": np.full(shape, 3.0),
         }
-        ds = _make_dataset(data, shape=shape)
+        ds = make_test_dataset(data, shape=shape)
         result = compute_field("c_s", ds)
         # c_s = sqrt(5/3 * 5 / 3) = sqrt(25/9) = 5/3
         np.testing.assert_allclose(result, 5.0 / 3.0, rtol=1e-14)
@@ -323,7 +269,7 @@ class TestMultiComponent:
             "B2": np.full(shape, 1.0),
             "B3": np.zeros(shape),
         }
-        ds = _make_dataset(data, shape=shape)
+        ds = make_test_dataset(data, shape=shape)
         s3 = compute_field("S3", ds)
         np.testing.assert_allclose(s3, 1.0, rtol=1e-15)
 
@@ -337,7 +283,7 @@ class TestMultiComponent:
             "V2": np.ones(shape),
             "V3": np.ones(shape),
         }
-        ds = _make_dataset(data, shape=shape)
+        ds = make_test_dataset(data, shape=shape)
         result = compute_field("vort2", ds)
         np.testing.assert_allclose(result, 0.0, atol=1e-15)
 
@@ -350,7 +296,7 @@ class TestComputeAliases:
             "B2": np.ones(shape),
             "B3": np.ones(shape),
         }
-        ds = _make_dataset(data, shape=shape)
+        ds = make_test_dataset(data, shape=shape)
         result_alias = compute_field("curl_Bx", ds)
         result_canonical = compute_field("curl_B1", ds)
         np.testing.assert_array_equal(result_alias, result_canonical)
@@ -364,14 +310,14 @@ class TestFieldDatasetMethods:
             "B2": np.full(shape, 4.0),
             "B3": np.zeros(shape),
         }
-        ds = _make_dataset(data, shape=shape)
+        ds = make_test_dataset(data, shape=shape)
         result = ds.compute("|B|")
         np.testing.assert_allclose(result, 5.0, rtol=1e-15)
 
     def test_in_si_with_identity(self):
         shape = (2, 2, 2)
         data = {"B1": np.full(shape, 5.0)}
-        ds = _make_dataset(data, shape=shape)
+        ds = make_test_dataset(data, shape=shape)
         result = ds.in_si("B1")
         np.testing.assert_allclose(result, 5.0, rtol=1e-15)
 
@@ -389,7 +335,7 @@ class TestFieldDatasetMethods:
             charge_ref=1.0,
         )
         data = {"B1": np.full(shape, 3.0)}
-        ds = _make_dataset(data, shape=shape, normalization=norm)
+        ds = make_test_dataset(data, shape=shape, normalization=norm)
         result = ds.in_si("B1")
         np.testing.assert_allclose(result, 3.0 * b_ref, rtol=1e-15)
 
@@ -402,7 +348,7 @@ class TestFieldDatasetMethods:
             "B2": np.zeros(shape),
             "B3": np.zeros(shape),
         }
-        ds = _make_dataset(data, shape=shape, normalization=norm)
+        ds = make_test_dataset(data, shape=shape, normalization=norm)
         beta = ds.in_si("beta")
         beta_code = compute_field("beta", ds)
         # Dimensionless → same in SI
@@ -422,13 +368,13 @@ class TestFieldDatasetMethods:
             charge_ref=1.0,
         )
         data = {"B1": np.full(shape, 5.0)}
-        ds = _make_dataset(data, shape=shape, normalization=norm)
+        ds = make_test_dataset(data, shape=shape, normalization=norm)
         result = ds.in_units("B1", "nT")
         # 5 code * 1e-6 T / 1e-9 = 5000 nT
         np.testing.assert_allclose(result, 5000.0, rtol=1e-15)
 
     def test_in_units_unknown_raises(self):
-        ds = _make_dataset({"B1": np.ones((2, 2, 2))}, shape=(2, 2, 2))
+        ds = make_test_dataset({"B1": np.ones((2, 2, 2))}, shape=(2, 2, 2))
         with pytest.raises(ValueError, match="Unknown unit"):
             ds.in_units("B1", "furlongs")
 
@@ -496,23 +442,23 @@ class TestRoundTrip:
     def test_identity_normalization_passthrough(self):
         shape = (2, 2, 2)
         data = {"B1": np.full(shape, 7.0)}
-        ds = _make_dataset(data, shape=shape)
+        ds = make_test_dataset(data, shape=shape)
         np.testing.assert_allclose(ds.in_si("B1"), 7.0, rtol=1e-15)
 
 
 class TestErrorMessages:
     def test_unknown_name_suggests(self):
-        ds = _make_dataset({"B1": np.ones((2, 2, 2))}, shape=(2, 2, 2))
+        ds = make_test_dataset({"B1": np.ones((2, 2, 2))}, shape=(2, 2, 2))
         with pytest.raises(KeyError, match="Did you mean"):
             compute_field("bta", ds)
 
     def test_missing_dependency_lists_available(self):
-        ds = _make_dataset({"B1": np.ones((2, 2, 2))}, shape=(2, 2, 2))
+        ds = make_test_dataset({"B1": np.ones((2, 2, 2))}, shape=(2, 2, 2))
         with pytest.raises(KeyError, match="requires"):
             compute_field("|B|", ds)
 
     def test_recursion_depth(self):
-        ds = _make_dataset({}, shape=(2, 2, 2))
+        ds = make_test_dataset({}, shape=(2, 2, 2))
         with pytest.raises((KeyError, RecursionError)):
             compute_field("M_ms", ds)
 
@@ -524,7 +470,7 @@ class TestEnthalpy:
             "P": np.full(shape, 1.0),
             "rho_m": np.full(shape, 1.0),
         }
-        ds = _make_dataset(data, shape=shape)
+        ds = make_test_dataset(data, shape=shape)
         result = compute_field("h", ds)
         # h = gamma * P / ((gamma-1) * rho_m) = 5/3 / (2/3) = 2.5
         np.testing.assert_allclose(result, 2.5, rtol=1e-14)
@@ -537,7 +483,7 @@ class TestEntropy:
             "P": np.full(shape, 1.0),
             "rho_m": np.full(shape, 1.0),
         }
-        ds = _make_dataset(data, shape=shape)
+        ds = make_test_dataset(data, shape=shape)
         result = compute_field("s", ds)
         # s = ln(P / rho^gamma) = ln(1) = 0
         np.testing.assert_allclose(result, 0.0, atol=1e-15)
@@ -548,7 +494,7 @@ class TestEntropy:
             "Pe": np.full(shape, 1.0),
             "n_s0": np.full(shape, 1.0),
         }
-        ds = _make_dataset(data, shape=shape)
+        ds = make_test_dataset(data, shape=shape)
         result = compute_field("s_e", ds)
         np.testing.assert_allclose(result, 0.0, atol=1e-15)
 
@@ -560,7 +506,7 @@ class TestIonAcousticSpeed:
             "Te": np.full(shape, 1.0),
             "Ti": np.zeros(shape),
         }
-        ds = _make_dataset(
+        ds = make_test_dataset(
             data,
             shape=shape,
             species=[ELECTRONS, IONS],
@@ -575,7 +521,7 @@ class TestSpeciesAliases:
         """n_e alias in FieldDataset resolves to n_s0 for compute."""
         shape = (2, 2, 2)
         data = {"n_s0": np.full(shape, 4.0)}
-        ds = _make_dataset(data, shape=shape, species=[ELECTRONS, IONS])
+        ds = make_test_dataset(data, shape=shape, species=[ELECTRONS, IONS])
         # omega_pe depends on n_s0 — verify it works when n_e is the alias
         result = compute_field("omega_pe", ds)
         np.testing.assert_allclose(result, 32.0, rtol=1e-14)
@@ -583,7 +529,7 @@ class TestSpeciesAliases:
     def test_n_e_n_i_accessible_as_fields(self):
         shape = (2, 2, 2)
         data = {"n_s0": np.full(shape, 1.0), "n_s1": np.full(shape, 2.0)}
-        ds = _make_dataset(data, shape=shape)
+        ds = make_test_dataset(data, shape=shape)
         np.testing.assert_allclose(ds["n_e"], 1.0)
         np.testing.assert_allclose(ds["n_i"], 2.0)
 
@@ -601,7 +547,7 @@ class TestSpeciesAliases:
             "B3": np.ones(shape),
             "n_s1": np.full(shape, 2.0),
         }
-        ds = _make_dataset(data, shape=shape)
+        ds = make_test_dataset(data, shape=shape)
         result = compute_field("s_gyro_i", ds)
         # P_par=3 (B along z), P_perp=(1+1+3-3)/2=1
         # s_gyro = ln(P_par * P_perp^2 / n^5) = ln(3 * 1 / 32) = ln(3/32)
@@ -623,7 +569,7 @@ class TestSpeciesAliases:
             "B3": np.ones(shape),
             "n_s0": np.full(shape, 1.0),
         }
-        ds = _make_dataset(data, shape=shape)
+        ds = make_test_dataset(data, shape=shape)
         with pytest.raises(KeyError, match="s_gyro"):
             compute_field("s_gyro", ds)
 
@@ -635,7 +581,7 @@ class TestSpeciesAliases:
             "u2": np.full(shape, 0.3),
             "u3": np.full(shape, 0.1),
         }
-        ds = _make_dataset(data, shape=shape)
+        ds = make_test_dataset(data, shape=shape)
         np.testing.assert_allclose(ds["ux"], 0.5)
         np.testing.assert_allclose(ds["uy"], 0.3)
         np.testing.assert_allclose(ds["uz"], 0.1)
@@ -655,7 +601,7 @@ class TestPressureTensor:
             "B2": np.zeros(shape),
             "B3": np.ones(shape),
         }
-        ds = _make_dataset(data, shape=shape)
+        ds = make_test_dataset(data, shape=shape)
         result = compute_field("P_par", ds)
         # B along z → P_par = P33 = 3
         np.testing.assert_allclose(result, 3.0, rtol=1e-15)
@@ -673,7 +619,7 @@ class TestPressureTensor:
             "B2": np.zeros(shape),
             "B3": np.ones(shape),
         }
-        ds = _make_dataset(data, shape=shape)
+        ds = make_test_dataset(data, shape=shape)
         result = compute_field("P_perp", ds)
         # P_perp = (Tr(P) - P_par) / 2 = (6 - 3) / 2 = 1.5
         np.testing.assert_allclose(result, 1.5, rtol=1e-15)

@@ -262,6 +262,54 @@ class TestConvergence:
         assert ratio_2 > 3.5, f"Second ratio {ratio_2:.2f} too low"
 
 
+class TestAnisotropicSpacing:
+    """Operators produce correct results with different dx, dy, dz."""
+
+    def test_divergence_anisotropic(self):
+        r"""F = (2x, 3y, 5z) with dx=0.5, dy=0.3, dz=0.7 → div F = 10."""
+        nx, ny, nz = 8, 8, 8
+        dx, dy, dz = 0.5, 0.3, 0.7
+        x = np.arange(nx) * dx
+        y = np.arange(ny) * dy
+        z = np.arange(nz) * dz
+        xx, yy, zz = np.meshgrid(x, y, z, indexing="ij")
+        f1 = 2.0 * xx
+        f2 = 3.0 * yy
+        f3 = 5.0 * zz
+        result = divergence(f1, f2, f3, dx, dy, dz)
+        np.testing.assert_allclose(result, 10.0, rtol=1e-14)
+
+    def test_gradient_anisotropic(self):
+        r"""f = 2x + 3y + 5z with dx=0.5, dy=0.3, dz=0.7 → grad f = (2, 3, 5)."""
+        nx, ny, nz = 8, 8, 8
+        dx, dy, dz = 0.5, 0.3, 0.7
+        x = np.arange(nx) * dx
+        y = np.arange(ny) * dy
+        z = np.arange(nz) * dz
+        xx, yy, zz = np.meshgrid(x, y, z, indexing="ij")
+        f = 2.0 * xx + 3.0 * yy + 5.0 * zz
+        g1, g2, g3 = gradient(f, dx, dy, dz)
+        np.testing.assert_allclose(g1, 2.0, rtol=1e-14)
+        np.testing.assert_allclose(g2, 3.0, rtol=1e-14)
+        np.testing.assert_allclose(g3, 5.0, rtol=1e-14)
+
+    def test_curl_anisotropic(self):
+        r"""F = (-y, x, 0) with dx=0.5, dy=0.3, dz=0.7 → curl F = (0, 0, 2)."""
+        nx, ny, nz = 8, 8, 8
+        dx, dy, dz = 0.5, 0.3, 0.7
+        x = np.arange(nx) * dx
+        y = np.arange(ny) * dy
+        z = np.arange(nz) * dz
+        xx, yy, _zz = np.meshgrid(x, y, z, indexing="ij")
+        f1 = -yy
+        f2 = xx
+        f3 = np.zeros_like(xx)
+        c1, c2, c3 = curl(f1, f2, f3, dx, dy, dz)
+        np.testing.assert_allclose(c1, 0.0, atol=1e-14)
+        np.testing.assert_allclose(c2, 0.0, atol=1e-14)
+        np.testing.assert_allclose(c3, 2.0, rtol=1e-14)
+
+
 class TestNonCartesianNotImplemented:
     @pytest.mark.parametrize("geom", [GeometryType.SPHERICAL, GeometryType.CYLINDRICAL])
     def test_divergence_raises(self, geom: GeometryType):

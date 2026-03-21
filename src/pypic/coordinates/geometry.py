@@ -2,6 +2,15 @@
 
 from __future__ import annotations
 
+__all__ = [
+    "CARTESIAN",
+    "CYLINDRICAL",
+    "GEOMETRY_BY_NAME",
+    "SPHERICAL",
+    "CoordinateGeometry",
+    "GeometryType",
+]
+
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import TYPE_CHECKING, Any, assert_never

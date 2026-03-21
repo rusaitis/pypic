@@ -402,12 +402,12 @@ def _get_recipe(name: str) -> _Recipe:
     dynamic = _try_species_recipe(canonical)
     if dynamic is not None:
         return dynamic
-    all_names = sorted(set(_REGISTRY) | set(_COMPUTE_ALIASES))
+    all_names = available_quantities()
     suggestions = difflib.get_close_matches(name, all_names, n=3, cutoff=0.4)
     msg = f"Unknown derived quantity {name!r}."
     if suggestions:
         msg += f" Did you mean: {suggestions}?"
-    msg += f" Available: {all_names}"
+    msg += " Call available_quantities() for the full list."
     raise KeyError(msg) from None
 
 
@@ -432,8 +432,13 @@ def _get_species_args(
         )
         raise ValueError(msg)
     sp = dataset.species[idx]
-    assert sp.charge is not None
-    assert sp.mass is not None
+    if sp.charge is None or sp.mass is None:
+        missing = [p for p in ("charge", "mass") if getattr(sp, p) is None]
+        msg = (
+            f"Species {sp.name!r} (index {idx}) is missing {', '.join(missing)}, "
+            f"required by {recipe.func.__name__!r}"
+        )
+        raise ValueError(msg)
     return [sp.charge, sp.mass]
 
 

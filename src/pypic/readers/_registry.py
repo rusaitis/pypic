@@ -280,24 +280,14 @@ class Simulation:
         -------
         FieldDataset
         """
-        from pypic.readers.base import (
-            _CARTESIAN_ALIASES,
-            _CYLINDRICAL_ALIASES,
-            _SPHERICAL_ALIASES,
-            supports_selective_read,
-        )
+        from pypic.readers.base import _default_aliases, supports_selective_read
 
         if fields is None and not kwargs:
             return self._reader.read_timestep(self._path, step)
 
         canonical: set[str] | None = None
         if fields is not None:
-            alias_tables: dict[str, dict[str, str]] = {
-                "cartesian": _CARTESIAN_ALIASES,
-                "spherical": _SPHERICAL_ALIASES,
-                "cylindrical": _CYLINDRICAL_ALIASES,
-            }
-            alias_map = alias_tables[self._config.grid.geometry.type.value]
+            alias_map = _default_aliases(self._config.grid.geometry)
             canonical = {alias_map.get(name, name) for name in fields}
 
         if supports_selective_read(self._reader):

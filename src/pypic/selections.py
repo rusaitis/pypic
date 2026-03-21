@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+__all__ = ["BoxSelection", "PlaneSelection"]
+
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 

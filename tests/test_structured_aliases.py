@@ -9,30 +9,11 @@ from pypic.compute import (
     compute_field,
     field_si_factor,
 )
-from pypic.readers.base import FieldDataset, GridInfo, _default_aliases
+from pypic.readers.base import _default_aliases
 from pypic.units import Normalization, SpeciesInfo
+from tests._helpers import ELECTRONS, IONS, make_test_dataset
 
-ELECTRONS = SpeciesInfo(name="electrons", charge=-1.0, mass=1 / 256)
-IONS = SpeciesInfo(name="ions", charge=1.0, mass=1.0)
 ALPHAS = SpeciesInfo(name="alphas", charge=2.0, mass=4.0)
-
-
-def _make_dataset(
-    fields: dict[str, np.ndarray],
-    *,
-    shape: tuple[int, ...] = (4, 3, 2),
-    species: list[SpeciesInfo] | None = None,
-    physics: dict | None = None,
-    normalization: Normalization | None = None,
-) -> FieldDataset:
-    grid = GridInfo(dimensions=shape, spacing=(1.0,) * len(shape))
-    return FieldDataset.from_arrays(
-        fields,
-        grid,
-        normalization or Normalization.identity(),
-        species=species,
-        physics=physics,
-    )
 
 
 class TestUnderscoreFieldAliases:
@@ -52,7 +33,7 @@ class TestUnderscoreFieldAliases:
     def test_cartesian_underscore_aliases(self, alias, canonical):
         shape = (2, 2, 2)
         data = {canonical: np.full(shape, 7.0)}
-        ds = _make_dataset(data, shape=shape)
+        ds = make_test_dataset(data, shape=shape)
         np.testing.assert_array_equal(ds[alias], ds[canonical])
 
     @pytest.mark.parametrize(
@@ -62,7 +43,7 @@ class TestUnderscoreFieldAliases:
     def test_numbered_underscore_aliases(self, alias, canonical):
         shape = (2, 2, 2)
         data = {canonical: np.full(shape, 3.0)}
-        ds = _make_dataset(data, shape=shape)
+        ds = make_test_dataset(data, shape=shape)
         np.testing.assert_array_equal(ds[alias], ds[canonical])
 
     @pytest.mark.parametrize(
@@ -80,12 +61,12 @@ class TestUnderscoreFieldAliases:
     def test_scalar_underscore_aliases(self, alias, canonical):
         shape = (2, 2, 2)
         data = {canonical: np.full(shape, 5.0)}
-        ds = _make_dataset(data, shape=shape)
+        ds = make_test_dataset(data, shape=shape)
         np.testing.assert_array_equal(ds[alias], ds[canonical])
 
     def test_has_field_with_underscore_alias(self):
         shape = (2, 2, 2)
-        ds = _make_dataset({"B1": np.ones(shape)}, shape=shape)
+        ds = make_test_dataset({"B1": np.ones(shape)}, shape=shape)
         assert ds.has_field("B_x")
         assert ds.has_field("B_1")
 
@@ -114,7 +95,7 @@ class TestMagnitudeComputeAliases:
             f"{prefix}2": np.full(shape, 4.0),
             f"{prefix}3": np.zeros(shape),
         }
-        ds = _make_dataset(data, shape=shape)
+        ds = make_test_dataset(data, shape=shape)
         result_alias = compute_field(alias, ds)
         result_canonical = compute_field(canonical, ds)
         np.testing.assert_array_equal(result_alias, result_canonical)
@@ -131,7 +112,7 @@ class TestDescriptiveComputeAliases:
             "B2": np.full(shape, 4.0),
             "B3": np.zeros(shape),
         }
-        ds = _make_dataset(data, shape=shape)
+        ds = make_test_dataset(data, shape=shape)
         result = compute_field("plasma_beta", ds)
         np.testing.assert_allclose(result, 2.0, rtol=1e-15)
 
@@ -143,7 +124,7 @@ class TestDescriptiveComputeAliases:
             "B3": np.zeros(shape),
             "rho_m": np.full(shape, 4.0),
         }
-        ds = _make_dataset(data, shape=shape)
+        ds = make_test_dataset(data, shape=shape)
         result = compute_field("v_Alfven", ds)
         np.testing.assert_allclose(result, 0.5, rtol=1e-15)
 
@@ -169,7 +150,7 @@ class TestStructuredSpeciesComputeAliases:
     def test_omega_p_s0(self):
         shape = (2, 2, 2)
         data = {"n_s0": np.full(shape, 4.0)}
-        ds = _make_dataset(data, shape=shape, species=[ELECTRONS, IONS])
+        ds = make_test_dataset(data, shape=shape, species=[ELECTRONS, IONS])
         result = compute_field("omega_p_s0", ds)
         expected = compute_field("omega_pe", ds)
         np.testing.assert_array_equal(result, expected)
@@ -177,7 +158,7 @@ class TestStructuredSpeciesComputeAliases:
     def test_d_s1(self):
         shape = (2, 2, 2)
         data = {"n_s1": np.full(shape, 1.0)}
-        ds = _make_dataset(data, shape=shape, species=[ELECTRONS, IONS])
+        ds = make_test_dataset(data, shape=shape, species=[ELECTRONS, IONS])
         result = compute_field("d_s1", ds)
         expected = compute_field("d_i", ds)
         np.testing.assert_array_equal(result, expected)
@@ -190,7 +171,7 @@ class TestStructuredSpeciesComputeAliases:
             "B2": np.zeros(shape),
             "B3": np.zeros(shape),
         }
-        ds = _make_dataset(data, shape=shape, species=[ELECTRONS, IONS])
+        ds = make_test_dataset(data, shape=shape, species=[ELECTRONS, IONS])
         result = compute_field("larmor_radius_s0", ds)
         expected = compute_field("r_e", ds)
         np.testing.assert_array_equal(result, expected)
@@ -257,7 +238,7 @@ class TestOperatorAliases:
             "B2": np.ones(shape),
             "B3": np.ones(shape),
         }
-        ds = _make_dataset(data, shape=shape)
+        ds = make_test_dataset(data, shape=shape)
         result = compute_field("curl_B_x", ds)
         expected = compute_field("curl_B1", ds)
         np.testing.assert_array_equal(result, expected)
@@ -272,7 +253,7 @@ class TestOperatorAliases:
             "B2": np.full(shape, 1.0),
             "B3": np.zeros(shape),
         }
-        ds = _make_dataset(data, shape=shape)
+        ds = make_test_dataset(data, shape=shape)
         result = compute_field("S_x", ds)
         expected = compute_field("S1", ds)
         np.testing.assert_array_equal(result, expected)
@@ -337,7 +318,8 @@ class TestSIConversionThroughAliases:
             mass_ref=1.0,
             charge_ref=1.0,
         )
-        ds = _make_dataset({"B1": np.full(shape, 5.0)}, shape=shape, normalization=norm)
+        fields = {"B1": np.full(shape, 5.0)}
+        ds = make_test_dataset(fields, shape=shape, normalization=norm)
         result = ds.in_si("Bx")
         np.testing.assert_allclose(result, 5.0 * b_ref, rtol=1e-15)
 
@@ -354,7 +336,8 @@ class TestSIConversionThroughAliases:
             mass_ref=1.0,
             charge_ref=1.0,
         )
-        ds = _make_dataset({"B1": np.full(shape, 5.0)}, shape=shape, normalization=norm)
+        fields = {"B1": np.full(shape, 5.0)}
+        ds = make_test_dataset(fields, shape=shape, normalization=norm)
         result = ds.in_si("B_x")
         np.testing.assert_allclose(result, 5.0 * b_ref, rtol=1e-15)
 
@@ -376,7 +359,7 @@ class TestSIConversionThroughAliases:
             "B2": np.full(shape, 4.0),
             "B3": np.zeros(shape),
         }
-        ds = _make_dataset(data, shape=shape, normalization=norm)
+        ds = make_test_dataset(data, shape=shape, normalization=norm)
         result = ds.in_si("B_mag")
         np.testing.assert_allclose(result, 5.0 * b_ref, rtol=1e-15)
 
@@ -423,7 +406,7 @@ class TestMultiSpeciesDynamicRecipes:
     def test_omega_p_s2_computes(self):
         shape = (2, 2, 2)
         data = {"n_s2": np.full(shape, 4.0)}
-        ds = _make_dataset(data, shape=shape, species=[ELECTRONS, IONS, ALPHAS])
+        ds = make_test_dataset(data, shape=shape, species=[ELECTRONS, IONS, ALPHAS])
         result = compute_field("omega_p_s2", ds)
         # omega_p = sqrt(n * q^2 / m) = sqrt(4 * 4 / 4) = sqrt(4) = 2
         np.testing.assert_allclose(result, 2.0, rtol=1e-14)
@@ -435,7 +418,7 @@ class TestMultiSpeciesDynamicRecipes:
             "B2": np.zeros(shape),
             "B3": np.zeros(shape),
         }
-        ds = _make_dataset(data, shape=shape, species=[ELECTRONS, IONS, ALPHAS])
+        ds = make_test_dataset(data, shape=shape, species=[ELECTRONS, IONS, ALPHAS])
         result = compute_field("omega_c_s2", ds)
         # omega_c = |q| * |B| / m = 2 * 2 / 4 = 1
         np.testing.assert_allclose(result, 1.0, rtol=1e-15)
@@ -443,7 +426,7 @@ class TestMultiSpeciesDynamicRecipes:
     def test_d_s2_computes(self):
         shape = (2, 2, 2)
         data = {"n_s2": np.full(shape, 1.0)}
-        ds = _make_dataset(data, shape=shape, species=[ELECTRONS, IONS, ALPHAS])
+        ds = make_test_dataset(data, shape=shape, species=[ELECTRONS, IONS, ALPHAS])
         result = compute_field("d_s2", ds)
         # d = c / omega_p = 1 / sqrt(1 * 4 / 4) = 1 / 1 = 1
         np.testing.assert_allclose(result, 1.0, rtol=1e-14)
@@ -455,7 +438,7 @@ class TestMultiSpeciesDynamicRecipes:
             "P_s2": np.full(shape, 8.0),
             "n_s2": np.full(shape, 2.0),
         }
-        ds = _make_dataset(data, shape=shape, species=[ELECTRONS, IONS, ALPHAS])
+        ds = make_test_dataset(data, shape=shape, species=[ELECTRONS, IONS, ALPHAS])
         result = compute_field("v_th_s2", ds)
         # T_s2 = P/n = 4, v_th = sqrt(T/m) = sqrt(4/4) = 1
         np.testing.assert_allclose(result, 1.0, rtol=1e-14)
@@ -469,7 +452,7 @@ class TestMultiSpeciesDynamicRecipes:
             "B2": np.zeros(shape),
             "B3": np.zeros(shape),
         }
-        ds = _make_dataset(data, shape=shape, species=[ELECTRONS, IONS, ALPHAS])
+        ds = make_test_dataset(data, shape=shape, species=[ELECTRONS, IONS, ALPHAS])
         result = compute_field("r_s2", ds)
         # T_s2 = 4, r = sqrt(m*T) / (|q|*B) = sqrt(4*4) / (2*1) = 4/2 = 2
         np.testing.assert_allclose(result, 2.0, rtol=1e-14)
@@ -480,7 +463,7 @@ class TestMultiSpeciesDynamicRecipes:
             "P_s2": np.full(shape, 4.0),
             "n_s2": np.full(shape, 1.0),
         }
-        ds = _make_dataset(data, shape=shape, species=[ELECTRONS, IONS, ALPHAS])
+        ds = make_test_dataset(data, shape=shape, species=[ELECTRONS, IONS, ALPHAS])
         result = compute_field("lambda_D_s2", ds)
         # T_s2 = 4, lambda_D = sqrt(T / (n * q^2)) = sqrt(4 / (1*4)) = 1
         np.testing.assert_allclose(result, 1.0, rtol=1e-14)
@@ -493,7 +476,7 @@ class TestMultiSpeciesDynamicRecipes:
             "B2": np.zeros(shape),
             "B3": np.zeros(shape),
         }
-        ds = _make_dataset(data, shape=shape, species=[ELECTRONS, IONS, ALPHAS])
+        ds = make_test_dataset(data, shape=shape, species=[ELECTRONS, IONS, ALPHAS])
         result = compute_field("beta_s2", ds)
         # beta = 2*P / B^2 = 2*5 / 1 = 10
         np.testing.assert_allclose(result, 10.0, rtol=1e-15)
@@ -504,7 +487,7 @@ class TestMultiSpeciesDynamicRecipes:
             "P_s2": np.full(shape, 1.0),
             "n_s2": np.full(shape, 1.0),
         }
-        ds = _make_dataset(data, shape=shape, species=[ELECTRONS, IONS, ALPHAS])
+        ds = make_test_dataset(data, shape=shape, species=[ELECTRONS, IONS, ALPHAS])
         result = compute_field("s_s2", ds)
         # s = ln(P / n^gamma) = ln(1) = 0
         np.testing.assert_allclose(result, 0.0, atol=1e-15)
@@ -515,7 +498,7 @@ class TestMultiSpeciesDynamicRecipes:
             "P_s2": np.full(shape, 6.0),
             "n_s2": np.full(shape, 3.0),
         }
-        ds = _make_dataset(data, shape=shape, species=[ELECTRONS, IONS, ALPHAS])
+        ds = make_test_dataset(data, shape=shape, species=[ELECTRONS, IONS, ALPHAS])
         result = compute_field("T_s2", ds)
         # T = P / n = 2
         np.testing.assert_allclose(result, 2.0, rtol=1e-15)
@@ -524,7 +507,7 @@ class TestMultiSpeciesDynamicRecipes:
         """Existing s0/s1 aliases should still work via _COMPUTE_ALIASES."""
         shape = (2, 2, 2)
         data = {"n_s0": np.full(shape, 4.0)}
-        ds = _make_dataset(data, shape=shape, species=[ELECTRONS, IONS])
+        ds = make_test_dataset(data, shape=shape, species=[ELECTRONS, IONS])
         result_alias = compute_field("omega_p_s0", ds)
         result_canonical = compute_field("omega_pe", ds)
         np.testing.assert_array_equal(result_alias, result_canonical)
@@ -583,14 +566,14 @@ class TestSpeciesNameAliases:
     def test_n_alphas_resolves_to_n_s2(self):
         shape = (2, 2, 2)
         data = {"n_s2": np.full(shape, 7.0)}
-        ds = _make_dataset(data, shape=shape, species=[ELECTRONS, IONS, ALPHAS])
+        ds = make_test_dataset(data, shape=shape, species=[ELECTRONS, IONS, ALPHAS])
         np.testing.assert_array_equal(ds["n_alphas"], ds["n_s2"])
 
     def test_n_e_n_i_aliases_take_priority(self):
         """Hardcoded n_e/n_i must not be overwritten by species-name logic."""
         shape = (2, 2, 2)
         data = {"n_s0": np.full(shape, 1.0), "n_s1": np.full(shape, 2.0)}
-        ds = _make_dataset(data, shape=shape, species=[ELECTRONS, IONS])
+        ds = make_test_dataset(data, shape=shape, species=[ELECTRONS, IONS])
         np.testing.assert_allclose(ds["n_e"], 1.0)
         np.testing.assert_allclose(ds["n_i"], 2.0)
 
@@ -598,7 +581,7 @@ class TestSpeciesNameAliases:
         """n_alphas alias not created when n_s2 is absent."""
         shape = (2, 2, 2)
         data = {"n_s0": np.full(shape, 1.0)}
-        ds = _make_dataset(data, shape=shape, species=[ELECTRONS, IONS, ALPHAS])
+        ds = make_test_dataset(data, shape=shape, species=[ELECTRONS, IONS, ALPHAS])
         assert not ds.has_field("n_alphas")
 
 
@@ -629,7 +612,7 @@ class TestAuditIssue2SGyroRename:
             "B3": np.ones(shape),
             "n_s0": np.full(shape, 1.0),
         }
-        ds = _make_dataset(data, shape=shape)
+        ds = make_test_dataset(data, shape=shape)
         with pytest.raises(KeyError, match="s_gyro_e"):
             compute_field("s_gyro", ds)
 
@@ -644,7 +627,7 @@ class TestAuditIssue6ElectronVelocityMagnitude:
             "Ve2": np.full(shape, 4.0),
             "Ve3": np.zeros(shape),
         }
-        ds = _make_dataset(data, shape=shape)
+        ds = make_test_dataset(data, shape=shape)
         result = compute_field("|Ve|", ds)
         np.testing.assert_allclose(result, 5.0, rtol=1e-15)
 
@@ -656,7 +639,7 @@ class TestAuditIssue6ElectronVelocityMagnitude:
             "Ve2": np.full(shape, 4.0),
             "Ve3": np.zeros(shape),
         }
-        ds = _make_dataset(data, shape=shape)
+        ds = make_test_dataset(data, shape=shape)
         result = compute_field(alias, ds)
         np.testing.assert_allclose(result, 5.0, rtol=1e-15)
 
@@ -728,13 +711,13 @@ class TestAuditFieldPrefixAliases:
     def test_efx_alias_resolves(self):
         shape = (2, 2, 2)
         data = {"EF1": np.full(shape, 7.0)}
-        ds = _make_dataset(data, shape=shape)
+        ds = make_test_dataset(data, shape=shape)
         np.testing.assert_array_equal(ds["EFx"], ds["EF1"])
 
     def test_b0x_alias_resolves(self):
         shape = (2, 2, 2)
         data = {"B01": np.full(shape, 3.0)}
-        ds = _make_dataset(data, shape=shape)
+        ds = make_test_dataset(data, shape=shape)
         np.testing.assert_array_equal(ds["B0x"], ds["B01"])
 
     def test_ion_acoustic_speed_alias(self):
@@ -758,6 +741,6 @@ class TestEnergyFluxAliases:
     def test_energy_flux_x_passthrough(self):
         shape = (2, 2, 2)
         data = {"EF1": np.full(shape, 3.14)}
-        ds = _make_dataset(data, shape=shape)
+        ds = make_test_dataset(data, shape=shape)
         result = compute_field("energy_flux_x", ds)
         np.testing.assert_allclose(result, 3.14)

@@ -129,21 +129,23 @@ _FIELD_PREFIX_PAIRS = (
 )
 
 
-def _build_aliases(suffixes: tuple[str, str, str]) -> dict[str, str]:
-    """Generate field name aliases for a coordinate system."""
+def _build_aliases(
+    suffixes: tuple[str, str, str], *, separator: str = ""
+) -> dict[str, str]:
+    """Generate field name aliases for a coordinate system.
+
+    Parameters
+    ----------
+    suffixes : tuple[str, str, str]
+        Coordinate suffixes (e.g. ``("x", "y", "z")``).
+    separator : str
+        Separator between prefix and suffix. ``""`` gives ``Bx``,
+        ``"_"`` gives ``B_x``.
+    """
     aliases: dict[str, str] = {}
     for alias_prefix, canonical_prefix in _FIELD_PREFIX_PAIRS:
         for i, suffix in enumerate(suffixes, 1):
-            aliases[f"{alias_prefix}{suffix}"] = f"{canonical_prefix}{i}"
-    return aliases
-
-
-def _build_underscore_aliases(suffixes: tuple[str, str, str]) -> dict[str, str]:
-    """Generate underscore-separated field aliases (e.g. ``B_x → B1``)."""
-    aliases: dict[str, str] = {}
-    for alias_prefix, canonical_prefix in _FIELD_PREFIX_PAIRS:
-        for i, suffix in enumerate(suffixes, 1):
-            aliases[f"{alias_prefix}_{suffix}"] = f"{canonical_prefix}{i}"
+            aliases[f"{alias_prefix}{separator}{suffix}"] = f"{canonical_prefix}{i}"
     return aliases
 
 
@@ -151,9 +153,9 @@ _CARTESIAN_ALIASES = _build_aliases(("x", "y", "z"))
 _SPHERICAL_ALIASES = _build_aliases(("r", "theta", "phi"))
 _CYLINDRICAL_ALIASES = _build_aliases(("r", "phi", "z"))
 
-_CARTESIAN_UNDERSCORE_ALIASES = _build_underscore_aliases(("x", "y", "z"))
-_SPHERICAL_UNDERSCORE_ALIASES = _build_underscore_aliases(("r", "theta", "phi"))
-_CYLINDRICAL_UNDERSCORE_ALIASES = _build_underscore_aliases(("r", "phi", "z"))
+_CARTESIAN_UNDERSCORE_ALIASES = _build_aliases(("x", "y", "z"), separator="_")
+_SPHERICAL_UNDERSCORE_ALIASES = _build_aliases(("r", "theta", "phi"), separator="_")
+_CYLINDRICAL_UNDERSCORE_ALIASES = _build_aliases(("r", "phi", "z"), separator="_")
 
 # Numbered underscore aliases (B_1→B1, E_2→E2, etc.) — geometry-independent
 _NUMBERED_UNDERSCORE_ALIASES: dict[str, str] = {}
