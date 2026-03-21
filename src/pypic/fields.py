@@ -56,6 +56,7 @@ _QUANTITY_UNITS: dict[str, str] = {
     "b_field_per_length": "T/m",
     "e_field_per_length": "V/m^2",
     "velocity_per_length": "1/s",
+    "specific_energy": "J/kg",
     "dimensionless": "",
 }
 
@@ -250,14 +251,16 @@ _FIELD_INFO: dict[str, FieldInfo] = {
         r"$EF_3$",
     ),
     # Thermodynamic (specific quantities — energy per unit mass)
-    "h": _FI("temperature", "Specific enthalpy", "J", r"$h$"),
+    "h": _FI("specific_energy", "Specific enthalpy", "J/kg", r"$h$"),
     "h_rel": _FI(
-        "temperature",
+        "specific_energy",
         "Relativistic specific enthalpy",
-        "J",
+        "J/kg",
         r"$h_{rel}$",
     ),
-    "e_int": _FI("temperature", "Specific internal energy", "J", r"$e_{int}$"),
+    "e_int": _FI(
+        "specific_energy", "Specific internal energy", "J/kg", r"$e_{int}$"
+    ),
     # Diagnostics (spatial derivatives)
     "div_B": _FI(
         "b_field_per_length",

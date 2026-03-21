@@ -346,6 +346,7 @@ _COMPOUND_FACTORS: dict[str, Callable[[Normalization], float]] = {
     "b_field_per_length": lambda n: n.b_field_ref / n.length_ref,
     "e_field_per_length": lambda n: n.e_field_ref / n.length_ref,
     "velocity_per_length": lambda n: n.velocity_ref / n.length_ref,
+    "specific_energy": lambda n: n.velocity_ref**2,
 }
 
 

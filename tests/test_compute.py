@@ -404,8 +404,20 @@ class TestSIFactors:
             ("sigma", {}, 1.0),
             # Vorticity = velocity_per_length = velocity_ref / length_ref
             ("vort1", {"velocity_ref": 4.0, "length_ref": 2.0}, 2.0),
+            # Specific energy = velocity_ref^2 (NOT mass_ref * velocity_ref^2)
+            ("h", {"velocity_ref": 3.0, "mass_ref": 5.0}, 9.0),
         ],
-        ids=["pressure", "frequency", "B0", "n_s2", "P11", "gamma_L", "sigma", "vort1"],
+        ids=[
+            "pressure",
+            "frequency",
+            "B0",
+            "n_s2",
+            "P11",
+            "gamma_L",
+            "sigma",
+            "vort1",
+            "enthalpy",
+        ],
     )
     def test_si_factor(self, field, norm_kwargs, expected):
         defaults = dict(

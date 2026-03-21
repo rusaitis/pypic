@@ -210,12 +210,12 @@ grow.
   matters for relativistic workflows.
   **Depends on:** Step 18 (relativistic derived quantities).
 
-- [ ] **Step 33: `specific_energy` quantity type for enthalpy**
-  `h`, `h_rel`, `e_int` use `quantity_type="temperature"`. Dimensionally
-  correct (specific energy and temperature-in-energy-units scale the same
-  way), but semantically misleading — enthalpy is not a temperature. A
-  `"specific_energy"` type with the same SI factor (`mass_ref * velocity_ref²`)
-  would be cleaner. Very low priority — purely cosmetic.
+- [x] **Step 33: `specific_energy` quantity type for enthalpy**
+  `h`, `h_rel`, `e_int` used `quantity_type="temperature"` with SI factor
+  `mass_ref * velocity_ref²` (J). The correct SI factor for specific energy
+  (energy per unit mass) is `velocity_ref²` (J/kg) — this was a dimensional
+  bug masked by `identity()` normalization in tests. Fixed by adding a
+  `"specific_energy"` quantity type with the correct factor.
 
 ---
 
@@ -256,4 +256,4 @@ grow.
 | 30 | readers/selections | Reduced geometry after slicing | — |
 | 31 | coordinates | Remove default geometry from operators | — |
 | 32 | fields/units | Separate `four_velocity` quantity type | — |
-| 33 | fields/units | `specific_energy` quantity type for enthalpy | — |
+| 33 | fields/units | `specific_energy` quantity type for enthalpy | ✅ |

@@ -43,13 +43,13 @@ SI conversion boundaries. Temperatures are in energy units throughout
 
 | Name | Description | Normalized | SI |
 |------|-------------|------------|-----|
-| `h` | Specific enthalpy | $\gamma P / ((\gamma - 1) \rho_m)$ | -- |
-| `h_rel` | Relativistic specific enthalpy | $c^2 + \gamma P / ((\gamma - 1) \rho_m)$ | -- |
+| `h` | Specific enthalpy | $\gamma P / ((\gamma - 1) \rho_m)$ | $h \cdot v_{ref}^2$ \[J/kg\] |
+| `h_rel` | Relativistic specific enthalpy | $c^2 + \gamma P / ((\gamma - 1) \rho_m)$ | $h_{rel} \cdot v_{ref}^2$ \[J/kg\] |
 | `s` | Specific entropy (isotropic) | $\ln(P / \rho_m^\gamma)$ (MHD), $\ln(P_s / n_s^\gamma)$ (PIC) | -- |
 | `s_e` | Electron entropy | $\ln(P_e / n_e^\gamma)$ | -- |
 | `s_i` | Ion entropy | $\ln(P_i / n_i^\gamma)$ | -- |
 | `s_gyro` | Gyrotropic entropy | $\ln(P_{\parallel,s} P_{\perp,s}^2 / n_s^5)$ | -- |
-| `e_int` | Specific internal energy | $P / ((\gamma - 1) \rho_m)$ | -- |
+| `e_int` | Specific internal energy | $P / ((\gamma - 1) \rho_m)$ | $e_{int} \cdot v_{ref}^2$ \[J/kg\] |
 | `gamma_eos` | Adiabatic index | $\gamma = c_p / c_v$ | -- |
 
 [1] MHD entropy uses mass density ($\rho_m$, fluid equation of state);

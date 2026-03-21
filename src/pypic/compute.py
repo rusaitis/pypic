@@ -337,6 +337,7 @@ _DISPLAY_UNITS: dict[str, float] = {
     "K": constants.k,
     "A/m^2": 1.0,
     "C/m^3": 1.0,
+    "J/kg": 1.0,
     "normalized": 1.0,
 }
 
