@@ -12,6 +12,8 @@ import copy
 import re
 from dataclasses import dataclass
 
+from pypic._aliases import _COMPUTE_ALIASES, _get_field_alias_fallback
+
 
 @dataclass(frozen=True, slots=True)
 class FieldInfo:
@@ -530,8 +532,6 @@ def field_info(
         return _maybe_localize(info)
 
     # 2. Compute alias resolution (B_mag -> |B|, etc.)
-    from pypic.compute import _COMPUTE_ALIASES
-
     canonical = _COMPUTE_ALIASES.get(name)
     if canonical is not None:
         info = _FIELD_INFO.get(canonical)
@@ -539,8 +539,6 @@ def field_info(
             return _maybe_localize(info)
 
     # 3. Field alias fallback (Bx -> B1, P_e -> Pe, etc.)
-    from pypic.compute import _get_field_alias_fallback
-
     fallback = _get_field_alias_fallback()
     target = canonical if canonical is not None else name
     resolved = fallback.get(target, name)
