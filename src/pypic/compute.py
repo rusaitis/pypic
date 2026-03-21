@@ -18,6 +18,7 @@ from scipy import constants
 
 from pypic import derived, diagnostics
 from pypic.coordinates import operators
+from pypic.coordinates.geometry import GeometryType
 from pypic.fields import _FIELD_INFO
 
 if TYPE_CHECKING:
@@ -550,6 +551,13 @@ def compute_field(name: str, dataset: FieldDataset, _depth: int = 0) -> FloatArr
 
     # Append grid spacing
     if recipe.needs_grid:
+        if dataset.grid.geometry.type != GeometryType.CARTESIAN:
+            msg = (
+                f"Derived quantity {canonical!r} requires spatial derivatives, "
+                f"which are only implemented for Cartesian geometry. "
+                f"Dataset has {dataset.grid.geometry.type.value} geometry."
+            )
+            raise NotImplementedError(msg)
         args.extend(dataset.grid.spacing)
 
     result = recipe.func(*args)

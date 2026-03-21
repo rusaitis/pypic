@@ -170,6 +170,55 @@ Recommended implementation order: 19 → 20 → 21 → 22 → 23, with 24/25 par
 
 ---
 
+## Phase 11: Geometry & Type System Hardening
+
+Design weaknesses identified during the unit/geometry audit. These are
+not bugs — current behavior is correct for Cartesian data — but will
+become problems as non-Cartesian geometries and relativistic workflows
+grow.
+
+- [ ] **Step 30: Reduced geometry after slicing**
+  After `PlaneSelection.apply()` reduces 3D→2D, the `GridInfo` keeps the
+  original 3-axis `CoordinateGeometry`. Code uses `axis_names[:ndim]` to
+  get surviving names, which gives the **first N** names, not the
+  **surviving** names (e.g. slicing the r-axis from spherical gives
+  surviving (θ, φ) but `axis_names[:2]` returns (r, θ)). Needs a concept
+  of "reduced geometry" or storing surviving axis indices. Affects
+  `PlaneSelection.apply()`, `BoxSelection.apply()`, and
+  `_build_grid_from_dataset()` in `readers/base.py`. No impact on
+  shipped readers (all Cartesian), but blocks correct spherical/cylindrical
+  slicing.
+  **Depends on:** Step 15 (frame transforms) or Step 16 (sphere selection).
+
+- [ ] **Step 31: Remove default geometry from operators**
+  `divergence()`, `curl()`, `gradient()` in `coordinates/operators.py`
+  default to `GeometryType.CARTESIAN`. This hides bugs: callers who forget
+  to pass geometry silently get Cartesian behavior. Removing the default
+  forces all callers to be explicit. Currently harmless because non-Cartesian
+  raises `NotImplementedError`, but will hide bugs when spherical/cylindrical
+  implementations are added. The `compute()` geometry guard (A2) catches
+  this at the FieldDataset level, but direct operator callers remain
+  unguarded.
+  **Depends on:** Spherical/cylindrical operator implementations (Step 10 extension).
+
+- [ ] **Step 32: Separate `four_velocity` quantity type**
+  `u1/u2/u3` (four-velocity, γv, unbounded) share `quantity_type="velocity"`
+  with `V1/V2/V3` (three-velocity, bounded by c). SI conversion is correct
+  (both have units of m/s), but the shared type prevents distinguishing them
+  in validation or display contexts. A separate `"four_velocity"` type with
+  the same SI factor would make the semantics explicit. Low priority — only
+  matters for relativistic workflows.
+  **Depends on:** Step 18 (relativistic derived quantities).
+
+- [ ] **Step 33: `specific_energy` quantity type for enthalpy**
+  `h`, `h_rel`, `e_int` use `quantity_type="temperature"`. Dimensionally
+  correct (specific energy and temperature-in-energy-units scale the same
+  way), but semantically misleading — enthalpy is not a temperature. A
+  `"specific_energy"` type with the same SI factor (`mass_ref * velocity_ref²`)
+  would be cleaner. Very low priority — purely cosmetic.
+
+---
+
 ## Summary
 
 | Step | Module | Delivers | Status |
@@ -204,3 +253,7 @@ Recommended implementation order: 19 → 20 → 21 → 22 → 23, with 24/25 par
 | 27 | interop | yt, PlasmaPy, SpacePy thin adapters | — |
 | 28 | docs | Ecosystem positioning page | — |
 | 29 | interop | SPASE XML metadata export | — |
+| 30 | readers/selections | Reduced geometry after slicing | — |
+| 31 | coordinates | Remove default geometry from operators | — |
+| 32 | fields/units | Separate `four_velocity` quantity type | — |
+| 33 | fields/units | `specific_energy` quantity type for enthalpy | — |

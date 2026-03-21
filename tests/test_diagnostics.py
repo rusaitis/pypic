@@ -1,6 +1,7 @@
 import numpy as np
 import pytest
 
+from pypic.coordinates.geometry import GeometryType
 from pypic.diagnostics import (
     div_b,
     div_e,
@@ -237,3 +238,20 @@ class TestConvergence:
         ratio_2 = errors[1] / errors[2]
         assert ratio_1 > 3.5, f"First ratio {ratio_1:.2f} too low for 2nd order"
         assert ratio_2 > 3.5, f"Second ratio {ratio_2:.2f} too low for 2nd order"
+
+
+class TestGeometryForwarding:
+    def test_div_b_rejects_spherical(self):
+        b = np.ones((4, 4, 4))
+        with pytest.raises(NotImplementedError, match="spherical"):
+            div_b(b, b, b, 1.0, 1.0, 1.0, geometry=GeometryType.SPHERICAL)
+
+    def test_max_div_b_rejects_spherical(self):
+        b = np.ones((4, 4, 4))
+        with pytest.raises(NotImplementedError, match="spherical"):
+            max_div_b(b, b, b, 1.0, 1.0, 1.0, geometry=GeometryType.SPHERICAL)
+
+    def test_div_e_rejects_spherical(self):
+        e = np.ones((4, 4, 4))
+        with pytest.raises(NotImplementedError, match="spherical"):
+            div_e(e, e, e, 1.0, 1.0, 1.0, geometry=GeometryType.SPHERICAL)

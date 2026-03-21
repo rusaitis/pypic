@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
+from pypic.coordinates.geometry import GeometryType
 from pypic.coordinates.operators import divergence
 
 if TYPE_CHECKING:
@@ -179,6 +180,8 @@ def div_b(
     d1: float,
     d2: float,
     d3: float,
+    *,
+    geometry: GeometryType = GeometryType.CARTESIAN,
 ) -> FloatArray:
     r"""Compute the divergence of the magnetic field.
 
@@ -205,6 +208,8 @@ def div_b(
         Grid spacing along the second axis.
     d3 : float
         Grid spacing along the third axis.
+    geometry : GeometryType
+        Coordinate geometry. Only Cartesian is implemented.
 
     Returns
     -------
@@ -220,7 +225,7 @@ def div_b(
     >>> np.max(np.abs(div_b(b1, b2, b3, 1.0, 1.0, 1.0)))
     np.float64(0.0)
     """
-    return divergence(b1, b2, b3, d1, d2, d3)
+    return divergence(b1, b2, b3, d1, d2, d3, geometry=geometry)
 
 
 def max_div_b(
@@ -230,6 +235,8 @@ def max_div_b(
     d1: float,
     d2: float,
     d3: float,
+    *,
+    geometry: GeometryType = GeometryType.CARTESIAN,
 ) -> np.floating[Any]:
     r"""Compute the maximum absolute divergence of B.
 
@@ -251,6 +258,8 @@ def max_div_b(
         Grid spacing along the second axis.
     d3 : float
         Grid spacing along the third axis.
+    geometry : GeometryType
+        Coordinate geometry. Only Cartesian is implemented.
 
     Returns
     -------
@@ -264,7 +273,7 @@ def max_div_b(
     >>> max_div_b(b, b, b, 1.0, 1.0, 1.0)
     np.float64(0.0)
     """
-    return np.max(np.abs(div_b(b1, b2, b3, d1, d2, d3)))
+    return np.max(np.abs(div_b(b1, b2, b3, d1, d2, d3, geometry=geometry)))
 
 
 def div_e(
@@ -274,6 +283,8 @@ def div_e(
     d1: float,
     d2: float,
     d3: float,
+    *,
+    geometry: GeometryType = GeometryType.CARTESIAN,
 ) -> FloatArray:
     r"""Compute the divergence of the electric field.
 
@@ -299,6 +310,8 @@ def div_e(
         Grid spacing along the second axis.
     d3 : float
         Grid spacing along the third axis.
+    geometry : GeometryType
+        Coordinate geometry. Only Cartesian is implemented.
 
     Returns
     -------
@@ -312,7 +325,7 @@ def div_e(
     >>> np.max(np.abs(div_e(e, e, e, 1.0, 1.0, 1.0)))
     np.float64(0.0)
     """
-    return divergence(e1, e2, e3, d1, d2, d3)
+    return divergence(e1, e2, e3, d1, d2, d3, geometry=geometry)
 
 
 __all__ = [

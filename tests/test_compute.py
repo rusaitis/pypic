@@ -10,6 +10,7 @@ from pypic.compute import (
     display_unit_factor,
     field_si_factor,
 )
+from pypic.coordinates.geometry import SPHERICAL
 from pypic.readers.base import FieldDataset, GridInfo
 from pypic.units import Normalization, SpeciesInfo
 
@@ -676,3 +677,89 @@ class TestPressureTensor:
         result = compute_field("P_perp", ds)
         # P_perp = (Tr(P) - P_par) / 2 = (6 - 3) / 2 = 1.5
         np.testing.assert_allclose(result, 1.5, rtol=1e-15)
+
+
+class TestGeometryGuard:
+    def test_compute_div_b_rejects_spherical(self):
+        shape = (4, 4, 4)
+        grid = GridInfo(dimensions=shape, spacing=(1.0, 1.0, 1.0), geometry=SPHERICAL)
+        data = {
+            "B1": np.ones(shape),
+            "B2": np.ones(shape),
+            "B3": np.ones(shape),
+        }
+        ds = FieldDataset.from_arrays(data, grid, Normalization.identity())
+        with pytest.raises(NotImplementedError, match="Cartesian"):
+            compute_field("div_B", ds)
+
+    def test_compute_vorticity_rejects_spherical(self):
+        shape = (4, 4, 4)
+        grid = GridInfo(dimensions=shape, spacing=(1.0, 1.0, 1.0), geometry=SPHERICAL)
+        data = {
+            "V1": np.ones(shape),
+            "V2": np.ones(shape),
+            "V3": np.ones(shape),
+        }
+        ds = FieldDataset.from_arrays(data, grid, Normalization.identity())
+        with pytest.raises(NotImplementedError, match="Cartesian"):
+            compute_field("vort1", ds)
+
+
+class TestSIFactorCoverage:
+    def test_div_e_factor(self):
+        norm = Normalization(
+            length_ref=2.0,
+            time_ref=1.0,
+            velocity_ref=1.0,
+            b_field_ref=1.0,
+            e_field_ref=3.0,
+            density_ref=1.0,
+            mass_ref=1.0,
+            charge_ref=1.0,
+        )
+        factor = field_si_factor("div_E", norm)
+        # e_field_ref / length_ref
+        assert factor == pytest.approx(1.5)
+
+    def test_background_b_factor(self):
+        norm = Normalization(
+            length_ref=1.0,
+            time_ref=1.0,
+            velocity_ref=1.0,
+            b_field_ref=7.0,
+            e_field_ref=1.0,
+            density_ref=1.0,
+            mass_ref=1.0,
+            charge_ref=1.0,
+        )
+        factor = field_si_factor("B0_1", norm)
+        assert factor == pytest.approx(7.0)
+
+    def test_species_density_factor(self):
+        norm = Normalization(
+            length_ref=1.0,
+            time_ref=1.0,
+            velocity_ref=1.0,
+            b_field_ref=1.0,
+            e_field_ref=1.0,
+            density_ref=5.0,
+            mass_ref=1.0,
+            charge_ref=1.0,
+        )
+        factor = field_si_factor("n_s2", norm)
+        assert factor == pytest.approx(5.0)
+
+    def test_pressure_tensor_factor(self):
+        norm = Normalization(
+            length_ref=1.0,
+            time_ref=1.0,
+            velocity_ref=3.0,
+            b_field_ref=1.0,
+            e_field_ref=1.0,
+            density_ref=2.0,
+            mass_ref=5.0,
+            charge_ref=1.0,
+        )
+        factor = field_si_factor("P11", norm)
+        # pressure = density_ref * mass_ref * velocity_ref^2
+        assert factor == pytest.approx(2.0 * 5.0 * 9.0)

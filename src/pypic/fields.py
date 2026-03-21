@@ -453,6 +453,8 @@ def _replace_latex_component(latex: str, digit: str, axis: str) -> str:
     latex = latex.replace(f",{digit}}}", f",{label}}}")
     # Digit at start of brace group: {{N, → {{label, (e.g. $J_{{1,s2}}$)
     latex = latex.replace(f"{{{digit},", f"{{{label},")
+    # Digit between commas: ,N, → ,label, (e.g. $V_{{e,2,s1}}$)
+    latex = latex.replace(f",{digit},", f",{label},")
     return latex
 
 

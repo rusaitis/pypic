@@ -239,3 +239,8 @@ class TestGeometryAwareLabels:
         info = field_info("S2", axis_names=self.SPHERICAL)
         assert info.long_name == "Poynting flux θ-component"
         assert info.latex == r"$S_{\theta}$"
+
+    def test_species_electron_velocity_component(self) -> None:
+        info = field_info("Ve2_s1", axis_names=self.CARTESIAN)
+        assert info.long_name == "Electron velocity y-component (species 1)"
+        assert info.latex == r"$V_{e,y,s1}$"
