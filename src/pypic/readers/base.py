@@ -135,9 +135,42 @@ def _build_aliases(suffixes: tuple[str, str, str]) -> dict[str, str]:
     return aliases
 
 
+def _build_underscore_aliases(suffixes: tuple[str, str, str]) -> dict[str, str]:
+    """Generate underscore-separated field aliases (e.g. ``B_x → B1``)."""
+    aliases: dict[str, str] = {}
+    for alias_prefix, canonical_prefix in _FIELD_PREFIX_PAIRS:
+        for i, suffix in enumerate(suffixes, 1):
+            aliases[f"{alias_prefix}_{suffix}"] = f"{canonical_prefix}{i}"
+    return aliases
+
+
 _CARTESIAN_ALIASES = _build_aliases(("x", "y", "z"))
 _SPHERICAL_ALIASES = _build_aliases(("r", "theta", "phi"))
 _CYLINDRICAL_ALIASES = _build_aliases(("r", "phi", "z"))
+
+_CARTESIAN_UNDERSCORE_ALIASES = _build_underscore_aliases(("x", "y", "z"))
+_SPHERICAL_UNDERSCORE_ALIASES = _build_underscore_aliases(("r", "theta", "phi"))
+_CYLINDRICAL_UNDERSCORE_ALIASES = _build_underscore_aliases(("r", "phi", "z"))
+
+# Numbered underscore aliases (B_1→B1, E_2→E2, etc.) — geometry-independent
+_NUMBERED_UNDERSCORE_ALIASES: dict[str, str] = {}
+for _alias_pfx, _canon_pfx in _FIELD_PREFIX_PAIRS:
+    for _i in (1, 2, 3):
+        _NUMBERED_UNDERSCORE_ALIASES[f"{_alias_pfx}_{_i}"] = f"{_canon_pfx}{_i}"
+
+# Scalar underscore aliases (P_e→Pe, T_i→Ti, pressure tensor components)
+_SCALAR_UNDERSCORE_ALIASES: dict[str, str] = {
+    "P_e": "Pe",
+    "P_i": "Pi",
+    "T_e": "Te",
+    "T_i": "Ti",
+    "P_11": "P11",
+    "P_12": "P12",
+    "P_13": "P13",
+    "P_22": "P22",
+    "P_23": "P23",
+    "P_33": "P33",
+}
 
 # Species-convenience aliases (geometry-independent)
 _SPECIES_ALIASES: dict[str, str] = {
@@ -151,12 +184,17 @@ def _default_aliases(geometry: CoordinateGeometry) -> dict[str, str]:
     match geometry.type:
         case GeometryType.CARTESIAN:
             aliases = dict(_CARTESIAN_ALIASES)
+            aliases.update(_CARTESIAN_UNDERSCORE_ALIASES)
         case GeometryType.SPHERICAL:
             aliases = dict(_SPHERICAL_ALIASES)
+            aliases.update(_SPHERICAL_UNDERSCORE_ALIASES)
         case GeometryType.CYLINDRICAL:
             aliases = dict(_CYLINDRICAL_ALIASES)
+            aliases.update(_CYLINDRICAL_UNDERSCORE_ALIASES)
         case _ as unreachable:
             assert_never(unreachable)
+    aliases.update(_NUMBERED_UNDERSCORE_ALIASES)
+    aliases.update(_SCALAR_UNDERSCORE_ALIASES)
     aliases.update(_SPECIES_ALIASES)
     return aliases
 

@@ -163,6 +163,63 @@ _COMPUTE_ALIASES: dict[str, str] = {
     "Sy": "S2",
     "Sz": "S3",
     "s_gyro_e": "s_gyro",
+    # Magnitude aliases (_mag suffix)
+    "B_mag": "|B|",
+    "Bmag": "|B|",
+    "E_mag": "|E|",
+    "Emag": "|E|",
+    "J_mag": "|J|",
+    "Jmag": "|J|",
+    "V_mag": "|V|",
+    "vort_mag": "|vort|",
+    # Descriptive names
+    "plasma_beta": "beta",
+    "v_Alfven": "v_A",
+    "c_ms": "v_ms",
+    "energy_magnetic": "e_B",
+    "energy_electric": "e_E",
+    "energy_kinetic": "e_k",
+    "energy_thermal": "e_th",
+    "enthalpy": "h",
+    "enthalpy_relativistic": "h_rel",
+    "energy_internal": "e_int",
+    # Structured species names
+    "omega_p_s0": "omega_pe",
+    "omega_p_s1": "omega_pi",
+    "omega_c_s0": "omega_ce",
+    "omega_c_s1": "omega_ci",
+    "d_s0": "d_e",
+    "d_s1": "d_i",
+    "v_thermal_s0": "v_th_e",
+    "v_thermal_s1": "v_th_i",
+    "larmor_radius_s0": "r_e",
+    "larmor_radius_s1": "r_i",
+    "rL_s0": "r_e",
+    "rL_s1": "r_i",
+    "plasma_beta_s0": "beta_e",
+    "plasma_beta_s1": "beta_i",
+    "beta_s0": "beta_e",
+    "beta_s1": "beta_i",
+    "entropy_s0": "s_e",
+    "entropy_s1": "s_i",
+    "entropy_gyrotropic_s0": "s_gyro",
+    "entropy_gyrotropic_s1": "s_gyro_i",
+    # Underscore-separated operator/component aliases
+    "curl_B_1": "curl_B1",
+    "curl_B_2": "curl_B2",
+    "curl_B_3": "curl_B3",
+    "curl_B_x": "curl_B1",
+    "curl_B_y": "curl_B2",
+    "curl_B_z": "curl_B3",
+    "vort_1": "vort1",
+    "vort_2": "vort2",
+    "vort_3": "vort3",
+    "S_1": "S1",
+    "S_2": "S2",
+    "S_3": "S3",
+    "S_x": "S1",
+    "S_y": "S2",
+    "S_z": "S3",
 }
 
 # Maps field/derived names to physical quantity types for SI conversion
@@ -458,6 +515,49 @@ def compute_field(name: str, dataset: FieldDataset, _depth: int = 0) -> FloatArr
     return result  # type: ignore[no-any-return]
 
 
+def _build_field_alias_fallback() -> dict[str, str]:
+    """Build a flat field alias lookup for SI conversion fallback.
+
+    Merges all geometry alias dicts plus species and scalar aliases.
+    This is safe because all B-field components map to the same SI
+    quantity type regardless of which coordinate index they represent.
+    """
+    from pypic.readers.base import (
+        _CARTESIAN_ALIASES,
+        _CARTESIAN_UNDERSCORE_ALIASES,
+        _CYLINDRICAL_ALIASES,
+        _CYLINDRICAL_UNDERSCORE_ALIASES,
+        _NUMBERED_UNDERSCORE_ALIASES,
+        _SCALAR_UNDERSCORE_ALIASES,
+        _SPECIES_ALIASES,
+        _SPHERICAL_ALIASES,
+        _SPHERICAL_UNDERSCORE_ALIASES,
+    )
+
+    merged: dict[str, str] = {}
+    merged.update(_CARTESIAN_ALIASES)
+    merged.update(_SPHERICAL_ALIASES)
+    merged.update(_CYLINDRICAL_ALIASES)
+    merged.update(_CARTESIAN_UNDERSCORE_ALIASES)
+    merged.update(_SPHERICAL_UNDERSCORE_ALIASES)
+    merged.update(_CYLINDRICAL_UNDERSCORE_ALIASES)
+    merged.update(_NUMBERED_UNDERSCORE_ALIASES)
+    merged.update(_SCALAR_UNDERSCORE_ALIASES)
+    merged.update(_SPECIES_ALIASES)
+    return merged
+
+
+_FIELD_ALIAS_FALLBACK: dict[str, str] | None = None
+
+
+def _get_field_alias_fallback() -> dict[str, str]:
+    """Lazy-init the field alias fallback dict."""
+    global _FIELD_ALIAS_FALLBACK
+    if _FIELD_ALIAS_FALLBACK is None:
+        _FIELD_ALIAS_FALLBACK = _build_field_alias_fallback()
+    return _FIELD_ALIAS_FALLBACK
+
+
 def field_si_factor(name: str, normalization: Normalization) -> float:
     """Return the SI conversion factor for a field or derived quantity.
 
@@ -479,8 +579,12 @@ def field_si_factor(name: str, normalization: Normalization) -> float:
         If the quantity type for *name* is unknown.
     """
     canonical = _resolve_name(name)
-    # Also resolve FieldDataset aliases (Bx→B1, etc.)
     quantity_type = _FIELD_QUANTITY_MAP.get(canonical)
+    if quantity_type is None:
+        # Resolve field aliases (Bx→B1, B_x→B1, P_e→Pe, etc.)
+        fallback = _get_field_alias_fallback()
+        canonical = fallback.get(canonical, canonical)
+        quantity_type = _FIELD_QUANTITY_MAP.get(canonical)
     if quantity_type is None:
         msg = (
             f"No SI conversion known for {name!r}. "
