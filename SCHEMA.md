@@ -344,15 +344,15 @@ two-species case, `n_e` and `n_i` are accepted as aliases for `n_s0` and
 
 | Canonical | Meaning | Computed from |
 |-----------|---------|---------------|
-| `d_e` | Electron skin depth | `n_e`, species |
-| `d_i` | Ion skin depth | `n_i`, species |
+| `d_e` | Electron skin depth | `n_s0`, species |
+| `d_i` | Ion skin depth | `n_s1`, species |
 | `r_e` | Electron thermal gyroradius | `Te`, `|B|`, species |
 | `r_i` | Ion thermal gyroradius | `Ti`, `|B|`, species |
-| `omega_pe` | Electron plasma frequency | `n_e`, species |
-| `omega_pi` | Ion plasma frequency | `n_i`, species |
+| `omega_pe` | Electron plasma frequency | `n_s0`, species |
+| `omega_pi` | Ion plasma frequency | `n_s1`, species |
 | `omega_ce` | Electron cyclotron frequency (positive by convention) | `|B|`, species |
 | `omega_ci` | Ion cyclotron frequency (positive by convention) | `|B|`, species |
-| `lambda_D` | Electron Debye length | `n_e`, `Te`, species |
+| `lambda_D` | Electron Debye length | `n_s0`, `Te`, species |
 | `v_A` | Alfvén speed | `|B|`, `rho_m` |
 | `v_th_e` | Electron thermal speed (NRL convention) | `Te`, species |
 | `v_th_i` | Ion thermal speed (NRL convention) | `Ti`, species |
@@ -364,6 +364,9 @@ two-species case, `n_e` and `n_i` are accepted as aliases for `n_s0` and
 | `beta_e` | Electron beta | `Pe`, `|B|` |
 | `beta_i` | Ion beta | `Pi`, `|B|` |
 | `sigma` | Magnetization parameter | `|B|`, `rho_m`, `c` |
+
+`n_e` and `n_i` are accepted as aliases for `n_s0` and `n_s1` (see
+Densities section above).
 
 ### Other derived quantities
 

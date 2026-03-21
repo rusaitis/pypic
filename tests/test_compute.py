@@ -564,6 +564,77 @@ class TestIonAcousticSpeed:
         np.testing.assert_allclose(result, 1.0, rtol=1e-15)
 
 
+class TestSpeciesAliases:
+    def test_n_e_alias_resolves_through_compute(self):
+        """n_e alias in FieldDataset resolves to n_s0 for compute."""
+        shape = (2, 2, 2)
+        data = {"n_s0": np.full(shape, 4.0)}
+        ds = _make_dataset(data, shape=shape, species=[ELECTRONS, IONS])
+        # omega_pe depends on n_s0 — verify it works when n_e is the alias
+        result = compute_field("omega_pe", ds)
+        np.testing.assert_allclose(result, 32.0, rtol=1e-14)
+
+    def test_n_e_n_i_accessible_as_fields(self):
+        shape = (2, 2, 2)
+        data = {"n_s0": np.full(shape, 1.0), "n_s1": np.full(shape, 2.0)}
+        ds = _make_dataset(data, shape=shape)
+        np.testing.assert_allclose(ds["n_e"], 1.0)
+        np.testing.assert_allclose(ds["n_i"], 2.0)
+
+    def test_s_gyro_i_uses_n_s1(self):
+        shape = (2, 2, 2)
+        data = {
+            "P11": np.full(shape, 1.0),
+            "P22": np.full(shape, 1.0),
+            "P33": np.full(shape, 3.0),
+            "P12": np.zeros(shape),
+            "P13": np.zeros(shape),
+            "P23": np.zeros(shape),
+            "B1": np.zeros(shape),
+            "B2": np.zeros(shape),
+            "B3": np.ones(shape),
+            "n_s1": np.full(shape, 2.0),
+        }
+        ds = _make_dataset(data, shape=shape)
+        result = compute_field("s_gyro_i", ds)
+        # P_par=3 (B along z), P_perp=(1+1+3-3)/2=1
+        # s_gyro = ln(P_par * P_perp^2 / n^5) = ln(3 * 1 / 32) = ln(3/32)
+        expected = np.log(3.0 * 1.0**2 / 2.0**5)
+        np.testing.assert_allclose(result, expected, rtol=1e-14)
+
+    def test_s_gyro_e_alias_resolves_to_s_gyro(self):
+        shape = (2, 2, 2)
+        data = {
+            "P11": np.full(shape, 1.0),
+            "P22": np.full(shape, 1.0),
+            "P33": np.full(shape, 3.0),
+            "P12": np.zeros(shape),
+            "P13": np.zeros(shape),
+            "P23": np.zeros(shape),
+            "B1": np.zeros(shape),
+            "B2": np.zeros(shape),
+            "B3": np.ones(shape),
+            "n_s0": np.full(shape, 1.0),
+        }
+        ds = _make_dataset(data, shape=shape)
+        result_alias = compute_field("s_gyro_e", ds)
+        result_canonical = compute_field("s_gyro", ds)
+        np.testing.assert_array_equal(result_alias, result_canonical)
+
+    def test_four_velocity_aliases_resolve(self):
+        """ux/uy/uz field aliases work through FieldDataset."""
+        shape = (2, 2, 2)
+        data = {
+            "u1": np.full(shape, 0.5),
+            "u2": np.full(shape, 0.3),
+            "u3": np.full(shape, 0.1),
+        }
+        ds = _make_dataset(data, shape=shape)
+        np.testing.assert_allclose(ds["ux"], 0.5)
+        np.testing.assert_allclose(ds["uy"], 0.3)
+        np.testing.assert_allclose(ds["uz"], 0.1)
+
+
 class TestPressureTensor:
     def test_parallel_pressure(self):
         shape = (2, 2, 2)

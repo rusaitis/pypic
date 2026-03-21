@@ -122,6 +122,7 @@ _FIELD_PREFIX_PAIRS = (
     ("v", "V"),  # lowercase convenience alias
     ("Ve", "Ve"),
     ("S", "S"),
+    ("u", "u"),  # four-velocity
 )
 
 
@@ -138,18 +139,26 @@ _CARTESIAN_ALIASES = _build_aliases(("x", "y", "z"))
 _SPHERICAL_ALIASES = _build_aliases(("r", "theta", "phi"))
 _CYLINDRICAL_ALIASES = _build_aliases(("r", "phi", "z"))
 
+# Species-convenience aliases (geometry-independent)
+_SPECIES_ALIASES: dict[str, str] = {
+    "n_e": "n_s0",
+    "n_i": "n_s1",
+}
+
 
 def _default_aliases(geometry: CoordinateGeometry) -> dict[str, str]:
-    """Return geometry-specific field name aliases."""
+    """Return geometry-specific field name aliases plus species aliases."""
     match geometry.type:
         case GeometryType.CARTESIAN:
-            return dict(_CARTESIAN_ALIASES)
+            aliases = dict(_CARTESIAN_ALIASES)
         case GeometryType.SPHERICAL:
-            return dict(_SPHERICAL_ALIASES)
+            aliases = dict(_SPHERICAL_ALIASES)
         case GeometryType.CYLINDRICAL:
-            return dict(_CYLINDRICAL_ALIASES)
+            aliases = dict(_CYLINDRICAL_ALIASES)
         case _ as unreachable:
             assert_never(unreachable)
+    aliases.update(_SPECIES_ALIASES)
+    return aliases
 
 
 def _build_grid_from_dataset(old_grid: GridInfo, new_ds: xr.Dataset) -> GridInfo:

@@ -282,6 +282,38 @@ class TestAliases:
         assert ds.has_field("Bx")
         assert not ds.has_field("By")  # B2 doesn't exist
 
+    def test_n_e_n_i_aliases(self, sample_grid):
+        """n_e and n_i resolve to n_s0 and n_s1."""
+        fields = {
+            "n_s0": np.full((8, 6, 4), 1e18),
+            "n_s1": np.full((8, 6, 4), 1e18),
+        }
+        ds = FieldDataset.from_arrays(fields, sample_grid, Normalization.identity())
+        assert ds.has_field("n_e")
+        assert ds.has_field("n_i")
+        assert_allclose(ds["n_e"], fields["n_s0"])
+        assert_allclose(ds["n_i"], fields["n_s1"])
+
+    def test_n_e_alias_inactive_without_n_s0(self, sample_grid):
+        ds = FieldDataset.from_arrays(
+            {"B1": np.ones((8, 6, 4))}, sample_grid, Normalization.identity()
+        )
+        assert not ds.has_field("n_e")
+
+    def test_four_velocity_aliases(self, sample_grid):
+        """ux/uy/uz resolve to u1/u2/u3."""
+        fields = {
+            "u1": np.ones((8, 6, 4)),
+            "u2": np.full((8, 6, 4), 2.0),
+            "u3": np.full((8, 6, 4), 3.0),
+        }
+        ds = FieldDataset.from_arrays(fields, sample_grid, Normalization.identity())
+        assert ds.has_field("ux")
+        assert ds.has_field("uy")
+        assert ds.has_field("uz")
+        assert_allclose(ds["ux"], fields["u1"])
+        assert_allclose(ds["uz"], fields["u3"])
+
 
 class TestSimulationReader:
     def test_protocol_satisfied(self):

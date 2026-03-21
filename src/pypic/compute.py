@@ -73,6 +73,7 @@ _REGISTRY: dict[str, _Recipe] = {
     "s_e": _Recipe(derived.entropy, ("Pe", "n_s0"), needs_gamma=True),
     "s_i": _Recipe(derived.entropy, ("Pi", "n_s1"), needs_gamma=True),
     "s_gyro": _Recipe(derived.gyrotropic_entropy, ("P_par", "P_perp", "n_s0")),
+    "s_gyro_i": _Recipe(derived.gyrotropic_entropy, ("P_par", "P_perp", "n_s1")),
     # Poynting flux (tuple return — component selects)
     "S1": _Recipe(
         derived.poynting_flux,
@@ -161,6 +162,7 @@ _COMPUTE_ALIASES: dict[str, str] = {
     "Sx": "S1",
     "Sy": "S2",
     "Sz": "S3",
+    "s_gyro_e": "s_gyro",
 }
 
 # Maps field/derived names to physical quantity types for SI conversion
@@ -193,11 +195,17 @@ _FIELD_QUANTITY_MAP: dict[str, str] = {
     "v_ms": "velocity",
     "v_th_e": "velocity",
     "v_th_i": "velocity",
+    # Four-velocity
+    "u1": "velocity",
+    "u2": "velocity",
+    "u3": "velocity",
     # Densities
     "rho_m": "mass_density",
     "rho_c": "charge_density",
     "n_s0": "density",
     "n_s1": "density",
+    "n_e": "density",
+    "n_i": "density",
     # Pressure
     "P": "pressure",
     "Pe": "pressure",
@@ -257,6 +265,8 @@ _FIELD_QUANTITY_MAP: dict[str, str] = {
     "s_e": "dimensionless",
     "s_i": "dimensionless",
     "s_gyro": "dimensionless",
+    "s_gyro_e": "dimensionless",
+    "s_gyro_i": "dimensionless",
     "agyrotropy": "dimensionless",
 }
 
