@@ -148,13 +148,7 @@ class TestDivB:
         b1, b2, b3 = np.meshgrid(x, y, z, indexing="ij")
         result = div_b(b1, b2, b3, dx, dy, dz)
         np.testing.assert_allclose(result, 3.0, rtol=1e-14)
-
-    def test_output_shape(self):
-        shape = (5, 6, 7)
-        b1 = np.zeros(shape)
-        b2 = np.zeros(shape)
-        b3 = np.zeros(shape)
-        assert div_b(b1, b2, b3, 1.0, 1.0, 1.0).shape == shape
+        assert result.shape == (nx, ny, nz)
 
     def test_nan_propagation(self):
         shape = (4, 4, 4)
@@ -198,11 +192,7 @@ class TestDivE:
         e3 = np.zeros_like(xx)
         result = div_e(e1, e2, e3, dx, dy, dz)
         np.testing.assert_allclose(result, 1.0, rtol=1e-14)
-
-    def test_output_shape(self):
-        shape = (5, 6, 7)
-        e = np.zeros(shape)
-        assert div_e(e, e, e, 1.0, 1.0, 1.0).shape == shape
+        assert result.shape == (nx, ny, nz)
 
 
 class TestConvergence:
@@ -241,17 +231,8 @@ class TestConvergence:
 
 
 class TestGeometryForwarding:
-    def test_div_b_rejects_spherical(self):
-        b = np.ones((4, 4, 4))
+    @pytest.mark.parametrize("func", [div_b, max_div_b, div_e])
+    def test_rejects_spherical(self, func):
+        f = np.ones((4, 4, 4))
         with pytest.raises(NotImplementedError, match="spherical"):
-            div_b(b, b, b, 1.0, 1.0, 1.0, geometry=GeometryType.SPHERICAL)
-
-    def test_max_div_b_rejects_spherical(self):
-        b = np.ones((4, 4, 4))
-        with pytest.raises(NotImplementedError, match="spherical"):
-            max_div_b(b, b, b, 1.0, 1.0, 1.0, geometry=GeometryType.SPHERICAL)
-
-    def test_div_e_rejects_spherical(self):
-        e = np.ones((4, 4, 4))
-        with pytest.raises(NotImplementedError, match="spherical"):
-            div_e(e, e, e, 1.0, 1.0, 1.0, geometry=GeometryType.SPHERICAL)
+            func(f, f, f, 1.0, 1.0, 1.0, geometry=GeometryType.SPHERICAL)

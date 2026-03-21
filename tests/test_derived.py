@@ -66,20 +66,18 @@ class TestMagnitudes:
 
 
 class TestPlasmaBeta:
-    def test_unit_values(self):
+    def test_known_values(self):
+        # P=1, B=1 → beta = 2
         np.testing.assert_allclose(
             plasma_beta(np.array([1.0]), np.array([1.0])), 2.0, rtol=1e-15
         )
-
-    def test_low_beta(self):
+        # Low beta: P=0.5, B=2 → beta = 0.25
         np.testing.assert_allclose(
             plasma_beta(np.array([0.5]), np.array([2.0])), 0.25, rtol=1e-15
         )
-
-    def test_beta_one(self):
+        # Beta = 1 when P = B^2/2
         b = np.array([2.0])
-        pressure = b**2 / 2.0
-        np.testing.assert_allclose(plasma_beta(pressure, b), 1.0, rtol=1e-15)
+        np.testing.assert_allclose(plasma_beta(b**2 / 2.0, b), 1.0, rtol=1e-15)
 
     def test_zero_b_gives_nan(self):
         result = plasma_beta(np.array([1.0]), np.array([0.0]))
@@ -87,47 +85,38 @@ class TestPlasmaBeta:
 
 
 class TestAlfvenSpeed:
-    def test_claudemd_example(self):
+    def test_known_values(self):
         np.testing.assert_allclose(
             alfven_speed(np.array([1.0]), np.array([4.0])), 0.5, rtol=1e-15
         )
-
-    def test_unit_values(self):
         np.testing.assert_allclose(
             alfven_speed(np.array([1.0]), np.array([1.0])), 1.0, rtol=1e-15
         )
 
-    def test_zero_density_gives_nan(self):
-        result = alfven_speed(np.array([1.0]), np.array([0.0]))
-        assert np.isnan(result[0])
-
-    def test_negative_density_gives_nan(self):
-        result = alfven_speed(np.array([1.0]), np.array([-1.0]))
-        assert np.isnan(result[0])
+    def test_invalid_density_gives_nan(self):
+        assert np.isnan(alfven_speed(np.array([1.0]), np.array([0.0]))[0])
+        assert np.isnan(alfven_speed(np.array([1.0]), np.array([-1.0]))[0])
 
 
 class TestEnergyDensities:
-    def test_magnetic_energy(self):
+    def test_known_values(self):
+        # B=2 → e_B = B^2/2 = 2
         np.testing.assert_allclose(
             magnetic_energy_density(np.array([2.0])), 2.0, rtol=1e-15
         )
-
-    def test_electric_energy(self):
+        # E=3 → e_E = E^2/2 = 4.5
         np.testing.assert_allclose(
             electric_energy_density(np.array([3.0])), 4.5, rtol=1e-15
         )
-
-    def test_kinetic_energy(self):
+        # rho=2, V=3 → e_k = 0.5*2*9 = 9
         np.testing.assert_allclose(
             kinetic_energy_density(np.array([2.0]), np.array([3.0])), 9.0, rtol=1e-15
         )
 
-    def test_thermal_energy_default_gamma(self):
+    def test_thermal_energy(self):
         np.testing.assert_allclose(
             thermal_energy_density(np.array([1.0])), 1.5, rtol=1e-15
         )
-
-    def test_thermal_energy_gamma_2(self):
         np.testing.assert_allclose(
             thermal_energy_density(np.array([1.0]), gamma=2.0), 1.0, rtol=1e-15
         )
@@ -193,53 +182,42 @@ class TestThermodynamics:
         e_int = internal_energy(p, rho)
         np.testing.assert_allclose(h, e_int + p / rho, rtol=1e-15)
 
-    def test_relativistic_enthalpy_c1(self):
+    def test_relativistic_enthalpy(self):
         p = np.array([1.0])
         rho = np.array([1.0])
         h = enthalpy(p, rho)
         np.testing.assert_allclose(
             relativistic_enthalpy(p, rho, c=1.0), 1.0 + h, rtol=1e-15
         )
-
-    def test_relativistic_enthalpy_c10(self):
-        p = np.array([1.0])
-        rho = np.array([1.0])
-        h = enthalpy(p, rho)
         np.testing.assert_allclose(
             relativistic_enthalpy(p, rho, c=10.0), 100.0 + h, rtol=1e-15
         )
 
-    def test_entropy_unit_values(self):
+    def test_entropy_values(self):
         np.testing.assert_allclose(
             entropy(np.array([1.0]), np.array([1.0])), 0.0, atol=1e-15
         )
-
-    def test_entropy_e_over_1(self):
         np.testing.assert_allclose(
             entropy(np.array([np.e]), np.array([1.0])), 1.0, rtol=1e-15
         )
 
-    def test_gyrotropic_entropy_unit_values(self):
+    def test_gyrotropic_entropy(self):
         np.testing.assert_allclose(
             gyrotropic_entropy(np.array([1.0]), np.array([1.0]), np.array([1.0])),
             0.0,
             atol=1e-15,
         )
-
-    def test_gyrotropic_entropy_exponent_is_5(self):
-        n = np.array([2.0])
         # With P_par=P_perp=1: log(1 * 1 / n^5) = -5 * log(n)
+        n = np.array([2.0])
         expected = -5.0 * np.log(n)
         result = gyrotropic_entropy(np.array([1.0]), np.array([1.0]), n)
         np.testing.assert_allclose(result, expected, rtol=1e-15)
 
-    def test_entropy_negative_pressure_gives_nan(self):
-        result = entropy(np.array([-1.0]), np.array([1.0]))
-        assert np.isnan(result[0])
-
-    def test_gyrotropic_entropy_negative_pressure_gives_nan(self):
-        result = gyrotropic_entropy(np.array([-1.0]), np.array([1.0]), np.array([1.0]))
-        assert np.isnan(result[0])
+    def test_negative_pressure_gives_nan(self):
+        assert np.isnan(entropy(np.array([-1.0]), np.array([1.0]))[0])
+        assert np.isnan(
+            gyrotropic_entropy(np.array([-1.0]), np.array([1.0]), np.array([1.0]))[0]
+        )
 
 
 class TestDefaultParameters:
@@ -332,26 +310,26 @@ class TestPlasmaFrequency:
 
 
 class TestSkinDepth:
-    def test_identity_d_times_omega_p_equals_c(self):
+    def test_skin_depth(self):
+        # Identity: d * omega_p = c
         n = np.array([3.7])
         q, m, c = 1.5, 2.3, 10.0
         d = skin_depth(n, charge=q, mass=m, c=c)
         omega = plasma_frequency(n, charge=q, mass=m)
         np.testing.assert_allclose(d * omega, c, rtol=1e-15)
-
-    def test_custom_c(self):
+        # Known value: n=1, q=1, m=1, c=3 → d = 3
         np.testing.assert_allclose(
             skin_depth(np.array([1.0]), charge=1.0, mass=1.0, c=3.0), 3.0, rtol=1e-15
         )
 
 
 class TestGyroradius:
-    def test_negative_charge_gives_same_result(self):
+    def test_gyroradius(self):
+        # Charge sign invariance
         pos = gyroradius(np.array([2.0]), np.array([3.0]), charge=1.0, mass=1.0)
         neg = gyroradius(np.array([2.0]), np.array([3.0]), charge=-1.0, mass=1.0)
         np.testing.assert_allclose(pos, neg, rtol=1e-15)
-
-    def test_equals_vth_over_omega_c(self):
+        # Identity: r = v_th / omega_c
         t = np.array([2.5])
         b = np.array([3.7])
         q, m = 1.5, 2.3
@@ -362,13 +340,12 @@ class TestGyroradius:
 
 
 class TestDebyeLength:
-    def test_negative_charge_invariant(self):
+    def test_debye_length(self):
+        # Charge sign invariance
         pos = debye_length(np.array([2.0]), np.array([3.0]), charge=1.0)
         neg = debye_length(np.array([2.0]), np.array([3.0]), charge=-1.0)
         np.testing.assert_allclose(pos, neg, rtol=1e-15)
-
-    def test_known_value(self):
-        # T=4, n=1, q=1 → sqrt(4) = 2
+        # Known value: T=4, n=1, q=1 → sqrt(4) = 2
         np.testing.assert_allclose(
             debye_length(np.array([4.0]), np.array([1.0]), charge=1.0), 2.0, rtol=1e-15
         )
@@ -418,35 +395,29 @@ class TestMagnetosonicSpeed:
             magnetosonic_speed(np.array([3.0]), np.array([4.0])), 5.0, rtol=1e-15
         )
 
-    def test_zero_sound_speed(self):
+    def test_limiting_cases(self):
+        # Zero sound speed → v_ms = v_A
         np.testing.assert_allclose(
             magnetosonic_speed(np.array([5.0]), np.array([0.0])), 5.0, rtol=1e-15
         )
-
-    def test_zero_alfven_speed(self):
+        # Zero Alfvén speed → v_ms = c_s
         np.testing.assert_allclose(
             magnetosonic_speed(np.array([0.0]), np.array([7.0])), 7.0, rtol=1e-15
         )
 
 
 class TestMachNumbers:
-    def test_alfven_mach_value(self):
+    def test_known_values(self):
         np.testing.assert_allclose(
             alfven_mach(np.array([6.0]), np.array([3.0])), 2.0, rtol=1e-15
         )
-
-    def test_alfven_mach_zero_va_gives_nan(self):
-        result = alfven_mach(np.array([1.0]), np.array([0.0]))
-        assert np.isnan(result[0])
-
-    def test_magnetosonic_mach_value(self):
         np.testing.assert_allclose(
             magnetosonic_mach(np.array([10.0]), np.array([5.0])), 2.0, rtol=1e-15
         )
 
-    def test_magnetosonic_mach_zero_vms_gives_nan(self):
-        result = magnetosonic_mach(np.array([1.0]), np.array([0.0]))
-        assert np.isnan(result[0])
+    def test_zero_denominator_gives_nan(self):
+        assert np.isnan(alfven_mach(np.array([1.0]), np.array([0.0]))[0])
+        assert np.isnan(magnetosonic_mach(np.array([1.0]), np.array([0.0]))[0])
 
 
 # Shared fixtures for pressure tensor tests

@@ -106,8 +106,6 @@ class TestDependencyChains:
         # Uniform velocity → zero vorticity
         np.testing.assert_allclose(result, 0.0, atol=1e-15)
 
-
-class TestDirectFieldPassthrough:
     def test_existing_field_returned_directly(self):
         shape = (2, 2, 2)
         b1 = np.full(shape, 42.0)
@@ -288,20 +286,6 @@ class TestMultiComponent:
         np.testing.assert_allclose(result, 0.0, atol=1e-15)
 
 
-class TestComputeAliases:
-    def test_cartesian_aliases(self):
-        shape = (4, 4, 4)
-        data = {
-            "B1": np.ones(shape),
-            "B2": np.ones(shape),
-            "B3": np.ones(shape),
-        }
-        ds = make_test_dataset(data, shape=shape)
-        result_alias = compute_field("curl_Bx", ds)
-        result_canonical = compute_field("curl_B1", ds)
-        np.testing.assert_array_equal(result_alias, result_canonical)
-
-
 class TestFieldDatasetMethods:
     def test_compute_method(self):
         shape = (2, 2, 2)
@@ -378,28 +362,46 @@ class TestFieldDatasetMethods:
         with pytest.raises(ValueError, match="Unknown unit"):
             ds.in_units("B1", "furlongs")
 
+    def test_cartesian_compute_aliases(self):
+        shape = (4, 4, 4)
+        data = {"B1": np.ones(shape), "B2": np.ones(shape), "B3": np.ones(shape)}
+        ds = make_test_dataset(data, shape=shape)
+        result_alias = compute_field("curl_Bx", ds)
+        result_canonical = compute_field("curl_B1", ds)
+        np.testing.assert_array_equal(result_alias, result_canonical)
 
-class TestSIConversion:
-    def test_pressure_compound_factor(self):
-        norm = Normalization(
+    def test_identity_normalization_passthrough(self):
+        shape = (2, 2, 2)
+        ds = make_test_dataset({"B1": np.full(shape, 7.0)}, shape=shape)
+        np.testing.assert_allclose(ds.in_si("B1"), 7.0, rtol=1e-15)
+
+
+class TestSIFactors:
+    @pytest.mark.parametrize(
+        ("field", "norm_kwargs", "expected"),
+        [
+            # Compound: pressure = density_ref * mass_ref * velocity_ref^2
+            ("P", {"velocity_ref": 3.0, "density_ref": 2.0, "mass_ref": 5.0}, 90.0),
+            # Frequency = 1/time_ref
+            ("omega_pe", {"time_ref": 0.5}, 2.0),
+            # Background B uses b_field_ref
+            ("B0_1", {"b_field_ref": 7.0}, 7.0),
+            # Species density uses density_ref
+            ("n_s2", {"density_ref": 5.0}, 5.0),
+            # Pressure tensor = same as pressure
+            ("P11", {"velocity_ref": 3.0, "density_ref": 2.0, "mass_ref": 5.0}, 90.0),
+            # Dimensionless quantities
+            ("gamma_L", {}, 1.0),
+            ("sigma", {}, 1.0),
+            # Vorticity = frequency = 1/time_ref
+            ("vort1", {"time_ref": 0.25}, 4.0),
+        ],
+        ids=["pressure", "frequency", "B0", "n_s2", "P11", "gamma_L", "sigma", "vort1"],
+    )
+    def test_si_factor(self, field, norm_kwargs, expected):
+        defaults = dict(
             length_ref=1.0,
             time_ref=1.0,
-            velocity_ref=3.0,
-            b_field_ref=1.0,
-            e_field_ref=1.0,
-            density_ref=2.0,
-            mass_ref=5.0,
-            charge_ref=1.0,
-        )
-        factor = field_si_factor("P", norm)
-        # pressure = density_ref * mass_ref * velocity_ref^2
-        expected = 2.0 * 5.0 * 9.0
-        assert factor == pytest.approx(expected)
-
-    def test_frequency_factor(self):
-        norm = Normalization(
-            length_ref=1.0,
-            time_ref=0.5,
             velocity_ref=1.0,
             b_field_ref=1.0,
             e_field_ref=1.0,
@@ -407,8 +409,9 @@ class TestSIConversion:
             mass_ref=1.0,
             charge_ref=1.0,
         )
-        factor = field_si_factor("omega_pe", norm)
-        assert factor == pytest.approx(2.0)
+        defaults.update(norm_kwargs)
+        norm = Normalization(**defaults)
+        assert field_si_factor(field, norm) == pytest.approx(expected)
 
     def test_div_b_factor(self):
         norm = Normalization(
@@ -421,9 +424,20 @@ class TestSIConversion:
             mass_ref=1.0,
             charge_ref=1.0,
         )
-        factor = field_si_factor("div_B", norm)
-        # b_field_ref / length_ref
-        assert factor == pytest.approx(1.5)
+        assert field_si_factor("div_B", norm) == pytest.approx(1.5)
+
+    def test_div_e_factor(self):
+        norm = Normalization(
+            length_ref=2.0,
+            time_ref=1.0,
+            velocity_ref=1.0,
+            b_field_ref=1.0,
+            e_field_ref=3.0,
+            density_ref=1.0,
+            mass_ref=1.0,
+            charge_ref=1.0,
+        )
+        assert field_si_factor("div_E", norm) == pytest.approx(1.5)
 
 
 class TestDisplayUnits:
@@ -432,18 +446,11 @@ class TestDisplayUnits:
         assert display_unit_factor("km/s") == pytest.approx(1e3)
         assert display_unit_factor("RE") == pytest.approx(6.371e6)
         assert display_unit_factor("eV") == pytest.approx(constants.eV)
+        assert display_unit_factor("normalized") == pytest.approx(1.0)
 
     def test_unknown_unit_raises(self):
         with pytest.raises(ValueError, match="Unknown unit"):
             display_unit_factor("parsecs")
-
-
-class TestRoundTrip:
-    def test_identity_normalization_passthrough(self):
-        shape = (2, 2, 2)
-        data = {"B1": np.full(shape, 7.0)}
-        ds = make_test_dataset(data, shape=shape)
-        np.testing.assert_allclose(ds.in_si("B1"), 7.0, rtol=1e-15)
 
 
 class TestErrorMessages:
@@ -463,54 +470,33 @@ class TestErrorMessages:
             compute_field("M_ms", ds)
 
 
-class TestEnthalpy:
-    def test_enthalpy_basic(self):
+class TestThermodynamicCompute:
+    def test_enthalpy(self):
         shape = (2, 2, 2)
-        data = {
-            "P": np.full(shape, 1.0),
-            "rho_m": np.full(shape, 1.0),
-        }
+        data = {"P": np.full(shape, 1.0), "rho_m": np.full(shape, 1.0)}
         ds = make_test_dataset(data, shape=shape)
         result = compute_field("h", ds)
         # h = gamma * P / ((gamma-1) * rho_m) = 5/3 / (2/3) = 2.5
         np.testing.assert_allclose(result, 2.5, rtol=1e-14)
 
-
-class TestEntropy:
     def test_entropy_unit_values(self):
         shape = (2, 2, 2)
-        data = {
-            "P": np.full(shape, 1.0),
-            "rho_m": np.full(shape, 1.0),
-        }
+        data = {"P": np.full(shape, 1.0), "rho_m": np.full(shape, 1.0)}
         ds = make_test_dataset(data, shape=shape)
         result = compute_field("s", ds)
-        # s = ln(P / rho^gamma) = ln(1) = 0
         np.testing.assert_allclose(result, 0.0, atol=1e-15)
 
     def test_species_entropy(self):
         shape = (2, 2, 2)
-        data = {
-            "Pe": np.full(shape, 1.0),
-            "n_s0": np.full(shape, 1.0),
-        }
+        data = {"Pe": np.full(shape, 1.0), "n_s0": np.full(shape, 1.0)}
         ds = make_test_dataset(data, shape=shape)
         result = compute_field("s_e", ds)
         np.testing.assert_allclose(result, 0.0, atol=1e-15)
 
-
-class TestIonAcousticSpeed:
-    def test_basic(self):
+    def test_ion_acoustic_speed(self):
         shape = (2, 2, 2)
-        data = {
-            "Te": np.full(shape, 1.0),
-            "Ti": np.zeros(shape),
-        }
-        ds = make_test_dataset(
-            data,
-            shape=shape,
-            species=[ELECTRONS, IONS],
-        )
+        data = {"Te": np.full(shape, 1.0), "Ti": np.zeros(shape)}
+        ds = make_test_dataset(data, shape=shape, species=[ELECTRONS, IONS])
         result = compute_field("c_ia", ds)
         # c_ia = sqrt((gamma_e*Te + gamma_i*Ti) / m_i) = sqrt(1/1) = 1
         np.testing.assert_allclose(result, 1.0, rtol=1e-15)
@@ -588,7 +574,7 @@ class TestSpeciesAliases:
 
 
 class TestPressureTensor:
-    def test_parallel_pressure(self):
+    def test_parallel_and_perpendicular_pressure(self):
         shape = (2, 2, 2)
         data = {
             "P11": np.full(shape, 1.0),
@@ -602,138 +588,24 @@ class TestPressureTensor:
             "B3": np.ones(shape),
         }
         ds = make_test_dataset(data, shape=shape)
-        result = compute_field("P_par", ds)
         # B along z → P_par = P33 = 3
-        np.testing.assert_allclose(result, 3.0, rtol=1e-15)
-
-    def test_perpendicular_pressure(self):
-        shape = (2, 2, 2)
-        data = {
-            "P11": np.full(shape, 1.0),
-            "P22": np.full(shape, 2.0),
-            "P33": np.full(shape, 3.0),
-            "P12": np.zeros(shape),
-            "P13": np.zeros(shape),
-            "P23": np.zeros(shape),
-            "B1": np.zeros(shape),
-            "B2": np.zeros(shape),
-            "B3": np.ones(shape),
-        }
-        ds = make_test_dataset(data, shape=shape)
-        result = compute_field("P_perp", ds)
+        np.testing.assert_allclose(compute_field("P_par", ds), 3.0, rtol=1e-15)
         # P_perp = (Tr(P) - P_par) / 2 = (6 - 3) / 2 = 1.5
-        np.testing.assert_allclose(result, 1.5, rtol=1e-15)
+        np.testing.assert_allclose(compute_field("P_perp", ds), 1.5, rtol=1e-15)
 
 
 class TestGeometryGuard:
-    def test_compute_div_b_rejects_spherical(self):
+    @pytest.mark.parametrize(
+        ("field", "components"),
+        [
+            ("div_B", {"B1", "B2", "B3"}),
+            ("vort1", {"V1", "V2", "V3"}),
+        ],
+    )
+    def test_compute_rejects_spherical(self, field, components):
         shape = (4, 4, 4)
         grid = GridInfo(dimensions=shape, spacing=(1.0, 1.0, 1.0), geometry=SPHERICAL)
-        data = {
-            "B1": np.ones(shape),
-            "B2": np.ones(shape),
-            "B3": np.ones(shape),
-        }
+        data = {name: np.ones(shape) for name in components}
         ds = FieldDataset.from_arrays(data, grid, Normalization.identity())
         with pytest.raises(NotImplementedError, match="Cartesian"):
-            compute_field("div_B", ds)
-
-    def test_compute_vorticity_rejects_spherical(self):
-        shape = (4, 4, 4)
-        grid = GridInfo(dimensions=shape, spacing=(1.0, 1.0, 1.0), geometry=SPHERICAL)
-        data = {
-            "V1": np.ones(shape),
-            "V2": np.ones(shape),
-            "V3": np.ones(shape),
-        }
-        ds = FieldDataset.from_arrays(data, grid, Normalization.identity())
-        with pytest.raises(NotImplementedError, match="Cartesian"):
-            compute_field("vort1", ds)
-
-
-class TestSIFactorCoverage:
-    def test_div_e_factor(self):
-        norm = Normalization(
-            length_ref=2.0,
-            time_ref=1.0,
-            velocity_ref=1.0,
-            b_field_ref=1.0,
-            e_field_ref=3.0,
-            density_ref=1.0,
-            mass_ref=1.0,
-            charge_ref=1.0,
-        )
-        factor = field_si_factor("div_E", norm)
-        # e_field_ref / length_ref
-        assert factor == pytest.approx(1.5)
-
-    def test_background_b_factor(self):
-        norm = Normalization(
-            length_ref=1.0,
-            time_ref=1.0,
-            velocity_ref=1.0,
-            b_field_ref=7.0,
-            e_field_ref=1.0,
-            density_ref=1.0,
-            mass_ref=1.0,
-            charge_ref=1.0,
-        )
-        factor = field_si_factor("B0_1", norm)
-        assert factor == pytest.approx(7.0)
-
-    def test_species_density_factor(self):
-        norm = Normalization(
-            length_ref=1.0,
-            time_ref=1.0,
-            velocity_ref=1.0,
-            b_field_ref=1.0,
-            e_field_ref=1.0,
-            density_ref=5.0,
-            mass_ref=1.0,
-            charge_ref=1.0,
-        )
-        factor = field_si_factor("n_s2", norm)
-        assert factor == pytest.approx(5.0)
-
-    def test_pressure_tensor_factor(self):
-        norm = Normalization(
-            length_ref=1.0,
-            time_ref=1.0,
-            velocity_ref=3.0,
-            b_field_ref=1.0,
-            e_field_ref=1.0,
-            density_ref=2.0,
-            mass_ref=5.0,
-            charge_ref=1.0,
-        )
-        factor = field_si_factor("P11", norm)
-        # pressure = density_ref * mass_ref * velocity_ref^2
-        assert factor == pytest.approx(2.0 * 5.0 * 9.0)
-
-
-class TestNewSIFactors:
-    def test_gamma_l_dimensionless(self):
-        norm = Normalization.identity()
-        assert field_si_factor("gamma_L", norm) == pytest.approx(1.0)
-
-    def test_sigma_dimensionless(self):
-        norm = Normalization.identity()
-        assert field_si_factor("sigma", norm) == pytest.approx(1.0)
-
-    def test_vorticity_frequency_factor(self):
-        norm = Normalization(
-            length_ref=1.0,
-            time_ref=0.25,
-            velocity_ref=1.0,
-            b_field_ref=1.0,
-            e_field_ref=1.0,
-            density_ref=1.0,
-            mass_ref=1.0,
-            charge_ref=1.0,
-        )
-        factor = field_si_factor("vort1", norm)
-        # frequency = 1/time_ref = 4.0
-        assert factor == pytest.approx(4.0)
-
-    def test_normalized_display_unit(self):
-        assert display_unit_factor("normalized") == pytest.approx(1.0)
+            compute_field(field, ds)

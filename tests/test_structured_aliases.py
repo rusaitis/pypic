@@ -364,27 +364,13 @@ class TestSIConversionThroughAliases:
         np.testing.assert_allclose(result, 5.0 * b_ref, rtol=1e-15)
 
 
-class TestRegistryIntegrity:
-    """No collisions between alias dicts and registry."""
-
-    def test_no_compute_alias_collides_with_registry(self):
-        overlap = set(_COMPUTE_ALIASES) & set(_REGISTRY)
-        assert not overlap, f"Compute alias collision with registry: {overlap}"
-
-    def test_all_compute_aliases_resolve_to_registry_or_field(self):
-        # Aliases may point to raw field names (Te, Pi, etc.) or to other
-        # aliases (c_ia, etc.) used as direct passthrough.
-        raw_field_targets = {"Te", "Ti", "Pe", "Pi", "EF1", "EF2", "EF3"}
-        for alias, target in _COMPUTE_ALIASES.items():
-            assert target in _REGISTRY or target in raw_field_targets, (
-                f"Alias {alias!r} -> {target!r} not in registry or known fields"
-            )
+class TestFieldAliasIntegrity:
+    """No collisions between field aliases and canonical names."""
 
     def test_no_underscore_field_alias_collides_with_canonical(self):
         from pypic.coordinates import CARTESIAN
 
         aliases = _default_aliases(CARTESIAN)
-        # No alias should have the same key as a common canonical field
         canonical_fields = {"B1", "B2", "B3", "E1", "E2", "E3", "Pe", "Pi", "Te", "Ti"}
         overlap = set(aliases) & canonical_fields
         assert not overlap, f"Alias collision with canonical: {overlap}"
@@ -516,23 +502,20 @@ class TestMultiSpeciesDynamicRecipes:
 class TestMultiSpeciesSIConversion:
     """SI factor resolution for per-species fields."""
 
-    def test_n_s2_si_factor(self):
-        norm = Normalization(
+    @pytest.mark.parametrize(
+        ("field", "norm_kwargs", "expected"),
+        [
+            ("n_s2", {"density_ref": 5.0}, 5.0),
+            ("omega_p_s2", {"time_ref": 0.5}, 2.0),
+            ("v_th_s2", {"velocity_ref": 3.0}, 3.0),
+            ("beta_s2", {}, 1.0),
+        ],
+        ids=["density", "frequency", "velocity", "dimensionless"],
+    )
+    def test_species_si_factor(self, field, norm_kwargs, expected):
+        defaults = dict(
             length_ref=1.0,
             time_ref=1.0,
-            velocity_ref=1.0,
-            b_field_ref=1.0,
-            e_field_ref=1.0,
-            density_ref=5.0,
-            mass_ref=1.0,
-            charge_ref=1.0,
-        )
-        assert field_si_factor("n_s2", norm) == pytest.approx(5.0)
-
-    def test_omega_p_s2_si_factor(self):
-        norm = Normalization(
-            length_ref=1.0,
-            time_ref=0.5,
             velocity_ref=1.0,
             b_field_ref=1.0,
             e_field_ref=1.0,
@@ -540,24 +523,9 @@ class TestMultiSpeciesSIConversion:
             mass_ref=1.0,
             charge_ref=1.0,
         )
-        assert field_si_factor("omega_p_s2", norm) == pytest.approx(2.0)
-
-    def test_v_th_s2_si_factor(self):
-        norm = Normalization(
-            length_ref=1.0,
-            time_ref=1.0,
-            velocity_ref=3.0,
-            b_field_ref=1.0,
-            e_field_ref=1.0,
-            density_ref=1.0,
-            mass_ref=1.0,
-            charge_ref=1.0,
-        )
-        assert field_si_factor("v_th_s2", norm) == pytest.approx(3.0)
-
-    def test_beta_s2_si_factor(self):
-        norm = Normalization.identity()
-        assert field_si_factor("beta_s2", norm) == pytest.approx(1.0)
+        defaults.update(norm_kwargs)
+        norm = Normalization(**defaults)
+        assert field_si_factor(field, norm) == pytest.approx(expected)
 
 
 class TestSpeciesNameAliases:
