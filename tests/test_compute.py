@@ -38,6 +38,15 @@ class TestRegistryIntegrity:
         names = available_quantities()
         assert names == sorted(names)
 
+    def test_species_recipes_have_species_args(self):
+        """Every recipe with species_index must have a species_args descriptor."""
+        for name, recipe in _REGISTRY.items():
+            if recipe.species_index is not None:
+                assert recipe.species_args is not None, (
+                    f"Recipe {name!r} has species_index={recipe.species_index} "
+                    f"but species_args is None"
+                )
+
 
 class TestMagnitudes:
     @pytest.mark.parametrize(
@@ -393,8 +402,8 @@ class TestSIFactors:
             # Dimensionless quantities
             ("gamma_L", {}, 1.0),
             ("sigma", {}, 1.0),
-            # Vorticity = frequency = 1/time_ref
-            ("vort1", {"time_ref": 0.25}, 4.0),
+            # Vorticity = velocity_per_length = velocity_ref / length_ref
+            ("vort1", {"velocity_ref": 4.0, "length_ref": 2.0}, 2.0),
         ],
         ids=["pressure", "frequency", "B0", "n_s2", "P11", "gamma_L", "sigma", "vort1"],
     )

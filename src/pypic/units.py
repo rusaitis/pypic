@@ -343,6 +343,9 @@ _COMPOUND_FACTORS: dict[str, Callable[[Normalization], float]] = {
     "mass_density": lambda n: n.density_ref * n.mass_ref,
     "charge_density": lambda n: n.charge_ref * n.density_ref,
     "poynting_flux": lambda n: n.e_field_ref * n.b_field_ref,
+    "b_field_per_length": lambda n: n.b_field_ref / n.length_ref,
+    "e_field_per_length": lambda n: n.e_field_ref / n.length_ref,
+    "velocity_per_length": lambda n: n.velocity_ref / n.length_ref,
 }
 
 

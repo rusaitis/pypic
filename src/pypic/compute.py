@@ -23,7 +23,7 @@ from pypic._aliases import (
 )
 from pypic.coordinates import operators
 from pypic.coordinates.geometry import GeometryType
-from pypic.fields import _FIELD_INFO
+from pypic.fields import _FIELD_INFO, _SPECIES_QUANTITY_PATTERNS
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -70,7 +70,12 @@ _REGISTRY: dict[str, _Recipe] = {
     "beta_i": _Recipe(derived.plasma_beta, ("Pi", "|B|")),
     "v_A": _Recipe(derived.alfven_speed, ("|B|", "rho_m")),
     "c_s": _Recipe(derived.sound_speed, ("P", "rho_m"), needs_gamma=True),
-    "c_ia": _Recipe(derived.ion_acoustic_speed, ("Te", "Ti"), species_index=1),
+    "c_ia": _Recipe(
+        derived.ion_acoustic_speed,
+        ("Te", "Ti"),
+        species_index=1,
+        species_args=_SpeciesArgs.MASS_ONLY,
+    ),
     "v_ms": _Recipe(derived.magnetosonic_speed, ("v_A", "c_s")),
     "M_A": _Recipe(derived.alfven_mach, ("|V|", "v_A")),
     "M_ms": _Recipe(derived.magnetosonic_mach, ("|V|", "v_ms")),
@@ -110,18 +115,75 @@ _REGISTRY: dict[str, _Recipe] = {
         component=2,
     ),
     # Species-dependent: electrons (species 0)
-    "omega_pe": _Recipe(derived.plasma_frequency, ("n_s0",), species_index=0),
-    "omega_ce": _Recipe(derived.gyrofrequency, ("|B|",), species_index=0),
-    "d_e": _Recipe(derived.skin_depth, ("n_s0",), species_index=0, needs_c=True),
-    "v_th_e": _Recipe(derived.thermal_speed, ("Te",), species_index=0),
-    "r_e": _Recipe(derived.gyroradius, ("Te", "|B|"), species_index=0),
-    "lambda_D": _Recipe(derived.debye_length, ("Te", "n_s0"), species_index=0),
+    "omega_pe": _Recipe(
+        derived.plasma_frequency,
+        ("n_s0",),
+        species_index=0,
+        species_args=_SpeciesArgs.CHARGE_MASS,
+    ),
+    "omega_ce": _Recipe(
+        derived.gyrofrequency,
+        ("|B|",),
+        species_index=0,
+        species_args=_SpeciesArgs.CHARGE_MASS,
+    ),
+    "d_e": _Recipe(
+        derived.skin_depth,
+        ("n_s0",),
+        species_index=0,
+        needs_c=True,
+        species_args=_SpeciesArgs.CHARGE_MASS,
+    ),
+    "v_th_e": _Recipe(
+        derived.thermal_speed,
+        ("Te",),
+        species_index=0,
+        species_args=_SpeciesArgs.MASS_ONLY,
+    ),
+    "r_e": _Recipe(
+        derived.gyroradius,
+        ("Te", "|B|"),
+        species_index=0,
+        species_args=_SpeciesArgs.CHARGE_MASS,
+    ),
+    "lambda_D": _Recipe(
+        derived.debye_length,
+        ("Te", "n_s0"),
+        species_index=0,
+        species_args=_SpeciesArgs.CHARGE_ONLY,
+    ),
     # Species-dependent: ions (species 1)
-    "omega_pi": _Recipe(derived.plasma_frequency, ("n_s1",), species_index=1),
-    "omega_ci": _Recipe(derived.gyrofrequency, ("|B|",), species_index=1),
-    "d_i": _Recipe(derived.skin_depth, ("n_s1",), species_index=1, needs_c=True),
-    "v_th_i": _Recipe(derived.thermal_speed, ("Ti",), species_index=1),
-    "r_i": _Recipe(derived.gyroradius, ("Ti", "|B|"), species_index=1),
+    "omega_pi": _Recipe(
+        derived.plasma_frequency,
+        ("n_s1",),
+        species_index=1,
+        species_args=_SpeciesArgs.CHARGE_MASS,
+    ),
+    "omega_ci": _Recipe(
+        derived.gyrofrequency,
+        ("|B|",),
+        species_index=1,
+        species_args=_SpeciesArgs.CHARGE_MASS,
+    ),
+    "d_i": _Recipe(
+        derived.skin_depth,
+        ("n_s1",),
+        species_index=1,
+        needs_c=True,
+        species_args=_SpeciesArgs.CHARGE_MASS,
+    ),
+    "v_th_i": _Recipe(
+        derived.thermal_speed,
+        ("Ti",),
+        species_index=1,
+        species_args=_SpeciesArgs.MASS_ONLY,
+    ),
+    "r_i": _Recipe(
+        derived.gyroradius,
+        ("Ti", "|B|"),
+        species_index=1,
+        species_args=_SpeciesArgs.CHARGE_MASS,
+    ),
     # Pressure tensor
     "P_par": _Recipe(derived.parallel_pressure, _PRESSURE_TENSOR_AND_B),
     "P_perp": _Recipe(derived.perpendicular_pressure, _PRESSURE_TENSOR_AND_B),
@@ -170,6 +232,7 @@ _REGISTRY: dict[str, _Recipe] = {
     # Vorticity magnitude — depends on vort1/2/3
     "|vort|": _Recipe(derived.velocity_magnitude, ("vort1", "vort2", "vort3")),
 }
+
 
 @dataclass(frozen=True, slots=True)
 class _SpeciesTemplate:
@@ -240,24 +303,6 @@ def _try_species_recipe(name: str) -> _Recipe | None:
         needs_c=template.needs_c,
         species_args=template.species_args,
     )
-
-
-# Regex patterns for SI conversion of per-species fields
-_SI_PATTERNS: list[tuple[re.Pattern[str], str]] = [
-    (re.compile(r"^n_s\d+$"), "density"),
-    (re.compile(r"^rho_c_s\d+$"), "charge_density"),
-    (re.compile(r"^J[123]_s\d+$"), "current_density"),
-    (re.compile(r"^V[123e]?_s\d+$"), "velocity"),
-    (re.compile(r"^Ve[123]_s\d+$"), "velocity"),
-    (re.compile(r"^EF[123]_s\d+$"), "poynting_flux"),
-    (re.compile(r"^P\d{0,2}_s\d+$"), "pressure"),
-    (re.compile(r"^T_s\d+$"), "temperature"),
-    (re.compile(r"^omega_[pc]_s\d+$"), "frequency"),
-    (re.compile(r"^[dr]_s\d+$"), "length"),
-    (re.compile(r"^lambda_D_s\d+$"), "length"),
-    (re.compile(r"^v_th_s\d+$"), "velocity"),
-    (re.compile(r"^(?:beta|s|s_gyro|agyrotropy)_s\d+$"), "dimensionless"),
-]
 
 
 # Maps field/derived names to physical quantity types for SI conversion.
@@ -442,23 +487,13 @@ def compute_field(name: str, dataset: FieldDataset, _depth: int = 0) -> FloatArr
     # Append species charge/mass
     species_args = _get_species_args(dataset, recipe)
     if species_args:
-        if recipe.species_args is not None:
-            # Dynamic recipe: use explicit species_args descriptor
-            _append_species_params(args, species_args, recipe.species_args)
-        else:
-            # Static recipe: dispatch by function identity
-            func = recipe.func
-            if func is derived.thermal_speed or func is derived.ion_acoustic_speed:
-                args.append(species_args[1])
-            elif (
-                func is derived.gyrofrequency
-                or func is derived.plasma_frequency
-                or func is derived.skin_depth
-                or func is derived.gyroradius
-            ):
-                args.extend(species_args)
-            elif func is derived.debye_length:
-                args.append(species_args[0])
+        if recipe.species_args is None:
+            msg = (
+                f"Recipe for {canonical!r} has species_index={recipe.species_index} "
+                f"but no species_args descriptor"
+            )
+            raise ValueError(msg)
+        _append_species_params(args, species_args, recipe.species_args)
 
     # Append gamma
     if recipe.needs_gamma:
@@ -515,7 +550,7 @@ def field_si_factor(name: str, normalization: Normalization) -> float:
         quantity_type = _FIELD_QUANTITY_MAP.get(canonical)
     if quantity_type is None:
         # Try regex patterns for per-species fields (n_s2, J1_s3, etc.)
-        for pattern, qtype in _SI_PATTERNS:
+        for pattern, qtype in _SPECIES_QUANTITY_PATTERNS:
             if pattern.match(canonical):
                 quantity_type = qtype
                 break
@@ -525,13 +560,6 @@ def field_si_factor(name: str, normalization: Normalization) -> float:
             f"Known fields: {sorted(_FIELD_QUANTITY_MAP)}"
         )
         raise ValueError(msg)
-    # For div_B and div_E, the actual SI factor includes 1/length_ref
-    if canonical in ("div_B", "div_E"):
-        base = normalization.si_factor(quantity_type)
-        return base / normalization.si_factor("length")
-    if canonical.startswith("curl_B"):
-        base = normalization.si_factor("b_field")
-        return base / normalization.si_factor("length")
     return normalization.si_factor(quantity_type)
 
 

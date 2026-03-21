@@ -5,12 +5,13 @@ from pypic.compute import _FIELD_QUANTITY_MAP, field_si_factor
 from pypic.fields import (
     _FIELD_INFO,
     _QUANTITY_UNITS,
+    _SPECIES_INFO_PATTERNS,
     field_info,
     quantity_units,
     unit_label,
 )
 from pypic.readers.base import FieldDataset, GridInfo
-from pypic.units import Normalization, SpeciesInfo
+from pypic.units import _COMPOUND_FACTORS, _QUANTITIES, Normalization, SpeciesInfo
 
 
 def _make_dataset(fields: dict[str, np.ndarray]) -> FieldDataset:
@@ -286,3 +287,21 @@ class TestNewFieldEntries:
         assert info.quantity_type == "pressure"
         assert info.long_name == "Pressure 11 (species 2)"
         assert info.latex == r"$P_{11,s2}$"
+
+
+class TestQuantityTypeCoverage:
+    """Structural tests ensuring quantity-type registries stay synchronized."""
+
+    def test_quantity_types_complete(self) -> None:
+        """Every quantity type with an SI factor must have a unit label."""
+        si_factor_types = _QUANTITIES | _COMPOUND_FACTORS.keys()
+        unit_label_types = set(_QUANTITY_UNITS)
+        assert si_factor_types == unit_label_types
+
+    def test_species_patterns_have_known_quantity_types(self) -> None:
+        """Every quantity_type in _SPECIES_INFO_PATTERNS has a _QUANTITY_UNITS entry."""
+        for pattern, qtype, _, _ in _SPECIES_INFO_PATTERNS:
+            assert qtype in _QUANTITY_UNITS, (
+                f"Pattern {pattern.pattern!r} uses quantity_type={qtype!r} "
+                f"which is missing from _QUANTITY_UNITS"
+            )

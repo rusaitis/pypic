@@ -53,6 +53,9 @@ _QUANTITY_UNITS: dict[str, str] = {
     "energy_density": "J/m^3",
     "frequency": "rad/s",
     "poynting_flux": "W/m^2",
+    "b_field_per_length": "T/m",
+    "e_field_per_length": "V/m^2",
+    "velocity_per_length": "1/s",
     "dimensionless": "",
 }
 
@@ -256,30 +259,60 @@ _FIELD_INFO: dict[str, FieldInfo] = {
     ),
     "e_int": _FI("temperature", "Specific internal energy", "J", r"$e_{int}$"),
     # Diagnostics (spatial derivatives)
-    "div_B": _FI("b_field", "Divergence of B", "T", r"$\nabla \cdot B$"),
-    "div_E": _FI("e_field", "Divergence of E", "V/m", r"$\nabla \cdot E$"),
+    "div_B": _FI(
+        "b_field_per_length",
+        "Divergence of B",
+        "T/m",
+        r"$\nabla \cdot B$",
+    ),
+    "div_E": _FI(
+        "e_field_per_length",
+        "Divergence of E",
+        "V/m^2",
+        r"$\nabla \cdot E$",
+    ),
     "curl_B1": _FI(
-        "b_field",
+        "b_field_per_length",
         "Curl of B component 1",
-        "T",
+        "T/m",
         r"$(\nabla \times B)_1$",
     ),
     "curl_B2": _FI(
-        "b_field",
+        "b_field_per_length",
         "Curl of B component 2",
-        "T",
+        "T/m",
         r"$(\nabla \times B)_2$",
     ),
     "curl_B3": _FI(
-        "b_field",
+        "b_field_per_length",
         "Curl of B component 3",
-        "T",
+        "T/m",
         r"$(\nabla \times B)_3$",
     ),
-    "vort1": _FI("frequency", "Vorticity component 1", "rad/s", r"$\omega_1$"),
-    "vort2": _FI("frequency", "Vorticity component 2", "rad/s", r"$\omega_2$"),
-    "vort3": _FI("frequency", "Vorticity component 3", "rad/s", r"$\omega_3$"),
-    "|vort|": _FI("frequency", "Vorticity magnitude", "rad/s", r"$|\omega|$"),
+    "vort1": _FI(
+        "velocity_per_length",
+        "Vorticity component 1",
+        "1/s",
+        r"$\omega_1$",
+    ),
+    "vort2": _FI(
+        "velocity_per_length",
+        "Vorticity component 2",
+        "1/s",
+        r"$\omega_2$",
+    ),
+    "vort3": _FI(
+        "velocity_per_length",
+        "Vorticity component 3",
+        "1/s",
+        r"$\omega_3$",
+    ),
+    "|vort|": _FI(
+        "velocity_per_length",
+        "Vorticity magnitude",
+        "1/s",
+        r"$|\omega|$",
+    ),
     # Dimensionless
     "beta": _FI("dimensionless", "Plasma beta", "", r"$\beta$"),
     "beta_e": _FI("dimensionless", "Electron beta", "", r"$\beta_e$"),
@@ -416,6 +449,11 @@ _SPECIES_INFO_PATTERNS: list[tuple[re.Pattern[str], str, str, str]] = [
         "Agyrotropy (species {N})",
         r"$Q_{{s{N}}}$",
     ),
+]
+
+
+_SPECIES_QUANTITY_PATTERNS: list[tuple[re.Pattern[str], str]] = [
+    (pat, qtype) for pat, qtype, _, _ in _SPECIES_INFO_PATTERNS
 ]
 
 
