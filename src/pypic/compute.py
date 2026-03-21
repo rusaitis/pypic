@@ -9,6 +9,7 @@ this module via deferred imports.
 from __future__ import annotations
 
 import difflib
+import functools
 import re
 from dataclasses import dataclass
 from enum import StrEnum
@@ -379,6 +380,7 @@ _DISPLAY_UNITS: dict[str, float] = {
     "K": constants.k,
     "A/m^2": 1.0,
     "C/m^3": 1.0,
+    "normalized": 1.0,
 }
 
 _MAX_DEPTH = 10
@@ -599,15 +601,10 @@ def _build_field_alias_fallback() -> dict[str, str]:
     return merged
 
 
-_FIELD_ALIAS_FALLBACK: dict[str, str] | None = None
-
-
+@functools.cache
 def _get_field_alias_fallback() -> dict[str, str]:
-    """Lazy-init the field alias fallback dict."""
-    global _FIELD_ALIAS_FALLBACK
-    if _FIELD_ALIAS_FALLBACK is None:
-        _FIELD_ALIAS_FALLBACK = _build_field_alias_fallback()
-    return _FIELD_ALIAS_FALLBACK
+    """Return the field alias fallback dict (cached, thread-safe)."""
+    return _build_field_alias_fallback()
 
 
 def field_si_factor(name: str, normalization: Normalization) -> float:

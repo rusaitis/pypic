@@ -763,3 +763,31 @@ class TestSIFactorCoverage:
         factor = field_si_factor("P11", norm)
         # pressure = density_ref * mass_ref * velocity_ref^2
         assert factor == pytest.approx(2.0 * 5.0 * 9.0)
+
+
+class TestNewSIFactors:
+    def test_gamma_l_dimensionless(self):
+        norm = Normalization.identity()
+        assert field_si_factor("gamma_L", norm) == pytest.approx(1.0)
+
+    def test_sigma_dimensionless(self):
+        norm = Normalization.identity()
+        assert field_si_factor("sigma", norm) == pytest.approx(1.0)
+
+    def test_vorticity_frequency_factor(self):
+        norm = Normalization(
+            length_ref=1.0,
+            time_ref=0.25,
+            velocity_ref=1.0,
+            b_field_ref=1.0,
+            e_field_ref=1.0,
+            density_ref=1.0,
+            mass_ref=1.0,
+            charge_ref=1.0,
+        )
+        factor = field_si_factor("vort1", norm)
+        # frequency = 1/time_ref = 4.0
+        assert factor == pytest.approx(4.0)
+
+    def test_normalized_display_unit(self):
+        assert display_unit_factor("normalized") == pytest.approx(1.0)

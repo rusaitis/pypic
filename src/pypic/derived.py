@@ -164,7 +164,7 @@ def velocity_magnitude(
 
 def plasma_beta(
     pressure: FloatArray,
-    b_magnitude: FloatArray,
+    b: FloatArray,
 ) -> FloatArray:
     r"""Compute the plasma beta.
 
@@ -174,7 +174,7 @@ def plasma_beta(
     ----------
     pressure : NDArray
         Scalar pressure in normalized units.
-    b_magnitude : NDArray
+    b : NDArray
         Magnetic field magnitude in normalized units.
 
     Returns
@@ -188,7 +188,7 @@ def plasma_beta(
     >>> plasma_beta(np.array([1.0]), np.array([1.0]))
     array([2.])
     """
-    return _safe_divide(2.0 * pressure, b_magnitude**2)
+    return _safe_divide(2.0 * pressure, b**2)
 
 
 def alfven_speed(
@@ -224,7 +224,7 @@ def alfven_speed(
 
 
 def magnetic_energy_density(
-    b_magnitude: FloatArray,
+    b: FloatArray,
 ) -> FloatArray:
     r"""Compute the magnetic energy density.
 
@@ -234,7 +234,7 @@ def magnetic_energy_density(
 
     Parameters
     ----------
-    b_magnitude : NDArray
+    b : NDArray
         Magnetic field magnitude in normalized units.
 
     Returns
@@ -248,11 +248,11 @@ def magnetic_energy_density(
     >>> magnetic_energy_density(np.array([2.0]))
     array([2.])
     """
-    return b_magnitude**2 / 2.0
+    return b**2 / 2.0
 
 
 def electric_energy_density(
-    e_magnitude: FloatArray,
+    e: FloatArray,
 ) -> FloatArray:
     r"""Compute the electric energy density.
 
@@ -262,7 +262,7 @@ def electric_energy_density(
 
     Parameters
     ----------
-    e_magnitude : NDArray
+    e : NDArray
         Electric field magnitude in normalized units.
 
     Returns
@@ -276,12 +276,12 @@ def electric_energy_density(
     >>> electric_energy_density(np.array([3.0]))
     array([4.5])
     """
-    return e_magnitude**2 / 2.0
+    return e**2 / 2.0
 
 
 def kinetic_energy_density(
     rho_m: FloatArray,
-    v_magnitude: FloatArray,
+    v: FloatArray,
 ) -> FloatArray:
     r"""Compute the kinetic energy density.
 
@@ -291,7 +291,7 @@ def kinetic_energy_density(
     ----------
     rho_m : NDArray
         Mass density in normalized units.
-    v_magnitude : NDArray
+    v : NDArray
         Bulk velocity magnitude in normalized units.
 
     Returns
@@ -305,7 +305,7 @@ def kinetic_energy_density(
     >>> kinetic_energy_density(np.array([2.0]), np.array([3.0]))
     array([9.])
     """
-    return 0.5 * rho_m * v_magnitude**2
+    return 0.5 * rho_m * v**2
 
 
 def thermal_energy_density(
@@ -529,9 +529,9 @@ def entropy(
 
 
 def gyrotropic_entropy(
-    p_parallel: FloatArray,
-    p_perpendicular: FloatArray,
-    n: FloatArray,
+    p_par: FloatArray,
+    p_perp: FloatArray,
+    density: FloatArray,
 ) -> FloatArray:
     r"""Compute the gyrotropic entropy from CGL double-adiabatic invariants.
 
@@ -543,11 +543,11 @@ def gyrotropic_entropy(
 
     Parameters
     ----------
-    p_parallel : NDArray
+    p_par : NDArray
         Pressure parallel to the magnetic field.
-    p_perpendicular : NDArray
+    p_perp : NDArray
         Pressure perpendicular to the magnetic field.
-    n : NDArray
+    density : NDArray
         Number density.
 
     Returns
@@ -561,7 +561,7 @@ def gyrotropic_entropy(
     >>> gyrotropic_entropy(np.array([1.0]), np.array([1.0]), np.array([1.0]))
     array([0.])
     """
-    ratio = _safe_divide(p_parallel * p_perpendicular**2, n**5)
+    ratio = _safe_divide(p_par * p_perp**2, density**5)
     return np.where(ratio > 0, np.log(ratio), np.nan)
 
 
@@ -645,7 +645,7 @@ def thermal_speed(
 
 
 def gyrofrequency(
-    b_magnitude: FloatArray,
+    b: FloatArray,
     charge: float,
     mass: float,
 ) -> FloatArray:
@@ -657,7 +657,7 @@ def gyrofrequency(
 
     Parameters
     ----------
-    b_magnitude : NDArray
+    b : NDArray
         Magnetic field magnitude in normalized units.
     charge : float
         Particle charge in normalized units (sign is stripped).
@@ -675,7 +675,7 @@ def gyrofrequency(
     >>> gyrofrequency(np.array([2.0]), charge=-1.0, mass=1.0)
     array([2.])
     """
-    return np.abs(charge) * b_magnitude / mass  # type: ignore[no-any-return]
+    return np.abs(charge) * b / mass  # type: ignore[no-any-return]
 
 
 def plasma_frequency(
@@ -749,7 +749,7 @@ def skin_depth(
 
 def gyroradius(
     temperature: FloatArray,
-    b_magnitude: FloatArray,
+    b: FloatArray,
     charge: float,
     mass: float,
 ) -> FloatArray:
@@ -763,7 +763,7 @@ def gyroradius(
     ----------
     temperature : NDArray
         Temperature in energy units (normalized).
-    b_magnitude : NDArray
+    b : NDArray
         Magnetic field magnitude in normalized units.
     charge : float
         Particle charge in normalized units (sign is stripped).
@@ -781,7 +781,7 @@ def gyroradius(
     >>> gyroradius(np.array([1.0]), np.array([1.0]), charge=1.0, mass=1.0)
     array([1.])
     """
-    return _safe_divide(np.sqrt(mass * temperature), np.abs(charge) * b_magnitude)
+    return _safe_divide(np.sqrt(mass * temperature), np.abs(charge) * b)
 
 
 def debye_length(
@@ -851,9 +851,9 @@ def sound_speed(
 
 
 def ion_acoustic_speed(
-    temperature_e: FloatArray,
-    temperature_i: FloatArray,
-    mass_i: float,
+    te: FloatArray,
+    ti: FloatArray,
+    mass: float,
     gamma_e: float = 1.0,
     gamma_i: float = 3.0,
 ) -> FloatArray:
@@ -866,11 +866,11 @@ def ion_acoustic_speed(
 
     Parameters
     ----------
-    temperature_e : NDArray
+    te : NDArray
         Electron temperature in energy units (normalized).
-    temperature_i : NDArray
+    ti : NDArray
         Ion temperature in energy units (normalized).
-    mass_i : float
+    mass : float
         Ion mass in normalized units.
     gamma_e : float
         Electron adiabatic index. Default is 1.0 (isothermal).
@@ -885,15 +885,15 @@ def ion_acoustic_speed(
     Examples
     --------
     >>> import numpy as np
-    >>> ion_acoustic_speed(np.array([1.0]), np.array([0.0]), mass_i=1.0)
+    >>> ion_acoustic_speed(np.array([1.0]), np.array([0.0]), mass=1.0)
     array([1.])
     """
-    return np.sqrt((gamma_e * temperature_e + gamma_i * temperature_i) / mass_i)
+    return np.sqrt((gamma_e * te + gamma_i * ti) / mass)
 
 
 def magnetosonic_speed(
-    v_alfven: FloatArray,
-    c_sound: FloatArray,
+    v_a: FloatArray,
+    c_s: FloatArray,
 ) -> FloatArray:
     r"""Compute the fast magnetosonic speed (perpendicular propagation).
 
@@ -903,9 +903,9 @@ def magnetosonic_speed(
 
     Parameters
     ----------
-    v_alfven : NDArray
+    v_a : NDArray
         Alfvén speed in normalized units.
-    c_sound : NDArray
+    c_s : NDArray
         Sound speed in normalized units.
 
     Returns
@@ -919,12 +919,12 @@ def magnetosonic_speed(
     >>> magnetosonic_speed(np.array([3.0]), np.array([4.0]))
     array([5.])
     """
-    return np.sqrt(v_alfven**2 + c_sound**2)
+    return np.sqrt(v_a**2 + c_s**2)
 
 
 def alfven_mach(
-    v_magnitude: FloatArray,
-    v_alfven: FloatArray,
+    v: FloatArray,
+    v_a: FloatArray,
 ) -> FloatArray:
     r"""Compute the Alfvén Mach number.
 
@@ -932,9 +932,9 @@ def alfven_mach(
 
     Parameters
     ----------
-    v_magnitude : NDArray
+    v : NDArray
         Bulk velocity magnitude in normalized units.
-    v_alfven : NDArray
+    v_a : NDArray
         Alfvén speed in normalized units.
 
     Returns
@@ -948,12 +948,12 @@ def alfven_mach(
     >>> alfven_mach(np.array([2.0]), np.array([1.0]))
     array([2.])
     """
-    return _safe_divide(v_magnitude, v_alfven)
+    return _safe_divide(v, v_a)
 
 
 def magnetosonic_mach(
-    v_magnitude: FloatArray,
-    v_magnetosonic: FloatArray,
+    v: FloatArray,
+    v_ms: FloatArray,
 ) -> FloatArray:
     r"""Compute the magnetosonic Mach number.
 
@@ -961,9 +961,9 @@ def magnetosonic_mach(
 
     Parameters
     ----------
-    v_magnitude : NDArray
+    v : NDArray
         Bulk velocity magnitude in normalized units.
-    v_magnetosonic : NDArray
+    v_ms : NDArray
         Magnetosonic speed in normalized units.
 
     Returns
@@ -977,7 +977,7 @@ def magnetosonic_mach(
     >>> magnetosonic_mach(np.array([5.0]), np.array([5.0]))
     array([1.])
     """
-    return _safe_divide(v_magnitude, v_magnetosonic)
+    return _safe_divide(v, v_ms)
 
 
 def parallel_pressure(

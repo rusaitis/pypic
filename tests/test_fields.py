@@ -244,3 +244,45 @@ class TestGeometryAwareLabels:
         info = field_info("Ve2_s1", axis_names=self.CARTESIAN)
         assert info.long_name == "Electron velocity y-component (species 1)"
         assert info.latex == r"$V_{e,y,s1}$"
+
+
+class TestNewFieldEntries:
+    """Verify gamma_L, sigma, gamma_eos registry entries."""
+
+    @pytest.mark.parametrize(
+        ("name", "latex"),
+        [
+            ("gamma_L", r"$\gamma$"),
+            ("sigma", r"$\sigma$"),
+            ("gamma_eos", r"$\gamma_{eos}$"),
+        ],
+    )
+    def test_dimensionless_entry(self, name: str, latex: str) -> None:
+        info = field_info(name)
+        assert info.quantity_type == "dimensionless"
+        assert info.si_unit == ""
+        assert info.latex == latex
+
+    def test_high_species_index(self) -> None:
+        info = field_info("n_s99")
+        assert info.quantity_type == "density"
+        assert info.long_name == "Number density (species 99)"
+
+    def test_pressure_scalar_species_s0_alias(self) -> None:
+        """P_s0 resolves to Pe via compute alias."""
+        info = field_info("P_s0")
+        assert info.quantity_type == "pressure"
+        assert info.long_name == "Electron pressure"
+
+    def test_pressure_scalar_species_s3(self) -> None:
+        """P_s3 hits the regex path (no alias for species >= 2)."""
+        info = field_info("P_s3")
+        assert info.quantity_type == "pressure"
+        assert info.long_name == "Pressure (species 3)"
+        assert info.latex == r"$P_{s3}$"
+
+    def test_pressure_tensor_species(self) -> None:
+        info = field_info("P11_s2")
+        assert info.quantity_type == "pressure"
+        assert info.long_name == "Pressure 11 (species 2)"
+        assert info.latex == r"$P_{11,s2}$"

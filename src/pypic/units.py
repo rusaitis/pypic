@@ -66,6 +66,22 @@ class Normalization:
     mass_ref: float
     charge_ref: float
 
+    def __post_init__(self) -> None:
+        for attr in (
+            "length_ref",
+            "time_ref",
+            "velocity_ref",
+            "b_field_ref",
+            "e_field_ref",
+            "density_ref",
+            "mass_ref",
+            "charge_ref",
+        ):
+            val = getattr(self, attr)
+            if val <= 0:
+                msg = f"{attr} must be positive, got {val}"
+                raise ValueError(msg)
+
     @classmethod
     def pic_standard(
         cls,
@@ -467,6 +483,10 @@ class SpeciesInfo:
     particles_per_cell: int | tuple[int, int, int] | None = None
 
     def __post_init__(self) -> None:
+        if self.mass is not None and self.mass <= 0:
+            msg = f"mass must be positive, got {self.mass}"
+            raise ValueError(msg)
+
         if (
             self.charge is not None
             and self.mass is not None

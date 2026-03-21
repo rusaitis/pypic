@@ -391,7 +391,7 @@ class TestIonAcousticSpeed:
     def test_cold_ions(self):
         # Te=1, Ti=0, m_i=1, gamma_e=1 -> c_ia = 1
         np.testing.assert_allclose(
-            ion_acoustic_speed(np.array([1.0]), np.array([0.0]), mass_i=1.0),
+            ion_acoustic_speed(np.array([1.0]), np.array([0.0]), mass=1.0),
             1.0,
             rtol=1e-15,
         )
@@ -399,14 +399,14 @@ class TestIonAcousticSpeed:
     def test_defaults(self):
         te = np.array([2.0])
         ti = np.array([0.5])
-        explicit = ion_acoustic_speed(te, ti, mass_i=1.0, gamma_e=1.0, gamma_i=3.0)
-        implicit = ion_acoustic_speed(te, ti, mass_i=1.0)
+        explicit = ion_acoustic_speed(te, ti, mass=1.0, gamma_e=1.0, gamma_i=3.0)
+        implicit = ion_acoustic_speed(te, ti, mass=1.0)
         np.testing.assert_allclose(explicit, implicit, rtol=1e-15)
 
     def test_known_value(self):
         # gamma_e*Te + gamma_i*Ti = 1*4 + 3*2 = 10, m_i=10 -> sqrt(1) = 1
         np.testing.assert_allclose(
-            ion_acoustic_speed(np.array([4.0]), np.array([2.0]), mass_i=10.0),
+            ion_acoustic_speed(np.array([4.0]), np.array([2.0]), mass=10.0),
             1.0,
             rtol=1e-15,
         )

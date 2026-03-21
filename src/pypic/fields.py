@@ -300,6 +300,9 @@ _FIELD_INFO: dict[str, FieldInfo] = {
         r"$s_{gyro,i}$",
     ),
     "agyrotropy": _FI("dimensionless", "Agyrotropy measure", "", r"$Q$"),
+    "gamma_L": _FI("dimensionless", "Bulk Lorentz factor", "", r"$\gamma$"),
+    "sigma": _FI("dimensionless", "Magnetization parameter", "", r"$\sigma$"),
+    "gamma_eos": _FI("dimensionless", "Adiabatic index", "", r"$\gamma_{eos}$"),
 }
 
 _SPECIES_INFO_PATTERNS: list[tuple[re.Pattern[str], str, str, str]] = [
@@ -344,7 +347,7 @@ _SPECIES_INFO_PATTERNS: list[tuple[re.Pattern[str], str, str, str]] = [
         "pressure",
         "Pressure {C} (species {N})",
         r"$P_{{{C},s{N}}}$",
-    ),
+    ),  # Empty component handled in _try_species_info
     (
         re.compile(r"^T_s(\d+)$"),
         "temperature",
@@ -422,8 +425,13 @@ def _try_species_info(name: str) -> FieldInfo | None:
             groups = m.groups()
             if len(groups) == 2:
                 component, species_idx = groups
-                long_name = name_tmpl.format(C=component, N=species_idx)
-                latex = latex_tmpl.format(C=component, N=species_idx)
+                if component == "":
+                    # Scalar species field (e.g. P_s0 → "Pressure (species 0)")
+                    long_name = f"Pressure (species {species_idx})"
+                    latex = rf"$P_{{s{species_idx}}}$"
+                else:
+                    long_name = name_tmpl.format(C=component, N=species_idx)
+                    latex = latex_tmpl.format(C=component, N=species_idx)
             else:
                 species_idx = groups[0]
                 long_name = name_tmpl.format(N=species_idx)

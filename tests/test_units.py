@@ -132,3 +132,39 @@ class TestSpeciesInfoValidation:
     def test_consistent_all_three_ok(self):
         s = SpeciesInfo(name="ok", charge=2.0, mass=1.0, charge_to_mass=2.0)
         assert s.charge_to_mass == 2.0
+
+    def test_zero_mass_raises(self):
+        with pytest.raises(ValueError, match="mass must be positive"):
+            SpeciesInfo(name="bad", charge=-1.0, mass=0.0)
+
+    def test_negative_mass_raises(self):
+        with pytest.raises(ValueError, match="mass must be positive"):
+            SpeciesInfo(name="bad", charge=-1.0, mass=-1.0)
+
+
+class TestNormalizationValidation:
+    def test_zero_ref_raises(self):
+        with pytest.raises(ValueError, match="length_ref must be positive"):
+            Normalization(
+                length_ref=0.0,
+                time_ref=1.0,
+                velocity_ref=1.0,
+                b_field_ref=1.0,
+                e_field_ref=1.0,
+                density_ref=1.0,
+                mass_ref=1.0,
+                charge_ref=1.0,
+            )
+
+    def test_negative_ref_raises(self):
+        with pytest.raises(ValueError, match="density_ref must be positive"):
+            Normalization(
+                length_ref=1.0,
+                time_ref=1.0,
+                velocity_ref=1.0,
+                b_field_ref=1.0,
+                e_field_ref=1.0,
+                density_ref=-1.0,
+                mass_ref=1.0,
+                charge_ref=1.0,
+            )
