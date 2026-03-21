@@ -116,7 +116,9 @@ class GridInfo:
 
 _FIELD_PREFIX_PAIRS = (
     ("B", "B"),
+    ("B0", "B0"),  # split-B background field (BATSRUS)
     ("E", "E"),
+    ("EF", "EF"),  # per-species energy flux (iPIC3D H5hut)
     ("J", "J"),
     ("V", "V"),
     ("v", "V"),  # lowercase convenience alias
@@ -289,6 +291,12 @@ class FieldDataset:
         merged = _default_aliases(grid.geometry)
         if aliases:
             merged.update(aliases)
+        # Generate species-name aliases (e.g. n_electrons→n_s0) from config
+        for i, sp in enumerate(self._species):
+            candidate = f"n_{sp.name.lower()}"
+            target = f"n_s{i}"
+            if candidate not in merged and target in self._ds.data_vars:
+                merged[candidate] = target
         # Only keep aliases whose canonical target exists
         self._aliases = {k: v for k, v in merged.items() if v in self._ds.data_vars}
 

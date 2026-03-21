@@ -275,6 +275,7 @@ geometry-appropriate aliases (e.g., `Br` → `B1` for spherical). The
 | Canonical | Cartesian alias | Meaning | Present in |
 |-----------|----------------|---------|------------|
 | `B1`, `B2`, `B3` | `Bx`, `By`, `Bz` | Magnetic field components | PIC, MHD |
+| `B0_1`, `B0_2`, `B0_3` | `B0x`, `B0y`, `B0z` | Background magnetic field (split-B) | MHD (optional) |
 | `E1`, `E2`, `E3` | `Ex`, `Ey`, `Ez` | Electric field components | PIC (MHD: derived) |
 
 ### Fluid / moment quantities — densities
@@ -317,7 +318,8 @@ two-species case, `n_e` and `n_i` are accepted as aliases for `n_s0` and
 | `s` | Specific entropy (isotropic) | MHD, PIC |
 | `s_e` | Electron entropy | PIC |
 | `s_i` | Ion entropy | PIC |
-| `s_gyro` | Gyrotropic entropy | PIC (anisotropic) |
+| `s_gyro_e` | Electron gyrotropic entropy | PIC (anisotropic) |
+| `s_gyro_i` | Ion gyrotropic entropy | PIC (anisotropic) |
 | `e_int` | Specific internal energy | MHD |
 | `gamma_eos` | Adiabatic index | MHD (from physics config) |
 
@@ -326,6 +328,7 @@ two-species case, `n_e` and `n_i` are accepted as aliases for `n_s0` and
 | Canonical | Cartesian alias | Meaning | Present in |
 |-----------|----------------|---------|------------|
 | `S1`, `S2`, `S3` | `Sx`, `Sy`, `Sz` | Poynting flux | PIC, MHD |
+| `EF1`, `EF2`, `EF3` | `EFx`, `EFy`, `EFz` | Per-species energy flux | PIC (per-species) |
 | `e_B` | — | Magnetic energy density | PIC, MHD |
 | `e_E` | — | Electric energy density | PIC |
 | `e_k` | — | Kinetic energy density | MHD, PIC (moments) |
@@ -339,6 +342,10 @@ two-species case, `n_e` and `n_i` are accepted as aliases for `n_s0` and
 | `P_perp` | Pressure perpendicular to B | PIC (from tensor) |
 | `Pij` | Full pressure tensor (6 independent components: P11, P12, P13, P22, P23, P33) | PIC |
 | `agyrotropy` | Agyrotropy measure (deviation from gyrotropic symmetry) | PIC (derived) |
+
+`P_par` and `P_perp` are currently decomposed from the **total** pressure
+tensor (`P11..P33`). Per-species decomposition (`P_par_s0`, `P_perp_s0`)
+from per-species tensors (`P11_s0..P33_s0`) is future work.
 
 ### Characteristic scales (derived)
 
@@ -376,6 +383,7 @@ Densities section above).
 | `\|E\|` | — | Electric field magnitude | E1, E2, E3 |
 | `\|J\|` | — | Current density magnitude | J1, J2, J3 |
 | `\|V\|` | — | Bulk velocity magnitude | V1, V2, V3 |
+| `\|Ve\|` | — | Electron velocity magnitude | Ve1, Ve2, Ve3 |
 | `div_B` | — | Divergence of B (should be ~0) | B1, B2, B3, grid |
 | `div_E` | — | Divergence of E | E1, E2, E3, grid |
 | `curl_B1`, `curl_B2`, `curl_B3` | `curl_Bx`, ... | Curl of B | B1, B2, B3, grid |

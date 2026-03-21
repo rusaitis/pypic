@@ -14,6 +14,7 @@ from pypic.units import Normalization, SpeciesInfo
 
 ELECTRONS = SpeciesInfo(name="electrons", charge=-1.0, mass=1 / 256)
 IONS = SpeciesInfo(name="ions", charge=1.0, mass=1.0)
+ALPHAS = SpeciesInfo(name="alphas", charge=2.0, mass=4.0)
 
 
 def _make_dataset(
@@ -102,6 +103,7 @@ class TestMagnitudeComputeAliases:
             ("J_mag", "|J|"),
             ("Jmag", "|J|"),
             ("V_mag", "|V|"),
+            ("Vmag", "|V|"),
         ],
     )
     def test_magnitude_aliases(self, alias, canonical):
@@ -204,12 +206,21 @@ class TestStructuredSpeciesComputeAliases:
             ("d_s1", "d_i"),
             ("v_thermal_s0", "v_th_e"),
             ("v_thermal_s1", "v_th_i"),
+            ("v_th_s0", "v_th_e"),
+            ("v_th_s1", "v_th_i"),
             ("rL_s0", "r_e"),
             ("rL_s1", "r_i"),
+            ("r_s0", "r_e"),
+            ("r_s1", "r_i"),
             ("beta_s0", "beta_e"),
             ("beta_s1", "beta_i"),
             ("entropy_s0", "s_e"),
             ("entropy_s1", "s_i"),
+            ("T_s0", "Te"),
+            ("T_s1", "Ti"),
+            ("P_s0", "Pe"),
+            ("P_s1", "Pi"),
+            ("lambda_D_s0", "lambda_D"),
         ],
     )
     def test_species_aliases_resolve(self, alias, canonical):
@@ -377,9 +388,14 @@ class TestRegistryIntegrity:
         overlap = set(_COMPUTE_ALIASES) & set(_REGISTRY)
         assert not overlap, f"Compute alias collision with registry: {overlap}"
 
-    def test_all_compute_aliases_resolve_to_registry(self):
+    def test_all_compute_aliases_resolve_to_registry_or_field(self):
+        # Aliases may point to raw field names (Te, Pi, etc.) or to other
+        # aliases (c_ia, etc.) used as direct passthrough.
+        raw_field_targets = {"Te", "Ti", "Pe", "Pi", "EF1", "EF2", "EF3"}
         for alias, target in _COMPUTE_ALIASES.items():
-            assert target in _REGISTRY, f"Alias {alias!r} -> {target!r} not in registry"
+            assert target in _REGISTRY or target in raw_field_targets, (
+                f"Alias {alias!r} -> {target!r} not in registry or known fields"
+            )
 
     def test_no_underscore_field_alias_collides_with_canonical(self):
         from pypic.coordinates import CARTESIAN
@@ -399,3 +415,349 @@ class TestRegistryIntegrity:
         assert "P_e" in aliases
         assert "T_i" in aliases
         assert "P_11" in aliases
+
+
+class TestMultiSpeciesDynamicRecipes:
+    """Dynamic species-template recipes for species index >= 2."""
+
+    def test_omega_p_s2_computes(self):
+        shape = (2, 2, 2)
+        data = {"n_s2": np.full(shape, 4.0)}
+        ds = _make_dataset(data, shape=shape, species=[ELECTRONS, IONS, ALPHAS])
+        result = compute_field("omega_p_s2", ds)
+        # omega_p = sqrt(n * q^2 / m) = sqrt(4 * 4 / 4) = sqrt(4) = 2
+        np.testing.assert_allclose(result, 2.0, rtol=1e-14)
+
+    def test_omega_c_s2_computes(self):
+        shape = (2, 2, 2)
+        data = {
+            "B1": np.full(shape, 2.0),
+            "B2": np.zeros(shape),
+            "B3": np.zeros(shape),
+        }
+        ds = _make_dataset(data, shape=shape, species=[ELECTRONS, IONS, ALPHAS])
+        result = compute_field("omega_c_s2", ds)
+        # omega_c = |q| * |B| / m = 2 * 2 / 4 = 1
+        np.testing.assert_allclose(result, 1.0, rtol=1e-15)
+
+    def test_d_s2_computes(self):
+        shape = (2, 2, 2)
+        data = {"n_s2": np.full(shape, 1.0)}
+        ds = _make_dataset(data, shape=shape, species=[ELECTRONS, IONS, ALPHAS])
+        result = compute_field("d_s2", ds)
+        # d = c / omega_p = 1 / sqrt(1 * 4 / 4) = 1 / 1 = 1
+        np.testing.assert_allclose(result, 1.0, rtol=1e-14)
+
+    def test_v_th_s2_computes(self):
+        shape = (2, 2, 2)
+        # T_s2 is not raw data; it must be computed from P_s2 and n_s2
+        data = {
+            "P_s2": np.full(shape, 8.0),
+            "n_s2": np.full(shape, 2.0),
+        }
+        ds = _make_dataset(data, shape=shape, species=[ELECTRONS, IONS, ALPHAS])
+        result = compute_field("v_th_s2", ds)
+        # T_s2 = P/n = 4, v_th = sqrt(T/m) = sqrt(4/4) = 1
+        np.testing.assert_allclose(result, 1.0, rtol=1e-14)
+
+    def test_r_s2_computes(self):
+        shape = (2, 2, 2)
+        data = {
+            "P_s2": np.full(shape, 4.0),
+            "n_s2": np.full(shape, 1.0),
+            "B1": np.full(shape, 1.0),
+            "B2": np.zeros(shape),
+            "B3": np.zeros(shape),
+        }
+        ds = _make_dataset(data, shape=shape, species=[ELECTRONS, IONS, ALPHAS])
+        result = compute_field("r_s2", ds)
+        # T_s2 = 4, r = sqrt(m*T) / (|q|*B) = sqrt(4*4) / (2*1) = 4/2 = 2
+        np.testing.assert_allclose(result, 2.0, rtol=1e-14)
+
+    def test_lambda_d_s2_computes(self):
+        shape = (2, 2, 2)
+        data = {
+            "P_s2": np.full(shape, 4.0),
+            "n_s2": np.full(shape, 1.0),
+        }
+        ds = _make_dataset(data, shape=shape, species=[ELECTRONS, IONS, ALPHAS])
+        result = compute_field("lambda_D_s2", ds)
+        # T_s2 = 4, lambda_D = sqrt(T / (n * q^2)) = sqrt(4 / (1*4)) = 1
+        np.testing.assert_allclose(result, 1.0, rtol=1e-14)
+
+    def test_beta_s2_computes(self):
+        shape = (2, 2, 2)
+        data = {
+            "P_s2": np.full(shape, 5.0),
+            "B1": np.full(shape, 1.0),
+            "B2": np.zeros(shape),
+            "B3": np.zeros(shape),
+        }
+        ds = _make_dataset(data, shape=shape, species=[ELECTRONS, IONS, ALPHAS])
+        result = compute_field("beta_s2", ds)
+        # beta = 2*P / B^2 = 2*5 / 1 = 10
+        np.testing.assert_allclose(result, 10.0, rtol=1e-15)
+
+    def test_s_s2_computes(self):
+        shape = (2, 2, 2)
+        data = {
+            "P_s2": np.full(shape, 1.0),
+            "n_s2": np.full(shape, 1.0),
+        }
+        ds = _make_dataset(data, shape=shape, species=[ELECTRONS, IONS, ALPHAS])
+        result = compute_field("s_s2", ds)
+        # s = ln(P / n^gamma) = ln(1) = 0
+        np.testing.assert_allclose(result, 0.0, atol=1e-15)
+
+    def test_temperature_s2_computes(self):
+        shape = (2, 2, 2)
+        data = {
+            "P_s2": np.full(shape, 6.0),
+            "n_s2": np.full(shape, 3.0),
+        }
+        ds = _make_dataset(data, shape=shape, species=[ELECTRONS, IONS, ALPHAS])
+        result = compute_field("T_s2", ds)
+        # T = P / n = 2
+        np.testing.assert_allclose(result, 2.0, rtol=1e-15)
+
+    def test_s0_s1_still_resolve_via_static_aliases(self):
+        """Existing s0/s1 aliases should still work via _COMPUTE_ALIASES."""
+        shape = (2, 2, 2)
+        data = {"n_s0": np.full(shape, 4.0)}
+        ds = _make_dataset(data, shape=shape, species=[ELECTRONS, IONS])
+        result_alias = compute_field("omega_p_s0", ds)
+        result_canonical = compute_field("omega_pe", ds)
+        np.testing.assert_array_equal(result_alias, result_canonical)
+
+
+class TestMultiSpeciesSIConversion:
+    """SI factor resolution for per-species fields."""
+
+    def test_n_s2_si_factor(self):
+        norm = Normalization(
+            length_ref=1.0,
+            time_ref=1.0,
+            velocity_ref=1.0,
+            b_field_ref=1.0,
+            e_field_ref=1.0,
+            density_ref=5.0,
+            mass_ref=1.0,
+            charge_ref=1.0,
+        )
+        assert field_si_factor("n_s2", norm) == pytest.approx(5.0)
+
+    def test_omega_p_s2_si_factor(self):
+        norm = Normalization(
+            length_ref=1.0,
+            time_ref=0.5,
+            velocity_ref=1.0,
+            b_field_ref=1.0,
+            e_field_ref=1.0,
+            density_ref=1.0,
+            mass_ref=1.0,
+            charge_ref=1.0,
+        )
+        assert field_si_factor("omega_p_s2", norm) == pytest.approx(2.0)
+
+    def test_v_th_s2_si_factor(self):
+        norm = Normalization(
+            length_ref=1.0,
+            time_ref=1.0,
+            velocity_ref=3.0,
+            b_field_ref=1.0,
+            e_field_ref=1.0,
+            density_ref=1.0,
+            mass_ref=1.0,
+            charge_ref=1.0,
+        )
+        assert field_si_factor("v_th_s2", norm) == pytest.approx(3.0)
+
+    def test_beta_s2_si_factor(self):
+        norm = Normalization.identity()
+        assert field_si_factor("beta_s2", norm) == pytest.approx(1.0)
+
+
+class TestSpeciesNameAliases:
+    """Species-name aliases generated from config species list."""
+
+    def test_n_alphas_resolves_to_n_s2(self):
+        shape = (2, 2, 2)
+        data = {"n_s2": np.full(shape, 7.0)}
+        ds = _make_dataset(data, shape=shape, species=[ELECTRONS, IONS, ALPHAS])
+        np.testing.assert_array_equal(ds["n_alphas"], ds["n_s2"])
+
+    def test_n_e_n_i_aliases_take_priority(self):
+        """Hardcoded n_e/n_i must not be overwritten by species-name logic."""
+        shape = (2, 2, 2)
+        data = {"n_s0": np.full(shape, 1.0), "n_s1": np.full(shape, 2.0)}
+        ds = _make_dataset(data, shape=shape, species=[ELECTRONS, IONS])
+        np.testing.assert_allclose(ds["n_e"], 1.0)
+        np.testing.assert_allclose(ds["n_i"], 2.0)
+
+    def test_species_alias_not_added_without_data(self):
+        """n_alphas alias not created when n_s2 is absent."""
+        shape = (2, 2, 2)
+        data = {"n_s0": np.full(shape, 1.0)}
+        ds = _make_dataset(data, shape=shape, species=[ELECTRONS, IONS, ALPHAS])
+        assert not ds.has_field("n_alphas")
+
+
+class TestAuditIssue2SGyroRename:
+    """s_gyro_e/s_gyro_i are canonical; bare s_gyro is an error."""
+
+    def test_s_gyro_e_is_canonical(self):
+        assert "s_gyro_e" in _REGISTRY
+
+    def test_s_gyro_i_is_canonical(self):
+        assert "s_gyro_i" in _REGISTRY
+
+    def test_bare_s_gyro_not_in_aliases(self):
+        assert "s_gyro" not in _COMPUTE_ALIASES
+
+    def test_bare_s_gyro_raises_with_suggestions(self):
+        """Bare s_gyro raises KeyError with suggestion to use s_gyro_e."""
+        shape = (2, 2, 2)
+        data = {
+            "P11": np.full(shape, 1.0),
+            "P22": np.full(shape, 1.0),
+            "P33": np.full(shape, 3.0),
+            "P12": np.zeros(shape),
+            "P13": np.zeros(shape),
+            "P23": np.zeros(shape),
+            "B1": np.zeros(shape),
+            "B2": np.zeros(shape),
+            "B3": np.ones(shape),
+            "n_s0": np.full(shape, 1.0),
+        }
+        ds = _make_dataset(data, shape=shape)
+        with pytest.raises(KeyError, match="s_gyro_e"):
+            compute_field("s_gyro", ds)
+
+
+class TestAuditIssue6ElectronVelocityMagnitude:
+    """|Ve| compute and aliases."""
+
+    def test_ve_magnitude_345(self):
+        shape = (2, 2, 2)
+        data = {
+            "Ve1": np.full(shape, 3.0),
+            "Ve2": np.full(shape, 4.0),
+            "Ve3": np.zeros(shape),
+        }
+        ds = _make_dataset(data, shape=shape)
+        result = compute_field("|Ve|", ds)
+        np.testing.assert_allclose(result, 5.0, rtol=1e-15)
+
+    @pytest.mark.parametrize("alias", ["Ve_mag", "Vemag"])
+    def test_ve_magnitude_aliases(self, alias):
+        shape = (2, 2, 2)
+        data = {
+            "Ve1": np.full(shape, 3.0),
+            "Ve2": np.full(shape, 4.0),
+            "Ve3": np.zeros(shape),
+        }
+        ds = _make_dataset(data, shape=shape)
+        result = compute_field(alias, ds)
+        np.testing.assert_allclose(result, 5.0, rtol=1e-15)
+
+
+class TestAuditSIFactorGaps:
+    """SI factor resolution for fields added by audit."""
+
+    @pytest.mark.parametrize("name", ["s_gyro_e", "s_gyro_i"])
+    def test_gyrotropic_entropy_si_factor(self, name):
+        norm = Normalization.identity()
+        assert field_si_factor(name, norm) == pytest.approx(1.0)
+
+    @pytest.mark.parametrize("name", ["EF1", "EF2", "EF3"])
+    def test_ef_si_factor(self, name):
+        norm = Normalization.identity()
+        factor = field_si_factor(name, norm)
+        assert factor == pytest.approx(1.0)
+
+    @pytest.mark.parametrize("name", ["B0_1", "B0_2", "B0_3"])
+    def test_b0_si_factor(self, name):
+        b_ref = 2.5
+        norm = Normalization(
+            length_ref=1.0,
+            time_ref=1.0,
+            velocity_ref=1.0,
+            b_field_ref=b_ref,
+            e_field_ref=1.0,
+            density_ref=1.0,
+            mass_ref=1.0,
+            charge_ref=1.0,
+        )
+        assert field_si_factor(name, norm) == pytest.approx(b_ref)
+
+    def test_ef1_s0_si_factor(self):
+        norm = Normalization.identity()
+        factor = field_si_factor("EF1_s0", norm)
+        assert factor == pytest.approx(1.0)
+
+    def test_ve1_s0_si_factor(self):
+        norm = Normalization(
+            length_ref=1.0,
+            time_ref=1.0,
+            velocity_ref=3.0,
+            b_field_ref=1.0,
+            e_field_ref=1.0,
+            density_ref=1.0,
+            mass_ref=1.0,
+            charge_ref=1.0,
+        )
+        assert field_si_factor("Ve1_s0", norm) == pytest.approx(3.0)
+
+    def test_ve_magnitude_si_factor(self):
+        norm = Normalization(
+            length_ref=1.0,
+            time_ref=1.0,
+            velocity_ref=3.0,
+            b_field_ref=1.0,
+            e_field_ref=1.0,
+            density_ref=1.0,
+            mass_ref=1.0,
+            charge_ref=1.0,
+        )
+        assert field_si_factor("|Ve|", norm) == pytest.approx(3.0)
+
+
+class TestAuditFieldPrefixAliases:
+    """EF and B0 Cartesian aliases via _FIELD_PREFIX_PAIRS."""
+
+    def test_efx_alias_resolves(self):
+        shape = (2, 2, 2)
+        data = {"EF1": np.full(shape, 7.0)}
+        ds = _make_dataset(data, shape=shape)
+        np.testing.assert_array_equal(ds["EFx"], ds["EF1"])
+
+    def test_b0x_alias_resolves(self):
+        shape = (2, 2, 2)
+        data = {"B01": np.full(shape, 3.0)}
+        ds = _make_dataset(data, shape=shape)
+        np.testing.assert_array_equal(ds["B0x"], ds["B01"])
+
+    def test_ion_acoustic_speed_alias(self):
+        assert _COMPUTE_ALIASES["ion_acoustic_speed"] == "c_ia"
+
+
+class TestEnergyFluxAliases:
+    """Descriptive energy_flux_x/y/z aliases for EF1/EF2/EF3."""
+
+    @pytest.mark.parametrize(
+        ("alias", "canonical"),
+        [
+            ("energy_flux_x", "EF1"),
+            ("energy_flux_y", "EF2"),
+            ("energy_flux_z", "EF3"),
+        ],
+    )
+    def test_energy_flux_alias_resolves(self, alias, canonical):
+        assert _COMPUTE_ALIASES[alias] == canonical
+
+    def test_energy_flux_x_passthrough(self):
+        shape = (2, 2, 2)
+        data = {"EF1": np.full(shape, 3.14)}
+        ds = _make_dataset(data, shape=shape)
+        result = compute_field("energy_flux_x", ds)
+        np.testing.assert_allclose(result, 3.14)

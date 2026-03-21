@@ -75,8 +75,13 @@ class TestRegistryIntegrity:
         assert not overlap, f"Name collision: {overlap}"
 
     def test_all_aliases_resolve(self):
+        # Aliases may point to raw field names (Te, Pi, etc.) used as
+        # direct passthrough, not only to _REGISTRY entries.
+        raw_field_targets = {"Te", "Ti", "Pe", "Pi", "EF1", "EF2", "EF3"}
         for alias, target in _COMPUTE_ALIASES.items():
-            assert target in _REGISTRY, f"Alias {alias!r} -> {target!r} not in registry"
+            assert target in _REGISTRY or target in raw_field_targets, (
+                f"Alias {alias!r} -> {target!r} not in registry or known fields"
+            )
 
     def test_available_quantities_nonempty(self):
         names = available_quantities()
@@ -602,7 +607,8 @@ class TestSpeciesAliases:
         expected = np.log(3.0 * 1.0**2 / 2.0**5)
         np.testing.assert_allclose(result, expected, rtol=1e-14)
 
-    def test_s_gyro_e_alias_resolves_to_s_gyro(self):
+    def test_bare_s_gyro_raises(self):
+        """Bare s_gyro is an error — must specify s_gyro_e or s_gyro_i."""
         shape = (2, 2, 2)
         data = {
             "P11": np.full(shape, 1.0),
@@ -617,9 +623,8 @@ class TestSpeciesAliases:
             "n_s0": np.full(shape, 1.0),
         }
         ds = _make_dataset(data, shape=shape)
-        result_alias = compute_field("s_gyro_e", ds)
-        result_canonical = compute_field("s_gyro", ds)
-        np.testing.assert_array_equal(result_alias, result_canonical)
+        with pytest.raises(KeyError, match="s_gyro"):
+            compute_field("s_gyro", ds)
 
     def test_four_velocity_aliases_resolve(self):
         """ux/uy/uz field aliases work through FieldDataset."""

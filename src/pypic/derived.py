@@ -580,6 +580,38 @@ def _unit_vector(
     return _safe_divide(b1, mag), _safe_divide(b2, mag), _safe_divide(b3, mag)
 
 
+def temperature(
+    pressure: FloatArray,
+    density: FloatArray,
+) -> FloatArray:
+    r"""Compute temperature from pressure and number density.
+
+    $$T = P / n$$
+
+    Temperature is in energy units (not Kelvin). Divide by $k_B$ to
+    convert to Kelvin.
+
+    Parameters
+    ----------
+    pressure : NDArray
+        Scalar pressure in normalized units.
+    density : NDArray
+        Number density in normalized units.
+
+    Returns
+    -------
+    NDArray
+        Temperature in energy units (normalized).
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> temperature(np.array([2.0]), np.array([4.0]))
+    array([0.5])
+    """
+    return _safe_divide(pressure, density)
+
+
 def thermal_speed(
     temperature: FloatArray,
     mass: float,
@@ -1189,6 +1221,7 @@ __all__ = [
     "relativistic_enthalpy",
     "skin_depth",
     "sound_speed",
+    "temperature",
     "thermal_energy_density",
     "thermal_speed",
     "velocity_magnitude",

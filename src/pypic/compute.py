@@ -9,7 +9,9 @@ this module via deferred imports.
 from __future__ import annotations
 
 import difflib
+import re
 from dataclasses import dataclass
+from enum import StrEnum
 from typing import TYPE_CHECKING, Any
 
 from scipy import constants
@@ -25,6 +27,15 @@ if TYPE_CHECKING:
     from pypic.units import Normalization
 
 
+class _SpeciesArgs(StrEnum):
+    """Describes which species parameters a dynamic recipe needs."""
+
+    CHARGE_MASS = "charge_mass"
+    MASS_ONLY = "mass_only"
+    CHARGE_ONLY = "charge_only"
+    NONE = "none"
+
+
 @dataclass(frozen=True, slots=True)
 class _Recipe:
     func: Callable[..., Any]
@@ -34,6 +45,7 @@ class _Recipe:
     needs_gamma: bool = False
     needs_c: bool = False
     component: int | None = None
+    species_args: _SpeciesArgs | None = None
 
 
 _PRESSURE_TENSOR_FIELDS = ("P11", "P22", "P33", "P12", "P13", "P23")
@@ -45,6 +57,7 @@ _REGISTRY: dict[str, _Recipe] = {
     "|E|": _Recipe(derived.electric_field_magnitude, ("E1", "E2", "E3")),
     "|J|": _Recipe(derived.current_density_magnitude, ("J1", "J2", "J3")),
     "|V|": _Recipe(derived.velocity_magnitude, ("V1", "V2", "V3")),
+    "|Ve|": _Recipe(derived.velocity_magnitude, ("Ve1", "Ve2", "Ve3")),
     # Plasma parameters
     "beta": _Recipe(derived.plasma_beta, ("P", "|B|")),
     "beta_e": _Recipe(derived.plasma_beta, ("Pe", "|B|")),
@@ -72,7 +85,7 @@ _REGISTRY: dict[str, _Recipe] = {
     "s": _Recipe(derived.entropy, ("P", "rho_m"), needs_gamma=True),
     "s_e": _Recipe(derived.entropy, ("Pe", "n_s0"), needs_gamma=True),
     "s_i": _Recipe(derived.entropy, ("Pi", "n_s1"), needs_gamma=True),
-    "s_gyro": _Recipe(derived.gyrotropic_entropy, ("P_par", "P_perp", "n_s0")),
+    "s_gyro_e": _Recipe(derived.gyrotropic_entropy, ("P_par", "P_perp", "n_s0")),
     "s_gyro_i": _Recipe(derived.gyrotropic_entropy, ("P_par", "P_perp", "n_s1")),
     # Poynting flux (tuple return — component selects)
     "S1": _Recipe(
@@ -162,7 +175,6 @@ _COMPUTE_ALIASES: dict[str, str] = {
     "Sx": "S1",
     "Sy": "S2",
     "Sz": "S3",
-    "s_gyro_e": "s_gyro",
     # Magnitude aliases (_mag suffix)
     "B_mag": "|B|",
     "Bmag": "|B|",
@@ -171,11 +183,15 @@ _COMPUTE_ALIASES: dict[str, str] = {
     "J_mag": "|J|",
     "Jmag": "|J|",
     "V_mag": "|V|",
+    "Vmag": "|V|",
+    "Ve_mag": "|Ve|",
+    "Vemag": "|Ve|",
     "vort_mag": "|vort|",
     # Descriptive names
     "plasma_beta": "beta",
     "v_Alfven": "v_A",
     "c_ms": "v_ms",
+    "ion_acoustic_speed": "c_ia",
     "energy_magnetic": "e_B",
     "energy_electric": "e_E",
     "energy_kinetic": "e_k",
@@ -202,8 +218,21 @@ _COMPUTE_ALIASES: dict[str, str] = {
     "beta_s1": "beta_i",
     "entropy_s0": "s_e",
     "entropy_s1": "s_i",
-    "entropy_gyrotropic_s0": "s_gyro",
+    "entropy_gyrotropic_s0": "s_gyro_e",
     "entropy_gyrotropic_s1": "s_gyro_i",
+    # Per-species temperature/pressure aliases for s0/s1
+    "T_s0": "Te",
+    "T_s1": "Ti",
+    "P_s0": "Pe",
+    "P_s1": "Pi",
+    # Structured v_th aliases
+    "v_th_s0": "v_th_e",
+    "v_th_s1": "v_th_i",
+    # Structured r aliases
+    "r_s0": "r_e",
+    "r_s1": "r_i",
+    # Structured lambda_D aliases
+    "lambda_D_s0": "lambda_D",
     # Underscore-separated operator/component aliases
     "curl_B_1": "curl_B1",
     "curl_B_2": "curl_B2",
@@ -220,7 +249,101 @@ _COMPUTE_ALIASES: dict[str, str] = {
     "S_x": "S1",
     "S_y": "S2",
     "S_z": "S3",
+    # Descriptive energy flux aliases
+    "energy_flux_x": "EF1",
+    "energy_flux_y": "EF2",
+    "energy_flux_z": "EF3",
 }
+
+
+@dataclass(frozen=True, slots=True)
+class _SpeciesTemplate:
+    """Template for species-dependent derived quantities.
+
+    Used to dynamically synthesize recipes for species index >= 2,
+    where static registry entries don't exist.
+    """
+
+    func: Callable[..., Any]
+    field_pattern: tuple[str, ...]
+    species_args: _SpeciesArgs
+    needs_gamma: bool = False
+    needs_c: bool = False
+
+
+_SPECIES_TEMPLATES: dict[str, _SpeciesTemplate] = {
+    "omega_p": _SpeciesTemplate(
+        derived.plasma_frequency, ("n_s{N}",), _SpeciesArgs.CHARGE_MASS
+    ),
+    "omega_c": _SpeciesTemplate(
+        derived.gyrofrequency, ("|B|",), _SpeciesArgs.CHARGE_MASS
+    ),
+    "d": _SpeciesTemplate(
+        derived.skin_depth, ("n_s{N}",), _SpeciesArgs.CHARGE_MASS, needs_c=True
+    ),
+    "v_th": _SpeciesTemplate(
+        derived.thermal_speed, ("T_s{N}",), _SpeciesArgs.MASS_ONLY
+    ),
+    "r": _SpeciesTemplate(
+        derived.gyroradius, ("T_s{N}", "|B|"), _SpeciesArgs.CHARGE_MASS
+    ),
+    "lambda_D": _SpeciesTemplate(
+        derived.debye_length, ("T_s{N}", "n_s{N}"), _SpeciesArgs.CHARGE_ONLY
+    ),
+    "beta": _SpeciesTemplate(derived.plasma_beta, ("P_s{N}", "|B|"), _SpeciesArgs.NONE),
+    "s": _SpeciesTemplate(
+        derived.entropy, ("P_s{N}", "n_s{N}"), _SpeciesArgs.NONE, needs_gamma=True
+    ),
+    "s_gyro": _SpeciesTemplate(
+        derived.gyrotropic_entropy, ("P_par", "P_perp", "n_s{N}"), _SpeciesArgs.NONE
+    ),
+    "T": _SpeciesTemplate(derived.temperature, ("P_s{N}", "n_s{N}"), _SpeciesArgs.NONE),
+}
+
+_SPECIES_SUFFIX_RE = re.compile(r"^(.+)_s(\d+)$")
+
+
+def _try_species_recipe(name: str) -> _Recipe | None:
+    """Try to build a recipe from species templates for names like ``omega_p_s2``.
+
+    Returns ``None`` if the name doesn't match any template.
+    """
+    m = _SPECIES_SUFFIX_RE.match(name)
+    if m is None:
+        return None
+    prefix, idx_str = m.group(1), m.group(2)
+    species_index = int(idx_str)
+    template = _SPECIES_TEMPLATES.get(prefix)
+    if template is None:
+        return None
+    fields = tuple(f.replace("{N}", idx_str) for f in template.field_pattern)
+    return _Recipe(
+        func=template.func,
+        fields=fields,
+        species_index=species_index,
+        needs_gamma=template.needs_gamma,
+        needs_c=template.needs_c,
+        species_args=template.species_args,
+    )
+
+
+# Regex patterns for SI conversion of per-species fields
+_SI_PATTERNS: list[tuple[re.Pattern[str], str]] = [
+    (re.compile(r"^n_s\d+$"), "density"),
+    (re.compile(r"^rho_c_s\d+$"), "charge_density"),
+    (re.compile(r"^J[123]_s\d+$"), "current_density"),
+    (re.compile(r"^V[123e]?_s\d+$"), "velocity"),
+    (re.compile(r"^Ve[123]_s\d+$"), "velocity"),
+    (re.compile(r"^EF[123]_s\d+$"), "poynting_flux"),
+    (re.compile(r"^P\d{0,2}_s\d+$"), "pressure"),
+    (re.compile(r"^T_s\d+$"), "temperature"),
+    (re.compile(r"^omega_[pc]_s\d+$"), "frequency"),
+    (re.compile(r"^[dr]_s\d+$"), "length"),
+    (re.compile(r"^lambda_D_s\d+$"), "length"),
+    (re.compile(r"^v_th_s\d+$"), "velocity"),
+    (re.compile(r"^(?:beta|s|s_gyro|agyrotropy)_s\d+$"), "dimensionless"),
+]
+
 
 # Maps field/derived names to physical quantity types for SI conversion
 _FIELD_QUANTITY_MAP: dict[str, str] = {
@@ -229,6 +352,9 @@ _FIELD_QUANTITY_MAP: dict[str, str] = {
     "B2": "b_field",
     "B3": "b_field",
     "|B|": "b_field",
+    "B0_1": "b_field",
+    "B0_2": "b_field",
+    "B0_3": "b_field",
     "E1": "e_field",
     "E2": "e_field",
     "E3": "e_field",
@@ -243,6 +369,7 @@ _FIELD_QUANTITY_MAP: dict[str, str] = {
     "V2": "velocity",
     "V3": "velocity",
     "|V|": "velocity",
+    "|Ve|": "velocity",
     "Ve1": "velocity",
     "Ve2": "velocity",
     "Ve3": "velocity",
@@ -294,10 +421,13 @@ _FIELD_QUANTITY_MAP: dict[str, str] = {
     "r_e": "length",
     "r_i": "length",
     "lambda_D": "length",
-    # Poynting flux
+    # Poynting flux / energy flux
     "S1": "poynting_flux",
     "S2": "poynting_flux",
     "S3": "poynting_flux",
+    "EF1": "poynting_flux",
+    "EF2": "poynting_flux",
+    "EF3": "poynting_flux",
     # Thermodynamic (specific quantities — energy per unit mass → velocity²)
     "h": "temperature",
     "h_rel": "temperature",
@@ -321,7 +451,6 @@ _FIELD_QUANTITY_MAP: dict[str, str] = {
     "s": "dimensionless",
     "s_e": "dimensionless",
     "s_i": "dimensionless",
-    "s_gyro": "dimensionless",
     "s_gyro_e": "dimensionless",
     "s_gyro_i": "dimensionless",
     "agyrotropy": "dimensionless",
@@ -369,13 +498,18 @@ def _get_recipe(name: str) -> _Recipe:
     try:
         return _REGISTRY[canonical]
     except KeyError:
-        all_names = sorted(set(_REGISTRY) | set(_COMPUTE_ALIASES))
-        suggestions = difflib.get_close_matches(name, all_names, n=3, cutoff=0.4)
-        msg = f"Unknown derived quantity {name!r}."
-        if suggestions:
-            msg += f" Did you mean: {suggestions}?"
-        msg += f" Available: {all_names}"
-        raise KeyError(msg) from None
+        pass
+    # Try dynamic species template synthesis (e.g. omega_p_s2, T_s3)
+    dynamic = _try_species_recipe(canonical)
+    if dynamic is not None:
+        return dynamic
+    all_names = sorted(set(_REGISTRY) | set(_COMPUTE_ALIASES))
+    suggestions = difflib.get_close_matches(name, all_names, n=3, cutoff=0.4)
+    msg = f"Unknown derived quantity {name!r}."
+    if suggestions:
+        msg += f" Did you mean: {suggestions}?"
+    msg += f" Available: {all_names}"
+    raise KeyError(msg) from None
 
 
 def _get_species_args(
@@ -412,6 +546,27 @@ def _get_gamma(dataset: FieldDataset) -> float:
 def _get_c(dataset: FieldDataset) -> float:
     """Get the speed of light from physics config, default 1.0."""
     return float(dataset.physics.get("c", 1.0))
+
+
+def _append_species_params(
+    args: list[Any],
+    species_args: list[float],
+    kind: _SpeciesArgs,
+) -> None:
+    """Append the right species parameters based on the descriptor."""
+    match kind:
+        case _SpeciesArgs.CHARGE_MASS:
+            args.extend(species_args)
+        case _SpeciesArgs.MASS_ONLY:
+            args.append(species_args[1])
+        case _SpeciesArgs.CHARGE_ONLY:
+            args.append(species_args[0])
+        case _SpeciesArgs.NONE:
+            pass
+        case _ as unreachable:  # pragma: no cover
+            from typing import assert_never
+
+            assert_never(unreachable)
 
 
 def compute_field(name: str, dataset: FieldDataset, _depth: int = 0) -> FloatArray:
@@ -470,31 +625,24 @@ def compute_field(name: str, dataset: FieldDataset, _depth: int = 0) -> FloatArr
 
     # Append species charge/mass
     species_args = _get_species_args(dataset, recipe)
-    # For species-dependent functions, we need to figure out
-    # which extra args the function expects (charge, mass, or just mass)
     if species_args:
-        func = recipe.func
-        if func is derived.thermal_speed:
-            # thermal_speed(temperature, mass)
-            args.append(species_args[1])
-        elif func is derived.ion_acoustic_speed:
-            # ion_acoustic_speed(Te, Ti, mass_i, gamma_e, gamma_i)
-            args.append(species_args[1])
-        elif func is derived.gyrofrequency:
-            # gyrofrequency(b, charge, mass)
-            args.extend(species_args)
-        elif func is derived.plasma_frequency:
-            # plasma_frequency(density, charge, mass)
-            args.extend(species_args)
-        elif func is derived.skin_depth:
-            # skin_depth(density, charge, mass, c)
-            args.extend(species_args)
-        elif func is derived.gyroradius:
-            # gyroradius(temperature, b, charge, mass)
-            args.extend(species_args)
-        elif func is derived.debye_length:
-            # debye_length(temperature, density, charge)
-            args.append(species_args[0])
+        if recipe.species_args is not None:
+            # Dynamic recipe: use explicit species_args descriptor
+            _append_species_params(args, species_args, recipe.species_args)
+        else:
+            # Static recipe: dispatch by function identity
+            func = recipe.func
+            if func is derived.thermal_speed or func is derived.ion_acoustic_speed:
+                args.append(species_args[1])
+            elif (
+                func is derived.gyrofrequency
+                or func is derived.plasma_frequency
+                or func is derived.skin_depth
+                or func is derived.gyroradius
+            ):
+                args.extend(species_args)
+            elif func is derived.debye_length:
+                args.append(species_args[0])
 
     # Append gamma
     if recipe.needs_gamma:
@@ -585,6 +733,12 @@ def field_si_factor(name: str, normalization: Normalization) -> float:
         fallback = _get_field_alias_fallback()
         canonical = fallback.get(canonical, canonical)
         quantity_type = _FIELD_QUANTITY_MAP.get(canonical)
+    if quantity_type is None:
+        # Try regex patterns for per-species fields (n_s2, J1_s3, etc.)
+        for pattern, qtype in _SI_PATTERNS:
+            if pattern.match(canonical):
+                quantity_type = qtype
+                break
     if quantity_type is None:
         msg = (
             f"No SI conversion known for {name!r}. "
