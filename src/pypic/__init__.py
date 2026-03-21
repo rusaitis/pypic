@@ -55,6 +55,7 @@ from pypic.diagnostics import (
     linf_error,
     max_div_b,
 )
+from pypic.fields import FieldInfo, field_info, unit_label
 from pypic.readers import (
     AuxiliaryDataReader,
     BATSRUSConfig,
@@ -111,6 +112,7 @@ __all__ = [
     "ConservedQuantities",
     "CoordinateGeometry",
     "FieldDataset",
+    "FieldInfo",
     "GeometryType",
     "GridInfo",
     "IPic3DConfig",
@@ -150,6 +152,7 @@ __all__ = [
     "entropy",
     "field_difference",
     "field_energy",
+    "field_info",
     "gradient",
     "gyrofrequency",
     "gyroradius",
@@ -189,6 +192,7 @@ __all__ = [
     "temperature",
     "thermal_energy_density",
     "thermal_speed",
+    "unit_label",
     "unregister_reader",
     "velocity_magnitude",
 ]

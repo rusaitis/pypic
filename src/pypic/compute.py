@@ -18,6 +18,7 @@ from scipy import constants
 
 from pypic import derived, diagnostics
 from pypic.coordinates import operators
+from pypic.fields import _FIELD_INFO
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -345,115 +346,10 @@ _SI_PATTERNS: list[tuple[re.Pattern[str], str]] = [
 ]
 
 
-# Maps field/derived names to physical quantity types for SI conversion
+# Maps field/derived names to physical quantity types for SI conversion.
+# Derived from the canonical registry in fields.py — single source of truth.
 _FIELD_QUANTITY_MAP: dict[str, str] = {
-    # Electromagnetic fields
-    "B1": "b_field",
-    "B2": "b_field",
-    "B3": "b_field",
-    "|B|": "b_field",
-    "B0_1": "b_field",
-    "B0_2": "b_field",
-    "B0_3": "b_field",
-    "E1": "e_field",
-    "E2": "e_field",
-    "E3": "e_field",
-    "|E|": "e_field",
-    # Current density
-    "J1": "current_density",
-    "J2": "current_density",
-    "J3": "current_density",
-    "|J|": "current_density",
-    # Velocities
-    "V1": "velocity",
-    "V2": "velocity",
-    "V3": "velocity",
-    "|V|": "velocity",
-    "|Ve|": "velocity",
-    "Ve1": "velocity",
-    "Ve2": "velocity",
-    "Ve3": "velocity",
-    "v_A": "velocity",
-    "c_s": "velocity",
-    "c_ia": "velocity",
-    "v_ms": "velocity",
-    "v_th_e": "velocity",
-    "v_th_i": "velocity",
-    # Four-velocity
-    "u1": "velocity",
-    "u2": "velocity",
-    "u3": "velocity",
-    # Densities
-    "rho_m": "mass_density",
-    "rho_c": "charge_density",
-    "n_s0": "density",
-    "n_s1": "density",
-    "n_e": "density",
-    "n_i": "density",
-    # Pressure
-    "P": "pressure",
-    "Pe": "pressure",
-    "Pi": "pressure",
-    "P_par": "pressure",
-    "P_perp": "pressure",
-    "P11": "pressure",
-    "P22": "pressure",
-    "P33": "pressure",
-    "P12": "pressure",
-    "P13": "pressure",
-    "P23": "pressure",
-    # Temperature
-    "Te": "temperature",
-    "Ti": "temperature",
-    # Energy densities
-    "e_B": "energy_density",
-    "e_E": "energy_density",
-    "e_k": "energy_density",
-    "e_th": "energy_density",
-    # Frequencies
-    "omega_pe": "frequency",
-    "omega_pi": "frequency",
-    "omega_ce": "frequency",
-    "omega_ci": "frequency",
-    # Lengths
-    "d_e": "length",
-    "d_i": "length",
-    "r_e": "length",
-    "r_i": "length",
-    "lambda_D": "length",
-    # Poynting flux / energy flux
-    "S1": "poynting_flux",
-    "S2": "poynting_flux",
-    "S3": "poynting_flux",
-    "EF1": "poynting_flux",
-    "EF2": "poynting_flux",
-    "EF3": "poynting_flux",
-    # Thermodynamic (specific quantities — energy per unit mass → velocity²)
-    "h": "temperature",
-    "h_rel": "temperature",
-    "e_int": "temperature",
-    # Diagnostics (per-length quantities)
-    "div_B": "b_field",  # really b_field/length but same SI factor pattern
-    "div_E": "e_field",
-    "curl_B1": "b_field",
-    "curl_B2": "b_field",
-    "curl_B3": "b_field",
-    "vort1": "frequency",
-    "vort2": "frequency",
-    "vort3": "frequency",
-    "|vort|": "frequency",
-    # Dimensionless
-    "beta": "dimensionless",
-    "beta_e": "dimensionless",
-    "beta_i": "dimensionless",
-    "M_A": "dimensionless",
-    "M_ms": "dimensionless",
-    "s": "dimensionless",
-    "s_e": "dimensionless",
-    "s_i": "dimensionless",
-    "s_gyro_e": "dimensionless",
-    "s_gyro_i": "dimensionless",
-    "agyrotropy": "dimensionless",
+    name: info.quantity_type for name, info in _FIELD_INFO.items()
 }
 
 # Display unit conversion: unit string → SI value

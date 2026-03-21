@@ -23,6 +23,7 @@ if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence
     from pathlib import Path
 
+    from pypic.fields import FieldInfo
     from pypic.types import FloatArray
     from pypic.units import Normalization, SpeciesInfo
 
@@ -353,9 +354,18 @@ class FieldDataset:
         coord_arrays = grid.coordinate_arrays()
         coords = {dim_names[i]: coord_arrays[i] for i in range(ndim)}
 
-        data_vars = {
-            name: xr.DataArray(data=arr, dims=dim_names) for name, arr in fields.items()
-        }
+        from pypic.fields import field_info as _field_info
+
+        data_vars: dict[str, xr.DataArray] = {}
+        for var_name, arr in fields.items():
+            da = xr.DataArray(data=arr, dims=dim_names)
+            try:
+                info = _field_info(var_name, axis_names=grid.geometry.axis_names)
+                da.attrs["long_name"] = info.long_name
+                da.attrs["units"] = "normalized"
+            except KeyError:
+                pass
+            data_vars[var_name] = da
         dataset = xr.Dataset(data_vars, coords=coords)
         return cls(
             dataset,
@@ -612,6 +622,22 @@ class FieldDataset:
         from pypic.compute import compute_field
 
         return compute_field(name, self)
+
+    def field_info(self, name: str) -> FieldInfo:
+        """Return metadata for a field or derived quantity.
+
+        Parameters
+        ----------
+        name : str
+            Field or derived quantity name (canonical or alias).
+
+        Returns
+        -------
+        FieldInfo
+        """
+        from pypic.fields import field_info as _field_info
+
+        return _field_info(name, axis_names=self._grid.geometry.axis_names)
 
     def in_si(self, name: str) -> FloatArray:
         """Return a field or derived quantity in SI units.

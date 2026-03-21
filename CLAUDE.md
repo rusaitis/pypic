@@ -84,7 +84,7 @@ Docs built with MkDocs Material + mkdocstrings.
 
 ## Testing
 
-- One assert per test where practical. Descriptive test names.
+- One assert per test where practical. Descriptive test names. Structural invariants ("every entry in registry X satisfies property Y") are better as a single test with a descriptive assertion message than N parametrized copies of the same check.
 - `@pytest.mark.parametrize` for numerical validation.
 - Derived quantities: test against hand calculations and NRL Formulary values.
 - `np.testing.assert_allclose` with explicit `rtol`/`atol`.
