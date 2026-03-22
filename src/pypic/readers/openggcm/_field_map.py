@@ -105,5 +105,3 @@ def convert_fields_to_si(
             si[raw_name] = data
 
     return si
-
-

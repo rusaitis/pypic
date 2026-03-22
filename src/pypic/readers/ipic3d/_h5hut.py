@@ -38,6 +38,7 @@ log = logging.getLogger(__name__)
 
 _FIELDS_PATTERN = re.compile(r"-Fields_(\d+)\.h5$")
 
+
 def _read_field(block: h5py.Group, name: str) -> FloatArray:
     """Read a single field dataset, transpose ZYX→XYZ, promote to float64."""
     raw = block[name]["0"][()]

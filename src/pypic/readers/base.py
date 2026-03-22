@@ -753,6 +753,7 @@ class FieldDataset:
             if qt is not None:
                 factor = self._normalization.si_factor(qt)
                 return data if factor == 1.0 else data * factor
+            # No quantity_type attr — fall through to global registry
         else:
             data = compute_field(name, self)
 

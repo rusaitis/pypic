@@ -11,8 +11,33 @@ from pypic.readers.base import GridInfo
 from pypic.readers.batsrus._field_map import FIELD_NAME_MAP, SKIP_FIELDS
 
 if TYPE_CHECKING:
+    from collections.abc import Mapping
+
     from pypic.readers.batsrus._hdf5 import BATLData
     from pypic.types import FloatArray
+
+
+def _canonical_var_pairs(
+    var_names: tuple[str, ...],
+) -> list[tuple[int, str]]:
+    """Map BATSRUS var names to (index, canonical_name), skipping non-field vars."""
+    return [
+        (iv, FIELD_NAME_MAP.get(vname, vname))
+        for iv, vname in enumerate(var_names)
+        if vname not in SKIP_FIELDS
+    ]
+
+
+def _canonical_hdf5_names(
+    var_names: tuple[str, ...],
+    available: Mapping[str, object],
+) -> list[tuple[str, str]]:
+    """Map BATSRUS var names to (raw_name, canonical_name) for available HDF5 fields."""
+    return [
+        (vname, FIELD_NAME_MAP.get(vname, vname))
+        for vname in var_names
+        if vname not in SKIP_FIELDS and vname in available
+    ]
 
 
 def assemble_uniform_idl(
@@ -62,10 +87,7 @@ def assemble_uniform_idl(
     )
 
     fields: dict[str, FloatArray] = {}
-    for iv, vname in enumerate(var_names):
-        if vname in SKIP_FIELDS:
-            continue
-        canonical = FIELD_NAME_MAP.get(vname, vname)
+    for iv, canonical in _canonical_var_pairs(var_names):
         arr = np.full(dims, np.nan, dtype=np.float64)
         arr[indices] = state[:, iv]
         fields[canonical] = arr
@@ -136,41 +158,37 @@ def regrid_amr_idl(
 
     fields: dict[str, FloatArray] = {}
 
+    var_pairs = _canonical_var_pairs(var_names)
+
     if not has_fine:
         # Fast path: no cells finer than output — fill directly
-        for vname in var_names:
-            if vname in SKIP_FIELDS:
-                continue
-            canonical = FIELD_NAME_MAP.get(vname, vname)
+        for _iv, canonical in var_pairs:
             fields[canonical] = np.full(dims, np.nan, dtype=np.float64)
 
         for ic in range(len(dx)):
             cell_dx = dx[ic]
             ratio = round(cell_dx / out_dx)
             idx_start = tuple(
-                max(0, min(
-                    round((coords[ic, d] - cell_dx / 2 - global_min[d]) / out_dx),
-                    dims[d] - 1,
-                ))
+                max(
+                    0,
+                    min(
+                        round((coords[ic, d] - cell_dx / 2 - global_min[d]) / out_dx),
+                        dims[d] - 1,
+                    ),
+                )
                 for d in range(ndim)
             )
             slices = tuple(
                 slice(idx_start[d], min(idx_start[d] + ratio, dims[d]))
                 for d in range(ndim)
             )
-            for iv, vname in enumerate(var_names):
-                if vname in SKIP_FIELDS:
-                    continue
-                canonical = FIELD_NAME_MAP.get(vname, vname)
+            for iv, canonical in var_pairs:
                 fields[canonical][slices] = state[ic, iv]
     else:
         # Accumulation path: average fine cells, repeat coarse
         sums: dict[str, FloatArray] = {}
         counts = np.zeros(dims, dtype=np.float64)
-        for vname in var_names:
-            if vname in SKIP_FIELDS:
-                continue
-            canonical = FIELD_NAME_MAP.get(vname, vname)
+        for _iv, canonical in var_pairs:
             sums[canonical] = np.zeros(dims, dtype=np.float64)
 
         for ic in range(len(dx)):
@@ -179,20 +197,22 @@ def regrid_amr_idl(
                 # Coarse or equal: nearest-neighbor fill
                 ratio = round(cell_dx / out_dx)
                 idx_start = tuple(
-                    max(0, min(
-                        round((coords[ic, d] - cell_dx / 2 - global_min[d]) / out_dx),
-                        dims[d] - 1,
-                    ))
+                    max(
+                        0,
+                        min(
+                            round(
+                                (coords[ic, d] - cell_dx / 2 - global_min[d]) / out_dx
+                            ),
+                            dims[d] - 1,
+                        ),
+                    )
                     for d in range(ndim)
                 )
                 slices = tuple(
                     slice(idx_start[d], min(idx_start[d] + ratio, dims[d]))
                     for d in range(ndim)
                 )
-                for iv, vname in enumerate(var_names):
-                    if vname in SKIP_FIELDS:
-                        continue
-                    canonical = FIELD_NAME_MAP.get(vname, vname)
+                for iv, canonical in var_pairs:
                     sums[canonical][slices] += state[ic, iv]
                 counts[slices] += 1.0
             else:
@@ -204,10 +224,7 @@ def regrid_amr_idl(
                     )
                     for d in range(ndim)
                 )
-                for iv, vname in enumerate(var_names):
-                    if vname in SKIP_FIELDS:
-                        continue
-                    canonical = FIELD_NAME_MAP.get(vname, vname)
+                for iv, canonical in var_pairs:
                     sums[canonical][idx] += state[ic, iv]
                 counts[idx] += 1.0
 
@@ -306,10 +323,7 @@ def _assemble_hdf5_blocks(
             for mn, mx, d in zip(batl.domain_min, batl.domain_max, dims, strict=True)
         )
         fields: dict[str, FloatArray] = {}
-        for vname in batl.var_names:
-            if vname in SKIP_FIELDS or vname not in batl.fields:
-                continue
-            canonical = FIELD_NAME_MAP.get(vname, vname)
+        for _raw, canonical in _canonical_hdf5_names(batl.var_names, batl.fields):
             fields[canonical] = np.full(dims, np.nan, dtype=np.float64)
         grid = GridInfo(
             dimensions=dims, spacing=spacing, origin=origin, geometry=geometry
@@ -336,11 +350,10 @@ def _assemble_hdf5_blocks(
     origin = tuple(float(global_min[d]) for d in range(ndim))
     spacing = tuple(float(out_dx[d]) for d in range(ndim))
 
+    hdf5_pairs = _canonical_hdf5_names(batl.var_names, batl.fields)
+
     fields = {}
-    for vname in batl.var_names:
-        if vname in SKIP_FIELDS or vname not in batl.fields:
-            continue
-        canonical = FIELD_NAME_MAP.get(vname, vname)
+    for _raw, canonical in hdf5_pairs:
         fields[canonical] = np.full(dims, np.nan, dtype=np.float64)
 
     # Place each block into the output grid
@@ -358,11 +371,8 @@ def _assemble_hdf5_blocks(
             round((bbox[ib, d, 0] - global_min[d]) / out_dx[d]) for d in range(ndim)
         )
 
-        for vname in batl.var_names:
-            if vname in SKIP_FIELDS or vname not in batl.fields:
-                continue
-            canonical = FIELD_NAME_MAP.get(vname, vname)
-            block_data = batl.fields[vname][ib]
+        for raw, canonical in hdf5_pairs:
+            block_data = batl.fields[raw][ib]
 
             # HDF5 always stores (nK, nJ, nI) even for 2D (nK=1).
             # Remove the collapsed axis explicitly, then reverse

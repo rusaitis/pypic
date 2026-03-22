@@ -306,9 +306,7 @@ _FIELD_INFO: dict[str, FieldInfo] = {
         "J/kg",
         r"$h_{rel}$",
     ),
-    "e_int": _FI(
-        "specific_energy", "Specific internal energy", "J/kg", r"$e_{int}$"
-    ),
+    "e_int": _FI("specific_energy", "Specific internal energy", "J/kg", r"$e_{int}$"),
     # Diagnostics (spatial derivatives)
     "div_B": _FI(
         "b_field_per_length",
@@ -390,6 +388,7 @@ _FIELD_INFO: dict[str, FieldInfo] = {
     "sigma": _FI("dimensionless", "Magnetization parameter", "", r"$\sigma$"),
     "gamma_eos": _FI("dimensionless", "Adiabatic index", "", r"$\gamma_{eos}$"),
 }
+
 
 def register_field(
     name: str,

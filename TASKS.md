@@ -61,7 +61,7 @@ Each step produces something testable. No step starts until the previous step's 
   **Registry and auto-detection:** Confidence-based `open_simulation()` with `ProbeResult` diagnostics, factory fallback (tries next-best reader if top candidate crashes, `ExceptionGroup` if all fail), `Simulation` facade with `probe_results` introspection, `describe()`, `refresh_steps()`, `first_step`/`last_step`. Selective I/O via `fields=` parameter. `AuxiliaryDataReader` protocol for tabular data. BATSRUS `.h` probe tightened to BATSRUS timestamp pattern (avoids C header false positives). `FieldDataset._resolve_key` suggests close matches on `KeyError`.
 
 - [x] **Step 13: FieldDataset — compute() and in_units()**
-  `compute(name)` dispatches string to derived function ("|B|", "beta", "v_A", "M_A", "|vort|", "vort1"/"vort2"/"vort3", ...). `in_si(field)` for SI conversion. `in_units(field, unit_str)` for display units ("nT", "km/s").
+  `compute(name)` dispatches string to derived function ("|B|", "beta", "v_A", "M_A", "|vort|", "vort1"/"vort2"/"vort3", ...). `in_si(field)` for SI conversion. `in_units(field, unit_str)` for display units ("nT", "km/s"). `QuantityType` StrEnum, `_FIELD_INFO` registry with `FieldInfo` metadata (quantity_type, long_name, si_unit, latex). `register_field()` / `unregister_field()` for custom fields. `FieldDataset.with_field()` attaches fields with xarray attrs carrying metadata through slicing. Attrs-first lookup in `field_info()` / `in_si()` (xarray attrs override global registry). Geometry-aware label localization. Per-species regex patterns for auto-generated metadata.
 
 - [ ] **Step 14: plotting/slices — basic 2D visualization**
   `plot_field_slice` (plane selection, axis labels, colorbar). `plot_comparison` (three-panel: A | B | difference). Publication rcParams in `plotting/styles.py`.
@@ -131,7 +131,7 @@ Each step produces something testable. No step starts until the previous step's 
 
 - [ ] **Step 24: `pypic.io` — Zarr export/import for FieldDataset**
   `to_zarr(fds, path)` leveraging `xr.Dataset.to_zarr()` + pypic metadata as group attrs (grid, normalization, species, physics). `from_zarr(path) -> FieldDataset` reconstructs everything. Round-trip guarantee. Default compression: zstd. Optional dep: `zarr>=3.0` under `zarr` extra.
-  **Field metadata:** `pypic.field_registry` module — dict mapping canonical names → `{units: str, long_name: str}` (e.g., `"B1" → {"units": "normalized", "long_name": "Magnetic field component 1"}`). Applied as xarray DataArray `.attrs` during `FieldDataset.from_arrays()`. Self-describing exports without adopting CF vocabulary (CF has no plasma physics coverage). `in_si()` updates attrs to SI unit strings.
+  **Field metadata:** Already self-describing via xarray DataArray attrs (`quantity_type`, `si_unit`, `long_name`, `latex`, `units`), set by `from_arrays()` and `with_field()`. `xr.Dataset.to_zarr()` serializes attrs automatically — no separate field registry module needed. `from_zarr()` reconstructs `FieldDataset` including per-field metadata. No CF vocabulary (CF has no plasma physics coverage).
 
 - [ ] **Step 25: `pypic.io` — Parquet/Arrow for ParticleData**
   `particles_to_parquet(data, path)`, `particles_from_parquet(path) -> ParticleData`, `particles_to_arrow(data) -> pyarrow.Table` (zero-copy), `particles_from_arrow(table, ...) -> ParticleData`. Columnar storage: x/y/z/vx/vy/vz/charge/id columns. Species metadata in Parquet footer. Optional dep: `pyarrow>=17.0` under `arrow` extra.
@@ -235,7 +235,7 @@ grow.
 | 10 | coordinates | curl, div, grad (Cartesian) | ✅ |
 | 11 | selections | Plane, Box | ✅ |
 | 12 | readers | iPIC3D, BATSRUS, OpenGGCM, Simple readers + registry + auto-detection | ✅ |
-| 13 | fields | compute(), in_units() | ✅ |
+| 13 | fields | compute(), in_units(), QuantityType, field metadata registry | ✅ |
 | 14 | plotting | 2D slices, comparison | — |
 | **—** | **—** | **Milestone: daily-use tool** | **—** |
 | 15 | coordinates | Frame transforms | — |

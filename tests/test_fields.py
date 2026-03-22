@@ -425,9 +425,7 @@ class TestWithField:
     def test_in_si_via_attrs(self) -> None:
         norm = Normalization.pic_electron(n_e=1.0e18)
         grid = GridInfo(dimensions=(2,), spacing=(1.0,))
-        ds = FieldDataset.from_arrays(
-            {"B1": np.array([1.0, 2.0])}, grid, norm
-        )
+        ds = FieldDataset.from_arrays({"B1": np.array([1.0, 2.0])}, grid, norm)
         data = np.array([3.0, 4.0])
         ds2 = ds.with_field("custom_v", data, QuantityType.VELOCITY)
         si_vals = ds2.in_si("custom_v")
@@ -451,9 +449,7 @@ class TestWithField:
 
     def test_survives_isel(self) -> None:
         ds = _make_dataset({"B1": np.ones((4, 3, 2))})
-        ds2 = ds.with_field(
-            "diag", np.ones((4, 3, 2)), QuantityType.PRESSURE
-        )
+        ds2 = ds.with_field("diag", np.ones((4, 3, 2)), QuantityType.PRESSURE)
         sliced = ds2.isel(z=0)
         info = sliced.field_info("diag")
         assert info.quantity_type == "pressure"
@@ -462,7 +458,9 @@ class TestWithField:
     def test_survives_plane_selection(self) -> None:
         ds = _make_dataset({"B1": np.ones((4, 3, 2))})
         ds2 = ds.with_field(
-            "diag", np.ones((4, 3, 2)), QuantityType.VELOCITY,
+            "diag",
+            np.ones((4, 3, 2)),
+            QuantityType.VELOCITY,
             long_name="My diagnostic",
         )
         plane = PlaneSelection(normal="z").apply(ds2)
@@ -512,9 +510,7 @@ class TestAttrsOverrideRegistry:
         """in_si() picks quantity_type from attrs, not global registry."""
         norm = Normalization.pic_electron(n_e=1.0e18)
         grid = GridInfo(dimensions=(2,), spacing=(1.0,))
-        ds = FieldDataset.from_arrays(
-            {"B1": np.array([1.0, 2.0])}, grid, norm
-        )
+        ds = FieldDataset.from_arrays({"B1": np.array([1.0, 2.0])}, grid, norm)
         # Attach "B1" with velocity quantity_type (overriding b_field)
         ds2 = ds.with_field("B1", np.array([5.0, 6.0]), QuantityType.VELOCITY)
         si = ds2.in_si("B1")

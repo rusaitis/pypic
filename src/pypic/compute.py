@@ -591,9 +591,11 @@ def display_unit_factor(unit_str: str) -> float:
 
 
 def available_quantities() -> list[str]:
-    """Return sorted list of all computable quantity names.
+    """Return sorted list of registered quantity names and aliases.
 
-    Includes both canonical names and aliases.
+    Does not include dynamically synthesized per-species quantities
+    (e.g. ``"omega_p_s2"``, ``"T_s3"``), which are also computable
+    via :func:`compute_field`.
 
     Returns
     -------
