@@ -27,6 +27,58 @@ _LOC_CODES: dict[str, int] = {
 }
 
 
+OverlayShade = Literal["darker", "lighter"]
+
+_SHADE_FACTOR = 0.4
+
+
+def _detect_overlay_defaults(
+    shade: OverlayShade | None,
+) -> tuple[tuple[float, float, float], tuple[float, float, float]]:
+    """Derive overlay bg and fg colors from rcParams.
+
+    The overlay background is the axes facecolor blended toward black
+    (``"darker"``) or white (``"lighter"``).  When *shade* is ``None``,
+    the direction is auto-selected from the axes facecolor luminance.
+    Foreground color is always read from ``rcParams["text.color"]`` so
+    that custom themes propagate into overlay text automatically.
+
+    Parameters
+    ----------
+    shade : "darker", "lighter", or None
+        ``None`` auto-selects based on axes facecolor luminance.
+
+    Returns
+    -------
+    tuple[tuple, tuple]
+        ``(default_bg, default_fg)``
+    """
+    import matplotlib as mpl
+    from matplotlib.colors import to_rgba
+
+    bg = to_rgba(mpl.rcParams.get("axes.facecolor", "white"))
+    luminance = 0.299 * bg[0] + 0.587 * bg[1] + 0.114 * bg[2]
+
+    if shade is None:
+        shade = "darker" if luminance < 0.5 else "lighter"
+
+    if shade == "darker":
+        f = _SHADE_FACTOR
+        default_bg = (bg[0] * f, bg[1] * f, bg[2] * f)
+    else:
+        f = _SHADE_FACTOR
+        default_bg = (
+            bg[0] + (1.0 - bg[0]) * f,
+            bg[1] + (1.0 - bg[1]) * f,
+            bg[2] + (1.0 - bg[2]) * f,
+        )
+
+    fg_rgba = to_rgba(mpl.rcParams.get("text.color", "black"))
+    default_fg: tuple[float, float, float] = (fg_rgba[0], fg_rgba[1], fg_rgba[2])
+
+    return default_bg, default_fg
+
+
 def _format_status_text(
     *,
     step: int | None,
@@ -135,7 +187,7 @@ def add_status_badge(
     step_range: tuple[int, int] | None = None,
     label: str | None = None,
     show_max: bool = True,
-    dark_mode: bool = True,
+    shade: OverlayShade | None = None,
     loc: BadgeLoc = "upper right",
     fontsize: float = 9,
     bar_color: str = "#e8913a",
@@ -151,10 +203,12 @@ def add_status_badge(
     r"""Add a status badge overlay to an axes.
 
     Renders simulation step and/or time as a rounded box with a progress
-    bar when ``step_range`` is provided. Two built-in modes controlled by
-    ``dark_mode``: dark (black background, white text — the default) and
-    light (white background, black text). Override individual colors with
-    ``bg_color``, ``text_color``, or ``track_color`` when needed.
+    bar when ``step_range`` is provided. The overlay background is
+    derived from the axes facecolor — darkened or lightened depending
+    on the *shade* parameter (auto-detected by default). Text color
+    is read from ``rcParams["text.color"]`` so that custom themes
+    propagate automatically. Override individual colors with
+    ``bg_color``, ``text_color``, or ``track_color``.
 
     Parameters
     ----------
@@ -174,9 +228,9 @@ def add_status_badge(
     show_max : bool
         When ``step_range`` is set, show ``"X / Y"`` if True,
         just ``"X"`` if False.
-    dark_mode : bool
-        ``True`` (default): black background, white text.
-        ``False``: white background, black text.
+    shade : "darker", "lighter", or None
+        ``"darker"``: darken axes facecolor for overlay bg.
+        ``"lighter"``: lighten it. ``None`` (default): auto-detect.
     loc : BadgeLoc
         Badge placement location.
     fontsize : float
@@ -190,12 +244,11 @@ def add_status_badge(
     bar_height : float
         Height of the progress bar in points.
     bg_color : str, tuple, or None
-        Box background color override. ``None`` uses the ``dark_mode``
-        default (alpha controlled by *bg_alpha*).
+        Box background color override. ``None`` derives from *shade*.
     bg_alpha : float
         Box background opacity.
     text_color : str, tuple, or None
-        Text color override. ``None`` uses the ``dark_mode`` default.
+        Text color override. ``None`` uses rcParams text color.
     text_alpha : float
         Text opacity (default 0.85 for subtle softening).
     track_color : str, tuple, or None
@@ -211,12 +264,7 @@ def add_status_badge(
 
     from matplotlib.offsetbox import AnchoredOffsetbox, TextArea, VPacker
 
-    if dark_mode:
-        default_bg: tuple[float, float, float] = (0.0, 0.0, 0.0)
-        default_fg: tuple[float, float, float] = (1.0, 1.0, 1.0)
-    else:
-        default_bg = (1.0, 1.0, 1.0)
-        default_fg = (0.0, 0.0, 0.0)
+    default_bg, default_fg = _detect_overlay_defaults(shade)
 
     bg_rgba = _resolve_rgba(bg_color, bg_alpha, default_bg)
     resolved_text = _resolve_rgba(text_color, text_alpha, default_fg)
@@ -282,7 +330,7 @@ def add_panel_label(
     ax: Axes,
     label: str,
     *,
-    dark_mode: bool = False,
+    shade: OverlayShade | None = None,
     loc: BadgeLoc = "upper left",
     fontsize: float = 14,
     fontweight: str = "bold",
@@ -301,8 +349,9 @@ def add_panel_label(
         Target axes.
     label : str
         Panel label text (e.g. ``"a"``, ``"b"``).
-    dark_mode : bool
-        ``False`` (default): white background.  ``True``: black background.
+    shade : "darker", "lighter", or None
+        ``"darker"``: darken axes facecolor for overlay bg.
+        ``"lighter"``: lighten it. ``None`` (default): auto-detect.
     loc : BadgeLoc
         Placement location.
     fontsize : float
@@ -321,12 +370,7 @@ def add_panel_label(
     ensure_matplotlib()
     from matplotlib.offsetbox import AnchoredOffsetbox, TextArea
 
-    if dark_mode:
-        default_bg: tuple[float, float, float] = (0.0, 0.0, 0.0)
-        default_fg: tuple[float, float, float] = (1.0, 1.0, 1.0)
-    else:
-        default_bg = (1.0, 1.0, 1.0)
-        default_fg = (0.0, 0.0, 0.0)
+    default_bg, default_fg = _detect_overlay_defaults(shade)
 
     bg_rgba = _resolve_rgba(bg_color, bg_alpha, default_bg)
     resolved_text = _resolve_rgba(text_color, text_alpha, default_fg)
@@ -354,7 +398,7 @@ def add_vector_legend(
     ax: Axes,
     entries: VectorLegendEntry | list[VectorLegendEntry],
     *,
-    dark_mode: bool = False,
+    shade: OverlayShade | None = None,
     loc: BadgeLoc = "upper left",
     fontsize: float = 9,
     sample_width: float = 20,
@@ -375,8 +419,9 @@ def add_vector_legend(
         Target axes.
     entries : VectorLegendEntry or list[VectorLegendEntry]
         One or more legend entries.
-    dark_mode : bool
-        ``False`` (default): white background.  ``True``: black background.
+    shade : "darker", "lighter", or None
+        ``"darker"``: darken axes facecolor for overlay bg.
+        ``"lighter"``: lighten it. ``None`` (default): auto-detect.
     loc : BadgeLoc
         Placement location.
     fontsize : float
@@ -406,12 +451,7 @@ def add_vector_legend(
     if isinstance(entries, VectorLegendEntry):
         entries = [entries]
 
-    if dark_mode:
-        default_bg: tuple[float, float, float] = (0.0, 0.0, 0.0)
-        default_fg: tuple[float, float, float] = (1.0, 1.0, 1.0)
-    else:
-        default_bg = (1.0, 1.0, 1.0)
-        default_fg = (0.0, 0.0, 0.0)
+    default_bg, default_fg = _detect_overlay_defaults(shade)
 
     bg_rgba = _resolve_rgba(bg_color, bg_alpha, default_bg)
     resolved_text = _resolve_rgba(text_color, text_alpha, default_fg)

@@ -22,10 +22,14 @@ import numpy as np
 from matplotlib.backend_tools import Cursors
 from mpl_toolkits.mplot3d import proj3d
 
-from pypic.plotting import DARK, use_theme
+from pypic.plotting import DARK, plot_field_line, style_3d_axes, use_theme
 from pypic.readers.base import FieldDataset, GridInfo
 from pypic.selections import PlaneSelection
-from pypic.traces import VectorFieldInterpolator, trace_field_line
+from pypic.traces import (
+    VectorFieldInterpolator,
+    attach_scalars,
+    trace_field_line,
+)
 from pypic.units import Normalization
 
 PLANET_RADIUS = 1.0
@@ -106,30 +110,6 @@ def _seed_points(
                 seeds.append((x, 0.0, z))
     return seeds
 
-
-def _style_3d_axes(ax: plt.Axes) -> None:  # type: ignore[type-arg]
-    """Apply dark styling to 3D axes (Axes3D ignores most rcParams)."""
-    bg = "#1e1e1e"
-    text_color = "#e0e0e0"
-    dim_color = "#444444"
-
-    ax.set_facecolor(bg)
-    ax.xaxis.pane.fill = False  # type: ignore[attr-defined]
-    ax.yaxis.pane.fill = False  # type: ignore[attr-defined]
-    ax.zaxis.pane.fill = False  # type: ignore[attr-defined]
-    ax.xaxis.pane.set_edgecolor(dim_color)  # type: ignore[attr-defined]
-    ax.yaxis.pane.set_edgecolor(dim_color)  # type: ignore[attr-defined]
-    ax.zaxis.pane.set_edgecolor(dim_color)  # type: ignore[attr-defined]
-
-    for axis in (ax.xaxis, ax.yaxis, ax.zaxis):
-        axis.label.set_color(text_color)  # type: ignore[attr-defined]
-        axis.set_tick_params(colors=dim_color, labelsize=8)  # type: ignore[attr-defined]
-        axis._axinfo["grid"]["color"] = dim_color  # type: ignore[attr-defined]
-        axis._axinfo["grid"]["linewidth"] = 0.3  # type: ignore[attr-defined]
-
-    ax.set_xlabel("$x$ [$R_E$]")
-    ax.set_ylabel("$y$ [$R_E$]")
-    ax.set_zlabel("$z$ [$R_E$]")  # type: ignore[attr-defined]
 
 
 def _slice_bz(
@@ -431,16 +411,26 @@ def main() -> None:
 
     print(f"  {len(lines)} lines traced successfully")
 
-    # Color palette for L-shells
-    cmap = plt.get_cmap("plasma")
-    l_colors = {
-        l_val: cmap(i / (len(l_shells) - 1)) for i, l_val in enumerate(l_shells)
-    }
+    # Sample B components and compute |B| along each field line
+    print("Sampling |B| along field lines...")
+    lines_with_b = []
+    for fl in lines:
+        fl = attach_scalars(fl, ds, ["B1", "B2", "B3"])
+        bmag = np.sqrt(
+            fl.scalars["B1"] ** 2 + fl.scalars["B2"] ** 2 + fl.scalars["B3"] ** 2
+        )
+        lines_with_b.append(fl.with_scalars(**{"|B|": bmag}))
+    lines = lines_with_b
+
+    # Shared color limits across all lines
+    all_bmag = np.concatenate([fl.scalars["|B|"] for fl in lines])
+    valid_bmag = all_bmag[np.isfinite(all_bmag) & (all_bmag > 0)]
+    vmin_b = float(np.nanmin(valid_bmag))
+    vmax_b = float(np.nanpercentile(valid_bmag, 98))
 
     with use_theme(DARK):
         fig = plt.figure(figsize=(10, 8))
         ax = fig.add_subplot(111, projection="3d")
-        _style_3d_axes(ax)
 
         # Draw the planet
         px, py, pz = _planet_mesh(PLANET_RADIUS, n=25)
@@ -454,23 +444,21 @@ def main() -> None:
             linewidth=0.2,
         )
 
-        # Draw field lines, colored by L-shell
-        seed_idx = 0
-        n_per_shell = 3
-        for l_val in l_shells:
-            color = l_colors[l_val]
-            for _ in range(n_per_shell):
-                if seed_idx < len(lines):
-                    pts = lines[seed_idx].points
-                    ax.plot(
-                        pts[:, 0],
-                        pts[:, 1],
-                        pts[:, 2],
-                        color=color,
-                        linewidth=1.2,
-                        alpha=0.9,
-                    )
-                    seed_idx += 1
+        # Draw field lines, colored by |B|
+        fl_artist = None
+        for fl in lines:
+            fl_artist = plot_field_line(
+                ax, fl, color="|B|", cmap="plasma",
+                vmin=vmin_b, vmax=vmax_b,
+                linewidth=1.5, alpha=0.9,
+            )
+
+        # Colorbar from the last artist
+        if fl_artist is not None:
+            fig.colorbar(
+                fl_artist, ax=ax, shrink=0.55, pad=0.08,  # type: ignore[arg-type]
+                label="$|B|$",
+            )
 
         # Axis limits and viewing angle
         lim = 5.5
@@ -480,26 +468,15 @@ def main() -> None:
         ax.view_init(elev=15, azim=-60)  # type: ignore[attr-defined]
         ax.set_aspect("equal")
 
-        # Legend via dummy lines
-        for l_val in l_shells:
-            ax.plot(
-                [],
-                [],
-                [],
-                color=l_colors[l_val],
-                linewidth=2,
-                label=f"L = {l_val}",
-            )
-        ax.legend(
-            loc="upper left",
-            fontsize=9,
-            facecolor=(0.1, 0.1, 0.1, 0.7),
-            edgecolor="none",
-            labelcolor="#e0e0e0",
+        # Apply clean 3D styling (must come after set_xlim/ylim)
+        style_3d_axes(
+            ax,
+            axis_labels=("$x$", "$y$", "$z$"),
+            coord_units="$R_E$",
         )
 
         ax.set_title(
-            "Magnetic Dipole Field Lines",
+            "Magnetic Dipole — $|B|$ along field lines",
             color="#e0e0e0",
             fontsize=14,
             pad=10,

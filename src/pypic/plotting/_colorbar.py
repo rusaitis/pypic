@@ -2,27 +2,53 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 if TYPE_CHECKING:
     from matplotlib.axes import Axes
     from matplotlib.colorbar import Colorbar
     from matplotlib.figure import Figure
 
-    from pypic.plotting._badge import BadgeLoc
+    from pypic.plotting._badge import BadgeLoc, OverlayShade
+
+ExtremesMode = Literal["darken", "transparent"]
 
 
-def _darken_extremes(mappable: object, factor: float = 0.65) -> None:
-    """Darken the over/under extension colors of a ScalarMappable."""
+def _apply_extremes(
+    mappable: object,
+    *,
+    mode: ExtremesMode = "darken",
+    darken_factor: float = 0.65,
+) -> None:
+    """Style the over/under extension colors of a ScalarMappable.
+
+    Parameters
+    ----------
+    mappable : object
+        A ``ScalarMappable`` (e.g. from ``pcolormesh``).
+    mode : "darken" or "transparent"
+        ``"darken"`` — multiply the endpoint RGB by *darken_factor*.
+        ``"transparent"`` — set under/over to fully transparent.
+    darken_factor : float
+        RGB multiplier for ``"darken"`` mode.
+    """
     from matplotlib.cm import ScalarMappable
     from matplotlib.colors import to_rgba
 
-    if isinstance(mappable, ScalarMappable):
-        cmap = mappable.cmap.copy()
+    if not isinstance(mappable, ScalarMappable):
+        return
+
+    cmap = mappable.cmap.copy()
+    if mode == "transparent":
+        cmap.set_under((0.0, 0.0, 0.0, 0.0))
+        cmap.set_over((0.0, 0.0, 0.0, 0.0))
+    else:
         for setter, val in [("set_under", 0.0), ("set_over", 1.0)]:
             r, g, b, a = to_rgba(cmap(val))
-            getattr(cmap, setter)((r * factor, g * factor, b * factor, a))
-        mappable.set_cmap(cmap)
+            getattr(cmap, setter)(
+                (r * darken_factor, g * darken_factor, b * darken_factor, a)
+            )
+    mappable.set_cmap(cmap)
 
 
 def add_colorbar(
@@ -32,19 +58,36 @@ def add_colorbar(
     label: str,
     *,
     extend: str = "both",
+    extremes: ExtremesMode = "darken",
 ) -> Colorbar:
-    """Add a colorbar with darkened over/under extensions and subtle outline."""
+    """Add a colorbar with styled over/under extensions and subtle outline.
+
+    Parameters
+    ----------
+    extremes : "darken" or "transparent"
+        ``"darken"`` darkens the extension colors. ``"transparent"`` makes
+        values outside ``[vmin, vmax]`` invisible.
+
+    Colors for the outline, ticks, and label are read from the active
+    matplotlib rcParams so that custom themes propagate automatically.
+    """
+    import matplotlib as mpl
+    from matplotlib.colors import to_rgba
     from mpl_toolkits.axes_grid1 import make_axes_locatable
 
-    _darken_extremes(mappable)
+    _apply_extremes(mappable, mode=extremes)
+
+    text_color = mpl.rcParams.get("text.color", "black")
+    tick_color = mpl.rcParams.get("xtick.color", "0.4")
+    outline_rgba = (*to_rgba(tick_color)[:3], 0.3)
 
     divider = make_axes_locatable(ax)
     cax = divider.append_axes("right", size="4%", pad=0.05)
     cb = fig.colorbar(mappable, cax=cax, extend=extend)  # type: ignore[arg-type]
-    cb.set_label(label)
+    cb.set_label(label, color=text_color)
     cb.outline.set_linewidth(0.3)
-    cb.outline.set_edgecolor((0.5, 0.5, 0.5, 0.3))
-    cb.ax.tick_params(width=0.3, length=2)
+    cb.outline.set_edgecolor(outline_rgba)
+    cb.ax.tick_params(width=0.3, length=2, colors=tick_color, labelcolor=text_color)
     return cb
 
 
@@ -54,7 +97,7 @@ def add_inset_colorbar(
     label: str = "",
     *,
     loc: BadgeLoc = "lower right",
-    dark_mode: bool = False,
+    shade: OverlayShade | None = None,
     width: float = 0.3,
     height: float = 0.015,
     pad: float = 0.03,
@@ -82,8 +125,9 @@ def add_inset_colorbar(
         Colorbar label text.
     loc : BadgeLoc
         Inset placement location.
-    dark_mode : bool
-        ``False`` (default): white background. ``True``: black background.
+    shade : "darker", "lighter", or None
+        ``"darker"``: darken axes facecolor for overlay bg.
+        ``"lighter"``: lighten it. ``None`` (default): auto-detect.
     width : float
         Bar width as a fraction of axes width.
     height : float
@@ -112,14 +156,9 @@ def add_inset_colorbar(
     from matplotlib.patches import FancyBboxPatch
     from matplotlib.ticker import MaxNLocator
 
-    from pypic.plotting._badge import _resolve_rgba
+    from pypic.plotting._badge import _detect_overlay_defaults, _resolve_rgba
 
-    if dark_mode:
-        default_bg: tuple[float, float, float] = (0.0, 0.0, 0.0)
-        default_fg: tuple[float, float, float] = (1.0, 1.0, 1.0)
-    else:
-        default_bg = (1.0, 1.0, 1.0)
-        default_fg = (0.0, 0.0, 0.0)
+    default_bg, default_fg = _detect_overlay_defaults(shade)
 
     bg_rgba = _resolve_rgba(bg_color, bg_alpha, default_bg)
     fg_rgba = _resolve_rgba(text_color, text_alpha, default_fg)
@@ -189,6 +228,6 @@ def add_inset_colorbar(
     cb.outline.set_edgecolor((*fg_rgba[:3], 0.3))
     cax.set_facecolor("none")
 
-    _darken_extremes(mappable)
+    _apply_extremes(mappable)
 
     return cb

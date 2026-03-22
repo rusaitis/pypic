@@ -646,23 +646,49 @@ class TestStatusBadge:
         np.testing.assert_allclose(fc[3], 0.5, atol=0.01)
         plt.close(fig)
 
-    def test_default_dark_mode(self) -> None:
-        """Default dark_mode=True: black bg at alpha 0.65, white text."""
+    def test_auto_detect_on_light_bg(self) -> None:
+        """Auto-detect on white axes: lighter shade (near white)."""
         import matplotlib.pyplot as plt
 
         fig, ax = plt.subplots()
         box = add_status_badge(ax, step=1)
         fc = box.patch.get_facecolor()
-        np.testing.assert_allclose(fc[:3], (0.0, 0.0, 0.0), atol=0.01)
+        # White bg + lighter shade → stays white
+        np.testing.assert_allclose(fc[:3], (1.0, 1.0, 1.0), atol=0.01)
         np.testing.assert_allclose(fc[3], 0.65, atol=0.01)
         plt.close(fig)
 
-    def test_light_mode(self) -> None:
-        """dark_mode=False: white bg, black text."""
+    def test_auto_detect_on_dark_bg(self) -> None:
+        """Auto-detect on dark axes: darker shade (darkened facecolor)."""
+        import matplotlib as mpl
+        import matplotlib.pyplot as plt
+
+        with mpl.rc_context({"axes.facecolor": "#1e1e1e", "text.color": "#e0e0e0"}):
+            fig, ax = plt.subplots()
+            box = add_status_badge(ax, step=1)
+            fc = box.patch.get_facecolor()
+            # #1e1e1e * 0.4 → darkened, not pure black
+            assert all(c < 0.12 for c in fc[:3]), f"expected dark bg, got {fc[:3]}"
+            assert fc[3] == pytest.approx(0.65, abs=0.01)
+            plt.close(fig)
+
+    def test_shade_darker_on_light_bg(self) -> None:
+        """shade='darker' on white bg produces gray overlay."""
         import matplotlib.pyplot as plt
 
         fig, ax = plt.subplots()
-        box = add_status_badge(ax, step=1, dark_mode=False)
+        box = add_status_badge(ax, step=1, shade="darker")
+        fc = box.patch.get_facecolor()
+        # white * 0.4 = (0.4, 0.4, 0.4)
+        np.testing.assert_allclose(fc[:3], (0.4, 0.4, 0.4), atol=0.01)
+        plt.close(fig)
+
+    def test_shade_lighter(self) -> None:
+        """shade='lighter' on white bg stays white."""
+        import matplotlib.pyplot as plt
+
+        fig, ax = plt.subplots()
+        box = add_status_badge(ax, step=1, shade="lighter")
         fc = box.patch.get_facecolor()
         np.testing.assert_allclose(fc[:3], (1.0, 1.0, 1.0), atol=0.01)
         plt.close(fig)
@@ -697,7 +723,7 @@ class TestInsetColorbar:
         matplotlib.pyplot.close(fig)
 
     def test_light_mode_default(self, mesh_on_ax: tuple) -> None:
-        """Default dark_mode=False: white bg patch at alpha 0.65."""
+        """Auto-detect on default (white) axes: white bg patch at alpha 0.65."""
         fig, ax, mesh = mesh_on_ax
         add_inset_colorbar(ax, mesh)
         bg_patch = ax.patches[-1]
@@ -706,12 +732,13 @@ class TestInsetColorbar:
         np.testing.assert_allclose(fc[3], 0.65, atol=0.01)
         matplotlib.pyplot.close(fig)
 
-    def test_dark_mode(self, mesh_on_ax: tuple) -> None:
+    def test_shade_darker(self, mesh_on_ax: tuple) -> None:
+        """shade='darker' on white bg → gray overlay."""
         fig, ax, mesh = mesh_on_ax
-        add_inset_colorbar(ax, mesh, dark_mode=True)
+        add_inset_colorbar(ax, mesh, shade="darker")
         bg_patch = ax.patches[-1]
         fc = bg_patch.get_facecolor()
-        np.testing.assert_allclose(fc[:3], (0.0, 0.0, 0.0), atol=0.01)
+        np.testing.assert_allclose(fc[:3], (0.4, 0.4, 0.4), atol=0.01)
         np.testing.assert_allclose(fc[3], 0.65, atol=0.01)
         matplotlib.pyplot.close(fig)
 
@@ -788,22 +815,24 @@ class TestVectorLegend:
         assert box in ax.artists
         plt.close(fig)
 
-    def test_dark_mode(self) -> None:
+    def test_shade_darker(self) -> None:
+        """shade='darker' on white bg → gray overlay."""
         import matplotlib.pyplot as plt
 
         fig, ax = plt.subplots()
         entry = VectorLegendEntry(label="B", color="white")
-        box = add_vector_legend(ax, entry, dark_mode=True)
+        box = add_vector_legend(ax, entry, shade="darker")
         fc = box.patch.get_facecolor()
-        np.testing.assert_allclose(fc[:3], (0.0, 0.0, 0.0), atol=0.01)
+        np.testing.assert_allclose(fc[:3], (0.4, 0.4, 0.4), atol=0.01)
         plt.close(fig)
 
-    def test_light_mode(self) -> None:
+    def test_shade_lighter(self) -> None:
+        """shade='lighter' on white bg → stays white."""
         import matplotlib.pyplot as plt
 
         fig, ax = plt.subplots()
         entry = VectorLegendEntry(label="B", color="black")
-        box = add_vector_legend(ax, entry, dark_mode=False)
+        box = add_vector_legend(ax, entry, shade="lighter")
         fc = box.patch.get_facecolor()
         np.testing.assert_allclose(fc[:3], (1.0, 1.0, 1.0), atol=0.01)
         plt.close(fig)
@@ -860,20 +889,22 @@ class TestPanelLabel:
         assert box in ax.artists
         plt.close(fig)
 
-    def test_dark_mode(self) -> None:
+    def test_shade_darker(self) -> None:
+        """shade='darker' on white bg → gray overlay."""
         import matplotlib.pyplot as plt
 
         fig, ax = plt.subplots()
-        box = add_panel_label(ax, "a", dark_mode=True)
+        box = add_panel_label(ax, "a", shade="darker")
         fc = box.patch.get_facecolor()
-        np.testing.assert_allclose(fc[:3], (0.0, 0.0, 0.0), atol=0.01)
+        np.testing.assert_allclose(fc[:3], (0.4, 0.4, 0.4), atol=0.01)
         plt.close(fig)
 
-    def test_light_mode(self) -> None:
+    def test_shade_lighter(self) -> None:
+        """shade='lighter' on white bg → stays white."""
         import matplotlib.pyplot as plt
 
         fig, ax = plt.subplots()
-        box = add_panel_label(ax, "a", dark_mode=False)
+        box = add_panel_label(ax, "a", shade="lighter")
         fc = box.patch.get_facecolor()
         np.testing.assert_allclose(fc[:3], (1.0, 1.0, 1.0), atol=0.01)
         plt.close(fig)

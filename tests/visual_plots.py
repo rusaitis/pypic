@@ -22,6 +22,9 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 
 from pypic.plotting import (  # noqa: E402
+    ANDROMEDA,
+    ANUPPUCCIN_LIGHT,
+    CATPPUCCIN_MOCHA,
     DARK,
     LIGHT,
     PlotTheme,
@@ -194,10 +197,10 @@ def generate(theme: PlotTheme) -> None:
         for ax in axes.flat:
             plot_field_slice(ds_a, "B1", ax=ax, theme=theme)
 
-        # Dark mode (default)
+        # Darker shade (auto on dark themes)
         add_status_badge(axes[0, 0], step=42, loc="upper left")
-        # Light mode
-        add_status_badge(axes[0, 1], time=3.14, dark_mode=False, loc="upper right")
+        # Lighter shade
+        add_status_badge(axes[0, 1], time=3.14, shade="lighter", loc="upper right")
         # Both step+time
         add_status_badge(axes[0, 2], step=100, time=5.0, loc="lower left")
         # Custom label
@@ -304,11 +307,11 @@ def generate(theme: PlotTheme) -> None:
         fig.tight_layout()
     _save(fig, "colorbar_side_vs_inset", name)
 
-    # 21. Inset colorbar with dark_mode on manually placed colorbar
+    # 21. Inset colorbar with darker shade on manually placed colorbar
     fig, ax = plot_field_slice(ds_a, "rho_m", theme=theme, colorbar=False, step=100)
     mesh = ax.get_children()[0]
     add_inset_colorbar(
-        ax, mesh, r"$\rho_m$", dark_mode=True, loc="lower left", fontsize=8,
+        ax, mesh, r"$\rho_m$", shade="darker", loc="lower left", fontsize=8,
     )
     _save(fig, "inset_colorbar_dark_manual", name)
 
@@ -382,19 +385,26 @@ def main() -> None:
     )
     parser.add_argument(
         "--theme",
-        choices=["light", "dark", "both"],
-        default="both",
-        help="Which theme(s) to generate (default: both)",
+        choices=["light", "dark", "catppuccin", "anuppuccin", "andromeda", "all"],
+        default="all",
+        help="Which theme(s) to generate (default: all)",
     )
     args = parser.parse_args()
 
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
+    all_themes = {
+        "light": LIGHT,
+        "dark": DARK,
+        "catppuccin": CATPPUCCIN_MOCHA,
+        "anuppuccin": ANUPPUCCIN_LIGHT,
+        "andromeda": ANDROMEDA,
+    }
     themes: list[PlotTheme] = []
-    if args.theme in ("light", "both"):
-        themes.append(LIGHT)
-    if args.theme in ("dark", "both"):
-        themes.append(DARK)
+    if args.theme == "all":
+        themes = list(all_themes.values())
+    else:
+        themes = [all_themes[args.theme]]
 
     for theme in themes:
         generate(theme)
