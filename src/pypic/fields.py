@@ -9,10 +9,17 @@ source of truth — ``compute._FIELD_QUANTITY_MAP`` is derived from
 from __future__ import annotations
 
 import copy
+import logging
 import re
+import threading
 from dataclasses import dataclass
+from enum import StrEnum
 
 from pypic._aliases import _COMPUTE_ALIASES, _get_field_alias_fallback
+
+log = logging.getLogger(__name__)
+
+_lock = threading.Lock()
 
 
 @dataclass(frozen=True, slots=True)
@@ -38,6 +45,43 @@ class FieldInfo:
     latex: str = ""
 
 
+class QuantityType(StrEnum):
+    """Physical quantity types for field metadata and SI conversion.
+
+    Each member corresponds to a key in ``Normalization.si_factor()``
+    and maps to a default SI unit label.  Since ``QuantityType`` is a
+    ``StrEnum``, members compare equal to plain strings:
+    ``QuantityType.B_FIELD == "b_field"`` is ``True``.
+
+    Examples
+    --------
+    >>> QuantityType.B_FIELD
+    <QuantityType.B_FIELD: 'b_field'>
+    >>> QuantityType.B_FIELD == "b_field"
+    True
+    """
+
+    B_FIELD = "b_field"
+    E_FIELD = "e_field"
+    VELOCITY = "velocity"
+    LENGTH = "length"
+    TIME = "time"
+    DENSITY = "density"
+    MASS_DENSITY = "mass_density"
+    CHARGE_DENSITY = "charge_density"
+    CURRENT_DENSITY = "current_density"
+    PRESSURE = "pressure"
+    TEMPERATURE = "temperature"
+    ENERGY_DENSITY = "energy_density"
+    FREQUENCY = "frequency"
+    POYNTING_FLUX = "poynting_flux"
+    B_FIELD_PER_LENGTH = "b_field_per_length"
+    E_FIELD_PER_LENGTH = "e_field_per_length"
+    VELOCITY_PER_LENGTH = "velocity_per_length"
+    SPECIFIC_ENERGY = "specific_energy"
+    DIMENSIONLESS = "dimensionless"
+
+
 _QUANTITY_UNITS: dict[str, str] = {
     "b_field": "T",
     "e_field": "V/m",
@@ -59,6 +103,10 @@ _QUANTITY_UNITS: dict[str, str] = {
     "specific_energy": "J/kg",
     "dimensionless": "",
 }
+
+assert set(QuantityType) == set(_QUANTITY_UNITS), (
+    "QuantityType and _QUANTITY_UNITS out of sync"
+)
 
 # Helper to keep long FieldInfo constructors within 88 columns
 _FI = FieldInfo
@@ -342,6 +390,79 @@ _FIELD_INFO: dict[str, FieldInfo] = {
     "sigma": _FI("dimensionless", "Magnetization parameter", "", r"$\sigma$"),
     "gamma_eos": _FI("dimensionless", "Adiabatic index", "", r"$\gamma_{eos}$"),
 }
+
+def register_field(
+    name: str,
+    quantity_type: QuantityType | str,
+    *,
+    long_name: str = "",
+    si_unit: str | None = None,
+    latex: str = "",
+) -> None:
+    """Register metadata for a custom field.
+
+    Enables ``field_info()``, ``field_si_factor()``, ``in_si()``,
+    ``in_units()``, and ``unit_label()`` for user-defined fields.
+
+    Parameters
+    ----------
+    name : str
+        Field name (e.g. ``"my_diagnostic"``).
+    quantity_type : QuantityType | str
+        Physical quantity type — must be a key in ``_QUANTITY_UNITS``
+        (e.g. ``QuantityType.VELOCITY``, ``"pressure"``).
+    long_name : str
+        Human-readable label for plot titles.
+    si_unit : str | None
+        SI unit label.  If ``None``, inferred from *quantity_type*.
+    latex : str
+        LaTeX symbol for plot labels.
+
+    Raises
+    ------
+    ValueError
+        If *quantity_type* is not recognized.
+    """
+    if quantity_type not in _QUANTITY_UNITS:
+        valid = sorted(_QUANTITY_UNITS)
+        msg = f"Unknown quantity_type {quantity_type!r}. Valid: {valid}"
+        raise ValueError(msg)
+
+    if si_unit is None:
+        si_unit = _QUANTITY_UNITS[quantity_type]
+
+    info = FieldInfo(quantity_type, long_name, si_unit, latex)
+
+    with _lock:
+        if name in _FIELD_INFO:
+            log.warning("Overwriting existing field metadata for %r", name)
+        _FIELD_INFO[name] = info
+
+        # Sync compute._FIELD_QUANTITY_MAP (same dict object, mutation propagates)
+        from pypic.compute import _FIELD_QUANTITY_MAP
+
+        _FIELD_QUANTITY_MAP[name] = quantity_type
+
+
+def unregister_field(name: str) -> None:
+    """Remove custom field metadata.
+
+    Raises
+    ------
+    KeyError
+        If *name* is not registered.
+    """
+    with _lock:
+        try:
+            del _FIELD_INFO[name]
+        except KeyError:
+            msg = f"No field metadata registered for {name!r}"
+            raise KeyError(msg) from None
+
+        from pypic.compute import _FIELD_QUANTITY_MAP
+
+        _FIELD_QUANTITY_MAP.pop(name, None)
+
 
 _SPECIES_INFO_PATTERNS: list[tuple[re.Pattern[str], str, str, str]] = [
     (
@@ -667,7 +788,10 @@ def quantity_units(quantity_type: str) -> str:
 
 __all__ = [
     "FieldInfo",
+    "QuantityType",
     "field_info",
     "quantity_units",
+    "register_field",
     "unit_label",
+    "unregister_field",
 ]

@@ -55,7 +55,14 @@ from pypic.diagnostics import (
     linf_error,
     max_div_b,
 )
-from pypic.fields import FieldInfo, field_info, unit_label
+from pypic.fields import (
+    FieldInfo,
+    QuantityType,
+    field_info,
+    register_field,
+    unit_label,
+    unregister_field,
+)
 from pypic.readers import (
     AuxiliaryDataReader,
     BATSRUSConfig,
@@ -127,6 +134,7 @@ __all__ = [
     "PhysicsConstants",
     "PlaneSelection",
     "ProbeResult",
+    "QuantityType",
     "ReaderEntry",
     "SimpleReader",
     "Simulation",
@@ -183,6 +191,7 @@ __all__ = [
     "plasma_frequency",
     "poynting_flux",
     "read_phdf5_particles",
+    "register_field",
     "register_reader",
     "registered_readers",
     "relativistic_enthalpy",
@@ -193,6 +202,7 @@ __all__ = [
     "thermal_energy_density",
     "thermal_speed",
     "unit_label",
+    "unregister_field",
     "unregister_reader",
     "velocity_magnitude",
 ]

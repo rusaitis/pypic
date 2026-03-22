@@ -6,11 +6,15 @@ from pypic.fields import (
     _FIELD_INFO,
     _QUANTITY_UNITS,
     _SPECIES_INFO_PATTERNS,
+    QuantityType,
     field_info,
     quantity_units,
+    register_field,
     unit_label,
+    unregister_field,
 )
 from pypic.readers.base import FieldDataset, GridInfo
+from pypic.selections import PlaneSelection
 from pypic.units import _COMPOUND_FACTORS, _QUANTITIES, Normalization, SpeciesInfo
 
 
@@ -305,3 +309,229 @@ class TestQuantityTypeCoverage:
                 f"Pattern {pattern.pattern!r} uses quantity_type={qtype!r} "
                 f"which is missing from _QUANTITY_UNITS"
             )
+
+
+class TestFieldRegistration:
+    """register_field / unregister_field public API."""
+
+    def test_register_and_lookup(self) -> None:
+        name = "_test_reg_lookup"
+        try:
+            register_field(name, "velocity", long_name="Test speed", latex=r"$v_t$")
+            info = field_info(name)
+            assert info.quantity_type == "velocity"
+            assert info.long_name == "Test speed"
+            assert info.latex == r"$v_t$"
+        finally:
+            unregister_field(name)
+
+    def test_register_enables_si_factor(self) -> None:
+        name = "_test_reg_si"
+        norm = Normalization.identity()
+        try:
+            register_field(name, "b_field")
+            factor = field_si_factor(name, norm)
+            assert isinstance(factor, float)
+        finally:
+            unregister_field(name)
+
+    def test_register_auto_fills_si_unit(self) -> None:
+        name = "_test_reg_auto_unit"
+        try:
+            register_field(name, "pressure")
+            assert field_info(name).si_unit == "Pa"
+        finally:
+            unregister_field(name)
+
+    def test_register_custom_si_unit(self) -> None:
+        name = "_test_reg_custom_unit"
+        try:
+            register_field(name, "pressure", si_unit="nPa")
+            assert field_info(name).si_unit == "nPa"
+        finally:
+            unregister_field(name)
+
+    def test_register_invalid_quantity_type(self) -> None:
+        with pytest.raises(ValueError, match="Unknown quantity_type"):
+            register_field("_test_bad_qtype", "nonexistent_type")
+
+    def test_unregister(self) -> None:
+        name = "_test_unreg"
+        register_field(name, "dimensionless")
+        unregister_field(name)
+        with pytest.raises(KeyError, match="No metadata"):
+            field_info(name)
+
+    def test_unregister_nonexistent(self) -> None:
+        with pytest.raises(KeyError, match="No field metadata"):
+            unregister_field("_test_does_not_exist_xyz")
+
+    def test_overwrite_warns(self, caplog: pytest.LogCaptureFixture) -> None:
+        name = "_test_overwrite"
+        try:
+            register_field(name, "velocity")
+            with caplog.at_level("WARNING", logger="pypic.fields"):
+                register_field(name, "pressure")
+            assert "Overwriting" in caplog.text
+            assert field_info(name).quantity_type == "pressure"
+        finally:
+            unregister_field(name)
+
+    def test_syncs_field_quantity_map(self) -> None:
+        name = "_test_sync_map"
+        try:
+            register_field(name, "energy_density")
+            assert _FIELD_QUANTITY_MAP[name] == "energy_density"
+        finally:
+            unregister_field(name)
+        assert name not in _FIELD_QUANTITY_MAP
+
+    def test_register_with_enum(self) -> None:
+        name = "_test_reg_enum"
+        try:
+            register_field(name, QuantityType.VELOCITY, long_name="Enum speed")
+            info = field_info(name)
+            assert info.quantity_type == "velocity"
+            assert info.long_name == "Enum speed"
+        finally:
+            unregister_field(name)
+
+
+class TestQuantityType:
+    """QuantityType StrEnum covers all _QUANTITY_UNITS keys."""
+
+    def test_covers_all_quantity_units(self) -> None:
+        enum_values = {member.value for member in QuantityType}
+        assert enum_values == set(_QUANTITY_UNITS)
+
+    def test_strenum_equality_with_strings(self) -> None:
+        assert QuantityType.B_FIELD == "b_field"
+        assert QuantityType.DIMENSIONLESS == "dimensionless"
+        assert QuantityType.VELOCITY == "velocity"
+
+    def test_usable_as_dict_key(self) -> None:
+        assert _QUANTITY_UNITS[QuantityType.PRESSURE] == "Pa"
+
+
+class TestWithField:
+    """FieldDataset.with_field() — attach custom fields with metadata."""
+
+    def test_basic(self) -> None:
+        ds = _make_dataset({"B1": np.ones((4, 3, 2))})
+        data = np.full((4, 3, 2), 0.42)
+        ds2 = ds.with_field("R_rec", data, QuantityType.DIMENSIONLESS)
+        np.testing.assert_array_equal(ds2["R_rec"], data)
+
+    def test_in_si_via_attrs(self) -> None:
+        norm = Normalization.pic_electron(n_e=1.0e18)
+        grid = GridInfo(dimensions=(2,), spacing=(1.0,))
+        ds = FieldDataset.from_arrays(
+            {"B1": np.array([1.0, 2.0])}, grid, norm
+        )
+        data = np.array([3.0, 4.0])
+        ds2 = ds.with_field("custom_v", data, QuantityType.VELOCITY)
+        si_vals = ds2.in_si("custom_v")
+        expected_factor = norm.si_factor("velocity")
+        np.testing.assert_allclose(si_vals, data * expected_factor)
+
+    def test_field_info_from_attrs(self) -> None:
+        ds = _make_dataset({"B1": np.ones((4, 3, 2))})
+        ds2 = ds.with_field(
+            "R_rec",
+            np.ones((4, 3, 2)),
+            QuantityType.DIMENSIONLESS,
+            long_name="Reconnection rate",
+            latex=r"$R_{rec}$",
+        )
+        info = ds2.field_info("R_rec")
+        assert info.quantity_type == "dimensionless"
+        assert info.long_name == "Reconnection rate"
+        assert info.si_unit == ""
+        assert info.latex == r"$R_{rec}$"
+
+    def test_survives_isel(self) -> None:
+        ds = _make_dataset({"B1": np.ones((4, 3, 2))})
+        ds2 = ds.with_field(
+            "diag", np.ones((4, 3, 2)), QuantityType.PRESSURE
+        )
+        sliced = ds2.isel(z=0)
+        info = sliced.field_info("diag")
+        assert info.quantity_type == "pressure"
+        assert info.si_unit == "Pa"
+
+    def test_survives_plane_selection(self) -> None:
+        ds = _make_dataset({"B1": np.ones((4, 3, 2))})
+        ds2 = ds.with_field(
+            "diag", np.ones((4, 3, 2)), QuantityType.VELOCITY,
+            long_name="My diagnostic",
+        )
+        plane = PlaneSelection(normal="z").apply(ds2)
+        info = plane.field_info("diag")
+        assert info.quantity_type == "velocity"
+        assert info.long_name == "My diagnostic"
+
+    def test_invalid_quantity_type(self) -> None:
+        ds = _make_dataset({"B1": np.ones((4, 3, 2))})
+        with pytest.raises(ValueError, match="Unknown quantity_type"):
+            ds.with_field("bad", np.ones((4, 3, 2)), "nonexistent_type")
+
+    def test_immutable_original(self) -> None:
+        ds = _make_dataset({"B1": np.ones((4, 3, 2))})
+        original_names = ds.field_names()
+        ds.with_field("extra", np.ones((4, 3, 2)), QuantityType.DENSITY)
+        assert ds.field_names() == original_names
+
+    def test_string_quantity_type(self) -> None:
+        ds = _make_dataset({"B1": np.ones((4, 3, 2))})
+        ds2 = ds.with_field("test_f", np.ones((4, 3, 2)), "b_field")
+        info = ds2.field_info("test_f")
+        assert info.quantity_type == "b_field"
+        assert info.si_unit == "T"
+
+
+class TestAttrsOverrideRegistry:
+    """xarray attrs take priority over global registry for field_info/in_si."""
+
+    def test_field_info_uses_attrs_over_registry(self) -> None:
+        """with_field() attrs override global _FIELD_INFO for same name."""
+        ds = _make_dataset({"B1": np.ones((4, 3, 2))})
+        # Override B1 as if it were a pressure field
+        ds2 = ds.with_field(
+            "B1",
+            np.full((4, 3, 2), 2.0),
+            QuantityType.PRESSURE,
+            long_name="Custom pressure",
+            latex=r"$P_{custom}$",
+        )
+        info = ds2.field_info("B1")
+        assert info.quantity_type == "pressure"
+        assert info.long_name == "Custom pressure"
+        assert info.latex == r"$P_{custom}$"
+
+    def test_in_si_uses_attrs_over_registry(self) -> None:
+        """in_si() picks quantity_type from attrs, not global registry."""
+        norm = Normalization.pic_electron(n_e=1.0e18)
+        grid = GridInfo(dimensions=(2,), spacing=(1.0,))
+        ds = FieldDataset.from_arrays(
+            {"B1": np.array([1.0, 2.0])}, grid, norm
+        )
+        # Attach "B1" with velocity quantity_type (overriding b_field)
+        ds2 = ds.with_field("B1", np.array([5.0, 6.0]), QuantityType.VELOCITY)
+        si = ds2.in_si("B1")
+        expected = np.array([5.0, 6.0]) * norm.si_factor("velocity")
+        np.testing.assert_allclose(si, expected)
+
+
+class TestFromArraysQuantityTypeAttr:
+    """from_arrays() stores quantity_type in DataArray attrs."""
+
+    def test_canonical_field_has_quantity_type(self) -> None:
+        ds = _make_dataset({"B1": np.ones((4, 3, 2)), "rho_m": np.ones((4, 3, 2))})
+        assert ds.xr["B1"].attrs["quantity_type"] == "b_field"
+        assert ds.xr["B1"].attrs["si_unit"] == "T"
+        assert ds.xr["rho_m"].attrs["quantity_type"] == "mass_density"
+        assert ds.xr["rho_m"].attrs["si_unit"] == "kg/m^3"
+
+    def test_unknown_field_no_quantity_type(self) -> None:
+        ds = _make_dataset({"custom_xyz": np.ones((4, 3, 2))})
+        assert "quantity_type" not in ds.xr["custom_xyz"].attrs

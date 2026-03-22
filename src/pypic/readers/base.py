@@ -24,7 +24,7 @@ if TYPE_CHECKING:
 
     from xarray import Dataset
 
-    from pypic.fields import FieldInfo
+    from pypic.fields import FieldInfo, QuantityType
     from pypic.types import FloatArray
     from pypic.units import Normalization, SpeciesInfo
 
@@ -366,6 +366,10 @@ class FieldDataset:
                 info = _field_info(var_name, axis_names=grid.geometry.axis_names)
                 da.attrs["long_name"] = info.long_name
                 da.attrs["units"] = "normalized"
+                da.attrs["quantity_type"] = info.quantity_type
+                da.attrs["si_unit"] = info.si_unit
+                if info.latex:
+                    da.attrs["latex"] = info.latex
             except KeyError:
                 pass
             data_vars[var_name] = da
@@ -626,8 +630,78 @@ class FieldDataset:
 
         return compute_field(name, self)
 
+    def with_field(
+        self,
+        name: str,
+        data: FloatArray,
+        quantity_type: QuantityType | str,
+        *,
+        long_name: str = "",
+        latex: str = "",
+    ) -> FieldDataset:
+        """Return a new FieldDataset with an additional custom field.
+
+        The field's ``quantity_type`` is stored in xarray attrs, so
+        ``in_si()``, ``field_info()``, and unit conversion work without
+        global ``register_field()`` calls.
+
+        Parameters
+        ----------
+        name : str
+            Field name.
+        data : FloatArray
+            Array matching the grid dimensions.
+        quantity_type : QuantityType | str
+            Physical quantity type (e.g. ``QuantityType.VELOCITY``).
+        long_name : str
+            Human-readable label for plot titles.
+        latex : str
+            LaTeX symbol for plot labels.
+
+        Returns
+        -------
+        FieldDataset
+            New dataset with the field added.
+
+        Raises
+        ------
+        ValueError
+            If *quantity_type* is not recognized.
+        """
+        from pypic.fields import _QUANTITY_UNITS
+
+        qt = str(quantity_type)
+        if qt not in _QUANTITY_UNITS:
+            valid = sorted(_QUANTITY_UNITS)
+            msg = f"Unknown quantity_type {qt!r}. Valid: {valid}"
+            raise ValueError(msg)
+
+        si_unit = _QUANTITY_UNITS[qt]
+        ndim = len(self._grid.dimensions)
+        dim_names = list(self._grid.geometry.axis_names[:ndim])
+        da = xr.DataArray(data=data, dims=dim_names)
+        da.attrs["quantity_type"] = qt
+        da.attrs["si_unit"] = si_unit
+        da.attrs["units"] = "normalized"
+        da.attrs["long_name"] = long_name
+        da.attrs["latex"] = latex
+
+        new_ds = self._ds.assign({name: da})
+        return FieldDataset(
+            new_ds,
+            self._grid,
+            self._normalization,
+            species=self._species,
+            physics=self._physics,
+            metadata=self._metadata,
+            aliases=dict(self._aliases),
+        )
+
     def field_info(self, name: str) -> FieldInfo:
         """Return metadata for a field or derived quantity.
+
+        Checks xarray DataArray attrs first (set by ``with_field()``
+        or ``from_arrays()``), then falls back to the global registry.
 
         Parameters
         ----------
@@ -638,12 +712,27 @@ class FieldDataset:
         -------
         FieldInfo
         """
+        from pypic.fields import FieldInfo as _FieldInfo
         from pypic.fields import field_info as _field_info
 
+        if self.has_field(name):
+            resolved = self._resolve_key(name)
+            attrs = self._ds[resolved].attrs
+            qt = attrs.get("quantity_type")
+            if qt is not None:
+                return _FieldInfo(
+                    quantity_type=qt,
+                    long_name=attrs.get("long_name", ""),
+                    si_unit=attrs.get("si_unit", ""),
+                    latex=attrs.get("latex", ""),
+                )
         return _field_info(name, axis_names=self._grid.geometry.axis_names)
 
     def in_si(self, name: str) -> FloatArray:
         """Return a field or derived quantity in SI units.
+
+        Checks xarray DataArray attrs first (set by ``with_field()``
+        or ``from_arrays()``), then falls back to the global registry.
 
         Parameters
         ----------
@@ -657,11 +746,19 @@ class FieldDataset:
         """
         from pypic.compute import compute_field, field_si_factor
 
-        data = self[name] if self.has_field(name) else compute_field(name, self)
+        if self.has_field(name):
+            resolved = self._resolve_key(name)
+            data = self._ds[resolved].values
+            qt = self._ds[resolved].attrs.get("quantity_type")
+            if qt is not None:
+                factor = self._normalization.si_factor(qt)
+                return data if factor == 1.0 else data * factor
+        else:
+            data = compute_field(name, self)
+
+        # Fall back to global registry
         factor = field_si_factor(name, self._normalization)
-        if factor == 1.0:
-            return data
-        return data * factor
+        return data if factor == 1.0 else data * factor
 
     def in_units(self, name: str, unit_str: str) -> FloatArray:
         """Return a field or derived quantity in display units.
