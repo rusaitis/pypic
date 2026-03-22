@@ -14,6 +14,11 @@ if TYPE_CHECKING:
     from pypic.types import FloatArray
 
 
+def surviving_axis_names(data: FieldDataset) -> tuple[str, ...]:
+    """Return the axis names surviving after any plane selection."""
+    return data.grid.geometry.axis_names[: len(data.grid.dimensions)]
+
+
 def resolve_field_values(
     data: FieldDataset, field: str, units: str | None
 ) -> FloatArray:

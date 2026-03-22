@@ -208,7 +208,7 @@ def add_inset_colorbar(
     bar_y = y0 + tick_space
     cax = ax.inset_axes([x0, bar_y, width, height], zorder=5)
     fig = ax.get_figure()
-    cb = fig.colorbar(  # type: ignore[union-attr, arg-type]
+    cb = fig.colorbar(  # type: ignore[union-attr]
         mappable, cax=cax, orientation="horizontal", extend=extend
     )
 

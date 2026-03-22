@@ -15,6 +15,7 @@ if TYPE_CHECKING:
     from matplotlib.axes import Axes
     from matplotlib.colors import Colormap
 
+    from pypic.plotting._colorbar import ExtremesMode
     from pypic.traces import FieldLine, ParticleTrace
     from pypic.types import FloatArray
 
@@ -58,9 +59,7 @@ def _colored_line_3d(
     from matplotlib.colors import Normalize
     from mpl_toolkits.mplot3d.art3d import Line3DCollection
 
-    segments = np.concatenate(
-        [points[:-1, np.newaxis], points[1:, np.newaxis]], axis=1
-    )
+    segments = np.concatenate([points[:-1, np.newaxis], points[1:, np.newaxis]], axis=1)
 
     if cmap is None:
         cmap = "inferno"
@@ -78,6 +77,54 @@ def _colored_line_3d(
     return lc
 
 
+def _plot_line_3d(
+    ax: Axes,
+    points: FloatArray,
+    scalars: Mapping[str, FloatArray],
+    *,
+    color: str | FloatArray | None = None,
+    cmap: str | Colormap | None = None,
+    vmin: float | None = None,
+    vmax: float | None = None,
+    linewidth: float = 1.2,
+    alpha: float = 0.9,
+    label: str | None = None,
+    colorbar: bool | Literal["inset"] = False,
+    extremes: ExtremesMode = "darken",
+    **kwargs: Any,  # noqa: ANN401 — matplotlib passthrough
+) -> Artist:
+    """Shared implementation for 3D line plotting with optional scalar coloring."""
+    values = _resolve_color_values(color, points, scalars)
+
+    if values is not None:
+        artist = _colored_line_3d(
+            ax,
+            points,
+            values,
+            cmap=cmap,
+            vmin=vmin,
+            vmax=vmax,
+            linewidth=linewidth,
+            alpha=alpha,
+        )
+        if colorbar:
+            cb_label = color if isinstance(color, str) else ""
+            _add_3d_colorbar(ax, artist, cb_label, colorbar, extremes=extremes)
+        return artist  # type: ignore[return-value]
+
+    lines = ax.plot(
+        points[:, 0],
+        points[:, 1],
+        points[:, 2],
+        color=color,
+        linewidth=linewidth,
+        alpha=alpha,
+        label=label,
+        **kwargs,
+    )
+    return lines[0]
+
+
 def plot_field_line(
     ax: Axes,
     line: FieldLine,
@@ -90,7 +137,7 @@ def plot_field_line(
     alpha: float = 0.9,
     label: str | None = None,
     colorbar: bool | Literal["inset"] = False,
-    extremes: str = "darken",
+    extremes: ExtremesMode = "darken",
     **kwargs: Any,  # noqa: ANN401 — matplotlib passthrough
 ) -> Artist:
     r"""Plot a field line in 3D, optionally colored by a scalar quantity.
@@ -135,27 +182,21 @@ def plot_field_line(
         for scalar coloring).
     """
     ensure_matplotlib()
-
-    values = _resolve_color_values(color, line.points, line.scalars)
-
-    if values is not None:
-        artist = _colored_line_3d(
-            ax, line.points, values,
-            cmap=cmap, vmin=vmin, vmax=vmax,
-            linewidth=linewidth, alpha=alpha,
-        )
-        if colorbar:
-            cb_label = color if isinstance(color, str) else ""
-            _add_3d_colorbar(ax, artist, cb_label, colorbar, extremes=extremes)
-        return artist
-
-    pts = line.points
-    lines = ax.plot(
-        pts[:, 0], pts[:, 1], pts[:, 2],
-        color=color, linewidth=linewidth, alpha=alpha, label=label,
+    return _plot_line_3d(
+        ax,
+        line.points,
+        line.scalars,
+        color=color,
+        cmap=cmap,
+        vmin=vmin,
+        vmax=vmax,
+        linewidth=linewidth,
+        alpha=alpha,
+        label=label,
+        colorbar=colorbar,
+        extremes=extremes,
         **kwargs,
     )
-    return lines[0]
 
 
 def plot_trajectory(
@@ -170,7 +211,7 @@ def plot_trajectory(
     alpha: float = 0.9,
     label: str | None = None,
     colorbar: bool | Literal["inset"] = False,
-    extremes: str = "darken",
+    extremes: ExtremesMode = "darken",
     **kwargs: Any,  # noqa: ANN401 — matplotlib passthrough
 ) -> Artist:
     r"""Plot a particle trajectory in 3D, optionally colored by a scalar.
@@ -215,29 +256,23 @@ def plot_trajectory(
     ensure_matplotlib()
 
     # ParticleTrace has a .time array that can be used as a built-in scalar
-    scalars = dict(trace.scalars)
-    scalars["time"] = trace.time
+    scalars = {**trace.scalars, "time": trace.time}
 
-    values = _resolve_color_values(color, trace.points, scalars)
-
-    if values is not None:
-        artist = _colored_line_3d(
-            ax, trace.points, values,
-            cmap=cmap, vmin=vmin, vmax=vmax,
-            linewidth=linewidth, alpha=alpha,
-        )
-        if colorbar:
-            cb_label = color if isinstance(color, str) else ""
-            _add_3d_colorbar(ax, artist, cb_label, colorbar, extremes=extremes)
-        return artist
-
-    pts = trace.points
-    lines = ax.plot(
-        pts[:, 0], pts[:, 1], pts[:, 2],
-        color=color, linewidth=linewidth, alpha=alpha, label=label,
+    return _plot_line_3d(
+        ax,
+        trace.points,
+        scalars,
+        color=color,
+        cmap=cmap,
+        vmin=vmin,
+        vmax=vmax,
+        linewidth=linewidth,
+        alpha=alpha,
+        label=label,
+        colorbar=colorbar,
+        extremes=extremes,
         **kwargs,
     )
-    return lines[0]
 
 
 def _resolve_color_values(
@@ -252,10 +287,7 @@ def _resolve_color_values(
     if isinstance(color, np.ndarray):
         if color.shape == (points.shape[0],):
             return color
-        msg = (
-            f"color array has shape {color.shape}, "
-            f"expected ({points.shape[0]},)"
-        )
+        msg = f"color array has shape {color.shape}, expected ({points.shape[0]},)"
         raise ValueError(msg)
 
     if isinstance(color, str) and color in scalars:
@@ -270,17 +302,28 @@ def _add_3d_colorbar(
     mappable: object,
     label: str,
     mode: bool | Literal["inset"],
-    extremes: str = "darken",
+    extremes: ExtremesMode = "darken",
 ) -> None:
-    """Attach a colorbar to a 3D axes."""
+    """Attach a colorbar to a 3D axes with standard pypic styling."""
+    import matplotlib as mpl
+    from matplotlib.colors import to_rgba
+
     from pypic.plotting._colorbar import _apply_extremes
 
-    _apply_extremes(mappable, mode=extremes)  # type: ignore[arg-type]
+    _apply_extremes(mappable, mode=extremes)
 
     fig = ax.get_figure()
     if mode == "inset":
         from pypic.plotting._colorbar import add_inset_colorbar
 
-        add_inset_colorbar(ax, mappable, label)
+        add_inset_colorbar(ax, mappable, label, extremes=extremes)
     elif fig is not None:
-        fig.colorbar(mappable, ax=ax, shrink=0.6, pad=0.08, label=label)  # type: ignore[arg-type]
+        text_color = mpl.rcParams.get("text.color", "black")
+        tick_color = mpl.rcParams.get("xtick.color", "0.4")
+        outline_rgba = (*to_rgba(tick_color)[:3], 0.3)
+
+        cb = fig.colorbar(mappable, ax=ax, shrink=0.6, pad=0.08, label=label)  # type: ignore[arg-type]
+        cb.outline.set_linewidth(0.3)
+        cb.outline.set_edgecolor(outline_rgba)
+        cb.ax.tick_params(width=0.3, length=2, colors=tick_color, labelcolor=text_color)
+        cb.set_label(label, color=text_color)

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
@@ -105,8 +106,14 @@ LIGHT = PlotTheme(
     diverging_cmap="RdBu_r",
     grid_color="0.0",
     line_colors=(
-        "#1e66f5", "#d20f39", "#40a02b", "#fe640b",
-        "#8839ef", "#179299", "#e64553", "#df8e1d",
+        "#1e66f5",
+        "#d20f39",
+        "#40a02b",
+        "#fe640b",
+        "#8839ef",
+        "#179299",
+        "#e64553",
+        "#df8e1d",
     ),
 )
 
@@ -130,8 +137,14 @@ DARK = PlotTheme(
     diverging_cmap="RdBu_r",
     grid_color="1.0",
     line_colors=(
-        "#7cb7ff", "#f47067", "#96e072", "#f39c12",
-        "#c74ded", "#00e8c6", "#ff8b6a", "#ffe66d",
+        "#7cb7ff",
+        "#f47067",
+        "#96e072",
+        "#f39c12",
+        "#c74ded",
+        "#00e8c6",
+        "#ff8b6a",
+        "#ffe66d",
     ),
 )
 
@@ -155,8 +168,14 @@ CATPPUCCIN_MOCHA = PlotTheme(
     diverging_cmap="RdBu_r",
     grid_color="#cdd6f4",
     line_colors=(
-        "#89b4fa", "#f38ba8", "#a6e3a1", "#fab387",
-        "#cba6f7", "#94e2d5", "#eba0ac", "#f9e2af",
+        "#89b4fa",
+        "#f38ba8",
+        "#a6e3a1",
+        "#fab387",
+        "#cba6f7",
+        "#94e2d5",
+        "#eba0ac",
+        "#f9e2af",
     ),
 )
 
@@ -180,8 +199,14 @@ ANUPPUCCIN_LIGHT = PlotTheme(
     diverging_cmap="RdBu_r",
     grid_color="#4c4f69",
     line_colors=(
-        "#1e66f5", "#d20f39", "#40a02b", "#fe640b",
-        "#8839ef", "#179299", "#e64553", "#df8e1d",
+        "#1e66f5",
+        "#d20f39",
+        "#40a02b",
+        "#fe640b",
+        "#8839ef",
+        "#179299",
+        "#e64553",
+        "#df8e1d",
     ),
 )
 
@@ -205,8 +230,14 @@ ANDROMEDA = PlotTheme(
     diverging_cmap="RdBu_r",
     grid_color="#d5ced9",
     line_colors=(
-        "#00e8c6", "#7cb7ff", "#f92672", "#ffe66d",
-        "#c74ded", "#96e072", "#f39c12", "#ee5d43",
+        "#00e8c6",
+        "#7cb7ff",
+        "#f92672",
+        "#ffe66d",
+        "#c74ded",
+        "#96e072",
+        "#f39c12",
+        "#ee5d43",
     ),
 )
 
@@ -249,12 +280,24 @@ def apply_theme_to_figure(fig: Figure, theme: PlotTheme) -> None:
     for text in fig.texts:
         text.set_color(tc)
 
+    legend_label_c = theme.rcparams.get("legend.labelcolor", tc)
+
     for ax in fig.get_axes():
         ax.set_facecolor(afc)
         ax.title.set_color(tc)
         ax.xaxis.label.set_color(label_c)
         ax.yaxis.label.set_color(label_c)
         ax.tick_params(colors=tick_c, labelcolor=tick_c)
+        for spine_name in ("left", "right", "top", "bottom"):
+            visible = theme.rcparams.get(f"axes.spines.{spine_name}", True)
+            ax.spines[spine_name].set_visible(visible)
+            if visible:
+                edge_c = theme.rcparams.get("axes.edgecolor", "black")
+                ax.spines[spine_name].set_edgecolor(edge_c)
+        legend = ax.get_legend()
+        if legend is not None:
+            for text in legend.get_texts():
+                text.set_color(legend_label_c)
 
 
 def apply_grid(ax: Axes, theme: PlotTheme, *, minor: bool = False) -> None:
@@ -338,7 +381,8 @@ def style_3d_axes(
         axis.set_ticks([])
         axis.set_ticklabels([])
         axis.label.set_text("")
-        axis._axinfo["grid"]["color"] = "none"
+        with contextlib.suppress(AttributeError, KeyError, TypeError):
+            axis._axinfo["grid"]["color"] = "none"  # private API; best-effort
     ax.grid(False)
 
     from matplotlib.ticker import MaxNLocator
@@ -348,10 +392,12 @@ def style_3d_axes(
     z0 = grid_z if grid_z is not None else center[2]
 
     locator = MaxNLocator(nbins=grid_count)
-    x_ticks = [v for v in locator.tick_values(xlim[0], xlim[1])
-               if xlim[0] <= v <= xlim[1]]
-    y_ticks = [v for v in locator.tick_values(ylim[0], ylim[1])
-               if ylim[0] <= v <= ylim[1]]
+    x_ticks = [
+        v for v in locator.tick_values(xlim[0], xlim[1]) if xlim[0] <= v <= xlim[1]
+    ]
+    y_ticks = [
+        v for v in locator.tick_values(ylim[0], ylim[1]) if ylim[0] <= v <= ylim[1]
+    ]
 
     grid_alpha = 0.06
     grid_lw = 0.5
@@ -360,13 +406,23 @@ def style_3d_axes(
 
     for x in x_ticks:
         ax.plot(
-            [x, x], [ylim[0], ylim[1]], [z0, z0],
-            color=tc_rgb, alpha=grid_alpha, linewidth=grid_lw, zorder=0,
+            [x, x],
+            [ylim[0], ylim[1]],
+            [z0, z0],
+            color=tc_rgb,
+            alpha=grid_alpha,
+            linewidth=grid_lw,
+            zorder=0,
         )
     for y in y_ticks:
         ax.plot(
-            [xlim[0], xlim[1]], [y, y], [z0, z0],
-            color=tc_rgb, alpha=grid_alpha, linewidth=grid_lw, zorder=0,
+            [xlim[0], xlim[1]],
+            [y, y],
+            [z0, z0],
+            color=tc_rgb,
+            alpha=grid_alpha,
+            linewidth=grid_lw,
+            zorder=0,
         )
 
     offset_frac = 0.04
@@ -379,6 +435,8 @@ def style_3d_axes(
             return ticks
         step = abs(ticks[1] - ticks[0]) if len(ticks) > 1 else 1.0
         filtered = [v for v in ticks if abs(v) > 0.3 * step]
+        if not filtered:
+            return ticks
         return filtered[::2] if len(filtered) > 5 else filtered
 
     x_labels = _label_values(x_ticks)
@@ -387,9 +445,15 @@ def style_3d_axes(
         if coord_units and j == len(x_labels) - 1:
             val += f" {coord_units}"
         ax.text(
-            x, ylim[0] - y_range * offset_frac, z0,
-            val, color=(*tc_rgb, label_alpha),
-            fontsize=label_size, ha="center", va="top", zorder=1,
+            x,
+            ylim[0] - y_range * offset_frac,
+            z0,
+            val,
+            color=(*tc_rgb, label_alpha),
+            fontsize=label_size,
+            ha="center",
+            va="top",
+            zorder=1,
         )
 
     y_labels = _label_values(y_ticks)
@@ -398,13 +462,21 @@ def style_3d_axes(
         if coord_units and j == len(y_labels) - 1:
             val += f" {coord_units}"
         ax.text(
-            xlim[0] - x_range * offset_frac, y, z0,
-            val, color=(*tc_rgb, label_alpha),
-            fontsize=label_size, ha="right", va="center", zorder=1,
+            xlim[0] - x_range * offset_frac,
+            y,
+            z0,
+            val,
+            color=(*tc_rgb, label_alpha),
+            fontsize=label_size,
+            ha="right",
+            va="center",
+            zorder=1,
         )
 
     if axis_length is None:
-        axis_length = 0.20 * min(x_range, y_range)
+        zlim = ax.get_zlim()  # type: ignore[attr-defined]
+        z_range = zlim[1] - zlim[0]
+        axis_length = 0.20 * min(x_range, y_range, z_range)
 
     arrow_alpha = 0.7
     arrow_lw = 1.0
@@ -420,14 +492,21 @@ def style_3d_axes(
             [center[0], center[0] + dx],
             [center[1], center[1] + dy],
             [center[2], center[2] + dz],
-            color=tc_rgb, alpha=arrow_alpha, linewidth=arrow_lw,
-            solid_capstyle="round", zorder=5,
+            color=tc_rgb,
+            alpha=arrow_alpha,
+            linewidth=arrow_lw,
+            solid_capstyle="round",
+            zorder=5,
         )
         ax.text(
             center[0] + dx * label_offset,
             center[1] + dy * label_offset,
             center[2] + dz * label_offset,
-            lbl, color=(*tc_rgb, arrow_alpha),
-            fontsize=10, ha="center", va="center",
-            fontweight="bold", zorder=5,
+            lbl,
+            color=(*tc_rgb, arrow_alpha),
+            fontsize=10,
+            ha="center",
+            va="center",
+            fontweight="bold",
+            zorder=5,
         )

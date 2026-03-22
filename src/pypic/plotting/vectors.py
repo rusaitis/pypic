@@ -13,14 +13,13 @@ if TYPE_CHECKING:
     from matplotlib.colors import Colormap
     from matplotlib.figure import Figure
 
+    from pypic.plotting._colorbar import ExtremesMode
     from pypic.plotting.styles import PlotTheme
     from pypic.readers.base import FieldDataset
     from pypic.selections import PlaneSelection
 
 
-def _resolve_plane_components(
-    data: FieldDataset, field_prefix: str
-) -> tuple[str, str]:
+def _resolve_plane_components(data: FieldDataset, field_prefix: str) -> tuple[str, str]:
     """Return the two in-plane component field names for a vector field.
 
     Maps surviving dataset axes to the corresponding numbered component
@@ -71,6 +70,7 @@ def plot_streamlines(
     time: float | None = None,
     ax: Axes | None = None,
     colorbar: bool | Literal["inset"] = True,
+    extremes: ExtremesMode = "darken",
     legend: bool | str = True,
     figsize: tuple[float, float] | None = None,
     **kwargs: Any,  # noqa: ANN401 — streamplot passthrough
@@ -128,6 +128,9 @@ def plot_streamlines(
         Existing axes to draw on. ``None`` creates a new figure.
     colorbar : bool
         Whether to add a colorbar. Ignored when *color* is set.
+    extremes : "darken" or "transparent"
+        How to style values outside ``[vmin, vmax]``.
+        ``"transparent"`` makes them invisible.
     legend : bool or str
         When *color* is set (uniform mode), add a vector legend overlay.
         ``True`` uses the field prefix as label, a string overrides it.
@@ -150,6 +153,7 @@ def plot_streamlines(
         default_midplane,
         get_or_create_axes,
         resolve_field_values,
+        surviving_axis_names,
     )
     from pypic.plotting.styles import DEFAULT, apply_grid, use_theme
 
@@ -179,9 +183,7 @@ def plot_streamlines(
 
         from pypic.plotting._colormaps import resolve_colormap
 
-        info = data.field_info(
-            color_field if color_field is not None else f"|{field}|"
-        )
+        info = data.field_info(color_field if color_field is not None else f"|{field}|")
         cmap_name = resolve_colormap(
             color_name,
             color_values,
@@ -191,7 +193,7 @@ def plot_streamlines(
         )
 
     coords = data.grid.coordinate_arrays()
-    surviving_axes = data.grid.geometry.axis_names[: len(data.grid.dimensions)]
+    surviving_axes = surviving_axis_names(data)
 
     # Linewidth: tuple → magnitude-scaled, float → constant, None → default
     if linewidth is None:
@@ -254,7 +256,9 @@ def plot_streamlines(
 
             unit_str = units or ""
             cb_label = field_label(info, unit_str=unit_str)
-            attach_colorbar(fig, ax, stream.lines, cb_label, colorbar)
+            attach_colorbar(
+                fig, ax, stream.lines, cb_label, colorbar, extremes=extremes
+            )
 
         if not use_colormap and legend is not False:
             from pypic.plotting._badge import VectorLegendEntry, add_vector_legend
@@ -262,7 +266,10 @@ def plot_streamlines(
             legend_label = legend if isinstance(legend, str) else field
             lw = linewidth if isinstance(linewidth, (int, float)) else 1.0
             entry = VectorLegendEntry(
-                label=legend_label, color=color, linewidth=lw, alpha=alpha,  # type: ignore[arg-type]
+                label=legend_label,
+                color=color,
+                linewidth=lw,
+                alpha=alpha,
             )
             add_vector_legend(ax, entry)
 
@@ -274,11 +281,7 @@ def plot_streamlines(
         if title is not None:
             ax.set_title(title)
         else:
-            _info = (
-                info
-                if use_colormap
-                else data.field_info(f"|{field}|")
-            )
+            _info = info if use_colormap else data.field_info(f"|{field}|")
             ax.set_title(figure_title(_info, step=step, time=time))
 
         fig.tight_layout()
@@ -305,6 +308,7 @@ def plot_quiver(
     time: float | None = None,
     ax: Axes | None = None,
     colorbar: bool | Literal["inset"] = True,
+    extremes: ExtremesMode = "darken",
     legend: bool | str = True,
     figsize: tuple[float, float] | None = None,
     **kwargs: Any,  # noqa: ANN401 — quiver passthrough
@@ -356,6 +360,9 @@ def plot_quiver(
         Existing axes to draw on. ``None`` creates a new figure.
     colorbar : bool
         Whether to add a colorbar. Ignored when *color* is set.
+    extremes : "darken" or "transparent"
+        How to style values outside ``[vmin, vmax]``.
+        ``"transparent"`` makes them invisible.
     legend : bool or str
         When *color* is set (uniform mode), add a vector legend overlay.
         ``True`` uses the field prefix as label, a string overrides it.
@@ -378,6 +385,7 @@ def plot_quiver(
         default_midplane,
         get_or_create_axes,
         resolve_field_values,
+        surviving_axis_names,
     )
     from pypic.plotting.styles import DEFAULT, apply_grid, use_theme
 
@@ -407,9 +415,7 @@ def plot_quiver(
 
         from pypic.plotting._colormaps import resolve_colormap
 
-        info = data.field_info(
-            color_field if color_field is not None else f"|{field}|"
-        )
+        info = data.field_info(color_field if color_field is not None else f"|{field}|")
         cmap_name = resolve_colormap(
             color_name,
             color_values,
@@ -419,7 +425,7 @@ def plot_quiver(
         )
 
     coords = data.grid.coordinate_arrays()
-    surviving_axes = data.grid.geometry.axis_names[: len(data.grid.dimensions)]
+    surviving_axes = surviving_axis_names(data)
 
     # Subsample
     if isinstance(stride, int):
@@ -468,14 +474,16 @@ def plot_quiver(
 
             unit_str = units or ""
             cb_label = field_label(info, unit_str=unit_str)
-            attach_colorbar(fig, ax, quiv, cb_label, colorbar)
+            attach_colorbar(fig, ax, quiv, cb_label, colorbar, extremes=extremes)
 
         if not use_colormap and legend is not False:
             from pypic.plotting._badge import VectorLegendEntry, add_vector_legend
 
             legend_label = legend if isinstance(legend, str) else field
             entry = VectorLegendEntry(
-                label=legend_label, color=color, alpha=alpha,  # type: ignore[arg-type]
+                label=legend_label,
+                color=color,
+                alpha=alpha,
             )
             add_vector_legend(ax, entry)
 
@@ -487,11 +495,7 @@ def plot_quiver(
         if title is not None:
             ax.set_title(title)
         else:
-            _info = (
-                info
-                if use_colormap
-                else data.field_info(f"|{field}|")
-            )
+            _info = info if use_colormap else data.field_info(f"|{field}|")
             ax.set_title(figure_title(_info, step=step, time=time))
 
         fig.tight_layout()

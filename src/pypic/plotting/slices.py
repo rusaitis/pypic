@@ -11,6 +11,7 @@ if TYPE_CHECKING:
     from matplotlib.colors import Colormap
     from matplotlib.figure import Figure
 
+    from pypic.plotting._colorbar import ExtremesMode
     from pypic.plotting.styles import PlotTheme
     from pypic.readers.base import FieldDataset
     from pypic.selections import PlaneSelection
@@ -27,12 +28,14 @@ def plot_field_slice(
     cmap: str | Colormap | None = None,
     vmin: float | None = None,
     vmax: float | None = None,
+    alpha: float = 1.0,
     symmetric: bool | None = None,
     title: str | None = None,
     step: int | None = None,
     time: float | None = None,
     ax: Axes | None = None,
     colorbar: bool | Literal["inset"] = True,
+    extremes: ExtremesMode = "darken",
     figsize: tuple[float, float] | None = None,
 ) -> tuple[Figure, Axes]:
     r"""Plot a 2D slice of a scalar field.
@@ -58,6 +61,9 @@ def plot_field_slice(
         Override automatic colormap selection.
     vmin, vmax : float | None
         Color limits. ``None`` for auto.
+    alpha : float
+        Mesh transparency (0 = invisible, 1 = opaque). Useful for
+        overlaying semi-transparent scalar fields.
     symmetric : bool | None
         Force symmetric color limits around zero. ``None`` auto-detects
         (``True`` when diverging colormap is selected).
@@ -71,6 +77,9 @@ def plot_field_slice(
         Existing axes to draw on. ``None`` creates a new figure.
     colorbar : bool
         Whether to add a colorbar.
+    extremes : "darken" or "transparent"
+        How to style values outside ``[vmin, vmax]``.
+        ``"transparent"`` makes them invisible.
     figsize : tuple[float, float] | None
         Figure size override.
 
@@ -91,6 +100,7 @@ def plot_field_slice(
         default_midplane,
         get_or_create_axes,
         resolve_field_values,
+        surviving_axis_names,
     )
     from pypic.plotting.styles import DEFAULT, apply_grid, use_theme
 
@@ -106,7 +116,7 @@ def plot_field_slice(
 
     info = data.field_info(field)
     coords = data.grid.coordinate_arrays()
-    surviving_axes = data.grid.geometry.axis_names[: len(data.grid.dimensions)]
+    surviving_axes = surviving_axis_names(data)
 
     cmap_name = resolve_colormap(
         field, values, theme, info=info, cmap=cmap if isinstance(cmap, str) else None
@@ -130,11 +140,12 @@ def plot_field_slice(
             cmap=cmap if not isinstance(cmap, str) else cmap_name,
             vmin=vmin,
             vmax=vmax,
+            alpha=alpha,
         )
 
         unit_str = units or ""
         cb_label = field_label(info, unit_str=unit_str)
-        attach_colorbar(fig, ax, mesh, cb_label, colorbar)
+        attach_colorbar(fig, ax, mesh, cb_label, colorbar, extremes=extremes)
 
         ax.set_xlabel(axis_label(surviving_axes[0], unit_str=coord_units or ""))
         ax.set_ylabel(axis_label(surviving_axes[1], unit_str=coord_units or ""))
@@ -149,5 +160,3 @@ def plot_field_slice(
         fig.tight_layout()
 
     return fig, ax
-
-

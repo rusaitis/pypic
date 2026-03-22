@@ -129,6 +129,8 @@ def plot_line(
             ax.legend()
             style_legend(ax)
 
+        fig.tight_layout()
+
     return fig, ax
 
 
@@ -222,5 +224,7 @@ def plot_time_series(
         if legend and (len(columns) > 1 or labels != columns):
             ax.legend()
             style_legend(ax)
+
+        fig.tight_layout()
 
     return fig, ax

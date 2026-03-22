@@ -28,6 +28,30 @@ _LOC_CODES: dict[str, int] = {
 }
 
 
+def _make_overlay_box(
+    ax: Axes,
+    child: object,
+    loc: BadgeLoc,
+    bg_rgba: tuple[float, float, float, float],
+) -> AnchoredOffsetbox:
+    """Create a styled overlay box and add it to *ax*."""
+    from matplotlib.offsetbox import AnchoredOffsetbox
+
+    loc_code = _LOC_CODES.get(loc, 1)
+    box = AnchoredOffsetbox(
+        loc=loc_code,
+        child=child,
+        pad=0.4,
+        borderpad=OVERLAY_BORDER_PAD,
+        frameon=True,
+    )
+    box.patch.set_boxstyle(OVERLAY_BOX_STYLE)
+    box.patch.set_facecolor(bg_rgba)
+    box.patch.set_edgecolor("none")
+    ax.add_artist(box)
+    return box
+
+
 OverlayShade = Literal["darker", "lighter"]
 
 _SHADE_FACTOR = 0.4
@@ -263,7 +287,7 @@ def add_status_badge(
     """
     ensure_matplotlib()
 
-    from matplotlib.offsetbox import AnchoredOffsetbox, TextArea, VPacker
+    from matplotlib.offsetbox import TextArea, VPacker
 
     default_bg, default_fg = _detect_overlay_defaults(shade)
 
@@ -299,21 +323,7 @@ def add_status_badge(
     else:
         child = text_area
 
-    loc_code = _LOC_CODES.get(loc, 1)
-    box = AnchoredOffsetbox(
-        loc=loc_code,
-        child=child,
-        pad=0.4,
-        borderpad=OVERLAY_BORDER_PAD,
-        frameon=True,
-    )
-
-    box.patch.set_boxstyle(OVERLAY_BOX_STYLE)
-    box.patch.set_facecolor(bg_rgba)
-    box.patch.set_edgecolor("none")
-
-    ax.add_artist(box)
-    return box
+    return _make_overlay_box(ax, child, loc, bg_rgba)
 
 
 @dataclass(frozen=True, slots=True)
@@ -369,7 +379,7 @@ def add_panel_label(
     AnchoredOffsetbox
     """
     ensure_matplotlib()
-    from matplotlib.offsetbox import AnchoredOffsetbox, TextArea
+    from matplotlib.offsetbox import TextArea
 
     default_bg, default_fg = _detect_overlay_defaults(shade)
 
@@ -379,20 +389,7 @@ def add_panel_label(
     props = {"fontsize": fontsize, "fontweight": fontweight, "color": resolved_text}
     text_area = TextArea(label, textprops=props)
 
-    loc_code = _LOC_CODES.get(loc, 2)
-    box = AnchoredOffsetbox(
-        loc=loc_code,
-        child=text_area,
-        pad=0.4,
-        borderpad=OVERLAY_BORDER_PAD,
-        frameon=True,
-    )
-    box.patch.set_boxstyle(OVERLAY_BOX_STYLE)
-    box.patch.set_facecolor(bg_rgba)
-    box.patch.set_edgecolor("none")
-
-    ax.add_artist(box)
-    return box
+    return _make_overlay_box(ax, text_area, loc, bg_rgba)
 
 
 def add_vector_legend(
@@ -440,14 +437,13 @@ def add_vector_legend(
     """
     ensure_matplotlib()
     from matplotlib.lines import Line2D
-    from matplotlib.patches import FancyArrowPatch
     from matplotlib.offsetbox import (
-        AnchoredOffsetbox,
         DrawingArea,
         HPacker,
         TextArea,
         VPacker,
     )
+    from matplotlib.patches import FancyArrowPatch
 
     if isinstance(entries, VectorLegendEntry):
         entries = [entries]
@@ -495,17 +491,4 @@ def add_vector_legend(
     else:
         child = rows[0]
 
-    loc_code = _LOC_CODES.get(loc, 2)
-    box = AnchoredOffsetbox(
-        loc=loc_code,
-        child=child,
-        pad=0.4,
-        borderpad=OVERLAY_BORDER_PAD,
-        frameon=True,
-    )
-    box.patch.set_boxstyle(OVERLAY_BOX_STYLE)
-    box.patch.set_facecolor(bg_rgba)
-    box.patch.set_edgecolor("none")
-
-    ax.add_artist(box)
-    return box
+    return _make_overlay_box(ax, child, loc, bg_rgba)

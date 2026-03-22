@@ -136,6 +136,8 @@ class TestPlotFieldSlice:
             pytest.param({"units": "nT"}, id="units"),
             pytest.param({"theme": DARK}, id="dark-theme"),
             pytest.param({"symmetric": False}, id="symmetric-override"),
+            pytest.param({"extremes": "transparent"}, id="transparent-extremes"),
+            pytest.param({"alpha": 0.5}, id="alpha"),
         ],
     )
     def test_options(self, ds_2d: FieldDataset, kwargs: dict) -> None:
@@ -154,24 +156,34 @@ class TestPlotFieldSlice:
 
 
 class TestPlotComparison:
-    def test_returns_figure_and_axes_dict(
-        self, ds_2d: FieldDataset
-    ) -> None:
+    def test_returns_figure_and_axes_dict(self, ds_2d: FieldDataset) -> None:
         fig, axes = plot_comparison(ds_2d, ds_2d, "B1")
         assert isinstance(fig, Figure)
         assert set(axes) == {"a", "b", "diff"}
         plt.close(fig)
 
     def test_custom_labels(self, ds_2d: FieldDataset) -> None:
-        fig, axes = plot_comparison(
-            ds_2d, ds_2d, "B1", labels=("Run1", "Run2")
-        )
+        fig, axes = plot_comparison(ds_2d, ds_2d, "B1", labels=("Run1", "Run2"))
         assert axes["a"].get_title() == "Run1"
         assert axes["b"].get_title() == "Run2"
         plt.close(fig)
 
     def test_3d_and_derived(self, ds_3d: FieldDataset) -> None:
         fig, _ = plot_comparison(ds_3d, ds_3d, "|B|")
+        assert isinstance(fig, Figure)
+        plt.close(fig)
+
+    @pytest.mark.parametrize(
+        "kwargs",
+        [
+            pytest.param({"colorbar": "inset"}, id="inset-colorbar"),
+            pytest.param({"colorbar": False}, id="no-colorbar"),
+            pytest.param({"extremes": "transparent"}, id="transparent-extremes"),
+            pytest.param({"vmin": -1.0, "vmax": 1.0}, id="custom-clim"),
+        ],
+    )
+    def test_options(self, ds_2d: FieldDataset, kwargs: dict) -> None:
+        fig, _ = plot_comparison(ds_2d, ds_2d, "B1", **kwargs)
         assert isinstance(fig, Figure)
         plt.close(fig)
 
@@ -189,8 +201,13 @@ class TestColormapDetection:
             ("unknown", False, None, False),
         ],
         ids=[
-            "magnitude", "component", "density", "charge-density",
-            "beta", "all-positive-fallback", "mixed-sign-fallback",
+            "magnitude",
+            "component",
+            "density",
+            "charge-density",
+            "beta",
+            "all-positive-fallback",
+            "mixed-sign-fallback",
         ],
     )
     def test_detection(
@@ -295,24 +312,18 @@ class TestPlotTimeSeries:
         plt.close(fig)
 
     def test_multiple_columns(self, tabular: TabularData) -> None:
-        fig, ax = plot_time_series(
-            tabular, ["total_energy", "kinetic_energy"]
-        )
+        fig, ax = plot_time_series(tabular, ["total_energy", "kinetic_energy"])
         assert len(ax.lines) == 2
         assert ax.get_legend() is not None
         plt.close(fig)
 
     def test_custom_x_column(self, tabular: TabularData) -> None:
-        fig, ax = plot_time_series(
-            tabular, "total_energy", x_column="cycle"
-        )
+        fig, ax = plot_time_series(tabular, "total_energy", x_column="cycle")
         assert ax.get_xlabel() == "cycle"
         plt.close(fig)
 
     def test_no_legend(self, tabular: TabularData) -> None:
-        fig, ax = plot_time_series(
-            tabular, "total_energy", legend=False
-        )
+        fig, ax = plot_time_series(tabular, "total_energy", legend=False)
         assert ax.get_legend() is None
         plt.close(fig)
 
@@ -334,9 +345,7 @@ class TestVectorPlots:
     @pytest.mark.parametrize(
         "plot_fn", [plot_streamlines, plot_quiver], ids=["streamlines", "quiver"]
     )
-    def test_custom_axes(
-        self, ds_2d: FieldDataset, plot_fn: object
-    ) -> None:
+    def test_custom_axes(self, ds_2d: FieldDataset, plot_fn: object) -> None:
         fig_ext, ax_ext = plt.subplots()
         _, ax = plot_fn(ds_2d, "B", ax=ax_ext)  # type: ignore[operator]
         assert ax is ax_ext
@@ -345,9 +354,7 @@ class TestVectorPlots:
     @pytest.mark.parametrize(
         "plot_fn", [plot_streamlines, plot_quiver], ids=["streamlines", "quiver"]
     )
-    def test_uniform_color(
-        self, ds_2d: FieldDataset, plot_fn: object
-    ) -> None:
+    def test_uniform_color(self, ds_2d: FieldDataset, plot_fn: object) -> None:
         fig, _ = plot_fn(ds_2d, "B", color="black")  # type: ignore[operator]
         assert isinstance(fig, Figure)
         plt.close(fig)
@@ -355,9 +362,7 @@ class TestVectorPlots:
     @pytest.mark.parametrize(
         "plot_fn", [plot_streamlines, plot_quiver], ids=["streamlines", "quiver"]
     )
-    def test_auto_legend(
-        self, ds_2d: FieldDataset, plot_fn: object
-    ) -> None:
+    def test_auto_legend(self, ds_2d: FieldDataset, plot_fn: object) -> None:
         fig, ax = plot_fn(ds_2d, "B", color="black")  # type: ignore[operator]
         legend_boxes = [a for a in ax.artists if hasattr(a, "patch")]
         assert len(legend_boxes) >= 1
@@ -376,15 +381,24 @@ class TestVectorPlots:
             (plot_streamlines, {"theme": DARK}),
             (plot_streamlines, {"colorbar": False}),
             (plot_streamlines, {"alpha": 0.4, "color": "black"}),
+            (plot_streamlines, {"extremes": "transparent"}),
             (plot_quiver, {"stride": 2}),
             (plot_quiver, {"stride": (2, 3)}),
             (plot_quiver, {"theme": DARK}),
             (plot_quiver, {"colorbar": False}),
+            (plot_quiver, {"extremes": "transparent"}),
         ],
         ids=[
-            "stream-color_field", "stream-dark", "stream-no-cb",
-            "stream-alpha", "quiver-stride", "quiver-stride-tuple",
-            "quiver-dark", "quiver-no-cb",
+            "stream-color_field",
+            "stream-dark",
+            "stream-no-cb",
+            "stream-alpha",
+            "stream-transparent",
+            "quiver-stride",
+            "quiver-stride-tuple",
+            "quiver-dark",
+            "quiver-no-cb",
+            "quiver-transparent",
         ],
     )
     def test_options(
@@ -409,8 +423,14 @@ class TestStatusBadge:
             ({"time": 0.005, "time_units": "ns"}, "t = 5.00e-03 ns"),
         ],
         ids=[
-            "step", "time", "both", "custom-label", "empty-label",
-            "with-max", "no-max", "time-units",
+            "step",
+            "time",
+            "both",
+            "custom-label",
+            "empty-label",
+            "with-max",
+            "no-max",
+            "time-units",
         ],
     )
     def test_format_status_text(self, kwargs: dict, expected: str) -> None:
@@ -507,9 +527,7 @@ class TestInsetColorbar:
         ],
         ids=["slice", "streamlines", "quiver"],
     )
-    def test_via_plot_functions(
-        self, ds_2d: FieldDataset, plot_fn: object
-    ) -> None:
+    def test_via_plot_functions(self, ds_2d: FieldDataset, plot_fn: object) -> None:
         fig, _ = plot_fn(ds_2d)  # type: ignore[operator]
         assert isinstance(fig, Figure)
         plt.close(fig)
