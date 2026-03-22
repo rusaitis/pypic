@@ -144,16 +144,14 @@ def plot_streamlines(
     tuple[Figure, Axes]
     """
     ensure_matplotlib()
-    import matplotlib.pyplot as plt
 
     from pypic.plotting._labels import axis_label, figure_title
-    from pypic.plotting._resolve import default_midplane, resolve_field_values
-    from pypic.plotting.styles import (
-        DEFAULT,
-        apply_grid,
-        apply_theme_to_figure,
-        use_theme,
+    from pypic.plotting._resolve import (
+        default_midplane,
+        get_or_create_axes,
+        resolve_field_values,
     )
+    from pypic.plotting.styles import DEFAULT, apply_grid, use_theme
 
     if theme is None:
         theme = DEFAULT
@@ -216,11 +214,7 @@ def plot_streamlines(
         lw_arg = linewidth  # type: ignore[assignment]
 
     with use_theme(theme):
-        if ax is None:
-            fig, ax = plt.subplots(figsize=figsize)
-        else:
-            fig = ax.get_figure()  # type: ignore[assignment]
-            apply_theme_to_figure(fig, theme)
+        fig, ax = get_or_create_axes(theme, ax, figsize)
 
         if use_colormap:
             stream = ax.streamplot(
@@ -255,18 +249,12 @@ def plot_streamlines(
             stream.arrows.set_alpha(alpha)
 
         if use_colormap and colorbar:
+            from pypic.plotting._colorbar import attach_colorbar
             from pypic.plotting._labels import field_label
 
-            unit_str = units if units else ""
+            unit_str = units or ""
             cb_label = field_label(info, unit_str=unit_str)
-            if colorbar == "inset":
-                from pypic.plotting._colorbar import add_inset_colorbar
-
-                add_inset_colorbar(ax, stream.lines, cb_label)
-            else:
-                from pypic.plotting._colorbar import add_colorbar
-
-                add_colorbar(fig, ax, stream.lines, cb_label)
+            attach_colorbar(fig, ax, stream.lines, cb_label, colorbar)
 
         if not use_colormap and legend is not False:
             from pypic.plotting._badge import VectorLegendEntry, add_vector_legend
@@ -384,16 +372,14 @@ def plot_quiver(
     tuple[Figure, Axes]
     """
     ensure_matplotlib()
-    import matplotlib.pyplot as plt
 
     from pypic.plotting._labels import axis_label, figure_title
-    from pypic.plotting._resolve import default_midplane, resolve_field_values
-    from pypic.plotting.styles import (
-        DEFAULT,
-        apply_grid,
-        apply_theme_to_figure,
-        use_theme,
+    from pypic.plotting._resolve import (
+        default_midplane,
+        get_or_create_axes,
+        resolve_field_values,
     )
+    from pypic.plotting.styles import DEFAULT, apply_grid, use_theme
 
     if theme is None:
         theme = DEFAULT
@@ -449,11 +435,7 @@ def plot_quiver(
     xx, yy = np.meshgrid(x_sub, y_sub, indexing="ij")
 
     with use_theme(theme):
-        if ax is None:
-            fig, ax = plt.subplots(figsize=figsize)
-        else:
-            fig = ax.get_figure()  # type: ignore[assignment]
-            apply_theme_to_figure(fig, theme)
+        fig, ax = get_or_create_axes(theme, ax, figsize)
 
         if use_colormap:
             color_sub = color_values[::s0, ::s1]
@@ -481,18 +463,12 @@ def plot_quiver(
             )
 
         if use_colormap and colorbar:
+            from pypic.plotting._colorbar import attach_colorbar
             from pypic.plotting._labels import field_label
 
-            unit_str = units if units else ""
+            unit_str = units or ""
             cb_label = field_label(info, unit_str=unit_str)
-            if colorbar == "inset":
-                from pypic.plotting._colorbar import add_inset_colorbar
-
-                add_inset_colorbar(ax, quiv, cb_label)
-            else:
-                from pypic.plotting._colorbar import add_colorbar
-
-                add_colorbar(fig, ax, quiv, cb_label)
+            attach_colorbar(fig, ax, quiv, cb_label, colorbar)
 
         if not use_colormap and legend is not False:
             from pypic.plotting._badge import VectorLegendEntry, add_vector_legend

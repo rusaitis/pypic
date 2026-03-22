@@ -1,10 +1,14 @@
-"""Shared field resolution and midplane defaulting helpers."""
+"""Shared field resolution, midplane defaulting, and axes helpers."""
 
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from matplotlib.axes import Axes
+    from matplotlib.figure import Figure
+
+    from pypic.plotting.styles import PlotTheme
     from pypic.readers.base import FieldDataset
     from pypic.selections import PlaneSelection
     from pypic.types import FloatArray
@@ -37,6 +41,43 @@ def resolve_field_values(
     if data.has_field(field):
         return data[field]
     return data.compute(field)
+
+
+def get_or_create_axes(
+    theme: PlotTheme,
+    ax: Axes | None,
+    figsize: tuple[float, float] | None,
+) -> tuple[Figure, Axes]:
+    """Return ``(fig, ax)``, creating a new figure if *ax* is ``None``.
+
+    When *ax* is provided, applies the theme to the existing figure so
+    that axes created outside ``use_theme()`` still match the palette.
+
+    Parameters
+    ----------
+    theme : PlotTheme
+        Active plot theme.
+    ax : Axes or None
+        Existing axes, or ``None`` to create a new figure.
+    figsize : tuple or None
+        Figure size (only used when creating a new figure).
+
+    Returns
+    -------
+    tuple[Figure, Axes]
+    """
+    import matplotlib.pyplot as plt
+
+    from pypic.plotting.styles import apply_theme_to_figure
+
+    if ax is None:
+        fig, ax = plt.subplots(figsize=figsize)
+        return fig, ax
+
+    fig = ax.get_figure()
+    assert fig is not None
+    apply_theme_to_figure(fig, theme)
+    return fig, ax
 
 
 def default_midplane(data: FieldDataset) -> PlaneSelection | None:

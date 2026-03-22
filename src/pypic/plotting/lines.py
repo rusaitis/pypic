@@ -74,17 +74,10 @@ def plot_line(
     tuple[Figure, Axes]
     """
     ensure_matplotlib()
-    import matplotlib.pyplot as plt
 
     from pypic.plotting._labels import axis_label, field_label, figure_title
-    from pypic.plotting._resolve import resolve_field_values
-    from pypic.plotting.styles import (
-        DEFAULT,
-        apply_grid,
-        apply_theme_to_figure,
-        style_legend,
-        use_theme,
-    )
+    from pypic.plotting._resolve import get_or_create_axes, resolve_field_values
+    from pypic.plotting.styles import DEFAULT, apply_grid, style_legend, use_theme
 
     if theme is None:
         theme = DEFAULT
@@ -103,7 +96,6 @@ def plot_line(
         msg = f"axis is required for {ndim}D data (axes: {axis_names})"
         raise ValueError(msg)
 
-    # Slice other axes to reduce to 1D
     slice_axes = [a for a in axis_names if a != plot_axis]
     if slice_axes:
         indexers: dict[str, int] = {}
@@ -118,14 +110,10 @@ def plot_line(
     values = resolve_field_values(data, field, units)
 
     info = data.field_info(field)
-    coord = data.grid.coordinate_arrays()[0]  # 1D after slicing
+    coord = data.grid.coordinate_arrays()[0]
 
     with use_theme(theme):
-        if ax is None:
-            fig, ax = plt.subplots(figsize=figsize)
-        else:
-            fig = ax.get_figure()  # type: ignore[assignment]
-            apply_theme_to_figure(fig, theme)
+        fig, ax = get_or_create_axes(theme, ax, figsize)
 
         ax.plot(coord, values, label=label, **kwargs)
         ax.set_xlabel(axis_label(plot_axis, unit_str=coord_units or ""))
@@ -193,15 +181,9 @@ def plot_time_series(
     tuple[Figure, Axes]
     """
     ensure_matplotlib()
-    import matplotlib.pyplot as plt
 
-    from pypic.plotting.styles import (
-        DEFAULT,
-        apply_grid,
-        apply_theme_to_figure,
-        style_legend,
-        use_theme,
-    )
+    from pypic.plotting._resolve import get_or_create_axes
+    from pypic.plotting.styles import DEFAULT, apply_grid, style_legend, use_theme
 
     if theme is None:
         theme = DEFAULT
@@ -215,11 +197,7 @@ def plot_time_series(
         labels = columns
 
     with use_theme(theme):
-        if ax is None:
-            fig, ax = plt.subplots(figsize=figsize)
-        else:
-            fig = ax.get_figure()  # type: ignore[assignment]
-            apply_theme_to_figure(fig, theme)
+        fig, ax = get_or_create_axes(theme, ax, figsize)
 
         for col, lbl in zip(columns, labels, strict=True):
             ax.plot(x, data[col], label=lbl, **kwargs)

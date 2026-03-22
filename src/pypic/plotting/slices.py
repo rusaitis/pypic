@@ -79,21 +79,20 @@ def plot_field_slice(
     tuple[Figure, Axes]
     """
     ensure_matplotlib()
-    import matplotlib.pyplot as plt
 
+    from pypic.plotting._colorbar import attach_colorbar
     from pypic.plotting._colormaps import (
         is_positive_definite,
         resolve_colormap,
         symmetric_clim,
     )
     from pypic.plotting._labels import axis_label, field_label, figure_title
-    from pypic.plotting._resolve import default_midplane, resolve_field_values
-    from pypic.plotting.styles import (
-        DEFAULT,
-        apply_grid,
-        apply_theme_to_figure,
-        use_theme,
+    from pypic.plotting._resolve import (
+        default_midplane,
+        get_or_create_axes,
+        resolve_field_values,
     )
+    from pypic.plotting.styles import DEFAULT, apply_grid, use_theme
 
     if theme is None:
         theme = DEFAULT
@@ -121,11 +120,7 @@ def plot_field_slice(
         vmin, vmax = symmetric_clim(values)
 
     with use_theme(theme):
-        if ax is None:
-            fig, ax = plt.subplots(figsize=figsize)
-        else:
-            fig = ax.get_figure()  # type: ignore[assignment]
-            apply_theme_to_figure(fig, theme)
+        fig, ax = get_or_create_axes(theme, ax, figsize)
 
         mesh = ax.pcolormesh(
             coords[0],
@@ -137,17 +132,9 @@ def plot_field_slice(
             vmax=vmax,
         )
 
-        unit_str = units if units else ""
-        if colorbar:
-            cb_label = field_label(info, unit_str=unit_str)
-            if colorbar == "inset":
-                from pypic.plotting._colorbar import add_inset_colorbar
-
-                add_inset_colorbar(ax, mesh, cb_label)
-            else:
-                from pypic.plotting._colorbar import add_colorbar
-
-                add_colorbar(fig, ax, mesh, cb_label)
+        unit_str = units or ""
+        cb_label = field_label(info, unit_str=unit_str)
+        attach_colorbar(fig, ax, mesh, cb_label, colorbar)
 
         ax.set_xlabel(axis_label(surviving_axes[0], unit_str=coord_units or ""))
         ax.set_ylabel(axis_label(surviving_axes[1], unit_str=coord_units or ""))

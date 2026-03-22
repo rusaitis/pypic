@@ -102,6 +102,7 @@ def add_inset_colorbar(
     height: float = 0.015,
     pad: float = 0.03,
     extend: str = "both",
+    extremes: ExtremesMode = "darken",
     n_ticks: int = 3,
     fontsize: float = 8,
     bg_color: str | tuple[float, ...] | None = None,
@@ -202,7 +203,8 @@ def add_inset_colorbar(
     )
     ax.add_patch(bg_patch)
 
-    # Bar sits above the tick space; label renders above via title
+    _apply_extremes(mappable, mode=extremes)
+
     bar_y = y0 + tick_space
     cax = ax.inset_axes([x0, bar_y, width, height], zorder=5)
     fig = ax.get_figure()
@@ -213,7 +215,6 @@ def add_inset_colorbar(
     cb.locator = MaxNLocator(nbins=n_ticks)
     cb.update_ticks()
 
-    # Style ticks and label — full RGBA propagates text_alpha
     tick_color = fg_rgba
     cax.tick_params(
         labelsize=fontsize,
@@ -228,6 +229,39 @@ def add_inset_colorbar(
     cb.outline.set_edgecolor((*fg_rgba[:3], 0.3))
     cax.set_facecolor("none")
 
-    _apply_extremes(mappable)
-
     return cb
+
+
+def attach_colorbar(
+    fig: Figure,
+    ax: Axes,
+    mappable: object,
+    label: str,
+    colorbar: bool | Literal["inset"],
+    *,
+    extremes: ExtremesMode = "darken",
+) -> None:
+    """Dispatch to the appropriate colorbar function, or do nothing.
+
+    Parameters
+    ----------
+    fig : Figure
+        Parent figure (used for standard colorbars).
+    ax : Axes
+        Target axes.
+    mappable : object
+        A ``ScalarMappable``.
+    label : str
+        Colorbar label.
+    colorbar : bool or "inset"
+        ``True`` for a standard side colorbar, ``"inset"`` for an
+        overlay colorbar, ``False`` to skip.
+    extremes : "darken" or "transparent"
+        How to style over/under values.
+    """
+    if not colorbar:
+        return
+    if colorbar == "inset":
+        add_inset_colorbar(ax, mappable, label, extremes=extremes)
+    else:
+        add_colorbar(fig, ax, mappable, label, extremes=extremes)

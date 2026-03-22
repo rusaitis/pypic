@@ -6,9 +6,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
-from cycler import cycler
-
-from pypic.plotting._badge import OVERLAY_BORDER_PAD
+OVERLAY_BORDER_PAD: float = 0.6
 
 if TYPE_CHECKING:
     from collections.abc import Generator
@@ -65,13 +63,18 @@ class PlotTheme:
     name : str
         Human-readable theme name.
     rcparams : dict[str, Any]
-        Full set of matplotlib rcParams to apply.
+        Full set of matplotlib rcParams to apply (must not contain
+        ``axes.prop_cycle`` — use *line_colors* instead).
     sequential_cmap : str
         Default colormap for positive-definite fields.
     diverging_cmap : str
         Default colormap for signed fields.
     grid_color : str
         Color for grid lines (``"0.0"`` black, ``"1.0"`` white).
+    line_colors : tuple[str, ...]
+        Hex color cycle for line plots. Built into an
+        ``axes.prop_cycle`` at theme-application time so that
+        ``cycler`` (a matplotlib dependency) is not required at import.
     """
 
     name: str
@@ -79,6 +82,7 @@ class PlotTheme:
     sequential_cmap: str
     diverging_cmap: str
     grid_color: str
+    line_colors: tuple[str, ...] = ()
 
 
 LIGHT = PlotTheme(
@@ -96,20 +100,14 @@ LIGHT = PlotTheme(
         "legend.facecolor": (0.0, 0.0, 0.0, 0.06),
         "legend.labelcolor": (0.15, 0.15, 0.15, 0.85),
         "legend.borderaxespad": OVERLAY_BORDER_PAD,
-        "axes.prop_cycle": cycler("color", [
-            "#1e66f5",  # blue
-            "#d20f39",  # red
-            "#40a02b",  # green
-            "#fe640b",  # orange
-            "#8839ef",  # purple
-            "#179299",  # teal
-            "#e64553",  # maroon
-            "#df8e1d",  # yellow
-        ]),
     },
     sequential_cmap="inferno",
     diverging_cmap="RdBu_r",
     grid_color="0.0",
+    line_colors=(
+        "#1e66f5", "#d20f39", "#40a02b", "#fe640b",
+        "#8839ef", "#179299", "#e64553", "#df8e1d",
+    ),
 )
 
 DARK = PlotTheme(
@@ -127,20 +125,14 @@ DARK = PlotTheme(
         "legend.facecolor": (1.0, 1.0, 1.0, 0.08),
         "legend.labelcolor": (0.8, 0.8, 0.8, 0.85),
         "legend.borderaxespad": OVERLAY_BORDER_PAD,
-        "axes.prop_cycle": cycler("color", [
-            "#7cb7ff",  # blue
-            "#f47067",  # red
-            "#96e072",  # green
-            "#f39c12",  # orange
-            "#c74ded",  # purple
-            "#00e8c6",  # cyan
-            "#ff8b6a",  # coral
-            "#ffe66d",  # yellow
-        ]),
     },
     sequential_cmap="inferno",
     diverging_cmap="RdBu_r",
     grid_color="1.0",
+    line_colors=(
+        "#7cb7ff", "#f47067", "#96e072", "#f39c12",
+        "#c74ded", "#00e8c6", "#ff8b6a", "#ffe66d",
+    ),
 )
 
 CATPPUCCIN_MOCHA = PlotTheme(
@@ -158,20 +150,14 @@ CATPPUCCIN_MOCHA = PlotTheme(
         "legend.facecolor": (0.19, 0.20, 0.27, 0.15),  # surface0
         "legend.labelcolor": (0.80, 0.84, 0.96, 0.85),  # text
         "legend.borderaxespad": OVERLAY_BORDER_PAD,
-        "axes.prop_cycle": cycler("color", [
-            "#89b4fa",  # blue
-            "#f38ba8",  # red
-            "#a6e3a1",  # green
-            "#fab387",  # peach
-            "#cba6f7",  # mauve
-            "#94e2d5",  # teal
-            "#eba0ac",  # maroon
-            "#f9e2af",  # yellow
-        ]),
     },
     sequential_cmap="inferno",
     diverging_cmap="RdBu_r",
     grid_color="#cdd6f4",
+    line_colors=(
+        "#89b4fa", "#f38ba8", "#a6e3a1", "#fab387",
+        "#cba6f7", "#94e2d5", "#eba0ac", "#f9e2af",
+    ),
 )
 
 ANUPPUCCIN_LIGHT = PlotTheme(
@@ -189,20 +175,14 @@ ANUPPUCCIN_LIGHT = PlotTheme(
         "legend.facecolor": (0.86, 0.88, 0.91, 0.15),  # mantle
         "legend.labelcolor": (0.30, 0.31, 0.41, 0.85),  # text
         "legend.borderaxespad": OVERLAY_BORDER_PAD,
-        "axes.prop_cycle": cycler("color", [
-            "#1e66f5",  # blue
-            "#d20f39",  # red
-            "#40a02b",  # green
-            "#fe640b",  # peach
-            "#8839ef",  # mauve
-            "#179299",  # teal
-            "#e64553",  # maroon
-            "#df8e1d",  # yellow
-        ]),
     },
     sequential_cmap="inferno",
     diverging_cmap="RdBu_r",
     grid_color="#4c4f69",
+    line_colors=(
+        "#1e66f5", "#d20f39", "#40a02b", "#fe640b",
+        "#8839ef", "#179299", "#e64553", "#df8e1d",
+    ),
 )
 
 ANDROMEDA = PlotTheme(
@@ -220,20 +200,14 @@ ANDROMEDA = PlotTheme(
         "legend.facecolor": (0.13, 0.14, 0.16, 0.15),  # widget bg
         "legend.labelcolor": (0.84, 0.81, 0.85, 0.85),  # text
         "legend.borderaxespad": OVERLAY_BORDER_PAD,
-        "axes.prop_cycle": cycler("color", [
-            "#00e8c6",  # cyan (signature)
-            "#7cb7ff",  # blue
-            "#f92672",  # pink
-            "#ffe66d",  # yellow
-            "#c74ded",  # purple
-            "#96e072",  # green
-            "#f39c12",  # orange
-            "#ee5d43",  # red
-        ]),
     },
     sequential_cmap="inferno",
     diverging_cmap="RdBu_r",
     grid_color="#d5ced9",
+    line_colors=(
+        "#00e8c6", "#7cb7ff", "#f92672", "#ffe66d",
+        "#c74ded", "#96e072", "#f39c12", "#ee5d43",
+    ),
 )
 
 DEFAULT = LIGHT
@@ -244,8 +218,14 @@ def use_theme(theme: PlotTheme) -> Generator[None]:
     """Temporarily apply *theme* rcParams, restoring originals on exit."""
     import matplotlib as mpl
 
-    old = {k: mpl.rcParams[k] for k in theme.rcparams if k in mpl.rcParams}
-    mpl.rcParams.update(theme.rcparams)
+    rc = dict(theme.rcparams)
+    if theme.line_colors:
+        from cycler import cycler
+
+        rc["axes.prop_cycle"] = cycler("color", list(theme.line_colors))
+
+    old = {k: mpl.rcParams[k] for k in rc if k in mpl.rcParams}
+    mpl.rcParams.update(rc)
     try:
         yield
     finally:
@@ -350,7 +330,6 @@ def style_3d_axes(
     tc_rgba = to_rgba(text_color)
     tc_rgb = tc_rgba[:3]
 
-    # --- Strip default 3D chrome ---
     ax.set_facecolor(bg_color)
     for axis in (ax.xaxis, ax.yaxis, ax.zaxis):  # type: ignore[attr-defined]
         axis.pane.fill = False
@@ -362,7 +341,6 @@ def style_3d_axes(
         axis._axinfo["grid"]["color"] = "none"
     ax.grid(False)
 
-    # --- Equatorial grid ---
     from matplotlib.ticker import MaxNLocator
 
     xlim = ax.get_xlim()
@@ -380,36 +358,33 @@ def style_3d_axes(
     label_alpha = 0.5
     label_size = 8
 
-    # Lines parallel to y
     for x in x_ticks:
         ax.plot(
             [x, x], [ylim[0], ylim[1]], [z0, z0],
             color=tc_rgb, alpha=grid_alpha, linewidth=grid_lw, zorder=0,
         )
-    # Lines parallel to x
     for y in y_ticks:
         ax.plot(
             [xlim[0], xlim[1]], [y, y], [z0, z0],
             color=tc_rgb, alpha=grid_alpha, linewidth=grid_lw, zorder=0,
         )
 
-    # --- Grid endpoint labels (skip near-zero, every other if crowded) ---
     offset_frac = 0.04
     x_range = xlim[1] - xlim[0]
     y_range = ylim[1] - ylim[0]
 
     def _label_values(ticks: list[float]) -> list[float]:
-        """Select tick values to label, skipping near-zero and thinning."""
+        """Return tick values to label, skipping near-zero and thinning."""
         if len(ticks) < 2:
             return ticks
         step = abs(ticks[1] - ticks[0]) if len(ticks) > 1 else 1.0
         filtered = [v for v in ticks if abs(v) > 0.3 * step]
         return filtered[::2] if len(filtered) > 5 else filtered
 
-    for j, x in enumerate(_label_values(x_ticks)):
+    x_labels = _label_values(x_ticks)
+    for j, x in enumerate(x_labels):
         val = f"{x:g}"
-        is_last = j == len(_label_values(x_ticks)) - 1
-        if coord_units and is_last:
+        if coord_units and j == len(x_labels) - 1:
             val += f" {coord_units}"
         ax.text(
             x, ylim[0] - y_range * offset_frac, z0,
@@ -417,10 +392,10 @@ def style_3d_axes(
             fontsize=label_size, ha="center", va="top", zorder=1,
         )
 
-    for j, y in enumerate(_label_values(y_ticks)):
+    y_labels = _label_values(y_ticks)
+    for j, y in enumerate(y_labels):
         val = f"{y:g}"
-        is_last = j == len(_label_values(y_ticks)) - 1
-        if coord_units and is_last:
+        if coord_units and j == len(y_labels) - 1:
             val += f" {coord_units}"
         ax.text(
             xlim[0] - x_range * offset_frac, y, z0,
@@ -428,13 +403,12 @@ def style_3d_axes(
             fontsize=label_size, ha="right", va="center", zorder=1,
         )
 
-    # --- Axis triad ---
     if axis_length is None:
         axis_length = 0.20 * min(x_range, y_range)
 
     arrow_alpha = 0.7
     arrow_lw = 1.0
-    label_offset = 1.3  # label position as fraction of arrow length
+    label_offset = 1.3
 
     directions = [
         (axis_length, 0.0, 0.0),
@@ -442,7 +416,6 @@ def style_3d_axes(
         (0.0, 0.0, axis_length),
     ]
     for (dx, dy, dz), lbl in zip(directions, axis_labels, strict=True):
-        # Arrow shaft
         ax.plot(
             [center[0], center[0] + dx],
             [center[1], center[1] + dy],
@@ -450,7 +423,6 @@ def style_3d_axes(
             color=tc_rgb, alpha=arrow_alpha, linewidth=arrow_lw,
             solid_capstyle="round", zorder=5,
         )
-        # Label at tip
         ax.text(
             center[0] + dx * label_offset,
             center[1] + dy * label_offset,

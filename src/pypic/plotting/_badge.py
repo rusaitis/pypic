@@ -11,8 +11,9 @@ if TYPE_CHECKING:
     from matplotlib.axes import Axes
     from matplotlib.offsetbox import AnchoredOffsetbox, DrawingArea
 
+from pypic.plotting.styles import OVERLAY_BORDER_PAD
+
 OVERLAY_BOX_STYLE = "round,pad=0.4,rounding_size=0.6"
-OVERLAY_BORDER_PAD: float = 0.6
 
 BadgeLoc = Literal[
     "upper left", "upper right", "lower left", "lower right", "upper center"
