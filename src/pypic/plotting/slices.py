@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 from pypic.plotting._guard import ensure_matplotlib
 
@@ -32,7 +32,7 @@ def plot_field_slice(
     step: int | None = None,
     time: float | None = None,
     ax: Axes | None = None,
-    colorbar: bool = True,
+    colorbar: bool | Literal["inset"] = True,
     figsize: tuple[float, float] | None = None,
 ) -> tuple[Figure, Axes]:
     r"""Plot a 2D slice of a scalar field.
@@ -139,9 +139,15 @@ def plot_field_slice(
 
         unit_str = units if units else ""
         if colorbar:
-            from pypic.plotting._colorbar import add_colorbar
+            cb_label = field_label(info, unit_str=unit_str)
+            if colorbar == "inset":
+                from pypic.plotting._colorbar import add_inset_colorbar
 
-            add_colorbar(fig, ax, mesh, field_label(info, unit_str=unit_str))
+                add_inset_colorbar(ax, mesh, cb_label)
+            else:
+                from pypic.plotting._colorbar import add_colorbar
+
+                add_colorbar(fig, ax, mesh, cb_label)
 
         ax.set_xlabel(axis_label(surviving_axes[0], unit_str=coord_units or ""))
         ax.set_ylabel(axis_label(surviving_axes[1], unit_str=coord_units or ""))

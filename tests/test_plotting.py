@@ -15,13 +15,22 @@ from pypic.plotting import (  # noqa: E402
     DARK,
     DEFAULT,
     LIGHT,
+    OVERLAY_BORDER_PAD,
     PlotTheme,
+    VectorLegendEntry,
+    add_inset_colorbar,
+    add_panel_label,
+    add_status_badge,
+    add_vector_legend,
     plot_comparison,
     plot_field_slice,
     plot_line,
+    plot_quiver,
+    plot_streamlines,
     plot_time_series,
     use_theme,
 )
+from pypic.plotting._badge import _format_status_text  # noqa: E402
 from pypic.plotting._colormaps import is_positive_definite, symmetric_clim  # noqa: E402
 from pypic.readers.base import FieldDataset, GridInfo, TabularData  # noqa: E402
 from pypic.selections import PlaneSelection  # noqa: E402
@@ -383,3 +392,621 @@ class TestPlotTimeSeries:
     def test_kwargs_passthrough(self, tabular: TabularData) -> None:
         fig, _ax = plot_time_series(tabular, "total_energy", linestyle="--")
         matplotlib.pyplot.close(fig)
+
+
+class TestPlotStreamlines:
+    def test_returns_figure_and_axes(self, ds_2d: FieldDataset) -> None:
+        fig, ax = plot_streamlines(ds_2d, "B")
+        assert isinstance(fig, Figure)
+        assert isinstance(ax, Axes)
+        matplotlib.pyplot.close(fig)
+
+    def test_auto_slices_3d(self, ds_3d: FieldDataset) -> None:
+        fig, _ax = plot_streamlines(ds_3d, "B")
+        assert isinstance(fig, Figure)
+        matplotlib.pyplot.close(fig)
+
+    def test_explicit_plane(self, ds_3d: FieldDataset) -> None:
+        plane = PlaneSelection(normal="x", index=3)
+        fig, _ax = plot_streamlines(ds_3d, "B", plane=plane)
+        assert isinstance(fig, Figure)
+        matplotlib.pyplot.close(fig)
+
+    def test_custom_axes(self, ds_2d: FieldDataset) -> None:
+        import matplotlib.pyplot as plt
+
+        _fig_ext, ax_ext = plt.subplots()
+        fig, ax = plot_streamlines(ds_2d, "B", ax=ax_ext)
+        assert ax is ax_ext
+        matplotlib.pyplot.close(fig)
+
+    def test_color_field(self, ds_2d: FieldDataset) -> None:
+        fig, _ax = plot_streamlines(ds_2d, "B", color_field="|B|")
+        assert isinstance(fig, Figure)
+        matplotlib.pyplot.close(fig)
+
+    def test_linewidth_scaling(self, ds_2d: FieldDataset) -> None:
+        fig, _ax = plot_streamlines(ds_2d, "B", linewidth=(0.3, 3.0))
+        assert isinstance(fig, Figure)
+        matplotlib.pyplot.close(fig)
+
+    def test_fixed_linewidth(self, ds_2d: FieldDataset) -> None:
+        fig, _ax = plot_streamlines(ds_2d, "B", linewidth=1.5)
+        assert isinstance(fig, Figure)
+        matplotlib.pyplot.close(fig)
+
+    def test_dark_theme(self, ds_2d: FieldDataset) -> None:
+        fig, _ax = plot_streamlines(ds_2d, "B", theme=DARK)
+        assert isinstance(fig, Figure)
+        matplotlib.pyplot.close(fig)
+
+    def test_no_colorbar(self, ds_2d: FieldDataset) -> None:
+        fig, _ax = plot_streamlines(ds_2d, "B", colorbar=False)
+        assert isinstance(fig, Figure)
+        matplotlib.pyplot.close(fig)
+
+    def test_uniform_color(self, ds_2d: FieldDataset) -> None:
+        fig, _ax = plot_streamlines(ds_2d, "B", color="black")
+        assert isinstance(fig, Figure)
+        matplotlib.pyplot.close(fig)
+
+    def test_alpha(self, ds_2d: FieldDataset) -> None:
+        fig, _ax = plot_streamlines(ds_2d, "B", color="white", alpha=0.4)
+        assert isinstance(fig, Figure)
+        matplotlib.pyplot.close(fig)
+
+    def test_alpha_with_colormap(self, ds_2d: FieldDataset) -> None:
+        fig, _ax = plot_streamlines(ds_2d, "B", alpha=0.6)
+        assert isinstance(fig, Figure)
+        matplotlib.pyplot.close(fig)
+
+    def test_arrowstyle(self, ds_2d: FieldDataset) -> None:
+        fig, _ax = plot_streamlines(ds_2d, "B", arrowstyle="->")
+        assert isinstance(fig, Figure)
+        matplotlib.pyplot.close(fig)
+
+    def test_kwargs_passthrough(self, ds_2d: FieldDataset) -> None:
+        fig, _ax = plot_streamlines(
+            ds_2d, "B", integration_direction="forward", minlength=0.2
+        )
+        assert isinstance(fig, Figure)
+        matplotlib.pyplot.close(fig)
+
+
+class TestPlotQuiver:
+    def test_returns_figure_and_axes(self, ds_2d: FieldDataset) -> None:
+        fig, ax = plot_quiver(ds_2d, "B")
+        assert isinstance(fig, Figure)
+        assert isinstance(ax, Axes)
+        matplotlib.pyplot.close(fig)
+
+    def test_auto_slices_3d(self, ds_3d: FieldDataset) -> None:
+        fig, _ax = plot_quiver(ds_3d, "B")
+        assert isinstance(fig, Figure)
+        matplotlib.pyplot.close(fig)
+
+    def test_explicit_plane(self, ds_3d: FieldDataset) -> None:
+        plane = PlaneSelection(normal="x", index=3)
+        fig, _ax = plot_quiver(ds_3d, "B", plane=plane)
+        assert isinstance(fig, Figure)
+        matplotlib.pyplot.close(fig)
+
+    def test_custom_axes(self, ds_2d: FieldDataset) -> None:
+        import matplotlib.pyplot as plt
+
+        _fig_ext, ax_ext = plt.subplots()
+        fig, ax = plot_quiver(ds_2d, "B", ax=ax_ext)
+        assert ax is ax_ext
+        matplotlib.pyplot.close(fig)
+
+    def test_color_field(self, ds_2d: FieldDataset) -> None:
+        fig, _ax = plot_quiver(ds_2d, "B", color_field="|B|")
+        assert isinstance(fig, Figure)
+        matplotlib.pyplot.close(fig)
+
+    def test_stride(self, ds_2d: FieldDataset) -> None:
+        fig, _ax = plot_quiver(ds_2d, "B", stride=2)
+        assert isinstance(fig, Figure)
+        matplotlib.pyplot.close(fig)
+
+    def test_stride_tuple(self, ds_2d: FieldDataset) -> None:
+        fig, _ax = plot_quiver(ds_2d, "B", stride=(2, 3))
+        assert isinstance(fig, Figure)
+        matplotlib.pyplot.close(fig)
+
+    def test_dark_theme(self, ds_2d: FieldDataset) -> None:
+        fig, _ax = plot_quiver(ds_2d, "B", theme=DARK)
+        assert isinstance(fig, Figure)
+        matplotlib.pyplot.close(fig)
+
+    def test_no_colorbar(self, ds_2d: FieldDataset) -> None:
+        fig, _ax = plot_quiver(ds_2d, "B", colorbar=False)
+        assert isinstance(fig, Figure)
+        matplotlib.pyplot.close(fig)
+
+    def test_uniform_color(self, ds_2d: FieldDataset) -> None:
+        fig, _ax = plot_quiver(ds_2d, "B", color="black", stride=2)
+        assert isinstance(fig, Figure)
+        matplotlib.pyplot.close(fig)
+
+    def test_alpha(self, ds_2d: FieldDataset) -> None:
+        fig, _ax = plot_quiver(ds_2d, "B", color="gray", alpha=0.5, stride=2)
+        assert isinstance(fig, Figure)
+        matplotlib.pyplot.close(fig)
+
+    def test_alpha_with_colormap(self, ds_2d: FieldDataset) -> None:
+        fig, _ax = plot_quiver(ds_2d, "B", alpha=0.6)
+        assert isinstance(fig, Figure)
+        matplotlib.pyplot.close(fig)
+
+    def test_kwargs_passthrough(self, ds_2d: FieldDataset) -> None:
+        fig, _ax = plot_quiver(
+            ds_2d, "B", headwidth=5, headlength=6, pivot="mid"
+        )
+        assert isinstance(fig, Figure)
+        matplotlib.pyplot.close(fig)
+
+
+class TestStatusBadge:
+    """Tests for add_status_badge and _format_status_text."""
+
+    def test_step_only(self) -> None:
+        text = _format_status_text(
+            step=42, time=None, time_units="", step_range=None
+        )
+        assert text == "step 42"
+
+    def test_time_only(self) -> None:
+        text = _format_status_text(
+            step=None, time=3.14, time_units="", step_range=None
+        )
+        assert text == "t = 3.14"
+
+    def test_custom_label_step(self) -> None:
+        text = _format_status_text(
+            step=100, time=None, time_units="", step_range=None, label="cycle"
+        )
+        assert text == "cycle 100"
+
+    def test_empty_label_step(self) -> None:
+        text = _format_status_text(
+            step=100, time=None, time_units="", step_range=None, label=""
+        )
+        assert text == "100"
+
+    def test_show_max_true(self) -> None:
+        text = _format_status_text(
+            step=100, time=None, time_units="", step_range=(0, 500), show_max=True
+        )
+        assert text == "step 100 / 500"
+
+    def test_show_max_false(self) -> None:
+        text = _format_status_text(
+            step=100, time=None, time_units="", step_range=(0, 500), show_max=False
+        )
+        assert text == "step 100"
+
+    def test_custom_label_with_max(self) -> None:
+        text = _format_status_text(
+            step=100,
+            time=None,
+            time_units="",
+            step_range=(0, 500),
+            label="cycle",
+            show_max=True,
+        )
+        assert text == "cycle 100 / 500"
+
+    def test_empty_label_with_max(self) -> None:
+        text = _format_status_text(
+            step=100, time=None, time_units="", step_range=(0, 500), label=""
+        )
+        assert text == "100 / 500"
+
+    def test_time_custom_label(self) -> None:
+        text = _format_status_text(
+            step=None, time=3.14, time_units="", step_range=None, label="time"
+        )
+        assert text == "time = 3.14"
+
+    def test_time_empty_label(self) -> None:
+        text = _format_status_text(
+            step=None, time=3.14, time_units="", step_range=None, label=""
+        )
+        assert text == "3.14"
+
+    def test_both_step_and_time(self) -> None:
+        text = _format_status_text(
+            step=100, time=5.0, time_units="", step_range=None
+        )
+        assert text == "step 100, t = 5.00"
+
+    def test_both_with_custom_label(self) -> None:
+        """label replaces step prefix; time keeps 't'."""
+        text = _format_status_text(
+            step=100, time=5.0, time_units="ns", step_range=None, label="cycle"
+        )
+        assert text == "cycle 100, t = 5.00 ns"
+
+    def test_no_step_no_time_raises(self) -> None:
+        import matplotlib.pyplot as plt
+
+        fig, ax = plt.subplots()
+        with pytest.raises(ValueError, match="At least one"):
+            add_status_badge(ax)
+        plt.close(fig)
+
+    def test_custom_bg_color(self) -> None:
+        import matplotlib.pyplot as plt
+
+        fig, ax = plt.subplots()
+        box = add_status_badge(ax, step=1, bg_color="red", bg_alpha=0.5)
+        fc = box.patch.get_facecolor()
+        np.testing.assert_allclose(fc[:3], (1.0, 0.0, 0.0), atol=0.01)
+        np.testing.assert_allclose(fc[3], 0.5, atol=0.01)
+        plt.close(fig)
+
+    def test_default_dark_mode(self) -> None:
+        """Default dark_mode=True: black bg at alpha 0.65, white text."""
+        import matplotlib.pyplot as plt
+
+        fig, ax = plt.subplots()
+        box = add_status_badge(ax, step=1)
+        fc = box.patch.get_facecolor()
+        np.testing.assert_allclose(fc[:3], (0.0, 0.0, 0.0), atol=0.01)
+        np.testing.assert_allclose(fc[3], 0.65, atol=0.01)
+        plt.close(fig)
+
+    def test_light_mode(self) -> None:
+        """dark_mode=False: white bg, black text."""
+        import matplotlib.pyplot as plt
+
+        fig, ax = plt.subplots()
+        box = add_status_badge(ax, step=1, dark_mode=False)
+        fc = box.patch.get_facecolor()
+        np.testing.assert_allclose(fc[:3], (1.0, 1.0, 1.0), atol=0.01)
+        plt.close(fig)
+
+    def test_badge_renders_on_axes(self, ds_2d: FieldDataset) -> None:
+        fig, ax = plot_field_slice(ds_2d, "B1")
+        box = add_status_badge(ax, step=42)
+        assert box in ax.artists
+        matplotlib.pyplot.close(fig)
+
+
+class TestInsetColorbar:
+    """Tests for add_inset_colorbar."""
+
+    @pytest.fixture
+    def mesh_on_ax(self) -> tuple:
+        """Create an axes with a pcolormesh for testing."""
+        import matplotlib.pyplot as plt
+
+        fig, ax = plt.subplots()
+        rng = np.random.default_rng(42)
+        data = rng.standard_normal((10, 8))
+        mesh = ax.pcolormesh(data)
+        return fig, ax, mesh
+
+    def test_returns_colorbar(self, mesh_on_ax: tuple) -> None:
+        from matplotlib.colorbar import Colorbar
+
+        fig, ax, mesh = mesh_on_ax
+        cb = add_inset_colorbar(ax, mesh, "test")
+        assert isinstance(cb, Colorbar)
+        matplotlib.pyplot.close(fig)
+
+    def test_light_mode_default(self, mesh_on_ax: tuple) -> None:
+        """Default dark_mode=False: white bg patch at alpha 0.65."""
+        fig, ax, mesh = mesh_on_ax
+        add_inset_colorbar(ax, mesh)
+        bg_patch = ax.patches[-1]
+        fc = bg_patch.get_facecolor()
+        np.testing.assert_allclose(fc[:3], (1.0, 1.0, 1.0), atol=0.01)
+        np.testing.assert_allclose(fc[3], 0.65, atol=0.01)
+        matplotlib.pyplot.close(fig)
+
+    def test_dark_mode(self, mesh_on_ax: tuple) -> None:
+        fig, ax, mesh = mesh_on_ax
+        add_inset_colorbar(ax, mesh, dark_mode=True)
+        bg_patch = ax.patches[-1]
+        fc = bg_patch.get_facecolor()
+        np.testing.assert_allclose(fc[:3], (0.0, 0.0, 0.0), atol=0.01)
+        np.testing.assert_allclose(fc[3], 0.65, atol=0.01)
+        matplotlib.pyplot.close(fig)
+
+    def test_custom_colors(self, mesh_on_ax: tuple) -> None:
+        from matplotlib.colors import to_rgba
+
+        fig, ax, mesh = mesh_on_ax
+        add_inset_colorbar(ax, mesh, bg_color="navy", text_color="gold")
+        bg_patch = ax.patches[-1]
+        fc = bg_patch.get_facecolor()
+        expected_bg = to_rgba("navy")
+        np.testing.assert_allclose(fc[:3], expected_bg[:3], atol=0.01)
+        matplotlib.pyplot.close(fig)
+
+    @pytest.mark.parametrize(
+        "loc",
+        ["upper left", "upper right", "lower left", "lower right", "upper center"],
+    )
+    def test_all_locs(self, loc: str, mesh_on_ax: tuple) -> None:
+        fig, ax, mesh = mesh_on_ax
+        cb = add_inset_colorbar(ax, mesh, loc=loc)
+        assert cb is not None
+        matplotlib.pyplot.close(fig)
+
+    def test_n_ticks(self, mesh_on_ax: tuple) -> None:
+        fig, ax, mesh = mesh_on_ax
+        cb = add_inset_colorbar(ax, mesh, n_ticks=2)
+        fig.canvas.draw()
+        tick_labels = cb.ax.get_xticklabels()
+        visible = [t for t in tick_labels if t.get_text()]
+        assert len(visible) <= 4
+        matplotlib.pyplot.close(fig)
+
+    def test_via_plot_field_slice(self, ds_2d: FieldDataset) -> None:
+        fig, ax = plot_field_slice(ds_2d, "B1", colorbar="inset")
+        assert isinstance(fig, Figure)
+        assert isinstance(ax, Axes)
+        matplotlib.pyplot.close(fig)
+
+    def test_via_streamlines(self, ds_2d: FieldDataset) -> None:
+        fig, ax = plot_streamlines(ds_2d, "B", colorbar="inset")
+        assert isinstance(fig, Figure)
+        assert isinstance(ax, Axes)
+        matplotlib.pyplot.close(fig)
+
+    def test_via_quiver(self, ds_2d: FieldDataset) -> None:
+        fig, ax = plot_quiver(ds_2d, "B", colorbar="inset")
+        assert isinstance(fig, Figure)
+        assert isinstance(ax, Axes)
+        matplotlib.pyplot.close(fig)
+
+
+class TestVectorLegend:
+    """Tests for VectorLegendEntry and add_vector_legend."""
+
+    def test_single_entry(self) -> None:
+        import matplotlib.pyplot as plt
+
+        fig, ax = plt.subplots()
+        entry = VectorLegendEntry(label="B", color="black")
+        box = add_vector_legend(ax, entry)
+        assert box in ax.artists
+        plt.close(fig)
+
+    def test_multiple_entries(self) -> None:
+        import matplotlib.pyplot as plt
+
+        fig, ax = plt.subplots()
+        entries = [
+            VectorLegendEntry(label="B", color="black"),
+            VectorLegendEntry(label="V", color="red", linewidth=2.0),
+        ]
+        box = add_vector_legend(ax, entries)
+        assert box in ax.artists
+        plt.close(fig)
+
+    def test_dark_mode(self) -> None:
+        import matplotlib.pyplot as plt
+
+        fig, ax = plt.subplots()
+        entry = VectorLegendEntry(label="B", color="white")
+        box = add_vector_legend(ax, entry, dark_mode=True)
+        fc = box.patch.get_facecolor()
+        np.testing.assert_allclose(fc[:3], (0.0, 0.0, 0.0), atol=0.01)
+        plt.close(fig)
+
+    def test_light_mode(self) -> None:
+        import matplotlib.pyplot as plt
+
+        fig, ax = plt.subplots()
+        entry = VectorLegendEntry(label="B", color="black")
+        box = add_vector_legend(ax, entry, dark_mode=False)
+        fc = box.patch.get_facecolor()
+        np.testing.assert_allclose(fc[:3], (1.0, 1.0, 1.0), atol=0.01)
+        plt.close(fig)
+
+    def test_custom_colors(self) -> None:
+        import matplotlib.pyplot as plt
+
+        fig, ax = plt.subplots()
+        entry = VectorLegendEntry(label="B", color="black")
+        box = add_vector_legend(ax, entry, bg_color="navy", text_color="gold")
+        fc = box.patch.get_facecolor()
+        from matplotlib.colors import to_rgba
+
+        np.testing.assert_allclose(fc[:3], to_rgba("navy")[:3], atol=0.01)
+        plt.close(fig)
+
+    def test_auto_legend_on_streamlines(self, ds_2d: FieldDataset) -> None:
+        fig, ax = plot_streamlines(ds_2d, "B", color="black")
+        legend_boxes = [a for a in ax.artists if hasattr(a, "patch")]
+        assert len(legend_boxes) >= 1
+        matplotlib.pyplot.close(fig)
+
+    def test_auto_legend_on_quiver(self, ds_2d: FieldDataset) -> None:
+        fig, ax = plot_quiver(ds_2d, "B", color="black", stride=2)
+        legend_boxes = [a for a in ax.artists if hasattr(a, "patch")]
+        assert len(legend_boxes) >= 1
+        matplotlib.pyplot.close(fig)
+
+    def test_legend_false_disables(self, ds_2d: FieldDataset) -> None:
+        fig, ax = plot_streamlines(ds_2d, "B", color="black", legend=False)
+        legend_boxes = [a for a in ax.artists if hasattr(a, "patch")]
+        assert len(legend_boxes) == 0
+        matplotlib.pyplot.close(fig)
+
+    def test_custom_legend_label(self, ds_2d: FieldDataset) -> None:
+        fig, ax = plot_streamlines(
+            ds_2d, "B", color="black", legend="Magnetic field"
+        )
+        legend_boxes = [a for a in ax.artists if hasattr(a, "patch")]
+        assert len(legend_boxes) >= 1
+        matplotlib.pyplot.close(fig)
+
+
+class TestPanelLabel:
+    """Tests for add_panel_label."""
+
+    def test_returns_anchored_offsetbox(self) -> None:
+        import matplotlib.pyplot as plt
+        from matplotlib.offsetbox import AnchoredOffsetbox
+
+        fig, ax = plt.subplots()
+        box = add_panel_label(ax, "a")
+        assert isinstance(box, AnchoredOffsetbox)
+        assert box in ax.artists
+        plt.close(fig)
+
+    def test_dark_mode(self) -> None:
+        import matplotlib.pyplot as plt
+
+        fig, ax = plt.subplots()
+        box = add_panel_label(ax, "a", dark_mode=True)
+        fc = box.patch.get_facecolor()
+        np.testing.assert_allclose(fc[:3], (0.0, 0.0, 0.0), atol=0.01)
+        plt.close(fig)
+
+    def test_light_mode(self) -> None:
+        import matplotlib.pyplot as plt
+
+        fig, ax = plt.subplots()
+        box = add_panel_label(ax, "a", dark_mode=False)
+        fc = box.patch.get_facecolor()
+        np.testing.assert_allclose(fc[:3], (1.0, 1.0, 1.0), atol=0.01)
+        plt.close(fig)
+
+    def test_custom_colors(self) -> None:
+        import matplotlib.pyplot as plt
+        from matplotlib.colors import to_rgba
+
+        fig, ax = plt.subplots()
+        box = add_panel_label(ax, "b", bg_color="red", text_color="white")
+        fc = box.patch.get_facecolor()
+        np.testing.assert_allclose(fc[:3], to_rgba("red")[:3], atol=0.01)
+        plt.close(fig)
+
+    @pytest.mark.parametrize(
+        "loc",
+        ["upper left", "upper right", "lower left", "lower right", "upper center"],
+    )
+    def test_all_locs(self, loc: str) -> None:
+        import matplotlib.pyplot as plt
+
+        fig, ax = plt.subplots()
+        box = add_panel_label(ax, "c", loc=loc)
+        assert box in ax.artists
+        plt.close(fig)
+
+    def test_multi_panel_grid(self) -> None:
+        import matplotlib.pyplot as plt
+
+        fig, axes = plt.subplots(1, 3)
+        labels = ["a", "b", "c"]
+        for ax, label in zip(axes, labels, strict=True):
+            box = add_panel_label(ax, label)
+            assert box in ax.artists
+        plt.close(fig)
+
+
+class TestOverlayTextAlpha:
+    """Text alpha propagation for all overlay elements."""
+
+    def test_badge_default_text_alpha(self) -> None:
+        import matplotlib.pyplot as plt
+
+        fig, ax = plt.subplots()
+        box = add_status_badge(ax, step=1)
+        text_area = box.get_child()
+        color = text_area._text.get_color()
+        assert len(color) == 4
+        np.testing.assert_allclose(color[3], 0.85, atol=0.01)
+        plt.close(fig)
+
+    def test_badge_explicit_text_alpha(self) -> None:
+        import matplotlib.pyplot as plt
+
+        fig, ax = plt.subplots()
+        box = add_status_badge(ax, step=1, text_alpha=1.0)
+        text_area = box.get_child()
+        color = text_area._text.get_color()
+        np.testing.assert_allclose(color[3], 1.0, atol=0.01)
+        plt.close(fig)
+
+    def test_panel_label_default_text_alpha(self) -> None:
+        import matplotlib.pyplot as plt
+
+        fig, ax = plt.subplots()
+        box = add_panel_label(ax, "a")
+        text_area = box.get_child()
+        color = text_area._text.get_color()
+        assert len(color) == 4
+        np.testing.assert_allclose(color[3], 0.85, atol=0.01)
+        plt.close(fig)
+
+    def test_vector_legend_default_text_alpha(self) -> None:
+        import matplotlib.pyplot as plt
+
+        fig, ax = plt.subplots()
+        entry = VectorLegendEntry(label="B", color="black")
+        box = add_vector_legend(ax, entry)
+        # Single entry: child is an HPacker containing [DrawingArea, TextArea]
+        hpacker = box.get_child()
+        text_area = hpacker.get_children()[1]
+        color = text_area._text.get_color()
+        assert len(color) == 4
+        np.testing.assert_allclose(color[3], 0.85, atol=0.01)
+        plt.close(fig)
+
+    def test_inset_colorbar_default_text_alpha(self) -> None:
+        import matplotlib.pyplot as plt
+
+        fig, ax = plt.subplots()
+        rng = np.random.default_rng(42)
+        mesh = ax.pcolormesh(rng.standard_normal((10, 8)))
+        cb = add_inset_colorbar(ax, mesh, "test")
+        fig.canvas.draw()
+        tick_labels = cb.ax.get_xticklabels()
+        visible = [t for t in tick_labels if t.get_text()]
+        if visible:
+            color = visible[0].get_color()
+            np.testing.assert_allclose(color[3], 0.85, atol=0.01)
+        plt.close(fig)
+
+
+class TestOverlayBorderPad:
+    """OVERLAY_BORDER_PAD used consistently across overlays."""
+
+    def test_constant_value(self) -> None:
+        assert OVERLAY_BORDER_PAD == 0.6
+
+    def test_badge_uses_constant(self) -> None:
+        import matplotlib.pyplot as plt
+
+        fig, ax = plt.subplots()
+        box = add_status_badge(ax, step=1)
+        assert box.borderpad == OVERLAY_BORDER_PAD
+        plt.close(fig)
+
+    def test_panel_label_uses_constant(self) -> None:
+        import matplotlib.pyplot as plt
+
+        fig, ax = plt.subplots()
+        box = add_panel_label(ax, "a")
+        assert box.borderpad == OVERLAY_BORDER_PAD
+        plt.close(fig)
+
+    def test_vector_legend_uses_constant(self) -> None:
+        import matplotlib.pyplot as plt
+
+        fig, ax = plt.subplots()
+        entry = VectorLegendEntry(label="B", color="black")
+        box = add_vector_legend(ax, entry)
+        assert box.borderpad == OVERLAY_BORDER_PAD
+        plt.close(fig)
+
+    def test_legend_borderaxespad_in_themes(self) -> None:
+        assert LIGHT.rcparams["legend.borderaxespad"] == OVERLAY_BORDER_PAD
+        assert DARK.rcparams["legend.borderaxespad"] == OVERLAY_BORDER_PAD

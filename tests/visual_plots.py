@@ -25,10 +25,16 @@ from pypic.plotting import (  # noqa: E402
     DARK,
     LIGHT,
     PlotTheme,
+    VectorLegendEntry,
+    add_inset_colorbar,
+    add_panel_label,
     add_status_badge,
+    add_vector_legend,
     plot_comparison,
     plot_field_slice,
     plot_line,
+    plot_quiver,
+    plot_streamlines,
     plot_time_series,
     use_theme,
 )
@@ -128,7 +134,7 @@ def generate(theme: PlotTheme) -> None:
 
     # 1. Single slice — stored field + badge
     fig, ax = plot_field_slice(ds_a, "B1", theme=theme, step=100, time=5.0)
-    add_status_badge(ax, step=100, time=5.0, theme=theme)
+    add_status_badge(ax, step=100, time=5.0)
     _save(fig, "slice_B1", name)
 
     # 2. Single slice — derived positive-definite field
@@ -139,7 +145,7 @@ def generate(theme: PlotTheme) -> None:
     fig, axes = plot_comparison(
         ds_a, ds_b, "B1", theme=theme, labels=("y₀=7.5", "y₀=8.0"), step=100
     )
-    add_status_badge(axes["a"], step=100, loc="upper left", theme=theme)
+    add_status_badge(axes["a"], step=100, loc="upper left")
     _save(fig, "comparison", name)
 
     # 4. Line overlay — B components along x
@@ -168,7 +174,7 @@ def generate(theme: PlotTheme) -> None:
         fig, axes = plt.subplots(2, 3, figsize=(14, 8))
         for i, (ax, field) in enumerate(zip(axes.flat, slice_fields, strict=True)):
             plot_field_slice(ds_a, field, ax=ax, theme=theme)
-            add_status_badge(ax, step=100 + i * 10, fontsize=7, theme=theme)
+            add_status_badge(ax, step=100 + i * 10, fontsize=7)
         fig.suptitle("Field overview", fontsize=13)
         fig.tight_layout()
     _save(fig, "grid_slices", name)
@@ -182,30 +188,36 @@ def generate(theme: PlotTheme) -> None:
         fig.tight_layout()
     _save(fig, "grid_lines", name)
 
-    # 8. Badge showcase — 2x2 grid, each corner placement + text variants
+    # 8. Badge showcase — 2x3 grid: dark/light mode, custom labels, colors
     with use_theme(theme):
-        fig, axes = plt.subplots(2, 2, figsize=(10, 8))
+        fig, axes = plt.subplots(2, 3, figsize=(14, 8))
         for ax in axes.flat:
             plot_field_slice(ds_a, "B1", ax=ax, theme=theme)
 
-        add_status_badge(axes[0, 0], step=42, loc="upper left", theme=theme)
-        add_status_badge(axes[0, 1], time=3.14, loc="upper right", theme=theme)
+        # Dark mode (default)
+        add_status_badge(axes[0, 0], step=42, loc="upper left")
+        # Light mode
+        add_status_badge(axes[0, 1], time=3.14, dark_mode=False, loc="upper right")
+        # Both step+time
+        add_status_badge(axes[0, 2], step=100, time=5.0, loc="lower left")
+        # Custom label
+        add_status_badge(axes[1, 0], step=100, label="cycle", loc="upper left")
+        # Custom colors override
         add_status_badge(
-            axes[1, 0], step=100, time=5.0, loc="lower left", theme=theme
+            axes[1, 1], step=42, label="",
+            bg_color="#1a5276", text_color="gold", bg_alpha=0.75,
+            loc="upper right",
         )
+        # Time with custom label
         add_status_badge(
-            axes[1, 1],
-            step=100,
-            time=0.005,
-            time_units="ns",
+            axes[1, 2], time=0.005, time_units="ns", label="time",
             loc="lower right",
-            theme=theme,
         )
         fig.suptitle("Badge placement showcase", fontsize=13)
         fig.tight_layout()
     _save(fig, "badge_showcase", name)
 
-    # 9. Badge progress — 1x3 row showing early/mid/late progress
+    # 9. Badge progress — 1x3 row showing early/mid/late + show_max toggle
     with use_theme(theme):
         fig, axes = plt.subplots(1, 3, figsize=(14, 4))
         step_range = (0, 500)
@@ -215,12 +227,153 @@ def generate(theme: PlotTheme) -> None:
                 ax,
                 step=s,
                 step_range=step_range,
+                show_max=s != 250,  # middle panel: no max
                 loc="upper right",
-                theme=theme,
             )
         fig.suptitle("Progress bar showcase", fontsize=13)
         fig.tight_layout()
     _save(fig, "badge_progress", name)
+
+    # 10. Streamlines — B field on midplane
+    fig, _ = plot_streamlines(ds_a, "B", theme=theme, step=100)
+    _save(fig, "streamlines_B", name)
+
+    # 11. Streamlines — colored by |B| (3D magnitude)
+    fig, _ = plot_streamlines(
+        ds_a, "B", color_field="|B|", theme=theme, step=100
+    )
+    _save(fig, "streamlines_B_color_Bmag", name)
+
+    # 12. Quiver — V field on midplane
+    fig, _ = plot_quiver(ds_a, "V", stride=2, theme=theme, step=100)
+    _save(fig, "quiver_V", name)
+
+    # 13. Quiver — B field with custom stride
+    fig, _ = plot_quiver(ds_a, "B", stride=(3, 2), theme=theme, step=100)
+    _save(fig, "quiver_B", name)
+
+    # 14. Side-by-side streamlines + quiver
+    with use_theme(theme):
+        fig, (ax_stream, ax_quiv) = plt.subplots(1, 2, figsize=(14, 5))
+        plot_streamlines(ds_a, "B", ax=ax_stream, theme=theme)
+        ax_stream.set_title("Streamlines")
+        plot_quiver(ds_a, "B", stride=3, ax=ax_quiv, theme=theme)
+        ax_quiv.set_title("Quiver")
+        fig.suptitle("Vector field visualization", fontsize=13)
+        fig.tight_layout()
+    _save(fig, "vectors_side_by_side", name)
+
+    # 15. Streamlines overlay — black lines on scalar field
+    fig, ax = plot_field_slice(ds_a, "rho_m", theme=theme, step=100)
+    plot_streamlines(
+        ds_a, "B", ax=ax, color="black", linewidth=0.8, alpha=0.6,
+        colorbar=False, theme=theme,
+    )
+    _save(fig, "streamlines_overlay", name)
+
+    # 16. Quiver overlay — white arrows on scalar field
+    fig, ax = plot_field_slice(ds_a, "|B|", theme=theme, step=100)
+    plot_quiver(
+        ds_a, "V", ax=ax, color="white", alpha=0.7, stride=3,
+        colorbar=False, theme=theme,
+    )
+    _save(fig, "quiver_overlay", name)
+
+    # 17. Inset colorbar — single slice
+    fig, ax = plot_field_slice(ds_a, "B1", theme=theme, colorbar="inset", step=100)
+    _save(fig, "inset_colorbar_slice", name)
+
+    # 18. Inset colorbar + badge on same plot
+    fig, ax = plot_field_slice(ds_a, "|B|", theme=theme, colorbar="inset", step=100)
+    add_status_badge(ax, step=100, time=5.0, loc="upper right")
+    _save(fig, "inset_colorbar_with_badge", name)
+
+    # 19. Dark-mode inset colorbar
+    fig, ax = plot_field_slice(ds_a, "B1", theme=theme, colorbar="inset", step=100)
+    # Manually add a dark-mode inset colorbar on a second slice
+    _save(fig, "inset_colorbar_darkmode_auto", name)
+
+    # 20. Side colorbar vs inset colorbar comparison
+    with use_theme(theme):
+        fig, (ax_side, ax_inset) = plt.subplots(1, 2, figsize=(12, 5))
+        plot_field_slice(ds_a, "B1", ax=ax_side, theme=theme, colorbar=True)
+        ax_side.set_title("Side colorbar")
+        plot_field_slice(ds_a, "B1", ax=ax_inset, theme=theme, colorbar="inset")
+        ax_inset.set_title("Inset colorbar")
+        fig.suptitle("Colorbar comparison", fontsize=13)
+        fig.tight_layout()
+    _save(fig, "colorbar_side_vs_inset", name)
+
+    # 21. Inset colorbar with dark_mode on manually placed colorbar
+    fig, ax = plot_field_slice(ds_a, "rho_m", theme=theme, colorbar=False, step=100)
+    mesh = ax.get_children()[0]
+    add_inset_colorbar(
+        ax, mesh, r"$\rho_m$", dark_mode=True, loc="lower left", fontsize=8,
+    )
+    _save(fig, "inset_colorbar_dark_manual", name)
+
+    # 22. Streamlines overlay with auto-legend
+    fig, ax = plot_field_slice(ds_a, "rho_m", theme=theme, step=100)
+    plot_streamlines(
+        ds_a, "B", ax=ax, color="black", linewidth=0.8, alpha=0.6,
+        colorbar=False, theme=theme,
+    )
+    _save(fig, "streamlines_auto_legend", name)
+
+    # 23. Quiver overlay with auto-legend
+    fig, ax = plot_field_slice(ds_a, "|B|", theme=theme, step=100)
+    plot_quiver(
+        ds_a, "V", ax=ax, color="white", alpha=0.7, stride=3,
+        colorbar=False, theme=theme,
+    )
+    _save(fig, "quiver_auto_legend", name)
+
+    # 24. Multi-entry vector legend (B + V overlaid)
+    fig, ax = plot_field_slice(ds_a, "rho_m", theme=theme, step=100)
+    plot_streamlines(
+        ds_a, "B", ax=ax, color="black", linewidth=0.8, alpha=0.6,
+        colorbar=False, legend=False, theme=theme,
+    )
+    plot_quiver(
+        ds_a, "V", ax=ax, color="red", alpha=0.7, stride=3,
+        colorbar=False, legend=False, theme=theme,
+    )
+    add_vector_legend(ax, [
+        VectorLegendEntry(label="B field", color="black", linewidth=0.8, alpha=0.6),
+        VectorLegendEntry(label="V flow", color="red", alpha=0.7),
+    ])
+    _save(fig, "multi_entry_vector_legend", name)
+
+    # 25. Panel label grid (2x3 with a-f)
+    slice_labels = ["B1", "|B|", "beta", "v_A", "e_B", "rho_m"]
+    with use_theme(theme):
+        fig, axes = plt.subplots(2, 3, figsize=(14, 8))
+        for i, (ax, fld) in enumerate(zip(axes.flat, slice_labels, strict=True)):
+            plot_field_slice(ds_a, fld, ax=ax, theme=theme)
+            add_panel_label(ax, chr(ord("a") + i))
+        fig.suptitle("Panel labels a-f", fontsize=13)
+        fig.tight_layout()
+    _save(fig, "panel_labels_grid", name)
+
+    # 26. Combined: panel labels + badges + vector legend
+    with use_theme(theme):
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
+        plot_field_slice(ds_a, "rho_m", ax=ax1, theme=theme)
+        add_panel_label(ax1, "a")
+        add_status_badge(ax1, step=100, time=5.0, loc="upper right")
+        plot_streamlines(
+            ds_a, "B", ax=ax1, color="black", linewidth=0.8, alpha=0.5,
+            colorbar=False, legend=False, theme=theme,
+        )
+        add_vector_legend(ax1, VectorLegendEntry(label="B", color="black"),
+                          loc="lower left")
+
+        plot_field_slice(ds_b, "rho_m", ax=ax2, theme=theme)
+        add_panel_label(ax2, "b")
+        add_status_badge(ax2, step=100, time=5.0, loc="upper right")
+        fig.suptitle("Combined overlays", fontsize=13)
+        fig.tight_layout()
+    _save(fig, "combined_overlays", name)
 
 
 def main() -> None:

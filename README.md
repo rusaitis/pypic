@@ -26,6 +26,11 @@ uv run ruff format --check src tests  # format check
 uv run mypy src                       # type check
 ```
 
+Interactive 3D dipole with field line tracing and Bz slice:
+```sh
+uv run python tests/visual_dipole_3d.py
+```
+
 Optional dead code test using vulture:
 ```
 uv run vulture src/

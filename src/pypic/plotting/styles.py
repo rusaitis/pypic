@@ -6,6 +6,8 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
+from pypic.plotting._badge import OVERLAY_BORDER_PAD
+
 if TYPE_CHECKING:
     from collections.abc import Generator
 
@@ -48,6 +50,7 @@ _COMMON_RC: dict[str, Any] = {
     "axes.spines.bottom": False,
     "axes.spines.top": False,
     "axes.spines.right": False,
+    "axes3d.mouserotationstyle": "azel",
 }
 
 
@@ -89,7 +92,8 @@ LIGHT = PlotTheme(
         "xtick.color": "0.4",
         "ytick.color": "0.4",
         "legend.facecolor": (0.0, 0.0, 0.0, 0.06),
-        "legend.labelcolor": "0.25",
+        "legend.labelcolor": (0.15, 0.15, 0.15, 0.85),
+        "legend.borderaxespad": OVERLAY_BORDER_PAD,
     },
     sequential_cmap="inferno",
     diverging_cmap="RdBu_r",
@@ -109,7 +113,8 @@ DARK = PlotTheme(
         "xtick.color": "#888888",
         "ytick.color": "#888888",
         "legend.facecolor": (1.0, 1.0, 1.0, 0.08),
-        "legend.labelcolor": "#cccccc",
+        "legend.labelcolor": (0.8, 0.8, 0.8, 0.85),
+        "legend.borderaxespad": OVERLAY_BORDER_PAD,
     },
     sequential_cmap="inferno",
     diverging_cmap="RdBu_r",
