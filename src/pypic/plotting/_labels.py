@@ -28,8 +28,8 @@ def axis_label(axis_name: str, *, unit_str: str = "") -> str:
     return label
 
 
-def colorbar_label(info: FieldInfo, *, unit_str: str = "") -> str:
-    """Build a colorbar label from field metadata.
+def field_label(info: FieldInfo, *, unit_str: str = "") -> str:
+    """Build a field label from metadata (colorbars, y-axes, etc.).
 
     Parameters
     ----------

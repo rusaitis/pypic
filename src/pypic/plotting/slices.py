@@ -87,28 +87,19 @@ def plot_field_slice(
         resolve_colormap,
         symmetric_clim,
     )
-    from pypic.plotting._labels import axis_label, colorbar_label, figure_title
+    from pypic.plotting._labels import axis_label, field_label, figure_title
+    from pypic.plotting._resolve import default_midplane, resolve_field_values
     from pypic.plotting.styles import DEFAULT, use_theme
 
     if theme is None:
         theme = DEFAULT
 
-    ndim = len(data.grid.dimensions)
-    if ndim == 3 and plane is None:
-        from pypic.selections import PlaneSelection
-
-        normal = data.grid.geometry.axis_names[2]
-        plane = PlaneSelection(normal=normal)
-
+    if plane is None:
+        plane = default_midplane(data)
     if plane is not None:
         data = plane.apply(data)
 
-    if data.has_field(field):
-        values = data.in_units(field, units) if units else data[field]
-    else:
-        values = data.compute(field)
-        if units:
-            values = data.in_units(field, units)
+    values = resolve_field_values(data, field, units)
 
     info = data.field_info(field)
     coords = data.grid.coordinate_arrays()
@@ -143,7 +134,7 @@ def plot_field_slice(
 
         unit_str = units if units else ""
         if colorbar:
-            _add_colorbar(fig, ax, mesh, colorbar_label(info, unit_str=unit_str))
+            _add_colorbar(fig, ax, mesh, field_label(info, unit_str=unit_str))
 
         ax.set_xlabel(axis_label(surviving_axes[0], unit_str=coord_units or ""))
         ax.set_ylabel(axis_label(surviving_axes[1], unit_str=coord_units or ""))
@@ -153,6 +144,8 @@ def plot_field_slice(
             ax.set_title(title)
         else:
             ax.set_title(figure_title(info, step=step, time=time))
+
+        fig.tight_layout()
 
     return fig, ax
 

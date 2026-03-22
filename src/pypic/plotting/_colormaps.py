@@ -118,4 +118,6 @@ def symmetric_clim(data: FloatArray) -> tuple[float, float]:
         ``(-absmax, absmax)``
     """
     absmax = float(np.nanmax(np.abs(data)))
+    if not np.isfinite(absmax):
+        return (0.0, 0.0)
     return (-absmax, absmax)

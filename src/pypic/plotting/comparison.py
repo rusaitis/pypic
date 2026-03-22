@@ -14,7 +14,6 @@ if TYPE_CHECKING:
     from pypic.plotting.styles import PlotTheme
     from pypic.readers.base import FieldDataset
     from pypic.selections import PlaneSelection
-    from pypic.types import FloatArray
 
 
 def plot_comparison(
@@ -79,33 +78,21 @@ def plot_comparison(
         resolve_colormap,
         symmetric_clim,
     )
-    from pypic.plotting._labels import axis_label, colorbar_label, figure_title
+    from pypic.plotting._labels import axis_label, field_label, figure_title
+    from pypic.plotting._resolve import default_midplane, resolve_field_values
     from pypic.plotting.styles import DEFAULT, use_theme
 
     if theme is None:
         theme = DEFAULT
 
-    ndim_a = len(data_a.grid.dimensions)
-    if ndim_a == 3 and plane is None:
-        from pypic.selections import PlaneSelection
-
-        normal = data_a.grid.geometry.axis_names[2]
-        plane = PlaneSelection(normal=normal)
-
+    if plane is None:
+        plane = default_midplane(data_a)
     if plane is not None:
         data_a = plane.apply(data_a)
         data_b = plane.apply(data_b)
 
-    def _get_values(ds: FieldDataset) -> FloatArray:
-        if ds.has_field(field):
-            return ds.in_units(field, units) if units else ds[field]
-        vals = ds.compute(field)
-        if units:
-            return ds.in_units(field, units)
-        return vals
-
-    values_a = _get_values(data_a)
-    values_b = _get_values(data_b)
+    values_a = resolve_field_values(data_a, field, units)
+    values_b = resolve_field_values(data_b, field, units)
     diff = values_a - values_b
 
     info = data_a.field_info(field)
@@ -127,7 +114,7 @@ def plot_comparison(
     diff_vmin, diff_vmax = symmetric_clim(diff)
 
     unit_str = units if units else ""
-    cb_label = colorbar_label(info, unit_str=unit_str)
+    cb_label = field_label(info, unit_str=unit_str)
 
     with use_theme(theme):
         fig, axes_dict = plt.subplot_mosaic(

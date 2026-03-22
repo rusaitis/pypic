@@ -9,6 +9,7 @@ Actual plotting functions call ``ensure_matplotlib()`` at entry.
 """
 
 from pypic.plotting.comparison import plot_comparison
+from pypic.plotting.lines import plot_line, plot_time_series
 from pypic.plotting.slices import plot_field_slice
 from pypic.plotting.styles import DARK, DEFAULT, LIGHT, PlotTheme, use_theme
 
@@ -19,5 +20,7 @@ __all__ = [
     "PlotTheme",
     "plot_comparison",
     "plot_field_slice",
+    "plot_line",
+    "plot_time_series",
     "use_theme",
 ]
