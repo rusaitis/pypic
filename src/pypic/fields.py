@@ -385,7 +385,7 @@ _SPECIES_INFO_PATTERNS: list[tuple[re.Pattern[str], str, str, str]] = [
         "pressure",
         "Pressure {C} (species {N})",
         r"$P_{{{C},s{N}}}$",
-    ),  # Empty component handled in _try_species_info
+    ),  # \d{0,2} matches both P11_s0 (tensor) and P_s0 (scalar)
     (
         re.compile(r"^T_s(\d+)$"),
         "temperature",

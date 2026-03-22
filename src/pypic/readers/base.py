@@ -9,7 +9,6 @@ from typing import TYPE_CHECKING, Any, Protocol, assert_never, runtime_checkable
 
 import numpy as np
 import xarray as xr
-from xarray import Dataset
 
 from pypic.coordinates.geometry import (
     CARTESIAN,
@@ -22,6 +21,8 @@ from pypic.coordinates.geometry import (
 if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence
     from pathlib import Path
+
+    from xarray import Dataset
 
     from pypic.fields import FieldInfo
     from pypic.types import FloatArray
@@ -204,7 +205,7 @@ def _default_aliases(geometry: CoordinateGeometry) -> dict[str, str]:
     return aliases
 
 
-def _build_grid_from_dataset(old_grid: GridInfo, new_ds: xr.Dataset) -> GridInfo:
+def _build_grid_from_dataset(old_grid: GridInfo, new_ds: Dataset) -> GridInfo:
     """Derive a reduced GridInfo from a sliced xr.Dataset."""
     axis_names = old_grid.geometry.axis_names[: len(old_grid.dimensions)]
     surviving: list[tuple[int, str]] = []
