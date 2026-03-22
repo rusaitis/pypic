@@ -105,6 +105,15 @@ from pypic.readers import (
     unregister_reader,
 )
 from pypic.selections import BoxSelection, PlaneSelection
+from pypic.traces import (
+    FieldLine,
+    ParticleTrace,
+    TerminationReason,
+    VectorFieldInterpolator,
+    estimate_tracing_error,
+    trace_field_line,
+    trace_field_line_adaptive,
+)
 from pypic.units import Normalization, PhysicsConstants, SpeciesInfo
 
 __all__ = [
@@ -120,6 +129,7 @@ __all__ = [
     "CoordinateGeometry",
     "FieldDataset",
     "FieldInfo",
+    "FieldLine",
     "GeometryType",
     "GridInfo",
     "IPic3DConfig",
@@ -131,6 +141,7 @@ __all__ = [
     "OpenGGCMReader",
     "ParticleData",
     "ParticleDataReader",
+    "ParticleTrace",
     "PhysicsConstants",
     "PlaneSelection",
     "ProbeResult",
@@ -142,6 +153,8 @@ __all__ = [
     "SimulationReader",
     "SpeciesInfo",
     "TabularData",
+    "TerminationReason",
+    "VectorFieldInterpolator",
     "agyrotropy",
     "alfven_mach",
     "alfven_speed",
@@ -158,6 +171,7 @@ __all__ = [
     "electric_field_magnitude",
     "enthalpy",
     "entropy",
+    "estimate_tracing_error",
     "field_difference",
     "field_energy",
     "field_info",
@@ -201,6 +215,8 @@ __all__ = [
     "temperature",
     "thermal_energy_density",
     "thermal_speed",
+    "trace_field_line",
+    "trace_field_line_adaptive",
     "unit_label",
     "unregister_field",
     "unregister_reader",

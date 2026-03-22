@@ -8,6 +8,7 @@ This module can be imported for type checking without matplotlib installed.
 Actual plotting functions call ``ensure_matplotlib()`` at entry.
 """
 
+from pypic.plotting._badge import BadgeLoc, add_status_badge
 from pypic.plotting.comparison import plot_comparison
 from pypic.plotting.lines import plot_line, plot_time_series
 from pypic.plotting.slices import plot_field_slice
@@ -22,10 +23,12 @@ from pypic.plotting.styles import (
 )
 
 __all__ = [
+    "BadgeLoc",
     "DARK",
     "DEFAULT",
     "LIGHT",
     "PlotTheme",
+    "add_status_badge",
     "apply_grid",
     "apply_theme_to_figure",
     "plot_comparison",

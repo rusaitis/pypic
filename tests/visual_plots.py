@@ -25,6 +25,7 @@ from pypic.plotting import (  # noqa: E402
     DARK,
     LIGHT,
     PlotTheme,
+    add_status_badge,
     plot_comparison,
     plot_field_slice,
     plot_line,
@@ -125,18 +126,20 @@ def generate(theme: PlotTheme) -> None:
     ds_b = _make_dataset(y_center=8.0)
     tabular = _make_tabular()
 
-    # 1. Single slice — stored field
-    fig, _ = plot_field_slice(ds_a, "B1", theme=theme, step=100, time=5.0)
+    # 1. Single slice — stored field + badge
+    fig, ax = plot_field_slice(ds_a, "B1", theme=theme, step=100, time=5.0)
+    add_status_badge(ax, step=100, time=5.0, theme=theme)
     _save(fig, "slice_B1", name)
 
     # 2. Single slice — derived positive-definite field
     fig, _ = plot_field_slice(ds_a, "|B|", theme=theme, step=100)
     _save(fig, "slice_Bmag", name)
 
-    # 3. Comparison — three-panel A|B|diff
-    fig, _ = plot_comparison(
+    # 3. Comparison — three-panel A|B|diff + badge on first panel
+    fig, axes = plot_comparison(
         ds_a, ds_b, "B1", theme=theme, labels=("y₀=7.5", "y₀=8.0"), step=100
     )
+    add_status_badge(axes["a"], step=100, loc="upper left", theme=theme)
     _save(fig, "comparison", name)
 
     # 4. Line overlay — B components along x
@@ -159,12 +162,13 @@ def generate(theme: PlotTheme) -> None:
     )
     _save(fig, "time_series", name)
 
-    # 6. Crowded 2x3 grid of slices
+    # 6. Crowded 2x3 grid of slices + badges on each panel
     slice_fields = ["B1", "|B|", "beta", "v_A", "e_B", "rho_m"]
     with use_theme(theme):
         fig, axes = plt.subplots(2, 3, figsize=(14, 8))
-        for ax, field in zip(axes.flat, slice_fields):
+        for i, (ax, field) in enumerate(zip(axes.flat, slice_fields, strict=True)):
             plot_field_slice(ds_a, field, ax=ax, theme=theme)
+            add_status_badge(ax, step=100 + i * 10, fontsize=7, theme=theme)
         fig.suptitle("Field overview", fontsize=13)
         fig.tight_layout()
     _save(fig, "grid_slices", name)
@@ -177,6 +181,46 @@ def generate(theme: PlotTheme) -> None:
         fig.suptitle("Line profiles along x", fontsize=13)
         fig.tight_layout()
     _save(fig, "grid_lines", name)
+
+    # 8. Badge showcase — 2x2 grid, each corner placement + text variants
+    with use_theme(theme):
+        fig, axes = plt.subplots(2, 2, figsize=(10, 8))
+        for ax in axes.flat:
+            plot_field_slice(ds_a, "B1", ax=ax, theme=theme)
+
+        add_status_badge(axes[0, 0], step=42, loc="upper left", theme=theme)
+        add_status_badge(axes[0, 1], time=3.14, loc="upper right", theme=theme)
+        add_status_badge(
+            axes[1, 0], step=100, time=5.0, loc="lower left", theme=theme
+        )
+        add_status_badge(
+            axes[1, 1],
+            step=100,
+            time=0.005,
+            time_units="ns",
+            loc="lower right",
+            theme=theme,
+        )
+        fig.suptitle("Badge placement showcase", fontsize=13)
+        fig.tight_layout()
+    _save(fig, "badge_showcase", name)
+
+    # 9. Badge progress — 1x3 row showing early/mid/late progress
+    with use_theme(theme):
+        fig, axes = plt.subplots(1, 3, figsize=(14, 4))
+        step_range = (0, 500)
+        for ax, s in zip(axes, [20, 250, 480], strict=True):
+            plot_field_slice(ds_a, "|B|", ax=ax, theme=theme)
+            add_status_badge(
+                ax,
+                step=s,
+                step_range=step_range,
+                loc="upper right",
+                theme=theme,
+            )
+        fig.suptitle("Progress bar showcase", fontsize=13)
+        fig.tight_layout()
+    _save(fig, "badge_progress", name)
 
 
 def main() -> None:
