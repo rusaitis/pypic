@@ -263,6 +263,7 @@ class TestThemes:
             rcparams={"figure.dpi": 72},
             sequential_cmap="viridis",
             diverging_cmap="coolwarm",
+            grid_color="0.0",
         )
         with use_theme(custom):
             assert mpl.rcParams["figure.dpi"] == 72

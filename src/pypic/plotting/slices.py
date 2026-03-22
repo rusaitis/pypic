@@ -8,7 +8,6 @@ from pypic.plotting._guard import ensure_matplotlib
 
 if TYPE_CHECKING:
     from matplotlib.axes import Axes
-    from matplotlib.colorbar import Colorbar
     from matplotlib.colors import Colormap
     from matplotlib.figure import Figure
 
@@ -89,7 +88,12 @@ def plot_field_slice(
     )
     from pypic.plotting._labels import axis_label, field_label, figure_title
     from pypic.plotting._resolve import default_midplane, resolve_field_values
-    from pypic.plotting.styles import DEFAULT, use_theme
+    from pypic.plotting.styles import (
+        DEFAULT,
+        apply_grid,
+        apply_theme_to_figure,
+        use_theme,
+    )
 
     if theme is None:
         theme = DEFAULT
@@ -121,6 +125,7 @@ def plot_field_slice(
             fig, ax = plt.subplots(figsize=figsize)
         else:
             fig = ax.get_figure()  # type: ignore[assignment]
+            apply_theme_to_figure(fig, theme)
 
         mesh = ax.pcolormesh(
             coords[0],
@@ -134,11 +139,14 @@ def plot_field_slice(
 
         unit_str = units if units else ""
         if colorbar:
-            _add_colorbar(fig, ax, mesh, field_label(info, unit_str=unit_str))
+            from pypic.plotting._colorbar import add_colorbar
+
+            add_colorbar(fig, ax, mesh, field_label(info, unit_str=unit_str))
 
         ax.set_xlabel(axis_label(surviving_axes[0], unit_str=coord_units or ""))
         ax.set_ylabel(axis_label(surviving_axes[1], unit_str=coord_units or ""))
         ax.set_aspect("equal")
+        apply_grid(ax, theme)
 
         if title is not None:
             ax.set_title(title)
@@ -150,8 +158,3 @@ def plot_field_slice(
     return fig, ax
 
 
-def _add_colorbar(fig: Figure, ax: Axes, mappable: object, label: str) -> Colorbar:
-    """Add a colorbar to the axes."""
-    cb = fig.colorbar(mappable, ax=ax)  # type: ignore[arg-type]
-    cb.set_label(label)
-    return cb

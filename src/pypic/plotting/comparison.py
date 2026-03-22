@@ -80,7 +80,7 @@ def plot_comparison(
     )
     from pypic.plotting._labels import axis_label, field_label, figure_title
     from pypic.plotting._resolve import default_midplane, resolve_field_values
-    from pypic.plotting.styles import DEFAULT, use_theme
+    from pypic.plotting.styles import DEFAULT, apply_grid, use_theme
 
     if theme is None:
         theme = DEFAULT
@@ -129,6 +129,8 @@ def plot_comparison(
             ("diff", diff, diff_title, diff_vmin, diff_vmax),
         ]
 
+        from pypic.plotting._colorbar import add_colorbar
+
         for key, values, panel_title, vmin, vmax in panels:
             if key == "diff":
                 panel_cmap = diff_cmap or diff_cmap_name
@@ -148,10 +150,11 @@ def plot_comparison(
                 vmax=vmax,
             )
             label = f"\u0394 {cb_label}" if key == "diff" else cb_label
-            fig.colorbar(mesh, ax=ax).set_label(label)
+            add_colorbar(fig, ax, mesh, label)
             ax.set_xlabel(axis_label(surviving_axes[0], unit_str=coord_units or ""))
             ax.set_ylabel(axis_label(surviving_axes[1], unit_str=coord_units or ""))
             ax.set_aspect("equal")
+            apply_grid(ax, theme)
             ax.set_title(panel_title)
 
         if title is not None:

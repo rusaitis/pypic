@@ -78,7 +78,13 @@ def plot_line(
 
     from pypic.plotting._labels import axis_label, field_label, figure_title
     from pypic.plotting._resolve import resolve_field_values
-    from pypic.plotting.styles import DEFAULT, use_theme
+    from pypic.plotting.styles import (
+        DEFAULT,
+        apply_grid,
+        apply_theme_to_figure,
+        style_legend,
+        use_theme,
+    )
 
     if theme is None:
         theme = DEFAULT
@@ -119,10 +125,12 @@ def plot_line(
             fig, ax = plt.subplots(figsize=figsize)
         else:
             fig = ax.get_figure()  # type: ignore[assignment]
+            apply_theme_to_figure(fig, theme)
 
         ax.plot(coord, values, label=label, **kwargs)
         ax.set_xlabel(axis_label(plot_axis, unit_str=coord_units or ""))
         ax.set_ylabel(field_label(info, unit_str=units or ""))
+        apply_grid(ax, theme)
 
         if title is not None:
             ax.set_title(title)
@@ -131,6 +139,7 @@ def plot_line(
 
         if label is not None:
             ax.legend()
+            style_legend(ax)
 
     return fig, ax
 
@@ -186,7 +195,13 @@ def plot_time_series(
     ensure_matplotlib()
     import matplotlib.pyplot as plt
 
-    from pypic.plotting.styles import DEFAULT, use_theme
+    from pypic.plotting.styles import (
+        DEFAULT,
+        apply_grid,
+        apply_theme_to_figure,
+        style_legend,
+        use_theme,
+    )
 
     if theme is None:
         theme = DEFAULT
@@ -204,6 +219,7 @@ def plot_time_series(
             fig, ax = plt.subplots(figsize=figsize)
         else:
             fig = ax.get_figure()  # type: ignore[assignment]
+            apply_theme_to_figure(fig, theme)
 
         for col, lbl in zip(columns, labels, strict=True):
             ax.plot(x, data[col], label=lbl, **kwargs)
@@ -223,7 +239,10 @@ def plot_time_series(
         if title is not None:
             ax.set_title(title)
 
+        apply_grid(ax, theme)
+
         if legend and (len(columns) > 1 or labels != columns):
             ax.legend()
+            style_legend(ax)
 
     return fig, ax

@@ -17,6 +17,7 @@ data*/
 # Test artifacts
 tests/*.png
 tests/*.csv
+tests/output/
 tests/test_petsc_*/
 
 # Python
