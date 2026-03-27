@@ -201,12 +201,27 @@ def parse_inp(path: Path) -> IPic3DConfig:
     ns = int(ns_s)
 
     qom = _parse_array_float(qom_s)
-    if len(qom) != ns:
+    if len(qom) < ns:
         errors.append(ValueError(f"qom has {len(qom)} entries, expected ns={ns}"))
-    for key in ("uth", "vth", "wth", "u0", "v0", "w0"):
-        if key in kv and len(kv[key].split()) != ns:
+    elif len(qom) > ns:
+        log.warning("qom has %d entries but ns=%d; truncating", len(qom), ns)
+        qom = qom[:ns]
+    _per_species_keys = (
+        "uth", "vth", "wth", "u0", "v0", "w0",
+        "rhoINIT", "rhoINJECT", "npcelx", "npcely", "npcelz",
+    )
+    for key in _per_species_keys:
+        if key in kv:
             n = len(kv[key].split())
-            errors.append(ValueError(f"{key} has {n} entries, expected ns={ns}"))
+            if n < ns:
+                errors.append(
+                    ValueError(f"{key} has {n} entries, expected ns={ns}")
+                )
+            elif n > ns:
+                log.warning(
+                    "%s has %d entries but ns=%d; truncating", key, n, ns
+                )
+                kv[key] = " ".join(kv[key].split()[:ns])
     if errors:
         raise ExceptionGroup("Validation errors in iPIC3D .inp file", errors)
 

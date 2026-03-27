@@ -64,6 +64,7 @@ class GridInfo:
     geometry: CoordinateGeometry = CARTESIAN
     dt: float | None = None
     boundary: tuple[str, ...] | None = None
+    surviving_axes: tuple[int, ...] | None = None
 
     def __post_init__(self) -> None:
         ndim = len(self.dimensions)
@@ -89,6 +90,41 @@ class GridInfo:
                 f"must match dimensions length ({ndim})"
             )
             raise ValueError(msg)
+        if self.surviving_axes is not None and len(self.surviving_axes) != ndim:
+            msg = (
+                f"surviving_axes length ({len(self.surviving_axes)}) "
+                f"must match dimensions length ({ndim})"
+            )
+            raise ValueError(msg)
+
+    @property
+    def surviving_axis_names(self) -> tuple[str, ...]:
+        """Axis names for the current dimensions.
+
+        After slicing, returns only the names of axes that survived
+        (e.g. ``("x", "z")`` after removing the y-axis). When no
+        slicing has occurred, returns the first *ndim* names from
+        the geometry.
+
+        Examples
+        --------
+        >>> grid = GridInfo(
+        ...     dimensions=(4, 3, 2), spacing=(1.0, 1.0, 1.0),
+        ...     geometry=CARTESIAN,
+        ... )
+        >>> grid.surviving_axis_names
+        ('x', 'y', 'z')
+        >>> import copy
+        >>> sliced = copy.replace(
+        ...     grid, dimensions=(4, 2), spacing=(1.0, 1.0),
+        ...     origin=(0.0, 0.0), surviving_axes=(0, 2),
+        ... )
+        >>> sliced.surviving_axis_names
+        ('x', 'z')
+        """
+        if self.surviving_axes is not None:
+            return tuple(self.geometry.axis_names[i] for i in self.surviving_axes)
+        return self.geometry.axis_names[: len(self.dimensions)]
 
     def coordinate_arrays(self) -> tuple[FloatArray, ...]:
         r"""Cell-centered coordinate arrays for each axis.
@@ -207,12 +243,18 @@ def _default_aliases(geometry: CoordinateGeometry) -> dict[str, str]:
 
 def _build_grid_from_dataset(old_grid: GridInfo, new_ds: Dataset) -> GridInfo:
     """Derive a reduced GridInfo from a sliced xr.Dataset."""
-    axis_names = old_grid.geometry.axis_names[: len(old_grid.dimensions)]
-    surviving: list[tuple[int, str]] = []
+    current_names = old_grid.surviving_axis_names
+    surviving: list[tuple[int, str]] = []  # (local_index, name)
 
-    for i, name in enumerate(axis_names):
+    for local_idx, name in enumerate(current_names):
         if name in new_ds.dims:
-            surviving.append((i, name))
+            surviving.append((local_idx, name))
+
+    # Map local indices back to original 3D geometry axis indices
+    if old_grid.surviving_axes is not None:
+        new_surviving = tuple(old_grid.surviving_axes[li] for li, _ in surviving)
+    else:
+        new_surviving = tuple(li for li, _ in surviving)
 
     new_boundary = None
     if old_grid.boundary is not None:
@@ -228,6 +270,7 @@ def _build_grid_from_dataset(old_grid: GridInfo, new_ds: Dataset) -> GridInfo:
             for i, name in surviving
         ),
         boundary=new_boundary,
+        surviving_axes=new_surviving,
     )
 
 
@@ -352,10 +395,9 @@ class FieldDataset:
             from pypic.units import Normalization as _Norm
 
             normalization = _Norm.identity()
-        ndim = len(grid.dimensions)
-        dim_names = list(grid.geometry.axis_names[:ndim])
+        dim_names = list(grid.surviving_axis_names)
         coord_arrays = grid.coordinate_arrays()
-        coords = {dim_names[i]: coord_arrays[i] for i in range(ndim)}
+        coords = {dim_names[i]: coord_arrays[i] for i in range(len(dim_names))}
 
         from pypic.fields import field_info as _field_info
 
@@ -682,8 +724,7 @@ class FieldDataset:
             raise ValueError(msg)
 
         si_unit = _QUANTITY_UNITS[qt]
-        ndim = len(self._grid.dimensions)
-        dim_names = list(self._grid.geometry.axis_names[:ndim])
+        dim_names = list(self._grid.surviving_axis_names)
         da = xr.DataArray(data=data, dims=dim_names)
         da.attrs["quantity_type"] = qt
         da.attrs["si_unit"] = si_unit

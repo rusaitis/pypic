@@ -136,6 +136,7 @@ def plot_field_with_vectors(
     )
 
     # Vector overlay on already-sliced data (no plane= to avoid double-slicing)
+    # Suppress title on the vector layer so it doesn't overwrite the scalar title.
     match vector_style:
         case "streamlines":
             plot_streamlines(
@@ -149,6 +150,7 @@ def plot_field_with_vectors(
                 ax=ax,
                 colorbar=False,
                 legend=legend,
+                title="",
             )
         case "quiver":
             plot_quiver(
@@ -161,6 +163,7 @@ def plot_field_with_vectors(
                 ax=ax,
                 colorbar=False,
                 legend=legend,
+                title="",
             )
 
     if badge and (step is not None or time is not None):

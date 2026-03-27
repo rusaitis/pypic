@@ -90,7 +90,7 @@ def plot_line(
     theme = _resolve_theme_arg(theme)
 
     ndim = len(data.grid.dimensions)
-    axis_names = list(data.grid.geometry.axis_names[:ndim])
+    axis_names = list(data.grid.surviving_axis_names)
 
     if ndim == 1:
         plot_axis = axis_names[0]

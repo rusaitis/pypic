@@ -15,13 +15,8 @@ if TYPE_CHECKING:
 
 
 def surviving_axis_names(data: FieldDataset) -> tuple[str, ...]:
-    """Return the axis names surviving after any plane selection.
-
-    Takes the first *ndim* names from the geometry, which is correct for
-    Cartesian grids but not for non-Cartesian geometries where the sliced
-    axis may not be the last one.  See TASKS.md Step 30.
-    """
-    return data.grid.geometry.axis_names[: len(data.grid.dimensions)]
+    """Return the axis names surviving after any plane selection."""
+    return data.grid.surviving_axis_names
 
 
 def require_plottable_grid(data: FieldDataset) -> None:

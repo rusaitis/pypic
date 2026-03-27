@@ -177,7 +177,7 @@ not bugs — current behavior is correct for Cartesian data — but will
 become problems as non-Cartesian geometries and relativistic workflows
 grow.
 
-- [ ] **Step 30: Reduced geometry after slicing**
+- [x] **Step 30: Reduced geometry after slicing**
   After `PlaneSelection.apply()` reduces 3D→2D, the `GridInfo` keeps the
   original 3-axis `CoordinateGeometry`. Code uses `axis_names[:ndim]` to
   get surviving names, which gives the **first N** names, not the
@@ -253,7 +253,7 @@ grow.
 | 27 | interop | yt, PlasmaPy, SpacePy thin adapters | — |
 | 28 | docs | Ecosystem positioning page | — |
 | 29 | interop | SPASE XML metadata export | — |
-| 30 | readers/selections | Reduced geometry after slicing | — |
+| 30 | readers/selections | Reduced geometry after slicing | ✅ |
 | 31 | coordinates | Remove default geometry from operators | — |
 | 32 | fields/units | Separate `four_velocity` quantity type | — |
 | 33 | fields/units | `specific_energy` quantity type for enthalpy | ✅ |

@@ -47,11 +47,11 @@ def _resolve_plane_components(data: FieldDataset, field_prefix: str) -> tuple[st
     tuple[str, str]
         Numbered field names for the two in-plane components.
     """
-    all_axes = data.grid.geometry.axis_names
-    surviving = all_axes[: len(data.grid.dimensions)]
+    surviving = data.grid.surviving_axis_names
     if len(surviving) != 2:
         msg = f"Expected 2D data, got {len(surviving)}D"
         raise ValueError(msg)
+    all_axes = data.grid.geometry.axis_names
     comp0 = all_axes.index(surviving[0]) + 1
     comp1 = all_axes.index(surviving[1]) + 1
     return f"{field_prefix}{comp0}", f"{field_prefix}{comp1}"

@@ -56,7 +56,7 @@ class PlaneSelection:
         ValueError
             If ``normal`` is not a dimension in *data*.
         """
-        axis_names = data.grid.geometry.axis_names[: len(data.grid.dimensions)]
+        axis_names = data.grid.surviving_axis_names
         if self.normal not in axis_names:
             msg = f"Axis {self.normal!r} not found in dataset dimensions {axis_names!r}"
             raise ValueError(msg)
@@ -119,7 +119,7 @@ class BoxSelection:
         if not self.ranges:
             return data
 
-        axis_names = data.grid.geometry.axis_names[: len(data.grid.dimensions)]
+        axis_names = data.grid.surviving_axis_names
         for axis in self.ranges:
             if axis not in axis_names:
                 msg = f"Axis {axis!r} not found in dataset dimensions {axis_names!r}"

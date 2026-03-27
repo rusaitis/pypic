@@ -92,6 +92,35 @@ class TestPlaneSelection:
         result = PlaneSelection(normal="θ", index=1).apply(spherical_3d)
         assert result["B1"].shape == (4, 2)
 
+    @pytest.mark.parametrize(
+        ("normal", "expected_names"),
+        [("z", ("x", "y")), ("y", ("x", "z")), ("x", ("y", "z"))],
+    )
+    def test_surviving_axis_names_cartesian(
+        self,
+        cartesian_3d: FieldDataset,
+        normal: str,
+        expected_names: tuple[str, ...],
+    ) -> None:
+        result = PlaneSelection(normal=normal, index=0).apply(cartesian_3d)
+        assert result.grid.surviving_axis_names == expected_names
+
+    def test_surviving_axis_names_spherical(
+        self, spherical_3d: FieldDataset
+    ) -> None:
+        result = PlaneSelection(normal="θ", index=1).apply(spherical_3d)
+        assert result.grid.surviving_axis_names == ("r", "φ")
+
+    def test_surviving_axes_indices(self, cartesian_3d: FieldDataset) -> None:
+        result = PlaneSelection(normal="y", index=0).apply(cartesian_3d)
+        assert result.grid.surviving_axes == (0, 2)
+
+    def test_surviving_axes_double_slice(self, cartesian_3d: FieldDataset) -> None:
+        step1 = PlaneSelection(normal="z", index=0).apply(cartesian_3d)
+        step2 = PlaneSelection(normal="y", index=0).apply(step1)
+        assert step2.grid.surviving_axis_names == ("x",)
+        assert step2.grid.surviving_axes == (0,)
+
     def test_invalid_axis_raises(self, cartesian_3d: FieldDataset) -> None:
         with pytest.raises(ValueError, match="not found"):
             PlaneSelection(normal="w", index=0).apply(cartesian_3d)
