@@ -153,17 +153,20 @@ no hardcoded knowledge of any specific frame.
 
 ```toml
 [coordinates.transforms.TARGET_FRAME]
-type = "string"                    # "affine" | "rotation"
 origin = [0.0, 0.0, 0.0]          # translation (code units or physical)
-rotation = [[...], [...], [...]]   # 3x3 rotation matrix (optional)
+rotation = [[...], [...], [...]]   # 3x3 rotation matrix (optional, must be signed permutation)
 scale = 1.0                        # length scale factor (optional)
 from_frame = "string"              # for chaining: transform from this frame instead of native
-parameter = "string"               # for time-dependent transforms: named parameter
 ```
 
 Transforms can chain: if transform A goes from "simulation" to "GSM" and
 transform B goes from "GSM" to "GSE", requesting "GSE" from "simulation"
 data chains both automatically.
+
+**Planned: time-dependent transforms.** Frames like GSE↔GSM depend on
+the dipole tilt angle, which varies per timestep. A future `parameter`
+field will name a time-varying quantity (e.g., `"dipole_tilt"`) looked
+up per step to compute the rotation matrix. Not yet implemented.
 
 ### [[species]]
 

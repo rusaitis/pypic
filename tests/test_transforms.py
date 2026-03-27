@@ -487,6 +487,22 @@ class TestFieldDatasetTransformTo:
         result = ds.transform_to("GSM")
         assert result.normalization is ds.normalization
 
+    def test_general_rotation_raises(self) -> None:
+        """Non-permutation rotations require interpolation, not implemented."""
+        theta = np.pi / 4  # 45° around z
+        r = (
+            (float(np.cos(theta)), float(-np.sin(theta)), 0.0),
+            (float(np.sin(theta)), float(np.cos(theta)), 0.0),
+            (0.0, 0.0, 1.0),
+        )
+        t = FrameTransform("sim", "rotated", rotation=r)
+        ds = _make_dataset(
+            {"B1": np.ones((4, 3, 2)), "B2": np.ones((4, 3, 2)), "B3": np.ones((4, 3, 2))},
+            transforms={"rotated": t},
+        )
+        with pytest.raises(NotImplementedError, match="signed permutation"):
+            ds.transform_to(t)
+
     def test_round_trip(self) -> None:
         rng = np.random.default_rng(42)
         fields = {

@@ -585,12 +585,28 @@ class FieldDataset:
         else:
             indices = list(range(len(self._grid.dimensions)))
         ndim = len(indices)
+
+        # The grid transformation (transpose + flip) only works for
+        # signed permutation matrices (axis swaps and reflections).
+        # General rotations would require interpolation onto a new grid.
+        r_sub = rotation[np.ix_(indices, indices)]
+        abs_r = np.abs(r_sub)
+        if not (
+            np.allclose(np.sum(abs_r, axis=1), 1.0, atol=1e-6)
+            and np.allclose(np.sum(abs_r, axis=0), 1.0, atol=1e-6)
+        ):
+            raise NotImplementedError(
+                "transform_to() only supports axis-swap/reflection "
+                "rotation matrices (signed permutations). General "
+                "rotations require grid interpolation (not yet implemented)."
+            )
+
         t_origin = np.array(transform.origin, dtype=np.float64)
         dx_scale = transform.scale
 
         # Determine axis permutation and sign from rotation matrix.
         # For each TARGET axis (row of R), find which SOURCE axis
-        # it draws from (column with largest |R_ij|) and its sign.
+        # it draws from (the single nonzero column) and its sign.
         perm: list[int] = []   # perm[target_i] = source local index
         signs: list[float] = []  # sign of the mapping
         for target_i in indices:

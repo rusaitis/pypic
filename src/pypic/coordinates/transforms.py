@@ -432,7 +432,7 @@ def rotate_vector_components(
     >>> v1, v2, v3 = np.array([1.0]), np.array([0.0]), np.array([0.0])
     >>> R = np.array([[0, 0, 1], [1, 0, 0], [0, 1, 0]], dtype=float)
     >>> r1, r2, r3 = rotate_vector_components(v1, v2, v3, R)
-    >>> float(r1), float(r2), float(r3)
+    >>> float(r1[0]), float(r2[0]), float(r3[0])
     (0.0, 1.0, 0.0)
     """
     r = rotation
@@ -477,7 +477,7 @@ def rotate_pressure_tensor(
     ...     np.array([1.0]), np.array([2.0]), np.array([3.0]),
     ...     np.array([0.0]), np.array([0.0]), np.array([0.0]), I,
     ... )
-    >>> [float(x) for x in p]
+    >>> [float(x[0]) for x in p]
     [1.0, 2.0, 3.0, 0.0, 0.0, 0.0]
     """
     r = rotation
