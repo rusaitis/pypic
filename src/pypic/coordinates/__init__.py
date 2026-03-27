@@ -12,6 +12,7 @@ from pypic.coordinates.operators import curl, divergence, gradient
 from pypic.coordinates.transforms import (
     FrameTransform,
     compose_transforms,
+    find_pressure_tensor_groups,
     find_vector_triplets,
     identity_transform,
     resolve_transform,
@@ -30,6 +31,7 @@ __all__ = [
     "compose_transforms",
     "curl",
     "divergence",
+    "find_pressure_tensor_groups",
     "find_vector_triplets",
     "gradient",
     "identity_transform",

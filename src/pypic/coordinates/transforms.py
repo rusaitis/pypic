@@ -42,6 +42,20 @@ type Rotation3x3 = tuple[
 ]
 
 
+def _to_rotation(arr: np.ndarray) -> Rotation3x3:
+    """Convert a (3, 3) array to an immutable nested tuple."""
+    return (
+        (float(arr[0, 0]), float(arr[0, 1]), float(arr[0, 2])),
+        (float(arr[1, 0]), float(arr[1, 1]), float(arr[1, 2])),
+        (float(arr[2, 0]), float(arr[2, 1]), float(arr[2, 2])),
+    )
+
+
+def _to_vec3(arr: np.ndarray) -> tuple[float, float, float]:
+    """Convert a length-3 array to a float tuple."""
+    return (float(arr[0]), float(arr[1]), float(arr[2]))
+
+
 @dataclass(frozen=True, slots=True)
 class FrameTransform:
     r"""Affine transformation between coordinate reference frames.
@@ -139,32 +153,13 @@ class FrameTransform:
         ('b', 'a')
         """
         r = self.rotation_matrix
-        r_inv = r.T
-        inv_rotation: Rotation3x3 = tuple(  # type: ignore[assignment]
-            tuple(float(x) for x in row) for row in r_inv
-        )
-        # New origin in target-frame coords: o_new = -R @ o / s ... wait
-        # x_t = s * R * (x_s - o)  =>  x_s = R^T * x_t / s + o
-        # So inverse: x_s = (1/s) * R^T * (x_t - 0) + o
-        # i.e., inverse origin = -(1/s) R^T applied to nothing... let me think.
-        # x_t = s R (x_s - o)
-        # x_s = (1/s) R^T x_t + o
-        # x_s = (1/s) R^T (x_t - 0) + o
-        # So the inverse transform has: origin_inv = -s * R * o ... no.
-        # Let's write it as: x_s = scale_inv * R_inv * (x_t - origin_inv)
-        # (1/s) R^T x_t + o = scale_inv * R_inv * (x_t - origin_inv)
-        # => R_inv = R^T, scale_inv = 1/s
-        # => (1/s) R^T x_t + o = (1/s) R^T (x_t - origin_inv)
-        #    = (1/s) R^T x_t - (1/s) R^T origin_inv
-        # => o = -(1/s) R^T origin_inv
-        # => origin_inv = -s R o
         o = np.array(self.origin, dtype=np.float64)
-        inv_origin = tuple(float(x) for x in (-self.scale * r @ o))
+        # origin_inv = -s R o (from inverting the affine map)
         return FrameTransform(
             source_frame=self.target_frame,
             target_frame=self.source_frame,
-            origin=inv_origin,  # type: ignore[arg-type]
-            rotation=inv_rotation,
+            origin=_to_vec3(-self.scale * r @ o),
+            rotation=_to_rotation(r.T),
             scale=1.0 / self.scale,
             target_axis_names=None,
         )
@@ -240,16 +235,11 @@ def compose_transforms(
     combined_scale = first.scale * second.scale
     combined_origin = o1 + (1.0 / first.scale) * (r1.T @ o2)
 
-    rot_tuple: Rotation3x3 = tuple(  # type: ignore[assignment]
-        tuple(float(x) for x in row) for row in combined_rotation
-    )
-    origin_tuple = tuple(float(x) for x in combined_origin)
-
     return FrameTransform(
         source_frame=first.source_frame,
         target_frame=second.target_frame,
-        origin=origin_tuple,  # type: ignore[arg-type]
-        rotation=rot_tuple,
+        origin=_to_vec3(combined_origin),
+        rotation=_to_rotation(combined_rotation),
         scale=combined_scale,
         target_axis_names=second.target_axis_names or first.target_axis_names,
     )
@@ -319,13 +309,19 @@ def resolve_transform(
     raise ValueError(msg)
 
 
-# ---------------------------------------------------------------------------
-# Vector field detection and rotation
-# ---------------------------------------------------------------------------
+def _build_vector_triplet_regex() -> re.Pattern[str]:
+    """Build regex from the canonical vector prefixes in readers.base."""
+    from pypic.readers.base import _FIELD_PREFIX_PAIRS
 
-_VECTOR_TRIPLET_RE = re.compile(
-    r"^(B0|B|EF|E|J|Ve|V|S|u)([123])(?:_s(\d+))?$"
-)
+    prefixes = sorted(
+        {canon for _, canon in _FIELD_PREFIX_PAIRS},
+        key=len,
+        reverse=True,
+    )
+    return re.compile(rf"^({'|'.join(prefixes)})([123])(?:_s(\d+))?$")
+
+
+_VECTOR_TRIPLET_RE = _build_vector_triplet_regex()
 
 
 def find_vector_triplets(

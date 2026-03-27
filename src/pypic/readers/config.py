@@ -139,27 +139,27 @@ def _parse_transforms(
     if not transforms_section:
         return {}
 
-    _identity = ((1.0, 0.0, 0.0), (0.0, 1.0, 0.0), (0.0, 0.0, 1.0))
     result: dict[str, FrameTransform] = {}
     for target_name, spec in transforms_section.items():
         origin = tuple(float(x) for x in spec.get("origin", [0.0, 0.0, 0.0]))
         rotation_raw = spec.get("rotation", None)
+        kwargs: dict[str, Any] = {}
         if rotation_raw is not None:
-            rotation = tuple(tuple(float(x) for x in row) for row in rotation_raw)
-        else:
-            rotation = _identity
+            kwargs["rotation"] = tuple(
+                tuple(float(x) for x in row) for row in rotation_raw
+            )
         scale = float(spec.get("scale", 1.0))
         source = spec.get("from_frame", default_frame)
         axis_labels = spec.get("axis_labels", None)
-        target_axis_names = tuple(axis_labels) if axis_labels else None
+        if axis_labels:
+            kwargs["target_axis_names"] = tuple(axis_labels)
 
         result[target_name] = FrameTransform(
             source_frame=source,
             target_frame=target_name,
             origin=origin,  # type: ignore[arg-type]
-            rotation=rotation,  # type: ignore[arg-type]
             scale=scale,
-            target_axis_names=target_axis_names,  # type: ignore[arg-type]
+            **kwargs,
         )
     return result
 

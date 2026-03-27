@@ -609,7 +609,10 @@ class FieldDataset:
                     arr = np.transpose(arr, perm)
                 for ax in flip_axes:
                     arr = np.flip(arr, axis=ax)
-                new_vars[name] = xr.DataArray(data=np.ascontiguousarray(arr))
+                attrs = dict(da.attrs) if hasattr(da, "attrs") else {}
+                new_vars[name] = xr.DataArray(
+                    data=np.ascontiguousarray(arr), attrs=attrs,
+                )
 
         # Compute new origin, spacing, dimensions from permuted source
         old_coords = self._grid.coordinate_arrays()
