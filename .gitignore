@@ -120,3 +120,4 @@ examples/*
 # Test fixture data (small, committed)
 !tests/data/
 !tests/data/**
+tests/data/.DS_Store

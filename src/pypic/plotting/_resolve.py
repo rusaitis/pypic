@@ -15,8 +15,32 @@ if TYPE_CHECKING:
 
 
 def surviving_axis_names(data: FieldDataset) -> tuple[str, ...]:
-    """Return the axis names surviving after any plane selection."""
+    """Return the axis names surviving after any plane selection.
+
+    Takes the first *ndim* names from the geometry, which is correct for
+    Cartesian grids but not for non-Cartesian geometries where the sliced
+    axis may not be the last one.  See TASKS.md Step 30.
+    """
     return data.grid.geometry.axis_names[: len(data.grid.dimensions)]
+
+
+def require_plottable_grid(data: FieldDataset) -> None:
+    """Raise if the grid is too small for 2D plotting."""
+    dims = data.grid.dimensions
+    if any(d < 2 for d in dims[:2]):
+        msg = f"Grid too small to plot: dimensions {dims}"
+        raise ValueError(msg)
+
+
+def resolve_coord_units(
+    coord_units: str | tuple[str, str] | None,
+) -> tuple[str, str]:
+    """Normalize *coord_units* to a per-axis ``(x_unit, y_unit)`` pair."""
+    if coord_units is None:
+        return ("", "")
+    if isinstance(coord_units, tuple):
+        return coord_units
+    return (coord_units, coord_units)
 
 
 def resolve_field_values(
@@ -80,7 +104,9 @@ def get_or_create_axes(
         return fig, ax
 
     fig = ax.get_figure()
-    assert fig is not None
+    if fig is None:
+        msg = "Axes is not attached to a figure"
+        raise RuntimeError(msg)
     apply_theme_to_figure(fig, theme)
     return fig, ax
 
@@ -105,3 +131,38 @@ def default_midplane(data: FieldDataset) -> PlaneSelection | None:
         normal = data.grid.geometry.axis_names[2]
         return PlaneSelection(normal=normal)
     return None
+
+
+def prepare_data(
+    data: FieldDataset, plane: PlaneSelection | None
+) -> FieldDataset:
+    """Apply default midplane (if 3D) and validate for 2D plotting.
+
+    Parameters
+    ----------
+    data : FieldDataset
+        Input dataset (2D or 3D).
+    plane : PlaneSelection | None
+        Explicit plane selection. ``None`` auto-selects the midplane
+        for 3D data.
+
+    Returns
+    -------
+    FieldDataset
+        2D dataset ready for plotting.
+    """
+    if plane is None:
+        plane = default_midplane(data)
+    if plane is not None:
+        data = plane.apply(data)
+    require_plottable_grid(data)
+    return data
+
+
+def maybe_save(fig: Figure, save: str | None) -> None:
+    """Save figure to *save* path and close, if *save* is not None."""
+    if save is not None:
+        import matplotlib.pyplot as plt
+
+        fig.savefig(save)
+        plt.close(fig)

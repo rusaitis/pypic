@@ -90,10 +90,7 @@ class FieldLine:
         n = self.points.shape[0]
         for name, arr in self.scalars.items():
             if arr.shape != (n,):
-                msg = (
-                    f"scalar {name!r} has shape {arr.shape}, "
-                    f"expected ({n},)"
-                )
+                msg = f"scalar {name!r} has shape {arr.shape}, expected ({n},)"
                 raise ValueError(msg)
         object.__setattr__(self, "scalars", MappingProxyType(dict(self.scalars)))
         object.__setattr__(self, "metadata", MappingProxyType(dict(self.metadata)))
@@ -142,6 +139,11 @@ class FieldLine:
         -------
         FieldLine
         """
+        n = self.n_points
+        for name, arr in new_scalars.items():
+            if arr.shape != (n,):
+                msg = f"Scalar {name!r} has shape {arr.shape}, expected ({n},)"
+                raise ValueError(msg)
         merged = dict(self.scalars)
         merged.update(new_scalars)
         return copy.replace(self, scalars=merged)

@@ -164,9 +164,7 @@ def displacement(points: FloatArray) -> float:
     return float(np.linalg.norm(points[-1] - points[0]))
 
 
-def closest_approach(
-    points: FloatArray, target: Vector3
-) -> tuple[int, float]:
+def closest_approach(points: FloatArray, target: Vector3) -> tuple[int, float]:
     """Find the point on the curve nearest to *target*.
 
     Parameters
@@ -202,7 +200,9 @@ def plane_crossings(
 
     The plane is defined by $\mathbf{n} \cdot \mathbf{r} = d$ where
     $\mathbf{n}$ is the normal and $d$ is the offset. Crossing positions
-    are linearly interpolated between consecutive points.
+    are linearly interpolated between consecutive points. Segments
+    tangent to the plane (same signed distance at both endpoints)
+    are not counted as crossings.
 
     Parameters
     ----------
@@ -300,9 +300,7 @@ def resample_by_arc_length(
         raise ValueError(msg)
     s = arc_length_cumulative(points)
     s_new = np.linspace(s[0], s[-1], n_out)
-    resampled = np.column_stack(
-        [np.interp(s_new, s, points[:, i]) for i in range(3)]
-    )
+    resampled = np.column_stack([np.interp(s_new, s, points[:, i]) for i in range(3)])
     resampled_scalars: dict[str, FloatArray] = {}
     if scalars:
         for name, arr in scalars.items():
@@ -465,7 +463,7 @@ def drift_velocity(
     dt = np.gradient(time)
     dt = np.maximum(dt, np.finfo(dt.dtype).tiny)
     v_inst = np.gradient(points, axis=0) / dt[:, np.newaxis]
-    if window <= 1:
+    if window == 1:
         return v_inst  # type: ignore[no-any-return]
     kernel = np.ones(window) / window
     smoothed = np.column_stack(

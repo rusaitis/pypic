@@ -37,20 +37,21 @@ species is heated.
 ## Thermal Speed Convention
 
 We adopt $v_{th} = \sqrt{T/m}$ (with $T$ in energy units), following
-the NRL Plasma Formulary (Richardson 2019) convention. This is the 1D
-Maxwellian standard deviation $\sigma$ where
+the NRL Plasma Formulary [@NRL] convention. This is the 1D Maxwellian
+standard deviation $\sigma$ where
 $f(v_x) \propto \exp(-v_x^2 / (2\sigma^2))$ with $\sigma^2 = T/m$.
 
-**The community is split:** NRL, Chen, and kinetic theory use $\sqrt{T/m}$;
-Fitzpatrick, Bellan, and some particle physics texts use $\sqrt{2T/m}$
-("most probable speed"). The factor of $\sqrt{2}$ propagates into
-gyroradius definitions — always state the convention explicitly. The
-gyroradius $r = v_{th}/\omega_c$ uses whichever $v_{th}$ is adopted.
+**The community is split:** NRL [@NRL], Chen [@Chen], and kinetic theory
+use $\sqrt{T/m}$; Fitzpatrick [@Fitz], Bellan, and some particle physics
+texts use $\sqrt{2T/m}$ ("most probable speed"). The factor of $\sqrt{2}$
+propagates into gyroradius definitions — always state the convention
+explicitly. The gyroradius $r = v_{th}/\omega_c$ uses whichever $v_{th}$
+is adopted.
 
 ## Cyclotron Frequency Convention
 
 $\omega_{ce}$ and $\omega_{ci}$ are defined as positive (magnitudes),
-following NRL, Chen, and Fitzpatrick. Bellan uses the signed convention
+following NRL [@NRL], Chen [@Chen], and Fitzpatrick [@Fitz]. Bellan uses the signed convention
 $\omega_{c\sigma} = q_\sigma B / m_\sigma$ (so $\omega_{ce} < 0$ for
 electrons). The signed form is needed in the Stix cold plasma dielectric
 tensor. Our stored values are always positive.
@@ -102,9 +103,8 @@ The relative L2 error $\varepsilon_{L_2} = \|\mathbf{a} - \mathbf{b}\|_2
 / \|\mathbf{b}\|_2$ uses discrete sums without volume weighting. When
 computed and reference fields live on the same grid, $\Delta V$ appears
 identically in numerator and denominator and cancels. This matches the
-standard convention in convergence studies (LeVeque, *Finite Difference
-Methods for Ordinary and Partial Differential Equations*). Returns
-`inf` when the reference field is identically zero.
+standard convention in convergence studies [@LeVeque]. Returns `inf`
+when the reference field is identically zero.
 
 ### L-infinity norm: absolute, not relative
 

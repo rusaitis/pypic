@@ -26,6 +26,12 @@ uv run ruff format --check src tests  # format check
 uv run mypy src                       # type check
 ```
 
+Generate 2D visual test plots (all themes, output in `tests/output/`):
+```sh
+uv run python tests/visual_plots.py
+uv run python tests/visual_plots.py --theme dark  # single theme
+```
+
 Interactive 3D dipole with field line tracing and Bz slice:
 ```sh
 uv run python tests/visual_dipole_3d.py

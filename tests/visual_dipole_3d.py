@@ -13,16 +13,26 @@ Controls:
 Run with::
 
     uv run python tests/visual_dipole_3d.py
+    uv run python tests/visual_dipole_3d.py --theme light
+    uv run python tests/visual_dipole_3d.py --theme 3
 """
 
 from __future__ import annotations
 
+import argparse
+
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.backend_tools import Cursors
 from mpl_toolkits.mplot3d import proj3d
 
-from pypic.plotting import DARK, plot_field_line, style_3d_axes, use_theme
+from pypic.plotting import (
+    available_themes,
+    plot_field_line,
+    style_3d_axes,
+    use_theme,
+)
 from pypic.readers.base import FieldDataset, GridInfo
 from pypic.selections import PlaneSelection
 from pypic.traces import (
@@ -168,7 +178,7 @@ class SeedDragger:
             0.02,
             self._status_text(),
             ha="center",
-            color="#e0e0e0",
+            color=mpl.rcParams["text.color"],
             fontsize=9,
             family="monospace",
         )
@@ -373,6 +383,19 @@ class SeedDragger:
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser(description="3D dipole field line viewer.")
+    all_available = available_themes()
+    names = sorted(all_available)
+    numbered = [f"{i + 1}={n}" for i, n in enumerate(names)]
+    parser.add_argument(
+        "--theme",
+        default="dark",
+        help=f"Theme name or number ({', '.join(numbered)})",
+    )
+    args = parser.parse_args()
+    key = names[int(args.theme) - 1] if args.theme.isdigit() else args.theme
+    theme = all_available[key]
+
     # Build grid centered at origin
     dx = 2.0 * DOMAIN_HALF / N_CELLS
     grid = GridInfo(
@@ -428,7 +451,7 @@ def main() -> None:
     vmin_b = float(np.nanmin(valid_bmag))
     vmax_b = float(np.nanpercentile(valid_bmag, 98))
 
-    with use_theme(DARK):
+    with use_theme(theme):
         fig = plt.figure(figsize=(10, 8))
         ax = fig.add_subplot(111, projection="3d")
 
@@ -445,19 +468,13 @@ def main() -> None:
         )
 
         # Draw field lines, colored by |B|
-        fl_artist = None
-        for fl in lines:
-            fl_artist = plot_field_line(
+        for i, fl in enumerate(lines):
+            is_last = i == len(lines) - 1
+            plot_field_line(
                 ax, fl, color="|B|", cmap="plasma",
                 vmin=vmin_b, vmax=vmax_b,
                 linewidth=1.5, alpha=0.9,
-            )
-
-        # Colorbar from the last artist
-        if fl_artist is not None:
-            fig.colorbar(
-                fl_artist, ax=ax, shrink=0.55, pad=0.08,  # type: ignore[arg-type]
-                label="$|B|$",
+                colorbar=is_last,
             )
 
         # Axis limits and viewing angle
@@ -471,17 +488,16 @@ def main() -> None:
         # Apply clean 3D styling (must come after set_xlim/ylim)
         style_3d_axes(
             ax,
+            theme=theme,
             axis_labels=("$x$", "$y$", "$z$"),
             coord_units="$R_E$",
         )
 
         ax.set_title(
             "Magnetic Dipole — $|B|$ along field lines",
-            color="#e0e0e0",
             fontsize=14,
             pad=10,
         )
-        fig.set_facecolor("#1e1e1e")
 
         plt.tight_layout()
 

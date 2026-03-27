@@ -1,0 +1,63 @@
+name = "lcars"
+
+[colors]
+background = "#0a0e1a"
+text = [0.750, 0.880, 0.950, 0.95]
+secondary_text = [0.500, 0.650, 0.780, 0.80]
+grid = [0.300, 0.550, 0.800, 0.10]
+accent = "#5bc0eb"
+overlay = [0.060, 0.100, 0.200, 0.82]
+overlay_text = [0.750, 0.880, 0.950, 0.95]
+overlay_alt = [0.080, 0.130, 0.220, 0.75]
+overlay_alt_text = [0.400, 0.750, 0.900, 0.90]
+overlay_border = [0.300, 0.550, 0.800, 0.20]
+track = [0.300, 0.550, 0.800, 0.25]
+
+[colors.cycle]
+values = ["#5bc0eb", "#e8e8e8", "#fca311", "#48bfe3", "#90e0ef", "#a8dadc", "#72b4d9", "#caf0f8"]
+
+[colormaps]
+sequential = "cividis"
+diverging = "coolwarm"
+
+[font]
+family = ["Helvetica Neue", "Helvetica", "DejaVu Sans", "sans-serif"]
+title = 13.0
+label = 11.0
+tick = 10.0
+overlay = 9.5
+
+[overlay]
+rounding = 0.8
+padding = 0.45
+margin = 0.03
+
+[lines]
+width = 1.8
+arrow_size = 4.5
+arrow_style = "triangle"
+
+[axes]
+x_color = "#5bc0eb"
+y_color = "#90e0ef"
+z_color = "#e8e8e8"
+arrows = true
+
+[grid]
+major_width = 0.4
+minor_width = 0.25
+style = "solid"
+
+[colorbar]
+width = "4%"
+outline_width = 0.3
+tick_length = 2.0
+pad = 0.05
+
+[progress_bar]
+width = 90.0
+height = 5.0
+rounding = 2.5
+
+[plot]
+rounding = 0.0

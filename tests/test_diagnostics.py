@@ -236,3 +236,51 @@ class TestGeometryForwarding:
         f = np.ones((4, 4, 4))
         with pytest.raises(NotImplementedError, match="spherical"):
             func(f, f, f, 1.0, 1.0, 1.0, geometry=GeometryType.SPHERICAL)
+
+
+class TestSpatialStatistics:
+    def test_mean(self) -> None:
+        from pypic.diagnostics import spatial_mean
+
+        np.testing.assert_allclose(spatial_mean(np.array([1.0, 2.0, 3.0])), 2.0)
+
+    def test_mean_with_nan(self) -> None:
+        from pypic.diagnostics import spatial_mean
+
+        np.testing.assert_allclose(
+            spatial_mean(np.array([1.0, np.nan, 3.0])), 2.0,
+        )
+
+    def test_rms(self) -> None:
+        from pypic.diagnostics import spatial_rms
+
+        np.testing.assert_allclose(
+            spatial_rms(np.array([3.0, 4.0])), np.sqrt(12.5),
+        )
+
+    def test_rms_with_nan(self) -> None:
+        from pypic.diagnostics import spatial_rms
+
+        np.testing.assert_allclose(
+            spatial_rms(np.array([3.0, np.nan, 4.0])), np.sqrt(12.5),
+        )
+
+    def test_extrema(self) -> None:
+        from pypic.diagnostics import field_extrema
+
+        lo, hi = field_extrema(np.array([3.0, -1.0, 7.0]))
+        assert lo == -1.0
+        assert hi == 7.0
+
+    def test_extrema_with_nan(self) -> None:
+        from pypic.diagnostics import field_extrema
+
+        lo, hi = field_extrema(np.array([3.0, -1.0, 7.0, np.nan]))
+        assert lo == -1.0
+        assert hi == 7.0
+
+    def test_2d_array(self) -> None:
+        from pypic.diagnostics import spatial_mean
+
+        arr = np.array([[1.0, 2.0], [3.0, 4.0]])
+        np.testing.assert_allclose(spatial_mean(arr), 2.5)

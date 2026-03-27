@@ -10,7 +10,7 @@ if TYPE_CHECKING:
     from matplotlib.axes import Axes
     from matplotlib.figure import Figure
 
-    from pypic.plotting.styles import PlotTheme
+    from pypic.plotting.styles import ThemeArg
     from pypic.readers.base import FieldDataset, TabularData
 
 
@@ -22,12 +22,13 @@ def plot_line(
     index: dict[str, int] | None = None,
     units: str | None = None,
     coord_units: str | None = None,
-    theme: PlotTheme | None = None,
+    theme: ThemeArg = None,
     label: str | None = None,
     title: str | None = None,
     step: int | None = None,
     time: float | None = None,
     ax: Axes | None = None,
+    save: str | None = None,
     figsize: tuple[float, float] | None = None,
     **kwargs: Any,  # noqa: ANN401 — matplotlib passthrough
 ) -> tuple[Figure, Axes]:
@@ -77,10 +78,16 @@ def plot_line(
 
     from pypic.plotting._labels import axis_label, field_label, figure_title
     from pypic.plotting._resolve import get_or_create_axes, resolve_field_values
-    from pypic.plotting.styles import DEFAULT, apply_grid, style_legend, use_theme
+    from pypic.plotting.styles import (
+        _resolve_theme_arg,
+        apply_grid,
+        apply_rounding,
+        style_legend,
+        use_theme,
+    )
 
-    if theme is None:
-        theme = DEFAULT
+    owned = ax is None
+    theme = _resolve_theme_arg(theme)
 
     ndim = len(data.grid.dimensions)
     axis_names = list(data.grid.geometry.axis_names[:ndim])
@@ -107,7 +114,20 @@ def plot_line(
                 indexers[a] = data.grid.dimensions[dim_idx] // 2
         data = data.isel(indexers)
 
+    import warnings
+
+    import numpy as np
+
     values = resolve_field_values(data, field, units)
+
+    if values.shape[0] < 2:
+        warnings.warn(
+            f"Field {field!r} has fewer than 2 points; line will not be visible",
+            stacklevel=2,
+        )
+
+    if np.all(np.isnan(values)):
+        warnings.warn(f"Field {field!r} is entirely NaN", stacklevel=2)
 
     info = data.field_info(field)
     coord = data.grid.coordinate_arrays()[0]
@@ -129,9 +149,186 @@ def plot_line(
             ax.legend()
             style_legend(ax)
 
-        fig.tight_layout()
+        if owned:
+            fig.tight_layout()
+            apply_rounding(ax)
 
+    from pypic.plotting._resolve import maybe_save
+
+    maybe_save(fig, save)
     return fig, ax
+
+
+def plot_lines(
+    data: FieldDataset,
+    fields: list[str],
+    *,
+    axis: str | None = None,
+    index: dict[str, int] | None = None,
+    labels: list[str] | None = None,
+    units: str | None = None,
+    coord_units: str | None = None,
+    theme: ThemeArg = None,
+    title: str | None = None,
+    step: int | None = None,
+    time: float | None = None,
+    ax: Axes | None = None,
+    save: str | None = None,
+    figsize: tuple[float, float] | None = None,
+    **kwargs: Any,  # noqa: ANN401 — matplotlib passthrough
+) -> tuple[Figure, Axes]:
+    r"""Plot multiple fields overlaid on the same axes.
+
+    Convenience wrapper around :func:`plot_line` that handles axes
+    reuse, automatic color cycling, and legend display.
+
+    Parameters
+    ----------
+    data : FieldDataset
+        Input dataset.
+    fields : list[str]
+        Field names to plot (one line per field).
+    axis : str | None
+        Axis to plot along (required for 2D/3D data).
+    index : dict[str, int] | None
+        Fix non-plot axes at these indices.
+    labels : list[str] | None
+        Legend labels. ``None`` uses field names.
+    units : str | None
+        Display units for field values.
+    coord_units : str | None
+        Display units for coordinate axis.
+    theme : PlotTheme | None
+        Plot theme. ``None`` uses default.
+    title : str | None
+        Axes title.
+    step : int | None
+        Timestep number for the title.
+    time : float | None
+        Simulation time for the title.
+    ax : Axes | None
+        Existing axes. ``None`` creates a new figure.
+    save : str | None
+        Save figure to this path (and close).
+    figsize : tuple[float, float] | None
+        Figure size override.
+    **kwargs
+        Passed to ``ax.plot()`` (color, linestyle, etc.).
+
+    Returns
+    -------
+    tuple[Figure, Axes]
+    """
+    if labels is None:
+        labels = fields
+
+    fig = None
+    for field_name, lbl in zip(fields, labels, strict=True):
+        fig, ax = plot_line(
+            data,
+            field_name,
+            axis=axis,
+            index=index,
+            units=units,
+            coord_units=coord_units,
+            theme=theme,
+            label=lbl,
+            title=title,
+            step=step,
+            time=time,
+            ax=ax,
+            figsize=figsize,
+            **kwargs,
+        )
+
+    assert fig is not None
+    from pypic.plotting._resolve import maybe_save
+
+    maybe_save(fig, save)
+    return fig, ax  # type: ignore[return-value]
+
+
+def plot_line_comparison(
+    datasets: list[FieldDataset],
+    field: str,
+    *,
+    axis: str | None = None,
+    index: dict[str, int] | None = None,
+    labels: list[str] | None = None,
+    units: str | None = None,
+    coord_units: str | None = None,
+    theme: ThemeArg = None,
+    title: str | None = None,
+    ax: Axes | None = None,
+    save: str | None = None,
+    figsize: tuple[float, float] | None = None,
+    **kwargs: Any,  # noqa: ANN401 — matplotlib passthrough
+) -> tuple[Figure, Axes]:
+    r"""Compare 1D profiles of the same field from multiple datasets.
+
+    Overlays one line per dataset with automatic color cycling and
+    legend. Useful for comparing simulation runs with different
+    parameters or resolutions.
+
+    Parameters
+    ----------
+    datasets : list[FieldDataset]
+        Datasets to compare (must share compatible axes).
+    field : str
+        Field name to plot from each dataset.
+    axis : str | None
+        Axis to plot along (required for 2D/3D data).
+    index : dict[str, int] | None
+        Fix non-plot axes at these indices.
+    labels : list[str] | None
+        Legend labels (one per dataset). ``None`` uses ``"run 0"``,
+        ``"run 1"``, etc.
+    units : str | None
+        Display units for field values.
+    coord_units : str | None
+        Display units for the coordinate axis.
+    theme : PlotTheme | None
+        Plot theme. ``None`` uses default.
+    title : str | None
+        Axes title.
+    ax : Axes | None
+        Existing axes. ``None`` creates a new figure.
+    save : str | None
+        Save figure to this path.
+    figsize : tuple[float, float] | None
+        Figure size override.
+    **kwargs
+        Passed to ``ax.plot()`` (linestyle, linewidth, etc.).
+
+    Returns
+    -------
+    tuple[Figure, Axes]
+    """
+    if labels is None:
+        labels = [f"run {i}" for i in range(len(datasets))]
+
+    fig = None
+    for ds, lbl in zip(datasets, labels, strict=True):
+        fig, ax = plot_line(
+            ds,
+            field,
+            axis=axis,
+            index=index,
+            units=units,
+            coord_units=coord_units,
+            theme=theme,
+            label=lbl,
+            title=title,
+            ax=ax,
+            figsize=figsize,
+            **kwargs,
+        )
+
+    assert fig is not None
+    from pypic.plotting._resolve import maybe_save
+
+    maybe_save(fig, save)
+    return fig, ax  # type: ignore[return-value]
 
 
 def plot_time_series(
@@ -139,12 +336,13 @@ def plot_time_series(
     columns: str | list[str],
     *,
     x_column: str | None = None,
-    theme: PlotTheme | None = None,
+    theme: ThemeArg = None,
     labels: list[str] | None = None,
     title: str | None = None,
     xlabel: str | None = None,
     ylabel: str | None = None,
     ax: Axes | None = None,
+    save: str | None = None,
     figsize: tuple[float, float] | None = None,
     legend: bool = True,
     **kwargs: Any,  # noqa: ANN401 — matplotlib passthrough
@@ -185,10 +383,16 @@ def plot_time_series(
     ensure_matplotlib()
 
     from pypic.plotting._resolve import get_or_create_axes
-    from pypic.plotting.styles import DEFAULT, apply_grid, style_legend, use_theme
+    from pypic.plotting.styles import (
+        _resolve_theme_arg,
+        apply_grid,
+        apply_rounding,
+        style_legend,
+        use_theme,
+    )
 
-    if theme is None:
-        theme = DEFAULT
+    owned = ax is None
+    theme = _resolve_theme_arg(theme)
 
     if isinstance(columns, str):
         columns = [columns]
@@ -225,6 +429,11 @@ def plot_time_series(
             ax.legend()
             style_legend(ax)
 
-        fig.tight_layout()
+        if owned:
+            fig.tight_layout()
+            apply_rounding(ax)
 
+    from pypic.plotting._resolve import maybe_save
+
+    maybe_save(fig, save)
     return fig, ax

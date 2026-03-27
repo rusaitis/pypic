@@ -231,6 +231,69 @@ _REGISTRY: dict[str, _Recipe] = {
     ),
     # Vorticity magnitude — depends on vort1/2/3
     "|vort|": _Recipe(derived.velocity_magnitude, ("vort1", "vort2", "vort3")),
+    # Reconnection diagnostics
+    "J_dot_E": _Recipe(
+        derived.j_dot_e, ("J1", "J2", "J3", "E1", "E2", "E3")
+    ),
+    # Non-ideal electric field E' = E + VxB (component selects)
+    "E_prime_1": _Recipe(
+        derived.non_ideal_electric_field,
+        ("E1", "E2", "E3", "V1", "V2", "V3", "B1", "B2", "B3"),
+        component=0,
+    ),
+    "E_prime_2": _Recipe(
+        derived.non_ideal_electric_field,
+        ("E1", "E2", "E3", "V1", "V2", "V3", "B1", "B2", "B3"),
+        component=1,
+    ),
+    "E_prime_3": _Recipe(
+        derived.non_ideal_electric_field,
+        ("E1", "E2", "E3", "V1", "V2", "V3", "B1", "B2", "B3"),
+        component=2,
+    ),
+    # Ideal electric field E_ideal = -VxB (component selects)
+    "E_ideal_1": _Recipe(
+        derived.ideal_electric_field,
+        ("V1", "V2", "V3", "B1", "B2", "B3"),
+        component=0,
+    ),
+    "E_ideal_2": _Recipe(
+        derived.ideal_electric_field,
+        ("V1", "V2", "V3", "B1", "B2", "B3"),
+        component=1,
+    ),
+    "E_ideal_3": _Recipe(
+        derived.ideal_electric_field,
+        ("V1", "V2", "V3", "B1", "B2", "B3"),
+        component=2,
+    ),
+    # Hall electric field E_Hall = JxB/(nq) (component selects)
+    "E_Hall_1": _Recipe(
+        derived.hall_electric_field,
+        ("J1", "J2", "J3", "B1", "B2", "B3", "n_s0"),
+        species_index=0,
+        species_args=_SpeciesArgs.CHARGE_ONLY,
+        component=0,
+    ),
+    "E_Hall_2": _Recipe(
+        derived.hall_electric_field,
+        ("J1", "J2", "J3", "B1", "B2", "B3", "n_s0"),
+        species_index=0,
+        species_args=_SpeciesArgs.CHARGE_ONLY,
+        component=1,
+    ),
+    "E_Hall_3": _Recipe(
+        derived.hall_electric_field,
+        ("J1", "J2", "J3", "B1", "B2", "B3", "n_s0"),
+        species_index=0,
+        species_args=_SpeciesArgs.CHARGE_ONLY,
+        component=2,
+    ),
+    # Anisotropy instability parameters
+    "firehose": _Recipe(derived.firehose_parameter, ("P_par", "P_perp", "|B|")),
+    "mirror": _Recipe(derived.mirror_parameter, ("P_par", "P_perp", "|B|")),
+    # Magnetic flux function (2D only)
+    "psi": _Recipe(derived.magnetic_flux_function, ("B2",), needs_grid=True),
 }
 
 

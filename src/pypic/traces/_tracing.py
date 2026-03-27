@@ -17,6 +17,8 @@ from typing import TYPE_CHECKING, Self
 import numpy as np
 from scipy.interpolate import RegularGridInterpolator
 
+from pypic.traces._fieldline import _VALID_DIRECTIONS
+
 if TYPE_CHECKING:
     from collections.abc import Callable
 
@@ -28,10 +30,10 @@ if TYPE_CHECKING:
 class TerminationReason(StrEnum):
     """Why a field line trace stopped."""
 
-    MAX_STEPS = "max_steps"
-    DOMAIN_EXIT = "domain_exit"
-    NULL_POINT = "null_point"
-    CALLBACK = "callback"
+    MAX_STEPS = "max_steps"  # reached step limit
+    DOMAIN_EXIT = "domain_exit"  # left interpolation domain (NaN)
+    NULL_POINT = "null_point"  # |B| below null_threshold
+    CALLBACK = "callback"  # user terminate() returned True
 
 
 @dataclass(frozen=True, slots=True)
@@ -139,14 +141,16 @@ def _trace_single_direction(
     max_steps: int,
     null_threshold: float,
     terminate: Callable[[FloatArray], bool] | None,
-) -> tuple[list[FloatArray], TerminationReason]:
+) -> tuple[FloatArray, TerminationReason]:
     """Fixed-step classical RK4 integration in one direction."""
-    points: list[FloatArray] = [seed.copy()]
+    buf = np.empty((max_steps + 1, 3), dtype=np.float64)
+    buf[0] = seed
+    n = 0
     reason = TerminationReason.MAX_STEPS
     h = step_size
 
     for _ in range(max_steps):
-        y = points[-1]
+        y = buf[n]
 
         k1 = _rhs(y, interp, sign, null_threshold)
         if k1 is None:
@@ -171,17 +175,18 @@ def _trace_single_direction(
             reason = _classify_failure(p4, interp)
             break
 
-        y_new = y + (h / 6.0) * (k1 + 2.0 * k2 + 2.0 * k3 + k4)
-        points.append(y_new)
+        n += 1
+        buf[n] = y + (h / 6.0) * (k1 + 2.0 * k2 + 2.0 * k3 + k4)
 
-        if terminate is not None and terminate(y_new):
+        if terminate is not None and terminate(buf[n]):
             reason = TerminationReason.CALLBACK
             break
 
-    return points, reason
+    return buf[: n + 1], reason
 
 
-# Dormand-Prince RK4(5) Butcher tableau
+# Dormand-Prince RK4(5) Butcher tableau (7 stages)
+# Rows = stages, columns = weights on previous stages
 _DP_A = np.array(
     [
         [0, 0, 0, 0, 0, 0, 0],
@@ -215,21 +220,23 @@ def _trace_single_direction_adaptive(
     max_steps: int,
     null_threshold: float,
     terminate: Callable[[FloatArray], bool] | None,
-) -> tuple[list[FloatArray], TerminationReason, float]:
+) -> tuple[FloatArray, TerminationReason, float]:
     """Dormand-Prince RK4(5) adaptive integration in one direction."""
-    points: list[FloatArray] = [seed.copy()]
+    buf = np.empty((max_steps + 1, 3), dtype=np.float64)
+    buf[0] = seed
+    n = 0
     reason = TerminationReason.MAX_STEPS
     h = step_size_init
     max_local_error = 0.0
-    steps_taken = 0
 
-    while steps_taken < max_steps:
-        y = points[-1]
+    while n < max_steps:
+        y = buf[n]
 
+        # Evaluate all 7 Dormand-Prince stages
         k = np.empty((7, 3))
         failed = False
         for i in range(7):
-            yi = y + h * np.dot(_DP_A[i, :i], k[:i]) if i > 0 else y
+            yi = y if i == 0 else y + h * np.dot(_DP_A[i, :i], k[:i])
             rhs_val = _rhs(yi, interp, sign, null_threshold)
             if rhs_val is None:
                 reason = _classify_failure(yi, interp)
@@ -240,21 +247,20 @@ def _trace_single_direction_adaptive(
         if failed:
             break
 
+        # 5th-order solution and embedded error estimate
         y5 = y + h * np.dot(_DP_B5, k)
         err_vec = h * np.dot(_DP_E, k)
         scale = atol + rtol * np.abs(y5)
         err_norm = float(np.max(np.abs(err_vec) / scale))
         max_local_error = max(max_local_error, err_norm)
 
-        if err_norm == 0.0:
-            factor = 5.0
-        else:
-            factor = min(5.0, max(0.2, 0.9 * err_norm ** (-0.2)))
+        # Step size control: 0.9 safety factor, clamp growth to [0.2x, 5x]
+        factor = min(5.0, max(0.2, 0.9 * max(err_norm, 1e-15) ** (-0.2)))
         h_new = float(np.clip(h * factor, min_step, max_step))
 
         if err_norm <= 1.0 or h <= min_step:
-            points.append(y5)
-            steps_taken += 1
+            n += 1
+            buf[n] = y5
             h = h_new
             if terminate is not None and terminate(y5):
                 reason = TerminationReason.CALLBACK
@@ -262,13 +268,16 @@ def _trace_single_direction_adaptive(
         else:
             h = h_new
 
-    return points, reason, max_local_error
+    return buf[: n + 1], reason, max_local_error
+
+
+_EMPTY_POINTS = np.empty((0, 3), dtype=np.float64)
 
 
 def _assemble_field_line(
-    fwd_points: list[FloatArray],
+    fwd_points: FloatArray,
     fwd_reason: TerminationReason,
-    bwd_points: list[FloatArray],
+    bwd_points: FloatArray,
     bwd_reason: TerminationReason,
     seed: Vector3,
     direction: str,
@@ -279,26 +288,29 @@ def _assemble_field_line(
     """Concatenate forward/backward traces into a FieldLine."""
     from pypic.traces._fieldline import FieldLine as _FieldLine
 
-    if direction == "forward":
-        all_points = np.array(fwd_points)
-        reason = fwd_reason
-    elif direction == "backward":
-        all_points = np.array(bwd_points[::-1])
-        reason = bwd_reason
-    else:
-        bwd_rev = list(reversed(bwd_points))
-        if len(bwd_rev) > 0 and len(fwd_points) > 0:
-            combined = bwd_rev[:-1] + fwd_points
-        elif len(bwd_rev) > 0:
-            combined = bwd_rev
-        else:
-            combined = fwd_points
-        all_points = np.array(combined)
-        is_max = (
-            fwd_reason == TerminationReason.MAX_STEPS
-            or bwd_reason == TerminationReason.MAX_STEPS
-        )
-        reason = TerminationReason.MAX_STEPS if is_max else fwd_reason
+    match direction:
+        case "forward":
+            all_points = fwd_points
+            reason = fwd_reason
+        case "backward":
+            all_points = bwd_points[::-1]
+            reason = bwd_reason
+        case _:
+            # "both": reverse backward, drop duplicated seed, append forward.
+            # Reason: MAX_STEPS if either direction was truncated,
+            # otherwise forward reason (arbitrary but deterministic).
+            bwd_rev = bwd_points[::-1]
+            if len(bwd_rev) > 0 and len(fwd_points) > 0:
+                all_points = np.concatenate([bwd_rev[:-1], fwd_points])
+            elif len(bwd_rev) > 0:
+                all_points = bwd_rev
+            else:
+                all_points = fwd_points
+            is_max = (
+                fwd_reason == TerminationReason.MAX_STEPS
+                or bwd_reason == TerminationReason.MAX_STEPS
+            )
+            reason = TerminationReason.MAX_STEPS if is_max else fwd_reason
 
     metadata["reason"] = str(reason)
     metadata["n_steps"] = len(all_points) - 1
@@ -311,9 +323,6 @@ def _assemble_field_line(
         direction=direction,
         metadata=metadata,
     )
-
-
-_VALID_DIRECTIONS = frozenset({"forward", "backward", "both"})
 
 
 def trace_field_line(
@@ -368,78 +377,56 @@ def trace_field_line(
         raise ValueError(msg)
 
     if interpolator is None:
-        interpolator = VectorFieldInterpolator.from_dataset(
-            data,
-            field_components,
-        )
+        interpolator = VectorFieldInterpolator.from_dataset(data, field_components)
 
     seed_arr = np.asarray(seed, dtype=np.float64)
     _validate_seed(seed_arr, interpolator, null_threshold)
 
     field_name = _field_name_from_components(field_components)
     meta: dict = {"step_size": step_size, "method": "rk4"}  # type: ignore[type-arg]
-
     args = (step_size, max_steps, null_threshold, terminate)
-    if direction == "forward":
-        fwd, fwd_r = _trace_single_direction(
-            interpolator,
-            seed_arr,
-            1.0,
-            *args,
-        )
-        return _assemble_field_line(
-            fwd,
-            fwd_r,
-            [],
-            TerminationReason.MAX_STEPS,
-            seed,
-            direction,
-            field_name,
-            data.normalization,
-            meta,
-        )
-    if direction == "backward":
-        bwd, bwd_r = _trace_single_direction(
-            interpolator,
-            seed_arr,
-            -1.0,
-            *args,
-        )
-        return _assemble_field_line(
-            [],
-            TerminationReason.MAX_STEPS,
-            bwd,
-            bwd_r,
-            seed,
-            direction,
-            field_name,
-            data.normalization,
-            meta,
-        )
-    # "both"
-    fwd, fwd_r = _trace_single_direction(
-        interpolator,
-        seed_arr,
-        1.0,
-        *args,
-    )
-    bwd, bwd_r = _trace_single_direction(
-        interpolator,
-        seed_arr,
-        -1.0,
-        *args,
-    )
-    return _assemble_field_line(
-        fwd,
-        fwd_r,
-        bwd,
-        bwd_r,
-        seed,
-        direction,
-        field_name,
-        data.normalization,
-        meta,
-    )
+
+    match direction:
+        case "forward":
+            fwd, fwd_r = _trace_single_direction(interpolator, seed_arr, 1.0, *args)
+            return _assemble_field_line(
+                fwd,
+                fwd_r,
+                _EMPTY_POINTS,
+                TerminationReason.MAX_STEPS,
+                seed,
+                direction,
+                field_name,
+                data.normalization,
+                meta,
+            )
+        case "backward":
+            bwd, bwd_r = _trace_single_direction(interpolator, seed_arr, -1.0, *args)
+            return _assemble_field_line(
+                _EMPTY_POINTS,
+                TerminationReason.MAX_STEPS,
+                bwd,
+                bwd_r,
+                seed,
+                direction,
+                field_name,
+                data.normalization,
+                meta,
+            )
+        case _:
+            fwd, fwd_r = _trace_single_direction(interpolator, seed_arr, 1.0, *args)
+            bwd, bwd_r = _trace_single_direction(interpolator, seed_arr, -1.0, *args)
+            return _assemble_field_line(
+                fwd,
+                fwd_r,
+                bwd,
+                bwd_r,
+                seed,
+                direction,
+                field_name,
+                data.normalization,
+                meta,
+            )
 
 
 def trace_field_line_adaptive(
@@ -506,19 +493,14 @@ def trace_field_line_adaptive(
         raise ValueError(msg)
 
     if interpolator is None:
-        interpolator = VectorFieldInterpolator.from_dataset(
-            data,
-            field_components,
-        )
+        interpolator = VectorFieldInterpolator.from_dataset(data, field_components)
 
     seed_arr = np.asarray(seed, dtype=np.float64)
     _validate_seed(seed_arr, interpolator, null_threshold)
 
     field_name = _field_name_from_components(field_components)
 
-    def _adapt(
-        sign: float,
-    ) -> tuple[list[FloatArray], TerminationReason, float]:
+    def _adapt(sign: float) -> tuple[FloatArray, TerminationReason, float]:
         return _trace_single_direction_adaptive(
             interpolator,
             seed_arr,
@@ -541,46 +523,47 @@ def trace_field_line_adaptive(
             "max_local_error": err,
         }
 
-    if direction == "forward":
-        fwd, fwd_r, fwd_err = _adapt(1.0)
-        return _assemble_field_line(
-            fwd,
-            fwd_r,
-            [],
-            TerminationReason.MAX_STEPS,
-            seed,
-            direction,
-            field_name,
-            data.normalization,
-            _meta(fwd_err),
-        )
-    if direction == "backward":
-        bwd, bwd_r, bwd_err = _adapt(-1.0)
-        return _assemble_field_line(
-            [],
-            TerminationReason.MAX_STEPS,
-            bwd,
-            bwd_r,
-            seed,
-            direction,
-            field_name,
-            data.normalization,
-            _meta(bwd_err),
-        )
-    # "both"
-    fwd, fwd_r, fwd_err = _adapt(1.0)
-    bwd, bwd_r, bwd_err = _adapt(-1.0)
-    return _assemble_field_line(
-        fwd,
-        fwd_r,
-        bwd,
-        bwd_r,
-        seed,
-        direction,
-        field_name,
-        data.normalization,
-        _meta(max(fwd_err, bwd_err)),
-    )
+    match direction:
+        case "forward":
+            fwd, fwd_r, fwd_err = _adapt(1.0)
+            return _assemble_field_line(
+                fwd,
+                fwd_r,
+                _EMPTY_POINTS,
+                TerminationReason.MAX_STEPS,
+                seed,
+                direction,
+                field_name,
+                data.normalization,
+                _meta(fwd_err),
+            )
+        case "backward":
+            bwd, bwd_r, bwd_err = _adapt(-1.0)
+            return _assemble_field_line(
+                _EMPTY_POINTS,
+                TerminationReason.MAX_STEPS,
+                bwd,
+                bwd_r,
+                seed,
+                direction,
+                field_name,
+                data.normalization,
+                _meta(bwd_err),
+            )
+        case _:
+            fwd, fwd_r, fwd_err = _adapt(1.0)
+            bwd, bwd_r, bwd_err = _adapt(-1.0)
+            return _assemble_field_line(
+                fwd,
+                fwd_r,
+                bwd,
+                bwd_r,
+                seed,
+                direction,
+                field_name,
+                data.normalization,
+                _meta(max(fwd_err, bwd_err)),
+            )
 
 
 def estimate_tracing_error(
@@ -588,10 +571,16 @@ def estimate_tracing_error(
     data: FieldDataset,
     *,
     field_components: tuple[str, str, str] = ("B1", "B2", "B3"),
+    interpolator: VectorFieldInterpolator | None = None,
 ) -> float:
     r"""Estimate tracing error via Richardson extrapolation.
 
     Re-traces at half the original step size and compares endpoints.
+    For an order-$p$ scheme, halving the step reduces truncation error
+    by $2^p$; a ratio of ~16 confirms RK4's 4th-order convergence.
+
+    Only works with fixed-step field lines (from ``trace_field_line``).
+    Adaptive traces store ``max_local_error`` in metadata instead.
 
     Parameters
     ----------
@@ -601,12 +590,22 @@ def estimate_tracing_error(
         Same data used for the original trace.
     field_components : tuple[str, str, str]
         Vector field component names.
+    interpolator : VectorFieldInterpolator | None
+        Pre-built interpolator. Built internally if ``None``.
 
     Returns
     -------
     float
         L2 distance between original and refined endpoints.
     """
+    for key in ("step_size", "n_steps"):
+        if key not in field_line.metadata:
+            msg = (
+                f"FieldLine metadata missing required key {key!r}. "
+                f"Only fixed-step traces (trace_field_line) support error estimation."
+            )
+            raise ValueError(msg)
+
     original_step = field_line.metadata["step_size"]
     n_steps = field_line.metadata["n_steps"]
 
@@ -617,6 +616,7 @@ def estimate_tracing_error(
         max_steps=n_steps * 2,
         direction=field_line.direction,
         field_components=field_components,
+        interpolator=interpolator,
     )
     orig_end = np.array(field_line.end_point)
     ref_end = np.array(refined.end_point)
@@ -641,5 +641,12 @@ def _validate_seed(
 def _field_name_from_components(
     components: tuple[str, str, str],
 ) -> str:
-    """Infer a field name like 'B' from ('B1', 'B2', 'B3')."""
-    return components[0].rstrip("0123456789")
+    """Infer a field name like ``'B'`` from ``('B1', 'B2', 'B3')``.
+
+    Validates that all components share the same prefix.
+    """
+    names = {c.rstrip("0123456789") for c in components}
+    if len(names) != 1:
+        msg = f"Components must belong to the same field, got {components}"
+        raise ValueError(msg)
+    return names.pop()

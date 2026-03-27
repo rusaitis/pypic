@@ -18,6 +18,13 @@ if TYPE_CHECKING:
     from pypic.types import FloatArray
 
 
+def _require_positive_spacing(d1: float, d2: float, d3: float) -> None:
+    """Raise if any grid spacing is not positive."""
+    if d1 <= 0 or d2 <= 0 or d3 <= 0:
+        msg = f"Grid spacing must be positive, got ({d1}, {d2}, {d3})"
+        raise ValueError(msg)
+
+
 def _require_cartesian(geometry: GeometryType, operation: str) -> None:
     """Raise if *geometry* is not Cartesian."""
     match geometry:
@@ -81,6 +88,7 @@ def divergence(
     np.float64(0.0)
     """
     _require_cartesian(geometry, "divergence")
+    _require_positive_spacing(d1, d2, d3)
     df1_d1: FloatArray = np.gradient(f1, d1, axis=0)
     df2_d2: FloatArray = np.gradient(f2, d2, axis=1)
     df3_d3: FloatArray = np.gradient(f3, d3, axis=2)
@@ -146,6 +154,7 @@ def curl(
     np.float64(0.0)
     """
     _require_cartesian(geometry, "curl")
+    _require_positive_spacing(d1, d2, d3)
     curl_1: FloatArray = np.gradient(f3, d2, axis=1) - np.gradient(f2, d3, axis=2)
     curl_2: FloatArray = np.gradient(f1, d3, axis=2) - np.gradient(f3, d1, axis=0)
     curl_3: FloatArray = np.gradient(f2, d1, axis=0) - np.gradient(f1, d2, axis=1)
@@ -198,6 +207,7 @@ def gradient(
     np.float64(0.0)
     """
     _require_cartesian(geometry, "gradient")
+    _require_positive_spacing(d1, d2, d3)
     df_d1: FloatArray = np.gradient(f, d1, axis=0)
     df_d2: FloatArray = np.gradient(f, d2, axis=1)
     df_d3: FloatArray = np.gradient(f, d3, axis=2)

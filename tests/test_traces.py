@@ -53,7 +53,9 @@ class TestFieldLine:
     def test_construction(self) -> None:
         pts = _straight_line(5)
         fl = FieldLine(
-            points=pts, field_name="B", seed_point=(0.0, 0.0, 0.0),
+            points=pts,
+            field_name="B",
+            seed_point=(0.0, 0.0, 0.0),
             normalization=_identity(),
         )
         assert fl.n_points == 5
@@ -62,37 +64,47 @@ class TestFieldLine:
     def test_wrong_shape_rejects(self) -> None:
         with pytest.raises(ValueError, match="shape"):
             FieldLine(
-                points=np.zeros((5,)), field_name="B",
-                seed_point=(0.0, 0.0, 0.0), normalization=_identity(),
+                points=np.zeros((5,)),
+                field_name="B",
+                seed_point=(0.0, 0.0, 0.0),
+                normalization=_identity(),
             )
 
     def test_too_few_points_rejects(self) -> None:
         with pytest.raises(ValueError, match="at least 2"):
             FieldLine(
-                points=np.zeros((1, 3)), field_name="B",
-                seed_point=(0.0, 0.0, 0.0), normalization=_identity(),
+                points=np.zeros((1, 3)),
+                field_name="B",
+                seed_point=(0.0, 0.0, 0.0),
+                normalization=_identity(),
             )
 
     def test_invalid_direction_rejects(self) -> None:
         with pytest.raises(ValueError, match="direction"):
             FieldLine(
-                points=_straight_line(3), field_name="B",
-                seed_point=(0.0, 0.0, 0.0), normalization=_identity(),
+                points=_straight_line(3),
+                field_name="B",
+                seed_point=(0.0, 0.0, 0.0),
+                normalization=_identity(),
                 direction="up",
             )
 
     def test_scalar_shape_mismatch_rejects(self) -> None:
         with pytest.raises(ValueError, match="scalar"):
             FieldLine(
-                points=_straight_line(5), field_name="B",
-                seed_point=(0.0, 0.0, 0.0), normalization=_identity(),
+                points=_straight_line(5),
+                field_name="B",
+                seed_point=(0.0, 0.0, 0.0),
+                normalization=_identity(),
                 scalars={"|B|": np.ones(3)},
             )
 
     def test_start_end_points(self) -> None:
         pts = np.array([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
         fl = FieldLine(
-            points=pts, field_name="B", seed_point=(1.0, 2.0, 3.0),
+            points=pts,
+            field_name="B",
+            seed_point=(1.0, 2.0, 3.0),
             normalization=_identity(),
         )
         assert fl.start_point == (1.0, 2.0, 3.0)
@@ -100,15 +112,19 @@ class TestFieldLine:
 
     def test_len(self) -> None:
         fl = FieldLine(
-            points=_straight_line(7), field_name="B",
-            seed_point=(0.0, 0.0, 0.0), normalization=_identity(),
+            points=_straight_line(7),
+            field_name="B",
+            seed_point=(0.0, 0.0, 0.0),
+            normalization=_identity(),
         )
         assert len(fl) == 7
 
     def test_scalars_are_readonly(self) -> None:
         fl = FieldLine(
-            points=_straight_line(3), field_name="B",
-            seed_point=(0.0, 0.0, 0.0), normalization=_identity(),
+            points=_straight_line(3),
+            field_name="B",
+            seed_point=(0.0, 0.0, 0.0),
+            normalization=_identity(),
             scalars={"|B|": np.ones(3)},
         )
         assert isinstance(fl.scalars, MappingProxyType)
@@ -117,16 +133,20 @@ class TestFieldLine:
 
     def test_metadata_is_readonly(self) -> None:
         fl = FieldLine(
-            points=_straight_line(3), field_name="B",
-            seed_point=(0.0, 0.0, 0.0), normalization=_identity(),
+            points=_straight_line(3),
+            field_name="B",
+            seed_point=(0.0, 0.0, 0.0),
+            normalization=_identity(),
             metadata={"source": "test"},
         )
         assert isinstance(fl.metadata, MappingProxyType)
 
     def test_copy_replace(self) -> None:
         fl = FieldLine(
-            points=_straight_line(3), field_name="B",
-            seed_point=(0.0, 0.0, 0.0), normalization=_identity(),
+            points=_straight_line(3),
+            field_name="B",
+            seed_point=(0.0, 0.0, 0.0),
+            normalization=_identity(),
         )
         fl2 = copy.replace(fl, field_name="E")
         assert fl2.field_name == "E"
@@ -134,8 +154,10 @@ class TestFieldLine:
 
     def test_with_scalars(self) -> None:
         fl = FieldLine(
-            points=_straight_line(3), field_name="B",
-            seed_point=(0.0, 0.0, 0.0), normalization=_identity(),
+            points=_straight_line(3),
+            field_name="B",
+            seed_point=(0.0, 0.0, 0.0),
+            normalization=_identity(),
         )
         fl2 = fl.with_scalars(rho=np.ones(3))
         assert "rho" in fl2.scalars
@@ -143,8 +165,10 @@ class TestFieldLine:
 
     def test_repr(self) -> None:
         fl = FieldLine(
-            points=_straight_line(3), field_name="B",
-            seed_point=(0.0, 0.0, 0.0), normalization=_identity(),
+            points=_straight_line(3),
+            field_name="B",
+            seed_point=(0.0, 0.0, 0.0),
+            normalization=_identity(),
             time=1.5,
         )
         r = repr(fl)
@@ -159,7 +183,10 @@ class TestParticleTrace:
         t = np.arange(n, dtype=float) * 0.1
         vel = np.column_stack([np.ones(n), np.zeros(n), np.zeros(n)])
         return ParticleTrace(
-            points=pts, time=t, velocity=vel, species_name="electrons",
+            points=pts,
+            time=t,
+            velocity=vel,
+            species_name="electrons",
             normalization=_identity(),
         )
 
@@ -172,27 +199,33 @@ class TestParticleTrace:
         pts = _straight_line(5)
         with pytest.raises(ValueError, match="time must have shape"):
             ParticleTrace(
-                points=pts, time=np.arange(3, dtype=float),
+                points=pts,
+                time=np.arange(3, dtype=float),
                 velocity=np.ones((5, 3)),
-                species_name="e", normalization=_identity(),
+                species_name="e",
+                normalization=_identity(),
             )
 
     def test_non_monotonic_time_rejects(self) -> None:
         pts = _straight_line(3)
         with pytest.raises(ValueError, match="monotonically increasing"):
             ParticleTrace(
-                points=pts, time=np.array([0.0, 0.5, 0.3]),
+                points=pts,
+                time=np.array([0.0, 0.5, 0.3]),
                 velocity=np.ones((3, 3)),
-                species_name="e", normalization=_identity(),
+                species_name="e",
+                normalization=_identity(),
             )
 
     def test_wrong_velocity_shape_rejects(self) -> None:
         pts = _straight_line(5)
         with pytest.raises(ValueError, match="velocity must have shape"):
             ParticleTrace(
-                points=pts, time=np.arange(5, dtype=float),
+                points=pts,
+                time=np.arange(5, dtype=float),
                 velocity=np.ones((3, 3)),
-                species_name="e", normalization=_identity(),
+                species_name="e",
+                normalization=_identity(),
             )
 
     def test_duration(self) -> None:
@@ -487,7 +520,9 @@ class TestSampling:
         assert isinstance(data, FieldDataset)
         pts = np.array([[0.5, 0.5, 0.5], [1.5, 0.5, 0.5], [2.5, 0.5, 0.5]])
         fl = FieldLine(
-            points=pts, field_name="B", seed_point=(0.5, 0.5, 0.5),
+            points=pts,
+            field_name="B",
+            seed_point=(0.5, 0.5, 0.5),
             normalization=_identity(),
         )
         fl2 = attach_scalars(fl, data, ["rho"])
@@ -501,8 +536,10 @@ class TestSampling:
         assert isinstance(data, FieldDataset)
         pts = np.array([[0.5, 0.5, 0.5], [1.5, 0.5, 0.5], [2.5, 0.5, 0.5]])
         tr = ParticleTrace(
-            points=pts, time=np.array([0.0, 1.0, 2.0]),
-            velocity=np.ones((3, 3)), species_name="e",
+            points=pts,
+            time=np.array([0.0, 1.0, 2.0]),
+            velocity=np.ones((3, 3)),
+            species_name="e",
             normalization=_identity(),
         )
         tr2 = attach_scalars_to_trace(tr, data, ["rho"])
@@ -516,3 +553,216 @@ class TestSampling:
         pts = np.array([[0.5, 0.5, 0.5]])
         with pytest.raises(ValueError, match="Unknown interpolation"):
             sample_field(data, pts, "rho", method="cubic")
+
+
+# --- Tracing algorithm tests ---
+
+
+@pytest.fixture
+def uniform_field_data():
+    """3D uniform B=(1,0,0) field on a 20x20x20 grid for tracing tests."""
+    from pypic.readers.base import FieldDataset, GridInfo
+
+    grid = GridInfo(
+        dimensions=(20, 20, 20),
+        spacing=(1.0, 1.0, 1.0),
+        origin=(0.0, 0.0, 0.0),
+    )
+    ones = np.ones((20, 20, 20), dtype=np.float64)
+    zeros = np.zeros((20, 20, 20), dtype=np.float64)
+    return FieldDataset.from_arrays(
+        {"B1": ones, "B2": zeros, "B3": zeros},
+        grid,
+        Normalization.identity(),
+    )
+
+
+class TestVectorFieldInterpolator:
+    def test_from_dataset(self, uniform_field_data: object) -> None:
+        from pypic.traces import VectorFieldInterpolator
+
+        interp = VectorFieldInterpolator.from_dataset(uniform_field_data)
+        assert interp is not None
+
+    def test_call_inside_domain(self, uniform_field_data: object) -> None:
+        from pypic.traces import VectorFieldInterpolator
+
+        interp = VectorFieldInterpolator.from_dataset(uniform_field_data)
+        result = interp(np.array([10.0, 10.0, 10.0]))
+        assert result.shape == (3,)
+        assert not np.any(np.isnan(result))
+        np.testing.assert_allclose(result, [1.0, 0.0, 0.0])
+
+    def test_call_outside_domain(self, uniform_field_data: object) -> None:
+        from pypic.traces import VectorFieldInterpolator
+
+        interp = VectorFieldInterpolator.from_dataset(uniform_field_data)
+        result = interp(np.array([1e6, 1e6, 1e6]))
+        assert np.all(np.isnan(result))
+
+
+class TestTraceFieldLine:
+    def test_uniform_field_straight_line(self, uniform_field_data: object) -> None:
+        from pypic.traces import trace_field_line
+
+        seed = (10.0, 10.0, 10.0)
+        fl = trace_field_line(
+            uniform_field_data, seed, step_size=0.5, max_steps=10, direction="forward"
+        )
+        # In a uniform B=(1,0,0) field, the trace should move along +x
+        assert fl.n_points > 2
+        np.testing.assert_allclose(fl.points[:, 1], 10.0, atol=1e-10)
+        np.testing.assert_allclose(fl.points[:, 2], 10.0, atol=1e-10)
+        assert fl.points[-1, 0] > fl.points[0, 0]
+
+    def test_forward_only(self, uniform_field_data: object) -> None:
+        from pypic.traces import trace_field_line
+
+        fl = trace_field_line(
+            uniform_field_data,
+            (10.0, 10.0, 10.0),
+            step_size=0.5,
+            max_steps=5,
+            direction="forward",
+        )
+        assert fl.direction == "forward"
+        assert fl.points[0, 0] == pytest.approx(10.0)
+        diffs = np.diff(fl.points[:, 0])
+        assert np.all(diffs >= 0)
+
+    def test_backward_only(self, uniform_field_data: object) -> None:
+        from pypic.traces import trace_field_line
+
+        fl = trace_field_line(
+            uniform_field_data,
+            (10.0, 10.0, 10.0),
+            step_size=0.5,
+            max_steps=5,
+            direction="backward",
+        )
+        assert fl.direction == "backward"
+        # Backward trace should go in -x direction; points stored start-to-end
+        assert fl.points[0, 0] < fl.points[-1, 0]
+
+    def test_both_directions(self, uniform_field_data: object) -> None:
+        from pypic.traces import trace_field_line
+
+        fl = trace_field_line(
+            uniform_field_data,
+            (10.0, 10.0, 10.0),
+            step_size=0.5,
+            max_steps=5,
+            direction="both",
+        )
+        assert fl.direction == "both"
+        assert fl.n_points > 3  # at least fwd + bwd + seed
+
+    def test_domain_exit_terminates(self, uniform_field_data: object) -> None:
+        from pypic.traces import TerminationReason, trace_field_line
+
+        fl = trace_field_line(
+            uniform_field_data,
+            (18.0, 10.0, 10.0),
+            step_size=0.5,
+            max_steps=100,
+            direction="forward",
+        )
+        assert fl.metadata["reason"] == str(TerminationReason.DOMAIN_EXIT)
+
+    def test_terminate_callback(self, uniform_field_data: object) -> None:
+        from pypic.traces import TerminationReason, trace_field_line
+
+        fl = trace_field_line(
+            uniform_field_data,
+            (10.0, 10.0, 10.0),
+            step_size=0.5,
+            max_steps=100,
+            direction="forward",
+            terminate=lambda pt: pt[0] > 12.0,
+        )
+        assert fl.metadata["reason"] == str(TerminationReason.CALLBACK)
+        assert fl.points[-1, 0] > 12.0
+
+    def test_invalid_direction_rejects(self, uniform_field_data: object) -> None:
+        from pypic.traces import trace_field_line
+
+        with pytest.raises(ValueError, match="direction must be"):
+            trace_field_line(uniform_field_data, (10.0, 10.0, 10.0), direction="up")
+
+    def test_seed_outside_domain_rejects(self, uniform_field_data: object) -> None:
+        from pypic.traces import trace_field_line
+
+        with pytest.raises(ValueError, match="outside"):
+            trace_field_line(uniform_field_data, (1e6, 1e6, 1e6))
+
+
+class TestTraceFieldLineAdaptive:
+    def test_uniform_field_straight_line(self, uniform_field_data: object) -> None:
+        from pypic.traces import trace_field_line_adaptive
+
+        seed = (10.0, 10.0, 10.0)
+        fl = trace_field_line_adaptive(
+            uniform_field_data,
+            seed,
+            step_size_init=0.5,
+            max_steps=10,
+            direction="forward",
+        )
+        # In a uniform B=(1,0,0) field, trace should be a straight line along x
+        np.testing.assert_allclose(fl.points[:, 1], 10.0, atol=1e-10)
+        np.testing.assert_allclose(fl.points[:, 2], 10.0, atol=1e-10)
+        assert fl.points[-1, 0] > fl.points[0, 0]
+
+    def test_adaptive_stores_max_local_error(self, uniform_field_data: object) -> None:
+        from pypic.traces import trace_field_line_adaptive
+
+        fl = trace_field_line_adaptive(
+            uniform_field_data,
+            (10.0, 10.0, 10.0),
+            max_steps=10,
+            direction="forward",
+        )
+        assert "max_local_error" in fl.metadata
+        assert fl.metadata["method"] == "rk45_dopri"
+
+
+class TestEstimateTracingError:
+    def test_error_estimate(self, uniform_field_data: object) -> None:
+        from pypic.traces import estimate_tracing_error, trace_field_line
+
+        fl = trace_field_line(
+            uniform_field_data,
+            (10.0, 10.0, 10.0),
+            step_size=1.0,
+            max_steps=5,
+            direction="forward",
+        )
+        err = estimate_tracing_error(fl, uniform_field_data)
+        # For a uniform field, RK4 is exact — error should be near zero
+        assert err < 1e-6
+
+    def test_missing_metadata_raises(self) -> None:
+        from pypic.traces import estimate_tracing_error
+
+        fl = FieldLine(
+            points=np.array([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0]]),
+            field_name="B",
+            seed_point=(0.0, 0.0, 0.0),
+            normalization=_identity(),
+        )
+        with pytest.raises(ValueError, match="metadata missing"):
+            estimate_tracing_error(fl, None)  # type: ignore[arg-type]
+
+
+class TestFieldNameFromComponents:
+    def test_valid(self) -> None:
+        from pypic.traces._tracing import _field_name_from_components
+
+        assert _field_name_from_components(("B1", "B2", "B3")) == "B"
+        assert _field_name_from_components(("Ve1", "Ve2", "Ve3")) == "Ve"
+
+    def test_mismatched_rejects(self) -> None:
+        from pypic.traces._tracing import _field_name_from_components
+
+        with pytest.raises(ValueError, match="same field"):
+            _field_name_from_components(("B1", "E2", "B3"))

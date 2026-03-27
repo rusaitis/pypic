@@ -1,4 +1,4 @@
-"""Plot themes: PlotTheme dataclass, LIGHT/DARK presets, use_theme() context manager."""
+"""Plot themes: PlotTheme dataclass, use_theme() context manager, file-based themes."""
 
 from __future__ import annotations
 
@@ -7,8 +7,6 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
-OVERLAY_BORDER_PAD: float = 0.6
-
 if TYPE_CHECKING:
     from collections.abc import Generator
 
@@ -16,7 +14,6 @@ if TYPE_CHECKING:
     from matplotlib.figure import Figure
 
 _COMMON_RC: dict[str, Any] = {
-    "font.family": "serif",
     "font.serif": ["DejaVu Serif", "Computer Modern", "Times"],
     "mathtext.fontset": "dejavuserif",
     "font.size": 11,
@@ -24,6 +21,9 @@ _COMMON_RC: dict[str, Any] = {
     "axes.labelsize": 11,
     "xtick.labelsize": 10,
     "ytick.labelsize": 10,
+    "figure.facecolor": "none",
+    "axes.facecolor": "none",
+    "savefig.facecolor": "none",
     "figure.figsize": (7.0, 5.0),
     "figure.dpi": 150,
     "savefig.dpi": 300,
@@ -65,222 +65,295 @@ class PlotTheme:
         Human-readable theme name.
     rcparams : dict[str, Any]
         Full set of matplotlib rcParams to apply (must not contain
-        ``axes.prop_cycle`` — use *line_colors* instead).
-    sequential_cmap : str
-        Default colormap for positive-definite fields.
-    diverging_cmap : str
-        Default colormap for signed fields.
+        ``axes.prop_cycle`` — use *color_cycle* instead).
+    sequential_cmaps : tuple[str, ...]
+        Colormap preference list for positive-definite fields (first is default).
+    diverging_cmaps : tuple[str, ...]
+        Colormap preference list for signed fields (first is default).
     grid_color : str
         Color for grid lines (``"0.0"`` black, ``"1.0"`` white).
-    line_colors : tuple[str, ...]
-        Hex color cycle for line plots. Built into an
-        ``axes.prop_cycle`` at theme-application time so that
-        ``cycler`` (a matplotlib dependency) is not required at import.
+    color_cycle : tuple[str, ...]
+        Hex color wheel for sequential visual elements (lines, scatter,
+        categories). Built into ``axes.prop_cycle`` at theme-application
+        time so that ``cycler`` is not required at import.
     """
 
     name: str
     rcparams: dict[str, Any]
-    sequential_cmap: str
-    diverging_cmap: str
-    grid_color: str
-    line_colors: tuple[str, ...] = ()
+
+    # Colors — RGBA tuples (r, g, b, a) with built-in opacity.
+    # String colors (background, accent) are opaque and don't need alpha.
+    text_color: tuple[float, float, float, float] = (0.88, 0.88, 0.88, 0.9)
+    secondary_text_color: tuple[float, float, float, float] = (0.53, 0.53, 0.53, 0.8)
+    grid_color: tuple[float, float, float, float] = (0.0, 0.0, 0.0, 0.08)
+    overlay_color: tuple[float, float, float, float] = (0.07, 0.07, 0.07, 0.65)
+    overlay_text_color: tuple[float, float, float, float] = (0.88, 0.88, 0.88, 0.8)
+    overlay_alt_color: tuple[float, float, float, float] = (0.12, 0.12, 0.12, 0.55)
+    overlay_alt_text_color: tuple[float, float, float, float] = (0.88, 0.88, 0.88, 0.8)
+    overlay_border_color: tuple[float, float, float, float] = (0.3, 0.3, 0.3, 0.2)
+    track_color: tuple[float, float, float, float] = (0.3, 0.3, 0.3, 0.3)
+    accent_color: str = "#e8913a"
+    color_cycle: tuple[str, ...] = ()
+
+    # Colormaps (preference lists; first is default)
+    sequential_cmaps: tuple[str, ...] = ("inferno",)
+    diverging_cmaps: tuple[str, ...] = ("RdBu_r",)
+
+    # Font
+    font_family: tuple[str, ...] = ("DejaVu Serif", "Computer Modern", "Times", "serif")
+    font_title: float = 12.0
+    font_label: float = 11.0
+    font_tick: float = 10.0
+    font_overlay: float = 9.0
+
+    # Overlay (badges, legends, inset colorbars)
+    overlay_rounding: float = 0.6
+    overlay_padding: float = 0.4
+    overlay_margin: float = 0.03
+
+    # Lines & arrows
+    line_width: float = 1.5
+    arrow_size: float = 4.0
+    arrow_style: str = "triangle"
+
+    # Axes (3D triad)
+    axis_x_color: str = "#d63031"
+    axis_y_color: str = "#00b894"
+    axis_z_color: str = "#0984e3"
+    axis_arrows: bool = True
+
+    # Grid
+    grid_major_width: float = 0.5
+    grid_minor_width: float = 0.3
+    grid_style: str = "solid"
+
+    # Colorbar
+    colorbar_width: str = "4%"
+    colorbar_outline_width: float = 0.3
+    colorbar_tick_length: float = 2.0
+    colorbar_pad: float = 0.05
+
+    # Progress bar
+    progress_bar_width: float = 80.0
+    progress_bar_height: float = 4.0
+    progress_bar_rounding: float = 2.0
+
+    # Plot area
+    plot_rounding: float = 0.0
+
+    @property
+    def sequential_cmap(self) -> str:
+        """Default sequential colormap (first in preference list)."""
+        return self.sequential_cmaps[0]
+
+    @property
+    def diverging_cmap(self) -> str:
+        """Default diverging colormap (first in preference list)."""
+        return self.diverging_cmaps[0]
+
+    def customize(self, **overrides: Any) -> PlotTheme:  # noqa: ANN401
+        r"""Return a new theme with selected fields overridden.
+
+        Pass any :class:`PlotTheme` field name as a keyword argument.
+        Unknown keys with underscores are converted to matplotlib
+        rcParam keys and merged into ``rcparams``
+        (``figure_dpi=200`` → ``"figure.dpi": 200``).
+
+        Returns
+        -------
+        PlotTheme
+
+        Examples
+        --------
+        >>> t = get_theme()
+        >>> big = t.customize(font_title=16.0)
+        >>> big.font_title
+        16.0
+        """
+        import copy
+        import dataclasses
+
+        field_names = {f.name for f in dataclasses.fields(self)}
+        theme_kw: dict[str, Any] = {}
+        rc_kw: dict[str, Any] = {}
+
+        for key, value in overrides.items():
+            if key in field_names:
+                theme_kw[key] = value
+            else:
+                rc_kw[key.replace("_", ".")] = value
+
+        if rc_kw:
+            theme_kw["rcparams"] = {**self.rcparams, **rc_kw}
+
+        return copy.replace(self, **theme_kw)
 
 
-LIGHT = PlotTheme(
-    name="light",
-    rcparams={
-        **_COMMON_RC,
-        "figure.facecolor": "white",
-        "axes.facecolor": "white",
-        "savefig.facecolor": "white",
-        "text.color": "0.1",
-        "axes.edgecolor": "0.1",
-        "axes.labelcolor": "0.1",
-        "xtick.color": "0.4",
-        "ytick.color": "0.4",
-        "legend.facecolor": (0.0, 0.0, 0.0, 0.06),
-        "legend.labelcolor": (0.15, 0.15, 0.15, 0.85),
-        "legend.borderaxespad": OVERLAY_BORDER_PAD,
-    },
-    sequential_cmap="inferno",
-    diverging_cmap="RdBu_r",
-    grid_color="0.0",
-    line_colors=(
-        "#1e66f5",
-        "#d20f39",
-        "#40a02b",
-        "#fe640b",
-        "#8839ef",
-        "#179299",
-        "#e64553",
-        "#df8e1d",
-    ),
-)
+_DEFAULT_THEME_NAME = "light"
+"""Name of the theme loaded as default when no ``set_theme()`` has been called."""
 
-DARK = PlotTheme(
-    name="dark",
-    rcparams={
-        **_COMMON_RC,
-        "figure.facecolor": "#1e1e1e",
-        "axes.facecolor": "#1e1e1e",
-        "savefig.facecolor": "#1e1e1e",
-        "text.color": "#e0e0e0",
-        "axes.edgecolor": "#e0e0e0",
-        "axes.labelcolor": "#e0e0e0",
-        "xtick.color": "#888888",
-        "ytick.color": "#888888",
-        "legend.facecolor": (1.0, 1.0, 1.0, 0.08),
-        "legend.labelcolor": (0.8, 0.8, 0.8, 0.85),
-        "legend.borderaxespad": OVERLAY_BORDER_PAD,
-    },
-    sequential_cmap="inferno",
-    diverging_cmap="RdBu_r",
-    grid_color="1.0",
-    line_colors=(
-        "#7cb7ff",
-        "#f47067",
-        "#96e072",
-        "#f39c12",
-        "#c74ded",
-        "#00e8c6",
-        "#ff8b6a",
-        "#ffe66d",
-    ),
-)
+DEFAULT: PlotTheme | None = None
+"""Current default theme.  Loaded lazily on first access."""
 
-CATPPUCCIN_MOCHA = PlotTheme(
-    name="catppuccin-mocha",
-    rcparams={
-        **_COMMON_RC,
-        "figure.facecolor": "#1e1e2e",  # base
-        "axes.facecolor": "#1e1e2e",
-        "savefig.facecolor": "#1e1e2e",
-        "text.color": "#cdd6f4",  # text
-        "axes.edgecolor": "#cdd6f4",
-        "axes.labelcolor": "#bac2de",  # subtext1
-        "xtick.color": "#a6adc8",  # subtext0
-        "ytick.color": "#a6adc8",
-        "legend.facecolor": (0.19, 0.20, 0.27, 0.15),  # surface0
-        "legend.labelcolor": (0.80, 0.84, 0.96, 0.85),  # text
-        "legend.borderaxespad": OVERLAY_BORDER_PAD,
-    },
-    sequential_cmap="inferno",
-    diverging_cmap="RdBu_r",
-    grid_color="#cdd6f4",
-    line_colors=(
-        "#89b4fa",
-        "#f38ba8",
-        "#a6e3a1",
-        "#fab387",
-        "#cba6f7",
-        "#94e2d5",
-        "#eba0ac",
-        "#f9e2af",
-    ),
-)
+ThemeArg = PlotTheme | str | None
+"""Accepted type for the ``theme`` parameter across all plotting functions."""
 
-ANUPPUCCIN_LIGHT = PlotTheme(
-    name="anuppuccin-light",
-    rcparams={
-        **_COMMON_RC,
-        "figure.facecolor": "#eff1f5",  # base
-        "axes.facecolor": "#eff1f5",
-        "savefig.facecolor": "#eff1f5",
-        "text.color": "#4c4f69",  # text
-        "axes.edgecolor": "#4c4f69",
-        "axes.labelcolor": "#5c5f77",  # subtext1
-        "xtick.color": "#6c6f85",  # subtext0
-        "ytick.color": "#6c6f85",
-        "legend.facecolor": (0.86, 0.88, 0.91, 0.15),  # mantle
-        "legend.labelcolor": (0.30, 0.31, 0.41, 0.85),  # text
-        "legend.borderaxespad": OVERLAY_BORDER_PAD,
-    },
-    sequential_cmap="inferno",
-    diverging_cmap="RdBu_r",
-    grid_color="#4c4f69",
-    line_colors=(
-        "#1e66f5",
-        "#d20f39",
-        "#40a02b",
-        "#fe640b",
-        "#8839ef",
-        "#179299",
-        "#e64553",
-        "#df8e1d",
-    ),
-)
 
-ANDROMEDA = PlotTheme(
-    name="andromeda",
-    rcparams={
-        **_COMMON_RC,
-        "figure.facecolor": "#23262e",  # editor bg
-        "axes.facecolor": "#23262e",
-        "savefig.facecolor": "#23262e",
-        "text.color": "#d5ced9",  # primary text
-        "axes.edgecolor": "#d5ced9",
-        "axes.labelcolor": "#d5ced9",
-        "xtick.color": "#9a919c",  # dimmed text
-        "ytick.color": "#9a919c",
-        "legend.facecolor": (0.13, 0.14, 0.16, 0.15),  # widget bg
-        "legend.labelcolor": (0.84, 0.81, 0.85, 0.85),  # text
-        "legend.borderaxespad": OVERLAY_BORDER_PAD,
-    },
-    sequential_cmap="inferno",
-    diverging_cmap="RdBu_r",
-    grid_color="#d5ced9",
-    line_colors=(
-        "#00e8c6",
-        "#7cb7ff",
-        "#f92672",
-        "#ffe66d",
-        "#c74ded",
-        "#96e072",
-        "#f39c12",
-        "#ee5d43",
-    ),
-)
+def _resolve_theme_arg(theme: ThemeArg) -> PlotTheme:
+    """Normalize a theme argument to a PlotTheme instance.
 
-DEFAULT = LIGHT
+    Accepts a :class:`PlotTheme` object, a theme name (looked up from
+    the user and package theme directories), a ``.toml`` file path, or
+    ``None`` (falls back to the current default).
+    """
+    if theme is None:
+        return get_theme()
+    if isinstance(theme, PlotTheme):
+        return theme
+    from pathlib import Path
+
+    from pypic.plotting._theme_io import _find_theme, load_theme
+
+    if theme.endswith(".toml"):
+        return load_theme(Path(theme).expanduser())
+    return load_theme(_find_theme(theme.lower()))
+
+
+def set_theme(theme: ThemeArg) -> None:
+    """Set the default theme for all pypic plot functions.
+
+    Parameters
+    ----------
+    theme : ThemeArg
+        Theme name, path, or object.
+
+    Examples
+    --------
+    >>> set_theme("dark")
+    >>> get_theme().name
+    'dark'
+    >>> set_theme("light")
+    """
+    global DEFAULT
+    DEFAULT = _resolve_theme_arg(theme)
+
+
+def get_theme() -> PlotTheme:
+    """Return the current default theme.
+
+    Loads ``light`` from the theme directory on first call if no
+    default has been set.
+
+    Examples
+    --------
+    >>> get_theme().name
+    'light'
+    """
+    global DEFAULT
+    if DEFAULT is None:
+        from pypic.plotting._theme_io import _find_theme, load_theme
+
+        DEFAULT = load_theme(_find_theme(_DEFAULT_THEME_NAME))
+    return DEFAULT
+
+
+_active_theme: PlotTheme | None = None
+
+
+def get_active_theme() -> PlotTheme | None:
+    """Return the theme set by the innermost :func:`use_theme` context, or ``None``."""
+    return _active_theme
+
+
+def _theme_val(attr: str, default: Any) -> Any:  # noqa: ANN401
+    """Read *attr* from the active theme, or return *default* if no theme is active."""
+    theme = _active_theme
+    return getattr(theme, attr) if theme is not None else default
+
+
+_GENERIC_FAMILIES = frozenset({
+    "serif", "sans-serif", "monospace", "cursive", "fantasy",
+})
+
+
+def _available_fonts(families: tuple[str, ...]) -> list[str]:
+    """Filter *families* to those installed, keeping generic family names."""
+    from matplotlib.font_manager import fontManager
+
+    installed = {f.name for f in fontManager.ttflist}
+    result = [f for f in families if f in installed or f in _GENERIC_FAMILIES]
+    return result or ["sans-serif"]
 
 
 @contextmanager
-def use_theme(theme: PlotTheme) -> Generator[None]:
-    """Temporarily apply *theme* rcParams, restoring originals on exit."""
+def use_theme(theme: ThemeArg) -> Generator[None]:
+    """Temporarily apply *theme* rcParams, restoring originals on exit.
+
+    Accepts a :class:`PlotTheme`, a theme name string, a ``.toml``
+    file path, or ``None`` (uses the current default).
+    """
+    global _active_theme
     import matplotlib as mpl
 
-    rc = dict(theme.rcparams)
-    if theme.line_colors:
+    resolved = _resolve_theme_arg(theme)
+    rc = dict(resolved.rcparams)
+
+    # Inject font family and sizes from theme fields.
+    # Filter to available fonts to suppress matplotlib findfont warnings.
+    rc["font.family"] = _available_fonts(resolved.font_family)
+    rc["font.size"] = resolved.font_label
+    rc["axes.titlesize"] = resolved.font_title
+    rc["axes.labelsize"] = resolved.font_label
+    rc["xtick.labelsize"] = resolved.font_tick
+    rc["ytick.labelsize"] = resolved.font_tick
+    rc["legend.fontsize"] = resolved.font_overlay
+
+    if resolved.color_cycle:
         from cycler import cycler
 
-        rc["axes.prop_cycle"] = cycler("color", list(theme.line_colors))
+        rc["axes.prop_cycle"] = cycler("color", list(resolved.color_cycle))
+
+    # Inject RGBA colors from theme into rcParams
+    rc["text.color"] = resolved.text_color
+    rc["axes.edgecolor"] = resolved.text_color[:3]
+    rc["axes.labelcolor"] = resolved.text_color
+    rc["xtick.color"] = resolved.secondary_text_color
+    rc["ytick.color"] = resolved.secondary_text_color
+    rc["legend.facecolor"] = resolved.overlay_color
+    rc["legend.labelcolor"] = resolved.secondary_text_color
 
     old = {k: mpl.rcParams[k] for k in rc if k in mpl.rcParams}
+    # Always capture prop_cycle so themes without color_cycle restore it
+    if "axes.prop_cycle" not in old:
+        old["axes.prop_cycle"] = mpl.rcParams["axes.prop_cycle"]
+    prev_theme = _active_theme
+    _active_theme = resolved
     mpl.rcParams.update(rc)
     try:
         yield
     finally:
+        _active_theme = prev_theme
         mpl.rcParams.update(old)
 
 
 def apply_theme_to_figure(fig: Figure, theme: PlotTheme) -> None:
     """Set figure facecolors, text colors, and tick colors to match *theme*.
 
-    Useful when the figure was created outside ``use_theme()``.  Also
-    restyles any existing colorbar axes so that tick labels, axis labels,
-    and outlines pick up the theme palette.
+    Useful when the figure was created outside ``use_theme()``.  Applies
+    background, text, tick, spine, and legend colors to all axes on the
+    figure.
     """
     fc = theme.rcparams.get("figure.facecolor", "white")
     fig.set_facecolor(fc)
     afc = theme.rcparams.get("axes.facecolor", "white")
-    tc = theme.rcparams.get("text.color", "black")
-    tick_c = theme.rcparams.get("xtick.color", "0.4")
-    label_c = theme.rcparams.get("axes.labelcolor", tc)
+
+    tc = theme.text_color
+    label_c = theme.text_color
+    tick_c = theme.secondary_text_color
+    legend_label_c = theme.secondary_text_color
 
     for text in fig.texts:
         text.set_color(tc)
-
-    legend_label_c = theme.rcparams.get("legend.labelcolor", tc)
 
     for ax in fig.get_axes():
         ax.set_facecolor(afc)
@@ -312,22 +385,100 @@ def apply_grid(ax: Axes, theme: PlotTheme, *, minor: bool = False) -> None:
     minor : bool
         If ``True``, also draw minor grid lines.
     """
-    ax.grid(which="major", linewidth=0.5, alpha=0.08, color=theme.grid_color)
+    gc = theme.grid_color
+    ax.grid(
+        which="major",
+        linewidth=theme.grid_major_width,
+        linestyle=theme.grid_style,
+        alpha=gc[3],
+        color=gc[:3],
+    )
     if minor:
         ax.minorticks_on()
-        ax.grid(which="minor", linewidth=0.3, alpha=0.05, color=theme.grid_color)
+        ax.grid(
+            which="minor",
+            linewidth=theme.grid_minor_width,
+            linestyle=theme.grid_style,
+            alpha=gc[3],
+            color=gc[:3],
+        )
+
+
+def _rounded_axes_path(aspect: float, r: float) -> object:
+    """Build a rounded rectangle Path with aspect-corrected circular arcs."""
+    from matplotlib.path import Path
+
+    if aspect >= 1:
+        rx, ry = min(r / aspect, 0.5), min(r, 0.5)
+    else:
+        rx, ry = min(r, 0.5), min(r * aspect, 0.5)
+
+    kx, ky = 0.5523 * rx, 0.5523 * ry
+    c4 = Path.CURVE4
+    return Path(
+        [
+            (rx, 0), (1 - rx, 0),
+            (1 - rx + kx, 0), (1, ry - ky), (1, ry),
+            (1, 1 - ry),
+            (1, 1 - ry + ky), (1 - rx + kx, 1), (1 - rx, 1),
+            (rx, 1),
+            (rx - kx, 1), (0, 1 - ry + ky), (0, 1 - ry),
+            (0, ry),
+            (0, ry - ky), (rx - kx, 0), (rx, 0),
+            (rx, 0),
+        ],
+        [
+            Path.MOVETO, Path.LINETO,
+            c4, c4, c4, Path.LINETO,
+            c4, c4, c4, Path.LINETO,
+            c4, c4, c4, Path.LINETO,
+            c4, c4, c4, Path.CLOSEPOLY,
+        ],
+    )
+
+
+def apply_rounding(ax: Axes) -> None:
+    """Clip axes content to a rounded rectangle (no-op when ``plot_rounding == 0``)."""
+    rounding: float = _theme_val("plot_rounding", 0.0)
+    if rounding <= 0:
+        return
+    from matplotlib.patches import PathPatch
+
+    fig = ax.get_figure()
+    if fig is None:
+        return
+    renderer = fig.canvas.get_renderer()
+    bbox = ax.get_window_extent(renderer)
+    aspect = bbox.width / bbox.height if bbox.height > 0 else 1.0
+
+    path = _rounded_axes_path(aspect, rounding)
+    clip = PathPatch(path, transform=ax.transAxes, facecolor="none", edgecolor="none")
+    ax.add_patch(clip)
+    for child in ax.get_children():
+        if child is not clip:
+            child.set_clip_path(clip)
+
+
+def _overlay_box_style(theme: PlotTheme | None = None) -> str:
+    """Build overlay box style string from theme or defaults."""
+    if theme is None:
+        theme = get_active_theme()
+    pad = theme.overlay_padding if theme is not None else 0.4
+    rounding = theme.overlay_rounding if theme is not None else 0.6
+    return f"round,pad={pad},rounding_size={rounding}"
 
 
 def style_legend(ax: Axes) -> None:
     """Round the legend box corners if a legend is present."""
     legend = ax.get_legend()
     if legend is not None:
-        legend.get_frame().set_boxstyle("round,pad=0.4,rounding_size=0.6")
+        legend.get_frame().set_boxstyle(_overlay_box_style())
 
 
 def style_3d_axes(
     ax: Axes,
     *,
+    theme: PlotTheme | None = None,
     center: tuple[float, float, float] = (0.0, 0.0, 0.0),
     axis_labels: tuple[str, str, str] = ("$x$", "$y$", "$z$"),
     axis_length: float | None = None,
@@ -357,7 +508,7 @@ def style_3d_axes(
     axis_labels : tuple[str, str, str]
         Labels for the x, y, z arrows.
     axis_length : float or None
-        Length of the triad arrows. ``None`` uses 15 %% of the axes range.
+        Length of the triad arrows. ``None`` uses 20 %% of the axes range.
     grid_z : float or None
         Z-coordinate of the grid plane. ``None`` uses ``center[2]``.
     grid_count : int
@@ -372,6 +523,9 @@ def style_3d_axes(
     bg_color = mpl.rcParams.get("axes.facecolor", "#1e1e1e")
     tc_rgba = to_rgba(text_color)
     tc_rgb = tc_rgba[:3]
+
+    # Grid color: prefer theme.grid_color, fall back to text.color
+    grid_rgb = theme.grid_color[:3] if theme is not None else tc_rgb
 
     ax.set_facecolor(bg_color)
     for axis in (ax.xaxis, ax.yaxis, ax.zaxis):  # type: ignore[attr-defined]
@@ -399,18 +553,27 @@ def style_3d_axes(
         v for v in locator.tick_values(ylim[0], ylim[1]) if ylim[0] <= v <= ylim[1]
     ]
 
-    grid_alpha = 0.06
-    grid_lw = 0.5
-    label_alpha = 0.5
-    label_size = 8
+    if theme is not None:
+        gc = theme.grid_color
+        ga, grid_lw = gc[3], theme.grid_major_width
+        label_alpha = theme.secondary_text_color[3]
+        arrow_label_alpha = theme.text_color[3]
+        label_size = theme.font_tick
+        arrow_label_size = theme.font_label
+    else:
+        ga, grid_lw = 0.08, 0.5
+        label_alpha = 0.8
+        arrow_label_alpha = 0.9
+        label_size = mpl.rcParams.get("xtick.labelsize", 8)
+        arrow_label_size = mpl.rcParams.get("axes.labelsize", 10)
 
     for x in x_ticks:
         ax.plot(
             [x, x],
             [ylim[0], ylim[1]],
             [z0, z0],
-            color=tc_rgb,
-            alpha=grid_alpha,
+            color=grid_rgb,
+            alpha=ga,
             linewidth=grid_lw,
             zorder=0,
         )
@@ -419,8 +582,8 @@ def style_3d_axes(
             [xlim[0], xlim[1]],
             [y, y],
             [z0, z0],
-            color=tc_rgb,
-            alpha=grid_alpha,
+            color=grid_rgb,
+            alpha=ga,
             linewidth=grid_lw,
             zorder=0,
         )
@@ -431,13 +594,17 @@ def style_3d_axes(
 
     def _label_values(ticks: list[float]) -> list[float]:
         """Return tick values to label, skipping near-zero and thinning."""
+        zero_skip = 0.3  # skip labels within 30% of tick step from zero
+        max_before_thin = 5
         if len(ticks) < 2:
             return ticks
         step = abs(ticks[1] - ticks[0]) if len(ticks) > 1 else 1.0
-        filtered = [v for v in ticks if abs(v) > 0.3 * step]
+        filtered = [v for v in ticks if abs(v) > zero_skip * step]
         if not filtered:
             return ticks
-        return filtered[::2] if len(filtered) > 5 else filtered
+        if len(filtered) > max_before_thin:
+            return filtered[::2]
+        return filtered
 
     x_labels = _label_values(x_ticks)
     for j, x in enumerate(x_labels):
@@ -449,7 +616,7 @@ def style_3d_axes(
             ylim[0] - y_range * offset_frac,
             z0,
             val,
-            color=(*tc_rgb, label_alpha),
+            color=(*grid_rgb, label_alpha),
             fontsize=label_size,
             ha="center",
             va="top",
@@ -466,7 +633,7 @@ def style_3d_axes(
             y,
             z0,
             val,
-            color=(*tc_rgb, label_alpha),
+            color=(*grid_rgb, label_alpha),
             fontsize=label_size,
             ha="right",
             va="center",
@@ -478,22 +645,29 @@ def style_3d_axes(
         z_range = zlim[1] - zlim[0]
         axis_length = 0.20 * min(x_range, y_range, z_range)
 
-    arrow_alpha = 0.7
     arrow_lw = 1.0
     label_offset = 1.3
+
+    # Per-axis colors from theme, falling back to text color
+    if theme is not None:
+        axis_colors = [theme.axis_x_color, theme.axis_y_color, theme.axis_z_color]
+    else:
+        axis_colors = [tc_rgb, tc_rgb, tc_rgb]
 
     directions = [
         (axis_length, 0.0, 0.0),
         (0.0, axis_length, 0.0),
         (0.0, 0.0, axis_length),
     ]
-    for (dx, dy, dz), lbl in zip(directions, axis_labels, strict=True):
+    for (dx, dy, dz), lbl, ac in zip(
+        directions, axis_labels, axis_colors, strict=True
+    ):
         ax.plot(
             [center[0], center[0] + dx],
             [center[1], center[1] + dy],
             [center[2], center[2] + dz],
-            color=tc_rgb,
-            alpha=arrow_alpha,
+            color=ac,
+            alpha=arrow_label_alpha,
             linewidth=arrow_lw,
             solid_capstyle="round",
             zorder=5,
@@ -503,8 +677,8 @@ def style_3d_axes(
             center[1] + dy * label_offset,
             center[2] + dz * label_offset,
             lbl,
-            color=(*tc_rgb, arrow_alpha),
-            fontsize=10,
+            color=ac,
+            fontsize=arrow_label_size,
             ha="center",
             va="center",
             fontweight="bold",

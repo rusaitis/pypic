@@ -16,6 +16,7 @@ if TYPE_CHECKING:
     from matplotlib.colors import Colormap
 
     from pypic.plotting._colorbar import ExtremesMode
+    from pypic.plotting.styles import ThemeArg
     from pypic.traces import FieldLine, ParticleTrace
     from pypic.types import FloatArray
 
@@ -59,15 +60,23 @@ def _colored_line_3d(
     from matplotlib.colors import Normalize
     from mpl_toolkits.mplot3d.art3d import Line3DCollection
 
+    if points.shape[0] < 2:
+        msg = f"Need at least 2 points for colored line, got {points.shape[0]}"
+        raise ValueError(msg)
+
     segments = np.concatenate([points[:-1, np.newaxis], points[1:, np.newaxis]], axis=1)
 
     if cmap is None:
-        cmap = "inferno"
+        from pypic.plotting.styles import _theme_val
 
-    norm = Normalize(
-        vmin=vmin if vmin is not None else float(np.nanmin(values)),
-        vmax=vmax if vmax is not None else float(np.nanmax(values)),
-    )
+        cmap = _theme_val("sequential_cmaps", ("inferno",))[0]
+
+    vmin_val = vmin if vmin is not None else float(np.nanmin(values))
+    vmax_val = vmax if vmax is not None else float(np.nanmax(values))
+    if vmin_val == vmax_val:
+        vmin_val -= 1e-8
+        vmax_val += 1e-8
+    norm = Normalize(vmin=vmin_val, vmax=vmax_val)
 
     lc = Line3DCollection(
         segments, cmap=cmap, norm=norm, linewidths=linewidth, alpha=alpha
@@ -90,7 +99,7 @@ def _plot_line_3d(
     alpha: float = 0.9,
     label: str | None = None,
     colorbar: bool | Literal["inset"] = False,
-    extremes: ExtremesMode = "darken",
+    extremes: ExtremesMode = "semi",
     **kwargs: Any,  # noqa: ANN401 — matplotlib passthrough
 ) -> Artist:
     """Shared implementation for 3D line plotting with optional scalar coloring."""
@@ -137,7 +146,8 @@ def plot_field_line(
     alpha: float = 0.9,
     label: str | None = None,
     colorbar: bool | Literal["inset"] = False,
-    extremes: ExtremesMode = "darken",
+    extremes: ExtremesMode = "semi",
+    theme: ThemeArg = None,
     **kwargs: Any,  # noqa: ANN401 — matplotlib passthrough
 ) -> Artist:
     r"""Plot a field line in 3D, optionally colored by a scalar quantity.
@@ -172,6 +182,8 @@ def plot_field_line(
     extremes : "darken" or "transparent"
         How to style values outside ``[vmin, vmax]``.
         ``"transparent"`` makes them invisible.
+    theme : PlotTheme or None
+        Plot theme. ``None`` uses current rcParams context.
     **kwargs
         Passed to ``ax.plot()`` (uniform mode only).
 
@@ -182,21 +194,27 @@ def plot_field_line(
         for scalar coloring).
     """
     ensure_matplotlib()
-    return _plot_line_3d(
-        ax,
-        line.points,
-        line.scalars,
-        color=color,
-        cmap=cmap,
-        vmin=vmin,
-        vmax=vmax,
-        linewidth=linewidth,
-        alpha=alpha,
-        label=label,
-        colorbar=colorbar,
-        extremes=extremes,
-        **kwargs,
-    )
+
+    from pypic.plotting.styles import _resolve_theme_arg, use_theme
+
+    theme = _resolve_theme_arg(theme)
+
+    with use_theme(theme):
+        return _plot_line_3d(
+            ax,
+            line.points,
+            line.scalars,
+            color=color,
+            cmap=cmap,
+            vmin=vmin,
+            vmax=vmax,
+            linewidth=linewidth,
+            alpha=alpha,
+            label=label,
+            colorbar=colorbar,
+            extremes=extremes,
+            **kwargs,
+        )
 
 
 def plot_trajectory(
@@ -211,7 +229,8 @@ def plot_trajectory(
     alpha: float = 0.9,
     label: str | None = None,
     colorbar: bool | Literal["inset"] = False,
-    extremes: ExtremesMode = "darken",
+    extremes: ExtremesMode = "semi",
+    theme: ThemeArg = None,
     **kwargs: Any,  # noqa: ANN401 — matplotlib passthrough
 ) -> Artist:
     r"""Plot a particle trajectory in 3D, optionally colored by a scalar.
@@ -245,6 +264,8 @@ def plot_trajectory(
         Whether to add a colorbar when using scalar coloring.
     extremes : "darken" or "transparent"
         How to style values outside ``[vmin, vmax]``.
+    theme : PlotTheme or None
+        Plot theme. ``None`` uses current rcParams context.
     **kwargs
         Passed to ``ax.plot()`` (uniform mode only).
 
@@ -258,20 +279,25 @@ def plot_trajectory(
     # ParticleTrace has a .time array that can be used as a built-in scalar
     scalars = {**trace.scalars, "time": trace.time}
 
-    return _plot_line_3d(
-        ax,
-        trace.points,
-        scalars,
-        color=color,
-        cmap=cmap,
-        vmin=vmin,
-        vmax=vmax,
-        linewidth=linewidth,
-        alpha=alpha,
-        label=label,
-        colorbar=colorbar,
-        extremes=extremes,
-        **kwargs,
+    from pypic.plotting.styles import _resolve_theme_arg, use_theme
+
+    theme = _resolve_theme_arg(theme)
+
+    with use_theme(theme):
+        return _plot_line_3d(
+            ax,
+            trace.points,
+            scalars,
+            color=color,
+            cmap=cmap,
+            vmin=vmin,
+            vmax=vmax,
+            linewidth=linewidth,
+            alpha=alpha,
+            label=label,
+            colorbar=colorbar,
+            extremes=extremes,
+            **kwargs,
     )
 
 
@@ -301,29 +327,22 @@ def _add_3d_colorbar(
     ax: Axes,
     mappable: object,
     label: str,
-    mode: bool | Literal["inset"],
-    extremes: ExtremesMode = "darken",
+    _mode: bool | Literal["inset"],
+    extremes: ExtremesMode = "semi",
 ) -> None:
-    """Attach a colorbar to a 3D axes with standard pypic styling."""
-    import matplotlib as mpl
-    from matplotlib.colors import to_rgba
+    """Attach a colorbar to a 3D axes with standard pypic styling.
 
-    from pypic.plotting._colorbar import _apply_extremes
+    Uses ``fig.colorbar`` instead of the inset approach because 3D axes
+    cannot host 2D-only patches (``FancyBboxPatch`` lacks
+    ``do_3d_projection``).
+    """
+    from pypic.plotting._colorbar import _apply_extremes, _style_colorbar
 
     _apply_extremes(mappable, mode=extremes)
+    extend = "both" if extremes is not None else "neither"
 
     fig = ax.get_figure()
-    if mode == "inset":
-        from pypic.plotting._colorbar import add_inset_colorbar
-
-        add_inset_colorbar(ax, mappable, label, extremes=extremes)
-    elif fig is not None:
-        text_color = mpl.rcParams.get("text.color", "black")
-        tick_color = mpl.rcParams.get("xtick.color", "0.4")
-        outline_rgba = (*to_rgba(tick_color)[:3], 0.3)
-
-        cb = fig.colorbar(mappable, ax=ax, shrink=0.6, pad=0.08, label=label)  # type: ignore[arg-type]
-        cb.outline.set_linewidth(0.3)
-        cb.outline.set_edgecolor(outline_rgba)
-        cb.ax.tick_params(width=0.3, length=2, colors=tick_color, labelcolor=text_color)
-        cb.set_label(label, color=text_color)
+    cb = fig.colorbar(  # type: ignore[union-attr]
+        mappable, ax=ax, shrink=0.5, pad=0.08, extend=extend,
+    )
+    _style_colorbar(cb, label)

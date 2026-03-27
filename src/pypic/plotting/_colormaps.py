@@ -66,6 +66,8 @@ def is_positive_definite(
     if name in _POSITIVE_NAMES:
         return True
 
+    if not np.any(np.isfinite(data)):
+        return False
     return bool(np.nanmin(data) >= 0)
 
 
@@ -98,6 +100,11 @@ def resolve_colormap(
         Colormap name.
     """
     if cmap is not None:
+        import matplotlib.pyplot as plt
+
+        if cmap not in plt.colormaps():
+            msg = f"Unknown colormap {cmap!r}"
+            raise ValueError(msg)
         return cmap
     if is_positive_definite(name, data, info):
         return theme.sequential_cmap
@@ -118,6 +125,6 @@ def symmetric_clim(data: FloatArray) -> tuple[float, float]:
         ``(-absmax, absmax)``
     """
     absmax = float(np.nanmax(np.abs(data)))
-    if not np.isfinite(absmax):
-        return (0.0, 0.0)
+    if not np.isfinite(absmax) or absmax == 0.0:
+        return (-1e-8, 1e-8)
     return (-absmax, absmax)

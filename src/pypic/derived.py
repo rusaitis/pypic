@@ -19,7 +19,7 @@ def _safe_divide(
     denominator: FloatArray,
 ) -> FloatArray:
     """Divide, returning nan where the denominator is zero."""
-    out = np.full_like(numerator, np.nan, dtype=np.float64)
+    out = np.full_like(numerator, np.nan)
     nonzero = denominator != 0
     np.divide(numerator, denominator, out=out, where=nonzero)
     return out
@@ -1193,6 +1193,410 @@ def agyrotropy(
     return result
 
 
+def j_dot_e(
+    j1: FloatArray,
+    j2: FloatArray,
+    j3: FloatArray,
+    e1: FloatArray,
+    e2: FloatArray,
+    e3: FloatArray,
+) -> FloatArray:
+    r"""Compute the electromagnetic energy conversion rate.
+
+    $$\mathbf{J} \cdot \mathbf{E} = J_1 E_1 + J_2 E_2 + J_3 E_3$$
+
+    Positive values indicate electromagnetic-to-kinetic energy transfer
+    (particles gaining energy from fields). [Jack] §6.8,
+    [Zenitani & Hoshino 2001].
+
+    Parameters
+    ----------
+    j1 : NDArray
+        First component of current density.
+    j2 : NDArray
+        Second component of current density.
+    j3 : NDArray
+        Third component of current density.
+    e1 : NDArray
+        First component of electric field.
+    e2 : NDArray
+        Second component of electric field.
+    e3 : NDArray
+        Third component of electric field.
+
+    Returns
+    -------
+    NDArray
+        Energy conversion rate (energy density per unit time).
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> j_dot_e(
+    ...     np.array([1.0]), np.array([0.0]), np.array([0.0]),
+    ...     np.array([2.0]), np.array([0.0]), np.array([0.0]),
+    ... )
+    array([2.])
+    """
+    return j1 * e1 + j2 * e2 + j3 * e3
+
+
+def ideal_electric_field(
+    v1: FloatArray,
+    v2: FloatArray,
+    v3: FloatArray,
+    b1: FloatArray,
+    b2: FloatArray,
+    b3: FloatArray,
+) -> tuple[FloatArray, FloatArray, FloatArray]:
+    r"""Compute the ideal (convective) electric field.
+
+    $$\mathbf{E}_{ideal} = -\mathbf{V} \times \mathbf{B}$$
+
+    The ideal Ohm's law contribution. In perfect ideal MHD, the total
+    electric field equals this term. [Chen] §4.3, [NRL].
+
+    Parameters
+    ----------
+    v1 : NDArray
+        First component of bulk velocity.
+    v2 : NDArray
+        Second component of bulk velocity.
+    v3 : NDArray
+        Third component of bulk velocity.
+    b1 : NDArray
+        First component of magnetic field.
+    b2 : NDArray
+        Second component of magnetic field.
+    b3 : NDArray
+        Third component of magnetic field.
+
+    Returns
+    -------
+    tuple[NDArray, NDArray, NDArray]
+        Ideal electric field components.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> e1, e2, e3 = ideal_electric_field(
+    ...     np.array([1.0]), np.array([0.0]), np.array([0.0]),
+    ...     np.array([0.0]), np.array([0.0]), np.array([1.0]),
+    ... )
+    >>> e2.item()
+    1.0
+    """
+    return (
+        -(v2 * b3 - v3 * b2),
+        -(v3 * b1 - v1 * b3),
+        -(v1 * b2 - v2 * b1),
+    )
+
+
+def non_ideal_electric_field(
+    e1: FloatArray,
+    e2: FloatArray,
+    e3: FloatArray,
+    v1: FloatArray,
+    v2: FloatArray,
+    v3: FloatArray,
+    b1: FloatArray,
+    b2: FloatArray,
+    b3: FloatArray,
+) -> tuple[FloatArray, FloatArray, FloatArray]:
+    r"""Compute the non-ideal electric field (frozen-in violation).
+
+    $$\mathbf{E}' = \mathbf{E} + \mathbf{V} \times \mathbf{B}$$
+
+    Zero in ideal MHD. Non-zero where the frozen-in condition breaks
+    down (reconnection sites, resistive regions). The generalized Ohm's
+    law decomposes this into Hall, pressure gradient, and inertial
+    terms. [Birn & Priest 2007], [Hesse et al. 2011].
+
+    Parameters
+    ----------
+    e1 : NDArray
+        First component of total electric field.
+    e2 : NDArray
+        Second component of total electric field.
+    e3 : NDArray
+        Third component of total electric field.
+    v1 : NDArray
+        First component of bulk velocity.
+    v2 : NDArray
+        Second component of bulk velocity.
+    v3 : NDArray
+        Third component of bulk velocity.
+    b1 : NDArray
+        First component of magnetic field.
+    b2 : NDArray
+        Second component of magnetic field.
+    b3 : NDArray
+        Third component of magnetic field.
+
+    Returns
+    -------
+    tuple[NDArray, NDArray, NDArray]
+        Non-ideal electric field components.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> e1, e2, e3 = non_ideal_electric_field(
+    ...     np.array([0.0]), np.array([0.0]), np.array([0.5]),
+    ...     np.array([1.0]), np.array([0.0]), np.array([0.0]),
+    ...     np.array([0.0]), np.array([1.0]), np.array([0.0]),
+    ... )
+    >>> e3.item()
+    1.5
+    """
+    return (
+        e1 + (v2 * b3 - v3 * b2),
+        e2 + (v3 * b1 - v1 * b3),
+        e3 + (v1 * b2 - v2 * b1),
+    )
+
+
+def hall_electric_field(
+    j1: FloatArray,
+    j2: FloatArray,
+    j3: FloatArray,
+    b1: FloatArray,
+    b2: FloatArray,
+    b3: FloatArray,
+    n: FloatArray,
+    charge: float,
+) -> tuple[FloatArray, FloatArray, FloatArray]:
+    r"""Compute the Hall electric field.
+
+    $$\mathbf{E}_{Hall} = \frac{\mathbf{J} \times \mathbf{B}}{n |q|}$$
+
+    The Hall term in the generalized Ohm's law, using the charge
+    magnitude $|q|$ (always positive). Dominant at ion skin depth
+    scales where ion and electron motions decouple.
+    [Birn & Priest 2007], [Hesse et al. 2011].
+
+    Parameters
+    ----------
+    j1 : NDArray
+        First component of current density.
+    j2 : NDArray
+        Second component of current density.
+    j3 : NDArray
+        Third component of current density.
+    b1 : NDArray
+        First component of magnetic field.
+    b2 : NDArray
+        Second component of magnetic field.
+    b3 : NDArray
+        Third component of magnetic field.
+    n : NDArray
+        Number density of the charge-carrying species.
+    charge : float
+        Charge of the species (in code units). The absolute value
+        is used — sign does not affect the result.
+
+    Returns
+    -------
+    tuple[NDArray, NDArray, NDArray]
+        Hall electric field components.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> e1, e2, e3 = hall_electric_field(
+    ...     np.array([1.0]), np.array([0.0]), np.array([0.0]),
+    ...     np.array([0.0]), np.array([0.0]), np.array([1.0]),
+    ...     np.array([2.0]), -1.0,
+    ... )
+    >>> e2.item()
+    -0.5
+    """
+    nq = n * abs(charge)
+    return (
+        _safe_divide(j2 * b3 - j3 * b2, nq),
+        _safe_divide(j3 * b1 - j1 * b3, nq),
+        _safe_divide(j1 * b2 - j2 * b1, nq),
+    )
+
+
+def firehose_parameter(
+    p_par: FloatArray,
+    p_perp: FloatArray,
+    b: FloatArray,
+) -> FloatArray:
+    r"""Compute the firehose instability parameter.
+
+    $$\mathcal{F} = \frac{P_\parallel - P_\perp}{B^2 / 2} - 1$$
+
+    Unstable when $\mathcal{F} > 0$ (parallel pressure excess drives
+    field-line bending). [Hellinger et al. 2006], [Gary 1993].
+
+    Parameters
+    ----------
+    p_par : NDArray
+        Parallel pressure.
+    p_perp : NDArray
+        Perpendicular pressure.
+    b : NDArray
+        Magnetic field magnitude.
+
+    Returns
+    -------
+    NDArray
+        Firehose parameter (dimensionless). Positive = unstable.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> firehose_parameter(np.array([3.0]), np.array([1.0]), np.array([1.0]))
+    array([3.])
+    """
+    return _safe_divide(p_par - p_perp, 0.5 * b**2) - 1.0
+
+
+def mirror_parameter(
+    p_par: FloatArray,
+    p_perp: FloatArray,
+    b: FloatArray,
+) -> FloatArray:
+    r"""Compute the mirror instability parameter.
+
+    $$\mathcal{M} = \frac{P_\perp}{P_\parallel} - 1 - \frac{1}{\beta_\perp}$$
+
+    where $\beta_\perp = 2 P_\perp / B^2$. Unstable when $\mathcal{M} > 0$
+    (perpendicular pressure excess drives density compressions).
+    [Hellinger et al. 2006], [Kunz et al. 2014].
+
+    Parameters
+    ----------
+    p_par : NDArray
+        Parallel pressure.
+    p_perp : NDArray
+        Perpendicular pressure.
+    b : NDArray
+        Magnetic field magnitude.
+
+    Returns
+    -------
+    NDArray
+        Mirror parameter (dimensionless). Positive = unstable.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> mirror_parameter(np.array([1.0]), np.array([2.0]), np.array([1.0]))
+    array([0.75])
+    """
+    beta_perp = _safe_divide(2.0 * p_perp, b**2)
+    return _safe_divide(p_perp, p_par) - 1.0 - _safe_divide(np.ones_like(b), beta_perp)
+
+
+def magnetic_shear_angle(
+    b1_a: FloatArray,
+    b2_a: FloatArray,
+    b3_a: FloatArray,
+    b1_b: FloatArray,
+    b2_b: FloatArray,
+    b3_b: FloatArray,
+) -> FloatArray:
+    r"""Compute the angle between two magnetic field vectors.
+
+    $$\theta = \arccos\left(\frac{\mathbf{B}_a \cdot \mathbf{B}_b}
+    {|\mathbf{B}_a|\,|\mathbf{B}_b|}\right)$$
+
+    Used for current sheet characterization and component reconnection
+    analysis. [Trattner et al. 2007].
+
+    Parameters
+    ----------
+    b1_a : NDArray
+        First component of magnetic field A.
+    b2_a : NDArray
+        Second component of magnetic field A.
+    b3_a : NDArray
+        Third component of magnetic field A.
+    b1_b : NDArray
+        First component of magnetic field B.
+    b2_b : NDArray
+        Second component of magnetic field B.
+    b3_b : NDArray
+        Third component of magnetic field B.
+
+    Returns
+    -------
+    NDArray
+        Shear angle in radians, in $[0, \pi]$.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> angle = magnetic_shear_angle(
+    ...     np.array([1.0]), np.array([0.0]), np.array([0.0]),
+    ...     np.array([0.0]), np.array([1.0]), np.array([0.0]),
+    ... )
+    >>> np.testing.assert_allclose(angle, np.pi / 2, atol=1e-15)
+    """
+    dot = b1_a * b1_b + b2_a * b2_b + b3_a * b3_b
+    mag_a = np.sqrt(b1_a**2 + b2_a**2 + b3_a**2)
+    mag_b = np.sqrt(b1_b**2 + b2_b**2 + b3_b**2)
+    cos_theta = _safe_divide(dot, mag_a * mag_b)
+    return np.arccos(np.clip(cos_theta, -1.0, 1.0))
+
+
+def magnetic_flux_function(
+    b2: FloatArray,
+    dx: float,
+    dy: float,
+) -> FloatArray:
+    r"""Compute the magnetic flux function for 2D geometry.
+
+    $$\psi(x, y) = -\int_0^x B_2(x', y)\, dx'$$
+
+    where $\mathbf{B} = \nabla\psi \times \hat{z}$, giving
+    $B_1 = \partial\psi/\partial x_2$ and
+    $B_2 = -\partial\psi/\partial x_1$. Contours of $\psi$ are
+    in-plane magnetic field lines. The reconnection rate equals
+    $\partial\psi/\partial t$ at the X-point. [Biskamp 2000] §3.1.
+
+    Assumes Cartesian geometry. In cylindrical axisymmetric (r-z plane),
+    the flux function generalizes to $\psi = -\int r B_z\, dr$ with the
+    metric factor $r$.
+
+    Parameters
+    ----------
+    b2 : NDArray
+        Second component of the magnetic field (perpendicular to the
+        integration direction). Shape ``(nx, ny)`` for 2D data.
+    dx : float
+        Grid spacing along the first axis.
+    dy : float
+        Grid spacing along the second axis (unused, accepted for
+        compatibility with the grid-dependent dispatch).
+
+    Returns
+    -------
+    NDArray
+        Flux function $\psi$ (same shape as *b2*).
+
+    Raises
+    ------
+    ValueError
+        If *b2* is not 2D.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> b2 = np.ones((4, 3))
+    >>> psi = magnetic_flux_function(b2, 0.5, 1.0)
+    >>> np.testing.assert_allclose(psi[0, :], -0.5)
+    """
+    if b2.ndim != 2:
+        msg = f"magnetic_flux_function requires 2D data, got {b2.ndim}D"
+        raise ValueError(msg)
+    return -np.cumsum(b2 * dx, axis=0)
+
+
 __all__ = [
     "agyrotropy",
     "alfven_mach",
@@ -1203,16 +1607,24 @@ __all__ = [
     "electric_field_magnitude",
     "enthalpy",
     "entropy",
+    "firehose_parameter",
     "gyrofrequency",
     "gyroradius",
     "gyrotropic_entropy",
+    "hall_electric_field",
+    "ideal_electric_field",
     "internal_energy",
     "ion_acoustic_speed",
+    "j_dot_e",
     "kinetic_energy_density",
     "magnetic_energy_density",
     "magnetic_field_magnitude",
+    "magnetic_flux_function",
+    "magnetic_shear_angle",
     "magnetosonic_mach",
     "magnetosonic_speed",
+    "mirror_parameter",
+    "non_ideal_electric_field",
     "parallel_pressure",
     "perpendicular_pressure",
     "plasma_beta",

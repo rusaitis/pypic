@@ -44,7 +44,10 @@ def _nearest_indices(
         idx = np.clip(idx, 0, len(coords) - 2)
         closer_to_next = np.abs(vals - coords[idx + 1]) < np.abs(vals - coords[idx])
         idx = np.where(closer_to_next, idx + 1, idx)
-        half_dx = 0.5 * (coords[1] - coords[0]) if len(coords) > 1 else 0.5
+        if len(coords) > 1:
+            half_dx = 0.5 * (coords[1] - coords[0])
+        else:
+            half_dx = 0.5 * abs(float(coords[0])) + 0.5
         out = (vals < coords[0] - half_dx) | (vals > coords[-1] + half_dx)
         mask &= ~out
         indices[:, d] = idx

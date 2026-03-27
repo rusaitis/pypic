@@ -25,6 +25,7 @@ dev = [
     "mypy>=1.13",
     "mkdocs-material>=9.5",
     "mkdocstrings[python]>=0.27",
+    "mkdocs-bibtex>=2.16",
     "scipy-stubs>=1.17.1.1",
     "vulture>=2.15",
 ]

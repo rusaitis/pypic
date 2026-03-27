@@ -79,6 +79,7 @@ class QuantityType(StrEnum):
     E_FIELD_PER_LENGTH = "e_field_per_length"
     VELOCITY_PER_LENGTH = "velocity_per_length"
     SPECIFIC_ENERGY = "specific_energy"
+    POWER_DENSITY = "power_density"
     DIMENSIONLESS = "dimensionless"
 
 
@@ -101,6 +102,7 @@ _QUANTITY_UNITS: dict[str, str] = {
     "e_field_per_length": "V/m^2",
     "velocity_per_length": "1/s",
     "specific_energy": "J/kg",
+    "power_density": "W/m^3",
     "dimensionless": "",
 }
 
@@ -387,6 +389,43 @@ _FIELD_INFO: dict[str, FieldInfo] = {
     "gamma_L": _FI("dimensionless", "Bulk Lorentz factor", "", r"$\gamma$"),
     "sigma": _FI("dimensionless", "Magnetization parameter", "", r"$\sigma$"),
     "gamma_eos": _FI("dimensionless", "Adiabatic index", "", r"$\gamma_{eos}$"),
+    # Reconnection diagnostics
+    "J_dot_E": _FI(
+        "power_density",
+        "Energy conversion rate",
+        "W/m^3",
+        r"$\mathbf{J} \cdot \mathbf{E}$",
+    ),
+    "E_prime_1": _FI(
+        "e_field", "Non-ideal electric field, component 1", "V/m", r"$E'_1$",
+    ),
+    "E_prime_2": _FI(
+        "e_field", "Non-ideal electric field, component 2", "V/m", r"$E'_2$",
+    ),
+    "E_prime_3": _FI(
+        "e_field", "Non-ideal electric field, component 3", "V/m", r"$E'_3$",
+    ),
+    "E_ideal_1": _FI(
+        "e_field", "Ideal electric field, component 1", "V/m", r"$E_{ideal,1}$",
+    ),
+    "E_ideal_2": _FI(
+        "e_field", "Ideal electric field, component 2", "V/m", r"$E_{ideal,2}$",
+    ),
+    "E_ideal_3": _FI(
+        "e_field", "Ideal electric field, component 3", "V/m", r"$E_{ideal,3}$",
+    ),
+    "E_Hall_1": _FI(
+        "e_field", "Hall electric field, component 1", "V/m", r"$E_{Hall,1}$",
+    ),
+    "E_Hall_2": _FI(
+        "e_field", "Hall electric field, component 2", "V/m", r"$E_{Hall,2}$",
+    ),
+    "E_Hall_3": _FI(
+        "e_field", "Hall electric field, component 3", "V/m", r"$E_{Hall,3}$",
+    ),
+    "firehose": _FI("dimensionless", "Firehose parameter", "", r"$\mathcal{F}$"),
+    "mirror": _FI("dimensionless", "Mirror parameter", "", r"$\mathcal{M}$"),
+    "psi": _FI("b_field", "Magnetic flux function", "T", r"$\psi$"),
 }
 
 

@@ -11,16 +11,24 @@ from pypic.derived import (
     electric_field_magnitude,
     enthalpy,
     entropy,
+    firehose_parameter,
     gyrofrequency,
     gyroradius,
     gyrotropic_entropy,
+    hall_electric_field,
+    ideal_electric_field,
     internal_energy,
     ion_acoustic_speed,
+    j_dot_e,
     kinetic_energy_density,
     magnetic_energy_density,
     magnetic_field_magnitude,
+    magnetic_flux_function,
+    magnetic_shear_angle,
     magnetosonic_mach,
     magnetosonic_speed,
+    mirror_parameter,
+    non_ideal_electric_field,
     parallel_pressure,
     perpendicular_pressure,
     plasma_beta,
@@ -613,3 +621,237 @@ class TestCharacteristicScalesEdgeCases:
         nan = np.array([np.nan])
         result = agyrotropy(nan, ONES, ONES, ZEROS, ZEROS, ZEROS, *B_ALONG_Z)
         assert np.isnan(result[0])
+
+
+class TestJDotE:
+    def test_hand_calculation(self):
+        """J=(1,2,0), E=(3,0,1) → J·E = 1*3 + 2*0 + 0*1 = 3."""
+        result = j_dot_e(
+            np.array([1.0]), np.array([2.0]), np.array([0.0]),
+            np.array([3.0]), np.array([0.0]), np.array([1.0]),
+        )
+        np.testing.assert_allclose(result, 3.0, rtol=1e-15)
+
+    def test_orthogonal_gives_zero(self):
+        """J perpendicular to E → J·E = 0."""
+        result = j_dot_e(
+            np.array([1.0]), np.array([0.0]), np.array([0.0]),
+            np.array([0.0]), np.array([1.0]), np.array([0.0]),
+        )
+        np.testing.assert_allclose(result, 0.0, atol=1e-15)
+
+    def test_negative_means_fields_gain_energy(self):
+        result = j_dot_e(
+            np.array([1.0]), np.array([0.0]), np.array([0.0]),
+            np.array([-2.0]), np.array([0.0]), np.array([0.0]),
+        )
+        assert result[0] < 0
+
+    def test_nan_propagation(self):
+        result = j_dot_e(
+            np.array([np.nan]), np.array([0.0]), np.array([0.0]),
+            np.array([1.0]), np.array([0.0]), np.array([0.0]),
+        )
+        assert np.isnan(result[0])
+
+
+class TestIdealElectricField:
+    def test_hand_calculation(self):
+        """V=(1,0,0), B=(0,0,1) -> -VxB = -(0,-1,0) = (0,1,0)."""
+        e1, e2, e3 = ideal_electric_field(
+            np.array([1.0]), np.array([0.0]), np.array([0.0]),
+            np.array([0.0]), np.array([0.0]), np.array([1.0]),
+        )
+        np.testing.assert_allclose(e1, 0.0, atol=1e-15)
+        np.testing.assert_allclose(e2, 1.0, rtol=1e-15)
+        np.testing.assert_allclose(e3, 0.0, atol=1e-15)
+
+    def test_zero_velocity_gives_zero(self):
+        e1, e2, e3 = ideal_electric_field(
+            np.array([0.0]), np.array([0.0]), np.array([0.0]),
+            np.array([1.0]), np.array([2.0]), np.array([3.0]),
+        )
+        np.testing.assert_allclose(e1, 0.0, atol=1e-15)
+        np.testing.assert_allclose(e2, 0.0, atol=1e-15)
+        np.testing.assert_allclose(e3, 0.0, atol=1e-15)
+
+
+class TestNonIdealElectricField:
+    def test_ideal_case_gives_zero(self):
+        """When E = -VxB exactly, E' = E + VxB = 0 (frozen-in)."""
+        # V=(1,0,0), B=(0,1,0), VxB = (0,0,1), E_ideal = (0,0,-1)
+        e1, e2, e3 = non_ideal_electric_field(
+            np.array([0.0]), np.array([0.0]), np.array([-1.0]),  # E = -VxB
+            np.array([1.0]), np.array([0.0]), np.array([0.0]),   # V
+            np.array([0.0]), np.array([1.0]), np.array([0.0]),   # B
+        )
+        np.testing.assert_allclose(e1, 0.0, atol=1e-15)
+        np.testing.assert_allclose(e2, 0.0, atol=1e-15)
+        np.testing.assert_allclose(e3, 0.0, atol=1e-15)
+
+    def test_hand_calculation(self):
+        """E=(0,0,0.5), V=(1,0,0), B=(0,1,0), VxB=(0,0,1), E'=(0,0,1.5)."""
+        _e1, _e2, e3 = non_ideal_electric_field(
+            np.array([0.0]), np.array([0.0]), np.array([0.5]),
+            np.array([1.0]), np.array([0.0]), np.array([0.0]),
+            np.array([0.0]), np.array([1.0]), np.array([0.0]),
+        )
+        np.testing.assert_allclose(e3, 1.5, rtol=1e-15)
+
+    def test_consistency_with_ideal(self):
+        """E' = E - E_ideal (by definition)."""
+        v = np.array([1.0, 0.5, -0.3])
+        b = np.array([0.2, -0.4, 0.8])
+        e = np.array([0.1, 0.2, 0.3])
+        e_id1, e_id2, e_id3 = ideal_electric_field(
+            v[:1], v[1:2], v[2:], b[:1], b[1:2], b[2:],
+        )
+        ep1, ep2, ep3 = non_ideal_electric_field(
+            e[:1], e[1:2], e[2:], v[:1], v[1:2], v[2:], b[:1], b[1:2], b[2:],
+        )
+        np.testing.assert_allclose(ep1, e[:1] - e_id1, rtol=1e-14)
+        np.testing.assert_allclose(ep2, e[1:2] - e_id2, rtol=1e-14)
+        np.testing.assert_allclose(ep3, e[2:] - e_id3, rtol=1e-14)
+
+
+class TestHallElectricField:
+    def test_hand_calculation(self):
+        """J=(1,0,0), B=(0,0,1), n=2, |q|=1, JxB=(0,-1,0), E_Hall=(0,-0.5,0)."""
+        e1, e2, e3 = hall_electric_field(
+            np.array([1.0]), np.array([0.0]), np.array([0.0]),
+            np.array([0.0]), np.array([0.0]), np.array([1.0]),
+            np.array([2.0]), 1.0,
+        )
+        np.testing.assert_allclose(e1, 0.0, atol=1e-15)
+        np.testing.assert_allclose(e2, -0.5, rtol=1e-15)
+        np.testing.assert_allclose(e3, 0.0, atol=1e-15)
+
+    def test_charge_sign_independence(self):
+        """Result is the same for positive and negative charge (abs used)."""
+        args = (
+            np.array([1.0]), np.array([0.0]), np.array([0.0]),
+            np.array([0.0]), np.array([1.0]), np.array([0.0]),
+            np.array([1.0]),
+        )
+        pos = hall_electric_field(*args, 1.0)
+        neg = hall_electric_field(*args, -1.0)
+        for p, n in zip(pos, neg, strict=True):
+            np.testing.assert_allclose(p, n, rtol=1e-15)
+
+    def test_zero_density_gives_nan(self):
+        _e1, e2, _e3 = hall_electric_field(
+            np.array([1.0]), np.array([0.0]), np.array([0.0]),
+            np.array([0.0]), np.array([0.0]), np.array([1.0]),
+            np.array([0.0]), 1.0,
+        )
+        assert np.isnan(e2[0])
+
+
+class TestFirehoseParameter:
+    def test_isotropic_is_stable(self):
+        """Equal pressures: F = (P-P)/(B²/2) - 1 = -1."""
+        result = firehose_parameter(
+            np.array([2.0]), np.array([2.0]), np.array([1.0]),
+        )
+        np.testing.assert_allclose(result, -1.0, rtol=1e-15)
+
+    def test_marginal_stability(self):
+        """P_par - P_perp = B²/2 → F = 0."""
+        # B=2 → B²/2 = 2, so P_par - P_perp = 2
+        result = firehose_parameter(
+            np.array([3.0]), np.array([1.0]), np.array([2.0]),
+        )
+        np.testing.assert_allclose(result, 0.0, atol=1e-15)
+
+    def test_unstable(self):
+        """Large parallel excess → F > 0."""
+        result = firehose_parameter(
+            np.array([10.0]), np.array([1.0]), np.array([1.0]),
+        )
+        assert result[0] > 0
+
+    def test_zero_b_gives_nan(self):
+        result = firehose_parameter(
+            np.array([1.0]), np.array([0.5]), np.array([0.0]),
+        )
+        assert np.isnan(result[0])
+
+
+class TestMirrorParameter:
+    def test_isotropic_is_stable(self):
+        """P_par = P_perp: M = 1 - 1 - 1/β_perp = -1/β_perp < 0."""
+        # P=1, B=1 → β_perp = 2*1/1 = 2, M = 1 - 1 - 0.5 = -0.5
+        result = mirror_parameter(
+            np.array([1.0]), np.array([1.0]), np.array([1.0]),
+        )
+        np.testing.assert_allclose(result, -0.5, rtol=1e-14)
+
+    def test_zero_b_gives_nan(self):
+        result = mirror_parameter(
+            np.array([1.0]), np.array([1.0]), np.array([0.0]),
+        )
+        assert np.isnan(result[0])
+
+    def test_large_beta_limit(self):
+        """When β_perp → ∞, M → P_perp/P_par - 1."""
+        # B very small → β_perp very large → 1/β_perp ≈ 0
+        result = mirror_parameter(
+            np.array([1.0]), np.array([3.0]), np.array([1e-6]),
+        )
+        np.testing.assert_allclose(result, 2.0, atol=0.01)
+
+
+class TestMagneticShearAngle:
+    def test_parallel(self):
+        angle = magnetic_shear_angle(
+            np.array([1.0]), np.array([0.0]), np.array([0.0]),
+            np.array([2.0]), np.array([0.0]), np.array([0.0]),
+        )
+        np.testing.assert_allclose(angle, 0.0, atol=1e-15)
+
+    def test_antiparallel(self):
+        angle = magnetic_shear_angle(
+            np.array([1.0]), np.array([0.0]), np.array([0.0]),
+            np.array([-1.0]), np.array([0.0]), np.array([0.0]),
+        )
+        np.testing.assert_allclose(angle, np.pi, rtol=1e-14)
+
+    def test_perpendicular(self):
+        angle = magnetic_shear_angle(
+            np.array([1.0]), np.array([0.0]), np.array([0.0]),
+            np.array([0.0]), np.array([1.0]), np.array([0.0]),
+        )
+        np.testing.assert_allclose(angle, np.pi / 2, rtol=1e-14)
+
+    def test_45_degrees(self):
+        angle = magnetic_shear_angle(
+            np.array([1.0]), np.array([1.0]), np.array([0.0]),
+            np.array([1.0]), np.array([0.0]), np.array([0.0]),
+        )
+        np.testing.assert_allclose(angle, np.pi / 4, rtol=1e-14)
+
+
+class TestMagneticFluxFunction:
+    def test_uniform_field(self):
+        """Uniform B2=1: ψ = -∫B2 dx = -x*dx (negative cumsum)."""
+        b2 = np.ones((10, 5))
+        dx = 0.5
+        psi = magnetic_flux_function(b2, dx, 1.0)
+        # First row: psi[0,:] = -1*0.5 = -0.5
+        np.testing.assert_allclose(psi[0, :], -0.5, rtol=1e-15)
+        # Should decrease along x
+        assert psi[-1, 0] < psi[0, 0]
+
+    def test_sign_convention(self):
+        r"""Verify B2 = -∂ψ/∂x (standard convention)."""
+        nx, ny = 64, 32
+        dx = 0.1
+        b2 = np.ones((nx, ny)) * 2.0
+        psi = magnetic_flux_function(b2, dx, 1.0)
+        # Reconstruct: -∂ψ/∂x should ≈ B2
+        dpsi_dx = np.gradient(psi, dx, axis=0)
+        np.testing.assert_allclose(-dpsi_dx[2:-2, :], 2.0, rtol=0.01)
+
+    def test_3d_raises(self):
+        with pytest.raises(ValueError, match="2D"):
+            magnetic_flux_function(np.ones((4, 3, 2)), 1.0, 1.0)

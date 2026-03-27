@@ -670,6 +670,11 @@ class FieldDataset:
         """
         from pypic.fields import _QUANTITY_UNITS
 
+        expected = tuple(self._grid.dimensions)
+        if data.shape != expected:
+            msg = f"Array shape {data.shape} doesn't match grid dimensions {expected}"
+            raise ValueError(msg)
+
         qt = str(quantity_type)
         if qt not in _QUANTITY_UNITS:
             valid = sorted(_QUANTITY_UNITS)
@@ -839,11 +844,11 @@ class SimulationConfig:
     species : tuple[SpeciesInfo, ...]
         Species definitions (tuple for immutability).
     physics : dict[str, Any]
-        Physics parameters.
+        Physics parameters (immutable after construction).
     frame : str
         Reference frame label (e.g. ``"GSM"``, ``"simulation"``).
     metadata : dict[str, Any]
-        Additional configuration data.
+        Additional configuration data (immutable after construction).
 
     Examples
     --------

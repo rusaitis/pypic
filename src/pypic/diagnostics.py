@@ -328,12 +328,92 @@ def div_e(
     return divergence(e1, e2, e3, d1, d2, d3, geometry=geometry)
 
 
+def spatial_mean(field: FloatArray) -> np.floating[Any]:
+    r"""Compute the spatial mean of a field, ignoring NaN.
+
+    Uses unweighted averaging, which is correct for uniform Cartesian grids
+    where all cells have equal volume. For non-Cartesian geometries, a
+    volume-weighted average ($\int f\, dV / \int dV$) would be needed.
+
+    Parameters
+    ----------
+    field : NDArray
+        Scalar field (any dimensionality).
+
+    Returns
+    -------
+    np.floating
+        Spatial mean value.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> spatial_mean(np.array([1.0, 2.0, 3.0]))
+    np.float64(2.0)
+    """
+    return np.nanmean(field)
+
+
+def spatial_rms(field: FloatArray) -> np.floating[Any]:
+    r"""Compute the root-mean-square of a field, ignoring NaN.
+
+    $$f_{rms} = \sqrt{\langle f^2 \rangle}$$
+
+    Uses unweighted averaging, correct for uniform Cartesian grids.
+    Non-Cartesian geometries require volume-weighted RMS.
+
+    Parameters
+    ----------
+    field : NDArray
+        Scalar field (any dimensionality).
+
+    Returns
+    -------
+    np.floating
+        RMS value.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> spatial_rms(np.array([3.0, 4.0]))
+    np.float64(3.5355339059327378)
+    """
+    return np.sqrt(np.nanmean(field**2))
+
+
+def field_extrema(
+    field: FloatArray,
+) -> tuple[np.floating[Any], np.floating[Any]]:
+    r"""Return the minimum and maximum of a field, ignoring NaN.
+
+    Parameters
+    ----------
+    field : NDArray
+        Scalar field (any dimensionality).
+
+    Returns
+    -------
+    tuple[np.floating, np.floating]
+        ``(min, max)`` values.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> field_extrema(np.array([3.0, -1.0, 7.0]))
+    (np.float64(-1.0), np.float64(7.0))
+    """
+    return np.nanmin(field), np.nanmax(field)
+
+
 __all__ = [
     "div_b",
     "div_e",
     "field_difference",
     "field_energy",
+    "field_extrema",
     "l2_relative_error",
     "linf_error",
     "max_div_b",
+    "spatial_mean",
+    "spatial_rms",
 ]

@@ -61,11 +61,16 @@ class PlaneSelection:
             msg = f"Axis {self.normal!r} not found in dataset dimensions {axis_names!r}"
             raise ValueError(msg)
 
-        if self.index is None:
-            axis_idx = axis_names.index(self.normal)
-            idx = data.grid.dimensions[axis_idx] // 2
-        else:
-            idx = self.index
+        axis_idx = axis_names.index(self.normal)
+        idx = data.grid.dimensions[axis_idx] // 2 if self.index is None else self.index
+
+        dim_size = data.grid.dimensions[axis_idx]
+        if idx < 0 or idx >= dim_size:
+            msg = (
+                f"Index {idx} out of bounds for axis {self.normal!r} "
+                f"with dimension {dim_size}"
+            )
+            raise ValueError(msg)
 
         return data.isel({self.normal: idx})
 

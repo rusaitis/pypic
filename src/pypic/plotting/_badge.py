@@ -11,10 +11,6 @@ if TYPE_CHECKING:
     from matplotlib.axes import Axes
     from matplotlib.offsetbox import AnchoredOffsetbox, DrawingArea
 
-from pypic.plotting.styles import OVERLAY_BORDER_PAD
-
-OVERLAY_BOX_STYLE = "round,pad=0.4,rounding_size=0.6"
-
 BadgeLoc = Literal[
     "upper left", "upper right", "lower left", "lower right", "upper center"
 ]
@@ -37,40 +33,45 @@ def _make_overlay_box(
     """Create a styled overlay box and add it to *ax*."""
     from matplotlib.offsetbox import AnchoredOffsetbox
 
+    from pypic.plotting.styles import _overlay_box_style, _theme_val
+
+    pad: float = _theme_val("overlay_padding", 0.4)
+    margin: float = _theme_val("overlay_margin", 0.03)
+
     loc_code = _LOC_CODES.get(loc, 1)
+    has_bg = bg_rgba[3] >= 0.01
     box = AnchoredOffsetbox(
         loc=loc_code,
         child=child,
-        pad=0.4,
-        borderpad=OVERLAY_BORDER_PAD,
-        frameon=True,
+        pad=pad,
+        borderpad=margin * 20,  # convert axes fraction to approx points
+        frameon=has_bg,
     )
-    box.patch.set_boxstyle(OVERLAY_BOX_STYLE)
-    box.patch.set_facecolor(bg_rgba)
-    box.patch.set_edgecolor("none")
+    if has_bg:
+        box.patch.set_boxstyle(_overlay_box_style())
+        box.patch.set_facecolor(bg_rgba)
+        box.patch.set_edgecolor("none")
     ax.add_artist(box)
     return box
 
 
-OverlayShade = Literal["darker", "lighter"]
-
-_SHADE_FACTOR = 0.4
+OverlayVariant = Literal["darker", "lighter", "alt"]
 
 
 def _detect_overlay_defaults(
-    shade: OverlayShade | None,
+    variant: OverlayVariant | None,
 ) -> tuple[tuple[float, float, float], tuple[float, float, float]]:
-    """Derive overlay bg and fg colors from rcParams.
+    """Derive overlay bg and fg colors from the active theme or rcParams.
 
-    The overlay background is the axes facecolor blended toward black
-    (``"darker"``) or white (``"lighter"``).  When *shade* is ``None``,
-    the direction is auto-selected from the axes facecolor luminance.
-    Foreground color is always read from ``rcParams["text.color"]`` so
-    that custom themes propagate into overlay text automatically.
+    When a :func:`~pypic.plotting.use_theme` context is active and the
+    theme defines an ``overlay_color``, that color is used directly.
+    Otherwise the overlay background is the axes facecolor blended toward
+    black (``"darker"``) or white (``"lighter"``).
 
     Parameters
     ----------
-    shade : "darker", "lighter", or None
+    variant : "darker", "lighter", "alt", or None
+        ``"alt"`` uses the theme's alternative overlay colors.
         ``None`` auto-selects based on axes facecolor luminance.
 
     Returns
@@ -81,42 +82,60 @@ def _detect_overlay_defaults(
     import matplotlib as mpl
     from matplotlib.colors import to_rgba
 
-    bg = to_rgba(mpl.rcParams.get("axes.facecolor", "white"))
-    luminance = 0.299 * bg[0] + 0.587 * bg[1] + 0.114 * bg[2]
+    from pypic.plotting.styles import get_active_theme
 
-    if shade is None:
-        shade = "darker" if luminance < 0.5 else "lighter"
+    theme = get_active_theme()
 
-    if shade == "darker":
-        f = _SHADE_FACTOR
-        default_bg = (bg[0] * f, bg[1] * f, bg[2] * f)
+    # "alt" variant: use alternative overlay colors from theme
+    if variant == "alt" and theme is not None:
+        return theme.overlay_alt_color[:3], theme.overlay_alt_text_color[:3]
+
+    # Primary overlay color from theme
+    if theme is not None and any(c > 0 for c in theme.overlay_color[:3]):
+        default_bg: tuple[float, float, float] = theme.overlay_color[:3]
     else:
-        f = _SHADE_FACTOR
-        default_bg = (
-            bg[0] + (1.0 - bg[0]) * f,
-            bg[1] + (1.0 - bg[1]) * f,
-            bg[2] + (1.0 - bg[2]) * f,
-        )
+        # Fallback: darken or lighten the axes facecolor
+        bg = to_rgba(mpl.rcParams.get("axes.facecolor", "white"))
+        luminance = 0.299 * bg[0] + 0.587 * bg[1] + 0.114 * bg[2]
+        if variant is None:
+            variant = "darker" if luminance < 0.5 else "lighter"
+        f = 0.4
+        if variant == "darker":
+            default_bg = (bg[0] * f, bg[1] * f, bg[2] * f)
+        else:
+            default_bg = (
+                bg[0] + (1.0 - bg[0]) * f,
+                bg[1] + (1.0 - bg[1]) * f,
+                bg[2] + (1.0 - bg[2]) * f,
+            )
 
-    fg_rgba = to_rgba(mpl.rcParams.get("text.color", "black"))
-    default_fg: tuple[float, float, float] = (fg_rgba[0], fg_rgba[1], fg_rgba[2])
+    # Overlay text color from theme, or fall back to rcParams
+    if theme is not None:
+        default_fg: tuple[float, float, float] = theme.overlay_text_color[:3]
+    else:
+        fg_rgba = to_rgba(mpl.rcParams.get("text.color", "black"))
+        default_fg = (fg_rgba[0], fg_rgba[1], fg_rgba[2])
 
     return default_bg, default_fg
 
 
 def _format_status_text(
     *,
+    text: str | None,
     step: int | None,
-    time: float | None,
+    time: float | str | None,
     time_units: str,
     step_range: tuple[int, int] | None,
     label: str | None = None,
     show_max: bool = True,
 ) -> str:
-    """Build the status text string from step/time parameters.
+    """Build the status text string from step/time/text parameters.
 
     Parameters
     ----------
+    text : str or None
+        Direct custom text. When provided, *step*/*time*/*label* are
+        ignored for text generation.
     label : str or None
         Custom prefix for the step (or time-only) display.
         ``None`` uses auto-labels (``"step"`` / ``"t"``).
@@ -124,6 +143,9 @@ def _format_status_text(
     show_max : bool
         When ``step_range`` is set, include ``" / max"`` after the step.
     """
+    if text is not None:
+        return text
+
     parts: list[str] = []
 
     if step is not None:
@@ -135,7 +157,9 @@ def _format_status_text(
             parts.append(f"{prefix}{step}")
 
     if time is not None:
-        if abs(time) >= 1e4 or (0 < abs(time) < 0.01):
+        if isinstance(time, str):
+            t_str = time
+        elif abs(time) >= 1e4 or (0 < abs(time) < 0.01):
             t_str = f"{time:.2e}"
         else:
             t_str = f"{time:.2f}"
@@ -152,15 +176,21 @@ def _format_status_text(
 
 def _resolve_rgba(
     color: str | tuple[float, ...] | None,
-    alpha: float,
+    alpha: float | None,
     fallback: tuple[float, float, float],
+    fallback_alpha: float = 0.65,
 ) -> tuple[float, float, float, float]:
-    """Resolve an optional color override to RGBA, falling back to *fallback*."""
+    """Resolve an optional color override to RGBA, falling back to *fallback*.
+
+    When *alpha* is ``None``, the theme's overlay alpha (*fallback_alpha*)
+    is used.  Pass ``0.0`` explicitly for a transparent overlay.
+    """
+    a = fallback_alpha if alpha is None else alpha
     if color is None:
-        return (*fallback, alpha)
+        return (*fallback, a)
     from matplotlib.colors import to_rgba
 
-    return (*to_rgba(color)[:3], alpha)
+    return (*to_rgba(color)[:3], a)
 
 
 def _build_progress_bar(
@@ -172,8 +202,17 @@ def _build_progress_bar(
     track_color: tuple[float, ...],
 ) -> DrawingArea:
     """Build a DrawingArea containing track + fill rectangles."""
+    if bar_width <= 0 or bar_height <= 0:
+        msg = "bar_width and bar_height must be positive"
+        raise ValueError(msg)
+
     from matplotlib.offsetbox import DrawingArea
     from matplotlib.patches import FancyBboxPatch
+
+    from pypic.plotting.styles import _theme_val
+
+    rounding: float = _theme_val("progress_bar_rounding", 2.0)
+    box_style = f"round,pad=0,rounding_size={rounding}"
 
     drawing = DrawingArea(bar_width, bar_height)
 
@@ -181,7 +220,7 @@ def _build_progress_bar(
         (0, 0),
         bar_width,
         bar_height,
-        boxstyle="round,pad=0,rounding_size=2",
+        boxstyle=box_style,
         facecolor=track_color,
         edgecolor="none",
     )
@@ -193,7 +232,7 @@ def _build_progress_bar(
             (0, 0),
             fill_width,
             bar_height,
-            boxstyle="round,pad=0,rounding_size=2",
+            boxstyle=box_style,
             facecolor=bar_color,
             edgecolor="none",
             alpha=bar_alpha,
@@ -203,57 +242,61 @@ def _build_progress_bar(
     return drawing
 
 
-def add_status_badge(
+def add_badge(
     ax: Axes,
+    text: str | None = None,
     *,
     step: int | None = None,
-    time: float | None = None,
+    time: float | str | None = None,
     time_units: str = "",
     step_range: tuple[int, int] | None = None,
     label: str | None = None,
     show_max: bool = True,
-    shade: OverlayShade | None = None,
+    progress: float | None = None,
+    variant: OverlayVariant | None = None,
     loc: BadgeLoc = "upper right",
-    fontsize: float = 9,
-    bar_color: str = "#e8913a",
+    fontsize: float | None = None,
+    bar_color: str | None = None,
     bar_alpha: float = 0.8,
-    bar_width: float = 80,
-    bar_height: float = 4,
+    bar_width: float | None = None,
+    bar_height: float | None = None,
     bg_color: str | tuple[float, ...] | None = None,
-    bg_alpha: float = 0.65,
+    bg_alpha: float | None = None,
     text_color: str | tuple[float, ...] | None = None,
-    text_alpha: float = 0.85,
+    text_alpha: float = 0.8,
     track_color: str | tuple[float, ...] | None = None,
 ) -> AnchoredOffsetbox:
     r"""Add a status badge overlay to an axes.
 
-    Renders simulation step and/or time as a rounded box with a progress
-    bar when ``step_range`` is provided. The overlay background is
-    derived from the axes facecolor — darkened or lightened depending
-    on the *shade* parameter (auto-detected by default). Text color
-    is read from ``rcParams["text.color"]`` so that custom themes
-    propagate automatically. Override individual colors with
-    ``bg_color``, ``text_color``, or ``track_color``.
+    Renders simulation step, time, or custom text as a rounded box.
+    A progress bar is shown when *step_range* or *progress* is set.
 
     Parameters
     ----------
     ax : Axes
         Target axes for the badge.
+    text : str, optional
+        Direct custom text. When provided, *step*/*time*/*label* are
+        ignored for text generation (but *step_range*/*progress* still
+        drive the progress bar).
     step : int, optional
         Current simulation step number.
-    time : float, optional
-        Current simulation time.
+    time : float or str, optional
+        Simulation time. A float is auto-formatted; a string is used
+        verbatim (e.g. ``"13:34"``).
     time_units : str
         Unit label appended to the time value (e.g. ``"ns"``).
     step_range : tuple[int, int], optional
-        ``(start, end)`` step range for progress bar display.
+        ``(start, end)`` step range for auto-computing progress.
     label : str or None
-        Custom label prefix. ``None`` uses auto-labels (``"step"`` for
-        step display, ``"t"`` for time). ``""`` suppresses the prefix.
+        Custom label prefix (e.g. ``"Cycle"``, ``"Step"``). ``None``
+        uses auto-labels (``"step"`` / ``"t"``). ``""`` suppresses.
     show_max : bool
-        When ``step_range`` is set, show ``"X / Y"`` if True,
-        just ``"X"`` if False.
-    shade : "darker", "lighter", or None
+        When ``step_range`` is set, show ``"X / Y"`` if True.
+    progress : float or None
+        Explicit progress fraction (0.0 to 1.0). Overrides *step_range*
+        auto-computation when both are given.
+    variant : "darker", "lighter", "alt", or None
         ``"darker"``: darken axes facecolor for overlay bg.
         ``"lighter"``: lighten it. ``None`` (default): auto-detect.
     loc : BadgeLoc
@@ -269,7 +312,7 @@ def add_status_badge(
     bar_height : float
         Height of the progress bar in points.
     bg_color : str, tuple, or None
-        Box background color override. ``None`` derives from *shade*.
+        Box background color override. ``None`` derives from *variant*.
     bg_alpha : float
         Box background opacity.
     text_color : str, tuple, or None
@@ -277,25 +320,53 @@ def add_status_badge(
     text_alpha : float
         Text opacity (default 0.85 for subtle softening).
     track_color : str, tuple, or None
-        Progress bar track color override. ``None`` derives from the
-        foreground color at low alpha.
+        Progress bar track color override.
 
     Returns
     -------
     AnchoredOffsetbox
         The badge artist added to the axes.
+
+    Examples
+    --------
+    >>> import matplotlib.pyplot as plt
+    >>> fig, ax = plt.subplots()
+    >>> _ = add_badge(ax, step=42)
+    >>> _ = add_badge(ax, step=100, label="Cycle")
+    >>> _ = add_badge(ax, time="13:34")
+    >>> _ = add_badge(ax, "Harris sheet, δ = 0.5 d_i")
+    >>> plt.close(fig)
     """
     ensure_matplotlib()
 
     from matplotlib.offsetbox import TextArea, VPacker
 
-    default_bg, default_fg = _detect_overlay_defaults(shade)
+    from pypic.plotting.styles import _theme_val
 
-    bg_rgba = _resolve_rgba(bg_color, bg_alpha, default_bg)
+    default_bg, default_fg = _detect_overlay_defaults(variant)
+    overlay_alpha: float = _theme_val("overlay_color", (0, 0, 0, 0.65))[3]
+
+    if fontsize is None:
+        fontsize = _theme_val("font_overlay", 9.0)
+    if bar_color is None:
+        bar_color = _theme_val("accent_color", "#e8913a")
+    auto_bar_width = bar_width is None
+    if bar_width is None:
+        bar_width = _theme_val("progress_bar_width", 80.0)
+    if bar_height is None:
+        bar_height = _theme_val("progress_bar_height", 4.0)
+
+    bg_rgba = _resolve_rgba(bg_color, bg_alpha, default_bg, overlay_alpha)
     resolved_text = _resolve_rgba(text_color, text_alpha, default_fg)
-    track_rgba = _resolve_rgba(track_color, bg_alpha * 0.4, default_fg)
+
+    if track_color is None:
+        track_rgba = _theme_val("track_color", (0.3, 0.3, 0.3, 0.3))
+    else:
+        effective_alpha = overlay_alpha if bg_alpha is None else bg_alpha
+        track_rgba = _resolve_rgba(track_color, effective_alpha * 0.4, default_fg)
 
     status_text = _format_status_text(
+        text=text,
         step=step,
         time=time,
         time_units=time_units,
@@ -305,21 +376,35 @@ def add_status_badge(
     )
 
     if not status_text:
-        msg = "At least one of step or time must be provided"
+        msg = "Provide text, step, or time for the badge"
         raise ValueError(msg)
 
     text_props = {"fontsize": fontsize, "color": resolved_text}
     text_area = TextArea(status_text, textprops=text_props)
 
-    if step_range is not None and step is not None:
+    # Determine progress fraction
+    fraction: float | None = progress
+    if fraction is None and step_range is not None and step is not None:
         start, end = step_range
-        fraction = (step - start) / max(end - start, 1)
-        fraction = max(0.0, min(1.0, fraction))
+        if start > end:
+            msg = f"step_range start must be <= end, got ({start}, {end})"
+            raise ValueError(msg)
+        fraction = max(0.0, min(1.0, (step - start) / max(end - start, 1)))
 
-        progress = _build_progress_bar(
-            fraction, bar_width, bar_height, bar_color, bar_alpha, track_rgba
+    if fraction is not None:
+        # Scale bar width to match text length when using the default
+        if auto_bar_width:
+            estimated = len(status_text) * fontsize * 0.55
+            bar_width = max(60, min(200, estimated))
+        bar = _build_progress_bar(
+            max(0.0, min(1.0, fraction)),
+            bar_width,
+            bar_height,
+            bar_color,
+            bar_alpha,
+            track_rgba,
         )
-        child = VPacker(children=[text_area, progress], pad=0, sep=3, align="left")
+        child = VPacker(children=[text_area, bar], pad=0, sep=3, align="left")
     else:
         child = text_area
 
@@ -327,32 +412,32 @@ def add_status_badge(
 
 
 @dataclass(frozen=True, slots=True)
-class VectorLegendEntry:
+class LegendEntry:
     """One row in a vector legend: a sample line and its label."""
 
     label: str
-    color: str
+    color: str | None = None
     linewidth: float = 1.0
     linestyle: str = "-"
     alpha: float = 1.0
 
 
-def add_panel_label(
+def add_label(
     ax: Axes,
     label: str,
     *,
-    shade: OverlayShade | None = None,
+    variant: OverlayVariant | None = None,
     loc: BadgeLoc = "upper left",
     fontsize: float = 14,
     fontweight: str = "bold",
     bg_color: str | tuple[float, ...] | None = None,
-    bg_alpha: float = 0.65,
+    bg_alpha: float | None = None,
     text_color: str | tuple[float, ...] | None = None,
-    text_alpha: float = 0.85,
+    text_alpha: float = 0.8,
 ) -> AnchoredOffsetbox:
     r"""Add a bold panel letter (a, b, c, ...) overlay to an axes.
 
-    Styled with the same rounded box as :func:`add_status_badge`.
+    Styled with the same rounded box as :func:`add_badge`.
 
     Parameters
     ----------
@@ -360,7 +445,7 @@ def add_panel_label(
         Target axes.
     label : str
         Panel label text (e.g. ``"a"``, ``"b"``).
-    shade : "darker", "lighter", or None
+    variant : "darker", "lighter", "alt", or None
         ``"darker"``: darken axes facecolor for overlay bg.
         ``"lighter"``: lighten it. ``None`` (default): auto-detect.
     loc : BadgeLoc
@@ -370,7 +455,7 @@ def add_panel_label(
     fontweight : str
         Font weight (default ``"bold"``).
     bg_color, bg_alpha, text_color
-        Color overrides; same semantics as :func:`add_status_badge`.
+        Color overrides; same semantics as :func:`add_badge`.
     text_alpha : float
         Text opacity (default 0.85 for subtle softening).
 
@@ -381,9 +466,12 @@ def add_panel_label(
     ensure_matplotlib()
     from matplotlib.offsetbox import TextArea
 
-    default_bg, default_fg = _detect_overlay_defaults(shade)
+    from pypic.plotting.styles import _theme_val
 
-    bg_rgba = _resolve_rgba(bg_color, bg_alpha, default_bg)
+    default_bg, default_fg = _detect_overlay_defaults(variant)
+    overlay_alpha: float = _theme_val("overlay_color", (0, 0, 0, 0.65))[3]
+
+    bg_rgba = _resolve_rgba(bg_color, bg_alpha, default_bg, overlay_alpha)
     resolved_text = _resolve_rgba(text_color, text_alpha, default_fg)
 
     props = {"fontsize": fontsize, "fontweight": fontweight, "color": resolved_text}
@@ -392,32 +480,32 @@ def add_panel_label(
     return _make_overlay_box(ax, text_area, loc, bg_rgba)
 
 
-def add_vector_legend(
+def add_legend(
     ax: Axes,
-    entries: VectorLegendEntry | list[VectorLegendEntry],
+    entries: LegendEntry | list[LegendEntry],
     *,
-    shade: OverlayShade | None = None,
+    variant: OverlayVariant | None = None,
     loc: BadgeLoc = "upper left",
-    fontsize: float = 9,
+    fontsize: float | None = None,
     sample_width: float = 20,
     bg_color: str | tuple[float, ...] | None = None,
-    bg_alpha: float = 0.65,
+    bg_alpha: float | None = None,
     text_color: str | tuple[float, ...] | None = None,
-    text_alpha: float = 0.85,
+    text_alpha: float = 0.8,
 ) -> AnchoredOffsetbox:
     r"""Add a vector legend overlay showing colored line samples with labels.
 
     Each entry renders as a short line segment (using the entry's color,
     linewidth, linestyle, alpha) next to its label text.  Multiple entries
-    are stacked vertically.  The box style matches :func:`add_status_badge`.
+    are stacked vertically.  The box style matches :func:`add_badge`.
 
     Parameters
     ----------
     ax : Axes
         Target axes.
-    entries : VectorLegendEntry or list[VectorLegendEntry]
+    entries : LegendEntry or list[LegendEntry]
         One or more legend entries.
-    shade : "darker", "lighter", or None
+    variant : "darker", "lighter", "alt", or None
         ``"darker"``: darken axes facecolor for overlay bg.
         ``"lighter"``: lighten it. ``None`` (default): auto-detect.
     loc : BadgeLoc
@@ -427,7 +515,7 @@ def add_vector_legend(
     sample_width : float
         Width of the sample line in points.
     bg_color, bg_alpha, text_color
-        Color overrides; same semantics as :func:`add_status_badge`.
+        Color overrides; same semantics as :func:`add_badge`.
     text_alpha : float
         Text opacity (default 0.85 for subtle softening).
 
@@ -445,12 +533,18 @@ def add_vector_legend(
     )
     from matplotlib.patches import FancyArrowPatch
 
-    if isinstance(entries, VectorLegendEntry):
+    from pypic.plotting.styles import _theme_val
+
+    if fontsize is None:
+        fontsize = _theme_val("font_overlay", 9.0)
+
+    if isinstance(entries, LegendEntry):
         entries = [entries]
 
-    default_bg, default_fg = _detect_overlay_defaults(shade)
+    default_bg, default_fg = _detect_overlay_defaults(variant)
+    overlay_alpha: float = _theme_val("overlay_color", (0, 0, 0, 0.65))[3]
 
-    bg_rgba = _resolve_rgba(bg_color, bg_alpha, default_bg)
+    bg_rgba = _resolve_rgba(bg_color, bg_alpha, default_bg, overlay_alpha)
     resolved_text = _resolve_rgba(text_color, text_alpha, default_fg)
 
     rows: list[HPacker] = []
@@ -458,7 +552,8 @@ def add_vector_legend(
     for entry in entries:
         drawing = DrawingArea(sample_width, line_height)
         mid_y = line_height / 2
-        arrow_size = max(4.0, entry.linewidth * 2.5)
+        base_arrow: float = _theme_val("arrow_size", 4.0)
+        arrow_size = max(base_arrow, entry.linewidth * 2.5)
         line = Line2D(
             [0, sample_width - arrow_size],
             [mid_y, mid_y],

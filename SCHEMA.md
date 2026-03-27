@@ -389,6 +389,13 @@ Densities section above).
 | `curl_B1`, `curl_B2`, `curl_B3` | `curl_Bx`, ... | Curl of B | B1, B2, B3, grid |
 | `vort1`, `vort2`, `vort3` | `vort_x`, ... | Fluid vorticity | V1, V2, V3, grid |
 | `\|vort\|` | — | Vorticity magnitude | vort1, vort2, vort3 |
+| `J_dot_E` | — | Energy conversion rate | J1-J3, E1-E3 |
+| `E_prime_1/2/3` | — | Non-ideal electric field | E1-E3, V1-V3, B1-B3 |
+| `E_ideal_1/2/3` | — | Ideal electric field | V1-V3, B1-B3 |
+| `E_Hall_1/2/3` | — | Hall electric field | J1-J3, B1-B3, n\_s0, species |
+| `psi` | — | Magnetic flux function (2D) | B2, grid |
+| `firehose` | — | Firehose instability parameter | P\_par, P\_perp, \|B\| |
+| `mirror` | — | Mirror instability parameter | P\_par, P\_perp, \|B\| |
 
 Scalar quantities (`n_s0`, `rho_m`, `P`, `Te`, `beta`, ...) use the same
 name regardless of geometry.

@@ -6,7 +6,10 @@ theme:
   features:
     - content.code.copy
     - navigation.sections
+    - navigation.tabs
+    - navigation.top
     - search.highlight
+    - toc.integrate
 
 plugins:
   - search
@@ -17,9 +20,16 @@ plugins:
           options:
             docstring_style: numpy
             show_source: true
+            show_root_heading: true
+            show_root_full_path: false
+            members_order: source
+  - bibtex:
+      bib_file: docs/references.bib
 
 markdown_extensions:
   - admonition
+  - pymdownx.details
+  - footnotes
   - toc:
       permalink: true
   - pymdownx.arithmatex:
@@ -28,7 +38,23 @@ markdown_extensions:
   - pymdownx.superfences
 
 extra_javascript:
+  - mathjax.js
   - https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
 
 nav:
   - Home: index.md
+  - Physics Reference:
+    - Derivations: derivations.md
+    - Equations: equations.md
+    - Conventions: conventions.md
+  - API Reference:
+    - Derived Quantities: api/derived.md
+    - Diagnostics: api/diagnostics.md
+    - Spectral Analysis: api/spectral.md
+    - Reconnection: api/reconnection.md
+    - Units & Normalization: api/units.md
+    - Field Registry: api/fields.md
+    - Selections: api/selections.md
+    - Coordinates & Operators: api/coordinates.md
+    - Readers: api/readers.md
+    - Field Line Tracing: api/traces.md
