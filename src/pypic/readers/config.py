@@ -12,6 +12,7 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 from pypic.coordinates.geometry import GEOMETRY_BY_NAME, CoordinateGeometry
+from pypic.coordinates.transforms import FrameTransform
 from pypic.readers.base import GridInfo, SimulationConfig
 from pypic.units import Normalization, SpeciesInfo
 
@@ -102,6 +103,8 @@ def load_config(path: Path) -> SimulationConfig:
     if scaling:
         metadata["scaling"] = scaling
 
+    transforms = _parse_transforms(raw.get("coordinates", {}), frame)
+
     return SimulationConfig(
         model_name=model_name,
         model_type=model_type,
@@ -110,8 +113,55 @@ def load_config(path: Path) -> SimulationConfig:
         species=species,
         physics=raw.get("physics", {}),
         frame=frame,
+        transforms=transforms,
         metadata=metadata,
     )
+
+
+def _parse_transforms(
+    raw: dict[str, Any], default_frame: str
+) -> dict[str, FrameTransform]:
+    """Parse ``[coordinates.transforms.*]`` into FrameTransform objects.
+
+    Parameters
+    ----------
+    raw : dict
+        The ``[coordinates]`` section from the TOML file.
+    default_frame : str
+        Native frame name (from ``[coordinates] frame``).
+
+    Returns
+    -------
+    dict[str, FrameTransform]
+        Mapping of target frame name to transform.
+    """
+    transforms_section = raw.get("transforms", {})
+    if not transforms_section:
+        return {}
+
+    _identity = ((1.0, 0.0, 0.0), (0.0, 1.0, 0.0), (0.0, 0.0, 1.0))
+    result: dict[str, FrameTransform] = {}
+    for target_name, spec in transforms_section.items():
+        origin = tuple(float(x) for x in spec.get("origin", [0.0, 0.0, 0.0]))
+        rotation_raw = spec.get("rotation", None)
+        if rotation_raw is not None:
+            rotation = tuple(tuple(float(x) for x in row) for row in rotation_raw)
+        else:
+            rotation = _identity
+        scale = float(spec.get("scale", 1.0))
+        source = spec.get("from_frame", default_frame)
+        axis_labels = spec.get("axis_labels", None)
+        target_axis_names = tuple(axis_labels) if axis_labels else None
+
+        result[target_name] = FrameTransform(
+            source_frame=source,
+            target_frame=target_name,
+            origin=origin,  # type: ignore[arg-type]
+            rotation=rotation,  # type: ignore[arg-type]
+            scale=scale,
+            target_axis_names=target_axis_names,  # type: ignore[arg-type]
+        )
+    return result
 
 
 def _parse_model(raw: dict[str, Any]) -> tuple[str, str, dict[str, Any]]:

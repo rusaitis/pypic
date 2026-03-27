@@ -18,6 +18,8 @@ from pypic.coordinates.geometry import (
     GeometryType,
 )
 
+from pypic.coordinates.transforms import FrameTransform
+
 if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence
     from pathlib import Path
@@ -327,6 +329,8 @@ class FieldDataset:
         physics: dict[str, Any] | None = None,
         metadata: dict[str, Any] | None = None,
         aliases: dict[str, str] | None = None,
+        frame: str = "simulation",
+        transforms: dict[str, FrameTransform] | None = None,
     ) -> None:
         self._ds = dataset
         self._grid = grid
@@ -334,6 +338,8 @@ class FieldDataset:
         self._species = tuple(species) if species is not None else ()
         self._physics = physics if physics is not None else {}
         self._metadata = metadata if metadata is not None else {}
+        self._frame = frame
+        self._transforms = dict(transforms) if transforms is not None else {}
 
         merged = _default_aliases(grid.geometry)
         if aliases:
@@ -358,6 +364,8 @@ class FieldDataset:
         physics: dict[str, Any] | None = None,
         metadata: dict[str, Any] | None = None,
         aliases: dict[str, str] | None = None,
+        frame: str = "simulation",
+        transforms: dict[str, FrameTransform] | None = None,
     ) -> FieldDataset:
         r"""Build a FieldDataset from a dict of NumPy arrays.
 
@@ -424,6 +432,8 @@ class FieldDataset:
             physics=physics,
             metadata=metadata,
             aliases=aliases,
+            frame=frame,
+            transforms=transforms,
         )
 
     @property
@@ -457,9 +467,213 @@ class FieldDataset:
         return MappingProxyType(self._aliases)
 
     @property
+    def frame(self) -> str:
+        """Current reference frame label."""
+        return self._frame
+
+    @property
+    def transforms(self) -> MappingProxyType[str, FrameTransform]:
+        """Registered frame transforms (read-only view)."""
+        return MappingProxyType(self._transforms)
+
+    @property
+    def available_frames(self) -> list[str]:
+        """Frame names reachable via registered transforms."""
+        frames: set[str] = {self._frame}
+        for t in self._transforms.values():
+            frames.add(t.source_frame)
+            frames.add(t.target_frame)
+        return sorted(frames)
+
+    @property
     def xr(self) -> xr.Dataset:
         """Raw xarray Dataset."""
         return self._ds
+
+    def transform_to(self, target: str | FrameTransform) -> FieldDataset:
+        r"""Transform this dataset to a different coordinate reference frame.
+
+        Applies an affine transformation: translates the grid origin,
+        scales coordinates, and rotates vector field components and
+        pressure tensors. Scalar fields pass through unchanged. The
+        array memory layout is not transposed.
+
+        Parameters
+        ----------
+        target : str or FrameTransform
+            Target frame name (looked up in the transform registry) or
+            a `FrameTransform` instance applied directly.
+
+        Returns
+        -------
+        FieldDataset
+            New dataset in the target frame.
+
+        Raises
+        ------
+        ValueError
+            If no transform path exists from the current frame.
+        KeyError
+            If *target* is a string and no transforms are registered.
+        """
+        from pypic.coordinates.transforms import (
+            find_pressure_tensor_groups,
+            find_vector_triplets,
+            resolve_transform,
+            rotate_pressure_tensor,
+            rotate_vector_components,
+        )
+
+        if isinstance(target, FrameTransform):
+            transform = target
+            target_frame = transform.target_frame
+        else:
+            target_frame = target
+            if target_frame == self._frame:
+                return self
+            if not self._transforms:
+                msg = (
+                    f"No transforms registered; cannot transform "
+                    f"from {self._frame!r} to {target_frame!r}"
+                )
+                raise KeyError(msg)
+            transform = resolve_transform(
+                self._frame, target_frame, self._transforms
+            )
+        rotation = transform.rotation_matrix
+        dim_names = list(self._grid.surviving_axis_names)
+
+        # Start with a copy of all data variables
+        new_vars: dict[str, xr.DataArray] = {}
+        rotated_fields: set[str] = set()
+
+        # Rotate vector triplets
+        for n1, n2, n3 in find_vector_triplets(self.field_names()):
+            v1, v2, v3 = self[n1], self[n2], self[n3]
+            r1, r2, r3 = rotate_vector_components(v1, v2, v3, rotation)
+            for name, arr in [(n1, r1), (n2, r2), (n3, r3)]:
+                new_vars[name] = xr.DataArray(
+                    data=arr, dims=dim_names, attrs=dict(self._ds[name].attrs)
+                )
+                rotated_fields.add(name)
+
+        # Rotate pressure tensors
+        for p11, p22, p33, p12, p13, p23 in find_pressure_tensor_groups(
+            self.field_names()
+        ):
+            rp = rotate_pressure_tensor(
+                self[p11], self[p22], self[p33],
+                self[p12], self[p13], self[p23],
+                rotation,
+            )
+            for name, arr in zip(
+                [p11, p22, p33, p12, p13, p23], rp, strict=True
+            ):
+                new_vars[name] = xr.DataArray(
+                    data=arr, dims=dim_names, attrs=dict(self._ds[name].attrs)
+                )
+                rotated_fields.add(name)
+
+        # Copy scalar fields unchanged
+        for name in self._ds.data_vars:
+            if name not in rotated_fields:
+                new_vars[name] = self._ds[name]
+
+        # Transform grid: permute axes, flip reversed ones, shift origin
+        if self._grid.surviving_axes is not None:
+            indices = list(self._grid.surviving_axes)
+        else:
+            indices = list(range(len(self._grid.dimensions)))
+        ndim = len(indices)
+        t_origin = np.array(transform.origin, dtype=np.float64)
+        dx_scale = transform.scale
+
+        # Determine axis permutation and sign from rotation matrix.
+        # For each TARGET axis (row of R), find which SOURCE axis
+        # it draws from (column with largest |R_ij|) and its sign.
+        perm: list[int] = []   # perm[target_i] = source local index
+        signs: list[float] = []  # sign of the mapping
+        for target_i in indices:
+            row = rotation[target_i, :]
+            source_orig = int(np.argmax(np.abs(row[indices])))
+            perm.append(source_orig)
+            signs.append(float(np.sign(row[indices[source_orig]])))
+
+        # Transpose + flip arrays to match target axis ordering
+        needs_transpose = perm != list(range(ndim))
+        flip_axes = [i for i, s in enumerate(signs) if s < 0]
+        if needs_transpose or flip_axes:
+            for name, da in list(new_vars.items()):
+                arr = da.values if hasattr(da, "values") else da
+                if needs_transpose:
+                    arr = np.transpose(arr, perm)
+                for ax in flip_axes:
+                    arr = np.flip(arr, axis=ax)
+                new_vars[name] = xr.DataArray(data=np.ascontiguousarray(arr))
+
+        # Compute new origin, spacing, dimensions from permuted source
+        old_coords = self._grid.coordinate_arrays()
+        new_origin_list: list[float] = []
+        new_spacing_list: list[float] = []
+        new_dims_list: list[int] = []
+        for target_i, (src_i, sign) in enumerate(zip(perm, signs)):
+            src_coords = old_coords[src_i]
+            t_first = dx_scale * sign * (src_coords[0] - t_origin[indices[src_i]])
+            t_last = dx_scale * sign * (src_coords[-1] - t_origin[indices[src_i]])
+            dx = dx_scale * self._grid.spacing[src_i]
+            new_origin_list.append(float(min(t_first, t_last)) - 0.5 * dx)
+            new_spacing_list.append(dx)
+            new_dims_list.append(self._grid.dimensions[src_i])
+
+        # Map surviving_axes through the permutation
+        new_surviving = None
+        if self._grid.surviving_axes is not None:
+            new_surviving = tuple(
+                self._grid.surviving_axes[perm[i]] for i in range(ndim)
+            )
+
+        # Update geometry axis names if specified
+        new_geometry = self._grid.geometry
+        if transform.target_axis_names is not None:
+            new_geometry = copy.replace(
+                new_geometry, axis_names=transform.target_axis_names
+            )
+
+        new_grid = copy.replace(
+            self._grid,
+            dimensions=tuple(new_dims_list),
+            origin=tuple(new_origin_list),
+            spacing=tuple(new_spacing_list),
+            geometry=new_geometry,
+            surviving_axes=new_surviving,
+        )
+
+        # Rebuild xr.Dataset with transformed coordinates
+        new_dim_names = list(new_grid.surviving_axis_names)
+        coord_arrays = new_grid.coordinate_arrays()
+        coords = {
+            new_dim_names[i]: coord_arrays[i]
+            for i in range(len(new_dim_names))
+        }
+        rebuilt_vars: dict[str, xr.DataArray] = {}
+        for name, da in new_vars.items():
+            attrs = dict(da.attrs) if hasattr(da, "attrs") else {}
+            arr = da.values if hasattr(da, "values") else da
+            rebuilt_vars[name] = xr.DataArray(
+                data=arr, dims=new_dim_names, attrs=attrs,
+            )
+        new_ds = xr.Dataset(rebuilt_vars, coords=coords)
+
+        return FieldDataset(
+            new_ds,
+            new_grid,
+            self._normalization,
+            species=self._species,
+            physics=self._physics,
+            metadata=self._metadata,
+            frame=target_frame,
+            transforms=self._transforms,
+        )
 
     def _wrap_sliced(self, new_ds: Dataset) -> FieldDataset:
         """Wrap a sliced xr.Dataset in a new FieldDataset, preserving metadata."""
@@ -472,6 +686,8 @@ class FieldDataset:
             physics=self._physics,
             metadata=self._metadata,
             aliases={k: v for k, v in self._aliases.items() if v in new_ds.data_vars},
+            frame=self._frame,
+            transforms=self._transforms,
         )
 
     def _resolve_key(self, key: str) -> str:
@@ -606,6 +822,8 @@ class FieldDataset:
             physics=self._physics,
             metadata=self._metadata,
             aliases={k: v for k, v in self._aliases.items() if v in resolved},
+            frame=self._frame,
+            transforms=self._transforms,
         )
 
     def sel(
@@ -741,6 +959,8 @@ class FieldDataset:
             physics=self._physics,
             metadata=self._metadata,
             aliases=dict(self._aliases),
+            frame=self._frame,
+            transforms=self._transforms,
         )
 
     def field_info(self, name: str) -> FieldInfo:
@@ -914,12 +1134,18 @@ class SimulationConfig:
     species: tuple[SpeciesInfo, ...] = ()
     physics: dict[str, Any] = field(default_factory=dict)  # frozen via __post_init__
     frame: str = "simulation"
+    transforms: dict[str, FrameTransform] = field(default_factory=dict)
     metadata: dict[str, Any] = field(default_factory=dict)  # frozen via __post_init__
 
     def __post_init__(self) -> None:
         # Wrap mutable dicts in read-only proxies to enforce true immutability.
         # Callers pass plain dicts; frozen assignment uses object.__setattr__.
         object.__setattr__(self, "physics", MappingProxyType(dict(self.physics)))
+        object.__setattr__(
+            self,
+            "transforms",
+            MappingProxyType(dict(self.transforms)),
+        )
         object.__setattr__(self, "metadata", MappingProxyType(dict(self.metadata)))
 
 

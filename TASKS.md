@@ -72,7 +72,7 @@ Each step produces something testable. No step starts until the previous step's 
 
 ## Phase 4: Extensions
 
-- [ ] **Step 15: coordinates/transforms — frame transforms**
+- [x] **Step 15: coordinates/transforms — frame transforms**
   `ReferenceFrame`, `FrameTransform` dataclasses. Load from `[coordinates.transforms]` in simulation.toml. Transform chaining (A->B + B->C = A->C). `FieldDataset.transform_to(frame_name)`.
 
 - [ ] **Step 16: selections — SphereSelection**
@@ -238,7 +238,7 @@ grow.
 | 13 | fields | compute(), in_units(), QuantityType, field metadata registry | ✅ |
 | 14 | plotting | 2D slices, comparison | — |
 | **—** | **—** | **Milestone: daily-use tool** | **—** |
-| 15 | coordinates | Frame transforms | — |
+| 15 | coordinates | Frame transforms | ✅ |
 | 16 | selections | Sphere (NaN masking) | — |
 | 17 | docs | MkDocs site | — |
 | 18 | derived | lorentz_factor, magnetization, rel. corrections | — |

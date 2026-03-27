@@ -9,15 +9,31 @@ from pypic.coordinates.geometry import (
     GeometryType,
 )
 from pypic.coordinates.operators import curl, divergence, gradient
+from pypic.coordinates.transforms import (
+    FrameTransform,
+    compose_transforms,
+    find_vector_triplets,
+    identity_transform,
+    resolve_transform,
+    rotate_pressure_tensor,
+    rotate_vector_components,
+)
 
 __all__ = [
     "CARTESIAN",
     "CYLINDRICAL",
-    "GEOMETRY_BY_NAME",
-    "SPHERICAL",
     "CoordinateGeometry",
+    "FrameTransform",
+    "GEOMETRY_BY_NAME",
     "GeometryType",
+    "SPHERICAL",
+    "compose_transforms",
     "curl",
     "divergence",
+    "find_vector_triplets",
     "gradient",
+    "identity_transform",
+    "resolve_transform",
+    "rotate_pressure_tensor",
+    "rotate_vector_components",
 ]

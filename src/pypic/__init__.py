@@ -6,6 +6,7 @@ from pypic.compute import available_quantities
 from pypic.coordinates import (
     CARTESIAN,
     CYLINDRICAL,
+    FrameTransform,
     SPHERICAL,
     CoordinateGeometry,
     GeometryType,
@@ -130,6 +131,7 @@ __all__ = [
     "FieldDataset",
     "FieldInfo",
     "FieldLine",
+    "FrameTransform",
     "GeometryType",
     "GridInfo",
     "IPic3DConfig",
