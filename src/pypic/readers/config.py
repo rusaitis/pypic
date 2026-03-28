@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import copy
+import logging
 import tomllib
 from typing import TYPE_CHECKING, Any
 
+import numpy as np
 from scipy import constants
 
 if TYPE_CHECKING:
@@ -16,10 +18,134 @@ from pypic.coordinates.transforms import FrameTransform
 from pypic.readers.base import GridInfo, SimulationConfig
 from pypic.units import Normalization, SpeciesInfo
 
+log = logging.getLogger(__name__)
+
 _DEFAULT_SPECIES_PARAMS: dict[str, tuple[float, float]] = {
     "electrons": (constants.m_e, constants.e),
     "ions": (constants.m_p, constants.e),
 }
+
+LENGTH_UNITS: dict[str, float] = {
+    "m": 1.0,
+    "km": 1e3,
+    "R_E": 6.371e6,
+    "R_S": 6.957e8,
+    "AU": constants.astronomical_unit,
+}
+
+
+def apply_physical_extent(
+    config: SimulationConfig,
+    physical_extent: tuple[float, ...],
+    physical_extent_unit: str = "m",
+) -> SimulationConfig:
+    r"""Auto-compute transform scale factors from physical domain extent.
+
+    When a simulation represents a physical domain of known size (e.g.,
+    46 R_E across), this function computes the scale factor that converts
+    code units to the target physical unit. For transforms with the
+    default ``scale=1.0``, the computed scale is applied. For transforms
+    with an explicit scale, consistency is validated.
+
+    If the normalization is not identity, also computes and logs the
+    spatial shrink factor (ratio of effective to physical scale).
+
+    Parameters
+    ----------
+    config : SimulationConfig
+        Original simulation configuration.
+    physical_extent : tuple[float, ...]
+        Domain size per target-frame axis, in *physical_extent_unit*.
+    physical_extent_unit : str
+        Length unit name. See ``LENGTH_UNITS`` for valid values.
+
+    Returns
+    -------
+    SimulationConfig
+        New config with computed scale factors and metadata.
+
+    Raises
+    ------
+    ValueError
+        If the unit is unknown or the implied scale is not uniform.
+    """
+    unit_factor = LENGTH_UNITS.get(physical_extent_unit)
+    if unit_factor is None:
+        valid = ", ".join(sorted(LENGTH_UNITS))
+        raise ValueError(
+            f"Unknown physical_extent_unit {physical_extent_unit!r}. "
+            f"Valid: {valid}"
+        )
+
+    grid = config.grid
+    grid_extent = tuple(d * s for d, s in zip(grid.dimensions, grid.spacing))
+    mean_scale = 1.0
+
+    new_transforms: dict[str, FrameTransform] = {}
+    for name, transform in config.transforms.items():
+        r_abs = np.abs(transform.rotation_matrix)
+        rotated = r_abs @ np.array(grid_extent[:3])
+        ndim = min(len(physical_extent), len(rotated))
+        scales = np.array(physical_extent[:ndim]) / rotated[:ndim]
+
+        mean_scale = float(np.mean(scales))
+        for i, s in enumerate(scales):
+            if abs(s - mean_scale) / abs(mean_scale) > 0.05:
+                raise ValueError(
+                    f"physical_extent implies non-uniform scale for "
+                    f"transform {name!r}: per-axis ratios {scales.tolist()}"
+                )
+
+        if transform.scale == 1.0:
+            new_transforms[name] = copy.replace(transform, scale=mean_scale)
+            log.info(
+                "Spatial scaling: %s d_i -> %s %s (scale=%.4f)",
+                " x ".join(f"{e:.0f}" for e in grid_extent),
+                " x ".join(f"{e:.0f}" for e in physical_extent),
+                physical_extent_unit,
+                mean_scale,
+            )
+        else:
+            new_transforms[name] = transform
+            rel_diff = abs(transform.scale - mean_scale) / abs(mean_scale)
+            if rel_diff > 0.05:
+                log.warning(
+                    "Scale mismatch: transform %r has scale=%.4f, but "
+                    "physical_extent implies scale=%.4f (%.1f%% difference)",
+                    name, transform.scale, mean_scale, rel_diff * 100,
+                )
+
+    # Compute shrink factor if normalization is not identity
+    new_metadata = dict(config.metadata)
+    new_metadata["physical_extent"] = physical_extent
+    new_metadata["physical_extent_unit"] = physical_extent_unit
+
+    is_identity = all(
+        getattr(config.normalization, a) == 1.0
+        for a in ("length_ref", "time_ref", "velocity_ref")
+    )
+    if not is_identity:
+        physical_scale = mean_scale
+        norm_scale = config.normalization.length_ref / unit_factor
+        shrink_factor = physical_scale / norm_scale
+        new_metadata.setdefault("scaling", {})["shrink_factor"] = round(
+            shrink_factor, 4
+        )
+        log.info(
+            "Shrink factor: %.2fx (d_i = %.1f km, 1 %s = %.1f d_i physical, "
+            "%.1f d_i effective)",
+            shrink_factor,
+            config.normalization.length_ref / 1e3,
+            physical_extent_unit,
+            unit_factor / config.normalization.length_ref,
+            1.0 / mean_scale,
+        )
+
+    return copy.replace(
+        config,
+        transforms=new_transforms,
+        metadata=new_metadata,
+    )
 
 
 def load_config(path: Path) -> SimulationConfig:
@@ -105,7 +231,7 @@ def load_config(path: Path) -> SimulationConfig:
 
     transforms = _parse_transforms(raw.get("coordinates", {}), frame)
 
-    return SimulationConfig(
+    config = SimulationConfig(
         model_name=model_name,
         model_type=model_type,
         grid=grid,
@@ -116,6 +242,14 @@ def load_config(path: Path) -> SimulationConfig:
         transforms=transforms,
         metadata=metadata,
     )
+
+    coords_raw = raw.get("coordinates", {})
+    if "physical_extent" in coords_raw:
+        phys_ext = tuple(float(x) for x in coords_raw["physical_extent"])
+        phys_unit = str(coords_raw.get("physical_extent_unit", "m"))
+        config = apply_physical_extent(config, phys_ext, phys_unit)
+
+    return config
 
 
 def _parse_transforms(

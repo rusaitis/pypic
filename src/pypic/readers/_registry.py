@@ -438,6 +438,8 @@ def open_simulation(
     path: Path | str,
     *,
     reader: str | ReaderFactory | None = None,
+    physical_extent: tuple[float, ...] | None = None,
+    physical_extent_unit: str = "m",
     **kwargs: Any,  # noqa: ANN401 — reader-specific kwargs
 ) -> Simulation:
     """Open a simulation directory, auto-detecting the format.
@@ -467,6 +469,13 @@ def open_simulation(
           (e.g. ``"ipic3d"``).
         - callable — call it directly as
           ``reader(path, **kwargs) -> (reader, config)``.
+    physical_extent : tuple[float, ...] | None
+        Physical domain size per axis in *physical_extent_unit*.
+        When provided, auto-computes the spatial scale factor for
+        frame transforms. Overrides ``physical_extent`` from TOML.
+    physical_extent_unit : str
+        Length unit for *physical_extent* (default ``"m"``).
+        Valid: ``"m"``, ``"km"``, ``"R_E"``, ``"AU"``, ``"R_S"``.
     **kwargs
         Forwarded to the reader factory (e.g. ``normalization=...``
         for OpenGGCM).
@@ -485,12 +494,19 @@ def open_simulation(
     """
     path = Path(path)
 
+    def _maybe_apply_extent(config: SimulationConfig) -> SimulationConfig:
+        if physical_extent is not None:
+            from pypic.readers.config import apply_physical_extent
+
+            return apply_physical_extent(config, physical_extent, physical_extent_unit)
+        return config
+
     result: tuple[SimulationReader, SimulationConfig]
 
     # Explicit callable override
     if callable(reader) and not isinstance(reader, str):
         result = reader(path, **kwargs)
-        return Simulation(result[0], result[1], path)
+        return Simulation(result[0], _maybe_apply_extent(result[1]), path)
 
     # Explicit name lookup
     if isinstance(reader, str):
@@ -500,7 +516,7 @@ def open_simulation(
             msg = f"No reader registered with name {reader!r}. Available: {available}"
             raise KeyError(msg)
         result = entry.factory(path, **kwargs)
-        return Simulation(result[0], result[1], path)
+        return Simulation(result[0], _maybe_apply_extent(result[1]), path)
 
     # Auto-detect: probe all readers, try factories in descending confidence
     with _lock:
@@ -546,7 +562,10 @@ def open_simulation(
                 path,
             )
             result = registry_snapshot[name].factory(path, **kwargs)
-            return Simulation(result[0], result[1], path, probe_results=frozen_probes)
+            return Simulation(
+                result[0], _maybe_apply_extent(result[1]), path,
+                probe_results=frozen_probes,
+            )
         except Exception as exc:
             log.warning("Reader %r (confidence=%.2f) failed: %s", name, confidence, exc)
             errors.append(exc)

@@ -145,7 +145,17 @@ Describes the coordinate geometry and reference frame.
 geometry = "string"                # REQUIRED: "cartesian" | "spherical" | "cylindrical"
 frame = "string"                   # REQUIRED: native frame name (arbitrary, e.g., "simulation")
 axis_labels = ["x", "y", "z"]     # optional: override default axis names
+physical_extent = [46.0, 32.0, 13.0]  # optional: domain size in target-frame physical units
+physical_extent_unit = "R_E"       # optional: unit for physical_extent (default "m")
+                                   #   valid: "m", "km", "R_E", "R_S", "AU"
 ```
+
+When ``physical_extent`` is provided, the ``scale`` field of any
+transform with the default ``scale=1.0`` is auto-computed as
+``physical_extent / grid_extent`` (after accounting for rotation).
+If the normalization is not identity, the spatial shrink factor is
+also computed and logged. Can also be passed at runtime via
+``open_simulation(path, physical_extent=..., physical_extent_unit=...)``.
 
 **Frame transforms** (optional): define how to convert from the native
 frame to other reference frames. Frame names are arbitrary strings —
@@ -155,7 +165,7 @@ no hardcoded knowledge of any specific frame.
 [coordinates.transforms.TARGET_FRAME]
 origin = [0.0, 0.0, 0.0]          # translation (code units or physical)
 rotation = [[...], [...], [...]]   # 3x3 rotation matrix (optional, must be signed permutation)
-scale = 1.0                        # length scale factor (optional)
+scale = 1.0                        # length scale factor (optional, auto-computed from physical_extent)
 from_frame = "string"              # for chaining: transform from this frame instead of native
 ```
 

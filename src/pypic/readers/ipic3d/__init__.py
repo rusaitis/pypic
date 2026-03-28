@@ -104,19 +104,19 @@ def open_ipic3d(
         msg = f"No .inp or settings.hdf found in {path}"
         raise FileNotFoundError(msg)
 
-    sim_config = to_simulation_config(cfg)
+    sim_config = to_simulation_config(cfg, path)
 
     reader: SimulationReader
     if _has_h5hut_files(path):
-        reader = IPic3DH5hutReader(cfg)
+        reader = IPic3DH5hutReader(cfg, path)
     else:
         match cfg.write_method:
             case "shdf5":
-                reader = IPic3DSerialReader(cfg)
+                reader = IPic3DSerialReader(cfg, path)
             case "h5hut":
-                reader = IPic3DH5hutReader(cfg)
+                reader = IPic3DH5hutReader(cfg, path)
             case _:
-                reader = IPic3DParallelReader(cfg)
+                reader = IPic3DParallelReader(cfg, path)
 
     return reader, sim_config
 

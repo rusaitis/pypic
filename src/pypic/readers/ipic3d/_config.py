@@ -409,16 +409,23 @@ def _build_species(cfg: IPic3DConfig) -> tuple[SpeciesInfo, ...]:
     return tuple(species)
 
 
-def to_simulation_config(cfg: IPic3DConfig) -> SimulationConfig:
+def to_simulation_config(
+    cfg: IPic3DConfig, sim_dir: Path | None = None
+) -> SimulationConfig:
     """Convert iPIC3D config to the canonical SimulationConfig.
 
     Uses the node-centered origin offset trick: ``origin = -dx/2`` so that
     ``coordinate_arrays()`` produces exact node positions ``0, dx, 2dx, ..., L``.
 
+    If a ``simulation.toml`` exists in *sim_dir*, normalization, frame,
+    and transforms are merged from it (the ``.inp`` doesn't carry this info).
+
     Parameters
     ----------
     cfg : IPic3DConfig
         Native iPIC3D configuration.
+    sim_dir : Path | None
+        Simulation directory to look for ``simulation.toml``.
 
     Returns
     -------
@@ -461,13 +468,31 @@ def to_simulation_config(cfg: IPic3DConfig) -> SimulationConfig:
     if cfg.particles_output_cycle > 0:
         metadata["particles_output_cycle"] = cfg.particles_output_cycle
 
+    # If a simulation.toml exists alongside the .inp, merge normalization,
+    # frame, and transforms from it (the .inp doesn't carry this info).
+    normalization = Normalization.identity()
+    frame = ""
+    transforms: dict[str, Any] = {}
+    toml_path = sim_dir / "simulation.toml" if sim_dir is not None else None
+    if toml_path is not None and toml_path.exists():
+        from pypic.readers.config import load_config
+
+        toml_config = load_config(toml_path)
+        normalization = toml_config.normalization
+        frame = toml_config.frame
+        transforms = toml_config.transforms
+        if toml_config.metadata:
+            metadata.update(toml_config.metadata)
+
     return SimulationConfig(
         model_name="iPIC3D",
         model_type="PIC",
         grid=grid,
-        normalization=Normalization.identity(),
+        normalization=normalization,
         species=_build_species(cfg),
         physics=physics,
+        frame=frame,
+        transforms=transforms,
         metadata=metadata,
     )
 

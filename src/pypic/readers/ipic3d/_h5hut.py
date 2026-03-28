@@ -64,9 +64,9 @@ class IPic3DH5hutReader:
         Parsed iPIC3D configuration.
     """
 
-    def __init__(self, config: IPic3DConfig) -> None:
+    def __init__(self, config: IPic3DConfig, sim_dir: Path | None = None) -> None:
         self._config = config
-        self._sim_config = to_simulation_config(config)
+        self._sim_config = to_simulation_config(config, sim_dir)
 
     def available_timesteps(self, path: Path) -> list[int]:
         """Return sorted list of available timestep numbers.
@@ -252,6 +252,8 @@ class IPic3DH5hutReader:
             species=sc.species,
             physics=dict(sc.physics),
             metadata={**dict(sc.metadata), "step": step},
+            frame=sc.frame,
+            transforms=sc.transforms or None,
         )
 
     def available_auxiliary(self, path: Path) -> list[str]:

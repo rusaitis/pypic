@@ -8,7 +8,7 @@ import numpy as np
 import pytest
 from scipy import constants
 
-from pypic.readers.config import load_config
+from pypic.readers.config import LENGTH_UNITS, apply_physical_extent, load_config
 
 EXAMPLE_TOML = (
     Path(__file__).resolve().parent.parent / "examples" / "ipic3d-double-harris.toml"
@@ -650,3 +650,107 @@ system = "CGS"
                 )
             )
         assert len(exc_info.value.exceptions) >= 3
+
+
+_SCALING_TOML = """\
+[model]
+name = "test"
+type = "PIC"
+
+[grid]
+dimensions = [460, 130, 320]
+spacing = [0.4, 0.4, 0.4]
+
+[coordinates]
+geometry = "cartesian"
+frame = "simulation"
+physical_extent = [46.0, 32.0, 13.0]
+physical_extent_unit = "R_E"
+
+[coordinates.transforms.GSM]
+origin = [52.0, 26.0, 64.0]
+rotation = [[-1, 0, 0], [0, 0, 1], [0, 1, 0]]
+axis_labels = ["x_GSM", "y_GSM", "z_GSM"]
+
+[units]
+system = "PIC"
+reference_species = "ions"
+reference_density = 0.25e6
+"""
+
+
+class TestPhysicalExtent:
+    def test_auto_scale_from_toml(self, tmp_path: Path) -> None:
+        cfg = load_config(_write_toml(tmp_path, _SCALING_TOML))
+        np.testing.assert_allclose(cfg.transforms["GSM"].scale, 0.25, rtol=1e-6)
+
+    def test_shrink_factor_computed(self, tmp_path: Path) -> None:
+        cfg = load_config(_write_toml(tmp_path, _SCALING_TOML))
+        shrink = cfg.metadata["scaling"]["shrink_factor"]
+        np.testing.assert_allclose(shrink, 3.5, rtol=0.01)
+
+    def test_physical_extent_in_metadata(self, tmp_path: Path) -> None:
+        cfg = load_config(_write_toml(tmp_path, _SCALING_TOML))
+        assert cfg.metadata["physical_extent"] == (46.0, 32.0, 13.0)
+        assert cfg.metadata["physical_extent_unit"] == "R_E"
+
+    def test_explicit_scale_validated(self, tmp_path: Path) -> None:
+        """Explicit scale that matches physical_extent passes without error."""
+        toml = _SCALING_TOML.replace(
+            "axis_labels = [",
+            "scale = 0.25\naxis_labels = [",
+        )
+        cfg = load_config(_write_toml(tmp_path, toml))
+        np.testing.assert_allclose(cfg.transforms["GSM"].scale, 0.25)
+
+    def test_explicit_scale_mismatch_warns(
+        self, tmp_path: Path, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """Explicit scale that disagrees with physical_extent logs a warning."""
+        toml = _SCALING_TOML.replace(
+            "axis_labels = [",
+            "scale = 0.30\naxis_labels = [",
+        )
+        import logging
+
+        with caplog.at_level(logging.WARNING, logger="pypic.readers.config"):
+            cfg = load_config(_write_toml(tmp_path, toml))
+        assert cfg.transforms["GSM"].scale == 0.30  # explicit wins
+        assert "Scale mismatch" in caplog.text
+
+    def test_unknown_unit_raises(self, tmp_path: Path) -> None:
+        from pypic.coordinates.geometry import CARTESIAN
+        from pypic.readers.base import GridInfo, SimulationConfig
+        from pypic.units import Normalization
+
+        cfg = SimulationConfig(
+            model_name="t", model_type="PIC",
+            grid=GridInfo((10,), (1.0,), (0.0,), CARTESIAN),
+            normalization=Normalization.identity(),
+            species=(), physics={},
+        )
+        with pytest.raises(ValueError, match="Unknown physical_extent_unit"):
+            apply_physical_extent(cfg, (5.0,), "parsec")
+
+    def test_non_uniform_scale_raises(self, tmp_path: Path) -> None:
+        from pypic.coordinates.transforms import FrameTransform
+        from pypic.coordinates.geometry import CARTESIAN
+        from pypic.readers.base import GridInfo, SimulationConfig
+        from pypic.units import Normalization
+
+        t = FrameTransform("sim", "phys")
+        cfg = SimulationConfig(
+            model_name="t", model_type="PIC",
+            grid=GridInfo((100, 100, 100), (1.0, 1.0, 1.0), (0.0, 0.0, 0.0), CARTESIAN),
+            normalization=Normalization.identity(),
+            species=(), physics={},
+            transforms={"phys": t},
+        )
+        with pytest.raises(ValueError, match="non-uniform"):
+            apply_physical_extent(cfg, (50.0, 30.0, 50.0), "m")
+
+    def test_length_units_table(self) -> None:
+        assert LENGTH_UNITS["m"] == 1.0
+        assert LENGTH_UNITS["km"] == 1e3
+        assert LENGTH_UNITS["R_E"] == 6.371e6
+        assert len(LENGTH_UNITS) >= 5
