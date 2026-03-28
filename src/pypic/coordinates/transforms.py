@@ -76,7 +76,10 @@ class FrameTransform:
     rotation : Rotation3x3
         3×3 orthogonal rotation matrix as nested tuples.
     scale : float
-        Uniform length scale factor applied after rotation.
+        Converts code length units to target-frame units.
+        ``scale=0.25`` with target in R_E means 1 d_i = 0.25 R_E.
+        Default 1.0 (code and target use the same length unit).
+        Auto-computed from ``physical_extent`` when available.
     target_axis_names : tuple[str, str, str] | None
         Axis names in the target frame. ``None`` keeps source names.
 

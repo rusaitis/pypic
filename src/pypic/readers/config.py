@@ -42,13 +42,15 @@ def apply_physical_extent(
     r"""Auto-compute transform scale factors from physical domain extent.
 
     When a simulation represents a physical domain of known size (e.g.,
-    46 R_E across), this function computes the scale factor that converts
-    code units to the target physical unit. For transforms with the
-    default ``scale=1.0``, the computed scale is applied. For transforms
-    with an explicit scale, consistency is validated.
+    46 R_E across), this function computes the **scale** — the coordinate
+    conversion factor from code units to target units (e.g., 0.25 R_E/d_i).
+    For transforms with the default ``scale=1.0``, the computed scale is
+    applied. For transforms with an explicit scale, consistency is validated.
 
-    If the normalization is not identity, also computes and logs the
-    spatial shrink factor (ratio of effective to physical scale).
+    If the normalization is not identity, also computes the **shrink factor**
+    — how much the physical domain is compressed relative to what the
+    normalization implies (e.g., 3.5× for reduced mass ratio PIC).
+    A shrink factor of 1.0 means no spatial rescaling.
 
     Parameters
     ----------

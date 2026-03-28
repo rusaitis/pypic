@@ -91,7 +91,7 @@ reference_density = 1.0e18         # m⁻³ (number density of reference species
 reference_mass = 9.109e-31         # kg (optional, default: electron mass)
 reference_charge = 1.602e-19       # C (optional, default: elementary charge)
 speed_of_light = 2.998e8           # m/s (optional, default scipy.constants.c)
-scaling_factor = 10.0              # optional: documents how the system is scaled (no effect on computation)
+scaling_factor = 10.0              # optional: informational shrink factor (no effect on computation)
 scaling_description = "c/v_A reduced by 10x; mass ratio mi/me = 256 (real: 1836)"
 ```
 
@@ -153,9 +153,23 @@ physical_extent_unit = "R_E"       # optional: unit for physical_extent (default
 When ``physical_extent`` is provided, the ``scale`` field of any
 transform with the default ``scale=1.0`` is auto-computed as
 ``physical_extent / grid_extent`` (after accounting for rotation).
-If the normalization is not identity, the spatial shrink factor is
-also computed and logged. Can also be passed at runtime via
+Can also be passed at runtime via
 ``open_simulation(path, physical_extent=..., physical_extent_unit=...)``.
+
+**Scale vs shrink factor.** The ``scale`` is a coordinate conversion
+factor: how many target units (e.g., R_E) per code unit (e.g., d_i).
+The ``shrink_factor`` is a physics diagnostic: ratio of the effective
+scale to the physical scale implied by the normalization. A shrink
+factor of 1.0 means the grid faithfully represents physical distances.
+A value > 1 (e.g., 3.5) means the physical domain has been compressed
+relative to kinetic scales — common in PIC simulations with reduced
+mass ratio or MHD-coupled boundaries. The shrink factor is logged
+automatically and stored in ``metadata["scaling"]["shrink_factor"]``.
+Shrinking affects only length-dependent quantities: intensive
+per-point values (fields, densities, β, Mach numbers) are unchanged,
+but extensive integrals over physical volume or area (total energy,
+magnetic flux) scale as shrink² or shrink³. Global transit times
+are compressed by the shrink factor (correct velocity, shorter path).
 
 **Frame transforms** (optional): define how to convert from the native
 frame to other reference frames. Frame names are arbitrary strings —
