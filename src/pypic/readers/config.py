@@ -81,55 +81,50 @@ def apply_physical_extent(
 
     grid = config.grid
     grid_extent = tuple(d * s for d, s in zip(grid.dimensions, grid.spacing))
-    mean_scale = 1.0
+    computed_scale: float | None = None
 
     new_transforms: dict[str, FrameTransform] = {}
     for name, transform in config.transforms.items():
         r_abs = np.abs(transform.rotation_matrix)
         rotated = r_abs @ np.array(grid_extent[:3])
-        ndim = min(len(physical_extent), len(rotated))
-        scales = np.array(physical_extent[:ndim]) / rotated[:ndim]
+        n = min(len(physical_extent), len(rotated))
+        scales = np.array(physical_extent[:n]) / rotated[:n]
 
-        mean_scale = float(np.mean(scales))
-        for i, s in enumerate(scales):
-            if abs(s - mean_scale) / abs(mean_scale) > 0.05:
+        computed_scale = float(np.mean(scales))
+        for s in scales:
+            if abs(s - computed_scale) / abs(computed_scale) > 0.05:
                 raise ValueError(
                     f"physical_extent implies non-uniform scale for "
                     f"transform {name!r}: per-axis ratios {scales.tolist()}"
                 )
 
         if transform.scale == 1.0:
-            new_transforms[name] = copy.replace(transform, scale=mean_scale)
+            new_transforms[name] = copy.replace(transform, scale=computed_scale)
             log.info(
                 "Spatial scaling: %s d_i -> %s %s (scale=%.4f)",
                 " x ".join(f"{e:.0f}" for e in grid_extent),
                 " x ".join(f"{e:.0f}" for e in physical_extent),
                 physical_extent_unit,
-                mean_scale,
+                computed_scale,
             )
         else:
             new_transforms[name] = transform
-            rel_diff = abs(transform.scale - mean_scale) / abs(mean_scale)
+            rel_diff = abs(transform.scale - computed_scale) / abs(computed_scale)
             if rel_diff > 0.05:
                 log.warning(
                     "Scale mismatch: transform %r has scale=%.4f, but "
                     "physical_extent implies scale=%.4f (%.1f%% difference)",
-                    name, transform.scale, mean_scale, rel_diff * 100,
+                    name, transform.scale, computed_scale, rel_diff * 100,
                 )
 
-    # Compute shrink factor if normalization is not identity
     new_metadata = dict(config.metadata)
     new_metadata["physical_extent"] = physical_extent
     new_metadata["physical_extent_unit"] = physical_extent_unit
 
-    is_identity = all(
-        getattr(config.normalization, a) == 1.0
-        for a in ("length_ref", "time_ref", "velocity_ref")
-    )
-    if not is_identity:
-        physical_scale = mean_scale
+    # Compute shrink factor if normalization carries real physics
+    if computed_scale is not None and not config.normalization.is_identity:
         norm_scale = config.normalization.length_ref / unit_factor
-        shrink_factor = physical_scale / norm_scale
+        shrink_factor = computed_scale / norm_scale
         new_metadata.setdefault("scaling", {})["shrink_factor"] = round(
             shrink_factor, 4
         )
@@ -140,7 +135,7 @@ def apply_physical_extent(
             config.normalization.length_ref / 1e3,
             physical_extent_unit,
             unit_factor / config.normalization.length_ref,
-            1.0 / mean_scale,
+            1.0 / computed_scale,
         )
 
     return copy.replace(

@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 import h5py  # type: ignore[import-untyped]
 import numpy as np
 
-from pypic.readers.base import FieldDataset, TabularData
+from pypic.readers.base import FieldDataset, SimulationConfig, TabularData
 from pypic.readers.ipic3d._config import IPic3DConfig, to_simulation_config
 from pypic.readers.ipic3d._conserved import detect_conserved, load_ipic3d_auxiliary
 from pypic.readers.ipic3d._field_map import (
@@ -45,9 +45,11 @@ class IPic3DSerialReader:
         Parsed iPIC3D configuration.
     """
 
-    def __init__(self, config: IPic3DConfig, sim_dir: Path | None = None) -> None:
+    def __init__(
+        self, config: IPic3DConfig, sim_config: SimulationConfig | None = None
+    ) -> None:
         self._config = config
-        self._sim_config = to_simulation_config(config, sim_dir)
+        self._sim_config = sim_config or to_simulation_config(config)
 
     def available_timesteps(self, path: Path) -> list[int]:
         """Return sorted list of available timestep numbers.

@@ -465,7 +465,7 @@ class TestDisplayUnits:
     def test_known_unit(self):
         assert display_unit_factor("nT") == pytest.approx(1e-9)
         assert display_unit_factor("km/s") == pytest.approx(1e3)
-        assert display_unit_factor("RE") == pytest.approx(6.371e6)
+        assert display_unit_factor("R_E") == pytest.approx(6.371e6)
         assert display_unit_factor("eV") == pytest.approx(constants.eV)
         assert display_unit_factor("normalized") == pytest.approx(1.0)
 

@@ -108,15 +108,15 @@ def open_ipic3d(
 
     reader: SimulationReader
     if _has_h5hut_files(path):
-        reader = IPic3DH5hutReader(cfg, path)
+        reader = IPic3DH5hutReader(cfg, sim_config)
     else:
         match cfg.write_method:
             case "shdf5":
-                reader = IPic3DSerialReader(cfg, path)
+                reader = IPic3DSerialReader(cfg, sim_config)
             case "h5hut":
-                reader = IPic3DH5hutReader(cfg, path)
+                reader = IPic3DH5hutReader(cfg, sim_config)
             case _:
-                reader = IPic3DParallelReader(cfg, path)
+                reader = IPic3DParallelReader(cfg, sim_config)
 
     return reader, sim_config
 

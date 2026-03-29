@@ -241,6 +241,23 @@ class Normalization:
             charge_ref=1.0,
         )
 
+    @property
+    def is_identity(self) -> bool:
+        """True if all reference values are 1.0 (no unit conversion).
+
+        Examples
+        --------
+        >>> Normalization.identity().is_identity
+        True
+        """
+        return all(
+            getattr(self, f"{q}_ref") == 1.0
+            for q in (
+                "length", "time", "velocity", "b_field",
+                "e_field", "density", "mass", "charge",
+            )
+        )
+
     def _reference_value(self, quantity: str) -> float:
         """Look up the reference value for *quantity*, or raise ValueError."""
         if quantity not in _QUANTITIES:

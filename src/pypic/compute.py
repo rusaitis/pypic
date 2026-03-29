@@ -394,7 +394,7 @@ _DISPLAY_UNITS: dict[str, float] = {
     "rad/s": 1.0,
     "m": 1.0,
     "km": 1e3,
-    "RE": 6.371e6,
+    "R_E": 6.371e6,
     "eV": constants.eV,
     "keV": 1e3 * constants.eV,
     "K": constants.k,
