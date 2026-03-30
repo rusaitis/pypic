@@ -140,7 +140,7 @@ def add_inset_colorbar(
     mappable: object,
     label: str = "",
     *,
-    loc: BadgeLoc = "lower right",
+    loc: BadgeLoc | None = None,
     variant: OverlayVariant | None = None,
     width: float = 0.3,
     height: float = 0.02,
@@ -168,8 +168,8 @@ def add_inset_colorbar(
         A ``ScalarMappable`` (e.g. from ``pcolormesh`` or ``streamplot``).
     label : str
         Colorbar label text.
-    loc : BadgeLoc
-        Inset placement location.
+    loc : BadgeLoc or None
+        Inset placement. ``None`` auto-selects (prefers lower right).
     variant : "darker", "lighter", "alt", or None
         ``"darker"``: darken axes facecolor for overlay bg.
         ``"lighter"``: lighten it. ``None`` (default): auto-detect.
@@ -201,8 +201,14 @@ def add_inset_colorbar(
     from matplotlib.patches import FancyBboxPatch
     from matplotlib.ticker import MaxNLocator
 
-    from pypic.plotting._badge import _detect_overlay_defaults, _resolve_rgba
+    from pypic.plotting._badge import (
+        _claim_corner,
+        _detect_overlay_defaults,
+        _resolve_rgba,
+    )
     from pypic.plotting.styles import _theme_val
+
+    actual_loc = _claim_corner(ax, "lower right", loc)
 
     default_bg, default_fg = _detect_overlay_defaults(variant)
     overlay_alpha: float = _theme_val("overlay_color", (0, 0, 0, 0.65))[3]
@@ -212,46 +218,79 @@ def add_inset_colorbar(
 
     rounding: float = _theme_val("overlay_rounding", 0.6)
     if pad is None:
-        pad = _theme_val("overlay_margin", 0.03)
+        pad = _theme_val("overlay_margin", 0.03) * 0.5
 
-    # Scale padding to axes physical size: on small axes (dense grids)
-    # the fraction needs to be larger to fit the fixed-pt tick text.
-    # fontsize 8pt needs ~0.11 inches; convert to axes fraction.
+    box_pad = 0.015
+
     fig = ax.get_figure()
-    fig_h = fig.get_size_inches()[1] if fig is not None else 5.0  # type: ignore[union-attr]
-    ax_height_inches = max(ax.get_position().height * fig_h, 0.5)
-    font_frac = (fontsize / 72) / ax_height_inches  # cap height as axes fraction
 
-    tick_space = max(0.03, font_frac * 1.5)
-    above_bar = max(0.025, font_frac * 1.1) if label else 0.0
-    total_height = above_bar + height + tick_space
-    box_pad_x = 0.015
-    box_pad_y = max(0.035, font_frac * 1.1)
+    _apply_extremes(mappable, mode=extremes)
+    if extremes is None:
+        extend = "neither"
 
-    # Position: (x0, y0) is the bottom-left of the total bounding box
-    if loc == "lower right":
-        x0 = 1.0 - pad - box_pad_x - width
-        y0 = pad + box_pad_y
-    elif loc == "lower left":
-        x0 = pad + box_pad_x
-        y0 = pad + box_pad_y
-    elif loc == "upper right":
-        x0 = 1.0 - pad - box_pad_x - width
-        y0 = 1.0 - pad - box_pad_y - total_height
-    elif loc == "upper left":
-        x0 = pad + box_pad_x
-        y0 = 1.0 - pad - box_pad_y - total_height
-    else:  # upper center
-        x0 = 0.5 - width / 2
-        y0 = 1.0 - pad - box_pad_y - total_height
+    # --- Pass 1: render a provisional colorbar to measure text extents ---
+    prov_cax = ax.inset_axes([0.3, 0.3, width, height], zorder=5)
+    cb = fig.colorbar(  # type: ignore[union-attr]
+        mappable, cax=prov_cax, orientation="horizontal", extend=extend
+    )
+    cb.locator = MaxNLocator(nbins=n_ticks)
+    cb.update_ticks()
+    _style_colorbar(cb, tick_color=fg_rgba)
+    prov_cax.tick_params(labelsize=fontsize, colors=fg_rgba)
+    if label:
+        prov_cax.set_title(label, fontsize=fontsize, color=fg_rgba, pad=4)
 
-    # Background patch (slightly larger than colorbar + labels)
+    renderer = fig.canvas.get_renderer()  # type: ignore[union-attr]
+    fig.draw(renderer)
+    bbox_disp = prov_cax.get_tightbbox(renderer)
+    bbox_ax = bbox_disp.transformed(ax.transAxes.inverted())  # type: ignore[union-attr]
+
+    # Overhangs: how much text extends beyond the bar on each side
+    overhang_left = 0.3 - bbox_ax.x0
+    overhang_right = bbox_ax.x1 - (0.3 + width)
+    overhang_bottom = 0.3 - bbox_ax.y0
+    overhang_top = bbox_ax.y1 - (0.3 + height)
+
+    content_w = width + overhang_left + overhang_right
+    content_h = height + overhang_top + overhang_bottom
+    total_w = content_w + 2 * box_pad
+    total_h = content_h + 2 * box_pad
+
+    # Remove provisional colorbar axes
+    prov_cax.remove()
+
+    # --- Pass 2: place at the correct position ---
+    if "right" in actual_loc:
+        bg_x = 1.0 - pad - total_w
+    elif "center" in actual_loc:
+        bg_x = 0.5 - total_w / 2
+    else:
+        bg_x = pad
+    if "upper" in actual_loc:
+        bg_y = 1.0 - pad - total_h
+    else:
+        bg_y = pad
+
+    bar_x = bg_x + box_pad + overhang_left
+    bar_y = bg_y + box_pad + overhang_bottom
+    cax = ax.inset_axes([bar_x, bar_y, width, height], zorder=5)
+    cb = fig.colorbar(  # type: ignore[union-attr]
+        mappable, cax=cax, orientation="horizontal", extend=extend
+    )
+    cb.locator = MaxNLocator(nbins=n_ticks)
+    cb.update_ticks()
+    _style_colorbar(cb, tick_color=fg_rgba)
+    cax.tick_params(labelsize=fontsize, colors=fg_rgba)
+    if label:
+        cax.set_title(label, fontsize=fontsize, color=fg_rgba, pad=4)
+    cax.set_facecolor("none")
+
+    # Background patch sized to actual content
     has_bg = bg_rgba[3] >= 0.01
     bg_patch = FancyBboxPatch(
-        (x0 - box_pad_x, y0 - box_pad_y),
-        width + 2 * box_pad_x,
-        total_height + 2 * box_pad_y,
-        # rounding_size in axes-fraction coords; scale from pt-based rounding
+        (bg_x, bg_y),
+        total_w,
+        total_h,
         boxstyle=f"round,pad=0,rounding_size={rounding * 0.02:.4f}",
         facecolor=bg_rgba if has_bg else "none",
         edgecolor="none",
@@ -259,26 +298,6 @@ def add_inset_colorbar(
         zorder=4.9,
     )
     ax.add_patch(bg_patch)
-
-    _apply_extremes(mappable, mode=extremes)
-    if extremes is None:
-        extend = "neither"
-
-    bar_y = y0 + tick_space
-    cax = ax.inset_axes([x0, bar_y, width, height], zorder=5)
-    fig = ax.get_figure()
-    cb = fig.colorbar(  # type: ignore[union-attr]
-        mappable, cax=cax, orientation="horizontal", extend=extend
-    )
-
-    cb.locator = MaxNLocator(nbins=n_ticks)
-    cb.update_ticks()
-
-    _style_colorbar(cb, tick_color=fg_rgba)
-    cax.tick_params(labelsize=fontsize, colors=fg_rgba)
-    if label:
-        cax.set_title(label, fontsize=fontsize, color=fg_rgba, pad=2)
-    cax.set_facecolor("none")
 
     return cb
 

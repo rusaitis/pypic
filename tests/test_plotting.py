@@ -939,6 +939,55 @@ class TestLegendEntryNoneColor:
         plt.close(fig)
 
 
+class TestOverlayAutoPlacement:
+    """Overlays auto-select non-colliding corners."""
+
+    def test_default_corners(self) -> None:
+        """Each overlay type picks its preferred corner when all are free."""
+        from pypic.plotting._badge import _OCCUPIED_ATTR
+
+        fig, ax = plt.subplots()
+        with use_theme("dark"):
+            add_label(ax, "a")
+            cbar_im = ax.imshow([[0, 1]], aspect="auto")
+            add_inset_colorbar(ax, cbar_im, "test")
+            add_legend(ax, LegendEntry(label="v", color="white"))
+            add_badge(ax, step=1)
+        occupied = getattr(ax, _OCCUPIED_ATTR)
+        assert "upper left" in occupied      # label
+        assert "lower right" in occupied     # colorbar
+        assert "lower left" in occupied      # legend
+        assert "upper right" in occupied     # badge
+        plt.close(fig)
+
+    def test_bumps_to_free_corner(self) -> None:
+        """When preferred corner is taken, overlay picks the next free one."""
+        from pypic.plotting._badge import _OCCUPIED_ATTR
+
+        fig, ax = plt.subplots()
+        with use_theme("dark"):
+            # First label takes upper left
+            add_label(ax, "a")
+            # Second label prefers upper left, but it's taken → upper right
+            add_label(ax, "b")
+        occupied = getattr(ax, _OCCUPIED_ATTR)
+        assert "upper left" in occupied
+        assert "upper right" in occupied
+        plt.close(fig)
+
+    def test_explicit_loc_overrides(self) -> None:
+        """Explicit loc is respected even if it collides."""
+        from pypic.plotting._badge import _OCCUPIED_ATTR
+
+        fig, ax = plt.subplots()
+        with use_theme("dark"):
+            add_label(ax, "a")  # claims upper left
+            add_badge(ax, step=1, loc="upper left")  # explicit: same corner
+        occupied = getattr(ax, _OCCUPIED_ATTR)
+        assert "upper left" in occupied
+        plt.close(fig)
+
+
 class TestFieldGridNewParams:
     def test_shared_vmin_vmax(self, ds_2d: FieldDataset) -> None:
         from pypic.plotting import plot_field_grid

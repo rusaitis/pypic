@@ -23,19 +23,53 @@ _LOC_CODES: dict[str, int] = {
     "upper center": 9,
 }
 
+_CORNERS: tuple[str, ...] = (
+    "upper left",
+    "upper right",
+    "lower right",
+    "lower left",
+)
+
+_OCCUPIED_ATTR = "_pypic_occupied_corners"
+
+
+def _claim_corner(
+    ax: Axes, preferred: str, explicit: BadgeLoc | None = None
+) -> str:
+    """Pick an overlay corner, avoiding already-occupied ones.
+
+    If *explicit* is given it is used as-is (user override).  Otherwise
+    *preferred* is tried first, then the remaining corners in clockwise
+    order.  If all four are taken, *preferred* is returned anyway.
+    """
+    occupied: set[str] = getattr(ax, _OCCUPIED_ATTR, set())
+
+    chosen = explicit if explicit is not None else preferred
+    if explicit is None and chosen in occupied:
+        for corner in _CORNERS:
+            if corner not in occupied:
+                chosen = corner
+                break
+
+    occupied.add(chosen)
+    setattr(ax, _OCCUPIED_ATTR, occupied)
+    return chosen
+
 
 def _make_overlay_box(
     ax: Axes,
     child: object,
     loc: BadgeLoc,
     bg_rgba: tuple[float, float, float, float],
+    pad: float | None = None,
 ) -> AnchoredOffsetbox:
     """Create a styled overlay box and add it to *ax*."""
     from matplotlib.offsetbox import AnchoredOffsetbox
 
     from pypic.plotting.styles import _overlay_box_style, _theme_val
 
-    pad: float = _theme_val("overlay_padding", 0.4)
+    if pad is None:
+        pad = _theme_val("overlay_padding", 0.4)
     margin: float = _theme_val("overlay_margin", 0.03)
 
     loc_code = _LOC_CODES.get(loc, 1)
@@ -254,7 +288,7 @@ def add_badge(
     show_max: bool = True,
     progress: float | None = None,
     variant: OverlayVariant | None = None,
-    loc: BadgeLoc = "upper right",
+    loc: BadgeLoc | None = None,
     fontsize: float | None = None,
     bar_color: str | None = None,
     bar_alpha: float = 0.8,
@@ -299,8 +333,9 @@ def add_badge(
     variant : "darker", "lighter", "alt", or None
         ``"darker"``: darken axes facecolor for overlay bg.
         ``"lighter"``: lighten it. ``None`` (default): auto-detect.
-    loc : BadgeLoc
-        Badge placement location.
+    loc : BadgeLoc or None
+        Badge placement. ``None`` auto-selects (prefers upper right,
+        avoids corners already claimed by other overlays).
     fontsize : float
         Font size for the status text.
     bar_color : str
@@ -342,6 +377,8 @@ def add_badge(
     from matplotlib.offsetbox import TextArea, VPacker
 
     from pypic.plotting.styles import _theme_val
+
+    actual_loc = _claim_corner(ax, "upper right", loc)
 
     default_bg, default_fg = _detect_overlay_defaults(variant)
     overlay_alpha: float = _theme_val("overlay_color", (0, 0, 0, 0.65))[3]
@@ -408,7 +445,7 @@ def add_badge(
     else:
         child = text_area
 
-    return _make_overlay_box(ax, child, loc, bg_rgba)
+    return _make_overlay_box(ax, child, actual_loc, bg_rgba)
 
 
 @dataclass(frozen=True, slots=True)
@@ -427,7 +464,7 @@ def add_label(
     label: str,
     *,
     variant: OverlayVariant | None = None,
-    loc: BadgeLoc = "upper left",
+    loc: BadgeLoc | None = None,
     fontsize: float = 14,
     fontweight: str = "bold",
     bg_color: str | tuple[float, ...] | None = None,
@@ -448,8 +485,8 @@ def add_label(
     variant : "darker", "lighter", "alt", or None
         ``"darker"``: darken axes facecolor for overlay bg.
         ``"lighter"``: lighten it. ``None`` (default): auto-detect.
-    loc : BadgeLoc
-        Placement location.
+    loc : BadgeLoc or None
+        Placement. ``None`` auto-selects (prefers upper left).
     fontsize : float
         Label font size.
     fontweight : str
@@ -464,9 +501,11 @@ def add_label(
     AnchoredOffsetbox
     """
     ensure_matplotlib()
-    from matplotlib.offsetbox import TextArea
+    from matplotlib.offsetbox import HPacker, TextArea
 
     from pypic.plotting.styles import _theme_val
+
+    actual_loc = _claim_corner(ax, "upper left", loc)
 
     default_bg, default_fg = _detect_overlay_defaults(variant)
     overlay_alpha: float = _theme_val("overlay_color", (0, 0, 0, 0.65))[3]
@@ -477,7 +516,10 @@ def add_label(
     props = {"fontsize": fontsize, "fontweight": fontweight, "color": resolved_text}
     text_area = TextArea(label, textprops=props)
 
-    return _make_overlay_box(ax, text_area, loc, bg_rgba)
+    # Extra horizontal padding so the box looks square for single letters
+    child = HPacker(children=[text_area], pad=fontsize * 0.12, sep=0, align="center")
+
+    return _make_overlay_box(ax, child, actual_loc, bg_rgba, pad=0.2)
 
 
 def add_legend(
@@ -485,7 +527,7 @@ def add_legend(
     entries: LegendEntry | list[LegendEntry],
     *,
     variant: OverlayVariant | None = None,
-    loc: BadgeLoc = "upper left",
+    loc: BadgeLoc | None = None,
     fontsize: float | None = None,
     sample_width: float = 20,
     bg_color: str | tuple[float, ...] | None = None,
@@ -508,8 +550,8 @@ def add_legend(
     variant : "darker", "lighter", "alt", or None
         ``"darker"``: darken axes facecolor for overlay bg.
         ``"lighter"``: lighten it. ``None`` (default): auto-detect.
-    loc : BadgeLoc
-        Placement location.
+    loc : BadgeLoc or None
+        Placement. ``None`` auto-selects (prefers lower left).
     fontsize : float
         Label font size.
     sample_width : float
@@ -534,6 +576,8 @@ def add_legend(
     from matplotlib.patches import FancyArrowPatch
 
     from pypic.plotting.styles import _theme_val
+
+    actual_loc = _claim_corner(ax, "lower left", loc)
 
     if fontsize is None:
         fontsize = _theme_val("font_overlay", 9.0)
@@ -576,7 +620,7 @@ def add_legend(
 
         text = TextArea(
             entry.label,
-            textprops={"fontsize": fontsize, "color": resolved_text},
+            textprops={"fontsize": fontsize, "fontweight": "bold", "color": resolved_text},
         )
         row = HPacker(children=[drawing, text], pad=0, sep=4, align="center")
         rows.append(row)
@@ -586,4 +630,4 @@ def add_legend(
     else:
         child = rows[0]
 
-    return _make_overlay_box(ax, child, loc, bg_rgba)
+    return _make_overlay_box(ax, child, actual_loc, bg_rgba)
