@@ -67,10 +67,19 @@ SI conversion boundaries. Temperatures are in energy units throughout
 
 | Name | Description | Normalized | SI |
 |------|-------------|------------|-----|
+| `P` | Isotropic scalar pressure[^9] | $P = \frac{1}{3}\mathrm{Tr}(\mathbf{P}) = \frac{1}{3}(P_{11} + P_{22} + P_{33})$ | -- |
 | `P_par` | Parallel pressure | $P_\parallel = \hat{b} \cdot \mathbf{P} \cdot \hat{b}$ | -- |
 | `P_perp` | Perpendicular pressure | $P_\perp = (\mathrm{Tr}(\mathbf{P}) - P_\parallel) / 2$ | -- |
 | `Pij` | Full pressure tensor | 6 independent components: P11, P12, P13, P22, P23, P33 | -- |
 | `agyrotropy` | Agyrotropy measure | $Q$ (deviation from gyrotropic symmetry) | -- |
+
+[^9]: The trace $\mathrm{Tr}(\mathbf{P})$ is a coordinate invariant (first
+    invariant of the symmetric tensor), so $P = \mathrm{Tr}(\mathbf{P})/3$
+    gives the same scalar regardless of axis orientation. Identity:
+    $P = (P_\parallel + 2\,P_\perp)/3$. When `P` is not directly available
+    in the dataset but the pressure tensor is, `compute("P")` falls back to
+    this definition. Per-species scalar pressures (`Pe`, `Pi`, `P_s{N}`)
+    use the same trace formula on the per-species tensor.
 
 
 ## 5. Characteristic Scales

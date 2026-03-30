@@ -184,7 +184,11 @@ _REGISTRY: dict[str, _Recipe] = {
         species_index=1,
         species_args=_SpeciesArgs.CHARGE_MASS,
     ),
-    # Pressure tensor
+    # Isotropic scalar pressure from tensor trace (fallback when raw P absent)
+    "P": _Recipe(derived.isotropic_pressure, ("P11", "P22", "P33")),
+    "Pe": _Recipe(derived.isotropic_pressure, ("P11_s0", "P22_s0", "P33_s0")),
+    "Pi": _Recipe(derived.isotropic_pressure, ("P11_s1", "P22_s1", "P33_s1")),
+    # Pressure tensor decomposition
     "P_par": _Recipe(derived.parallel_pressure, _PRESSURE_TENSOR_AND_B),
     "P_perp": _Recipe(derived.perpendicular_pressure, _PRESSURE_TENSOR_AND_B),
     "agyrotropy": _Recipe(derived.agyrotropy, _PRESSURE_TENSOR_AND_B),
@@ -339,6 +343,11 @@ _SPECIES_TEMPLATES: dict[str, _SpeciesTemplate] = {
         derived.gyrotropic_entropy, ("P_par", "P_perp", "n_s{N}"), _SpeciesArgs.NONE
     ),
     "T": _SpeciesTemplate(derived.temperature, ("P_s{N}", "n_s{N}"), _SpeciesArgs.NONE),
+    "P": _SpeciesTemplate(
+        derived.isotropic_pressure,
+        ("P11_s{N}", "P22_s{N}", "P33_s{N}"),
+        _SpeciesArgs.NONE,
+    ),
 }
 
 _SPECIES_SUFFIX_RE = re.compile(r"^(.+)_s(\d+)$")

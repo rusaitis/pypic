@@ -29,10 +29,8 @@ _COMMON_RC: dict[str, Any] = {
     "savefig.dpi": 300,
     "savefig.bbox": "tight",
     "savefig.pad_inches": 0.05,
-    "xtick.major.size": 0,
-    "ytick.major.size": 0,
-    "xtick.minor.size": 0,
-    "ytick.minor.size": 0,
+    "xtick.direction": "in",
+    "ytick.direction": "in",
     "xtick.major.pad": 6,
     "ytick.major.pad": 6,
     "xtick.minor.visible": False,
@@ -47,8 +45,8 @@ _COMMON_RC: dict[str, Any] = {
     "image.origin": "lower",
     "image.interpolation": "none",
     "axes.grid": False,
-    "axes.spines.left": False,
-    "axes.spines.bottom": False,
+    "axes.spines.left": True,
+    "axes.spines.bottom": True,
     "axes.spines.top": False,
     "axes.spines.right": False,
     "axes3d.mouserotationstyle": "azel",
@@ -121,6 +119,13 @@ class PlotTheme:
     axis_y_color: str = "#00b894"
     axis_z_color: str = "#0984e3"
     axis_arrows: bool = True
+
+    # Ticks
+    tick_direction: str = "in"           # "in", "out", or "inout"
+    tick_major_length: float = 4.0
+    tick_major_width: float = 0.6
+    tick_minor_length: float = 2.0
+    tick_minor_width: float = 0.4
 
     # Grid
     grid_major_width: float = 0.5
@@ -307,6 +312,18 @@ def use_theme(theme: ThemeArg) -> Generator[None]:
     rc["xtick.labelsize"] = resolved.font_tick
     rc["ytick.labelsize"] = resolved.font_tick
     rc["legend.fontsize"] = resolved.font_overlay
+
+    # Tick geometry
+    rc["xtick.direction"] = resolved.tick_direction
+    rc["ytick.direction"] = resolved.tick_direction
+    rc["xtick.major.size"] = resolved.tick_major_length
+    rc["ytick.major.size"] = resolved.tick_major_length
+    rc["xtick.major.width"] = resolved.tick_major_width
+    rc["ytick.major.width"] = resolved.tick_major_width
+    rc["xtick.minor.size"] = resolved.tick_minor_length
+    rc["ytick.minor.size"] = resolved.tick_minor_length
+    rc["xtick.minor.width"] = resolved.tick_minor_width
+    rc["ytick.minor.width"] = resolved.tick_minor_width
 
     if resolved.color_cycle:
         from cycler import cycler

@@ -11,6 +11,31 @@ if TYPE_CHECKING:
     from pypic.plotting.styles import PlotTheme
     from pypic.types import FloatArray
 
+
+def _register_custom_colormaps() -> None:
+    """Register pypic's custom colormaps with matplotlib (once)."""
+    from matplotlib.colors import LinearSegmentedColormap
+    import matplotlib
+
+    # Blue-black-red diverging colormap for signed fields.
+    # Gradient: cyan → blue → dark → black → dark → red → orange
+    # https://eltos.github.io/gradient/#0:00BEEF-25:1967F3-45:1A356B-50:1A1719-55:662423-75:DB3832-100:DB9032
+    _BKR_COLORS = (
+        (0.000, (0.000, 0.745, 0.937)),
+        (0.250, (0.098, 0.404, 0.953)),
+        (0.450, (0.102, 0.208, 0.420)),
+        (0.500, (0.102, 0.090, 0.098)),
+        (0.550, (0.400, 0.141, 0.137)),
+        (0.750, (0.859, 0.220, 0.196)),
+        (1.000, (0.859, 0.565, 0.196)),
+    )
+    bkr = LinearSegmentedColormap.from_list("bkr", _BKR_COLORS)
+    matplotlib.colormaps.register(bkr)
+    matplotlib.colormaps.register(bkr.reversed(), name="bkr_r")
+
+
+_register_custom_colormaps()
+
 _POSITIVE_QUANTITY_TYPES = frozenset(
     {
         "density",

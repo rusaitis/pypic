@@ -19,6 +19,7 @@ from pypic.derived import (
     ideal_electric_field,
     internal_energy,
     ion_acoustic_speed,
+    isotropic_pressure,
     j_dot_e,
     kinetic_energy_density,
     magnetic_energy_density,
@@ -432,6 +433,36 @@ class TestMachNumbers:
 ZEROS = np.array([0.0])
 ONES = np.array([1.0])
 B_ALONG_Z = (ZEROS, ZEROS, ONES)
+
+
+class TestIsotropicPressure:
+    def test_trace_divided_by_three(self):
+        """P_iso = (P11 + P22 + P33) / 3."""
+        p11, p22, p33 = np.array([3.0]), np.array([6.0]), np.array([9.0])
+        np.testing.assert_allclose(isotropic_pressure(p11, p22, p33), 6.0, rtol=1e-15)
+
+    def test_isotropic_tensor_returns_diagonal(self):
+        """Isotropic tensor P*δ_ij → P_iso = P."""
+        p = np.array([5.0])
+        np.testing.assert_allclose(isotropic_pressure(p, p, p), 5.0, rtol=1e-15)
+
+    def test_consistent_with_par_perp(self):
+        """P_iso = (P_∥ + 2·P_⊥) / 3 for arbitrary tensor and B."""
+        p11, p22, p33 = np.array([3.0]), np.array([5.0]), np.array([7.0])
+        p12, p13, p23 = np.array([0.5]), np.array([-0.3]), np.array([0.2])
+        b = (np.array([1.0]), np.array([2.0]), np.array([3.0]))
+        args = (p11, p22, p33, p12, p13, p23, *b)
+        p_par = parallel_pressure(*args)
+        p_perp = perpendicular_pressure(*args)
+        p_iso = isotropic_pressure(p11, p22, p33)
+        np.testing.assert_allclose(p_iso, (p_par + 2.0 * p_perp) / 3, rtol=1e-14)
+
+    def test_nan_propagation(self):
+        """NaN in any diagonal component propagates."""
+        result = isotropic_pressure(
+            np.array([np.nan]), np.array([1.0]), np.array([1.0])
+        )
+        assert np.isnan(result[0])
 
 
 class TestParallelPressure:

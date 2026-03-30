@@ -75,8 +75,8 @@ Each step produces something testable. No step starts until the previous step's 
 - [x] **Step 15: coordinates/transforms — frame transforms**
   `ReferenceFrame`, `FrameTransform` dataclasses. Load from `[coordinates.transforms]` in simulation.toml. Transform chaining (A->B + B->C = A->C). `FieldDataset.transform_to(frame_name)`.
 
-- [ ] **Step 16: selections — SphereSelection**
-  Non-axis-aligned selection via `xr.where()`. Points outside sphere = NaN, grid shape preserved. NaN propagation in derived quantities and plotting.
+- [x] **Step 16: selections — SphereSelection**
+  Non-axis-aligned selection via `xr.where()`. Points outside sphere = NaN, grid shape preserved. NaN propagation in derived quantities and plotting. Also added `FieldDataset.where(cond)` as the general-purpose masking primitive.
 
 - [ ] **Step 18: derived (relativistic) — relativistic derived quantities**
   `lorentz_factor()` (from three-velocity or four-velocity).
@@ -239,7 +239,7 @@ grow.
 | 14 | plotting | 2D slices, comparison | — |
 | **—** | **—** | **Milestone: daily-use tool** | **—** |
 | 15 | coordinates | Frame transforms | ✅ |
-| 16 | selections | Sphere (NaN masking) | — |
+| 16 | selections | Sphere (NaN masking) | ✅ |
 | 17 | docs | MkDocs site | — |
 | 18 | derived | lorentz_factor, magnetization, rel. corrections | — |
 | 19 | regrid | `regrid()`, `align_grids()`, `common_grid()` | — |

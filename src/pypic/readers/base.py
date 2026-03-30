@@ -1089,6 +1089,30 @@ class FieldDataset:
         merged.update(kwargs)
         return self._wrap_sliced(self._ds.isel(merged))
 
+    def where(self, cond: np.ndarray, other: float = np.nan) -> FieldDataset:
+        r"""Mask fields where *cond* is ``False``.
+
+        Returns a new :class:`FieldDataset` with the same grid shape.
+        Points where *cond* is ``False`` are set to *other* (default
+        ``NaN``).  Useful for spatial masks (spherical cutouts, boundary
+        regions) without reducing dimensions.
+
+        Parameters
+        ----------
+        cond : np.ndarray
+            Boolean array with shape matching the grid dimensions.
+            ``True`` keeps the value, ``False`` replaces with *other*.
+        other : float
+            Fill value for masked points (default ``NaN``).
+
+        Returns
+        -------
+        FieldDataset
+        """
+        axis_names = list(self._grid.surviving_axis_names)
+        mask_da = xr.DataArray(cond, dims=axis_names)
+        return self._wrap_sliced(self._ds.where(mask_da, other=other))
+
 
 @runtime_checkable
 class SimulationReader(Protocol):

@@ -29,6 +29,7 @@ from pypic.derived import (
     gyrotropic_entropy,
     internal_energy,
     ion_acoustic_speed,
+    isotropic_pressure,
     kinetic_energy_density,
     magnetic_energy_density,
     magnetic_field_magnitude,
@@ -105,7 +106,7 @@ from pypic.readers import (
     supports_selective_read,
     unregister_reader,
 )
-from pypic.selections import BoxSelection, PlaneSelection
+from pypic.selections import BoxSelection, PlaneSelection, SphereSelection
 from pypic.traces import (
     FieldLine,
     ParticleTrace,
@@ -154,6 +155,7 @@ __all__ = [
     "SimulationConfig",
     "SimulationReader",
     "SpeciesInfo",
+    "SphereSelection",
     "TabularData",
     "TerminationReason",
     "VectorFieldInterpolator",
@@ -183,6 +185,7 @@ __all__ = [
     "gyrotropic_entropy",
     "internal_energy",
     "ion_acoustic_speed",
+    "isotropic_pressure",
     "kinetic_energy_density",
     "l2_relative_error",
     "linf_error",

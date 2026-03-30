@@ -980,6 +980,43 @@ def magnetosonic_mach(
     return _safe_divide(v, v_ms)
 
 
+def isotropic_pressure(
+    p11: FloatArray,
+    p22: FloatArray,
+    p33: FloatArray,
+) -> FloatArray:
+    r"""Compute the isotropic scalar pressure from the pressure tensor trace.
+
+    $$P_{iso} = \frac{1}{3}\mathrm{Tr}(\mathbf{P})
+              = \frac{1}{3}(P_{11} + P_{22} + P_{33})
+              = \frac{P_\parallel + 2\,P_\perp}{3}$$
+
+    The trace is a coordinate invariant — this gives the same result
+    regardless of the orientation of the coordinate axes.
+
+    Parameters
+    ----------
+    p11 : NDArray
+        Pressure tensor component $P_{11}$.
+    p22 : NDArray
+        Pressure tensor component $P_{22}$.
+    p33 : NDArray
+        Pressure tensor component $P_{33}$.
+
+    Returns
+    -------
+    NDArray
+        Isotropic scalar pressure in normalized units.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> isotropic_pressure(np.array([3.0]), np.array([6.0]), np.array([9.0]))
+    array([6.])
+    """
+    return (p11 + p22 + p33) / 3  # type: ignore[no-any-return]
+
+
 def parallel_pressure(
     p11: FloatArray,
     p22: FloatArray,
@@ -1615,6 +1652,7 @@ __all__ = [
     "ideal_electric_field",
     "internal_energy",
     "ion_acoustic_speed",
+    "isotropic_pressure",
     "j_dot_e",
     "kinetic_energy_density",
     "magnetic_energy_density",

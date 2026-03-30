@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
-__all__ = ["BoxSelection", "PlaneSelection"]
+__all__ = ["BoxSelection", "PlaneSelection", "SphereSelection"]
 
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
+
+import numpy as np
 
 if TYPE_CHECKING:
     from pypic.readers.base import FieldDataset
@@ -129,3 +131,86 @@ class BoxSelection:
             axis: slice(start, stop) for axis, (start, stop) in self.ranges.items()
         }
         return data.isel(indexers)
+
+
+@dataclass(frozen=True, slots=True)
+class SphereSelection:
+    r"""Mask fields inside or outside a sphere with NaN.
+
+    Unlike :class:`PlaneSelection` and :class:`BoxSelection`, this
+    preserves the grid shape — masked points become ``NaN`` rather than
+    being removed.
+
+    Parameters
+    ----------
+    center : tuple[float, ...]
+        Center point in coordinate units. Length must match the dataset
+        dimensionality (3 for 3D, 2 for a previously sliced 2D dataset).
+    radius : float
+        Radius in the same coordinate units as *center*.
+    keep : str
+        Which region to keep: ``"inside"`` (default) keeps points within
+        the sphere and NaN-fills outside; ``"outside"`` keeps points
+        beyond the sphere and NaN-fills inside.
+
+    Examples
+    --------
+    >>> from pypic.selections import SphereSelection
+    >>> import copy
+    >>> s = SphereSelection(center=(0.0, 0.0, 0.0), radius=3.375, keep="outside")
+    >>> s.radius
+    3.375
+    >>> copy.replace(s, keep="inside").keep
+    'inside'
+    """
+
+    center: tuple[float, ...]
+    radius: float
+    keep: str = "inside"
+
+    def apply(self, data: FieldDataset) -> FieldDataset:
+        """Apply the spherical mask, returning a new FieldDataset.
+
+        Parameters
+        ----------
+        data : FieldDataset
+            Input dataset.
+
+        Returns
+        -------
+        FieldDataset
+            Same grid shape, with masked points set to ``NaN``.
+
+        Raises
+        ------
+        ValueError
+            If *center* length does not match the dataset dimensionality,
+            *radius* is not positive, or *keep* is invalid.
+        """
+        coords = data.grid.coordinate_arrays()
+        ndim = len(coords)
+
+        if len(self.center) != ndim:
+            msg = (
+                f"center has {len(self.center)} components but dataset "
+                f"has {ndim} dimensions"
+            )
+            raise ValueError(msg)
+        if self.radius <= 0:
+            msg = f"radius must be positive, got {self.radius}"
+            raise ValueError(msg)
+        if self.keep not in ("inside", "outside"):
+            msg = f"keep must be 'inside' or 'outside', got {self.keep!r}"
+            raise ValueError(msg)
+
+        # Squared distance via broadcasting (avoids sqrt)
+        r_sq: np.ndarray = np.zeros(data.grid.dimensions)
+        for i in range(ndim):
+            shape = [1] * ndim
+            shape[i] = -1
+            r_sq = r_sq + (coords[i].reshape(shape) - self.center[i]) ** 2
+
+        radius_sq = self.radius**2
+        mask = r_sq <= radius_sq if self.keep == "inside" else r_sq > radius_sq
+
+        return data.where(mask)

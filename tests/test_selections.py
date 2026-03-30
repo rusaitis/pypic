@@ -1,4 +1,4 @@
-"""Tests for PlaneSelection and BoxSelection."""
+"""Tests for PlaneSelection, BoxSelection, and SphereSelection."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from numpy.testing import assert_array_equal
 
 from pypic.coordinates import CARTESIAN, CoordinateGeometry, GeometryType
 from pypic.readers import FieldDataset, GridInfo
-from pypic.selections import BoxSelection, PlaneSelection
+from pypic.selections import BoxSelection, PlaneSelection, SphereSelection
 from pypic.units import Normalization
 
 
@@ -174,3 +174,116 @@ class TestBoxSelection:
     def test_invalid_axis_raises(self, cartesian_3d: FieldDataset) -> None:
         with pytest.raises(ValueError, match="not found"):
             BoxSelection(ranges={"q": (0, 2)}).apply(cartesian_3d)
+
+
+class TestSphereSelection:
+    """Tests for SphereSelection (NaN masking inside/outside a sphere)."""
+
+    def test_mask_inside(self, cartesian_3d: FieldDataset) -> None:
+        """keep='outside' → points near center are NaN."""
+        # Grid: 8×6×4, centers at 0.5..7.5, 0.5..5.5, 0.5..3.5
+        sel = SphereSelection(center=(0.5, 0.5, 0.5), radius=1.0, keep="outside")
+        result = sel.apply(cartesian_3d)
+        # The point (0.5, 0.5, 0.5) is at distance 0 from center → should be NaN
+        assert np.isnan(result["B1"][0, 0, 0])
+        # A distant point should be finite
+        assert np.isfinite(result["B1"][7, 5, 3])
+
+    def test_keep_inside(self, cartesian_3d: FieldDataset) -> None:
+        """keep='inside' → points far from center are NaN."""
+        sel = SphereSelection(center=(0.5, 0.5, 0.5), radius=1.0, keep="inside")
+        result = sel.apply(cartesian_3d)
+        # The center point → should be finite
+        assert np.isfinite(result["B1"][0, 0, 0])
+        # A distant point → should be NaN
+        assert np.isnan(result["B1"][7, 5, 3])
+
+    def test_preserves_shape(self, cartesian_3d: FieldDataset) -> None:
+        sel = SphereSelection(center=(4.0, 3.0, 2.0), radius=2.0, keep="outside")
+        result = sel.apply(cartesian_3d)
+        assert result["B1"].shape == (8, 6, 4)
+        assert result.grid.dimensions == (8, 6, 4)
+
+    def test_preserves_grid_metadata(self, cartesian_3d: FieldDataset) -> None:
+        sel = SphereSelection(center=(4.0, 3.0, 2.0), radius=2.0, keep="inside")
+        result = sel.apply(cartesian_3d)
+        assert result.grid.spacing == cartesian_3d.grid.spacing
+        assert result.grid.origin == cartesian_3d.grid.origin
+        assert result.grid.geometry is cartesian_3d.grid.geometry
+
+    def test_preserves_metadata(self, cartesian_3d: FieldDataset) -> None:
+        sel = SphereSelection(center=(4.0, 3.0, 2.0), radius=2.0, keep="inside")
+        result = sel.apply(cartesian_3d)
+        assert result.normalization is cartesian_3d.normalization
+        assert result.species == cartesian_3d.species
+
+    def test_aliases_preserved(self, cartesian_3d: FieldDataset) -> None:
+        sel = SphereSelection(center=(4.0, 3.0, 2.0), radius=2.0, keep="inside")
+        result = sel.apply(cartesian_3d)
+        assert result.has_field("Bx")
+        # Bx alias still resolves to B1 for non-NaN points
+        finite_mask = np.isfinite(result["B1"])
+        assert_array_equal(result["Bx"][finite_mask], result["B1"][finite_mask])
+
+    def test_center_dim_mismatch_raises(self, cartesian_3d: FieldDataset) -> None:
+        with pytest.raises(ValueError, match="2 components.*3 dimensions"):
+            SphereSelection(center=(0.0, 0.0), radius=1.0).apply(cartesian_3d)
+
+    def test_negative_radius_raises(self, cartesian_3d: FieldDataset) -> None:
+        with pytest.raises(ValueError, match="positive"):
+            SphereSelection(center=(0.0, 0.0, 0.0), radius=-1.0).apply(cartesian_3d)
+
+    def test_zero_radius_raises(self, cartesian_3d: FieldDataset) -> None:
+        with pytest.raises(ValueError, match="positive"):
+            SphereSelection(center=(0.0, 0.0, 0.0), radius=0.0).apply(cartesian_3d)
+
+    def test_invalid_keep_raises(self, cartesian_3d: FieldDataset) -> None:
+        with pytest.raises(ValueError, match="'inside' or 'outside'"):
+            SphereSelection(center=(0.0, 0.0, 0.0), radius=1.0, keep="foo").apply(
+                cartesian_3d
+            )
+
+    def test_2d_after_plane_slice(self, cartesian_3d: FieldDataset) -> None:
+        """SphereSelection works on 2D data (circle mask)."""
+        sliced = PlaneSelection(normal="z", index=0).apply(cartesian_3d)
+        sel = SphereSelection(center=(4.0, 3.0), radius=1.5, keep="outside")
+        result = sel.apply(sliced)
+        assert result["B1"].shape == (8, 6)
+        # Center of circle should be NaN
+        assert np.isnan(result["B1"][4, 3])
+
+    def test_large_radius_keeps_all(self, cartesian_3d: FieldDataset) -> None:
+        """Radius encompassing all points → no NaN when keep='inside'."""
+        sel = SphereSelection(center=(4.0, 3.0, 2.0), radius=100.0, keep="inside")
+        result = sel.apply(cartesian_3d)
+        assert not np.any(np.isnan(result["B1"]))
+
+    def test_all_fields_masked(self, cartesian_3d: FieldDataset) -> None:
+        """Mask is applied to every field in the dataset."""
+        sel = SphereSelection(center=(0.5, 0.5, 0.5), radius=1.0, keep="outside")
+        result = sel.apply(cartesian_3d)
+        for name in result.field_names():
+            assert np.isnan(result[name][0, 0, 0]), f"{name} not masked at center"
+
+
+class TestFieldDatasetWhere:
+    """Tests for the FieldDataset.where() public method."""
+
+    def test_custom_mask(self, cartesian_3d: FieldDataset) -> None:
+        """Arbitrary boolean mask sets False points to NaN."""
+        mask = np.ones(cartesian_3d.grid.dimensions, dtype=bool)
+        mask[0, 0, 0] = False
+        result = cartesian_3d.where(mask)
+        assert np.isnan(result["B1"][0, 0, 0])
+        assert np.isfinite(result["B1"][1, 0, 0])
+
+    def test_preserves_shape(self, cartesian_3d: FieldDataset) -> None:
+        mask = np.ones(cartesian_3d.grid.dimensions, dtype=bool)
+        result = cartesian_3d.where(mask)
+        assert result["B1"].shape == cartesian_3d["B1"].shape
+
+    def test_custom_fill_value(self, cartesian_3d: FieldDataset) -> None:
+        mask = np.ones(cartesian_3d.grid.dimensions, dtype=bool)
+        mask[0, 0, 0] = False
+        result = cartesian_3d.where(mask, other=-999.0)
+        assert result["B1"][0, 0, 0] == -999.0
