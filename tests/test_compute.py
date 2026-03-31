@@ -88,45 +88,55 @@ class TestDependencyChains:
         # beta = 2P / B^2 = 2*25 / 25 = 2
         np.testing.assert_allclose(result, 2.0, rtol=1e-15)
 
-    def test_P_from_tensor_trace(self):
-        """P falls back to Tr(tensor)/3 when scalar P is absent."""
+    def test_P_from_species_tensors(self):
+        """P = Pe + Pi, each from per-species tensor trace."""
         shape = (2, 2, 2)
         data = {
-            "P11": np.full(shape, 3.0),
-            "P22": np.full(shape, 6.0),
-            "P33": np.full(shape, 9.0),
+            "P11_s0": np.full(shape, 3.0),
+            "P22_s0": np.full(shape, 3.0),
+            "P33_s0": np.full(shape, 3.0),
+            "P11_s1": np.full(shape, 6.0),
+            "P22_s1": np.full(shape, 6.0),
+            "P33_s1": np.full(shape, 6.0),
         }
         ds = make_test_dataset(data, shape=shape)
         result = compute_field("P", ds)
-        np.testing.assert_allclose(result, 6.0, rtol=1e-15)
+        # Pe = 3, Pi = 6, P = 9
+        np.testing.assert_allclose(result, 9.0, rtol=1e-15)
 
     def test_P_raw_takes_precedence(self):
-        """Raw scalar P in dataset takes priority over tensor fallback."""
+        """Raw scalar P in dataset takes priority over compute chain."""
         shape = (2, 2, 2)
         data = {
             "P": np.full(shape, 42.0),
-            "P11": np.full(shape, 1.0),
-            "P22": np.full(shape, 1.0),
-            "P33": np.full(shape, 1.0),
+            "P11_s0": np.full(shape, 1.0),
+            "P22_s0": np.full(shape, 1.0),
+            "P33_s0": np.full(shape, 1.0),
+            "P11_s1": np.full(shape, 1.0),
+            "P22_s1": np.full(shape, 1.0),
+            "P33_s1": np.full(shape, 1.0),
         }
         ds = make_test_dataset(data, shape=shape)
         result = compute_field("P", ds)
         np.testing.assert_allclose(result, 42.0, rtol=1e-15)
 
-    def test_beta_from_tensor(self):
-        """beta chains through P → tensor trace when no scalar P exists."""
+    def test_beta_from_species_tensors(self):
+        """beta chains through P → Pe + Pi → per-species tensor traces."""
         shape = (2, 2, 2)
         data = {
-            "P11": np.full(shape, 10.0),
-            "P22": np.full(shape, 10.0),
-            "P33": np.full(shape, 10.0),
+            "P11_s0": np.full(shape, 5.0),
+            "P22_s0": np.full(shape, 5.0),
+            "P33_s0": np.full(shape, 5.0),
+            "P11_s1": np.full(shape, 5.0),
+            "P22_s1": np.full(shape, 5.0),
+            "P33_s1": np.full(shape, 5.0),
             "B1": np.full(shape, 3.0),
             "B2": np.full(shape, 4.0),
             "B3": np.zeros(shape),
         }
         ds = make_test_dataset(data, shape=shape)
         result = compute_field("beta", ds)
-        # P = (10+10+10)/3 = 10, |B| = 5, beta = 2*10/25 = 0.8
+        # Pe = 5, Pi = 5, P = 10, |B| = 5, beta = 2*10/25 = 0.8
         np.testing.assert_allclose(result, 0.8, rtol=1e-15)
 
     def test_Pe_from_species_tensor(self):

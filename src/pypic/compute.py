@@ -184,8 +184,9 @@ _REGISTRY: dict[str, _Recipe] = {
         species_index=1,
         species_args=_SpeciesArgs.CHARGE_MASS,
     ),
-    # Isotropic scalar pressure from tensor trace (fallback when raw P absent)
-    "P": _Recipe(derived.isotropic_pressure, ("P11", "P22", "P33")),
+    # Total pressure from partial pressures (Pe, Pi each resolve from
+    # per-species tensor trace when not directly available).
+    "P": _Recipe(derived.total_pressure, ("Pe", "Pi")),
     "Pe": _Recipe(derived.isotropic_pressure, ("P11_s0", "P22_s0", "P33_s0")),
     "Pi": _Recipe(derived.isotropic_pressure, ("P11_s1", "P22_s1", "P33_s1")),
     # Pressure tensor decomposition

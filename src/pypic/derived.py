@@ -980,6 +980,32 @@ def magnetosonic_mach(
     return _safe_divide(v, v_ms)
 
 
+def total_pressure(p_e: FloatArray, p_i: FloatArray) -> FloatArray:
+    r"""Compute total scalar pressure from electron and ion partial pressures.
+
+    $$P = P_e + P_i$$
+
+    Parameters
+    ----------
+    p_e : NDArray
+        Electron scalar pressure.
+    p_i : NDArray
+        Ion scalar pressure.
+
+    Returns
+    -------
+    NDArray
+        Total scalar pressure in normalized units.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> total_pressure(np.array([2.0]), np.array([3.0]))
+    array([5.])
+    """
+    return p_e + p_i  # type: ignore[no-any-return]
+
+
 def isotropic_pressure(
     p11: FloatArray,
     p22: FloatArray,
