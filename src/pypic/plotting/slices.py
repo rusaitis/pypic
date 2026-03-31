@@ -198,6 +198,16 @@ def plot_field_slice(
         ax.set_xlabel(axis_label(surviving_axes[0], unit_str=cu_x))
         ax.set_ylabel(axis_label(surviving_axes[1], unit_str=cu_y))
         ax.set_aspect("equal")
+
+        # Bake theme font sizes onto the axes so they persist after the
+        # use_theme() context exits (rcParams are restored on exit).
+        resolved = _resolve_theme_arg(theme)
+        ax.tick_params(labelsize=resolved.font_tick)
+        ax.xaxis.label.set_fontsize(resolved.font_label)
+        ax.yaxis.label.set_fontsize(resolved.font_label)
+        if ax.get_title():
+            ax.title.set_fontsize(resolved.font_title)
+
         apply_grid(ax, theme)
 
         if title is not None:

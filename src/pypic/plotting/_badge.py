@@ -465,7 +465,7 @@ def add_label(
     *,
     variant: OverlayVariant | None = None,
     loc: BadgeLoc | None = None,
-    fontsize: float = 14,
+    fontsize: float | None = None,
     fontweight: str = "bold",
     bg_color: str | tuple[float, ...] | None = None,
     bg_alpha: float | None = None,
@@ -506,6 +506,9 @@ def add_label(
     from pypic.plotting.styles import _theme_val
 
     actual_loc = _claim_corner(ax, "upper left", loc)
+
+    if fontsize is None:
+        fontsize = _theme_val("font_title", 12.0)
 
     default_bg, default_fg = _detect_overlay_defaults(variant)
     overlay_alpha: float = _theme_val("overlay_color", (0, 0, 0, 0.65))[3]

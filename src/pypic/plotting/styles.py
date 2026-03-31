@@ -271,9 +271,12 @@ def get_active_theme() -> PlotTheme | None:
 
 
 def _theme_val(attr: str, default: Any) -> Any:  # noqa: ANN401
-    """Read *attr* from the active theme, or return *default* if no theme is active."""
-    theme = _active_theme
-    return getattr(theme, attr) if theme is not None else default
+    """Read *attr* from the active or global default theme.
+
+    Falls back to *default* only when no theme has been loaded at all.
+    """
+    theme = _active_theme if _active_theme is not None else get_theme()
+    return getattr(theme, attr, default)
 
 
 _GENERIC_FAMILIES = frozenset({

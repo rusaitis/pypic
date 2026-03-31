@@ -22,10 +22,10 @@ diverging = "RdBu_r"
 
 [font]
 family = ["DejaVu Serif", "Computer Modern", "Times", "serif"]
-title = 12.0
+title = 14.0
 label = 11.0
-tick = 10.0
-overlay = 9.0
+tick = 11.0
+overlay = 11.0
 
 [overlay]
 rounding = 0.6
@@ -56,5 +56,5 @@ pad = 0.05
 
 [progress_bar]
 width = 80.0
-height = 4.0
+height = 8.0
 rounding = 2.0

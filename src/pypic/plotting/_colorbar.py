@@ -148,7 +148,7 @@ def add_inset_colorbar(
     extend: str = "both",
     extremes: ExtremesMode = "semi",
     n_ticks: int = 3,
-    fontsize: float = 8,
+    fontsize: float | None = None,
     bg_color: str | tuple[float, ...] | None = None,
     bg_alpha: float | None = None,
     text_color: str | tuple[float, ...] | None = None,
@@ -221,6 +221,9 @@ def add_inset_colorbar(
         pad = _theme_val("overlay_margin", 0.03) * 0.5
 
     box_pad = 0.015
+
+    if fontsize is None:
+        fontsize = _theme_val("font_overlay", 9.0)
 
     fig = ax.get_figure()
 

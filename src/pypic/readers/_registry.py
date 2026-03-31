@@ -288,7 +288,18 @@ class Simulation:
         canonical: set[str] | None = None
         if fields is not None:
             alias_map = _default_aliases(self._config.grid.geometry)
-            canonical = {alias_map.get(name, name) for name in fields}
+            expanded: set[str] = set()
+            for name in fields:
+                resolved = alias_map.get(name, name)
+                expanded.add(resolved)
+                # Expand vector group shorthand: "B" → "B1","B2","B3".
+                # A name is a vector prefix if it's not already a known
+                # alias and doesn't end in a digit (avoids expanding
+                # "Bx" or "P11_s1").
+                if name not in alias_map and not name[-1:].isdigit():
+                    for suffix in ("1", "2", "3"):
+                        expanded.add(f"{resolved}{suffix}")
+            canonical = expanded
 
         if supports_selective_read(self._reader):
             return self._reader.read_timestep(  # type: ignore[call-arg]
