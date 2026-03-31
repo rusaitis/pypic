@@ -18,9 +18,9 @@ SI conversion boundaries. Temperatures are in energy units throughout
 | `rho_c` | Charge density | $\sum_s n_s q_s$ | -- |
 | `rho_m` | Mass density | $\sum_s n_s m_s$ | -- |
 | `J` | Current density | $\sum_s n_s q_s \mathbf{V}_s$ | -- |
-| `V` | Ion bulk velocity | 1st moment of $f_i$ (PIC) / fluid velocity (MHD) | -- |
+| `V` | Ion/fluid bulk velocity | 1st moment of $f_i$ (kinetic) or fluid velocity | -- |
 | `Ve` | Electron bulk velocity | 1st moment of $f_e$ | -- |
-| `P` | Total scalar pressure | $P_e + P_i$ (PIC) / fluid pressure (MHD) | -- |
+| `P` | Total scalar pressure | $P_e + P_i$ or $\frac{1}{3}\mathrm{Tr}(\mathbf{P})$ or fluid $P$ | -- |
 | `Pe` | Electron scalar pressure | $P_e = n_e T_e$ | -- |
 | `Pi` | Ion scalar pressure | $P_i = n_i T_i$ | -- |
 | `T` | Temperature (generic) | $T = P / n$ | $T^{SI} = T \cdot m_{ref} v_{ref}^2$ |
@@ -34,16 +34,16 @@ SI conversion boundaries. Temperatures are in energy units throughout
 |------|-------------|------------|-----|
 | `h` | Specific enthalpy | $\gamma P / ((\gamma - 1) \rho_m)$ | $h \cdot v_{ref}^2$ \[J/kg\] |
 | `h_rel` | Relativistic specific enthalpy[^2] | $c^2 + \gamma P / ((\gamma - 1) \rho_m)$ | $h_{rel} \cdot v_{ref}^2$ \[J/kg\] |
-| `s` | Specific entropy (isotropic)[^1] | $\ln(P / \rho_m^\gamma)$ (MHD), $\ln(P_s / n_s^\gamma)$ (PIC) | -- |
+| `s` | Specific entropy (isotropic)[^1] | $\ln(P / \rho_m^\gamma)$ (fluid) or $\ln(P_s / n_s^\gamma)$ (per-species) | -- |
 | `s_e` | Electron entropy | $\ln(P_e / n_e^\gamma)$ | -- |
 | `s_i` | Ion entropy | $\ln(P_i / n_i^\gamma)$ | -- |
 | `s_gyro` | Gyrotropic entropy | $\ln(P_{\parallel,s} P_{\perp,s}^2 / n_s^5)$ | -- |
 | `e_int` | Specific internal energy | $P / ((\gamma - 1) \rho_m)$ | $e_{int} \cdot v_{ref}^2$ \[J/kg\] |
 | `gamma_eos` | Adiabatic index | $\gamma = c_p / c_v$ | -- |
 
-[^1]: MHD entropy uses mass density ($\rho_m$, fluid equation of state);
-    PIC entropy uses per-species number density ($n_s$, kinetic moments per
-    particle), with $\gamma = 5/3$ (3D) by default. The gyrotropic exponent
+[^1]: The fluid form uses mass density ($\rho_m$, single-fluid equation of
+    state); the per-species form uses number density ($n_s$, kinetic moments
+    per particle), with $\gamma = 5/3$ (3D) by default. The gyrotropic exponent
     of 5 is independent of $\gamma$ — it arises from the CGL double-adiabatic
     invariants, not from the equation of state.
     See [conventions.md § γ Convention](conventions.md#γ-convention-for-pic-entropy).

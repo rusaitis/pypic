@@ -313,13 +313,38 @@ geometry-appropriate aliases (e.g., `Br` → `B1` for spherical). The
 | `rho_c` | Total charge density | PIC |
 | `rho_m` | Total mass density | MHD, PIC (derived) |
 
-`rho_c` and `rho_m` are unambiguous — no overloaded `rho`. For the common
-two-species case, `n_e` and `n_i` are accepted as aliases for `n_s0` and
-`n_s1`.
+`rho_c` and `rho_m` are unambiguous — no overloaded `rho`. `n_e` and
+`n_i` are accepted as aliases for `n_s0` and `n_s1` (see convenience
+aliases table below).
 
 **Per-species naming:** Append `_s` plus the species index (0-based):
 `rho_c_s0`, `J1_s1`, `V1_s2`, `n_s3`. The species *name* lives in the
-`[[species]]` table, not in the field name.
+`[[species]]` table, not in the field name. For vector fields, the
+component index comes before the species suffix: `J1_s0`, `EF2_s1`.
+
+**Electron/ion convenience aliases:** For the common two-species case
+(species 0 = electrons, species 1 = ions), short `e`/`i` suffixed names
+are accepted as aliases for the canonical `_s0`/`_s1` forms:
+
+| Alias | Canonical | Meaning |
+|-------|-----------|---------|
+| `n_e`, `n_i` | `n_s0`, `n_s1` | Number density |
+| `Pe`, `Pi` | `P_s0`, `P_s1` | Scalar pressure (or Tr(tensor)/3) |
+| `Te`, `Ti` | `T_s0`, `T_s1` | Temperature |
+| `Ve1`..`Ve3` | `V1_s0`..`V3_s0` | Electron bulk velocity |
+| `EFe`, `EFi` | `EF_s0`, `EF_s1` | Energy flux (vector group) |
+| `s_e`, `s_i` | — | Per-species entropy |
+| `beta_e`, `beta_i` | — | Per-species plasma beta |
+
+This convention assumes species 0 = electrons, 1 = ions (standard in
+PIC codes). For multi-species simulations (e.g. H⁺ + He²⁺ + O⁺), use
+the explicit `_sN` form.
+
+**Vector group shorthand in `read()`:** Passing a bare prefix like
+`"B"` to `read(fields=...)` expands to `B1, B2, B3`. Per-species
+groups also work: `"EF_s0"` expands to `EF1_s0, EF2_s0, EF3_s0`.
+Derived quantities expand to their dependencies: `"Pi"` loads the
+ion pressure tensor components `P11_s1`..`P33_s1`.
 
 ### Fluid / moment quantities — velocities, currents, pressure
 
@@ -355,24 +380,26 @@ two-species case, `n_e` and `n_i` are accepted as aliases for `n_s0` and
 | Canonical | Cartesian alias | Meaning | Present in |
 |-----------|----------------|---------|------------|
 | `S1`, `S2`, `S3` | `Sx`, `Sy`, `Sz` | Poynting flux | PIC, MHD |
-| `EF1`, `EF2`, `EF3` | `EFx`, `EFy`, `EFz` | Per-species energy flux | PIC (per-species) |
+| `EF1_s0`, `EF2_s0`, ... | `EFe`, `EFi` (vector groups) | Per-species energy flux | PIC (always per-species) |
 | `e_B` | — | Magnetic energy density | PIC, MHD |
 | `e_E` | — | Electric energy density | PIC |
 | `e_k` | — | Kinetic energy density | MHD, PIC (moments) |
 | `e_th` | — | Thermal energy density | MHD, PIC (moments) |
 
-### Pressure tensor (PIC, anisotropic)
+### Pressure tensor
 
 | Canonical | Meaning | Present in |
 |-----------|---------|------------|
-| `P_par` | Pressure parallel to B | PIC (from tensor) |
-| `P_perp` | Pressure perpendicular to B | PIC (from tensor) |
-| `Pij` | Full pressure tensor (6 independent components: P11, P12, P13, P22, P23, P33) | PIC |
-| `agyrotropy` | Agyrotropy measure (deviation from gyrotropic symmetry) | PIC (derived) |
+| `P_par` | Pressure parallel to B | PIC, multi-moment MHD (from tensor) |
+| `P_perp` | Pressure perpendicular to B | PIC, multi-moment MHD (from tensor) |
+| `Pij` | Full pressure tensor (6 independent components: P11, P12, P13, P22, P23, P33) | PIC, multi-moment MHD |
+| `agyrotropy` | Agyrotropy measure (deviation from gyrotropic symmetry) | PIC, multi-moment MHD (derived) |
 
-`P_par` and `P_perp` are currently decomposed from the **total** pressure
-tensor (`P11..P33`). Per-species decomposition (`P_par_s0`, `P_perp_s0`)
-from per-species tensors (`P11_s0..P33_s0`) is future work.
+Any code that evolves the full pressure tensor — PIC, hybrid, 10-moment
+MHD, CGL — can populate these fields. `P_par` and `P_perp` are
+decomposed from the **total** pressure tensor (`P11..P33`). Per-species
+decomposition (`P_par_s0`, `P_perp_s0`) from per-species tensors
+(`P11_s0..P33_s0`) is future work.
 
 ### Characteristic scales (derived)
 
@@ -399,8 +426,8 @@ from per-species tensors (`P11_s0..P33_s0`) is future work.
 | `beta_i` | Ion beta | `Pi`, `|B|` |
 | `sigma` | Magnetization parameter | `|B|`, `rho_m`, `c` |
 
-`n_e` and `n_i` are accepted as aliases for `n_s0` and `n_s1` (see
-Densities section above).
+See the electron/ion convenience aliases table in the Densities section
+for the full list of `e`/`i` shorthand names.
 
 ### Other derived quantities
 

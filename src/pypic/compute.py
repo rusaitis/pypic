@@ -676,9 +676,41 @@ def available_quantities() -> list[str]:
     return sorted(set(_REGISTRY) | set(_COMPUTE_ALIASES))
 
 
+def field_dependencies(name: str, _depth: int = 0) -> set[str]:
+    """Return the raw field names needed to compute *name*.
+
+    Recursively walks the compute recipe graph. If *name* has no recipe
+    (i.e. it is a raw field), returns ``{name}``.
+
+    Parameters
+    ----------
+    name : str
+        Field or derived quantity name (e.g. ``"Pi"``, ``"beta"``).
+
+    Returns
+    -------
+    set[str]
+        Leaf field names that must be present in the dataset.
+    """
+    if _depth > _MAX_DEPTH:
+        return {name}
+
+    canonical = _resolve_name(name)
+    try:
+        recipe = _get_recipe(canonical)
+    except KeyError:
+        return {canonical}
+
+    deps: set[str] = set()
+    for field in recipe.fields:
+        deps |= field_dependencies(field, _depth + 1)
+    return deps
+
+
 __all__ = [
     "available_quantities",
     "compute_field",
     "display_unit_factor",
+    "field_dependencies",
     "field_si_factor",
 ]

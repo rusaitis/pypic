@@ -24,7 +24,10 @@ class TestRegistryIntegrity:
     def test_all_aliases_resolve(self):
         # Aliases may point to raw field names (Te, Pi, etc.) used as
         # direct passthrough, not only to _REGISTRY entries.
-        raw_field_targets = {"Te", "Ti", "Pe", "Pi", "EF1", "EF2", "EF3"}
+        raw_field_targets = {
+            "Te", "Ti", "Pe", "Pi",
+            "EF1", "EF2", "EF3", "EF_s0", "EF_s1",
+        }
         for alias, target in _COMPUTE_ALIASES.items():
             assert target in _REGISTRY or target in raw_field_targets, (
                 f"Alias {alias!r} -> {target!r} not in registry or known fields"

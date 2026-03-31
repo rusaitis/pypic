@@ -254,6 +254,30 @@ class Simulation:
         """Last available timestep index."""
         return self.steps[-1]
 
+    @staticmethod
+    def _expanded_names(
+        name: str, alias_map: dict[str, str], canonical: set[str]
+    ) -> set[str]:
+        """Return the canonical names that *name* could have expanded to."""
+        from pypic._aliases import _COMPUTE_ALIASES
+
+        resolved = alias_map.get(name, _COMPUTE_ALIASES.get(name, name))
+        candidates = {resolved}
+        # Vector expansion
+        import re
+
+        _sp = re.match(r"^(.+?)(_s\d+)$", resolved)
+        prefix = _sp.group(1) if _sp else resolved
+        species = _sp.group(2) if _sp else ""
+        if not prefix[-1:].isdigit():
+            for c in ("1", "2", "3"):
+                candidates.add(f"{prefix}{c}{species}")
+        # Compute deps
+        from pypic.compute import field_dependencies
+
+        candidates |= field_dependencies(resolved)
+        return candidates & canonical
+
     def read(
         self,
         step: int,
@@ -287,31 +311,70 @@ class Simulation:
 
         canonical: set[str] | None = None
         if fields is not None:
+            import re
+
+            from pypic._aliases import _COMPUTE_ALIASES
+            from pypic.compute import field_dependencies
+
             alias_map = _default_aliases(self._config.grid.geometry)
             expanded: set[str] = set()
             for name in fields:
-                resolved = alias_map.get(name, name)
+                # Resolve geometry aliases (Bx→B1) and compute aliases (EFe→EF_s0)
+                resolved = alias_map.get(name, _COMPUTE_ALIASES.get(name, name))
                 expanded.add(resolved)
-                # Expand vector group shorthand: "B" → "B1","B2","B3".
-                # A name is a vector prefix if it's not already a known
-                # alias and doesn't end in a digit (avoids expanding
-                # "Bx" or "P11_s1").
-                if name not in alias_map and not name[-1:].isdigit():
-                    for suffix in ("1", "2", "3"):
-                        expanded.add(f"{resolved}{suffix}")
+                # Expand vector group shorthand:
+                #   "B"    → "B1","B2","B3"
+                #   "J_s0" → "J1_s0","J2_s0","J3_s0" (component before species)
+                # Skip names already resolved as aliases (e.g. "Bx") and
+                # names whose prefix already ends in a digit (e.g. "P11_s1").
+                if name not in alias_map:
+                    _sp = re.match(r"^(.+?)(_s\d+)$", resolved)
+                    prefix = _sp.group(1) if _sp else resolved
+                    species = _sp.group(2) if _sp else ""
+                    if not prefix[-1:].isdigit():
+                        for c in ("1", "2", "3"):
+                            expanded.add(f"{prefix}{c}{species}")
+                # Expand compute dependencies: "Pi" → "P11_s1","P22_s1","P33_s1"
+                expanded |= field_dependencies(resolved)
+
+            # If any diagonal tensor components were requested (P11, P22, P33
+            # or P11_sN etc.), also include the off-diagonals so that
+            # P_par/P_perp/agyrotropy can be computed from the same load.
+            _diag_re = re.compile(r"^P(11|22|33)(_s\d+)?$")
+            suffixes: set[str] = set()
+            for f in list(expanded):
+                m = _diag_re.match(f)
+                if m:
+                    suffixes.add(m.group(2) or "")
+            for s in suffixes:
+                for ij in ("11", "12", "13", "22", "23", "33"):
+                    expanded.add(f"P{ij}{s}")
+
             canonical = expanded
 
         if supports_selective_read(self._reader):
-            return self._reader.read_timestep(  # type: ignore[call-arg]
+            ds = self._reader.read_timestep(  # type: ignore[call-arg]
                 self._path,
                 step,
                 fields=canonical,
                 **kwargs,
             )
+        else:
+            ds = self._reader.read_timestep(self._path, step)
+            if canonical is not None:
+                ds = ds.select_fields(canonical)
 
-        ds = self._reader.read_timestep(self._path, step)
-        if canonical is not None:
-            ds = ds.select_fields(canonical)
+        # Warn for any user-requested name that yielded no loaded fields
+        if fields is not None:
+            loaded = set(ds.field_names())
+            for name in fields:
+                # A request is satisfied if any expansion of it was loaded
+                if not loaded & self._expanded_names(name, alias_map, canonical or set()):
+                    log.warning(
+                        "fields=%r: %r matched no fields in the dataset",
+                        list(fields), name,
+                    )
+
         return ds
 
     @property
