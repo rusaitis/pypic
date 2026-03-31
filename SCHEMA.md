@@ -346,6 +346,18 @@ groups also work: `"EF_s0"` expands to `EF1_s0, EF2_s0, EF3_s0`.
 Derived quantities expand to their dependencies: `"Pi"` loads the
 ion pressure tensor components `P11_s1`..`P33_s1`.
 
+**Current limitations:**
+
+- **Two-species assumption.** `P = Pe + Pi` and the `e`/`i` aliases
+  hardcode species 0 = electrons, 1 = ions. For 3+ species, compute
+  total pressure explicitly:
+  `P = sum(data.compute(f"P_s{i}") for i in range(n_species))`.
+  See `examples/advanced_calculations.py`.
+- **Split-B naming.** The background field prefix `B0` ends in a digit,
+  so its components use an underscore separator: `B0_1`, `B0_2`, `B0_3`
+  (aliases: `B0x`, `B0y`, `B0z`). This is the only field prefix where
+  the underscore is needed to avoid ambiguity with component indices.
+
 ### Fluid / moment quantities — velocities, currents, pressure
 
 | Canonical | Cartesian alias | Meaning | Present in |
