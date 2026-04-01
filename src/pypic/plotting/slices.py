@@ -11,6 +11,7 @@ if TYPE_CHECKING:
     from matplotlib.colors import Colormap
     from matplotlib.figure import Figure
 
+    from pypic.plotting._badge import OverlayVariant
     from pypic.plotting._colorbar import ExtremesMode
     from pypic.plotting.styles import ThemeArg
     from pypic.readers.base import FieldDataset
@@ -36,6 +37,8 @@ def plot_field_slice(
     time: float | None = None,
     ax: Axes | None = None,
     colorbar: bool | Literal["inset"] = True,
+    colorbar_label: str | None = None,
+    colorbar_variant: OverlayVariant | None = None,
     extremes: ExtremesMode = "semi",
     badge: bool = False,
     save: str | None = None,
@@ -191,8 +194,11 @@ def plot_field_slice(
         mesh = ax.pcolormesh(coords[0], coords[1], values.T, **mesh_kwargs)
 
         unit_str = units or ""
-        cb_label = field_label(info, unit_str=unit_str)
-        attach_colorbar(fig, ax, mesh, cb_label, colorbar, extremes=extremes)
+        cb_label = colorbar_label if colorbar_label is not None else field_label(info, unit_str=unit_str)
+        attach_colorbar(
+            fig, ax, mesh, cb_label, colorbar,
+            extremes=extremes, variant=colorbar_variant,
+        )
 
         cu_x, cu_y = resolve_coord_units(coord_units)
         ax.set_xlabel(axis_label(surviving_axes[0], unit_str=cu_x))
@@ -202,7 +208,19 @@ def plot_field_slice(
         # Bake theme font sizes onto the axes so they persist after the
         # use_theme() context exits (rcParams are restored on exit).
         resolved = _resolve_theme_arg(theme)
-        ax.tick_params(labelsize=resolved.font_tick)
+        ax.tick_params(
+            labelsize=resolved.font_tick,
+            direction=resolved.tick_direction,
+            which="major",
+            length=resolved.tick_major_length,
+            width=resolved.tick_major_width,
+        )
+        ax.tick_params(
+            which="minor",
+            direction=resolved.tick_direction,
+            length=resolved.tick_minor_length,
+            width=resolved.tick_minor_width,
+        )
         ax.xaxis.label.set_fontsize(resolved.font_label)
         ax.yaxis.label.set_fontsize(resolved.font_label)
         if ax.get_title():

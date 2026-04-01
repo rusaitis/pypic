@@ -56,12 +56,22 @@ def _claim_corner(
     return chosen
 
 
+def _resolve_border(variant: OverlayVariant | None = None) -> tuple[float, ...]:
+    """Return the overlay border color for the given variant."""
+    from pypic.plotting.styles import _theme_val
+
+    if variant == "alt":
+        return _theme_val("overlay_alt_border_color", (0.5, 0.5, 0.5, 0.3))
+    return _theme_val("overlay_border_color", (0.3, 0.3, 0.3, 0.2))
+
+
 def _make_overlay_box(
     ax: Axes,
     child: object,
     loc: BadgeLoc,
     bg_rgba: tuple[float, float, float, float],
     pad: float | None = None,
+    variant: OverlayVariant | None = None,
 ) -> AnchoredOffsetbox:
     """Create a styled overlay box and add it to *ax*."""
     from matplotlib.offsetbox import AnchoredOffsetbox
@@ -84,7 +94,8 @@ def _make_overlay_box(
     if has_bg:
         box.patch.set_boxstyle(_overlay_box_style())
         box.patch.set_facecolor(bg_rgba)
-        box.patch.set_edgecolor("none")
+        box.patch.set_edgecolor(_resolve_border(variant))
+        box.patch.set_linewidth(0.5)
     ax.add_artist(box)
     return box
 
@@ -94,8 +105,8 @@ OverlayVariant = Literal["darker", "lighter", "alt"]
 
 def _detect_overlay_defaults(
     variant: OverlayVariant | None,
-) -> tuple[tuple[float, float, float], tuple[float, float, float]]:
-    """Derive overlay bg and fg colors from the active theme or rcParams.
+) -> tuple[tuple[float, float, float], tuple[float, float, float], float]:
+    """Derive overlay bg, fg colors and alpha from the active theme.
 
     When a :func:`~pypic.plotting.use_theme` context is active and the
     theme defines an ``overlay_color``, that color is used directly.
@@ -110,23 +121,32 @@ def _detect_overlay_defaults(
 
     Returns
     -------
-    tuple[tuple, tuple]
-        ``(default_bg, default_fg)``
+    tuple[tuple, tuple, float]
+        ``(default_bg, default_fg, bg_alpha)``
     """
     import matplotlib as mpl
     from matplotlib.colors import to_rgba
 
-    from pypic.plotting.styles import get_active_theme
+    from pypic.plotting.styles import get_active_theme, get_theme
 
-    theme = get_active_theme()
+    # Use the active theme if inside use_theme(), otherwise fall back to
+    # the global default.  This ensures overlays created outside a
+    # use_theme() context still pick up theme colors.
+    theme = get_active_theme() or get_theme()
 
     # "alt" variant: use alternative overlay colors from theme
     if variant == "alt" and theme is not None:
-        return theme.overlay_alt_color[:3], theme.overlay_alt_text_color[:3]
+        return (
+            theme.overlay_alt_color[:3],
+            theme.overlay_alt_text_color[:3],
+            theme.overlay_alt_color[3],
+        )
 
     # Primary overlay color from theme
+    alpha = 0.65
     if theme is not None and any(c > 0 for c in theme.overlay_color[:3]):
         default_bg: tuple[float, float, float] = theme.overlay_color[:3]
+        alpha = theme.overlay_color[3]
     else:
         # Fallback: darken or lighten the axes facecolor
         bg = to_rgba(mpl.rcParams.get("axes.facecolor", "white"))
@@ -150,7 +170,46 @@ def _detect_overlay_defaults(
         fg_rgba = to_rgba(mpl.rcParams.get("text.color", "black"))
         default_fg = (fg_rgba[0], fg_rgba[1], fg_rgba[2])
 
-    return default_bg, default_fg
+    return default_bg, default_fg, alpha
+
+
+def _contrast_ratio(
+    c1: tuple[float, float, float], c2: tuple[float, float, float]
+) -> float:
+    """WCAG relative-luminance contrast ratio between two RGB colors."""
+
+    def _lum(c: tuple[float, float, float]) -> float:
+        r, g, b = (
+            v / 12.92 if v <= 0.04045 else ((v + 0.055) / 1.055) ** 2.4
+            for v in c
+        )
+        return 0.2126 * r + 0.7152 * g + 0.0722 * b
+
+    l1, l2 = _lum(c1), _lum(c2)
+    lighter, darker = max(l1, l2), min(l1, l2)
+    return (lighter + 0.05) / (darker + 0.05)
+
+
+def _pick_overlay_variant(
+    content_colors: list[tuple[float, float, float]],
+) -> OverlayVariant | None:
+    """Choose default or alt overlay variant for best contrast.
+
+    Compares the average contrast ratio of *content_colors* against the
+    default overlay background and the alt overlay background.  Returns
+    ``"alt"`` if the alt background gives better contrast, ``None``
+    (default overlay) otherwise.
+    """
+    default_bg = _detect_overlay_defaults(None)[0]
+    alt_bg = _detect_overlay_defaults("alt")[0]
+
+    avg_default = sum(_contrast_ratio(c, default_bg) for c in content_colors) / len(
+        content_colors
+    )
+    avg_alt = sum(_contrast_ratio(c, alt_bg) for c in content_colors) / len(
+        content_colors
+    )
+    return "alt" if avg_alt > avg_default else None
 
 
 def _format_status_text(
@@ -234,6 +293,7 @@ def _build_progress_bar(
     bar_color: str,
     bar_alpha: float,
     track_color: tuple[float, ...],
+    variant: OverlayVariant | None = None,
 ) -> DrawingArea:
     """Build a DrawingArea containing track + fill rectangles."""
     if bar_width <= 0 or bar_height <= 0:
@@ -245,18 +305,21 @@ def _build_progress_bar(
 
     from pypic.plotting.styles import _theme_val
 
-    rounding: float = _theme_val("progress_bar_rounding", 2.0)
+    overlay_rounding: float = _theme_val("overlay_rounding", 0.6)
+    rounding = min(overlay_rounding * bar_height * 0.7, bar_height / 2)
     box_style = f"round,pad=0,rounding_size={rounding}"
 
     drawing = DrawingArea(bar_width, bar_height)
 
+    border = _resolve_border(variant)
     track = FancyBboxPatch(
         (0, 0),
         bar_width,
         bar_height,
         boxstyle=box_style,
         facecolor=track_color,
-        edgecolor="none",
+        edgecolor=border,
+        linewidth=0.5,
     )
     drawing.add_artist(track)
 
@@ -380,8 +443,7 @@ def add_badge(
 
     actual_loc = _claim_corner(ax, "upper right", loc)
 
-    default_bg, default_fg = _detect_overlay_defaults(variant)
-    overlay_alpha: float = _theme_val("overlay_color", (0, 0, 0, 0.65))[3]
+    default_bg, default_fg, overlay_alpha = _detect_overlay_defaults(variant)
 
     if fontsize is None:
         fontsize = _theme_val("font_overlay", 9.0)
@@ -397,7 +459,8 @@ def add_badge(
     resolved_text = _resolve_rgba(text_color, text_alpha, default_fg)
 
     if track_color is None:
-        track_rgba = _theme_val("track_color", (0.3, 0.3, 0.3, 0.3))
+        track_key = "track_alt_color" if variant == "alt" else "track_color"
+        track_rgba = _theme_val(track_key, (0.3, 0.3, 0.3, 0.3))
     else:
         effective_alpha = overlay_alpha if bg_alpha is None else bg_alpha
         track_rgba = _resolve_rgba(track_color, effective_alpha * 0.4, default_fg)
@@ -440,12 +503,13 @@ def add_badge(
             bar_color,
             bar_alpha,
             track_rgba,
+            variant=variant,
         )
         child = VPacker(children=[text_area, bar], pad=0, sep=3, align="left")
     else:
         child = text_area
 
-    return _make_overlay_box(ax, child, actual_loc, bg_rgba)
+    return _make_overlay_box(ax, child, actual_loc, bg_rgba, variant=variant)
 
 
 @dataclass(frozen=True, slots=True)
@@ -507,11 +571,13 @@ def add_label(
 
     actual_loc = _claim_corner(ax, "upper left", loc)
 
+    is_phrase = " " in label
     if fontsize is None:
-        fontsize = _theme_val("font_title", 12.0)
+        fontsize = _theme_val("font_label" if is_phrase else "font_title", 12.0)
+    if fontweight == "bold" and is_phrase:
+        fontweight = "normal"
 
-    default_bg, default_fg = _detect_overlay_defaults(variant)
-    overlay_alpha: float = _theme_val("overlay_color", (0, 0, 0, 0.65))[3]
+    default_bg, default_fg, overlay_alpha = _detect_overlay_defaults(variant)
 
     bg_rgba = _resolve_rgba(bg_color, bg_alpha, default_bg, overlay_alpha)
     resolved_text = _resolve_rgba(text_color, text_alpha, default_fg)
@@ -520,15 +586,19 @@ def add_label(
     text_area = TextArea(label, textprops=props)
 
     # Extra horizontal padding so the box looks square for single letters
-    child = HPacker(children=[text_area], pad=fontsize * 0.12, sep=0, align="center")
+    pad = 0 if is_phrase else fontsize * 0.12
+    child = HPacker(children=[text_area], pad=pad, sep=0, align="center")
 
-    return _make_overlay_box(ax, child, actual_loc, bg_rgba, pad=0.2)
+    return _make_overlay_box(ax, child, actual_loc, bg_rgba, variant=variant)
 
 
 def add_legend(
     ax: Axes,
-    entries: LegendEntry | list[LegendEntry],
+    entries: str | LegendEntry | list[LegendEntry],
     *,
+    color: str | None = None,
+    linewidth: float = 1.0,
+    entry_alpha: float = 1.0,
     variant: OverlayVariant | None = None,
     loc: BadgeLoc | None = None,
     fontsize: float | None = None,
@@ -544,12 +614,22 @@ def add_legend(
     linewidth, linestyle, alpha) next to its label text.  Multiple entries
     are stacked vertically.  The box style matches :func:`add_badge`.
 
+    For a single entry, pass a string label directly::
+
+        add_legend(ax, "J", color="white")
+
     Parameters
     ----------
     ax : Axes
         Target axes.
-    entries : LegendEntry or list[LegendEntry]
-        One or more legend entries.
+    entries : str, LegendEntry, or list[LegendEntry]
+        A field label string, a single entry, or multiple entries.
+    color : str or None
+        Line color when *entries* is a string.
+    linewidth : float
+        Line width when *entries* is a string.
+    entry_alpha : float
+        Line opacity when *entries* is a string.
     variant : "darker", "lighter", "alt", or None
         ``"darker"``: darken axes facecolor for overlay bg.
         ``"lighter"``: lighten it. ``None`` (default): auto-detect.
@@ -585,11 +665,20 @@ def add_legend(
     if fontsize is None:
         fontsize = _theme_val("font_overlay", 9.0)
 
-    if isinstance(entries, LegendEntry):
+    if isinstance(entries, str):
+        entries = [LegendEntry(label=entries, color=color, linewidth=linewidth, alpha=entry_alpha)]
+    elif isinstance(entries, LegendEntry):
         entries = [entries]
 
-    default_bg, default_fg = _detect_overlay_defaults(variant)
-    overlay_alpha: float = _theme_val("overlay_color", (0, 0, 0, 0.65))[3]
+    # Auto-select overlay variant for best contrast with entry colors
+    if variant is None:
+        from matplotlib.colors import to_rgba
+
+        entry_rgbs = [to_rgba(e.color)[:3] for e in entries if e.color is not None]
+        if entry_rgbs:
+            variant = _pick_overlay_variant(entry_rgbs)
+
+    default_bg, default_fg, overlay_alpha = _detect_overlay_defaults(variant)
 
     bg_rgba = _resolve_rgba(bg_color, bg_alpha, default_bg, overlay_alpha)
     resolved_text = _resolve_rgba(text_color, text_alpha, default_fg)
@@ -633,4 +722,4 @@ def add_legend(
     else:
         child = rows[0]
 
-    return _make_overlay_box(ax, child, actual_loc, bg_rgba)
+    return _make_overlay_box(ax, child, actual_loc, bg_rgba, variant=variant)

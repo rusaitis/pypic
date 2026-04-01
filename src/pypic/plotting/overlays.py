@@ -11,6 +11,7 @@ if TYPE_CHECKING:
     from matplotlib.colors import Colormap
     from matplotlib.figure import Figure
 
+    from pypic.plotting._badge import OverlayVariant
     from pypic.plotting._colorbar import ExtremesMode
     from pypic.plotting.styles import ThemeArg
     from pypic.readers.base import FieldDataset
@@ -28,6 +29,8 @@ def plot_field_with_vectors(
     vector_linewidth: float = 0.8,
     stride: int | tuple[int, int] = 2,
     density: float = 1.5,
+    vector_downsample: int = 1,
+    vector_smooth: float | None = None,
     plane: PlaneSelection | None = None,
     units: str | None = None,
     coord_units: str | tuple[str, str] | None = None,
@@ -41,6 +44,8 @@ def plot_field_with_vectors(
     time: float | None = None,
     ax: Axes | None = None,
     colorbar: bool | Literal["inset"] = True,
+    colorbar_label: str | None = None,
+    colorbar_variant: OverlayVariant | None = None,
     extremes: ExtremesMode = "semi",
     legend: bool | str = True,
     badge: bool = False,
@@ -73,6 +78,12 @@ def plot_field_with_vectors(
         Subsampling for quiver mode (ignored for streamlines).
     density : float
         Streamline density (ignored for quiver mode).
+    vector_downsample : int
+        Downsample the vector grid by this factor before tracing
+        streamlines. Speeds up rendering on large grids.
+    vector_smooth : float or None
+        Gaussian smoothing sigma in grid cells for the vector field.
+        Suppresses grid-scale noise in streamlines.
     plane : PlaneSelection | None
         Plane selection for 3D data. ``None`` auto-slices at midplane.
     units : str | None
@@ -131,6 +142,8 @@ def plot_field_with_vectors(
         time=time,
         ax=ax,
         colorbar=colorbar,
+        colorbar_label=colorbar_label,
+        colorbar_variant=colorbar_variant,
         extremes=extremes,
         figsize=figsize,
     )
@@ -146,6 +159,8 @@ def plot_field_with_vectors(
                 alpha=vector_alpha,
                 linewidth=vector_linewidth,
                 density=density,
+                downsample=vector_downsample,
+                smooth=vector_smooth,
                 theme=theme,
                 ax=ax,
                 colorbar=False,

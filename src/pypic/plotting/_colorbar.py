@@ -204,23 +204,24 @@ def add_inset_colorbar(
     from pypic.plotting._badge import (
         _claim_corner,
         _detect_overlay_defaults,
+        _resolve_border,
         _resolve_rgba,
     )
     from pypic.plotting.styles import _theme_val
 
     actual_loc = _claim_corner(ax, "lower right", loc)
 
-    default_bg, default_fg = _detect_overlay_defaults(variant)
-    overlay_alpha: float = _theme_val("overlay_color", (0, 0, 0, 0.65))[3]
+    default_bg, default_fg, overlay_alpha = _detect_overlay_defaults(variant)
 
     bg_rgba = _resolve_rgba(bg_color, bg_alpha, default_bg, overlay_alpha)
     fg_rgba = _resolve_rgba(text_color, text_alpha, default_fg)
 
     rounding: float = _theme_val("overlay_rounding", 0.6)
+    overlay_pad: float = _theme_val("overlay_padding", 0.4)
     if pad is None:
         pad = _theme_val("overlay_margin", 0.03) * 0.5
 
-    box_pad = 0.015
+    box_pad = overlay_pad * 0.05  # convert points to axes fraction
 
     if fontsize is None:
         fontsize = _theme_val("font_overlay", 9.0)
@@ -239,7 +240,11 @@ def add_inset_colorbar(
     cb.locator = MaxNLocator(nbins=n_ticks)
     cb.update_ticks()
     _style_colorbar(cb, tick_color=fg_rgba)
-    prov_cax.tick_params(labelsize=fontsize, colors=fg_rgba)
+    prov_cax.tick_params(
+        labelsize=fontsize, colors=fg_rgba,
+        top=True, bottom=False, labeltop=False, labelbottom=True,
+        direction="in", width=0.6,
+    )
     if label:
         prov_cax.set_title(label, fontsize=fontsize, color=fg_rgba, pad=4)
 
@@ -253,6 +258,17 @@ def add_inset_colorbar(
     overhang_right = bbox_ax.x1 - (0.3 + width)
     overhang_bottom = 0.3 - bbox_ax.y0
     overhang_top = bbox_ax.y1 - (0.3 + height)
+
+    # Ensure content width accommodates the title if it's wider than the bar.
+    # get_tightbbox can underestimate title extent, so measure explicitly.
+    if label and prov_cax.title.get_text():
+        title_bbox = prov_cax.title.get_window_extent(renderer)
+        title_w_ax = title_bbox.transformed(ax.transAxes.inverted()).width
+        # Add a small buffer (half a character width) for font rendering variance
+        char_w = title_w_ax / max(len(label), 1)
+        title_overhang = max(0, (title_w_ax + char_w - width) / 2)
+        overhang_left = max(overhang_left, title_overhang)
+        overhang_right = max(overhang_right, title_overhang)
 
     content_w = width + overhang_left + overhang_right
     content_h = height + overhang_top + overhang_bottom
@@ -283,24 +299,91 @@ def add_inset_colorbar(
     cb.locator = MaxNLocator(nbins=n_ticks)
     cb.update_ticks()
     _style_colorbar(cb, tick_color=fg_rgba)
-    cax.tick_params(labelsize=fontsize, colors=fg_rgba)
+    cax.tick_params(
+        labelsize=fontsize, colors=fg_rgba,
+        top=True, bottom=False, labeltop=False, labelbottom=True,
+        direction="in", width=0.6,
+    )
     if label:
         cax.set_title(label, fontsize=fontsize, color=fg_rgba, pad=4)
     cax.set_facecolor("none")
 
-    # Background patch sized to actual content
+    # Background patch — initial size from provisional measurement
     has_bg = bg_rgba[3] >= 0.01
     bg_patch = FancyBboxPatch(
         (bg_x, bg_y),
         total_w,
         total_h,
-        boxstyle=f"round,pad=0,rounding_size={rounding * 0.02:.4f}",
+        boxstyle=f"round,pad=0,rounding_size={rounding * 0.04:.4f}",
         facecolor=bg_rgba if has_bg else "none",
-        edgecolor="none",
+        edgecolor=_resolve_border(variant),
+        linewidth=0.5,
         transform=ax.transAxes,
         zorder=4.9,
     )
     ax.add_patch(bg_patch)
+
+    # At draw time, re-measure content and reposition both the background
+    # patch and the colorbar axes so that the overlay respects the margin
+    # even after set_xlim / set_aspect changes the axes layout.
+    _loc_str = actual_loc
+    # Store the original bar position in axes fraction for absolute
+    # repositioning (avoids accumulating deltas across multiple draws).
+    _orig_bar_x = bar_x
+    _orig_bar_y = bar_y
+
+    # Remove the inset locator so set_position sticks across draws
+    cax.set_axes_locator(None)
+
+    def _resize_bg(event: object) -> None:  # noqa: ARG001
+        r = fig.canvas.get_renderer()  # type: ignore[union-attr]
+
+        # Temporarily put cax back at its original position to get a
+        # stable tightbbox measurement (avoids feedback loops).
+        ax_pos = ax.get_position()
+        cax.set_position([
+            ax_pos.x0 + _orig_bar_x * ax_pos.width,
+            ax_pos.y0 + _orig_bar_y * ax_pos.height,
+            width * ax_pos.width,
+            height * ax_pos.height,
+        ])
+
+        tb = cax.get_tightbbox(r)
+        if tb is None:
+            return
+        tb_ax = tb.transformed(ax.transAxes.inverted())
+        new_w = tb_ax.width + 2 * box_pad
+        new_h = tb_ax.height + 2 * box_pad
+
+        # Where the background should be (anchored to corner with margin)
+        if "right" in _loc_str:
+            new_bg_x = 1.0 - pad - new_w
+        elif "center" in _loc_str:
+            new_bg_x = 0.5 - new_w / 2
+        else:
+            new_bg_x = pad
+        if "upper" in _loc_str:
+            new_bg_y = 1.0 - pad - new_h
+        else:
+            new_bg_y = pad
+
+        bg_patch.set_bounds(new_bg_x, new_bg_y, new_w, new_h)
+
+        # Shift cax so content is centered in the background
+        content_cx = tb_ax.x0 + tb_ax.width / 2
+        content_cy = tb_ax.y0 + tb_ax.height / 2
+        target_cx = new_bg_x + new_w / 2
+        target_cy = new_bg_y + new_h / 2
+        new_bar_x = _orig_bar_x + (target_cx - content_cx)
+        new_bar_y = _orig_bar_y + (target_cy - content_cy)
+        cax.set_position([
+            ax_pos.x0 + new_bar_x * ax_pos.width,
+            ax_pos.y0 + new_bar_y * ax_pos.height,
+            width * ax_pos.width,
+            height * ax_pos.height,
+        ])
+
+    fig.canvas.mpl_connect("draw_event", _resize_bg)  # type: ignore[union-attr]
 
     return cb
 
@@ -313,6 +396,7 @@ def attach_colorbar(
     colorbar: bool | Literal["inset"],
     *,
     extremes: ExtremesMode = "semi",
+    variant: OverlayVariant | None = None,
 ) -> None:
     """Dispatch to the appropriate colorbar function, or do nothing.
 
@@ -331,10 +415,12 @@ def attach_colorbar(
         overlay colorbar, ``False`` to skip.
     extremes : "semi", "transparent", "darken", or None
         How to style over/under values. ``None`` uses matplotlib defaults.
+    variant : "darker", "lighter", "alt", or None
+        Overlay variant for inset colorbar styling.
     """
     if not colorbar:
         return
     if colorbar == "inset":
-        add_inset_colorbar(ax, mappable, label, extremes=extremes)
+        add_inset_colorbar(ax, mappable, label, extremes=extremes, variant=variant)
     else:
         add_colorbar(fig, ax, mappable, label, extremes=extremes)

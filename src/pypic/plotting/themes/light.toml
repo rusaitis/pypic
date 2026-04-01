@@ -4,14 +4,16 @@ name = "light"
 background = "#ffffff"
 text = [0.100, 0.100, 0.100, 0.90]
 secondary_text = [0.400, 0.400, 0.400, 0.80]
-grid = [0.000, 0.000, 0.000, 0.08]
+grid = [0.000, 0.000, 0.000, 0.1]
 accent = "#d20f39"
-overlay = [0.863, 0.878, 0.910, 0.65]
+overlay = [0.863, 0.878, 0.910, 0.85]
 overlay_text = [0.100, 0.100, 0.100, 0.80]
-overlay_alt = [0.900, 0.910, 0.930, 0.55]
-overlay_alt_text = [0.100, 0.100, 0.100, 0.80]
-overlay_border = [0.000, 0.000, 0.000, 0.10]
+overlay_alt = [0.070, 0.070, 0.070, 0.70]
+overlay_alt_text = [1.0, 1.0, 1.0, 1.0]
+overlay_border = [0.0, 0.0, 0.0, 0.20]
+overlay_alt_border = [1.0, 1.0, 1.0, 0.3]
 track = [0.000, 0.000, 0.000, 0.15]
+track_alt = [0.500, 0.500, 0.500, 0.40]
 
 [colors.cycle]
 values = ["#1e66f5", "#d20f39", "#40a02b", "#fe640b", "#8839ef", "#179299", "#e64553", "#df8e1d"]
@@ -28,9 +30,9 @@ tick = 11.0
 overlay = 11.0
 
 [overlay]
-rounding = 0.6
-padding = 0.4
-margin = 0.03
+rounding = 0.5
+padding = 0.6
+margin = 0.015
 
 [lines]
 width = 1.5
@@ -43,6 +45,13 @@ y_color = "#00b894"
 z_color = "#0984e3"
 arrows = true
 
+[ticks]
+direction = "inout"
+major_length = 4.0
+major_width = 1.0
+minor_length = 2.0
+minor_width = 0.4
+
 [grid]
 major_width = 0.5
 minor_width = 0.3
@@ -51,7 +60,7 @@ style = "solid"
 [colorbar]
 width = "4%"
 outline_width = 0.3
-tick_length = 2.0
+tick_length = 4.0
 pad = 0.05
 
 [progress_bar]

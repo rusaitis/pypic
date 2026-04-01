@@ -114,6 +114,9 @@ Each step produces something testable. No step starts until the previous step's 
 - [ ] **Step 21: `pypic.cli` — core subcommands (typer)**
   `pypic info <path>` (simulation metadata, steps, fields). `pypic fields <path> [--step N]` (canonical + alias field names). `pypic compare <path_a> <path_b> --step N --field FIELD [--metric l2|linf|both]` (numeric comparison, or table for all common fields when `--field` omitted). Entry point: `[project.scripts] pypic = "pypic.cli:app"`. Optional deps: `typer>=0.12`, `rich>=13.0` under `cli` extra.
 
+- [ ] **Step 21b: `sim.available_fields()` — lightweight field probe**
+  `Simulation.available_fields(step) -> list[str]` lists canonical field names in a timestep without loading arrays. New optional `SimulationReader` protocol method `available_fields(path, step) -> list[str]`. HDF5 readers (iPIC3D, Simple) list datasets via `h5py`; BATSRUS parses the header; others fall back to full read + `field_names()`. Prerequisite for `pypic fields` CLI command (Step 21). Also useful for selective `read(fields=...)` discovery.
+
 - [ ] **Step 22: `pypic plot` and `pypic plot-compare` CLI subcommands**
   `pypic plot <path> --step N --field FIELD [--plane xy|xz|yz] [--index I] [--output FILE]` — reads, selects plane via `PlaneSelection`, resolves derived fields via `compute()`, calls `plot_field_slice`. `pypic plot-compare` — three-panel (A | B | difference). Plane shorthand: `--plane xy` → `PlaneSelection(normal="z")`. Diverging colormap for signed fields, sequential for positive-definite.
 
@@ -245,6 +248,7 @@ grow.
 | 19 | regrid | `regrid()`, `align_grids()`, `common_grid()` | — |
 | 20 | diagnostics | `compare_fields()`, `field_comparison_report()` | — |
 | 21 | cli | `info`, `fields`, `compare` subcommands (typer) | — |
+| 21b | readers | `sim.available_fields()` lightweight field probe | — |
 | 22 | cli | `plot`, `plot-compare` subcommands | — |
 | 23 | readers | VLasiator VLSV reader (FSgrid + DCCRG regrid) | — |
 | 24 | io | Zarr export/import for FieldDataset | — |

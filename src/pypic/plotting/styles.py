@@ -89,7 +89,9 @@ class PlotTheme:
     overlay_alt_color: tuple[float, float, float, float] = (0.12, 0.12, 0.12, 0.55)
     overlay_alt_text_color: tuple[float, float, float, float] = (0.88, 0.88, 0.88, 0.8)
     overlay_border_color: tuple[float, float, float, float] = (0.3, 0.3, 0.3, 0.2)
+    overlay_alt_border_color: tuple[float, float, float, float] = (0.5, 0.5, 0.5, 0.3)
     track_color: tuple[float, float, float, float] = (0.3, 0.3, 0.3, 0.3)
+    track_alt_color: tuple[float, float, float, float] = (0.5, 0.5, 0.5, 0.4)
     accent_color: str = "#e8913a"
     color_cycle: tuple[str, ...] = ()
 
@@ -482,10 +484,11 @@ def apply_rounding(ax: Axes) -> None:
 def _overlay_box_style(theme: PlotTheme | None = None) -> str:
     """Build overlay box style string from theme or defaults."""
     if theme is None:
-        theme = get_active_theme()
-    pad = theme.overlay_padding if theme is not None else 0.4
-    rounding = theme.overlay_rounding if theme is not None else 0.6
-    return f"round,pad={pad},rounding_size={rounding}"
+        theme = get_active_theme() or get_theme()
+    rounding = theme.overlay_rounding
+    if rounding <= 0:
+        return "square,pad=0"
+    return f"round,pad=0,rounding_size={rounding}"
 
 
 def style_legend(ax: Axes) -> None:

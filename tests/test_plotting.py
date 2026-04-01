@@ -542,28 +542,24 @@ class TestStatusBadge:
 class TestOverlayVariant:
     """Test the shared variant auto-detection logic once."""
 
-    @pytest.mark.parametrize(
-        ("rc_bg", "variant", "expect_dark_bg"),
-        [
-            ("white", None, False),
-            ("#1e1e1e", None, True),
-            ("white", "darker", True),
-            ("white", "lighter", False),
-        ],
-        ids=["auto-light", "auto-dark", "explicit-darker", "explicit-lighter"],
-    )
-    def test_detect_overlay_defaults(
-        self, rc_bg: str, variant: str | None, expect_dark_bg: bool
-    ) -> None:
-        import matplotlib as mpl
+    def test_default_uses_theme_color(self) -> None:
+        bg, _fg, alpha = _detect_overlay_defaults(None)
+        assert len(bg) == 3
+        assert 0 < alpha <= 1
 
-        with mpl.rc_context({"axes.facecolor": rc_bg, "text.color": "#e0e0e0"}):
-            bg, _fg = _detect_overlay_defaults(variant)
-            luminance = 0.299 * bg[0] + 0.587 * bg[1] + 0.114 * bg[2]
-            if expect_dark_bg:
-                assert luminance < 0.5, f"expected dark bg, got {bg}"
-            else:
-                assert luminance >= 0.5, f"expected light bg, got {bg}"
+    def test_alt_variant_returns_alt_colors(self) -> None:
+        bg, fg, alpha = _detect_overlay_defaults("alt")
+        bg_default, fg_default, alpha_default = _detect_overlay_defaults(None)
+        # Alt should differ from default in at least alpha
+        assert alpha != alpha_default or bg != bg_default
+
+    def test_returns_three_values(self) -> None:
+        result = _detect_overlay_defaults("darker")
+        assert len(result) == 3
+        bg, fg, alpha = result
+        assert len(bg) == 3
+        assert len(fg) == 3
+        assert isinstance(alpha, float)
 
 
 class TestInsetColorbar:

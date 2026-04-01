@@ -163,6 +163,7 @@ def load_theme(path: str | Path) -> PlotTheme:
     overlay = raw.get("overlay", {})
     font = raw.get("font", {})
     grid = raw.get("grid", {})
+    ticks = raw.get("ticks", {})
     cmaps = raw.get("colormaps", {})
     lines = raw.get("lines", {})
     axes = raw.get("axes", {})
@@ -229,10 +230,20 @@ def load_theme(path: str | Path) -> PlotTheme:
         if "overlay_border" in colors
         else defaults.overlay_border_color
     )
+    overlay_alt_border = (
+        _parse_rgba(colors["overlay_alt_border"], 0.3)
+        if "overlay_alt_border" in colors
+        else (0.5, 0.5, 0.5, 0.3)
+    )
     track_color = (
         _parse_rgba(colors["track"], 0.3)
         if "track" in colors
         else defaults.track_color
+    )
+    track_alt_color = (
+        _parse_rgba(colors["track_alt"], 0.4)
+        if "track_alt" in colors
+        else (0.5, 0.5, 0.5, 0.4)
     )
 
     return PlotTheme(
@@ -246,7 +257,9 @@ def load_theme(path: str | Path) -> PlotTheme:
         overlay_alt_color=overlay_alt,
         overlay_alt_text_color=overlay_alt_text,
         overlay_border_color=overlay_border,
+        overlay_alt_border_color=overlay_alt_border,
         track_color=track_color,
+        track_alt_color=track_alt_color,
         accent_color=colors.get("accent", "#e8913a"),
         color_cycle=color_cycle,
         sequential_cmaps=seq_cmaps,
@@ -266,6 +279,11 @@ def load_theme(path: str | Path) -> PlotTheme:
         axis_y_color=axes.get("y_color", "#00b894"),
         axis_z_color=axes.get("z_color", "#0984e3"),
         axis_arrows=axes.get("arrows", True),
+        tick_direction=ticks.get("direction", "in"),
+        tick_major_length=ticks.get("major_length", 4.0),
+        tick_major_width=ticks.get("major_width", 0.6),
+        tick_minor_length=ticks.get("minor_length", 2.0),
+        tick_minor_width=ticks.get("minor_width", 0.4),
         grid_major_width=grid.get("major_width", 0.5),
         grid_minor_width=grid.get("minor_width", 0.3),
         grid_style=grid.get("style", "solid"),
@@ -316,7 +334,11 @@ def save_theme(theme: PlotTheme, path: str | Path) -> None:
         f"overlay_alt_text = {_rgba_to_toml(theme.overlay_alt_text_color)}"
     )
     lines.append(f"overlay_border = {_rgba_to_toml(theme.overlay_border_color)}")
+    lines.append(
+        f"overlay_alt_border = {_rgba_to_toml(theme.overlay_alt_border_color)}"
+    )
     lines.append(f"track = {_rgba_to_toml(theme.track_color)}")
+    lines.append(f"track_alt = {_rgba_to_toml(theme.track_alt_color)}")
 
     if theme.color_cycle:
         lines.append("")
@@ -364,6 +386,14 @@ def save_theme(theme: PlotTheme, path: str | Path) -> None:
     lines.append(f'y_color = "{theme.axis_y_color}"')
     lines.append(f'z_color = "{theme.axis_z_color}"')
     lines.append(f"arrows = {'true' if theme.axis_arrows else 'false'}")
+
+    # [ticks]
+    lines.extend(["", "[ticks]"])
+    lines.append(f'direction = "{theme.tick_direction}"')
+    lines.append(f"major_length = {theme.tick_major_length}")
+    lines.append(f"major_width = {theme.tick_major_width}")
+    lines.append(f"minor_length = {theme.tick_minor_length}")
+    lines.append(f"minor_width = {theme.tick_minor_width}")
 
     # [grid]
     lines.extend(["", "[grid]"])

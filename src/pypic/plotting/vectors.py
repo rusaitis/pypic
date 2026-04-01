@@ -111,6 +111,8 @@ def plot_streamlines(
     theme: ThemeArg = None,
     cmap: str | Colormap | None = None,
     density: float = 1.5,
+    downsample: int = 1,
+    smooth: float | None = None,
     linewidth: float | tuple[float, float] | None = None,
     arrowsize: float = 1.0,
     arrowstyle: str = "-|>",
@@ -162,6 +164,14 @@ def plot_streamlines(
         Override automatic colormap selection.
     density : float
         Streamline density (passed to ``ax.streamplot``).
+    downsample : int
+        Downsample the vector grid by this factor before tracing
+        streamlines. Values > 1 speed up ``streamplot`` significantly
+        on large grids with no visible difference.
+    smooth : float or None
+        Gaussian smoothing sigma in grid cells, applied to the vector
+        components before tracing. Suppresses grid-scale noise (useful
+        for PIC moment data). ``None`` disables smoothing.
     linewidth : float | tuple[float, float] | None
         Fixed linewidth, or ``(min, max)`` tuple to scale by magnitude.
         ``None`` defaults to ``(0.5, 2.0)`` scaled by magnitude.
@@ -248,6 +258,27 @@ def plot_streamlines(
         lw_arg = lw_scaled.T
     else:
         lw_arg = linewidth  # type: ignore[assignment]
+
+    # Smooth vector components to suppress grid-scale noise
+    if smooth is not None and smooth > 0:
+        from scipy.ndimage import gaussian_filter
+
+        nan_mask = np.isnan(u) | np.isnan(v)
+        u = gaussian_filter(np.nan_to_num(u, nan=0.0), sigma=smooth)
+        v = gaussian_filter(np.nan_to_num(v, nan=0.0), sigma=smooth)
+        u[nan_mask] = np.nan
+        v[nan_mask] = np.nan
+
+    # Downsample vector grid for faster streamline tracing
+    s = downsample
+    if s > 1:
+        coords = (coords[0][::s], coords[1][::s])
+        u = u[::s, ::s]
+        v = v[::s, ::s]
+        if use_colormap:
+            color_values = color_values[::s, ::s]  # type: ignore[possibly-undefined]
+        if isinstance(lw_arg, np.ndarray):
+            lw_arg = lw_arg[::s, ::s]
 
     with use_theme(theme):
         fig, ax = get_or_create_axes(theme, ax, figsize)
