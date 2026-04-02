@@ -39,6 +39,7 @@ def plot_field_slice(
     colorbar: bool | Literal["inset"] = True,
     colorbar_label: str | None = None,
     colorbar_variant: OverlayVariant | None = None,
+    colorbar_ticks: list[float] | None = None,
     extremes: ExtremesMode = "semi",
     badge: bool = False,
     save: str | None = None,
@@ -197,7 +198,7 @@ def plot_field_slice(
         cb_label = colorbar_label if colorbar_label is not None else field_label(info, unit_str=unit_str)
         attach_colorbar(
             fig, ax, mesh, cb_label, colorbar,
-            extremes=extremes, variant=colorbar_variant,
+            extremes=extremes, variant=colorbar_variant, ticks=colorbar_ticks,
         )
 
         cu_x, cu_y = resolve_coord_units(coord_units)

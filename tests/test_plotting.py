@@ -668,29 +668,24 @@ class TestLogScale:
         plt.close(fig)
 
 
-class TestPlotFieldWithVectors:
-    def test_streamlines(self, ds_2d: FieldDataset) -> None:
-        from pypic.plotting import plot_field_with_vectors
-
-        fig, ax = plot_field_with_vectors(ds_2d, "|B|", "B")
+class TestComposedFieldAndVectors:
+    def test_slice_then_streamlines(self, ds_2d: FieldDataset) -> None:
+        fig, ax = plot_field_slice(ds_2d, "|B|", title="")
+        plot_streamlines(ds_2d, "B", ax=ax, colorbar=False, legend=False, title="")
         assert isinstance(fig, Figure)
         assert isinstance(ax, Axes)
         plt.close(fig)
 
-    def test_quiver(self, ds_2d: FieldDataset) -> None:
-        from pypic.plotting import plot_field_with_vectors
-
-        fig, _ax = plot_field_with_vectors(
-            ds_2d, "rho_m", "B", vector_style="quiver", stride=2
-        )
+    def test_slice_then_quiver(self, ds_2d: FieldDataset) -> None:
+        fig, ax = plot_field_slice(ds_2d, "rho_m", title="")
+        plot_quiver(ds_2d, "B", ax=ax, stride=2, colorbar=False, legend=False, title="")
         assert isinstance(fig, Figure)
         plt.close(fig)
 
-    def test_custom_axes(self, ds_2d: FieldDataset) -> None:
-        from pypic.plotting import plot_field_with_vectors
-
+    def test_shared_axes(self, ds_2d: FieldDataset) -> None:
         fig_ext, ax_ext = plt.subplots()
-        _, ax = plot_field_with_vectors(ds_2d, "B1", "B", ax=ax_ext)
+        _, ax = plot_field_slice(ds_2d, "B1", ax=ax_ext, title="")
+        plot_streamlines(ds_2d, "B", ax=ax, colorbar=False, legend=False, title="")
         assert ax is ax_ext
         plt.close(fig_ext)
 

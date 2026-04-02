@@ -313,7 +313,12 @@ def plot_streamlines(
 
         if alpha < 1.0:
             stream.lines.set_alpha(alpha)
-            stream.arrows.set_alpha(alpha)
+            # stream.arrows.set_alpha doesn't work — arrows are individual FancyArrowPatch children
+            from matplotlib.patches import FancyArrowPatch
+
+            for child in ax.get_children():
+                if isinstance(child, FancyArrowPatch):
+                    child.set_alpha(alpha)
 
         if use_colormap and colorbar:
             from pypic.plotting._colorbar import attach_colorbar

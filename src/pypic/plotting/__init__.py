@@ -32,7 +32,6 @@ from pypic.plotting.lines import (
     plot_time_series,
 )
 from pypic.plotting.lines3d import plot_field_line, plot_trajectory
-from pypic.plotting.overlays import plot_field_with_vectors
 from pypic.plotting.panels import plot_field_grid
 from pypic.plotting.scatter import plot_scatter
 from pypic.plotting.slices import add_contours, plot_field_slice
@@ -75,7 +74,6 @@ __all__ = [
     "plot_field_grid",
     "plot_field_line",
     "plot_field_slice",
-    "plot_field_with_vectors",
     "plot_kymograph",
     "plot_line",
     "plot_line_comparison",

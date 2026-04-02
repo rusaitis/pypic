@@ -35,7 +35,6 @@ from pypic.plotting import (
     plot_cross_section,
     plot_field_grid,
     plot_field_slice,
-    plot_field_with_vectors,
     plot_kymograph,
     plot_line,
     plot_line_comparison,
@@ -371,16 +370,13 @@ def generate(theme: PlotTheme) -> None:
     _save(fig, "combined_overlays", theme)
 
     # 24. Scalar + vector overlay — streamlines
-    fig, _ = plot_field_with_vectors(
-        ds_a, "|B|", "B", theme=theme, step=100, time=5.0,
-    )
+    fig, ax = plot_field_slice(ds_a, "|B|", theme=theme, step=100, time=5.0)
+    plot_streamlines(ds_a, "B", ax=ax, theme=theme, colorbar=False, legend=False, title="")
     _save(fig, "overlay_streamlines", theme)
 
     # 25. Scalar + vector overlay — quiver
-    fig, _ = plot_field_with_vectors(
-        ds_a, "rho_m", "V", vector_style="quiver", stride=3,
-        theme=theme, step=100,
-    )
+    fig, ax = plot_field_slice(ds_a, "rho_m", theme=theme, step=100)
+    plot_quiver(ds_a, "V", ax=ax, stride=3, theme=theme, colorbar=False, legend=False, title="")
     _save(fig, "overlay_quiver", theme)
 
     # 26. Multi-panel field grid
@@ -513,9 +509,8 @@ def generate(theme: PlotTheme) -> None:
     _save(fig, "badge_variants", theme)
 
     # 39. Overlay with badge
-    fig, _ = plot_field_with_vectors(
-        ds_a, "|B|", "B", theme=theme, step=100, badge=True,
-    )
+    fig, ax = plot_field_slice(ds_a, "|B|", theme=theme, step=100, badge=True)
+    plot_streamlines(ds_a, "B", ax=ax, theme=theme, colorbar=False, legend=False, title="")
     _save(fig, "overlay_badge", theme)
 
     # 40. Kymograph — Bx current sheet drift

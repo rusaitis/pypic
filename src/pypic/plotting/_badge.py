@@ -531,6 +531,7 @@ def add_label(
     loc: BadgeLoc | None = None,
     fontsize: float | None = None,
     fontweight: str = "bold",
+    ha: str = "left",
     bg_color: str | tuple[float, ...] | None = None,
     bg_alpha: float | None = None,
     text_color: str | tuple[float, ...] | None = None,
@@ -582,8 +583,8 @@ def add_label(
     bg_rgba = _resolve_rgba(bg_color, bg_alpha, default_bg, overlay_alpha)
     resolved_text = _resolve_rgba(text_color, text_alpha, default_fg)
 
-    props = {"fontsize": fontsize, "fontweight": fontweight, "color": resolved_text}
-    text_area = TextArea(label, textprops=props)
+    props = {"fontsize": fontsize, "fontweight": fontweight, "color": resolved_text, "ha": ha}
+    text_area = TextArea(label, textprops=props, multilinebaseline=True)
 
     # Extra horizontal padding so the box looks square for single letters
     pad = 0 if is_phrase else fontsize * 0.12

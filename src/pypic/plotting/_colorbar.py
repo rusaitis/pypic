@@ -148,6 +148,7 @@ def add_inset_colorbar(
     extend: str = "both",
     extremes: ExtremesMode = "semi",
     n_ticks: int = 3,
+    ticks: list[float] | None = None,
     fontsize: float | None = None,
     bg_color: str | tuple[float, ...] | None = None,
     bg_alpha: float | None = None,
@@ -237,8 +238,11 @@ def add_inset_colorbar(
     cb = fig.colorbar(  # type: ignore[union-attr]
         mappable, cax=prov_cax, orientation="horizontal", extend=extend
     )
-    cb.locator = MaxNLocator(nbins=n_ticks)
-    cb.update_ticks()
+    if ticks is not None:
+        cb.set_ticks(ticks)
+    else:
+        cb.locator = MaxNLocator(nbins=n_ticks)
+        cb.update_ticks()
     _style_colorbar(cb, tick_color=fg_rgba)
     prov_cax.tick_params(
         labelsize=fontsize, colors=fg_rgba,
@@ -296,8 +300,11 @@ def add_inset_colorbar(
     cb = fig.colorbar(  # type: ignore[union-attr]
         mappable, cax=cax, orientation="horizontal", extend=extend
     )
-    cb.locator = MaxNLocator(nbins=n_ticks)
-    cb.update_ticks()
+    if ticks is not None:
+        cb.set_ticks(ticks)
+    else:
+        cb.locator = MaxNLocator(nbins=n_ticks)
+        cb.update_ticks()
     _style_colorbar(cb, tick_color=fg_rgba)
     cax.tick_params(
         labelsize=fontsize, colors=fg_rgba,
@@ -397,6 +404,7 @@ def attach_colorbar(
     *,
     extremes: ExtremesMode = "semi",
     variant: OverlayVariant | None = None,
+    ticks: list[float] | None = None,
 ) -> None:
     """Dispatch to the appropriate colorbar function, or do nothing.
 
@@ -417,10 +425,16 @@ def attach_colorbar(
         How to style over/under values. ``None`` uses matplotlib defaults.
     variant : "darker", "lighter", "alt", or None
         Overlay variant for inset colorbar styling.
+    ticks : list[float] or None
+        Explicit tick positions. ``None`` uses automatic ticks.
     """
     if not colorbar:
         return
     if colorbar == "inset":
-        add_inset_colorbar(ax, mappable, label, extremes=extremes, variant=variant)
+        add_inset_colorbar(
+            ax, mappable, label, extremes=extremes, variant=variant, ticks=ticks,
+        )
     else:
-        add_colorbar(fig, ax, mappable, label, extremes=extremes)
+        cb = add_colorbar(fig, ax, mappable, label, extremes=extremes)
+        if ticks is not None:
+            cb.set_ticks(ticks)
