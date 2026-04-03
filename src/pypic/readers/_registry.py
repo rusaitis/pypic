@@ -228,6 +228,11 @@ class Simulation:
         return self._config.physics  # type: ignore[return-value]  # MappingProxyType at runtime
 
     @property
+    def shrink_factor(self) -> float:
+        """Domain shrink factor (1.0 when unscaled)."""
+        return self._config.metadata.get("scaling", {}).get("shrink_factor", 1.0)
+
+    @property
     def probe_results(self) -> tuple[ProbeResult, ...] | None:
         """Auto-detection probe results, or ``None`` if reader was explicit."""
         return self._probe_results

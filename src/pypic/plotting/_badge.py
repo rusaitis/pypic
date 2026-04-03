@@ -212,6 +212,28 @@ def _pick_overlay_variant(
     return "alt" if avg_alt > avg_default else None
 
 
+def _format_time_value(time: float, units: str) -> tuple[str, str]:
+    """Format a numeric time value, returning ``(value_str, suffix_str)``.
+
+    When *units* is ``"s"`` and *time* >= 60, produces human-readable
+    durations like ``"2min 30s"`` or ``"1h 5min 12s"`` (suffix is empty
+    since units are embedded). Otherwise falls back to numeric formatting.
+    """
+    if units == "s" and abs(time) >= 60:
+        sign = "-" if time < 0 else ""
+        t = abs(time)
+        h = int(t // 3600)
+        m = int((t % 3600) // 60)
+        s = int(t % 60)
+        if h > 0:
+            return f"{sign}{h}h {m}min {s}s", ""
+        return f"{sign}{m}min {s}s", ""
+    suffix = f" {units}" if units else ""
+    if abs(time) >= 1e4 or (0 < abs(time) < 0.01):
+        return f"{time:.2e}", suffix
+    return f"{time:.2f}", suffix
+
+
 def _format_status_text(
     *,
     text: str | None,
@@ -252,11 +274,9 @@ def _format_status_text(
     if time is not None:
         if isinstance(time, str):
             t_str = time
-        elif abs(time) >= 1e4 or (0 < abs(time) < 0.01):
-            t_str = f"{time:.2e}"
+            suffix = f" {time_units}" if time_units else ""
         else:
-            t_str = f"{time:.2f}"
-        suffix = f" {time_units}" if time_units else ""
+            t_str, suffix = _format_time_value(time, time_units)
         # When time-only, label replaces the "t" prefix; with step, time keeps "t"
         time_label = "t" if step is not None else ("t" if label is None else label)
         if time_label:
