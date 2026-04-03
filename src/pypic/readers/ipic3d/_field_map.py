@@ -86,9 +86,6 @@ def per_species_canonical(component: str, species_index: int) -> str:
 
 
 _H5HUT_FIELD_MAP: dict[str, str] = {
-    "Vfx": "V1",
-    "Vfy": "V2",
-    "Vfz": "V3",
     "divB": "div_B",
 }
 

@@ -204,7 +204,7 @@ def parse_inp(path: Path) -> IPic3DConfig:
     if len(qom) < ns:
         errors.append(ValueError(f"qom has {len(qom)} entries, expected ns={ns}"))
     elif len(qom) > ns:
-        log.warning("qom has %d entries but ns=%d; truncating", len(qom), ns)
+        log.debug("qom has %d entries but ns=%d; truncating", len(qom), ns)
         qom = qom[:ns]
     _per_species_keys = (
         "uth", "vth", "wth", "u0", "v0", "w0",
@@ -218,7 +218,7 @@ def parse_inp(path: Path) -> IPic3DConfig:
                     ValueError(f"{key} has {n} entries, expected ns={ns}")
                 )
             elif n > ns:
-                log.warning(
+                log.debug(
                     "%s has %d entries but ns=%d; truncating", key, n, ns
                 )
                 kv[key] = " ".join(kv[key].split()[:ns])

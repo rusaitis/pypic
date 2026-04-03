@@ -93,6 +93,9 @@ _COMPUTE_ALIASES: dict[str, str] = {
     "S_x": "S1",
     "S_y": "S2",
     "S_z": "S3",
+    # Per-species velocity aliases
+    "Ve1": "V1_s0", "Ve2": "V2_s0", "Ve3": "V3_s0",
+    "Vi1": "V1_s1", "Vi2": "V2_s1", "Vi3": "V3_s1",
     # Energy flux aliases
     "EFe": "EF_s0",
     "EFi": "EF_s1",

@@ -6,9 +6,9 @@ text = [0.835, 0.808, 0.851, 0.90]
 secondary_text = [0.604, 0.569, 0.612, 0.80]
 grid = [0.835, 0.808, 0.851, 0.08]
 accent = "#00e8c6"
-overlay = [0.106, 0.114, 0.133, 0.65]
+overlay = [0.106, 0.114, 0.133, 0.8]
 overlay_text = [0.835, 0.808, 0.851, 0.80]
-overlay_alt = [0.150, 0.160, 0.180, 0.55]
+overlay_alt = [0.150, 0.160, 0.180, 0.8]
 overlay_alt_text = [0.835, 0.808, 0.851, 0.80]
 overlay_border = [0.835, 0.808, 0.851, 0.10]
 track = [0.835, 0.808, 0.851, 0.15]
@@ -22,13 +22,13 @@ diverging = "RdBu_r"
 
 [font]
 family = ["DejaVu Serif", "Computer Modern", "Times", "serif"]
-title = 12.0
-label = 11.0
-tick = 10.0
-overlay = 9.0
+title = 13.0
+label = 12.0
+tick = 11.0
+overlay = 11.0
 
 [overlay]
-rounding = 0.6
+rounding = 0.5
 padding = 0.4
 margin = 0.03
 

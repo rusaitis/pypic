@@ -45,8 +45,8 @@ _COMMON_RC: dict[str, Any] = {
     "image.origin": "lower",
     "image.interpolation": "none",
     "axes.grid": False,
-    "axes.spines.left": True,
-    "axes.spines.bottom": True,
+    "axes.spines.left": False,
+    "axes.spines.bottom": False,
     "axes.spines.top": False,
     "axes.spines.right": False,
     "axes3d.mouserotationstyle": "azel",
@@ -393,6 +393,32 @@ def apply_theme_to_figure(fig: Figure, theme: PlotTheme) -> None:
         if legend is not None:
             for text in legend.get_texts():
                 text.set_color(legend_label_c)
+
+
+def bake_theme(ax: Axes, theme: ThemeArg = None) -> None:
+    """Bake theme font sizes and tick geometry onto *ax*.
+
+    Ensures theme settings persist after the ``use_theme()`` context
+    manager exits (which restores rcParams to their previous values).
+    """
+    resolved = _resolve_theme_arg(theme)
+    ax.tick_params(
+        labelsize=resolved.font_tick,
+        direction=resolved.tick_direction,
+        which="major",
+        length=resolved.tick_major_length,
+        width=resolved.tick_major_width,
+    )
+    ax.tick_params(
+        which="minor",
+        direction=resolved.tick_direction,
+        length=resolved.tick_minor_length,
+        width=resolved.tick_minor_width,
+    )
+    ax.xaxis.label.set_fontsize(resolved.font_label)
+    ax.yaxis.label.set_fontsize(resolved.font_label)
+    if ax.get_title():
+        ax.title.set_fontsize(resolved.font_title)
 
 
 def apply_grid(ax: Axes, theme: PlotTheme, *, minor: bool = False) -> None:

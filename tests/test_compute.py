@@ -23,13 +23,18 @@ class TestRegistryIntegrity:
 
     def test_all_aliases_resolve(self):
         # Aliases may point to raw field names (Te, Pi, etc.) used as
-        # direct passthrough, not only to _REGISTRY entries.
+        # direct passthrough, or to dynamic species template recipes.
+        from pypic.compute import _try_species_recipe
+
         raw_field_targets = {
             "Te", "Ti", "Pe", "Pi",
             "EF1", "EF2", "EF3", "EF_s0", "EF_s1",
         }
         for alias, target in _COMPUTE_ALIASES.items():
-            assert target in _REGISTRY or target in raw_field_targets, (
+            in_registry = target in _REGISTRY
+            in_raw = target in raw_field_targets
+            in_species = _try_species_recipe(target) is not None
+            assert in_registry or in_raw or in_species, (
                 f"Alias {alias!r} -> {target!r} not in registry or known fields"
             )
 

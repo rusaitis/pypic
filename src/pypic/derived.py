@@ -980,6 +980,39 @@ def magnetosonic_mach(
     return _safe_divide(v, v_ms)
 
 
+def bulk_velocity(
+    j: FloatArray,
+    rho_c: FloatArray,
+) -> FloatArray:
+    r"""Compute bulk velocity from current and charge density.
+
+    $$V_s = \frac{J_s}{\rho_{c,s}}$$
+
+    Uses charge density directly (consistent with current density moments)
+    rather than ``n \cdot q`` which may have different normalization.
+
+    Parameters
+    ----------
+    j : NDArray
+        Current density component (one of $J_1, J_2, J_3$) for a species.
+    rho_c : NDArray
+        Charge density of the species.
+
+    Returns
+    -------
+    NDArray
+        Bulk velocity component in normalized units.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> bulk_velocity(np.array([0.5]), np.array([2.0]))
+    array([0.25])
+    """
+    with np.errstate(invalid="ignore", divide="ignore"):
+        return j / rho_c  # type: ignore[no-any-return]
+
+
 def total_pressure(p_e: FloatArray, p_i: FloatArray) -> FloatArray:
     r"""Compute total scalar pressure from electron and ion partial pressures.
 
@@ -1664,6 +1697,7 @@ __all__ = [
     "agyrotropy",
     "alfven_mach",
     "alfven_speed",
+    "bulk_velocity",
     "current_density_magnitude",
     "debye_length",
     "electric_energy_density",

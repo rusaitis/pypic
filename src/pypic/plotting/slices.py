@@ -206,26 +206,11 @@ def plot_field_slice(
         ax.set_ylabel(axis_label(surviving_axes[1], unit_str=cu_y))
         ax.set_aspect("equal")
 
-        # Bake theme font sizes onto the axes so they persist after the
-        # use_theme() context exits (rcParams are restored on exit).
-        resolved = _resolve_theme_arg(theme)
-        ax.tick_params(
-            labelsize=resolved.font_tick,
-            direction=resolved.tick_direction,
-            which="major",
-            length=resolved.tick_major_length,
-            width=resolved.tick_major_width,
-        )
-        ax.tick_params(
-            which="minor",
-            direction=resolved.tick_direction,
-            length=resolved.tick_minor_length,
-            width=resolved.tick_minor_width,
-        )
-        ax.xaxis.label.set_fontsize(resolved.font_label)
-        ax.yaxis.label.set_fontsize(resolved.font_label)
-        if ax.get_title():
-            ax.title.set_fontsize(resolved.font_title)
+        # Bake theme font sizes and tick geometry onto the axes so they
+        # persist after the use_theme() context exits.
+        from pypic.plotting.styles import bake_theme
+
+        bake_theme(ax, theme)
 
         apply_grid(ax, theme)
 
@@ -239,9 +224,9 @@ def plot_field_slice(
 
             add_badge(ax, step=step, time=time)
 
+        apply_rounding(ax)
         if owned:
             fig.tight_layout()
-            apply_rounding(ax)
 
     from pypic.plotting._resolve import maybe_save
 

@@ -1,69 +1,72 @@
 name = "light"
 
 [colors]
-background = "#ffffff"
-text = [0.100, 0.100, 0.100, 0.90]
-secondary_text = [0.400, 0.400, 0.400, 0.80]
-grid = [0.000, 0.000, 0.000, 0.1]
-accent = "#d20f39"
-overlay = [0.863, 0.878, 0.910, 0.85]
-overlay_text = [0.100, 0.100, 0.100, 0.80]
-overlay_alt = [0.070, 0.070, 0.070, 0.70]
-overlay_alt_text = [1.0, 1.0, 1.0, 1.0]
-overlay_border = [0.0, 0.0, 0.0, 0.20]
-overlay_alt_border = [1.0, 1.0, 1.0, 0.3]
-track = [0.000, 0.000, 0.000, 0.15]
-track_alt = [0.500, 0.500, 0.500, 0.40]
+background = "#f8f9fa"
+text = [0.200, 0.200, 0.220, 0.85]
+secondary_text = [0.450, 0.450, 0.470, 0.70]
+grid = [0.000, 0.000, 0.000, 0.05]
+accent = "#6366f1"
+overlay = [0.940, 0.945, 0.960, 0.80]
+overlay_text = [0.200, 0.200, 0.220, 0.75]
+overlay_alt = [0.120, 0.120, 0.140, 0.75]
+overlay_alt_text = [1.0, 1.0, 1.0, 0.90]
+overlay_border = [0.0, 0.0, 0.0, 0.08]
+overlay_alt_border = [1.0, 1.0, 1.0, 0.15]
+track = [0.000, 0.000, 0.000, 0.10]
+track_alt = [0.500, 0.500, 0.500, 0.30]
 
 [colors.cycle]
-values = ["#1e66f5", "#d20f39", "#40a02b", "#fe640b", "#8839ef", "#179299", "#e64553", "#df8e1d"]
+values = ["#6366f1", "#ec4899", "#14b8a6", "#f59e0b", "#8b5cf6", "#06b6d4", "#ef4444", "#84cc16"]
 
 [colormaps]
-sequential = "inferno"
+sequential = "magma"
 diverging = "RdBu_r"
 
 [font]
-family = ["DejaVu Serif", "Computer Modern", "Times", "serif"]
-title = 14.0
+family = ["Helvetica Neue", "Helvetica", "DejaVu Sans", "sans-serif"]
+title = 13.0
 label = 11.0
-tick = 11.0
-overlay = 11.0
+tick = 10
+overlay = 10
 
 [overlay]
-rounding = 0.5
-padding = 0.6
-margin = 0.015
+rounding = 0.4
+padding = 0.7
+margin = 0.02
 
 [lines]
-width = 1.5
-arrow_size = 4.0
+width = 1.2
+arrow_size = 3.5
 arrow_style = "triangle"
 
 [axes]
-x_color = "#d63031"
-y_color = "#00b894"
-z_color = "#0984e3"
+x_color = "#ef4444"
+y_color = "#14b8a6"
+z_color = "#6366f1"
 arrows = true
 
 [ticks]
 direction = "inout"
 major_length = 4.0
 major_width = 1.0
-minor_length = 2.0
-minor_width = 0.4
+minor_length = 1.5
+minor_width = 0.3
 
 [grid]
-major_width = 0.5
-minor_width = 0.3
+major_width = 0.3
+minor_width = 0.2
 style = "solid"
 
 [colorbar]
 width = "4%"
-outline_width = 0.3
-tick_length = 4.0
+outline_width = 0.2
+tick_length = 5.0
 pad = 0.05
 
 [progress_bar]
 width = 80.0
-height = 8.0
+height = 6.0
 rounding = 2.0
+
+[plot]
+rounding = 0.04

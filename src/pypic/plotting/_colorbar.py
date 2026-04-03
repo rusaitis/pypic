@@ -14,6 +14,16 @@ if TYPE_CHECKING:
 ExtremesMode = Literal["darken", "semi", "transparent"] | None
 
 
+def _compact_formatter(value: float, _pos: object) -> str:
+    """Format tick values compactly, keeping scientific notation on one line."""
+    if value == 0:
+        return "0"
+    abs_val = abs(value)
+    if 0.01 <= abs_val < 10000:
+        return f"{value:g}"
+    return f"{value:.1e}"
+
+
 def _apply_extremes(
     mappable: object,
     *,
@@ -200,7 +210,7 @@ def add_inset_colorbar(
     Colorbar
     """
     from matplotlib.patches import FancyBboxPatch
-    from matplotlib.ticker import MaxNLocator
+    from matplotlib.ticker import FuncFormatter, MaxNLocator
 
     from pypic.plotting._badge import (
         _claim_corner,
@@ -244,6 +254,8 @@ def add_inset_colorbar(
         cb.locator = MaxNLocator(nbins=n_ticks)
         cb.update_ticks()
     _style_colorbar(cb, tick_color=fg_rgba)
+    prov_cax.xaxis.set_major_formatter(FuncFormatter(_compact_formatter))
+    prov_cax.xaxis.get_offset_text().set_visible(False)
     prov_cax.tick_params(
         labelsize=fontsize, colors=fg_rgba,
         top=True, bottom=False, labeltop=False, labelbottom=True,
@@ -306,6 +318,8 @@ def add_inset_colorbar(
         cb.locator = MaxNLocator(nbins=n_ticks)
         cb.update_ticks()
     _style_colorbar(cb, tick_color=fg_rgba)
+    cax.xaxis.set_major_formatter(FuncFormatter(_compact_formatter))
+    cax.xaxis.get_offset_text().set_visible(False)
     cax.tick_params(
         labelsize=fontsize, colors=fg_rgba,
         top=True, bottom=False, labeltop=False, labelbottom=True,

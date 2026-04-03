@@ -616,9 +616,9 @@ class TestSelectiveReadH5hut:
         ds = reader.read_timestep(
             H5HUT_DIR,
             0,
-            fields={"B1", "rho_c_s0", "V1"},
+            fields={"B1", "rho_c_s0", "J1_s0"},
         )
-        assert sorted(ds.field_names()) == ["B1", "V1", "rho_c_s0"]
+        assert sorted(ds.field_names()) == ["B1", "J1_s0", "rho_c_s0"]
 
 
 class TestIPic3DAvailableAuxiliary:

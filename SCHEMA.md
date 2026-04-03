@@ -332,6 +332,7 @@ are accepted as aliases for the canonical `_s0`/`_s1` forms:
 | `Pe`, `Pi` | `P_s0`, `P_s1` | Scalar pressure (or Tr(tensor)/3) |
 | `Te`, `Ti` | `T_s0`, `T_s1` | Temperature |
 | `Ve1`..`Ve3` | `V1_s0`..`V3_s0` | Electron bulk velocity |
+| `Vi1`..`Vi3` | `V1_s1`..`V3_s1` | Ion bulk velocity |
 | `EFe`, `EFi` | `EF_s0`, `EF_s1` | Energy flux (vector group) |
 | `s_e`, `s_i` | — | Per-species entropy |
 | `beta_e`, `beta_i` | — | Per-species plasma beta |

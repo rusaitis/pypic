@@ -349,6 +349,15 @@ _SPECIES_TEMPLATES: dict[str, _SpeciesTemplate] = {
         ("P11_s{N}", "P22_s{N}", "P33_s{N}"),
         _SpeciesArgs.NONE,
     ),
+    "V1": _SpeciesTemplate(
+        derived.bulk_velocity, ("J1_s{N}", "rho_c_s{N}"), _SpeciesArgs.NONE
+    ),
+    "V2": _SpeciesTemplate(
+        derived.bulk_velocity, ("J2_s{N}", "rho_c_s{N}"), _SpeciesArgs.NONE
+    ),
+    "V3": _SpeciesTemplate(
+        derived.bulk_velocity, ("J3_s{N}", "rho_c_s{N}"), _SpeciesArgs.NONE
+    ),
 }
 
 _SPECIES_SUFFIX_RE = re.compile(r"^(.+)_s(\d+)$")
@@ -536,9 +545,13 @@ def compute_field(name: str, dataset: FieldDataset, _depth: int = 0) -> FloatArr
         msg = f"Dependency chain too deep (>{_MAX_DEPTH}) while computing {name!r}"
         raise RecursionError(msg)
 
+    # Check original name first — raw fields take priority over aliases
+    if dataset.has_field(name):
+        return dataset[name]
+
     canonical = _resolve_name(name)
 
-    # Direct field lookup (canonical or alias)
+    # Direct field lookup after alias resolution
     if dataset.has_field(canonical):
         return dataset[canonical]
 

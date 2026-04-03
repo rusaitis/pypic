@@ -177,9 +177,17 @@ class IPic3DH5hutReader:
                         continue
                     field_data[canon_name] = _read_field(block, ipic_name)
 
-            # Per-species charge density and currents
-            # Stored as rho/(4pi) and J/(4pi) -- Gaussian convention
+            # Per-species densities and currents
+            # Charge density and current stored as rho/(4pi) and J/(4pi) — Gaussian convention
             for s in range(nspec):
+                # Number density: N_{s} → n_s{s}
+                n_key = f"N_{s}"
+                if n_key in available:
+                    consumed.add(n_key)
+                    canon = f"n_s{s}"
+                    if expanded is None or canon in expanded:
+                        field_data[canon] = _read_field(block, n_key)
+
                 # Charge density: rho_{s} → rho_c_s{s}
                 rho_key = f"rho_{s}"
                 if rho_key in available:

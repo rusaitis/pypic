@@ -110,9 +110,13 @@ def plot_streamlines(
     alpha: float = 1.0,
     theme: ThemeArg = None,
     cmap: str | Colormap | None = None,
+    vmin: float | None = None,
+    vmax: float | None = None,
     density: float = 1.5,
     downsample: int = 1,
     smooth: float | None = None,
+    magnitude_min: float | None = None,
+    magnitude_max: float | None = None,
     linewidth: float | tuple[float, float] | None = None,
     arrowsize: float = 1.0,
     arrowstyle: str = "-|>",
@@ -214,6 +218,7 @@ def plot_streamlines(
         _resolve_theme_arg,
         apply_grid,
         apply_rounding,
+        bake_theme,
         use_theme,
     )
 
@@ -229,8 +234,14 @@ def plot_streamlines(
     use_colormap = color is None
 
     if use_colormap:
+        # Convert magnitude to display units when no explicit color_field
+        display_magnitude = magnitude
+        if units is not None and color_field is None:
+            u_display = resolve_field_values(data, comp_u, units)
+            v_display = resolve_field_values(data, comp_v, units)
+            display_magnitude = np.sqrt(u_display**2 + v_display**2)
         color_values, cmap_name, info = _resolve_vector_colors(
-            data, field, color_field, magnitude, units, theme, cmap
+            data, field, color_field, display_magnitude, units, theme, cmap
         )
 
     coords = data.grid.coordinate_arrays()
@@ -280,10 +291,39 @@ def plot_streamlines(
         if isinstance(lw_arg, np.ndarray):
             lw_arg = lw_arg[::s, ::s]
 
+    # Zero out vectors outside the magnitude range so streamplot skips them.
+    # When units is provided, thresholds are in display units — convert to
+    # code units via the same factor used by in_units().
+    if magnitude_min is not None or magnitude_max is not None:
+        if units is not None:
+            code = resolve_field_values(data, comp_u, None)
+            display = resolve_field_values(data, comp_u, units)
+            nonzero = np.abs(code) > 0
+            if np.any(nonzero):
+                scale = float(np.nanmedian(display[nonzero] / code[nonzero]))
+            else:
+                scale = 1.0
+            if magnitude_min is not None:
+                magnitude_min = magnitude_min / scale
+            if magnitude_max is not None:
+                magnitude_max = magnitude_max / scale
+
+        mag = np.sqrt(u**2 + v**2)
+        mask = np.ones_like(mag, dtype=bool)
+        if magnitude_min is not None:
+            mask &= mag >= magnitude_min
+        if magnitude_max is not None:
+            mask &= mag <= magnitude_max
+        u = np.where(mask, u, 0.0)
+        v = np.where(mask, v, 0.0)
+
     with use_theme(theme):
         fig, ax = get_or_create_axes(theme, ax, figsize)
 
         if use_colormap:
+            from matplotlib.colors import Normalize
+
+            norm = Normalize(vmin=vmin, vmax=vmax) if vmin is not None or vmax is not None else None
             stream = ax.streamplot(
                 coords[0],
                 coords[1],
@@ -291,6 +331,7 @@ def plot_streamlines(
                 v.T,
                 color=color_values.T,
                 cmap=cmap if not isinstance(cmap, str) else cmap_name,
+                norm=norm,
                 density=density,
                 linewidth=lw_arg,
                 arrowsize=arrowsize,
@@ -351,6 +392,7 @@ def plot_streamlines(
         ax.set_ylabel(axis_label(surviving_axes[1], unit_str=cu_y))
         ax.set_aspect("equal")
         apply_grid(ax, theme)
+        bake_theme(ax, theme)
 
         if title is not None:
             ax.set_title(title)
@@ -363,9 +405,9 @@ def plot_streamlines(
 
             add_badge(ax, step=step, time=time)
 
+        apply_rounding(ax)
         if owned:
             fig.tight_layout()
-            apply_rounding(ax)
 
     from pypic.plotting._resolve import maybe_save
 
@@ -471,6 +513,7 @@ def plot_quiver(
         _resolve_theme_arg,
         apply_grid,
         apply_rounding,
+        bake_theme,
         use_theme,
     )
 
@@ -559,6 +602,7 @@ def plot_quiver(
         ax.set_ylabel(axis_label(surviving_axes[1], unit_str=cu_y))
         ax.set_aspect("equal")
         apply_grid(ax, theme)
+        bake_theme(ax, theme)
 
         if title is not None:
             ax.set_title(title)
@@ -571,9 +615,9 @@ def plot_quiver(
 
             add_badge(ax, step=step, time=time)
 
+        apply_rounding(ax)
         if owned:
             fig.tight_layout()
-            apply_rounding(ax)
 
     from pypic.plotting._resolve import maybe_save
 
