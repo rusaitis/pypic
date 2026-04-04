@@ -337,6 +337,40 @@ def thermal_energy_density(
     return pressure / (gamma - 1.0)
 
 
+def thermal_energy_density_trace(
+    p11: FloatArray,
+    p22: FloatArray,
+    p33: FloatArray,
+) -> FloatArray:
+    r"""Compute thermal energy density from the pressure tensor trace.
+
+    $$e_{th} = \frac{1}{2}\mathrm{Tr}(\mathbf{P}) = \frac{1}{2}(P_{11} + P_{22} + P_{33})$$
+
+    Unlike ``thermal_energy_density`` (which uses $P/(\gamma-1)$), this
+    form is exact for any dimensionality or adiabatic index — it is the
+    kinetic definition of thermal energy from the second velocity moment.
+    Equivalent to ``thermal_energy_density`` when $\gamma = 5/3$ (3D).
+
+    Parameters
+    ----------
+    p11, p22, p33 : NDArray
+        Diagonal pressure tensor components.
+
+    Returns
+    -------
+    NDArray
+        Thermal energy density in normalized units.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> thermal_energy_density_trace(
+    ...     np.array([2.0]), np.array([1.0]), np.array([1.0]))
+    array([2.])
+    """
+    return 0.5 * (p11 + p22 + p33)  # type: ignore[no-any-return]
+
+
 def poynting_flux(
     e1: FloatArray,
     e2: FloatArray,
@@ -1011,6 +1045,191 @@ def bulk_velocity(
     """
     with np.errstate(invalid="ignore", divide="ignore"):
         return j / rho_c  # type: ignore[no-any-return]
+
+
+def kinetic_energy_flux_component(
+    v_comp: FloatArray,
+    v1: FloatArray,
+    v2: FloatArray,
+    v3: FloatArray,
+    rho_c: FloatArray,
+    charge: float,
+    mass: float,
+) -> FloatArray:
+    r"""Compute one component of the kinetic energy flux.
+
+    $$KEF_i = \frac{1}{2} n\, m\, |\mathbf{V}|^2\, V_i$$
+
+    where $n = |\rho_c / q|$.
+
+    Parameters
+    ----------
+    v_comp : NDArray
+        Velocity component ($V_1$, $V_2$, or $V_3$).
+    v1, v2, v3 : NDArray
+        All three velocity components.
+    rho_c : NDArray
+        Charge density of the species.
+    charge : float
+        Species charge in normalized units.
+    mass : float
+        Species mass in normalized units.
+
+    Returns
+    -------
+    NDArray
+        Kinetic energy flux component in normalized units.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> v = np.array([2.0])
+    >>> z = np.array([0.0])
+    >>> kinetic_energy_flux_component(v, v, z, z, np.array([1.0]), 1.0, 1.0)
+    array([4.])
+    """
+    n = np.abs(rho_c) / abs(charge)
+    v_sq = v1**2 + v2**2 + v3**2
+    return 0.5 * n * mass * v_sq * v_comp  # type: ignore[no-any-return]
+
+
+def heat_flux_component(
+    ef_comp: FloatArray,
+    kef_comp: FloatArray,
+) -> FloatArray:
+    r"""Compute one component of the heat flux (thermal energy flux residual).
+
+    $$HF_i = EF_i - KEF_i$$
+
+    The residual captures the enthalpy flux $(5/2) P V_i$ and the heat
+    flux vector $q_i$ from non-Maxwellian features of the distribution.
+
+    Parameters
+    ----------
+    ef_comp : NDArray
+        Total energy flux component (from particle moments).
+    kef_comp : NDArray
+        Kinetic energy flux component (bulk flow contribution).
+
+    Returns
+    -------
+    NDArray
+        Heat flux component in normalized units.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> heat_flux_component(np.array([10.0]), np.array([4.0]))
+    array([6.])
+    """
+    return ef_comp - kef_comp  # type: ignore[no-any-return]
+
+
+def enthalpy_flux_component(
+    pressure: FloatArray,
+    v_comp: FloatArray,
+    gamma: float = 5.0 / 3.0,
+) -> FloatArray:
+    r"""Compute one component of the enthalpy flux.
+
+    $$EHF_i = \frac{\gamma}{\gamma - 1}\, P\, V_i$$
+
+    This is the adiabatic (fluid) enthalpy flux. It captures the
+    $P\,dV$ work and internal energy transport but not the heat flux
+    vector $\mathbf{q}$ from non-Maxwellian features.
+
+    Works for both MHD (total $P$, fluid $V$) and PIC (per-species
+    $P_s$, $V_s$).
+
+    Parameters
+    ----------
+    pressure : NDArray
+        Scalar pressure (total or per-species).
+    v_comp : NDArray
+        Velocity component ($V_1$, $V_2$, or $V_3$).
+    gamma : float
+        Adiabatic index (default 5/3).
+
+    Returns
+    -------
+    NDArray
+        Enthalpy flux component in normalized units.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> enthalpy_flux_component(np.array([1.0]), np.array([2.0]), 5/3)
+    array([5.])
+    """
+    return (gamma / (gamma - 1.0)) * pressure * v_comp  # type: ignore[no-any-return]
+
+
+def conductive_heat_flux_component(
+    hf_comp: FloatArray,
+    ehf_comp: FloatArray,
+) -> FloatArray:
+    r"""Compute one component of the conductive heat flux vector.
+
+    $$q_i = HF_i - EHF_i = (EF_i - KEF_i) - \frac{\gamma}{\gamma-1} P V_i$$
+
+    The residual captures non-adiabatic energy transport: heat conduction
+    and non-Maxwellian contributions from the full distribution function.
+    Vanishes for a drifting Maxwellian in ideal MHD.
+
+    Requires the total energy flux moment (EF) from the simulation
+    output — available from PIC codes and multi-moment MHD.
+
+    Parameters
+    ----------
+    hf_comp : NDArray
+        Total thermal flux component ($HF_i = EF_i - KEF_i$).
+    ehf_comp : NDArray
+        Enthalpy flux component ($EHF_i$).
+
+    Returns
+    -------
+    NDArray
+        Conductive heat flux component in normalized units.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> conductive_heat_flux_component(np.array([6.0]), np.array([5.0]))
+    array([1.])
+    """
+    return hf_comp - ehf_comp  # type: ignore[no-any-return]
+
+
+def species_mass_density(
+    rho_c: FloatArray,
+    charge: float,
+    mass: float,
+) -> FloatArray:
+    r"""Compute per-species mass density from charge density.
+
+    $$\rho_{m,s} = \frac{|\rho_{c,s}|}{|q_s|}\, m_s = n_s\, m_s$$
+
+    Parameters
+    ----------
+    rho_c : NDArray
+        Charge density of the species.
+    charge : float
+        Species charge in normalized units.
+    mass : float
+        Species mass in normalized units.
+
+    Returns
+    -------
+    NDArray
+        Mass density in normalized units.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> species_mass_density(np.array([-2.0]), -1.0, 0.5)
+    array([1.])
+    """
+    return np.abs(rho_c) * mass / abs(charge)  # type: ignore[no-any-return]
 
 
 def total_pressure(p_e: FloatArray, p_i: FloatArray) -> FloatArray:

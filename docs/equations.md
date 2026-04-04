@@ -61,6 +61,35 @@ SI conversion boundaries. Temperatures are in energy units throughout
 | `e_E` | Electric energy density | $E^2 / 2$ | $\epsilon_0 E^2 / 2$ |
 | `e_k` | Kinetic energy density | $\frac{1}{2}\rho_m V^2$ | -- |
 | `e_th` | Thermal energy density | $P / (\gamma - 1)$ | -- |
+| `e_th_trace` | Thermal energy density (tensor) | $\frac{1}{2}\mathrm{Tr}(\mathbf{P}) = \frac{1}{2}(P_{11}+P_{22}+P_{33})$ | -- |
+
+### Energy flux decomposition
+
+The total energy flux per species (third-order velocity moment) decomposes
+into kinetic, enthalpy, and conductive heat flux contributions:
+
+$$\mathbf{EF}_s = \underbrace{\tfrac{1}{2} n_s m_s |\mathbf{V}_s|^2 \mathbf{V}_s}_{\mathbf{KEF}_s} + \underbrace{\tfrac{\gamma}{\gamma-1} P_s \mathbf{V}_s}_{\mathbf{EHF}_s} + \underbrace{\mathbf{q}_s}_{\text{heat flux}}$$
+
+| Name | Description | Normalized | Available when |
+|------|-------------|------------|----------------|
+| `EF` | Total energy flux[^ef] | $\tfrac{1}{2} m \int f\, \mathbf{v}\, v^2\, d^3v$ | EF in output (PIC, multi-moment MHD) |
+| `KEF` | Kinetic energy flux | $\tfrac{1}{2} n\, m\, |\mathbf{V}|^2\, \mathbf{V}$ | Any code with $n$, $m$, $\mathbf{V}$ |
+| `HF` | Total thermal flux | $\mathbf{EF} - \mathbf{KEF}$ | EF in output |
+| `EHF` | Enthalpy flux (adiabatic) | $\tfrac{\gamma}{\gamma-1} P\, \mathbf{V}$ | Any code with $P$, $\mathbf{V}$ |
+| `q` | Conductive heat flux | $\mathbf{HF} - \mathbf{EHF}$ | EF in output |
+
+[^ef]: iPIC3D outputs EF per species as a deposited moment. In ideal MHD
+    ($\mathbf{q} = 0$), the total energy flux equals $\mathbf{KEF} + \mathbf{EHF}$.
+    The conductive heat flux $\mathbf{q}$ captures non-Maxwellian and non-adiabatic
+    transport — it is the physically interesting residual in reconnection exhausts,
+    shocks, and turbulence. All quantities exist as both total (MHD: `EHF1`,
+    `EHF2`, `EHF3`) and per-species (PIC: `KEF1_s0`, `HFi`, `qi`).
+    **Precision notes:** `HF = EF - KEF` is exact (no closure assumption).
+    `EHF` uses the scalar (isotropic) pressure; for anisotropic plasmas the
+    exact enthalpy flux involves the full pressure tensor
+    ($EHF_i = P_{ij} V_j + \tfrac{1}{2} P_{jj} V_i$). The isotropic form
+    is a useful reference — discrepancies between `HF` and `EHF` reflect
+    *both* anisotropy and heat conduction effects.
 
 
 ## 4. Pressure Tensor

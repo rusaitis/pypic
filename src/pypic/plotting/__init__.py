@@ -8,6 +8,7 @@ This module can be imported for type checking without matplotlib installed.
 Actual plotting functions call ``ensure_matplotlib()`` at entry.
 """
 
+from pypic.plotting.annotations import SunDirection, add_circle, add_planet
 from pypic.plotting._badge import (
     BadgeLoc,
     LegendEntry,
@@ -53,6 +54,9 @@ from pypic.plotting.vectors import plot_quiver, plot_streamlines
 __all__ = [
     "BadgeLoc",
     "ExtremesMode",
+    "SunDirection",
+    "add_circle",
+    "add_planet",
     "LegendEntry",
     "PlotTheme",
     "ThemeArg",

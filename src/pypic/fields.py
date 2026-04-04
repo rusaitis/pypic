@@ -300,6 +300,9 @@ _FIELD_INFO: dict[str, FieldInfo] = {
         "W/m^2",
         r"$EF_3$",
     ),
+    "EHF1": _FI("poynting_flux", "Enthalpy flux component 1", "W/m^2", r"$EHF_1$"),
+    "EHF2": _FI("poynting_flux", "Enthalpy flux component 2", "W/m^2", r"$EHF_2$"),
+    "EHF3": _FI("poynting_flux", "Enthalpy flux component 3", "W/m^2", r"$EHF_3$"),
     # Thermodynamic (specific quantities — energy per unit mass)
     "h": _FI("specific_energy", "Specific enthalpy", "J/kg", r"$h$"),
     "h_rel": _FI(
@@ -540,11 +543,71 @@ _SPECIES_INFO_PATTERNS: list[tuple[re.Pattern[str], str, str, str]] = [
         r"$EF_{{{C},s{N}}}$",
     ),
     (
+        re.compile(r"^KEF([123])_s(\d+)$"),
+        "poynting_flux",
+        "Kinetic energy flux component {C} (species {N})",
+        r"$KEF_{{{C},s{N}}}$",
+    ),
+    (
+        re.compile(r"^HF([123])_s(\d+)$"),
+        "poynting_flux",
+        "Heat flux component {C} (species {N})",
+        r"$HF_{{{C},s{N}}}$",
+    ),
+    (
+        re.compile(r"^EHF([123])_s(\d+)$"),
+        "poynting_flux",
+        "Enthalpy flux component {C} (species {N})",
+        r"$EHF_{{{C},s{N}}}$",
+    ),
+    (
+        re.compile(r"^q([123])_s(\d+)$"),
+        "poynting_flux",
+        "Conductive heat flux component {C} (species {N})",
+        r"$q_{{{C},s{N}}}$",
+    ),
+    (
         re.compile(r"^P(\d{0,2})_s(\d+)$"),
         "pressure",
         "Pressure {C} (species {N})",
         r"$P_{{{C},s{N}}}$",
     ),  # \d{0,2} matches both P11_s0 (tensor) and P_s0 (scalar)
+    (
+        re.compile(r"^rho_m_s(\d+)$"),
+        "density",
+        "Mass density (species {N})",
+        r"$\rho_{{m,s{N}}}$",
+    ),
+    (
+        re.compile(r"^\|V\|_s(\d+)$"),
+        "velocity",
+        "Velocity magnitude (species {N})",
+        r"$|V_{{s{N}}}|$",
+    ),
+    (
+        re.compile(r"^e_k_s(\d+)$"),
+        "energy_density",
+        "Kinetic energy density (species {N})",
+        r"$e_{{k,s{N}}}$",
+    ),
+    (
+        re.compile(r"^e_th_s(\d+)$"),
+        "energy_density",
+        "Thermal energy density (species {N})",
+        r"$e_{{th,s{N}}}$",
+    ),
+    (
+        re.compile(r"^e_int_s(\d+)$"),
+        "specific_energy",
+        "Specific internal energy (species {N})",
+        r"$e_{{int,s{N}}}$",
+    ),
+    (
+        re.compile(r"^h_s(\d+)$"),
+        "specific_energy",
+        "Specific enthalpy (species {N})",
+        r"$h_{{s{N}}}$",
+    ),
     (
         re.compile(r"^T_s(\d+)$"),
         "temperature",

@@ -84,6 +84,9 @@ _REGISTRY: dict[str, _Recipe] = {
     "e_E": _Recipe(derived.electric_energy_density, ("|E|",)),
     "e_k": _Recipe(derived.kinetic_energy_density, ("rho_m", "|V|")),
     "e_th": _Recipe(derived.thermal_energy_density, ("P",), needs_gamma=True),
+    "e_th_trace": _Recipe(
+        derived.thermal_energy_density_trace, ("P11", "P22", "P33"),
+    ),
     # Thermodynamic
     "h": _Recipe(derived.enthalpy, ("P", "rho_m"), needs_gamma=True),
     "h_rel": _Recipe(
@@ -113,6 +116,16 @@ _REGISTRY: dict[str, _Recipe] = {
         derived.poynting_flux,
         ("E1", "E2", "E3", "B1", "B2", "B3"),
         component=2,
+    ),
+    # Enthalpy flux (total, MHD): EHF_i = (gamma/(gamma-1)) P V_i
+    "EHF1": _Recipe(
+        derived.enthalpy_flux_component, ("P", "V1"), needs_gamma=True,
+    ),
+    "EHF2": _Recipe(
+        derived.enthalpy_flux_component, ("P", "V2"), needs_gamma=True,
+    ),
+    "EHF3": _Recipe(
+        derived.enthalpy_flux_component, ("P", "V3"), needs_gamma=True,
     ),
     # Species-dependent: electrons (species 0)
     "omega_pe": _Recipe(
@@ -357,6 +370,97 @@ _SPECIES_TEMPLATES: dict[str, _SpeciesTemplate] = {
     ),
     "V3": _SpeciesTemplate(
         derived.bulk_velocity, ("J3_s{N}", "rho_c_s{N}"), _SpeciesArgs.NONE
+    ),
+    "|V|": _SpeciesTemplate(
+        derived.velocity_magnitude,
+        ("V1_s{N}", "V2_s{N}", "V3_s{N}"),
+        _SpeciesArgs.NONE,
+    ),
+    # Per-species mass density: rho_m_s = |rho_c_s| * m / |q|
+    "rho_m": _SpeciesTemplate(
+        derived.species_mass_density, ("rho_c_s{N}",), _SpeciesArgs.CHARGE_MASS
+    ),
+    # Per-species energy densities and thermodynamic quantities
+    "e_k": _SpeciesTemplate(
+        derived.kinetic_energy_density, ("rho_m_s{N}", "|V|_s{N}"), _SpeciesArgs.NONE
+    ),
+    "e_th": _SpeciesTemplate(
+        derived.thermal_energy_density, ("P_s{N}",), _SpeciesArgs.NONE,
+        needs_gamma=True,
+    ),
+    "e_th_trace": _SpeciesTemplate(
+        derived.thermal_energy_density_trace,
+        ("P11_s{N}", "P22_s{N}", "P33_s{N}"),
+        _SpeciesArgs.NONE,
+    ),
+    "e_int": _SpeciesTemplate(
+        derived.internal_energy, ("P_s{N}", "rho_m_s{N}"), _SpeciesArgs.NONE,
+        needs_gamma=True,
+    ),
+    "h": _SpeciesTemplate(
+        derived.enthalpy, ("P_s{N}", "rho_m_s{N}"), _SpeciesArgs.NONE,
+        needs_gamma=True,
+    ),
+    # Kinetic energy flux: KEF_i = (1/2) n m |V|² V_i
+    "KEF1": _SpeciesTemplate(
+        derived.kinetic_energy_flux_component,
+        ("V1_s{N}", "V1_s{N}", "V2_s{N}", "V3_s{N}", "rho_c_s{N}"),
+        _SpeciesArgs.CHARGE_MASS,
+    ),
+    "KEF2": _SpeciesTemplate(
+        derived.kinetic_energy_flux_component,
+        ("V2_s{N}", "V1_s{N}", "V2_s{N}", "V3_s{N}", "rho_c_s{N}"),
+        _SpeciesArgs.CHARGE_MASS,
+    ),
+    "KEF3": _SpeciesTemplate(
+        derived.kinetic_energy_flux_component,
+        ("V3_s{N}", "V1_s{N}", "V2_s{N}", "V3_s{N}", "rho_c_s{N}"),
+        _SpeciesArgs.CHARGE_MASS,
+    ),
+    # Heat flux: HF_i = EF_i - KEF_i (thermal + heat flux residual)
+    "HF1": _SpeciesTemplate(
+        derived.heat_flux_component, ("EF1_s{N}", "KEF1_s{N}"), _SpeciesArgs.NONE
+    ),
+    "HF2": _SpeciesTemplate(
+        derived.heat_flux_component, ("EF2_s{N}", "KEF2_s{N}"), _SpeciesArgs.NONE
+    ),
+    "HF3": _SpeciesTemplate(
+        derived.heat_flux_component, ("EF3_s{N}", "KEF3_s{N}"), _SpeciesArgs.NONE
+    ),
+    # Enthalpy flux (per-species): EHF_i = (gamma/(gamma-1)) P_s V_i_s
+    "EHF1": _SpeciesTemplate(
+        derived.enthalpy_flux_component,
+        ("P_s{N}", "V1_s{N}"),
+        _SpeciesArgs.NONE,
+        needs_gamma=True,
+    ),
+    "EHF2": _SpeciesTemplate(
+        derived.enthalpy_flux_component,
+        ("P_s{N}", "V2_s{N}"),
+        _SpeciesArgs.NONE,
+        needs_gamma=True,
+    ),
+    "EHF3": _SpeciesTemplate(
+        derived.enthalpy_flux_component,
+        ("P_s{N}", "V3_s{N}"),
+        _SpeciesArgs.NONE,
+        needs_gamma=True,
+    ),
+    # Conductive heat flux: q_i = HF_i - EHF_i (non-adiabatic residual)
+    "q1": _SpeciesTemplate(
+        derived.conductive_heat_flux_component,
+        ("HF1_s{N}", "EHF1_s{N}"),
+        _SpeciesArgs.NONE,
+    ),
+    "q2": _SpeciesTemplate(
+        derived.conductive_heat_flux_component,
+        ("HF2_s{N}", "EHF2_s{N}"),
+        _SpeciesArgs.NONE,
+    ),
+    "q3": _SpeciesTemplate(
+        derived.conductive_heat_flux_component,
+        ("HF3_s{N}", "EHF3_s{N}"),
+        _SpeciesArgs.NONE,
     ),
 }
 

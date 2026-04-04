@@ -393,11 +393,21 @@ ion pressure tensor components `P11_s1`..`P33_s1`.
 | Canonical | Cartesian alias | Meaning | Present in |
 |-----------|----------------|---------|------------|
 | `S1`, `S2`, `S3` | `Sx`, `Sy`, `Sz` | Poynting flux | PIC, MHD |
-| `EF1_s0`, `EF2_s0`, ... | `EFe`, `EFi` (vector groups) | Per-species energy flux | PIC (always per-species) |
+| `EF1_s0`, `EF2_s0`, ... | `EFe`, `EFi` (vector groups) | Per-species total energy flux (3rd moment) | PIC, multi-moment MHD |
+| `KEF1_s0`, `KEF2_s0`, ... | `KEFe`, `KEFi` | Kinetic energy flux (bulk flow) | PIC, MHD (derived) |
+| `HF1_s0`, `HF2_s0`, ... | `HFe`, `HFi` | Total thermal flux (EF − KEF) | PIC, multi-moment MHD |
+| `EHF1`, `EHF2`, `EHF3` | — | Enthalpy flux (total, fluid) | MHD, PIC (derived) |
+| `EHF1_s0`, `EHF2_s0`, ... | `EHFe`, `EHFi` | Enthalpy flux (per-species) | PIC, MHD (derived) |
+| `q1_s0`, `q2_s0`, ... | `qe`, `qi` | Conductive heat flux (HF − EHF) | PIC, multi-moment MHD |
 | `e_B` | — | Magnetic energy density | PIC, MHD |
 | `e_E` | — | Electric energy density | PIC |
-| `e_k` | — | Kinetic energy density | MHD, PIC (moments) |
-| `e_th` | — | Thermal energy density | MHD, PIC (moments) |
+| `e_k` | — | Kinetic energy density (total) | MHD, PIC (moments) |
+| `e_k_s0`, `e_k_s1`, ... | `e_k_e`, `e_k_i` | Kinetic energy density (per-species) | PIC (derived) |
+| `e_th` | — | Thermal energy density ($P/(\gamma-1)$) | MHD, PIC (moments) |
+| `e_th_trace` | — | Thermal energy density ($\frac{1}{2}\mathrm{Tr}(\mathbf{P})$, $\gamma$-free) | PIC, multi-moment MHD |
+| `e_th_s0`, `e_th_s1`, ... | `e_th_e`, `e_th_i` | Thermal energy density (per-species) | PIC (derived) |
+| `rho_m_s0`, `rho_m_s1`, ... | `rho_m_e`, `rho_m_i` | Mass density (per-species) | PIC (derived) |
+| `\|V\|_s0`, `\|V\|_s1`, ... | `\|Vi\|` | Velocity magnitude (per-species) | PIC (derived) |
 
 ### Pressure tensor
 

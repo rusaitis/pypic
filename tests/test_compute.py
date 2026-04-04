@@ -29,6 +29,8 @@ class TestRegistryIntegrity:
         raw_field_targets = {
             "Te", "Ti", "Pe", "Pi",
             "EF1", "EF2", "EF3", "EF_s0", "EF_s1",
+            "KEF_s0", "KEF_s1", "HF_s0", "HF_s1",
+            "EHF_s0", "EHF_s1", "q_s0", "q_s1",
         }
         for alias, target in _COMPUTE_ALIASES.items():
             in_registry = target in _REGISTRY
