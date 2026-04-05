@@ -10,6 +10,39 @@ Physical constants vanish from the normalized forms, reappearing only at
 SI conversion boundaries. Temperatures are in energy units throughout
 ($T = P/n$, not $T = P/(nk_B)$); divide by $k_B$ to convert to Kelvin.
 
+### SI conversion factors
+
+To convert a quantity from code units to SI: $x_{SI} = x_{code} \times f$,
+where $f$ is the SI factor for that quantity type. The base references
+($n_{ref}$, $m_{ref}$, $q_{ref}$, $v_{ref}$, $l_{ref}$, $t_{ref}$,
+$B_{ref}$, $E_{ref}$) are set by the normalization system (PIC, MHD, or
+custom). Compound factors are built from these:
+
+| Quantity type | SI factor $f$ | SI unit | Used by |
+|---------------|---------------|---------|---------|
+| `density` | $n_{ref}$ | m$^{-3}$ | $n_e$, $n_i$ |
+| `mass_density` | $n_{ref} m_{ref}$ | kg/m$^3$ | $\rho_m$ |
+| `charge_density` | $q_{ref} n_{ref}$ | C/m$^3$ | $\rho_c$ |
+| `velocity` | $v_{ref}$ | m/s | $V$, $v_A$, $v_{th}$ |
+| `b_field` | $B_{ref}$ | T | $B$ |
+| `e_field` | $E_{ref}$ | V/m | $E$ |
+| `pressure` | $n_{ref} m_{ref} v_{ref}^2$ | Pa | $P$, $P_e$, $P_i$ |
+| `temperature` | $m_{ref} v_{ref}^2$ | J | $T$ (energy units) |
+| `energy_density` | $n_{ref} m_{ref} v_{ref}^2$ | J/m$^3$ | $e_k$, $e_{th}$, $e_B$ |
+| `specific_energy` | $v_{ref}^2$ | J/kg | $h$, $e_{int}$ |
+| `current_density` | $q_{ref} n_{ref} v_{ref}$ | A/m$^2$ | $J$ |
+| `frequency` | $1/t_{ref}$ | rad/s | $\omega_p$, $\omega_c$ |
+| `length` | $l_{ref}$ | m | $d_e$, $d_i$, $r_i$ |
+| `poynting_flux` | $E_{ref} B_{ref}$ | W/m$^2$ | $S$ (EM flux) |
+| `energy_flux` | $n_{ref} m_{ref} v_{ref}^3$ | W/m$^2$ | EF, KEF, HF, EHF, $q$ |
+| `power_density` | $n_{ref} m_{ref} v_{ref}^2 / t_{ref}$ | W/m$^3$ | $J \cdot E$ |
+
+`poynting_flux` and `energy_flux` share SI units (W/m$^2$) but differ
+in normalization: EM flux scales with field references ($E_{ref} B_{ref}$),
+particle energy flux with matter references ($\rho_{ref} v_{ref}^3$). In
+code units where $\mu_0 = 1$ these are equivalent; in SI the factor of
+$\mu_0$ separates them.
+
 ## 1. Densities and Moments
 
 | Name | Description | Normalized | SI |

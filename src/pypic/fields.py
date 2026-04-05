@@ -75,6 +75,7 @@ class QuantityType(StrEnum):
     ENERGY_DENSITY = "energy_density"
     FREQUENCY = "frequency"
     POYNTING_FLUX = "poynting_flux"
+    ENERGY_FLUX = "energy_flux"
     B_FIELD_PER_LENGTH = "b_field_per_length"
     E_FIELD_PER_LENGTH = "e_field_per_length"
     VELOCITY_PER_LENGTH = "velocity_per_length"
@@ -98,6 +99,7 @@ _QUANTITY_UNITS: dict[str, str] = {
     "energy_density": "J/m^3",
     "frequency": "rad/s",
     "poynting_flux": "W/m^2",
+    "energy_flux": "W/m^2",
     "b_field_per_length": "T/m",
     "e_field_per_length": "V/m^2",
     "velocity_per_length": "1/s",
@@ -283,26 +285,26 @@ _FIELD_INFO: dict[str, FieldInfo] = {
         r"$S_3$",
     ),
     "EF1": _FI(
-        "poynting_flux",
+        "energy_flux",
         "Energy flux component 1",
         "W/m^2",
         r"$EF_1$",
     ),
     "EF2": _FI(
-        "poynting_flux",
+        "energy_flux",
         "Energy flux component 2",
         "W/m^2",
         r"$EF_2$",
     ),
     "EF3": _FI(
-        "poynting_flux",
+        "energy_flux",
         "Energy flux component 3",
         "W/m^2",
         r"$EF_3$",
     ),
-    "EHF1": _FI("poynting_flux", "Enthalpy flux component 1", "W/m^2", r"$EHF_1$"),
-    "EHF2": _FI("poynting_flux", "Enthalpy flux component 2", "W/m^2", r"$EHF_2$"),
-    "EHF3": _FI("poynting_flux", "Enthalpy flux component 3", "W/m^2", r"$EHF_3$"),
+    "EHF1": _FI("energy_flux", "Enthalpy flux component 1", "W/m^2", r"$EHF_1$"),
+    "EHF2": _FI("energy_flux", "Enthalpy flux component 2", "W/m^2", r"$EHF_2$"),
+    "EHF3": _FI("energy_flux", "Enthalpy flux component 3", "W/m^2", r"$EHF_3$"),
     # Thermodynamic (specific quantities — energy per unit mass)
     "h": _FI("specific_energy", "Specific enthalpy", "J/kg", r"$h$"),
     "h_rel": _FI(
@@ -538,31 +540,31 @@ _SPECIES_INFO_PATTERNS: list[tuple[re.Pattern[str], str, str, str]] = [
     ),
     (
         re.compile(r"^EF([123])_s(\d+)$"),
-        "poynting_flux",
+        "energy_flux",
         "Energy flux component {C} (species {N})",
         r"$EF_{{{C},s{N}}}$",
     ),
     (
         re.compile(r"^KEF([123])_s(\d+)$"),
-        "poynting_flux",
+        "energy_flux",
         "Kinetic energy flux component {C} (species {N})",
         r"$KEF_{{{C},s{N}}}$",
     ),
     (
         re.compile(r"^HF([123])_s(\d+)$"),
-        "poynting_flux",
+        "energy_flux",
         "Heat flux component {C} (species {N})",
         r"$HF_{{{C},s{N}}}$",
     ),
     (
         re.compile(r"^EHF([123])_s(\d+)$"),
-        "poynting_flux",
+        "energy_flux",
         "Enthalpy flux component {C} (species {N})",
         r"$EHF_{{{C},s{N}}}$",
     ),
     (
         re.compile(r"^q([123])_s(\d+)$"),
-        "poynting_flux",
+        "energy_flux",
         "Conductive heat flux component {C} (species {N})",
         r"$q_{{{C},s{N}}}$",
     ),

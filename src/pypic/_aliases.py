@@ -105,8 +105,8 @@ _COMPUTE_ALIASES: dict[str, str] = {
     "e_int_e": "e_int_s0", "e_int_i": "e_int_s1",
     "h_e": "h_s0", "h_i": "h_s1",
     # Energy flux aliases
-    "EFe": "EF_s0",
-    "EFi": "EF_s1",
+    "EFe": "EF_s0", "EFe1": "EF1_s0", "EFe2": "EF2_s0", "EFe3": "EF3_s0",
+    "EFi": "EF_s1", "EFi1": "EF1_s1", "EFi2": "EF2_s1", "EFi3": "EF3_s1",
     "energy_flux_x": "EF1",
     "energy_flux_y": "EF2",
     "energy_flux_z": "EF3",

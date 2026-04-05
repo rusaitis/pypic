@@ -359,7 +359,11 @@ _COMPOUND_FACTORS: dict[str, Callable[[Normalization], float]] = {
     "frequency": lambda n: 1.0 / n.time_ref,
     "mass_density": lambda n: n.density_ref * n.mass_ref,
     "charge_density": lambda n: n.charge_ref * n.density_ref,
-    "poynting_flux": lambda n: n.e_field_ref * n.b_field_ref,
+    "poynting_flux": lambda n: n.e_field_ref * n.b_field_ref,  # E × B (EM)
+    "energy_flux": lambda n: n.density_ref * n.mass_ref * n.velocity_ref**3,  # ρ v³ (particle)
+    # Both are W/m², but normalize differently: EM flux via field refs,
+    # particle flux via matter refs. The μ₀ factor between them is unity
+    # in code units but ~10⁶ in SI.
     "b_field_per_length": lambda n: n.b_field_ref / n.length_ref,
     "e_field_per_length": lambda n: n.e_field_ref / n.length_ref,
     "velocity_per_length": lambda n: n.velocity_ref / n.length_ref,

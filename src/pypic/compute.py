@@ -513,6 +513,7 @@ _DISPLAY_UNITS: dict[str, float] = {
     "nPa": 1e-9,
     "J/m^3": 1.0,
     "W/m^2": 1.0,
+    "mW/m^2": 1e-3,
     "Hz": 1.0,
     "rad/s": 1.0,
     "m": 1.0,
