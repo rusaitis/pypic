@@ -216,7 +216,10 @@ class IPic3DSerialReader:
                         and self._config.qom[s] < 0
                     ):
                         data = -data
-                    field_data[canon] = gaussian_pressure_to_si(data)
+                    data = gaussian_pressure_to_si(data)
+                    # Charge-weighted → mass-weighted: ×(m/|q|) = ×(1/|qom|)
+                    data = data / abs(self._config.qom[s])
+                    field_data[canon] = data
 
             # Energy flux (optional)
             want_ef_s = expanded is None or any(

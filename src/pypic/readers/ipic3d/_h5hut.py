@@ -233,6 +233,11 @@ class IPic3DH5hutReader:
                                 data = -data
                         # Pressure tensor stored as P/(4π) — Gaussian convention
                         data = gaussian_pressure_to_si(data)
+                        # Convert charge-weighted to mass-weighted pressure:
+                        # iPIC3D deposits q·n·v·v; physical P = m·n·v·v
+                        # Factor: m/|q| = 1/|qom|
+                        if s < len(self._config.qom):
+                            data = data / abs(self._config.qom[s])
                         field_data[canon] = data
 
                 # Energy flux: EFx_{s} → EF1_s{s}, etc.

@@ -190,14 +190,14 @@ class TestPhdf5Reader:
             assert np.all(p >= 0), f"{comp}_s{species} has negative values"
 
     def test_pressure_values(self, ds):
-        """Exact P11 values and P/|rho| = v_th² consistency."""
-        assert_allclose(ds["P11_s0"], RHO_INIT[0] * UTH[0] ** 2, atol=1e-12)
-        assert_allclose(ds["P11_s1"], RHO_INIT[1] * UTH[1] ** 2, atol=1e-12)
-        for s, uth in enumerate(UTH):
+        """Exact P11 values: physical P = n·m·v_th² = |rho_c|·v_th²/|qom|."""
+        for s, (rho, uth, qom) in enumerate(zip(RHO_INIT, UTH, QOM)):
+            expected = rho * uth**2 / abs(qom)
+            assert_allclose(ds[f"P11_s{s}"], expected, atol=1e-14)
             p = ds[f"P11_s{s}"]
-            rho = ds[f"rho_c_s{s}"]
-            ratio = np.mean(p) / np.mean(np.abs(rho))
-            assert_allclose(ratio, uth**2, atol=1e-12)
+            rho_c = ds[f"rho_c_s{s}"]
+            ratio = np.mean(p) / np.mean(np.abs(rho_c))
+            assert_allclose(ratio, uth**2 / abs(qom), atol=1e-14)
 
     def test_off_diagonal_pressure_zero(self, ds):
         for s in range(2):
@@ -376,12 +376,12 @@ class TestH5hutReader:
             assert ds[f"{comp}_s0"].min() >= 0.0, f"{comp}_s0 has negative values"
 
     def test_pressure_p_over_rho_consistency(self, ds):
-        """4π on both P and rho cancels: P/|rho| = v_th²."""
-        for s, uth in enumerate(UTH):
+        """Physical P/|rho_c| = v_th²/|qom| (mass-weighted pressure)."""
+        for s, (uth, qom) in enumerate(zip(UTH, QOM)):
             p = ds[f"P11_s{s}"]
             rho = ds[f"rho_c_s{s}"]
             ratio = np.mean(p) / np.mean(np.abs(rho))
-            assert_allclose(ratio, uth**2, atol=1e-4)
+            assert_allclose(ratio, uth**2 / abs(qom), atol=1e-6)
 
 
 class TestH5hutUnknownFieldPassthrough:
