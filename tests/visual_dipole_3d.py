@@ -92,7 +92,7 @@ def _seed_points(
 
 
 class _InteractiveTracer:
-    """Click on the equatorial plane to place a seed, press T to trace."""
+    """Drag the sphere widget to position a seed, press T to trace."""
 
     def __init__(
         self,
@@ -107,38 +107,109 @@ class _InteractiveTracer:
         self.interp = interp
         self.cmap = cmap
         self.vmax = vmax
-        self.seed: tuple[float, float, float] | None = None
-        self._marker_actor: object | None = None
-        self._traced_actors: list[object] = []
+        self.seed: tuple[float, float, float] = (4.0, 0.0, 0.0)
         self._trace_count = 0
+        self._free_3d = False
+        self._widget: object | None = None
+        self._crosshair_len = DOMAIN_HALF * 0.4
 
-    def on_pick(self, point: np.ndarray) -> None:
-        """Called when user clicks on the equatorial surface."""
+    def _update_crosshairs(self, x: float, y: float, z: float) -> None:
+        """Draw subtle dashed crosshair lines at the seed position."""
         import pyvista as pv
 
-        x, y = float(point[0]), float(point[1])
-        r = np.hypot(x, y)
-        if r < PLANET_RADIUS + 0.2:
-            return  # too close to planet
+        L = self._crosshair_len  # noqa: N806
+        color = "#ff6600"
+        opacity = 0.3
+        width = 1.0
 
-        self.seed = (x, y, 0.0)
-
-        # Update or create marker
-        if self._marker_actor is not None:
-            self.plotter.remove_actor(self._marker_actor)  # type: ignore[union-attr]
-        marker = pv.Sphere(radius=0.15, center=self.seed)
-        self._marker_actor = self.plotter.add_mesh(  # type: ignore[union-attr]
-            marker, color="#ff6600", opacity=0.9,
+        # X-line and Y-line on the equatorial plane (z=0)
+        x_line = pv.Line((x - L, y, 0), (x + L, y, 0))
+        self.plotter.add_mesh(  # type: ignore[union-attr]
+            x_line, color=color, opacity=opacity, line_width=width,
+            name="_cross_x", render_lines_as_tubes=False,
         )
+        y_line = pv.Line((x, y - L, 0), (x, y + L, 0))
+        self.plotter.add_mesh(  # type: ignore[union-attr]
+            y_line, color=color, opacity=opacity, line_width=width,
+            name="_cross_y", render_lines_as_tubes=False,
+        )
+        # Vertical z-line from plane to sphere (visible when off-plane)
+        if abs(z) > 0.01:
+            z_line = pv.Line((x, y, 0), (x, y, z))
+            self.plotter.add_mesh(  # type: ignore[union-attr]
+                z_line, color=color, opacity=opacity * 1.5, line_width=width,
+                name="_cross_z", render_lines_as_tubes=False,
+            )
+            # Small dot on the equatorial plane beneath the sphere
+            dot = pv.Sphere(radius=0.06, center=(x, y, 0))
+            self.plotter.add_mesh(  # type: ignore[union-attr]
+                dot, color=color, opacity=opacity,
+                name="_cross_dot",
+            )
+        else:
+            # Remove z-line and dot when on the plane
+            self.plotter.remove_actor("_cross_z", render=False)  # type: ignore[union-attr]
+            self.plotter.remove_actor("_cross_dot", render=False)  # type: ignore[union-attr]
+
+    def on_move(self, center: np.ndarray) -> None:
+        """Called when the sphere widget is released. Snaps to z=0 unless 3D."""
+        x, y, z = float(center[0]), float(center[1]), float(center[2])
+
+        if not self._free_3d:
+            z = 0.0
+            if self._widget is not None:
+                self._widget.SetCenter(x, y, 0.0)  # type: ignore[union-attr]
+
+        self.seed = (x, y, z)
+        self._update_crosshairs(x, y, z)
         r_eq = np.hypot(x, y)
-        print(f"  Seed: ({x:+.2f}, {y:+.2f}, 0.00)  L≈{r_eq:.1f}")
+        print(
+            f"  Seed: ({x:+.2f}, {y:+.2f}, {z:+.2f})  L≈{r_eq:.1f}",
+            end="\r",
+        )
+
+    def _nudge(self, dx: float = 0.0, dy: float = 0.0, dz: float = 0.0) -> None:
+        """Move seed by a small offset and update the widget."""
+        x, y, z = self.seed
+        x += dx
+        y += dy
+        z += dz if self._free_3d else 0.0
+        self.seed = (x, y, z)
+        if self._widget is not None:
+            self._widget.SetCenter(x, y, z)  # type: ignore[union-attr]
+        self._update_crosshairs(x, y, z)
+        r_eq = np.hypot(x, y)
+        print(f"  Seed: ({x:+.2f}, {y:+.2f}, {z:+.2f})  L≈{r_eq:.1f}", end="\r")
+        self.plotter.render()  # type: ignore[union-attr]
+
+    _STEP = 0.5  # arrow key step size in R_E
+
+    def nudge_left(self) -> None:
+        self._nudge(dx=-self._STEP)
+
+    def nudge_right(self) -> None:
+        self._nudge(dx=self._STEP)
+
+    def nudge_up(self) -> None:
+        self._nudge(dy=self._STEP)
+
+    def nudge_down(self) -> None:
+        self._nudge(dy=-self._STEP)
+
+    def nudge_z_up(self) -> None:
+        self._nudge(dz=self._STEP)
+
+    def nudge_z_down(self) -> None:
+        self._nudge(dz=-self._STEP)
+
+    def toggle_3d(self) -> None:
+        """Toggle between equatorial-plane-locked and free 3D movement."""
+        self._free_3d = not self._free_3d
+        mode = "3D free" if self._free_3d else "equatorial plane"
+        print(f"\n  Mode: {mode}")
 
     def trace(self) -> None:
         """Trace a field line from the current seed (T key)."""
-        if self.seed is None:
-            print("  No seed — click the equatorial plane first")
-            return
-
         try:
             fl = trace_field_line(
                 self.ds, self.seed,
@@ -243,6 +314,7 @@ def main() -> None:
         plotter, colored_lines,
         scalar="|B|", cmap=cmap,
         clim=(0, vmax), signed=False, radius=0.05,
+        show_scalar_bar=True, scalar_bar_position="lower_right",
     )
 
     lim = 5.5
@@ -260,31 +332,37 @@ def main() -> None:
         plotter.close()
         print(f"Saved to {outfile}")
     else:
-        # Interactive mode: click to seed, T to trace, C to clear
+        # Interactive mode: drag sphere to position, T to trace
         tracer = _InteractiveTracer(plotter, ds, interp, cmap, vmax)
 
-        # Add a transparent equatorial plane for picking
-        import pyvista as pv
+        def _on_widget_move(center: np.ndarray, widget: object) -> None:
+            tracer._widget = widget
+            tracer.on_move(center)
 
-        eq_plane = pv.Plane(
-            center=(0, 0, 0), direction=(0, 0, 1),
-            i_size=2 * lim, j_size=2 * lim,
-            i_resolution=1, j_resolution=1,
-        )
-        plotter.add_mesh(eq_plane, opacity=0.0, pickable=True, name="eq_pick")
-
-        plotter.enable_surface_point_picking(
-            callback=tracer.on_pick,
-            show_message=False,
-            show_point=False,
-            left_clicking=True,
-            picker="cell",
+        plotter.add_sphere_widget(
+            callback=_on_widget_move,
+            center=(4.0, 0.0, 0.0),
+            radius=0.25,
+            color="#ff6600",
+            style="surface",
+            selected_color="#ffcc66",
+            theta_resolution=20,
+            phi_resolution=20,
+            interaction_event="end",
+            pass_widget=True,
         )
 
         plotter.add_key_event("t", tracer.trace)
         plotter.add_key_event("c", tracer.clear)
+        plotter.add_key_event("z", tracer.toggle_3d)
+        plotter.add_key_event("Left", tracer.nudge_left)
+        plotter.add_key_event("Right", tracer.nudge_right)
+        plotter.add_key_event("Up", tracer.nudge_up)
+        plotter.add_key_event("Down", tracer.nudge_down)
+        plotter.add_key_event("Prior", tracer.nudge_z_up)    # Page Up
+        plotter.add_key_event("Next", tracer.nudge_z_down)   # Page Down
 
-        print("Click equatorial plane to seed | T: trace | C: clear | Scroll: zoom")
+        print("Arrows: move seed | PgUp/PgDn: move z (3D mode) | T: trace | Z: toggle 3D | C: clear")
         plotter.show()
 
 

@@ -7,22 +7,23 @@ from typing import TYPE_CHECKING, Any
 from pypic.plotting.pyvista._guard import ensure_pyvista
 
 if TYPE_CHECKING:
+    import pyvista as pv
     from matplotlib.colors import Colormap
 
     from pypic.plotting.styles import PlotTheme
 
 
 def _resolve_theme(theme: PlotTheme | None) -> PlotTheme:
-    """Return *theme* or the currently active pypic theme."""
+    """Return *theme*, or the active theme, or the global default."""
     if theme is not None:
         return theme
-    from pypic.plotting.styles import get_active_theme
+    from pypic.plotting.styles import get_active_theme, get_theme
 
-    return get_active_theme()
+    return get_active_theme() or get_theme()
 
 
 def apply_theme(
-    plotter: Any,
+    plotter: pv.Plotter,
     theme: PlotTheme | None = None,
 ) -> None:
     r"""Apply pypic :class:`PlotTheme` colors to a pyvista Plotter.
@@ -93,8 +94,40 @@ def create_plotter(
     return plotter
 
 
+def show_or_save(
+    plotter: pv.Plotter,
+    *,
+    save: bool = False,
+    outfile: str | None = None,
+    transparent_background: bool = True,
+) -> None:
+    r"""Show the interactive window or save a screenshot.
+
+    Parameters
+    ----------
+    plotter : pv.Plotter
+        The pyvista plotter.
+    save : bool
+        If ``True``, render off-screen and save to *outfile*.
+    outfile : str or None
+        Output file path. Required when *save* is ``True``.
+    transparent_background : bool
+        Save with transparent background (PNG alpha channel).
+    """
+    if save:
+        if outfile is None:
+            msg = "outfile is required when save=True"
+            raise ValueError(msg)
+        plotter.show(auto_close=False)
+        plotter.screenshot(str(outfile), transparent_background=transparent_background)
+        plotter.close()
+        print(f"Saved to {outfile}")
+    else:
+        plotter.show()
+
+
 def set_camera(
-    plotter: Any,
+    plotter: pv.Plotter,
     *,
     focal: tuple[float, float, float] = (0.0, 0.0, 0.0),
     distance: float = 50.0,

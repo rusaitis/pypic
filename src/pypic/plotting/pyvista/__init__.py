@@ -25,6 +25,7 @@ from pypic.plotting.pyvista._theme import (
     create_plotter,
     resolve_cmap,
     set_camera,
+    show_or_save,
 )
 
 __all__ = [
@@ -42,4 +43,5 @@ __all__ = [
     "create_plotter",
     "resolve_cmap",
     "set_camera",
+    "show_or_save",
 ]

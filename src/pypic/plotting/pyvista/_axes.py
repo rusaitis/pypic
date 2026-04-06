@@ -10,6 +10,8 @@ from pypic.plotting.pyvista._guard import ensure_pyvista
 from pypic.plotting.pyvista._theme import _resolve_theme
 
 if TYPE_CHECKING:
+    import pyvista as pv
+
     from pypic.plotting.styles import PlotTheme
 
 
@@ -38,19 +40,38 @@ def _rgba_to_hex(rgba: tuple[float, float, float, float]) -> str:
     return f"#{int(r*255):02x}{int(g*255):02x}{int(b*255):02x}"
 
 
+def _frame_labels(data: Any) -> tuple[str, str, str]:
+    """Generate axis labels from a FieldDataset's coordinate frame."""
+    frame = data.frame
+    if frame and frame != "simulation":
+        return (f"$x_{{{frame}}}$", f"$y_{{{frame}}}$", f"$z_{{{frame}}}$")
+    return ("$x$", "$y$", "$z$")
+
+
+def _coord_units_from_data(data: Any) -> str:
+    """Extract coordinate units from dataset metadata."""
+    meta = data.metadata if hasattr(data, "metadata") else {}
+    unit = meta.get("physical_extent_unit", "")
+    if unit and unit != "m":
+        return f"${unit}$" if "_" in unit else unit
+    return ""
+
+
 def add_axis_triad(
-    plotter: Any,
+    plotter: pv.Plotter,
     center: tuple[float, float, float] = (0.0, 0.0, 0.0),
     length: float = 5.0,
     *,
-    labels: tuple[str, str, str] = ("$X$", "$Y$", "$Z$"),
+    data: Any = None,
+    labels: tuple[str, str, str] | None = None,
     font_size: int | None = None,
     theme: PlotTheme | None = None,
 ) -> None:
     r"""Draw axis arrows from *center* with themed colors and labels.
 
-    Uses ``theme.axis_x_color``, ``axis_y_color``, ``axis_z_color``
-    for the three axes and ``theme.font_label`` for sizing.
+    When *data* (a :class:`FieldDataset`) is provided and *labels* is
+    ``None``, axis labels are auto-generated from the coordinate frame
+    (e.g. ``"$x_{GSM}$"``).
 
     Parameters
     ----------
@@ -60,13 +81,18 @@ def add_axis_triad(
         Origin of the triad.
     length : float
         Length of each axis arrow.
-    labels : tuple[str, str, str]
-        Labels for the x, y, z axes.
+    data : FieldDataset or None
+        Source dataset for auto-generating frame labels.
+    labels : tuple[str, str, str] or None
+        Labels for the x, y, z axes. ``None`` auto-generates from
+        *data* frame or defaults to ``("$X$", "$Y$", "$Z$")``.
     font_size : int or None
         Override label font size. ``None`` derives from theme.
     theme : PlotTheme or None
         Theme for colors. ``None`` uses active theme.
     """
+    if labels is None:
+        labels = _frame_labels(data) if data is not None else ("$X$", "$Y$", "$Z$")
     ensure_pyvista()
     import pyvista as pv
 
@@ -76,18 +102,22 @@ def add_axis_triad(
     c = np.asarray(center, dtype=float)
 
     # Scale font: pyvista font_size is ~3x matplotlib pt for similar visual weight
-    fs = font_size if font_size is not None else int(t.font_label * 3)
+    fs = font_size if font_size is not None else int(t.font_label * 3.0)
+
+    lw = t.line_width  # default 1.5
+    cone_h = t.arrow_size * 0.1  # 4.0 → 0.4
+    cone_r = t.arrow_size * 0.025  # 4.0 → 0.1
 
     for direction, color, label in zip(directions, colors, labels, strict=True):
         d = np.asarray(direction, dtype=float)
         tip = c + d * length
         shaft = pv.Line(tuple(c), tuple(tip))
-        plotter.add_mesh(shaft, color=color, line_width=1.5)
+        plotter.add_mesh(shaft, color=color, line_width=lw)
         cone = pv.Cone(
-            center=tuple(tip - d * 0.2),
+            center=tuple(tip - d * cone_h * 0.5),
             direction=direction,
-            height=0.4,
-            radius=0.1,
+            height=cone_h,
+            radius=cone_r,
             resolution=16,
         )
         plotter.add_mesh(cone, color=color)
@@ -97,44 +127,101 @@ def add_axis_triad(
             font_size=fs,
             text_color=color,
             shape=None,
-            render_points_as_spheres=False,
-            point_size=0,
+            show_points=False,
         )
 
 
+def _nice_step(data_range: float, target_n: int) -> float:
+    """Pick the nearest 1-2-5 step size for *data_range* / *target_n*."""
+    import math
+
+    raw = data_range / max(target_n, 1)
+    mag = 10 ** math.floor(math.log10(raw))
+    residual = raw / mag
+    if residual <= 1.5:
+        return mag
+    if residual <= 3.5:
+        return 2 * mag
+    if residual <= 7.5:
+        return 5 * mag
+    return 10 * mag
+
+
+def _uniform_ticks(lo: float, hi: float, step: float) -> list[float]:
+    """Generate evenly spaced ticks at multiples of *step* within [lo, hi]."""
+    import math
+
+    first = math.ceil(lo / step) * step
+    ticks: list[float] = []
+    v = first
+    while v <= hi + step * 1e-9:
+        ticks.append(round(v, 10))
+        v += step
+    return ticks
+
+
 def add_equatorial_grid(
-    plotter: Any,
-    xlim: tuple[float, float],
-    ylim: tuple[float, float],
+    plotter: pv.Plotter,
+    xlim: tuple[float, float] | None = None,
+    ylim: tuple[float, float] | None = None,
     *,
+    data_2d: Any = None,
+    margin: float = 0.0,
     z: float = 0.0,
+    step: float | None = None,
     n_lines: int = 5,
-    coord_units: str = "",
+    coord_units: str | None = None,
     theme: PlotTheme | None = None,
 ) -> None:
     r"""Draw subtle grid lines on a z-plane with coordinate labels.
 
-    Replicates the matplotlib ``style_3d_axes`` grid: ``MaxNLocator``
-    tick placement, label thinning near zero, labels at grid edges
-    with the last label appending *coord_units*.
+    Grid lines use a uniform spacing in 1-2-5 multiples, identical
+    in both x and y directions. Labels are placed at grid edges with
+    the last label appending *coord_units*.
+
+    Limits and coordinate units can be derived automatically from a
+    2D :class:`FieldDataset`.
 
     Parameters
     ----------
     plotter : pv.Plotter
         The pyvista plotter.
-    xlim : tuple[float, float]
-        X-axis range.
-    ylim : tuple[float, float]
-        Y-axis range.
+    xlim : tuple[float, float] or None
+        X-axis range. ``None`` derives from *data_2d*.
+    ylim : tuple[float, float] or None
+        Y-axis range. ``None`` derives from *data_2d*.
+    data_2d : FieldDataset or None
+        A 2D dataset to derive limits and coordinate units from.
+    margin : float
+        Extra extent beyond the data range in each direction
+        (in data coordinates). Only used with *data_2d*.
     z : float
         Z-coordinate of the grid plane.
+    step : float or None
+        Explicit grid spacing. ``None`` auto-selects a 1-2-5 step
+        based on the larger axis range and *n_lines*.
     n_lines : int
-        Approximate number of grid lines per axis.
-    coord_units : str
-        Unit string appended to the last label (e.g. ``"$R_E$"``).
+        Target number of grid lines per axis (used when *step* is ``None``).
+    coord_units : str or None
+        Unit string appended to the last label. ``None`` auto-derives
+        from *data_2d* metadata when available.
     theme : PlotTheme or None
         Theme for grid color and fonts. ``None`` uses active theme.
     """
+    # Derive limits and coord_units from data if not given
+    if xlim is None or ylim is None:
+        if data_2d is None:
+            msg = "Either xlim/ylim or data_2d must be provided"
+            raise ValueError(msg)
+        coords = data_2d.grid.coordinate_arrays()
+        if xlim is None:
+            xlim = (float(coords[0][0]) - margin, float(coords[0][-1]) + margin)
+        if ylim is None:
+            ylim = (float(coords[1][0]) - margin, float(coords[1][-1]) + margin)
+    if coord_units is None and data_2d is not None:
+        coord_units = _coord_units_from_data(data_2d)
+    if coord_units is None:
+        coord_units = ""
     ensure_pyvista()
     import pyvista as pv
 
@@ -145,18 +232,19 @@ def add_equatorial_grid(
     grid_lw = t.grid_major_width
 
     label_color = _rgba_to_hex(t.secondary_text_color)
-    # pyvista font_size ~3x matplotlib pt
-    label_fs = int(t.font_tick * 2.5)
+    label_fs = int(t.font_tick * 2.8)
 
-    from matplotlib.ticker import MaxNLocator
-
-    # Normalize ranges so offset math works for reversed limits
+    # Normalize ranges for reversed limits
     x_lo, x_hi = sorted(xlim)
     y_lo, y_hi = sorted(ylim)
 
-    loc = MaxNLocator(nbins=n_lines)
-    x_ticks = [v for v in loc.tick_values(x_lo, x_hi) if x_lo <= v <= x_hi]
-    y_ticks = [v for v in loc.tick_values(y_lo, y_hi) if y_lo <= v <= y_hi]
+    # Uniform 1-2-5 step from the larger range
+    if step is None:
+        max_range = max(x_hi - x_lo, y_hi - y_lo)
+        step = _nice_step(max_range, n_lines)
+
+    x_ticks = _uniform_ticks(x_lo, x_hi, step)
+    y_ticks = _uniform_ticks(y_lo, y_hi, step)
 
     # Draw grid lines
     for x in x_ticks:
@@ -168,7 +256,7 @@ def add_equatorial_grid(
         plotter.add_mesh(line, color=grid_hex, opacity=grid_opacity, line_width=grid_lw)
 
     # Coordinate labels at grid edges
-    offset_frac = 0.04
+    offset_frac = 0.015
     x_range = x_hi - x_lo
     y_range = y_hi - y_lo
 
@@ -183,8 +271,8 @@ def add_equatorial_grid(
             font_size=label_fs,
             text_color=label_color,
             shape=None,
-            render_points_as_spheres=False,
-            point_size=0,
+            show_points=False,
+            bold=False,
         )
 
     y_labels = _label_values(y_ticks)
@@ -198,6 +286,6 @@ def add_equatorial_grid(
             font_size=label_fs,
             text_color=label_color,
             shape=None,
-            render_points_as_spheres=False,
-            point_size=0,
+            show_points=False,
+            bold=False,
         )
