@@ -1,40 +1,39 @@
-"""3D dipole Earth field line visualization with interactive seed dragging.
+"""3D dipole field line visualization with pyvista.
 
 Generates an analytical magnetic dipole on a 3D grid, traces field lines
-using the RK4 tracer, and renders an interactive 3D matplotlib figure
-with a wireframe planet and colored field lines.
+using the RK4 tracer, and renders an interactive pyvista window with a
+planet sphere and colored field lines.
 
 Controls:
-- **Drag** the orange marker in the equatorial plane (z=0)
+- **Click** on the equatorial plane to place a seed marker
 - **T** — trace a field line from the marker
-- **S** — toggle a Bz color-map slice
-- **+/-** — move the slice up/down through the volume
+- **C** — clear all interactively traced lines
 
 Run with::
 
     uv run python tests/visual_dipole_3d.py
     uv run python tests/visual_dipole_3d.py --theme light
-    uv run python tests/visual_dipole_3d.py --theme 3
+    uv run python tests/visual_dipole_3d.py --save
 """
 
 from __future__ import annotations
 
 import argparse
 
-import matplotlib as mpl
-import matplotlib.pyplot as plt
 import numpy as np
-from matplotlib.backend_tools import Cursors
-from mpl_toolkits.mplot3d import proj3d
 
-from pypic.plotting import (
-    available_themes,
-    plot_field_line,
-    style_3d_axes,
-    use_theme,
+from pypic.plotting import available_themes, set_theme
+from pypic.plotting.pyvista import (
+    add_axis_triad,
+    add_equatorial_grid,
+    add_field_line,
+    add_field_lines,
+    add_planet,
+    create_plotter,
+    resolve_cmap,
+    set_camera,
 )
 from pypic.readers.base import FieldDataset, GridInfo
-from pypic.selections import PlaneSelection
 from pypic.traces import (
     VectorFieldInterpolator,
     attach_scalars,
@@ -52,18 +51,10 @@ def _dipole_field(
     moment: float = 1.0,
     planet_radius: float = PLANET_RADIUS,
 ) -> dict[str, np.ndarray]:
-    """Compute analytical dipole B field on the grid, zeroed inside the planet.
-
-    Dipole aligned with z-axis, moment M:
-        Bx = 3 M x z / r^5
-        By = 3 M y z / r^5
-        Bz = M (3 z^2 - r^2) / r^5
-    """
+    """Compute analytical dipole B field on the grid, zeroed inside the planet."""
     coords = grid.coordinate_arrays()
     x, y, z = np.meshgrid(*coords, indexing="ij")
     r = np.sqrt(x**2 + y**2 + z**2)
-
-    # Avoid division by zero at origin
     r_safe = np.where(r > 0, r, 1.0)
     r5 = r_safe**5
 
@@ -71,7 +62,6 @@ def _dipole_field(
     by = 3.0 * moment * y * z / r5
     bz = moment * (3.0 * z**2 - r_safe**2) / r5
 
-    # Zero out inside the planet — tracer will terminate via null detection
     inside = r < planet_radius
     bx[inside] = 0.0
     by[inside] = 0.0
@@ -80,36 +70,16 @@ def _dipole_field(
     return {"B1": bx, "B2": by, "B3": bz}
 
 
-def _planet_mesh(
-    radius: float = PLANET_RADIUS,
-    n: int = 20,
-) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """UV sphere mesh for plot_surface."""
-    u = np.linspace(0, 2 * np.pi, n)
-    v = np.linspace(0, np.pi, n)
-    x = radius * np.outer(np.cos(u), np.sin(v))
-    y = radius * np.outer(np.sin(u), np.sin(v))
-    z = radius * np.outer(np.ones_like(u), np.cos(v))
-    return x, y, z
-
-
 def _seed_points(
     l_shells: list[float],
     n_per_shell: int = 3,
 ) -> list[tuple[float, float, float]]:
-    """Generate seed points at given L-shells in the noon-midnight plane (y=0).
-
-    Seeds are placed at the magnetic equator (z=0) and at symmetric
-    latitudes above/below. L-shell gives the equatorial crossing distance
-    in R_E, so equatorial seeds sit at x = L, y = 0, z = 0.
-    Off-equator seeds use the dipole field line equation r = L cos^2(lambda).
-    """
+    """Generate seed points at given L-shells in the noon-midnight plane."""
     seeds: list[tuple[float, float, float]] = []
-    if n_per_shell == 1:
-        latitudes = [0.0]
-    else:
-        latitudes = np.linspace(-25.0, 25.0, n_per_shell).tolist()
-
+    latitudes = (
+        [0.0] if n_per_shell == 1
+        else np.linspace(-25.0, 25.0, n_per_shell).tolist()
+    )
     for l_val in l_shells:
         for lat_deg in latitudes:
             lat = np.radians(lat_deg)
@@ -121,265 +91,83 @@ def _seed_points(
     return seeds
 
 
-
-def _slice_bz(
-    ds: FieldDataset, z_index: int,
-) -> tuple[np.ndarray, np.ndarray, np.ndarray, float]:
-    """Extract Bz on a z-plane, return (X, Y, values, z_position)."""
-    plane = PlaneSelection(normal="z", index=z_index)
-    sliced = plane.apply(ds)
-    values = sliced["B3"]
-    coords = sliced.grid.coordinate_arrays()
-    x_1d, y_1d = coords[0], coords[1]
-    x_2d, y_2d = np.meshgrid(x_1d, y_1d, indexing="ij")
-    z_pos = ds.grid.coordinate_arrays()[2][z_index]
-    return x_2d, y_2d, values, float(z_pos)
-
-
-class SeedDragger:
-    """Draggable seed marker on z=0, press T to trace a field line."""
+class _InteractiveTracer:
+    """Click on the equatorial plane to place a seed, press T to trace."""
 
     def __init__(
         self,
-        ax: plt.Axes,  # type: ignore[type-arg]
-        fig: plt.Figure,
+        plotter: object,
         ds: FieldDataset,
         interp: VectorFieldInterpolator,
+        cmap: object,
+        vmax: float,
     ) -> None:
-        self.ax = ax
-        self.fig = fig
+        self.plotter = plotter
         self.ds = ds
         self.interp = interp
-        self.pos = np.array([3.0, 0.0, 0.0])
-        self.dragging = False
-        self.pick_radius = 15  # pixels
-        self.traced_lines: list[object] = []
-        self._hovering = False
+        self.cmap = cmap
+        self.vmax = vmax
+        self.seed: tuple[float, float, float] | None = None
+        self._marker_actor: object | None = None
+        self._traced_actors: list[object] = []
+        self._trace_count = 0
 
-        # Equatorial slice state
-        self._slice_visible = False
-        self._slice_z_index = N_CELLS // 2
-        self._slice_contour: object | None = None
-        self._cbar: plt.colorbar.Colorbar | None = None  # type: ignore[name-defined]
+    def on_pick(self, point: np.ndarray) -> None:
+        """Called when user clicks on the equatorial surface."""
+        import pyvista as pv
 
-        (self.marker,) = ax.plot(
-            [self.pos[0]],
-            [self.pos[1]],
-            [self.pos[2]],
-            "o",
-            markersize=12,
-            color="#ff6600",
-            markeredgecolor="white",
-            markeredgewidth=1.5,
-            zorder=10,
+        x, y = float(point[0]), float(point[1])
+        r = np.hypot(x, y)
+        if r < PLANET_RADIUS + 0.2:
+            return  # too close to planet
+
+        self.seed = (x, y, 0.0)
+
+        # Update or create marker
+        if self._marker_actor is not None:
+            self.plotter.remove_actor(self._marker_actor)  # type: ignore[union-attr]
+        marker = pv.Sphere(radius=0.15, center=self.seed)
+        self._marker_actor = self.plotter.add_mesh(  # type: ignore[union-attr]
+            marker, color="#ff6600", opacity=0.9,
         )
-        self.status = fig.text(
-            0.5,
-            0.02,
-            self._status_text(),
-            ha="center",
-            color=mpl.rcParams["text.color"],
-            fontsize=9,
-            family="monospace",
-        )
-        # Unbind 's' from matplotlib's default save-figure so it reaches _on_key
-        plt.rcParams["keymap.save"] = []
+        r_eq = np.hypot(x, y)
+        print(f"  Seed: ({x:+.2f}, {y:+.2f}, 0.00)  L≈{r_eq:.1f}")
 
-        connect = fig.canvas.mpl_connect
-        self._cids = [
-            connect("button_press_event", self._on_press),
-            connect("motion_notify_event", self._on_motion),
-            connect("button_release_event", self._on_release),
-            connect("key_press_event", self._on_key),
-        ]
-
-    def _marker_pixel_pos(self) -> np.ndarray:
-        """Forward-project marker 3D position to pixel coordinates."""
-        xv, yv, _ = proj3d.proj_transform(*self.pos, self.ax.get_proj())
-        return np.asarray(self.ax.transData.transform((xv, yv)))
-
-    def _screen_to_equatorial(self, xv: float, yv: float) -> np.ndarray | None:
-        """Ray-plane intersection: view coords to z=0 world coords."""
-        focal = self.ax._focal_length  # type: ignore[attr-defined]
-        zv = 1.0 if focal == np.inf else -1.0 / focal
-        p1 = np.array(
-            proj3d.inv_transform(xv, yv, zv, self.ax.invM)  # type: ignore[attr-defined]
-        ).ravel()
-        cam = np.asarray(self.ax._get_camera_loc())  # type: ignore[attr-defined]
-        direction = cam - p1
-        if direction[2] == 0:
-            return None
-        scale = p1[2] / direction[2]
-        return p1 - scale * direction
-
-    def _on_press(self, event: object) -> None:
-        """Start drag if left-click near marker."""
-        if getattr(event, "button", None) != 1:
+    def trace(self) -> None:
+        """Trace a field line from the current seed (T key)."""
+        if self.seed is None:
+            print("  No seed — click the equatorial plane first")
             return
-        if getattr(event, "inaxes", None) is not self.ax:
-            return
-        mpx = self._marker_pixel_pos()
-        ex, ey = getattr(event, "x", 0), getattr(event, "y", 0)
-        if np.hypot(ex - mpx[0], ey - mpx[1]) < self.pick_radius:
-            self.dragging = True
-            self.ax.disable_mouse_rotation()  # type: ignore[attr-defined]
 
-    def _is_near_marker(self, event: object) -> bool:
-        """Check if the mouse event is within pick_radius of the marker."""
-        ex, ey = getattr(event, "x", None), getattr(event, "y", None)
-        if ex is None or ey is None:
-            return False
-        mpx = self._marker_pixel_pos()
-        return float(np.hypot(ex - mpx[0], ey - mpx[1])) < self.pick_radius
-
-    def _set_hover(self, hovering: bool) -> None:
-        """Toggle hover highlight: hand cursor + enlarged marker."""
-        if hovering == self._hovering:
-            return
-        self._hovering = hovering
-        canvas = self.fig.canvas
-        if hovering:
-            canvas.set_cursor(Cursors.HAND)
-            self.marker.set_markersize(16)
-            self.marker.set_markeredgewidth(2.5)
-        else:
-            canvas.set_cursor(Cursors.POINTER)
-            self.marker.set_markersize(12)
-            self.marker.set_markeredgewidth(1.5)
-        canvas.draw_idle()
-
-    def _on_motion(self, event: object) -> None:
-        """Update marker on z=0 plane while dragging, hover highlight otherwise."""
-        if self.dragging:
-            xdata = getattr(event, "xdata", None)
-            ydata = getattr(event, "ydata", None)
-            if xdata is None or ydata is None:
-                return
-            p = self._screen_to_equatorial(xdata, ydata)
-            if p is None:
-                return
-            x = float(np.clip(p[0], -DOMAIN_HALF + 0.5, DOMAIN_HALF - 0.5))
-            y = float(np.clip(p[1], -DOMAIN_HALF + 0.5, DOMAIN_HALF - 0.5))
-            if np.hypot(x, y) < PLANET_RADIUS + 0.2:
-                return  # reject positions inside the planet
-            self.pos[:] = [x, y, 0.0]
-            self.marker.set_data_3d([x], [y], [0.0])  # type: ignore[attr-defined]
-            self.status.set_text(self._status_text())
-            self.fig.canvas.draw_idle()
-        else:
-            self._set_hover(self._is_near_marker(event))
-
-    def _on_release(self, event: object) -> None:
-        if self.dragging:
-            self.dragging = False
-            self.ax.mouse_init()  # type: ignore[attr-defined]
-
-    def _on_key(self, event: object) -> None:
-        """Key handler: T=trace, S=toggle slice, +/-=move slice."""
-        key = getattr(event, "key", None)
-        if key in ("t", "T"):
-            self._trace_from_marker()
-        elif key in ("s", "S"):
-            self._toggle_slice()
-        elif key in ("+", "="):
-            self._move_slice(1)
-        elif key == "-":
-            self._move_slice(-1)
-
-    def _trace_from_marker(self) -> None:
-        """Trace a field line from the current marker position."""
-        seed = (float(self.pos[0]), float(self.pos[1]), float(self.pos[2]))
         try:
             fl = trace_field_line(
-                self.ds,
-                seed,
-                step_size=0.1,
-                max_steps=5000,
-                direction="both",
-                null_threshold=1e-6,
+                self.ds, self.seed,
+                step_size=0.1, max_steps=5000,
+                direction="both", null_threshold=1e-6,
                 interpolator=self.interp,
             )
         except ValueError as exc:
-            print(f"  Cannot trace from {seed}: {exc}")
+            print(f"  Cannot trace from {self.seed}: {exc}")
             return
-        pts = fl.points
-        color = plt.get_cmap("cool")(len(self.traced_lines) % 8 / 7)
-        self.ax.plot(
-            pts[:, 0],
-            pts[:, 1],
-            pts[:, 2],
-            color=color,
-            linewidth=1.2,
-            alpha=0.9,
+
+        fl = attach_scalars(fl, self.ds, ["B1", "B2", "B3"])
+        bmag = np.sqrt(
+            fl.scalars["B1"] ** 2 + fl.scalars["B2"] ** 2 + fl.scalars["B3"] ** 2
         )
-        self.traced_lines.append(fl)
-        r_eq = np.hypot(self.pos[0], self.pos[1])
-        print(
-            f"  Traced line #{len(self.traced_lines)} from "
-            f"({self.pos[0]:.2f}, {self.pos[1]:.2f}), "
-            f"L\u2248{r_eq:.1f}, {fl.n_points} points"
+        fl = fl.with_scalars(**{"|B|": bmag})
+
+        add_field_line(
+            self.plotter, fl,  # type: ignore[arg-type]
+            scalar="|B|", cmap=self.cmap,
+            clim=(0, self.vmax), signed=False, radius=0.06,
         )
-        self.fig.canvas.draw_idle()
+        self._trace_count += 1
+        print(f"  Traced line #{self._trace_count} ({fl.n_points} points)")
 
-    def _toggle_slice(self) -> None:
-        """Toggle Bz color-map slice visibility."""
-        self._slice_visible = not self._slice_visible
-        if self._slice_visible:
-            self._draw_slice()
-        else:
-            # Remove colorbar first (while its mappable still exists)
-            if self._cbar is not None:
-                self._cbar.remove()
-                self._cbar = None
-            self._remove_slice()
-        self.status.set_text(self._status_text())
-        self.fig.canvas.draw_idle()
-
-    def _draw_slice(self) -> None:
-        """Draw (or redraw) the Bz contourf at the current z-index."""
-        # Remove old colorbar before its backing contour disappears
-        if self._cbar is not None:
-            self._cbar.remove()
-            self._cbar = None
-        self._remove_slice()
-        x_2d, y_2d, values, z_pos = _slice_bz(self.ds, self._slice_z_index)
-        cs = self.ax.contourf(
-            x_2d, y_2d, values,
-            levels=32, cmap="RdBu_r", alpha=0.7,
-            zdir="z", offset=z_pos,
-        )
-        self._slice_contour = cs
-        self._cbar = self.fig.colorbar(
-            cs, ax=self.ax, shrink=0.5, pad=0.08, label="$B_z$",
-        )
-
-    def _remove_slice(self) -> None:
-        """Remove existing slice contour from the axes."""
-        if self._slice_contour is not None:
-            self._slice_contour.remove()  # type: ignore[union-attr]
-            self._slice_contour = None
-
-    def _move_slice(self, delta: int) -> None:
-        """Move the slice by delta grid cells in z, clamped to bounds."""
-        new_idx = self._slice_z_index + delta
-        nz = self.ds.grid.dimensions[2]
-        if 0 <= new_idx < nz:
-            self._slice_z_index = new_idx
-            if self._slice_visible:
-                self._draw_slice()
-                self.status.set_text(self._status_text())
-                self.fig.canvas.draw_idle()
-
-    def _status_text(self) -> str:
-        r = np.hypot(self.pos[0], self.pos[1])
-        parts = [
-            f"Seed: ({self.pos[0]:+.2f}, {self.pos[1]:+.2f}, 0.00) L\u2248{r:.1f}",
-        ]
-        if self._slice_visible:
-            z_pos = self.ds.grid.coordinate_arrays()[2][self._slice_z_index]
-            parts.append(f"z={z_pos:+.2f} Bz slice")
-        parts.append("T: trace  S: slice  +/-: move")
-        return "  |  ".join(parts)
+    def clear(self) -> None:
+        """Clear all interactively traced lines (C key)."""
+        self._trace_count = 0
+        print("  Cleared interactive traces (re-run to reset fully)")
 
 
 def main() -> None:
@@ -392,9 +180,12 @@ def main() -> None:
         default="dark",
         help=f"Theme name or number ({', '.join(numbered)})",
     )
+    parser.add_argument(
+        "--save", action="store_true", help="Save screenshot instead of interactive",
+    )
     args = parser.parse_args()
     key = names[int(args.theme) - 1] if args.theme.isdigit() else args.theme
-    theme = all_available[key]
+    set_theme(key)
 
     # Build grid centered at origin
     dx = 2.0 * DOMAIN_HALF / N_CELLS
@@ -408,10 +199,9 @@ def main() -> None:
     fields = _dipole_field(grid)
     ds = FieldDataset.from_arrays(fields, grid, Normalization.identity())
 
-    # Pre-build interpolator for all traces
     interp = VectorFieldInterpolator.from_dataset(ds)
 
-    # Seed points at various L-shells
+    # Pre-trace field lines at various L-shells
     l_shells = [2.0, 3.0, 4.0, 5.0]
     seeds = _seed_points(l_shells, n_per_shell=3)
     print(f"Tracing {len(seeds)} field lines...")
@@ -420,90 +210,82 @@ def main() -> None:
     for seed in seeds:
         try:
             fl = trace_field_line(
-                ds,
-                seed,
-                step_size=0.1,
-                max_steps=5000,
-                direction="both",
-                null_threshold=1e-6,
-                interpolator=interp,
+                ds, seed, step_size=0.1, max_steps=5000,
+                direction="both", null_threshold=1e-6, interpolator=interp,
             )
             lines.append(fl)
         except ValueError:
-            pass  # seed at null or outside domain
+            pass
 
     print(f"  {len(lines)} lines traced successfully")
 
-    # Sample B components and compute |B| along each field line
-    print("Sampling |B| along field lines...")
-    lines_with_b = []
+    # Sample |B| along each line for coloring
+    colored_lines = []
     for fl in lines:
         fl = attach_scalars(fl, ds, ["B1", "B2", "B3"])
         bmag = np.sqrt(
             fl.scalars["B1"] ** 2 + fl.scalars["B2"] ** 2 + fl.scalars["B3"] ** 2
         )
-        lines_with_b.append(fl.with_scalars(**{"|B|": bmag}))
-    lines = lines_with_b
+        colored_lines.append(fl.with_scalars(**{"|B|": bmag}))
 
-    # Shared color limits across all lines
-    all_bmag = np.concatenate([fl.scalars["|B|"] for fl in lines])
-    valid_bmag = all_bmag[np.isfinite(all_bmag) & (all_bmag > 0)]
-    vmin_b = float(np.nanmin(valid_bmag))
-    vmax_b = float(np.nanpercentile(valid_bmag, 98))
+    all_bmag = np.concatenate([fl.scalars["|B|"] for fl in colored_lines])
+    valid = all_bmag[np.isfinite(all_bmag) & (all_bmag > 0)]
+    vmax = float(np.nanpercentile(valid, 98))
 
-    with use_theme(theme):
-        fig = plt.figure(figsize=(10, 8))
-        ax = fig.add_subplot(111, projection="3d")
+    cmap = resolve_cmap("plasma")
 
-        # Draw the planet
-        px, py, pz = _planet_mesh(PLANET_RADIUS, n=25)
-        ax.plot_surface(  # type: ignore[attr-defined]
-            px,
-            py,
-            pz,
-            color="#3a6ea5",
-            alpha=0.3,
-            edgecolor="#5a8ec5",
-            linewidth=0.2,
+    # Render
+    plotter = create_plotter(off_screen=args.save)
+
+    add_planet(plotter, radius=PLANET_RADIUS)
+
+    add_field_lines(
+        plotter, colored_lines,
+        scalar="|B|", cmap=cmap,
+        clim=(0, vmax), signed=False, radius=0.05,
+    )
+
+    lim = 5.5
+    add_axis_triad(plotter, length=2.0, labels=("$x$", "$y$", "$z$"))
+    add_equatorial_grid(plotter, xlim=(-lim, lim), ylim=(-lim, lim), coord_units="$R_E$")
+    set_camera(plotter, distance=18.0, elevation=15, azimuth=-60)
+
+    if args.save:
+        from pathlib import Path
+
+        outfile = Path(__file__).parent / "output" / "visual_dipole_3d.png"
+        outfile.parent.mkdir(exist_ok=True)
+        plotter.show(auto_close=False)
+        plotter.screenshot(str(outfile), transparent_background=True)
+        plotter.close()
+        print(f"Saved to {outfile}")
+    else:
+        # Interactive mode: click to seed, T to trace, C to clear
+        tracer = _InteractiveTracer(plotter, ds, interp, cmap, vmax)
+
+        # Add a transparent equatorial plane for picking
+        import pyvista as pv
+
+        eq_plane = pv.Plane(
+            center=(0, 0, 0), direction=(0, 0, 1),
+            i_size=2 * lim, j_size=2 * lim,
+            i_resolution=1, j_resolution=1,
+        )
+        plotter.add_mesh(eq_plane, opacity=0.0, pickable=True, name="eq_pick")
+
+        plotter.enable_surface_point_picking(
+            callback=tracer.on_pick,
+            show_message=False,
+            show_point=False,
+            left_clicking=True,
+            picker="cell",
         )
 
-        # Draw field lines, colored by |B|
-        for i, fl in enumerate(lines):
-            is_last = i == len(lines) - 1
-            plot_field_line(
-                ax, fl, color="|B|", cmap="plasma",
-                vmin=vmin_b, vmax=vmax_b,
-                linewidth=1.5, alpha=0.9,
-                colorbar=is_last,
-            )
+        plotter.add_key_event("t", tracer.trace)
+        plotter.add_key_event("c", tracer.clear)
 
-        # Axis limits and viewing angle
-        lim = 5.5
-        ax.set_xlim(-lim, lim)
-        ax.set_ylim(-lim, lim)
-        ax.set_zlim(-lim, lim)  # type: ignore[attr-defined]
-        ax.view_init(elev=15, azim=-60)  # type: ignore[attr-defined]
-        ax.set_aspect("equal")
-
-        # Apply clean 3D styling (must come after set_xlim/ylim)
-        style_3d_axes(
-            ax,
-            theme=theme,
-            axis_labels=("$x$", "$y$", "$z$"),
-            coord_units="$R_E$",
-        )
-
-        ax.set_title(
-            "Magnetic Dipole — $|B|$ along field lines",
-            fontsize=14,
-            pad=10,
-        )
-
-        plt.tight_layout()
-
-        dragger = SeedDragger(ax, fig, ds, interp)  # noqa: F841
-        print("Drag marker + T to trace | S to toggle Bz slice | +/- to move slice")
-        plt.show()
+        print("Click equatorial plane to seed | T: trace | C: clear | Scroll: zoom")
+        plotter.show()
 
 
 if __name__ == "__main__":

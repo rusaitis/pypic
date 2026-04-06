@@ -32,7 +32,6 @@ from pypic.plotting.lines import (
     plot_lines,
     plot_time_series,
 )
-from pypic.plotting.lines3d import plot_field_line, plot_trajectory
 from pypic.plotting.panels import plot_field_grid
 from pypic.plotting.scatter import plot_scatter
 from pypic.plotting.slices import add_contours, plot_field_slice
@@ -45,7 +44,6 @@ from pypic.plotting.styles import (
     get_active_theme,
     get_theme,
     set_theme,
-    style_3d_axes,
     style_legend,
     use_theme,
 )
@@ -76,7 +74,6 @@ __all__ = [
     "plot_comparison",
     "plot_cross_section",
     "plot_field_grid",
-    "plot_field_line",
     "plot_field_slice",
     "plot_kymograph",
     "plot_line",
@@ -87,10 +84,8 @@ __all__ = [
     "plot_scatter",
     "plot_streamlines",
     "plot_time_series",
-    "plot_trajectory",
     "save_theme",
     "set_theme",
-    "style_3d_axes",
     "style_legend",
     "use_theme",
 ]

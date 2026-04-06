@@ -16,6 +16,7 @@ dependencies = [
 
 [project.optional-dependencies]
 plot = ["matplotlib>=3.9"]
+3d = ["pyvista>=0.44"]
 lazy = ["dask>=2024.6"]
 
 [dependency-groups]
