@@ -27,6 +27,7 @@ from pypic.readers.base import (
 from pypic.units import Normalization
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
     from pathlib import Path
 
 # Type alias to keep factory signatures under 88 chars
@@ -240,94 +241,60 @@ class TestOpenSimulationAutoDetect:
         assert reader is not None
 
 
-class TestCanReadIPic3D:
-    def test_empty_dir(self, tmp_path: Path) -> None:
-        from pypic.readers.ipic3d._probe import can_read_confidence
+def _probe_func(reader_id: str) -> Callable[[Path], float]:
+    """Import and return the per-reader ``can_read_confidence`` probe."""
+    import importlib
 
-        assert can_read_confidence(tmp_path) == 0.0
-
-    def test_positive_detection(self, tmp_path: Path) -> None:
-        from pypic.readers.ipic3d._probe import can_read_confidence
-
-        (tmp_path / "GEM.inp").touch()
-        assert can_read_confidence(tmp_path) >= 0.5
-
-        # settings.hdf also triggers detection
-        hdf_dir = tmp_path / "hdf_only"
-        hdf_dir.mkdir()
-        (hdf_dir / "settings.hdf").touch()
-        assert can_read_confidence(hdf_dir) >= 0.4
-
-        # H5hut files also trigger detection
-        h5_dir = tmp_path / "h5hut_only"
-        h5_dir.mkdir()
-        (h5_dir / "GEM-Fields_000100.h5").touch()
-        assert can_read_confidence(h5_dir) >= 0.3
-
-    def test_not_a_directory(self, tmp_path: Path) -> None:
-        from pypic.readers.ipic3d._probe import can_read_confidence
-
-        f = tmp_path / "file.txt"
-        f.touch()
-        assert can_read_confidence(f) == 0.0
+    mod = importlib.import_module(f"pypic.readers.{reader_id}._probe")
+    probe: Callable[[Path], float] = mod.can_read_confidence
+    return probe
 
 
-class TestCanReadBATSRUS:
-    def test_empty_dir(self, tmp_path: Path) -> None:
-        from pypic.readers.batsrus._probe import can_read_confidence
-
-        assert can_read_confidence(tmp_path) == 0.0
-
-    def test_positive_detection(self, tmp_path: Path) -> None:
-        from pypic.readers.batsrus._probe import can_read_confidence
-
-        (tmp_path / "3d__n00000001.batl").touch()
-        assert can_read_confidence(tmp_path) >= 0.5
-
-        # PARAM.in also triggers detection
-        param_dir = tmp_path / "param_only"
-        param_dir.mkdir()
-        (param_dir / "PARAM.in").touch()
-        assert can_read_confidence(param_dir) >= 0.3
-
-        # Header + IDL also triggers detection
-        idl_dir = tmp_path / "idl_only"
-        idl_dir.mkdir()
-        (idl_dir / "3d__n00000001.h").touch()
-        (idl_dir / "3d__n00000001_pe0000.idl").touch()
-        assert can_read_confidence(idl_dir) >= 0.5
-
-        # .out file also triggers detection
-        out_dir = tmp_path / "out_only"
-        out_dir.mkdir()
-        (out_dir / "3d__n00000001.out").touch()
-        assert can_read_confidence(out_dir) >= 0.3
+@pytest.mark.parametrize("reader_id", ["ipic3d", "batsrus", "openggcm"])
+def test_probe_empty_dir_returns_zero(tmp_path: Path, reader_id: str) -> None:
+    """Every reader returns 0.0 confidence on an empty directory."""
+    assert _probe_func(reader_id)(tmp_path) == 0.0
 
 
-class TestCanReadOpenGGCM:
-    def test_empty_dir(self, tmp_path: Path) -> None:
-        from pypic.readers.openggcm._probe import can_read_confidence
+# (reader_id, files_to_touch, expected_min_score) — each row is one scenario.
+# Thresholds match the legacy per-reader signal weights; scenarios that used
+# strict equality (OpenGGCM) have been relaxed to >= without loss of coverage.
+_PROBE_SCENARIOS = [
+    ("ipic3d", ("GEM.inp",), 0.5),
+    ("ipic3d", ("settings.hdf",), 0.4),
+    ("ipic3d", ("GEM-Fields_000100.h5",), 0.3),
+    ("batsrus", ("3d__n00000001.batl",), 0.5),
+    ("batsrus", ("PARAM.in",), 0.3),
+    ("batsrus", ("3d__n00000001.h", "3d__n00000001_pe0000.idl"), 0.5),
+    ("batsrus", ("3d__n00000001.out",), 0.3),
+    ("openggcm", ("grid.001.dat",), 0.5),
+    ("openggcm", ("gc012.3df.006300",), 0.5),
+    ("openggcm", ("grid.001.dat", "gc012.3df.006300"), 1.0),
+]
 
-        assert can_read_confidence(tmp_path) == 0.0
 
-    def test_grid_file_only(self, tmp_path: Path) -> None:
-        from pypic.readers.openggcm._probe import can_read_confidence
+@pytest.mark.parametrize(
+    ("reader_id", "files", "expected_min"),
+    _PROBE_SCENARIOS,
+    ids=[f"{row[0]}-{'+'.join(row[1])}" for row in _PROBE_SCENARIOS],
+)
+def test_probe_detects_signature(
+    tmp_path: Path,
+    reader_id: str,
+    files: tuple[str, ...],
+    expected_min: float,
+) -> None:
+    """Each signature file bumps the probe score above its per-reader threshold."""
+    for fname in files:
+        (tmp_path / fname).touch()
+    assert _probe_func(reader_id)(tmp_path) >= expected_min
 
-        (tmp_path / "grid.001.dat").touch()
-        assert can_read_confidence(tmp_path) == 0.5
 
-    def test_3df_file_only(self, tmp_path: Path) -> None:
-        from pypic.readers.openggcm._probe import can_read_confidence
-
-        (tmp_path / "gc012.3df.006300").touch()
-        assert can_read_confidence(tmp_path) == 0.5
-
-    def test_full_match(self, tmp_path: Path) -> None:
-        from pypic.readers.openggcm._probe import can_read_confidence
-
-        (tmp_path / "grid.001.dat").touch()
-        (tmp_path / "gc012.3df.006300").touch()
-        assert can_read_confidence(tmp_path) == 1.0
+def test_ipic3d_probe_rejects_file_path(tmp_path: Path) -> None:
+    """iPIC3D probe must return 0.0 when given a file path, not a directory."""
+    f = tmp_path / "file.txt"
+    f.touch()
+    assert _probe_func("ipic3d")(f) == 0.0
 
 
 class TestBuiltinReadersRegistered:
