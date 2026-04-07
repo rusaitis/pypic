@@ -11,6 +11,10 @@ from pypic.plotting._format import (
     _format_time_value,  # noqa: F401  re-exported for backward compat
 )
 from pypic.plotting._guard import ensure_matplotlib
+from pypic.plotting._overlay_common import (
+    contrast_ratio,
+    resolve_rgba_override,
+)
 
 if TYPE_CHECKING:
     from matplotlib.axes import Axes
@@ -185,23 +189,6 @@ def _detect_overlay_defaults(
     return default_bg, default_fg, alpha
 
 
-def _contrast_ratio(
-    c1: tuple[float, float, float], c2: tuple[float, float, float]
-) -> float:
-    """WCAG relative-luminance contrast ratio between two RGB colors."""
-
-    def _lum(c: tuple[float, float, float]) -> float:
-        r, g, b = (
-            v / 12.92 if v <= 0.04045 else ((v + 0.055) / 1.055) ** 2.4
-            for v in c
-        )
-        return 0.2126 * r + 0.7152 * g + 0.0722 * b
-
-    l1, l2 = _lum(c1), _lum(c2)
-    lighter, darker = max(l1, l2), min(l1, l2)
-    return (lighter + 0.05) / (darker + 0.05)
-
-
 def _pick_overlay_variant(
     content_colors: list[tuple[float, float, float]],
 ) -> OverlayVariant | None:
@@ -215,32 +202,13 @@ def _pick_overlay_variant(
     default_bg = _detect_overlay_defaults(None)[0]
     alt_bg = _detect_overlay_defaults("alt")[0]
 
-    avg_default = sum(_contrast_ratio(c, default_bg) for c in content_colors) / len(
+    avg_default = sum(contrast_ratio(c, default_bg) for c in content_colors) / len(
         content_colors
     )
-    avg_alt = sum(_contrast_ratio(c, alt_bg) for c in content_colors) / len(
+    avg_alt = sum(contrast_ratio(c, alt_bg) for c in content_colors) / len(
         content_colors
     )
     return "alt" if avg_alt > avg_default else None
-
-
-def _resolve_rgba(
-    color: str | tuple[float, ...] | None,
-    alpha: float | None,
-    fallback: tuple[float, float, float],
-    fallback_alpha: float = 0.65,
-) -> tuple[float, float, float, float]:
-    """Resolve an optional color override to RGBA, falling back to *fallback*.
-
-    When *alpha* is ``None``, the theme's overlay alpha (*fallback_alpha*)
-    is used.  Pass ``0.0`` explicitly for a transparent overlay.
-    """
-    a = fallback_alpha if alpha is None else alpha
-    if color is None:
-        return (*fallback, a)
-    from matplotlib.colors import to_rgba
-
-    return (*to_rgba(color)[:3], a)
 
 
 def _build_progress_bar(
@@ -412,15 +380,17 @@ def add_badge(
     if bar_height is None:
         bar_height = _theme_val("progress_bar_height", 4.0)
 
-    bg_rgba = _resolve_rgba(bg_color, bg_alpha, default_bg, overlay_alpha)
-    resolved_text = _resolve_rgba(text_color, text_alpha, default_fg)
+    bg_rgba = resolve_rgba_override(bg_color, bg_alpha, (*default_bg, overlay_alpha))
+    resolved_text = resolve_rgba_override(text_color, text_alpha, (*default_fg, 0.65))
 
     if track_color is None:
         track_key = "track_alt_color" if variant == "alt" else "track_color"
         track_rgba = _theme_val(track_key, (0.3, 0.3, 0.3, 0.3))
     else:
         effective_alpha = overlay_alpha if bg_alpha is None else bg_alpha
-        track_rgba = _resolve_rgba(track_color, effective_alpha * 0.4, default_fg)
+        track_rgba = resolve_rgba_override(
+            track_color, effective_alpha * 0.4, (*default_fg, 0.65)
+        )
 
     status_text = _format_status_text(
         text=text,
@@ -537,8 +507,8 @@ def add_label(
 
     default_bg, default_fg, overlay_alpha = _detect_overlay_defaults(variant)
 
-    bg_rgba = _resolve_rgba(bg_color, bg_alpha, default_bg, overlay_alpha)
-    resolved_text = _resolve_rgba(text_color, text_alpha, default_fg)
+    bg_rgba = resolve_rgba_override(bg_color, bg_alpha, (*default_bg, overlay_alpha))
+    resolved_text = resolve_rgba_override(text_color, text_alpha, (*default_fg, 0.65))
 
     props = {"fontsize": fontsize, "fontweight": fontweight, "color": resolved_text, "ha": ha}
     text_area = TextArea(label, textprops=props, multilinebaseline=True)
@@ -638,8 +608,8 @@ def add_legend(
 
     default_bg, default_fg, overlay_alpha = _detect_overlay_defaults(variant)
 
-    bg_rgba = _resolve_rgba(bg_color, bg_alpha, default_bg, overlay_alpha)
-    resolved_text = _resolve_rgba(text_color, text_alpha, default_fg)
+    bg_rgba = resolve_rgba_override(bg_color, bg_alpha, (*default_bg, overlay_alpha))
+    resolved_text = resolve_rgba_override(text_color, text_alpha, (*default_fg, 0.65))
 
     rows: list[HPacker] = []
     line_height = fontsize * 0.4

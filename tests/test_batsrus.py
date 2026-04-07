@@ -307,6 +307,11 @@ class TestOpenBatsrusDetection:
         steps = reader.available_timesteps(HDF5_DIR)
         assert 0 in steps
 
+    def test_empty_dir_raises_file_not_found(self, tmp_path) -> None:  # type: ignore[no-untyped-def]
+        """Convention (Unit 6): missing-output → FileNotFoundError."""
+        with pytest.raises(FileNotFoundError, match="No BATSRUS output"):
+            open_batsrus(tmp_path)
+
 
 class TestIDLAMR:
     """Test IDL per-cell reader with AMR synthetic grid."""

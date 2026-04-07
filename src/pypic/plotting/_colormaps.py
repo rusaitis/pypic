@@ -7,6 +7,8 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 if TYPE_CHECKING:
+    from matplotlib.colors import Colormap
+
     from pypic.fields import FieldInfo
     from pypic.plotting.styles import PlotTheme
     from pypic.types import FloatArray
@@ -14,8 +16,8 @@ if TYPE_CHECKING:
 
 def _register_custom_colormaps() -> None:
     """Register pypic's custom colormaps with matplotlib (once)."""
-    from matplotlib.colors import LinearSegmentedColormap
     import matplotlib
+    from matplotlib.colors import LinearSegmentedColormap
 
     # Blue-black-red diverging colormap for signed fields.
     # Gradient: cyan → blue → dark → black → dark → red → orange
@@ -134,6 +136,58 @@ def resolve_colormap(
     if is_positive_definite(name, data, info):
         return theme.sequential_cmap
     return theme.diverging_cmap
+
+
+def resolve_field_colormap(
+    name: str,
+    data: FloatArray,
+    theme: PlotTheme,
+    *,
+    info: FieldInfo | None = None,
+    cmap: str | Colormap | None = None,
+) -> tuple[str, Colormap]:
+    """Choose the colormap for a field, returning both name and Colormap object.
+
+    Single source of truth for "given a field, pick the right colormap":
+    matplotlib backends consume the string name, pyvista needs the
+    :class:`~matplotlib.colors.Colormap` object. Wraps
+    :func:`resolve_colormap` (which only returns the name) and looks up
+    the matching Colormap so both backends route every overlay through
+    one dispatcher with identical positive-definite detection.
+
+    Parameters
+    ----------
+    name : str
+        Field name (used for positive-definite detection).
+    data : FloatArray
+        Field values (used as last-resort fallback for sign detection).
+    theme : PlotTheme
+        Active theme (provides default sequential / diverging cmaps).
+    info : FieldInfo | None
+        Field metadata, if available.
+    cmap : str, Colormap, or None
+        User override. ``Colormap`` instances pass through unchanged
+        (returned with their ``.name`` attribute). String names are
+        looked up directly. ``None`` triggers auto-selection from the
+        theme based on positive-definite detection.
+
+    Returns
+    -------
+    tuple[str, Colormap]
+        ``(cmap_name, colormap_object)``. The two are always consistent.
+    """
+    import matplotlib.pyplot as plt
+    from matplotlib.colors import Colormap as _Colormap
+
+    # Pre-resolved Colormap object: pass through, surface its registered name.
+    if isinstance(cmap, _Colormap):
+        return (cmap.name, cmap)
+
+    # String name (user override) or None (auto-detect): both routes go
+    # through resolve_colormap so the auto-detection logic stays in one
+    # place. The result is a name; look it up to get the Colormap.
+    cmap_name = resolve_colormap(name, data, theme, info=info, cmap=cmap)
+    return (cmap_name, plt.colormaps[cmap_name])
 
 
 def symmetric_clim(data: FloatArray) -> tuple[float, float]:

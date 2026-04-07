@@ -26,6 +26,7 @@ from pypic.readers.ipic3d import (
     parse_settings_hdf,
     to_simulation_config,
 )
+from pypic.readers.ipic3d._conserved import load_ipic3d_auxiliary
 
 DATA = Path("tests/data/ipic3d-synthetic")
 PHDF5_DIR = DATA / "phdf5"
@@ -527,6 +528,31 @@ class TestConservedToTabular:
         assert_allclose(tab["momentum"], cq.momentum)
         for s in range(len(cq.species_npart)):
             assert_allclose(tab[f"npart_s{s}"], cq.species_npart[s])
+
+
+class TestAuxiliaryErrors:
+    """Error-type contract for ``load_ipic3d_auxiliary``.
+
+    Convention (see Unit 6 in TASKS-cleanup.md):
+    - ``KeyError``        → unknown dataset name
+    - ``FileNotFoundError`` → recognized name, missing files on disk
+    """
+
+    def test_unknown_name_raises_key_error(self, tmp_path: Path) -> None:
+        with pytest.raises(KeyError, match="Unknown iPIC3D auxiliary"):
+            load_ipic3d_auxiliary(tmp_path, "no_such_dataset")
+
+    def test_missing_conserved_raises_file_not_found(
+        self, tmp_path: Path
+    ) -> None:
+        with pytest.raises(FileNotFoundError, match="ConservedQuantities"):
+            load_ipic3d_auxiliary(tmp_path, "conserved_quantities")
+
+    def test_missing_species_quantities_raises_file_not_found(
+        self, tmp_path: Path
+    ) -> None:
+        with pytest.raises(FileNotFoundError, match="SpeciesQuantities"):
+            load_ipic3d_auxiliary(tmp_path, "species_quantities")
 
 
 class TestSelectiveReadPhdf5:

@@ -246,6 +246,96 @@ class TestSymmetricClim:
         vmin, vmax = symmetric_clim(np.array([np.nan, np.nan]))
         assert vmin < 0 < vmax  # epsilon expansion, not degenerate (0, 0)
 
+
+class TestResolveFieldColormap:
+    """Single-source-of-truth dispatcher for field → colormap.
+
+    The matplotlib backend reads the returned name; the pyvista backend
+    reads the returned Colormap object. Both backends call this function,
+    so the same canonical names always pick the same colormap.
+    """
+
+    @pytest.fixture
+    def theme(self):  # type: ignore[no-untyped-def]
+        from pypic.plotting.styles import get_theme
+
+        return get_theme()
+
+    @pytest.mark.parametrize(
+        ("name", "values", "quantity_type", "expect_diverging"),
+        [
+            ("B1", np.array([-1.0, 0.0, 1.0]), "b_field", True),
+            ("rho_c", np.array([-1.0, 0.0, 1.0]), "charge_density", True),
+            ("J_dot_E", np.array([-1.0, 0.0, 1.0]), "power_density", True),
+            ("psi", np.array([-1.0, 0.0, 1.0]), None, True),
+            ("div_B", np.array([-1.0, 0.0, 1.0]), None, True),
+            ("|B|", np.array([0.5, 1.0, 1.5]), None, False),
+            ("n_s0", np.array([0.5, 1.0, 1.5]), "density", False),
+        ],
+        ids=["B1", "rho_c", "J_dot_E", "psi", "div_B", "abs_B", "n_s0"],
+    )
+    def test_canonical_field_dispatch(  # type: ignore[no-untyped-def]
+        self,
+        theme,
+        name: str,
+        values: np.ndarray,
+        quantity_type: str | None,
+        expect_diverging: bool,
+    ) -> None:
+        """Each canonical field name resolves to the right theme cmap."""
+        from pypic.fields import FieldInfo
+        from pypic.plotting._colormaps import resolve_field_colormap
+
+        info = (
+            FieldInfo(quantity_type=quantity_type, long_name="", si_unit="")
+            if quantity_type
+            else None
+        )
+        cmap_name, cmap_obj = resolve_field_colormap(
+            name, values, theme, info=info
+        )
+        # Returned tuple is internally consistent
+        assert cmap_obj.name == cmap_name
+        # Picks the right family from the theme
+        expected = theme.diverging_cmap if expect_diverging else theme.sequential_cmap
+        assert cmap_name == expected
+
+    def test_string_override_passes_through(self, theme) -> None:  # type: ignore[no-untyped-def]
+        """A user-supplied cmap name bypasses auto-detection."""
+        from pypic.plotting._colormaps import resolve_field_colormap
+
+        cmap_name, cmap_obj = resolve_field_colormap(
+            "B1", np.array([-1.0, 1.0]), theme, cmap="viridis"
+        )
+        assert cmap_name == "viridis"
+        assert cmap_obj.name == "viridis"
+
+    def test_colormap_object_passes_through(self, theme) -> None:  # type: ignore[no-untyped-def]
+        """A pre-built Colormap is returned unchanged with its name."""
+        import matplotlib.pyplot as plt
+
+        from pypic.plotting._colormaps import resolve_field_colormap
+
+        plasma = plt.colormaps["plasma"]
+        cmap_name, cmap_obj = resolve_field_colormap(
+            "B1", np.array([-1.0, 1.0]), theme, cmap=plasma
+        )
+        assert cmap_obj is plasma
+        assert cmap_name == "plasma"
+
+    def test_matches_resolve_colormap_string_path(self, theme) -> None:  # type: ignore[no-untyped-def]
+        """Returned name matches the legacy string-only resolver."""
+        from pypic.plotting._colormaps import resolve_colormap, resolve_field_colormap
+
+        for name, values in [
+            ("B1", np.array([-1.0, 1.0])),
+            ("|B|", np.array([0.0, 1.0])),
+            ("rho_c", np.array([-1.0, 1.0])),
+        ]:
+            legacy = resolve_colormap(name, values, theme)
+            new_name, _ = resolve_field_colormap(name, values, theme)
+            assert legacy == new_name
+
     def test_uniform_field(self) -> None:
         vmin, vmax = symmetric_clim(np.array([0.0, 0.0, 0.0]))
         assert vmin < 0 < vmax

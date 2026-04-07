@@ -216,16 +216,18 @@ def add_inset_colorbar(
         _claim_corner,
         _detect_overlay_defaults,
         _resolve_border,
-        _resolve_rgba,
     )
+    from pypic.plotting._overlay_common import resolve_rgba_override
     from pypic.plotting.styles import _theme_val
 
     actual_loc = _claim_corner(ax, "lower right", loc)
 
     default_bg, default_fg, overlay_alpha = _detect_overlay_defaults(variant)
 
-    bg_rgba = _resolve_rgba(bg_color, bg_alpha, default_bg, overlay_alpha)
-    fg_rgba = _resolve_rgba(text_color, text_alpha, default_fg)
+    bg_rgba = resolve_rgba_override(
+        bg_color, bg_alpha, (*default_bg, overlay_alpha)
+    )
+    fg_rgba = resolve_rgba_override(text_color, text_alpha, (*default_fg, 0.65))
 
     rounding: float = _theme_val("overlay_rounding", 0.6)
     overlay_pad: float = _theme_val("overlay_padding", 0.4)

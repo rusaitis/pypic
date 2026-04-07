@@ -9,6 +9,7 @@ from pypic.plotting._format import (
     _format_status_text,
     _normalize_loc,
 )
+from pypic.plotting._overlay_common import resolve_rgba_override
 from pypic.plotting.pyvista._guard import ensure_pyvista
 from pypic.plotting.pyvista._overlay import (
     _overlay_layout,
@@ -24,32 +25,6 @@ if TYPE_CHECKING:
     import pyvista as pv
 
     from pypic.plotting.styles import PlotTheme
-
-
-def _resolve_rgba_override(
-    color: str | tuple[float, ...] | None,
-    alpha: float | None,
-    fallback: tuple[float, float, float, float],
-) -> tuple[float, float, float, float]:
-    """Resolve an optional user (color, alpha) override to RGBA.
-
-    Mirrors :func:`pypic.plotting._badge._resolve_rgba` semantics for
-    the pyvista backend so ``bg_color`` / ``text_color`` / ``track_color``
-    overrides behave identically across both paths. When both *color* and
-    *alpha* are ``None``, returns *fallback* unchanged.
-    """
-    if color is None and alpha is None:
-        return fallback
-    from matplotlib.colors import to_rgb
-
-    if color is None:
-        a = alpha if alpha is not None else fallback[3]
-        return (fallback[0], fallback[1], fallback[2], a)
-    rgb = (
-        to_rgb(color) if isinstance(color, str) else (color[0], color[1], color[2])
-    )
-    a = alpha if alpha is not None else fallback[3]
-    return (rgb[0], rgb[1], rgb[2], a)
 
 
 def add_badge(
@@ -174,11 +149,11 @@ def add_badge(
     )
 
     # Apply color overrides on top of theme/variant defaults
-    bg_rgba = _resolve_rgba_override(bg_color, bg_alpha, default_bg)
-    text_rgba = _resolve_rgba_override(
+    bg_rgba = resolve_rgba_override(bg_color, bg_alpha, default_bg)
+    text_rgba = resolve_rgba_override(
         text_color, text_alpha, (*default_text[:3], text_alpha),
     )
-    track_rgba = _resolve_rgba_override(track_color, None, default_track)
+    track_rgba = resolve_rgba_override(track_color, None, default_track)
 
     status_text = _format_status_text(
         text=text,
@@ -390,8 +365,8 @@ def add_label(
         t, variant,
     )
 
-    bg_rgba = _resolve_rgba_override(bg_color, bg_alpha, default_bg)
-    text_rgba = _resolve_rgba_override(
+    bg_rgba = resolve_rgba_override(bg_color, bg_alpha, default_bg)
+    text_rgba = resolve_rgba_override(
         text_color, text_alpha, (*default_text[:3], text_alpha),
     )
 

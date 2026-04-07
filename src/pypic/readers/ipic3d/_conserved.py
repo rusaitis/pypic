@@ -439,7 +439,10 @@ def load_ipic3d_auxiliary(
     Raises
     ------
     KeyError
-        If *name* is not recognized or data is not found.
+        If *name* is not a recognized auxiliary dataset name.
+    FileNotFoundError
+        If *name* is recognized but the underlying files are missing
+        from *path*.
     """
     if name == "conserved_quantities":
         cq_file = path / "ConservedQuantities.txt"
@@ -454,7 +457,7 @@ def load_ipic3d_auxiliary(
                 f"No ConservedQuantities data found in {path}. "
                 f"Expected ConservedQuantities.txt or info-conserved/"
             )
-            raise KeyError(msg)
+            raise FileNotFoundError(msg)
 
         return conserved_to_tabular(cq)
 
@@ -462,7 +465,7 @@ def load_ipic3d_auxiliary(
         sq_file = path / "SpeciesQuantities.txt"
         if not sq_file.exists():
             msg = f"No SpeciesQuantities.txt found in {path}"
-            raise KeyError(msg)
+            raise FileNotFoundError(msg)
         return load_species_quantities(sq_file)
 
     msg = f"Unknown iPIC3D auxiliary dataset {name!r}"

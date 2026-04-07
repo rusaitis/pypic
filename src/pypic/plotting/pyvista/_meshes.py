@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Literal
 import numpy as np
 
 from pypic.plotting.pyvista._guard import ensure_pyvista
-from pypic.plotting.pyvista._theme import _resolve_theme, resolve_cmap
+from pypic.plotting.pyvista._theme import _resolve_theme
 
 if TYPE_CHECKING:
     import pyvista as pv
@@ -148,26 +148,26 @@ def _auto_resolve(
 
     Returns (values, resolved_cmap, clim, label).
     """
-    from pypic.plotting._colormaps import is_positive_definite, symmetric_clim
+    from pypic.plotting._colormaps import (
+        is_positive_definite,
+        resolve_field_colormap,
+        symmetric_clim,
+    )
     from pypic.plotting._labels import field_label
     from pypic.plotting._resolve import resolve_field_values
 
     # Values with optional unit conversion
     values = resolve_field_values(data_2d, field, units)
+    info = data_2d.field_info(field)
+    t = _resolve_theme(theme)
 
-    # Colormap: user override > metadata auto-select > theme default
-    if cmap is None:
-        info = data_2d.field_info(field)
-        if is_positive_definite(field, values, info):
-            resolved_cmap = resolve_cmap(None, signed=False, theme=theme)
-        else:
-            resolved_cmap = resolve_cmap(None, signed=True, theme=theme)
-    else:
-        resolved_cmap = resolve_cmap(cmap, theme=theme)
+    # Colormap: shared dispatcher with the matplotlib backend.
+    _, resolved_cmap = resolve_field_colormap(
+        field, values, t, info=info, cmap=cmap
+    )
 
     # Clim: user override > auto (symmetric for signed, (0, max) for positive)
     if clim is None:
-        info = data_2d.field_info(field)
         if is_positive_definite(field, values, info):
             vmax = float(np.nanmax(values))
             clim = (0.0, vmax if vmax > 0 else 1e-8)
@@ -176,7 +176,6 @@ def _auto_resolve(
 
     # Label: user override > metadata + units
     if scalar_label is None:
-        info = data_2d.field_info(field)
         if info is not None:
             scalar_label = field_label(info, unit_str=units or "")
         else:
