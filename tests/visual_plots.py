@@ -13,12 +13,17 @@ Output goes to ``tests/output/``.
 from __future__ import annotations
 
 import argparse
+import sys
 from pathlib import Path
 
 import matplotlib
 import numpy as np
 
 matplotlib.use("Agg")
+
+# Allow running as `python tests/visual_plots.py` from any cwd by adding
+# the project root to sys.path so `tests._helpers` resolves.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import matplotlib.pyplot as plt
 
@@ -47,65 +52,10 @@ from pypic.plotting import (
     use_theme,
 )
 from pypic.plotting.styles import apply_rounding
-from pypic.readers.base import FieldDataset, GridInfo, TabularData
-from pypic.units import Normalization
+from pypic.readers.base import TabularData
+from tests._helpers import make_harris_dataset
 
 OUTPUT_DIR = Path(__file__).parent / "output"
-
-GRID = GridInfo(
-    dimensions=(40, 30, 20),
-    spacing=(0.5, 0.5, 0.5),
-    origin=(0.0, 0.0, 0.0),
-)
-
-
-def _make_harris_fields(
-    y_center: float = 7.5,
-) -> dict[str, np.ndarray]:
-    """Harris-like current sheet with density enhancement at midplane."""
-    x, y, z = np.meshgrid(
-        np.linspace(0, 19.5, 40),
-        np.linspace(0, 14.5, 30),
-        np.linspace(0, 9.5, 20),
-        indexing="ij",
-    )
-
-    bx = np.tanh((y - y_center) / 2.0)
-    by = 0.1 * np.sin(2 * np.pi * x / 20.0)
-    bz = 0.05 * np.cos(2 * np.pi * z / 10.0)
-
-    ex = 0.01 * np.sin(np.pi * y / 15.0)
-    ey = -0.02 * np.cos(np.pi * x / 20.0)
-    ez = 0.005 * np.ones_like(x)
-
-    vx = 0.1 * np.tanh((y - y_center) / 3.0)
-    vy = 0.05 * np.sin(2 * np.pi * x / 20.0)
-    vz = 0.02 * np.cos(np.pi * z / 10.0)
-
-    rho_m = 1.0 + 0.5 / np.cosh((y - y_center) / 2.0) ** 2
-    pressure = 0.5 + 0.3 / np.cosh((y - y_center) / 2.0) ** 2
-
-    return {
-        "B1": bx,
-        "B2": by,
-        "B3": bz,
-        "E1": ex,
-        "E2": ey,
-        "E3": ez,
-        "V1": vx,
-        "V2": vy,
-        "V3": vz,
-        "rho_m": rho_m,
-        "P": pressure,
-    }
-
-
-def _make_dataset(y_center: float = 7.5) -> FieldDataset:
-    return FieldDataset.from_arrays(
-        _make_harris_fields(y_center),
-        GRID,
-        Normalization.identity(),
-    )
 
 
 def _make_tabular() -> TabularData:
@@ -141,8 +91,8 @@ def _save(fig: plt.Figure, plot_name: str, theme: PlotTheme) -> None:
 def generate(theme: PlotTheme) -> None:
     print(f"Generating {theme.name} theme plots...")
 
-    ds_a = _make_dataset(y_center=7.5)
-    ds_b = _make_dataset(y_center=8.0)
+    ds_a = make_harris_dataset(y_center=7.5)
+    ds_b = make_harris_dataset(y_center=8.0)
     tabular = _make_tabular()
 
     # 1. Single slice — stored field + badge

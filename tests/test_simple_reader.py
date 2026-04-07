@@ -21,6 +21,7 @@ from pypic.readers.base import (
     SimulationConfig,
 )
 from pypic.units import Normalization
+from tests._helpers import make_uniform_grid
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -32,12 +33,7 @@ ORIGIN = (0.0, 0.0, 0.0)
 
 
 def _sample_grid() -> GridInfo:
-    return GridInfo(
-        dimensions=DIMS,
-        spacing=SPACING,
-        origin=ORIGIN,
-        geometry=CARTESIAN,
-    )
+    return make_uniform_grid(*DIMS, spacing=SPACING, origin=ORIGIN)
 
 
 def _sample_config(

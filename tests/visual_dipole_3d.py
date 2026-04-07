@@ -19,8 +19,15 @@ Run with::
 from __future__ import annotations
 
 import argparse
+import sys
+from pathlib import Path
+from typing import TYPE_CHECKING
 
 import numpy as np
+
+# Allow running as `python tests/visual_dipole_3d.py` from any cwd by adding
+# the project root to sys.path so `tests._helpers` resolves.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from pypic.plotting import available_themes, set_theme
 from pypic.plotting.pyvista import (
@@ -33,41 +40,19 @@ from pypic.plotting.pyvista import (
     resolve_cmap,
     set_camera,
 )
-from pypic.readers.base import FieldDataset, GridInfo
 from pypic.traces import (
     VectorFieldInterpolator,
     attach_scalars,
     trace_field_line,
 )
-from pypic.units import Normalization
+from tests._helpers import make_dipole_dataset
+
+if TYPE_CHECKING:
+    from pypic.readers.base import FieldDataset
 
 PLANET_RADIUS = 1.0
 DOMAIN_HALF = 6.0
 N_CELLS = 80
-
-
-def _dipole_field(
-    grid: GridInfo,
-    moment: float = 1.0,
-    planet_radius: float = PLANET_RADIUS,
-) -> dict[str, np.ndarray]:
-    """Compute analytical dipole B field on the grid, zeroed inside the planet."""
-    coords = grid.coordinate_arrays()
-    x, y, z = np.meshgrid(*coords, indexing="ij")
-    r = np.sqrt(x**2 + y**2 + z**2)
-    r_safe = np.where(r > 0, r, 1.0)
-    r5 = r_safe**5
-
-    bx = 3.0 * moment * x * z / r5
-    by = 3.0 * moment * y * z / r5
-    bz = moment * (3.0 * z**2 - r_safe**2) / r5
-
-    inside = r < planet_radius
-    bx[inside] = 0.0
-    by[inside] = 0.0
-    bz[inside] = 0.0
-
-    return {"B1": bx, "B2": by, "B3": bz}
 
 
 def _seed_points(
@@ -258,17 +243,10 @@ def main() -> None:
     key = names[int(args.theme) - 1] if args.theme.isdigit() else args.theme
     set_theme(key)
 
-    # Build grid centered at origin
-    dx = 2.0 * DOMAIN_HALF / N_CELLS
-    grid = GridInfo(
-        dimensions=(N_CELLS, N_CELLS, N_CELLS),
-        spacing=(dx, dx, dx),
-        origin=(-DOMAIN_HALF, -DOMAIN_HALF, -DOMAIN_HALF),
-    )
-
     print("Computing dipole field...")
-    fields = _dipole_field(grid)
-    ds = FieldDataset.from_arrays(fields, grid, Normalization.identity())
+    ds = make_dipole_dataset(
+        n_cells=N_CELLS, domain_half=DOMAIN_HALF, planet_radius=PLANET_RADIUS
+    )
 
     interp = VectorFieldInterpolator.from_dataset(ds)
 

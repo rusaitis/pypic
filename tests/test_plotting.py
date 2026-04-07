@@ -42,18 +42,17 @@ from pypic.plotting.styles import _resolve_theme_arg  # noqa: E402
 from pypic.readers.base import FieldDataset, GridInfo, TabularData  # noqa: E402
 from pypic.selections import PlaneSelection  # noqa: E402
 from pypic.units import Normalization  # noqa: E402
+from tests._helpers import make_uniform_grid  # noqa: E402
 
 
 @pytest.fixture
 def grid_2d() -> GridInfo:
-    return GridInfo(dimensions=(10, 8), spacing=(1.0, 1.0), origin=(0.0, 0.0))
+    return make_uniform_grid(10, 8)
 
 
 @pytest.fixture
 def grid_3d() -> GridInfo:
-    return GridInfo(
-        dimensions=(10, 8, 6), spacing=(1.0, 1.0, 1.0), origin=(0.0, 0.0, 0.0)
-    )
+    return make_uniform_grid(10, 8, 6)
 
 
 @pytest.fixture
@@ -90,11 +89,10 @@ def ds_3d(grid_3d: GridInfo) -> FieldDataset:
 
 @pytest.fixture
 def ds_1d() -> FieldDataset:
-    grid = GridInfo(dimensions=(20,), spacing=(0.5,), origin=(0.0,))
     rng = np.random.default_rng(99)
     return FieldDataset.from_arrays(
         {"B1": rng.standard_normal(20)},
-        grid,
+        make_uniform_grid(20, spacing=0.5),
         Normalization.identity(),
     )
 

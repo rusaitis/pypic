@@ -15,16 +15,12 @@ from pypic.readers.base import (
     _default_aliases,
 )
 from pypic.units import Normalization, SpeciesInfo
+from tests._helpers import make_synthetic_fielddataset, make_uniform_grid
 
 
 @pytest.fixture
 def sample_grid():
-    return GridInfo(
-        dimensions=(8, 6, 4),
-        spacing=(0.5, 0.5, 0.5),
-        origin=(0.0, 0.0, 0.0),
-        geometry=CARTESIAN,
-    )
+    return make_uniform_grid(8, 6, 4, spacing=0.5)
 
 
 @pytest.fixture
@@ -39,9 +35,9 @@ def sample_fields():
 
 
 @pytest.fixture
-def sample_dataset(sample_grid, sample_fields):
-    return FieldDataset.from_arrays(
-        sample_fields, sample_grid, Normalization.identity()
+def sample_dataset(sample_grid):
+    return make_synthetic_fielddataset(
+        sample_grid, ("B1", "B2", "B3", "rho_c")
     )
 
 
