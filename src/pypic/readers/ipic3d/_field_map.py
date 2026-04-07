@@ -111,13 +111,7 @@ _PHDF5_DIAGONAL_PRESSURE = {"pXX", "pYY", "pZZ"}
 
 _H5HUT_DIAGONAL_PRESSURE = {"Pxx", "Pyy", "Pzz"}
 
-_PHDF5_EFLUX_MAP: dict[str, str] = {
-    "EFx": "EF1",
-    "EFy": "EF2",
-    "EFz": "EF3",
-}
-
-_H5HUT_EFLUX_MAP: dict[str, str] = {
+_EFLUX_MAP: dict[str, str] = {
     "EFx": "EF1",
     "EFy": "EF2",
     "EFz": "EF3",
@@ -172,7 +166,7 @@ def per_species_eflux_canonical(component: str, species_index: int) -> str:
     >>> per_species_eflux_canonical("EFz", 1)
     'EF3_s1'
     """
-    canonical = _PHDF5_EFLUX_MAP[component]
+    canonical = _EFLUX_MAP[component]
     return f"{canonical}_s{species_index}"
 
 

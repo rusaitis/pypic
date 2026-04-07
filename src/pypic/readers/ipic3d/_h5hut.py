@@ -13,9 +13,9 @@ from pypic.readers.base import FieldDataset, SimulationConfig, TabularData
 from pypic.readers.ipic3d._config import IPic3DConfig, to_simulation_config
 from pypic.readers.ipic3d._conserved import detect_conserved, load_ipic3d_auxiliary
 from pypic.readers.ipic3d._field_map import (
+    _EFLUX_MAP,
     _FIELD_NAME_MAP,
     _H5HUT_DIAGONAL_PRESSURE,
-    _H5HUT_EFLUX_MAP,
     _H5HUT_FIELD_MAP,
     _PRESSURE_COMPONENT_MAP,
     compute_totals_and_filter,
@@ -241,7 +241,7 @@ class IPic3DH5hutReader:
                         field_data[canon] = data
 
                 # Energy flux: EFx_{s} → EF1_s{s}, etc.
-                for efcomp, _ef_canon_base in _H5HUT_EFLUX_MAP.items():
+                for efcomp, _ef_canon_base in _EFLUX_MAP.items():
                     ef_key = f"{efcomp}_{s}"
                     if ef_key in available:
                         consumed.add(ef_key)

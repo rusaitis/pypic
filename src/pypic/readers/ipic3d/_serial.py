@@ -12,9 +12,9 @@ from pypic.readers.base import FieldDataset, SimulationConfig, TabularData
 from pypic.readers.ipic3d._config import IPic3DConfig, to_simulation_config
 from pypic.readers.ipic3d._conserved import detect_conserved, load_ipic3d_auxiliary
 from pypic.readers.ipic3d._field_map import (
+    _EFLUX_MAP,
     _FIELD_NAME_MAP,
     _PHDF5_DIAGONAL_PRESSURE,
-    _PHDF5_EFLUX_MAP,
     _PHDF5_PRESSURE_MAP,
     compute_totals_and_filter,
     expand_moment_dependencies,
@@ -223,10 +223,10 @@ class IPic3DSerialReader:
 
             # Energy flux (optional)
             want_ef_s = expanded is None or any(
-                f"{cb}_s{s}" in expanded for cb in _PHDF5_EFLUX_MAP.values()
+                f"{cb}_s{s}" in expanded for cb in _EFLUX_MAP.values()
             )
             if want_ef_s:
-                for ef_name, _ef_canon_base in _PHDF5_EFLUX_MAP.items():
+                for ef_name, _ef_canon_base in _EFLUX_MAP.items():
                     canon = per_species_eflux_canonical(ef_name, s)
                     if expanded is not None and canon not in expanded:
                         continue
