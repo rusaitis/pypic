@@ -57,8 +57,6 @@ def _prepare_scalar(
     # Unit conversion
     display_name = scalar
     if units is not None and data is not None:
-        from pypic.plotting._resolve import resolve_field_values
-
         # Get the SI conversion factor from a single-value probe
         si_val = float(data.normalization.to_si(
             data.field_info(scalar).quantity_type if data.field_info(scalar) else "b_field",
@@ -146,30 +144,22 @@ def add_field_line(
         polyline[display_name] = values
         tube = polyline.tube(radius=radius)
 
-        sbar_args: dict[str, object] = {}
-        sbar_title = ""
-        if show_scalar_bar:
-            from pypic.plotting.pyvista._overlay import build_scalar_bar
-
-            sbar_args, sbar_title = build_scalar_bar(
-                plotter, display_name,
-                position=scalar_bar_position, clim=clim, theme=theme,
-            )
-
         actor = plotter.add_mesh(
             tube,
             scalars=display_name,
             cmap=resolved_cmap,
             clim=clim,
             opacity=opacity,
-            show_scalar_bar=show_scalar_bar,
-            scalar_bar_args=sbar_args,
+            show_scalar_bar=False,
         )
 
-        if show_scalar_bar:
-            from pypic.plotting.pyvista._overlay import style_scalar_bar
+        if show_scalar_bar and clim is not None:
+            from pypic.plotting.pyvista._overlay import add_colorbar
 
-            style_scalar_bar(plotter, sbar_title)
+            add_colorbar(
+                plotter, resolved_cmap, clim, label=display_name,
+                loc=scalar_bar_position, theme=theme,
+            )
 
         return actor
     tube = polyline.tube(radius=radius)
@@ -262,7 +252,8 @@ def add_field_lines(
                     absmax = float(np.max(np.abs(valid)))
                     clim = (-absmax, absmax)
 
-    # Auto-select cmap from metadata
+    # Auto-select signedness from field metadata so the right default
+    # cmap is chosen downstream by add_field_line via resolve_cmap()
     if scalar is not None and cmap is None and data is not None:
         from pypic.plotting._colormaps import is_positive_definite
 
@@ -309,6 +300,7 @@ def add_trajectory(
     radius: float = 0.08,
     opacity: float = 1.0,
     show_scalar_bar: bool = False,
+    scalar_bar_position: str = "lower_left",
     theme: PlotTheme | None = None,
 ) -> pv.Actor | None:
     r"""Render a :class:`ParticleTrace` as a colored tube.
@@ -336,7 +328,9 @@ def add_trajectory(
     opacity : float
         Tube opacity (0–1).
     show_scalar_bar : bool
-        Whether to show the scalar bar.
+        Whether to show a themed scalar bar via :func:`add_colorbar`.
+    scalar_bar_position : str
+        Scalar bar corner: ``"lower_left"``, ``"lower_right"``, etc.
     theme : PlotTheme or None
         Theme for defaults.
 
@@ -360,14 +354,25 @@ def add_trajectory(
         resolved_cmap = resolve_cmap(cmap, signed=False, theme=theme)
         polyline[scalar] = scalars[scalar]
         tube = polyline.tube(radius=radius)
-        return plotter.add_mesh(
+
+        actor = plotter.add_mesh(
             tube,
             scalars=scalar,
             cmap=resolved_cmap,
             clim=clim,
             opacity=opacity,
-            show_scalar_bar=show_scalar_bar,
+            show_scalar_bar=False,
         )
+
+        if show_scalar_bar and clim is not None:
+            from pypic.plotting.pyvista._overlay import add_colorbar
+
+            add_colorbar(
+                plotter, resolved_cmap, clim, label=scalar,
+                loc=scalar_bar_position, theme=theme,
+            )
+
+        return actor
     tube = polyline.tube(radius=radius)
     return plotter.add_mesh(
         tube, color=color or "white", opacity=opacity, show_scalar_bar=False,
@@ -384,6 +389,7 @@ def add_trajectories(
     radius: float = 0.08,
     opacity: float = 1.0,
     show_scalar_bar: bool = True,
+    scalar_bar_position: str = "lower_left",
     theme: PlotTheme | None = None,
 ) -> list[pv.Actor]:
     r"""Render multiple particle trajectories with a shared color scale.
@@ -405,7 +411,9 @@ def add_trajectories(
     opacity : float
         Tube opacity (0–1).
     show_scalar_bar : bool
-        Whether to show a single scalar bar.
+        Whether to show a single themed scalar bar via :func:`add_colorbar`.
+    scalar_bar_position : str
+        Scalar bar corner: ``"lower_left"``, ``"lower_right"``, etc.
     theme : PlotTheme or None
         Theme for defaults.
 
@@ -448,6 +456,7 @@ def add_trajectories(
             radius=radius,
             opacity=opacity,
             show_scalar_bar=show_scalar_bar and is_last,
+            scalar_bar_position=scalar_bar_position,
             theme=theme,
         )
         if actor is not None:

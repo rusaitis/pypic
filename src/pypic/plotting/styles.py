@@ -139,11 +139,18 @@ class PlotTheme:
     colorbar_outline_width: float = 0.3
     colorbar_tick_length: float = 2.0
     colorbar_pad: float = 0.05
+    colorbar_title_font_scale: float = 1.4
+    colorbar_tick_font_scale: float = 1.2
 
     # Progress bar
     progress_bar_width: float = 80.0
     progress_bar_height: float = 4.0
     progress_bar_rounding: float = 2.0
+    badge_font_scale: float = 2.2
+
+    # Pyvista axes (3D triad and equatorial grid)
+    axis_triad_font_scale: float = 3.0
+    grid_label_font_scale: float = 2.8
 
     # Plot area
     plot_rounding: float = 0.0

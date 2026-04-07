@@ -319,7 +319,7 @@ def main() -> None:
 
     lim = 5.5
     add_axis_triad(plotter, length=2.0, labels=("$x$", "$y$", "$z$"))
-    add_equatorial_grid(plotter, xlim=(-lim, lim), ylim=(-lim, lim), coord_units="$R_E$")
+    add_equatorial_grid(plotter, xlim=(-lim, lim), ylim=(-lim, lim))
     set_camera(plotter, distance=18.0, elevation=15, azimuth=-60)
 
     if args.save:

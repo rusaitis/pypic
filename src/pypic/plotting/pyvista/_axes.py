@@ -16,22 +16,19 @@ if TYPE_CHECKING:
 
 
 def _label_values(ticks: list[float]) -> list[float]:
-    """Return tick values to label, skipping near-zero and thinning.
+    """Return tick values to label, thinning to ~6 if there are too many.
 
-    Mirrors the matplotlib ``style_3d_axes`` logic: skip labels within
-    30 % of the tick step from zero, cap to 5 labels by thinning.
+    Always preserves the 0 tick when present, by choosing the slice
+    offset so that 0 lands on a kept index.
     """
-    if len(ticks) < 2:
+    max_labels = 6
+    if len(ticks) <= max_labels:
         return ticks
-    zero_skip = 0.3
-    max_before_thin = 5
-    step = abs(ticks[1] - ticks[0])
-    filtered = [v for v in ticks if abs(v) > zero_skip * step]
-    if not filtered:
-        return ticks
-    if len(filtered) > max_before_thin:
-        return filtered[::2]
-    return filtered
+    # Ceiling division: -(-a // b) == math.ceil(a / b) for ints
+    stride = max(1, -(-len(ticks) // max_labels))
+    zero_idx = next((i for i, v in enumerate(ticks) if v == 0), None)
+    offset = zero_idx % stride if zero_idx is not None else 0
+    return ticks[offset::stride]
 
 
 def _rgba_to_hex(rgba: tuple[float, float, float, float]) -> str:
@@ -46,15 +43,6 @@ def _frame_labels(data: Any) -> tuple[str, str, str]:
     if frame and frame != "simulation":
         return (f"$x_{{{frame}}}$", f"$y_{{{frame}}}$", f"$z_{{{frame}}}$")
     return ("$x$", "$y$", "$z$")
-
-
-def _coord_units_from_data(data: Any) -> str:
-    """Extract coordinate units from dataset metadata."""
-    meta = data.metadata if hasattr(data, "metadata") else {}
-    unit = meta.get("physical_extent_unit", "")
-    if unit and unit != "m":
-        return f"${unit}$" if "_" in unit else unit
-    return ""
 
 
 def add_axis_triad(
@@ -101,8 +89,8 @@ def add_axis_triad(
     directions = ((1, 0, 0), (0, 1, 0), (0, 0, 1))
     c = np.asarray(center, dtype=float)
 
-    # Scale font: pyvista font_size is ~3x matplotlib pt for similar visual weight
-    fs = font_size if font_size is not None else int(t.font_label * 3.0)
+    # Scale font from theme; pyvista font_size is ~3x matplotlib pt for similar weight
+    fs = font_size if font_size is not None else int(t.font_label * t.axis_triad_font_scale)
 
     lw = t.line_width  # default 1.5
     cone_h = t.arrow_size * 0.1  # 4.0 → 0.4
@@ -170,17 +158,14 @@ def add_equatorial_grid(
     z: float = 0.0,
     step: float | None = None,
     n_lines: int = 5,
-    coord_units: str | None = None,
     theme: PlotTheme | None = None,
 ) -> None:
     r"""Draw subtle grid lines on a z-plane with coordinate labels.
 
     Grid lines use a uniform spacing in 1-2-5 multiples, identical
-    in both x and y directions. Labels are placed at grid edges with
-    the last label appending *coord_units*.
-
-    Limits and coordinate units can be derived automatically from a
-    2D :class:`FieldDataset`.
+    in both x and y directions. Labels are placed at grid edges as
+    plain numeric values (no units appended). Limits can be derived
+    automatically from a 2D :class:`FieldDataset`.
 
     Parameters
     ----------
@@ -191,7 +176,7 @@ def add_equatorial_grid(
     ylim : tuple[float, float] or None
         Y-axis range. ``None`` derives from *data_2d*.
     data_2d : FieldDataset or None
-        A 2D dataset to derive limits and coordinate units from.
+        A 2D dataset to derive limits from.
     margin : float
         Extra extent beyond the data range in each direction
         (in data coordinates). Only used with *data_2d*.
@@ -202,13 +187,10 @@ def add_equatorial_grid(
         based on the larger axis range and *n_lines*.
     n_lines : int
         Target number of grid lines per axis (used when *step* is ``None``).
-    coord_units : str or None
-        Unit string appended to the last label. ``None`` auto-derives
-        from *data_2d* metadata when available.
     theme : PlotTheme or None
         Theme for grid color and fonts. ``None`` uses active theme.
     """
-    # Derive limits and coord_units from data if not given
+    # Derive limits from data if not given
     if xlim is None or ylim is None:
         if data_2d is None:
             msg = "Either xlim/ylim or data_2d must be provided"
@@ -218,10 +200,6 @@ def add_equatorial_grid(
             xlim = (float(coords[0][0]) - margin, float(coords[0][-1]) + margin)
         if ylim is None:
             ylim = (float(coords[1][0]) - margin, float(coords[1][-1]) + margin)
-    if coord_units is None and data_2d is not None:
-        coord_units = _coord_units_from_data(data_2d)
-    if coord_units is None:
-        coord_units = ""
     ensure_pyvista()
     import pyvista as pv
 
@@ -232,7 +210,7 @@ def add_equatorial_grid(
     grid_lw = t.grid_major_width
 
     label_color = _rgba_to_hex(t.secondary_text_color)
-    label_fs = int(t.font_tick * 2.8)
+    label_fs = int(t.font_tick * t.grid_label_font_scale)
 
     # Normalize ranges for reversed limits
     x_lo, x_hi = sorted(xlim)
@@ -260,14 +238,10 @@ def add_equatorial_grid(
     x_range = x_hi - x_lo
     y_range = y_hi - y_lo
 
-    x_labels = _label_values(x_ticks)
-    for j, x in enumerate(x_labels):
-        val = f"{x:g}"
-        if coord_units and j == len(x_labels) - 1:
-            val += f" {coord_units}"
+    for x in _label_values(x_ticks):
         plotter.add_point_labels(
             [(x, y_lo - y_range * offset_frac, z)],
-            [val],
+            [f"{x:g}"],
             font_size=label_fs,
             text_color=label_color,
             shape=None,
@@ -275,14 +249,10 @@ def add_equatorial_grid(
             bold=False,
         )
 
-    y_labels = _label_values(y_ticks)
-    for j, y in enumerate(y_labels):
-        val = f"{y:g}"
-        if coord_units and j == len(y_labels) - 1:
-            val += f" {coord_units}"
+    for y in _label_values(y_ticks):
         plotter.add_point_labels(
             [(x_lo - x_range * offset_frac, y, z)],
-            [val],
+            [f"{y:g}"],
             font_size=label_fs,
             text_color=label_color,
             shape=None,

@@ -8,18 +8,19 @@ Requires: ``pip install pypic[3d]`` (installs pyvista).
 """
 
 from pypic.plotting.pyvista._axes import add_axis_triad, add_equatorial_grid
-from pypic.plotting.pyvista._badge import add_badge
+from pypic.plotting.pyvista._badge import add_badge, add_label
 from pypic.plotting.pyvista._lines import (
     add_field_line,
     add_field_lines,
-    add_trajectory,
     add_trajectories,
+    add_trajectory,
 )
 from pypic.plotting.pyvista._meshes import (
     add_equatorial_surface,
     add_planet,
     add_reference_circles,
 )
+from pypic.plotting.pyvista._overlay import add_colorbar
 from pypic.plotting.pyvista._theme import (
     apply_theme,
     create_plotter,
@@ -29,16 +30,18 @@ from pypic.plotting.pyvista._theme import (
 )
 
 __all__ = [
-    "add_badge",
     "add_axis_triad",
+    "add_badge",
+    "add_colorbar",
     "add_equatorial_grid",
     "add_equatorial_surface",
     "add_field_line",
     "add_field_lines",
+    "add_label",
     "add_planet",
     "add_reference_circles",
-    "add_trajectory",
     "add_trajectories",
+    "add_trajectory",
     "apply_theme",
     "create_plotter",
     "resolve_cmap",

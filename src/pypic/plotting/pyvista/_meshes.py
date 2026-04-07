@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 import numpy as np
 
@@ -22,7 +22,7 @@ def add_planet(
     radius: float = 1.0,
     center: tuple[float, float, float] = (0.0, 0.0, 0.0),
     *,
-    sun_direction: str = "right",
+    sun_direction: Literal["right", "left"] = "right",
     day_color: tuple[int, int, int] = (220, 220, 230),
     night_color: tuple[int, int, int] = (30, 30, 50),
     resolution: int = 32,
@@ -78,11 +78,16 @@ def add_reference_circles(
     center: tuple[float, float, float] = (0.0, 0.0, 0.0),
     z: float = 0.0,
     color: str | None = None,
+    opacity: float | None = None,
     width: float | None = None,
     n_points: int = 128,
     theme: PlotTheme | None = None,
 ) -> None:
     r"""Draw reference circles on a z-plane.
+
+    Each circle is rendered as a sequence of disjoint segments (via
+    ``Plotter.add_lines``), which produces a dashed appearance — half
+    the *n_points* become visual gaps.
 
     Parameters
     ----------
@@ -95,21 +100,26 @@ def add_reference_circles(
     z : float
         Z-coordinate of the plane.
     color : str or None
-        Circle color. ``None`` uses theme grid color.
+        Circle color. ``None`` uses ``theme.grid_color`` (RGB only).
+    opacity : float or None
+        Circle opacity. ``None`` uses ``min(1.0, theme.grid_color[3] * 4)``
+        so the circles read as visibly stronger reference markers than
+        the much fainter regular grid lines.
     width : float or None
         Line width. ``None`` uses ``theme.line_width``.
     n_points : int
-        Number of points per circle.
+        Number of points per circle (half become visual gaps).
     theme : PlotTheme or None
-        Theme for default color and width.
+        Theme for default color, opacity, and width.
     """
     ensure_pyvista()
 
     t = _resolve_theme(theme)
+    gc = t.grid_color
     if color is None:
-        gc = t.grid_color[:3]
-        lum = 0.299 * gc[0] + 0.587 * gc[1] + 0.114 * gc[2]
-        color = "grey" if lum < 0.1 else f"#{int(gc[0]*255):02x}{int(gc[1]*255):02x}{int(gc[2]*255):02x}"
+        color = f"#{int(gc[0]*255):02x}{int(gc[1]*255):02x}{int(gc[2]*255):02x}"
+    if opacity is None:
+        opacity = min(1.0, gc[3] * 4)
     if width is None:
         width = t.line_width
 
@@ -120,7 +130,8 @@ def add_reference_circles(
             center[1] + r * np.sin(theta),
             np.full(n_points, z),
         ])
-        plotter.add_lines(ring, color=color, width=width)
+        actor = plotter.add_lines(ring, color=color, width=width)
+        actor.GetProperty().SetOpacity(opacity)
 
 
 def _auto_resolve(
@@ -140,8 +151,6 @@ def _auto_resolve(
     from pypic.plotting._colormaps import is_positive_definite, symmetric_clim
     from pypic.plotting._labels import field_label
     from pypic.plotting._resolve import resolve_field_values
-
-    t = _resolve_theme(theme)
 
     # Values with optional unit conversion
     values = resolve_field_values(data_2d, field, units)
@@ -184,8 +193,10 @@ def add_equatorial_surface(
     units: str | None = None,
     cmap: str | Colormap | None = None,
     clim: tuple[float, float] | None = None,
-    opacity: float = 0.8,
+    opacity: float | str | np.ndarray = 0.8,
     z: float = 0.0,
+    rendering: Literal["smooth", "pixel"] = "smooth",
+    lighting: bool = False,
     scalar_label: str | None = None,
     show_scalar_bar: bool = True,
     scalar_bar_position: str = "lower_right",
@@ -214,10 +225,29 @@ def add_equatorial_surface(
         Colormap. ``None`` auto-selects from field metadata and theme.
     clim : tuple[float, float] or None
         Color limits. ``None`` auto-computes from field data.
-    opacity : float
-        Surface opacity.
+    opacity : float, str, or ndarray
+        Surface opacity. A float gives uniform alpha; a string names
+        a pyvista transfer function mapping scalar value to alpha
+        (``"linear"``, ``"sigmoid"``, ``"geom"``, and their ``"_r"``
+        reversed variants); an ndarray supplies per-point or per-cell
+        opacity. Combine ``opacity="linear"`` with a diverging cmap
+        to make mid-range values fade out so strong features pop.
     z : float
         Z-coordinate of the surface plane.
+    rendering : str
+        ``"smooth"`` (default) renders a ``pv.StructuredGrid`` with
+        point data and Gouraud-interpolated colors — smooth gradients
+        between grid nodes, good for eye-friendly visualization.
+        ``"pixel"`` renders a ``pv.ImageData`` with cell data and
+        ``interpolate_before_map=False`` — each data sample becomes
+        one flat-shaded cell at the true grid resolution, showing
+        the actual sampling without interpolation. Assumes a uniform
+        grid (pypic's standard); for non-uniform grids use ``"smooth"``.
+    lighting : bool
+        ``False`` (default) disables lighting so colors reflect the
+        colormap exactly. ``True`` restores diffuse/specular lighting,
+        which adds an angle-dependent brightness gradient across the
+        flat plane — rarely what you want for scientific 2D slices.
     scalar_label : str or None
         Label for the scalar bar. ``None`` auto-generates from metadata.
     show_scalar_bar : bool
@@ -238,38 +268,40 @@ def add_equatorial_surface(
     ensure_pyvista()
     import pyvista as _pv
 
-    t = _resolve_theme(theme)
-
     values, resolved_cmap, clim, label = _auto_resolve(
         data_2d, field, units=units, cmap=cmap, clim=clim,
         scalar_label=scalar_label, theme=theme,
     )
 
-    # Auto fmt: integer format if clim range is large enough
-    if fmt is None:
-        if clim is not None and abs(clim[1] - clim[0]) >= 5:
-            fmt = "%.0f"
-        else:
-            fmt = "%.1f"
-
     coords = data_2d.grid.coordinate_arrays()
-    x2d, y2d = np.meshgrid(coords[0], coords[1], indexing="ij")
-
-    surface = _pv.StructuredGrid(x2d, y2d, np.full_like(x2d, z))
-    # Use a plain array name internally; pretty label only for scalar bar title
     array_name = field
-    surface[array_name] = np.nan_to_num(values, nan=0.0).ravel(order="F")
+    clean = np.nan_to_num(values, nan=0.0)
 
-    # Styled scalar bar with themed background
-    sbar_args: dict[str, object] = {}
-    sbar_title = ""
-    if show_scalar_bar:
-        from pypic.plotting.pyvista._overlay import build_scalar_bar
-
-        sbar_args, sbar_title = build_scalar_bar(
-            plotter, label,
-            position=scalar_bar_position, fmt=fmt, clim=clim, theme=theme,
+    if rendering == "pixel":
+        # Uniform-grid ImageData: each data sample becomes one flat
+        # cell. Dimensions are one larger than the data along each
+        # axis (cells are between vertices), origin shifted by half
+        # a grid spacing so cell centers land on the original sample
+        # positions. Requires a uniform grid.
+        nx, ny = clean.shape
+        dx = float(coords[0][1] - coords[0][0]) if nx > 1 else 1.0
+        dy = float(coords[1][1] - coords[1][0]) if ny > 1 else 1.0
+        origin = (
+            float(coords[0][0]) - dx * 0.5,
+            float(coords[1][0]) - dy * 0.5,
+            z,
         )
+        surface = _pv.ImageData(
+            dimensions=(nx + 1, ny + 1, 1),
+            spacing=(dx, dy, 1.0),
+            origin=origin,
+        )
+        surface.cell_data[array_name] = clean.ravel(order="F")
+    else:
+        # StructuredGrid + point data: Gouraud-interpolated smooth rendering
+        x2d, y2d = np.meshgrid(coords[0], coords[1], indexing="ij")
+        surface = _pv.StructuredGrid(x2d, y2d, np.full_like(x2d, z))
+        surface[array_name] = clean.ravel(order="F")
 
     actor = plotter.add_mesh(
         surface,
@@ -277,13 +309,17 @@ def add_equatorial_surface(
         cmap=resolved_cmap,
         clim=clim,
         opacity=opacity,
-        show_scalar_bar=show_scalar_bar,
-        scalar_bar_args=sbar_args,
+        lighting=lighting,
+        interpolate_before_map=(rendering == "smooth"),
+        show_scalar_bar=False,
     )
 
     if show_scalar_bar:
-        from pypic.plotting.pyvista._overlay import style_scalar_bar
+        from pypic.plotting.pyvista._overlay import add_colorbar
 
-        style_scalar_bar(plotter, sbar_title)
+        add_colorbar(
+            plotter, resolved_cmap, clim, label=label,
+            loc=scalar_bar_position, fmt=fmt, theme=theme,
+        )
 
     return actor

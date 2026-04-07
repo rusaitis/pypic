@@ -5,14 +5,26 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Literal
 
+from pypic.plotting._format import (
+    BadgeLoc,
+    _format_status_text,
+    _format_time_value,  # noqa: F401  re-exported for backward compat
+)
 from pypic.plotting._guard import ensure_matplotlib
 
 if TYPE_CHECKING:
     from matplotlib.axes import Axes
     from matplotlib.offsetbox import AnchoredOffsetbox, DrawingArea
 
-BadgeLoc = Literal[
-    "upper left", "upper right", "lower left", "lower right", "upper center"
+# _format_time_value and _format_status_text are re-exported so callers
+# (including tests) that imported them directly from this module still
+# work. The canonical home is now pypic.plotting._format.
+__all__ = [
+    "BadgeLoc",
+    "LegendEntry",
+    "add_badge",
+    "add_label",
+    "add_legend",
 ]
 
 _LOC_CODES: dict[str, int] = {
@@ -210,81 +222,6 @@ def _pick_overlay_variant(
         content_colors
     )
     return "alt" if avg_alt > avg_default else None
-
-
-def _format_time_value(time: float, units: str) -> tuple[str, str]:
-    """Format a numeric time value, returning ``(value_str, suffix_str)``.
-
-    When *units* is ``"s"`` and *time* >= 60, produces human-readable
-    durations like ``"2min 30s"`` or ``"1h 5min 12s"`` (suffix is empty
-    since units are embedded). Otherwise falls back to numeric formatting.
-    """
-    if units == "s" and abs(time) >= 60:
-        sign = "-" if time < 0 else ""
-        t = abs(time)
-        h = int(t // 3600)
-        m = int((t % 3600) // 60)
-        s = int(t % 60)
-        if h > 0:
-            return f"{sign}{h}h {m}min {s}s", ""
-        return f"{sign}{m}min {s}s", ""
-    suffix = f" {units}" if units else ""
-    if abs(time) >= 1e4 or (0 < abs(time) < 0.01):
-        return f"{time:.2e}", suffix
-    return f"{time:.2f}", suffix
-
-
-def _format_status_text(
-    *,
-    text: str | None,
-    step: int | None,
-    time: float | str | None,
-    time_units: str,
-    step_range: tuple[int, int] | None,
-    label: str | None = None,
-    show_max: bool = True,
-) -> str:
-    """Build the status text string from step/time/text parameters.
-
-    Parameters
-    ----------
-    text : str or None
-        Direct custom text. When provided, *step*/*time*/*label* are
-        ignored for text generation.
-    label : str or None
-        Custom prefix for the step (or time-only) display.
-        ``None`` uses auto-labels (``"step"`` / ``"t"``).
-        ``""`` suppresses the prefix entirely.
-    show_max : bool
-        When ``step_range`` is set, include ``" / max"`` after the step.
-    """
-    if text is not None:
-        return text
-
-    parts: list[str] = []
-
-    if step is not None:
-        step_label = "step" if label is None else label
-        prefix = f"{step_label} " if step_label else ""
-        if step_range is not None and show_max:
-            parts.append(f"{prefix}{step} / {step_range[1]}")
-        else:
-            parts.append(f"{prefix}{step}")
-
-    if time is not None:
-        if isinstance(time, str):
-            t_str = time
-            suffix = f" {time_units}" if time_units else ""
-        else:
-            t_str, suffix = _format_time_value(time, time_units)
-        # When time-only, label replaces the "t" prefix; with step, time keeps "t"
-        time_label = "t" if step is not None else ("t" if label is None else label)
-        if time_label:
-            parts.append(f"{time_label} = {t_str}{suffix}")
-        else:
-            parts.append(f"{t_str}{suffix}")
-
-    return ", ".join(parts) if parts else ""
 
 
 def _resolve_rgba(
