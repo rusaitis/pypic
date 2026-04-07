@@ -733,8 +733,8 @@ class TestPhysicalExtent:
             apply_physical_extent(cfg, (5.0,), "parsec")
 
     def test_non_uniform_scale_raises(self, tmp_path: Path) -> None:
-        from pypic.coordinates.transforms import FrameTransform
         from pypic.coordinates.geometry import CARTESIAN
+        from pypic.coordinates.transforms import FrameTransform
         from pypic.readers.base import GridInfo, SimulationConfig
         from pypic.units import Normalization
 
@@ -754,3 +754,127 @@ class TestPhysicalExtent:
         assert LENGTH_UNITS["km"] == 1e3
         assert LENGTH_UNITS["R_E"] == 6.371e6
         assert len(LENGTH_UNITS) >= 5
+
+
+class TestMergeSimulationToml:
+    """Unit tests for the shared ``readers._config_helpers.merge_simulation_toml``."""
+
+    @pytest.fixture
+    def base_config(self):  # type: ignore[no-untyped-def]
+        from pypic.coordinates.geometry import CARTESIAN
+        from pypic.readers.base import GridInfo, SimulationConfig
+        from pypic.units import Normalization
+
+        return SimulationConfig(
+            model_name="ReaderX",
+            model_type="MHD",
+            grid=GridInfo(
+                dimensions=(4, 3, 2),
+                spacing=(1.0, 1.0, 1.0),
+                origin=(0.0, 0.0, 0.0),
+                geometry=CARTESIAN,
+            ),
+            normalization=Normalization.identity(),
+            frame="GSM",
+            metadata={"reader_only": "kept"},
+        )
+
+    def test_no_sim_dir_returns_base_unchanged(self, base_config) -> None:
+        from pypic.readers._config_helpers import merge_simulation_toml
+
+        result = merge_simulation_toml(None, base_config)
+        assert result is base_config
+
+    def test_missing_toml_returns_base_unchanged(
+        self, tmp_path: Path, base_config
+    ) -> None:
+        from pypic.readers._config_helpers import merge_simulation_toml
+
+        result = merge_simulation_toml(tmp_path, base_config)
+        assert result is base_config
+
+    def test_toml_overrides_normalization_frame_metadata(
+        self, tmp_path: Path, base_config
+    ) -> None:
+        from pypic.readers._config_helpers import merge_simulation_toml
+
+        _write_toml(
+            tmp_path,
+            """
+[model]
+name = "test"
+type = "MHD"
+
+[grid]
+dimensions = [10, 10, 10]
+spacing = [0.5, 0.5, 0.5]
+
+[units]
+system = "MHD"
+reference_length = 6.371e6
+reference_density = 1.67e-17
+reference_b_field = 5.0e-9
+
+[coordinates]
+geometry = "cartesian"
+frame = "simulation"
+
+[output]
+fields = ["B1"]
+""",
+        )
+        result = merge_simulation_toml(tmp_path, base_config)
+        # Frame override
+        assert result.frame == "simulation"
+        # Reader-side metadata preserved
+        assert result.metadata["reader_only"] == "kept"
+        # Toml metadata merged in (output goes into metadata)
+        assert "output" in result.metadata
+        # Reader-side fields preserved
+        assert result.model_name == "ReaderX"
+        assert result.grid.dimensions == (4, 3, 2)
+        # Normalization actually replaced (not identity any more)
+        assert result.normalization.length_ref == 6.371e6
+
+    def test_toml_metadata_wins_on_key_conflict(
+        self, tmp_path: Path, base_config
+    ) -> None:
+        # Re-create base with a metadata key that the toml will also set
+        from pypic.coordinates.geometry import CARTESIAN
+        from pypic.readers._config_helpers import merge_simulation_toml
+        from pypic.readers.base import GridInfo, SimulationConfig
+        from pypic.units import Normalization
+
+        base = SimulationConfig(
+            model_name="X",
+            model_type="MHD",
+            grid=GridInfo(
+                dimensions=(4,), spacing=(1.0,), origin=(0.0,), geometry=CARTESIAN
+            ),
+            normalization=Normalization.identity(),
+            metadata={"description": "from-reader", "reader_only": "kept"},
+        )
+        _write_toml(
+            tmp_path,
+            """
+[model]
+name = "test"
+type = "MHD"
+description = "from-toml"
+
+[grid]
+dimensions = [10, 10, 10]
+spacing = [0.5, 0.5, 0.5]
+
+[units]
+system = "SI"
+
+[coordinates]
+geometry = "cartesian"
+frame = "simulation"
+""",
+        )
+        result = merge_simulation_toml(tmp_path, base)
+        # Toml's description wins on conflict; reader_only is preserved
+        assert result.metadata["description"] == "from-toml"
+        assert result.metadata["reader_only"] == "kept"

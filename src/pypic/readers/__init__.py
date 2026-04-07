@@ -1,5 +1,6 @@
 """Simulation data readers and the FieldDataset container."""
 
+from pypic.readers._config_helpers import merge_simulation_toml
 from pypic.readers._registry import (
     ProbeResult,
     ReaderEntry,
@@ -77,6 +78,7 @@ __all__ = [
     "detect_particle_steps",
     "load_config",
     "load_conserved_quantities",
+    "merge_simulation_toml",
     "open_batsrus",
     "open_ipic3d",
     "open_openggcm",

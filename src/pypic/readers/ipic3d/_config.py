@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING, Any
 import h5py  # type: ignore[import-untyped]
 
 from pypic.coordinates.geometry import CARTESIAN
+from pypic.readers._config_helpers import merge_simulation_toml
 from pypic.readers.base import GridInfo, SimulationConfig
 from pypic.units import Normalization, SpeciesInfo
 
@@ -417,15 +418,17 @@ def to_simulation_config(
     Uses the node-centered origin offset trick: ``origin = -dx/2`` so that
     ``coordinate_arrays()`` produces exact node positions ``0, dx, 2dx, ..., L``.
 
-    If a ``simulation.toml`` exists in *sim_dir*, normalization, frame,
-    and transforms are merged from it (the ``.inp`` doesn't carry this info).
+    If a ``simulation.toml`` exists in *sim_dir*, its normalization, frame,
+    transforms, and metadata are merged in via
+    :func:`pypic.readers._config_helpers.merge_simulation_toml`.
 
     Parameters
     ----------
     cfg : IPic3DConfig
         Native iPIC3D configuration.
     sim_dir : Path | None
-        Simulation directory to look for ``simulation.toml``.
+        Simulation directory to scan for ``simulation.toml``. ``None`` skips
+        the merge.
 
     Returns
     -------
@@ -468,33 +471,17 @@ def to_simulation_config(
     if cfg.particles_output_cycle > 0:
         metadata["particles_output_cycle"] = cfg.particles_output_cycle
 
-    # If a simulation.toml exists alongside the .inp, merge normalization,
-    # frame, and transforms from it (the .inp doesn't carry this info).
-    normalization = Normalization.identity()
-    frame = ""
-    transforms: dict[str, Any] = {}
-    toml_path = sim_dir / "simulation.toml" if sim_dir is not None else None
-    if toml_path is not None and toml_path.exists():
-        from pypic.readers.config import load_config
-
-        toml_config = load_config(toml_path)
-        normalization = toml_config.normalization
-        frame = toml_config.frame
-        transforms = toml_config.transforms
-        if toml_config.metadata:
-            metadata.update(toml_config.metadata)
-
-    return SimulationConfig(
+    base = SimulationConfig(
         model_name="iPIC3D",
         model_type="PIC",
         grid=grid,
-        normalization=normalization,
+        normalization=Normalization.identity(),
         species=_build_species(cfg),
         physics=physics,
-        frame=frame,
-        transforms=transforms,
+        frame="",
         metadata=metadata,
     )
+    return merge_simulation_toml(sim_dir, base)
 
 
 def to_toml(cfg: IPic3DConfig) -> str:

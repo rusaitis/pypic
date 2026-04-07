@@ -8,6 +8,7 @@ from types import MappingProxyType
 from typing import TYPE_CHECKING, Any
 
 from pypic.coordinates import CARTESIAN, GEOMETRY_BY_NAME
+from pypic.readers._config_helpers import merge_simulation_toml
 from pypic.readers.base import GridInfo, SimulationConfig
 from pypic.units import Normalization
 
@@ -216,8 +217,13 @@ def to_simulation_config(
     header: BATSRUSHeader | None = None,
     *,
     grid: GridInfo | None = None,
+    sim_dir: Path | None = None,
 ) -> SimulationConfig:
     """Build a `SimulationConfig` from BATSRUS config and header.
+
+    If a ``simulation.toml`` exists in *sim_dir*, its normalization, frame,
+    transforms, and metadata are merged in via
+    :func:`pypic.readers._config_helpers.merge_simulation_toml`.
 
     Parameters
     ----------
@@ -227,6 +233,9 @@ def to_simulation_config(
         Parsed ``.h`` header (provides grid dimensions from actual output).
     grid
         Pre-built GridInfo (overrides header-derived grid).
+    sim_dir
+        Simulation directory to scan for ``simulation.toml``. ``None`` skips
+        the merge.
 
     Returns
     -------
@@ -262,8 +271,6 @@ def to_simulation_config(
             dt=config.dt_fixed,
         )
 
-    normalization = Normalization.identity()
-
     physics: dict[str, Any] = {"gamma": config.gamma}
     if config.use_splitb:
         physics["use_splitb"] = True
@@ -278,17 +285,16 @@ def to_simulation_config(
     if config.description:
         meta["description"] = config.description
 
-    frame = config.coord_system if config.coord_system != "simulation" else "simulation"
-
-    return SimulationConfig(
+    base = SimulationConfig(
         model_name="BATSRUS",
         model_type="MHD",
         grid=grid,
-        normalization=normalization,
+        normalization=Normalization.identity(),
         physics=physics,
-        frame=frame,
+        frame=config.coord_system,
         metadata=meta,
     )
+    return merge_simulation_toml(sim_dir, base)
 
 
 def _first_token(line: str) -> str:

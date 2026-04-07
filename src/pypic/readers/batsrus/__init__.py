@@ -135,7 +135,7 @@ def open_batsrus(
         else:
             _, grid = regrid_amr_hdf5(batl)
 
-    sim_config = to_simulation_config(batsrus_config, header, grid=grid)
+    sim_config = to_simulation_config(batsrus_config, header, grid=grid, sim_dir=path)
     return reader, sim_config
 
 

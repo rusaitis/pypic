@@ -198,7 +198,9 @@ class BATSRUSReader:
 
         normalization = Normalization.identity()
         if self._sim_config is None:
-            self._sim_config = to_simulation_config(self._config, header, grid=grid)
+            self._sim_config = to_simulation_config(
+                self._config, header, grid=grid, sim_dir=path
+            )
 
         physics: dict[str, Any] = {"gamma": self._config.gamma}
         metadata: dict[str, Any] = {
@@ -266,7 +268,9 @@ class BATSRUSReader:
 
         normalization = Normalization.identity()
         if self._sim_config is None:
-            self._sim_config = to_simulation_config(self._config, grid=grid)
+            self._sim_config = to_simulation_config(
+                self._config, grid=grid, sim_dir=path
+            )
 
         physics: dict[str, Any] = {"gamma": self._config.gamma}
         metadata: dict[str, Any] = {
