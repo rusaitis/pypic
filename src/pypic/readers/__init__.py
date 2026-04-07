@@ -19,6 +19,7 @@ from pypic.readers.base import (
     SimulationConfig,
     SimulationReader,
     TabularData,
+    score_signals,
     supports_selective_read,
 )
 from pypic.readers.batsrus import (
@@ -87,6 +88,7 @@ __all__ = [
     "read_phdf5_particles",
     "register_reader",
     "registered_readers",
+    "score_signals",
     "supports_selective_read",
     "unregister_reader",
 ]

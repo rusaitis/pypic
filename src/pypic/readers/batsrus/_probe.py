@@ -5,10 +5,19 @@ from __future__ import annotations
 import re
 from typing import TYPE_CHECKING
 
+from pypic.readers.base import score_signals
+
 if TYPE_CHECKING:
     from pathlib import Path
 
 _BATSRUS_H_RE = re.compile(r"_[tn]\d{8}")
+
+# Pure-glob signals handled by the shared helper.
+_CORE_SIGNALS: list[tuple[str, float]] = [
+    ("PARAM.in", 0.3),
+    ("*.batl", 0.5),
+    ("*_pe*.idl", 0.2),
+]
 
 
 def can_read_confidence(path: Path) -> float:
@@ -18,9 +27,9 @@ def can_read_confidence(path: Path) -> float:
 
     - ``PARAM.in``: +0.3
     - ``.batl`` files (HDF5 BATL): +0.5
-    - ``.h`` header files with BATSRUS timestamp pattern: +0.3
     - ``*_pe*.idl`` per-cell files: +0.2
-    - ``.out`` / ``.outs`` merged files: +0.3
+    - ``.h`` header files with BATSRUS timestamp pattern: +0.3
+    - ``.out`` / ``.outs`` merged files: +0.3 (only if nothing else matched)
 
     Parameters
     ----------
@@ -35,27 +44,19 @@ def can_read_confidence(path: Path) -> float:
     if not path.is_dir():
         return 0.0
 
-    score = 0.0
+    score = score_signals(path, _CORE_SIGNALS)
 
-    if (path / "PARAM.in").exists():
-        score += 0.3
-
-    if next(path.glob("*.batl"), None) is not None:
-        score += 0.5
-
+    # Filter .h files by BATSRUS timestamp pattern to avoid C header
+    # false positives (reader.h, config.h, ...).
     if any(_BATSRUS_H_RE.search(f.name) for f in path.glob("*.h")):
         score += 0.3
 
-    if next(path.glob("*_pe*.idl"), None) is not None:
-        score += 0.2
-
-    if score == 0.0:
-        # Only check .out/.outs if nothing else matched
-        has_out = (
-            next(path.glob("*.out"), None) is not None
-            or next(path.glob("*.outs"), None) is not None
-        )
-        if has_out:
-            score += 0.3
+    # Merged .out / .outs fall back only if nothing else matched, and
+    # contribute a single 0.3 regardless of which variant is present.
+    if score == 0.0 and (
+        next(path.glob("*.out"), None) is not None
+        or next(path.glob("*.outs"), None) is not None
+    ):
+        score += 0.3
 
     return min(score, 1.0)

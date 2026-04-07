@@ -4,8 +4,15 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from pypic.readers.base import score_signals
+
 if TYPE_CHECKING:
     from pathlib import Path
+
+_SIGNALS: list[tuple[str, float]] = [
+    ("grid.*.dat", 0.5),
+    ("*.3df.*", 0.5),
+]
 
 
 def can_read_confidence(path: Path) -> float:
@@ -26,15 +33,4 @@ def can_read_confidence(path: Path) -> float:
     float
         Confidence in ``[0.0, 1.0]``.
     """
-    if not path.is_dir():
-        return 0.0
-
-    score = 0.0
-
-    if next(path.glob("grid.*.dat"), None) is not None:
-        score += 0.5
-
-    if next(path.glob("*.3df.*"), None) is not None:
-        score += 0.5
-
-    return min(score, 1.0)
+    return score_signals(path, _SIGNALS)

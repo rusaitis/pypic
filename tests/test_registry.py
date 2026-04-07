@@ -250,6 +250,45 @@ def _probe_func(reader_id: str) -> Callable[[Path], float]:
     return probe
 
 
+class TestScoreSignals:
+    """Unit tests for the shared ``readers.base.score_signals`` helper."""
+
+    def test_non_directory_returns_zero(self, tmp_path: Path) -> None:
+        from pypic.readers.base import score_signals
+
+        f = tmp_path / "a_file"
+        f.touch()
+        assert score_signals(f, [("*", 0.5)]) == 0.0
+
+    def test_empty_dir_zero(self, tmp_path: Path) -> None:
+        from pypic.readers.base import score_signals
+
+        assert score_signals(tmp_path, [("*.toml", 0.5)]) == 0.0
+
+    def test_matching_patterns_accumulate(self, tmp_path: Path) -> None:
+        from pypic.readers.base import score_signals
+
+        (tmp_path / "config.toml").touch()
+        (tmp_path / "data.h5").touch()
+        score = score_signals(
+            tmp_path, [("*.toml", 0.5), ("*.h5", 0.3), ("*.nc", 0.9)]
+        )
+        assert score == pytest.approx(0.8)
+
+    def test_score_clamped_to_one(self, tmp_path: Path) -> None:
+        from pypic.readers.base import score_signals
+
+        (tmp_path / "a").touch()
+        (tmp_path / "b").touch()
+        assert score_signals(tmp_path, [("a", 0.8), ("b", 0.9)]) == 1.0
+
+    def test_empty_signals_zero(self, tmp_path: Path) -> None:
+        from pypic.readers.base import score_signals
+
+        (tmp_path / "anything").touch()
+        assert score_signals(tmp_path, []) == 0.0
+
+
 @pytest.mark.parametrize("reader_id", ["ipic3d", "batsrus", "openggcm"])
 def test_probe_empty_dir_returns_zero(tmp_path: Path, reader_id: str) -> None:
     """Every reader returns 0.0 confidence on an empty directory."""

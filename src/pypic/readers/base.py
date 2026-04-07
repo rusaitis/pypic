@@ -1523,6 +1523,55 @@ def supports_selective_read(reader: SimulationReader) -> bool:
     return "fields" in sig.parameters
 
 
+def score_signals(
+    path: Path, signals: Sequence[tuple[str, float]]
+) -> float:
+    """Sum weights of glob patterns that match entries under *path*.
+
+    For each ``(pattern, weight)`` pair the helper checks whether
+    ``path.glob(pattern)`` yields at least one entry and, if so, adds
+    ``weight`` to the running score. Intended for reader probe functions
+    (``can_read_confidence``) so the glob-and-accumulate boilerplate does
+    not get duplicated across every reader.
+
+    Signals that require reading file contents, filtering matches by
+    regex, or distinguishing files from directories should be evaluated
+    by the caller and added on top of the returned score. The caller is
+    responsible for any conditional logic beyond "pattern present → add
+    weight".
+
+    Parameters
+    ----------
+    path : Path
+        Directory to scan. Non-directories return ``0.0`` immediately.
+    signals : Sequence[tuple[str, float]]
+        Pairs of ``(glob_pattern, weight)`` to test against *path*.
+
+    Returns
+    -------
+    float
+        Sum of matching weights, clamped to ``[0.0, 1.0]``.
+
+    Examples
+    --------
+    >>> import tempfile
+    >>> from pathlib import Path
+    >>> with tempfile.TemporaryDirectory() as d:
+    ...     p = Path(d)
+    ...     (p / "config.toml").touch()
+    ...     (p / "data.h5").touch()
+    ...     score_signals(p, [("*.toml", 0.5), ("*.h5", 0.3), ("*.nc", 0.9)])
+    0.8
+    """
+    if not path.is_dir():
+        return 0.0
+    score = 0.0
+    for pattern, weight in signals:
+        if next(path.glob(pattern), None) is not None:
+            score += weight
+    return min(score, 1.0)
+
+
 @runtime_checkable
 class AuxiliaryDataReader(Protocol):
     """Opt-in protocol for readers that provide auxiliary tabular data.
