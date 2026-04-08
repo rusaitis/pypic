@@ -6,12 +6,21 @@ on:
   pull_request:
     branches: [main]
 
+# uv.lock is gitignored (library convention — let downstream resolve), so
+# every job re-resolves from pyproject.toml. setup-uv caches the resolver
+# and the wheel store keyed on pyproject.toml so the second run on a given
+# pyproject is fast.
+
 jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: "pyproject.toml"
+      - run: uv sync --all-extras --all-groups
       - run: uv run ruff check src tests
       - run: uv run ruff format --check src tests
 
@@ -20,6 +29,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: "pyproject.toml"
+      # mypy needs matplotlib/pyvista/h5py to resolve imports across the
+      # plotting and reader subpackages — they're optional at runtime but
+      # required for the strict type check to pass.
+      - run: uv sync --all-extras --all-groups
       - run: uv run mypy src
 
   test:
@@ -27,4 +43,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: "pyproject.toml"
+      # pytest --doctest-modules walks every src file. _colormaps.py runs
+      # _register_custom_colormaps() at import (matplotlib required), and
+      # tests/test_plotting* import matplotlib/pyvista directly.
+      - run: uv sync --all-extras --all-groups
       - run: uv run pytest
