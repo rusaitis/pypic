@@ -593,6 +593,12 @@ _SPECIES_INFO_PATTERNS: list[tuple[re.Pattern[str], str, str, str]] = [
         r"$e_{{k,s{N}}}$",
     ),
     (
+        re.compile(r"^e_th_trace_s(\d+)$"),
+        "energy_density",
+        "Thermal energy density tensor trace (species {N})",
+        r"$e_{{th,\mathrm{{tr}},s{N}}}$",
+    ),
+    (
         re.compile(r"^e_th_s(\d+)$"),
         "energy_density",
         "Thermal energy density (species {N})",

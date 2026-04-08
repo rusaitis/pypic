@@ -318,14 +318,22 @@ class Simulation:
         if fields is not None:
             import re
 
-            from pypic._aliases import _COMPUTE_ALIASES
+            from pypic._aliases import _COMPUTE_ALIASES, _GROUP_ALIASES
             from pypic.compute import field_dependencies
 
             alias_map = _default_aliases(self._config.grid.geometry)
             expanded: set[str] = set()
             for name in fields:
-                # Resolve geometry aliases (Bx→B1) and compute aliases (EFe→EF_s0)
-                resolved = alias_map.get(name, _COMPUTE_ALIASES.get(name, name))
+                # Resolve geometry aliases (Bx→B1), then compute aliases
+                # (energy_flux_x→EF1), then vector-group aliases
+                # (EFe→EF_s0). Group aliases are checked last because
+                # their target is a vector prefix, not a scalar name.
+                resolved = alias_map.get(
+                    name,
+                    _COMPUTE_ALIASES.get(
+                        name, _GROUP_ALIASES.get(name, name)
+                    ),
+                )
                 expanded.add(resolved)
                 # Expand vector group shorthand:
                 #   "B"    → "B1","B2","B3"

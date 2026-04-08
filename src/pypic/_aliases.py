@@ -104,24 +104,43 @@ _COMPUTE_ALIASES: dict[str, str] = {
     "e_th_e": "e_th_s0", "e_th_i": "e_th_s1",
     "e_int_e": "e_int_s0", "e_int_i": "e_int_s1",
     "h_e": "h_s0", "h_i": "h_s1",
-    # Energy flux aliases
-    "EFe": "EF_s0", "EFe1": "EF1_s0", "EFe2": "EF2_s0", "EFe3": "EF3_s0",
-    "EFi": "EF_s1", "EFi1": "EF1_s1", "EFi2": "EF2_s1", "EFi3": "EF3_s1",
+    # Energy flux aliases — numbered components only.
+    # The bare-prefix forms (EFe, EFi, KEFe, ...) live in _GROUP_ALIASES
+    # below because they expand to *three* names at read time, which is
+    # a different contract than scalar compute-time aliases.
+    "EFe1": "EF1_s0", "EFe2": "EF2_s0", "EFe3": "EF3_s0",
+    "EFi1": "EF1_s1", "EFi2": "EF2_s1", "EFi3": "EF3_s1",
     "energy_flux_x": "EF1",
     "energy_flux_y": "EF2",
     "energy_flux_z": "EF3",
-    # Kinetic energy flux aliases
-    "KEFe": "KEF_s0", "KEFe1": "KEF1_s0", "KEFe2": "KEF2_s0", "KEFe3": "KEF3_s0",
-    "KEFi": "KEF_s1", "KEFi1": "KEF1_s1", "KEFi2": "KEF2_s1", "KEFi3": "KEF3_s1",
-    # Heat flux aliases (total thermal = EF - KEF)
-    "HFe": "HF_s0", "HFe1": "HF1_s0", "HFe2": "HF2_s0", "HFe3": "HF3_s0",
-    "HFi": "HF_s1", "HFi1": "HF1_s1", "HFi2": "HF2_s1", "HFi3": "HF3_s1",
-    # Enthalpy flux aliases (adiabatic fluid: gamma/(gamma-1) P V)
-    "EHFe": "EHF_s0", "EHFe1": "EHF1_s0", "EHFe2": "EHF2_s0", "EHFe3": "EHF3_s0",
-    "EHFi": "EHF_s1", "EHFi1": "EHF1_s1", "EHFi2": "EHF2_s1", "EHFi3": "EHF3_s1",
-    # Conductive heat flux aliases (non-adiabatic: HF - EHF)
-    "qe": "q_s0", "qe1": "q1_s0", "qe2": "q2_s0", "qe3": "q3_s0",
-    "qi": "q_s1", "qi1": "q1_s1", "qi2": "q2_s1", "qi3": "q3_s1",
+    "KEFe1": "KEF1_s0", "KEFe2": "KEF2_s0", "KEFe3": "KEF3_s0",
+    "KEFi1": "KEF1_s1", "KEFi2": "KEF2_s1", "KEFi3": "KEF3_s1",
+    "HFe1": "HF1_s0", "HFe2": "HF2_s0", "HFe3": "HF3_s0",
+    "HFi1": "HF1_s1", "HFi2": "HF2_s1", "HFi3": "HF3_s1",
+    "EHFe1": "EHF1_s0", "EHFe2": "EHF2_s0", "EHFe3": "EHF3_s0",
+    "EHFi1": "EHF1_s1", "EHFi2": "EHF2_s1", "EHFi3": "EHF3_s1",
+    "qe1": "q1_s0", "qe2": "q2_s0", "qe3": "q3_s0",
+    "qi1": "q1_s1", "qi2": "q2_s1", "qi3": "q3_s1",
+}
+
+
+# Vector-group shorthand: aliases that expand to a three-component group
+# at read time (``read(fields=["EFe"]) → EF1_s0, EF2_s0, EF3_s0``). These
+# are deliberately separate from ``_COMPUTE_ALIASES`` because their target
+# is a *prefix*, not a single computable quantity — feeding ``EF_s0`` to
+# ``compute()`` would fail. Reader code consults this map after the
+# scalar alias map; see ``readers/_registry.py`` for the expansion logic.
+_GROUP_ALIASES: dict[str, str] = {
+    "EFe": "EF_s0",
+    "EFi": "EF_s1",
+    "KEFe": "KEF_s0",
+    "KEFi": "KEF_s1",
+    "HFe": "HF_s0",
+    "HFi": "HF_s1",
+    "EHFe": "EHF_s0",
+    "EHFi": "EHF_s1",
+    "qe": "q_s0",
+    "qi": "q_s1",
 }
 
 

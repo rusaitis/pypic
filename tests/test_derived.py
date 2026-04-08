@@ -1,3 +1,6 @@
+from collections.abc import Callable
+from typing import Any
+
 import numpy as np
 import pytest
 
@@ -886,3 +889,212 @@ class TestMagneticFluxFunction:
     def test_3d_raises(self):
         with pytest.raises(ValueError, match="2D"):
             magnetic_flux_function(np.ones((4, 3, 2)), 1.0, 1.0)
+
+
+# ---------------------------------------------------------------------------
+# Unit 12 — edge-case sweep across families that previous tests skipped
+# ---------------------------------------------------------------------------
+#
+# Each test below is one structural invariant ("every callable in this list
+# satisfies property P"). Failures are aggregated into a descriptive
+# message rather than fanned out across N parametrized cases — the
+# project's CLAUDE.md guidance prefers aggregation for invariant checks.
+#
+# The lists are kept in this section so adding a new derived function only
+# requires one append, not edits across multiple test classes.
+
+# (label, callable_taking_one_array) — magnitudes and 1-arg energy/scale funcs
+_FAMILY_1ARG: list[tuple[str, Callable[..., Any]]] = [
+    ("magnetic_field_magnitude",
+     lambda a: magnetic_field_magnitude(a, a, a)),
+    ("electric_field_magnitude",
+     lambda a: electric_field_magnitude(a, a, a)),
+    ("current_density_magnitude",
+     lambda a: current_density_magnitude(a, a, a)),
+    ("velocity_magnitude",
+     lambda a: velocity_magnitude(a, a, a)),
+    ("magnetic_energy_density", magnetic_energy_density),
+    ("electric_energy_density", electric_energy_density),
+    ("thermal_energy_density", thermal_energy_density),
+]
+
+# (label, callable_taking_two_arrays)
+_FAMILY_2ARG: list[tuple[str, Callable[..., Any]]] = [
+    ("plasma_beta", plasma_beta),
+    ("alfven_speed", alfven_speed),
+    ("kinetic_energy_density", kinetic_energy_density),
+]
+
+# (label, callable_taking_(rho_array,)) — density-dependent funcs that
+# should return NaN (not raise) for negative density input.
+_DENSITY_DEPENDENT: list[tuple[str, Callable[..., Any]]] = [
+    ("alfven_speed",
+     lambda n: alfven_speed(np.array([1.0]), n)),
+    ("plasma_frequency",
+     lambda n: plasma_frequency(n, charge=1.0, mass=1.0)),
+    ("skin_depth",
+     lambda n: skin_depth(n, charge=1.0, mass=1.0)),
+    ("debye_length",
+     lambda n: debye_length(np.array([1.0]), n, charge=1.0)),
+    ("sound_speed",
+     lambda n: sound_speed(np.array([1.0]), n)),
+]
+
+# (label, q+ callable, q- callable) — charge-dependent funcs whose
+# physical magnitudes must be invariant under charge sign flip.
+# Includes skin_depth which the existing per-class tests miss.
+_CHARGE_INVARIANT: list[tuple[str, Callable[..., Any], Callable[..., Any]]] = [
+    ("gyrofrequency",
+     lambda: gyrofrequency(np.array([2.0]), charge=1.0, mass=1.5),
+     lambda: gyrofrequency(np.array([2.0]), charge=-1.0, mass=1.5)),
+    ("plasma_frequency",
+     lambda: plasma_frequency(np.array([2.0]), charge=1.0, mass=1.5),
+     lambda: plasma_frequency(np.array([2.0]), charge=-1.0, mass=1.5)),
+    ("skin_depth",
+     lambda: skin_depth(np.array([2.0]), charge=1.0, mass=1.5, c=1.0),
+     lambda: skin_depth(np.array([2.0]), charge=-1.0, mass=1.5, c=1.0)),
+    ("gyroradius",
+     lambda: gyroradius(np.array([2.0]), np.array([3.0]), charge=1.0, mass=1.5),
+     lambda: gyroradius(np.array([2.0]), np.array([3.0]), charge=-1.0, mass=1.5)),
+    ("debye_length",
+     lambda: debye_length(np.array([2.0]), np.array([3.0]), charge=1.0),
+     lambda: debye_length(np.array([2.0]), np.array([3.0]), charge=-1.0)),
+]
+
+
+class TestEdgeCaseInvariants:
+    """Aggregated edge-case sweep — Unit 12 of the cleanup."""
+
+    def test_empty_arrays_propagate(self) -> None:
+        """Empty input → empty output, preserving shape (0,)."""
+        empty = np.array([], dtype=np.float64)
+        failures: list[str] = []
+        for label, func in _FAMILY_1ARG:
+            try:
+                result = func(empty)
+            except Exception as e:
+                failures.append(f"{label}: raised {type(e).__name__}: {e}")
+                continue
+            if result.shape != (0,):
+                failures.append(f"{label}: shape={result.shape}, expected (0,)")
+        for label, func in _FAMILY_2ARG:
+            try:
+                result = func(empty, empty)
+            except Exception as e:
+                failures.append(f"{label}: raised {type(e).__name__}: {e}")
+                continue
+            if result.shape != (0,):
+                failures.append(f"{label}: shape={result.shape}, expected (0,)")
+        assert not failures, "Empty-array regressions:\n  - " + "\n  - ".join(failures)
+
+    def test_single_element_preserves_shape(self) -> None:
+        """Length-1 input → length-1 output (no scalar special-casing)."""
+        one = np.array([1.0])
+        failures: list[str] = []
+        for label, func in _FAMILY_1ARG:
+            result = func(one)
+            if result.shape != (1,):
+                failures.append(f"{label}: shape={result.shape}, expected (1,)")
+        for label, func in _FAMILY_2ARG:
+            result = func(one, one)
+            if result.shape != (1,):
+                failures.append(f"{label}: shape={result.shape}, expected (1,)")
+        assert not failures, (
+            "Single-element shape regressions:\n  - " + "\n  - ".join(failures)
+        )
+
+    def test_negative_density_returns_nan(self) -> None:
+        """Negative density → NaN, never an exception.
+
+        Many derived quantities take ``sqrt(rho)`` or ``1/rho``. They must
+        propagate NaN for invalid input rather than raising — callers
+        often pass entire fields where a few cells may be unphysical.
+        The numpy ``invalid value`` warnings from ``sqrt(<0)`` are
+        expected and silenced via ``np.errstate``.
+        """
+        neg = np.array([-1.0])
+        failures: list[str] = []
+        with np.errstate(invalid="ignore"):
+            for label, func in _DENSITY_DEPENDENT:
+                try:
+                    result = func(neg)
+                except Exception as e:
+                    failures.append(f"{label}: raised {type(e).__name__}: {e}")
+                    continue
+                if not np.isnan(result[0]):
+                    failures.append(
+                        f"{label}: returned {result[0]!r}, expected NaN"
+                    )
+        assert not failures, (
+            "Negative-density NaN regressions:\n  - " + "\n  - ".join(failures)
+        )
+
+    def test_charge_sign_invariance(self) -> None:
+        r"""Magnitudes (gyrofreq, plasma freq, skin depth, gyroradius, $\lambda_D$)
+        depend on $|q|$ or $q^2$ — flipping the sign must not change them.
+
+        Catches accidental refactors that drop ``abs()`` or replace ``q**2``
+        with ``q``. Includes ``skin_depth`` which previously had no
+        dedicated charge-sign test.
+        """
+        failures: list[str] = []
+        for label, pos_call, neg_call in _CHARGE_INVARIANT:
+            pos = pos_call()
+            neg = neg_call()
+            if not np.allclose(pos, neg, rtol=1e-15):
+                failures.append(f"{label}: q=+1 → {pos}, q=-1 → {neg}")
+        assert not failures, (
+            "Charge sign invariance regressions:\n  - " + "\n  - ".join(failures)
+        )
+
+
+class TestDebyeLengthScaling:
+    r"""Functional-form regression tests for $\lambda_D = \sqrt{T / (n q^2)}$.
+
+    These complement the existing known-value test (``T=4, n=1, q=1 → 2``)
+    by checking the *dependence* on each input. Hand-coded values can
+    survive a refactor that swaps the formula for one with the same
+    output at a single point; scaling laws cannot.
+    """
+
+    @pytest.mark.parametrize(
+        ("t_factor", "expected_factor"),
+        [
+            (1.0, 1.0),
+            (2.0, np.sqrt(2.0)),
+            (4.0, 2.0),
+            (0.25, 0.5),
+        ],
+    )
+    def test_temperature_scaling(
+        self, t_factor: float, expected_factor: float,
+    ) -> None:
+        r"""$\lambda_D \propto \sqrt{T}$."""
+        base = debye_length(np.array([1.0]), np.array([1.0]), charge=1.0)
+        scaled = debye_length(
+            np.array([t_factor]), np.array([1.0]), charge=1.0,
+        )
+        np.testing.assert_allclose(
+            scaled, expected_factor * base, rtol=1e-15,
+        )
+
+    @pytest.mark.parametrize(
+        ("n_factor", "expected_factor"),
+        [
+            (1.0, 1.0),
+            (4.0, 0.5),
+            (0.25, 2.0),
+            (16.0, 0.25),
+        ],
+    )
+    def test_density_scaling(
+        self, n_factor: float, expected_factor: float,
+    ) -> None:
+        r"""$\lambda_D \propto 1/\sqrt{n}$."""
+        base = debye_length(np.array([1.0]), np.array([1.0]), charge=1.0)
+        scaled = debye_length(
+            np.array([1.0]), np.array([n_factor]), charge=1.0,
+        )
+        np.testing.assert_allclose(
+            scaled, expected_factor * base, rtol=1e-15,
+        )
