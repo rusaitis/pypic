@@ -52,6 +52,14 @@ class _Recipe:
     needs_c: bool = False
     component: int | None = None
     species_args: _SpeciesArgs | None = None
+    # When True, the dataset's geometry is passed to ``func`` as a
+    # ``geometry=`` kwarg. Used by operator-backed recipes
+    # (``div_B``, ``div_E``, ``curl_B*``, ``vort*``) so that the
+    # FieldDataset path is automatically correct when spherical /
+    # cylindrical operators are eventually implemented. ``psi`` opts
+    # out because ``magnetic_flux_function`` has its own (Cartesian-only)
+    # generalization path documented in its docstring.
+    passes_geometry: bool = False
 
 
 _PRESSURE_TENSOR_FIELDS = ("P11", "P22", "P33", "P12", "P13", "P23")
@@ -207,26 +215,35 @@ _REGISTRY: dict[str, _Recipe] = {
     "P_perp": _Recipe(derived.perpendicular_pressure, _PRESSURE_TENSOR_AND_B),
     "agyrotropy": _Recipe(derived.agyrotropy, _PRESSURE_TENSOR_AND_B),
     # Grid-dependent diagnostics
-    "div_B": _Recipe(diagnostics.div_b, ("B1", "B2", "B3"), needs_grid=True),
-    "div_E": _Recipe(diagnostics.div_e, ("E1", "E2", "E3"), needs_grid=True),
+    "div_B": _Recipe(
+        diagnostics.div_b, ("B1", "B2", "B3"),
+        needs_grid=True, passes_geometry=True,
+    ),
+    "div_E": _Recipe(
+        diagnostics.div_e, ("E1", "E2", "E3"),
+        needs_grid=True, passes_geometry=True,
+    ),
     # Curl of B (tuple return — component selects)
     "curl_B1": _Recipe(
         operators.curl,
         ("B1", "B2", "B3"),
         needs_grid=True,
         component=0,
+        passes_geometry=True,
     ),
     "curl_B2": _Recipe(
         operators.curl,
         ("B1", "B2", "B3"),
         needs_grid=True,
         component=1,
+        passes_geometry=True,
     ),
     "curl_B3": _Recipe(
         operators.curl,
         ("B1", "B2", "B3"),
         needs_grid=True,
         component=2,
+        passes_geometry=True,
     ),
     # Vorticity (tuple return — component selects)
     "vort1": _Recipe(
@@ -234,18 +251,21 @@ _REGISTRY: dict[str, _Recipe] = {
         ("V1", "V2", "V3"),
         needs_grid=True,
         component=0,
+        passes_geometry=True,
     ),
     "vort2": _Recipe(
         operators.curl,
         ("V1", "V2", "V3"),
         needs_grid=True,
         component=1,
+        passes_geometry=True,
     ),
     "vort3": _Recipe(
         operators.curl,
         ("V1", "V2", "V3"),
         needs_grid=True,
         component=2,
+        passes_geometry=True,
     ),
     # Vorticity magnitude — depends on vort1/2/3
     "|vort|": _Recipe(derived.velocity_magnitude, ("vort1", "vort2", "vort3")),
@@ -696,6 +716,7 @@ def compute_field(name: str, dataset: FieldDataset, _depth: int = 0) -> FloatArr
         args.append(_get_c(dataset))
 
     # Append grid spacing
+    kwargs: dict[str, Any] = {}
     if recipe.needs_grid:
         if dataset.grid.geometry.type != GeometryType.CARTESIAN:
             msg = (
@@ -705,8 +726,18 @@ def compute_field(name: str, dataset: FieldDataset, _depth: int = 0) -> FloatArr
             )
             raise NotImplementedError(msg)
         args.extend(dataset.grid.spacing)
+        # Operator-backed recipes get the dataset's geometry threaded
+        # through as a kwarg. Today this is a no-op for the only
+        # reachable code path (geometry is always Cartesian after the
+        # check above) but it pre-wires the FieldDataset → recipe →
+        # operator path so that when spherical/cylindrical operator
+        # implementations land, the recipe automatically passes the
+        # right geometry. At that point, the early raise above can be
+        # relaxed for ``passes_geometry`` recipes.
+        if recipe.passes_geometry:
+            kwargs["geometry"] = dataset.grid.geometry.type
 
-    result = recipe.func(*args)
+    result = recipe.func(*args, **kwargs)
 
     if recipe.component is not None:
         return result[recipe.component]  # type: ignore[no-any-return]

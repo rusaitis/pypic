@@ -193,16 +193,23 @@ grow.
   slicing.
   **Depends on:** Step 15 (frame transforms) or Step 16 (sphere selection).
 
-- [ ] **Step 31: Remove default geometry from operators**
+- [~] **Step 31: Remove default geometry from operators (deferred)**
   `divergence()`, `curl()`, `gradient()` in `coordinates/operators.py`
-  default to `GeometryType.CARTESIAN`. This hides bugs: callers who forget
-  to pass geometry silently get Cartesian behavior. Removing the default
-  forces all callers to be explicit. Currently harmless because non-Cartesian
-  raises `NotImplementedError`, but will hide bugs when spherical/cylindrical
-  implementations are added. The `compute()` geometry guard (A2) catches
-  this at the FieldDataset level, but direct operator callers remain
-  unguarded.
-  **Depends on:** Spherical/cylindrical operator implementations (Step 10 extension).
+  default to `GeometryType.CARTESIAN`. The original plan was to drop the
+  default and force every caller to be explicit. **Deferred** after the
+  audit showed there is no silent wrong behavior to guard against today
+  (non-Cartesian raises `NotImplementedError` immediately) and removing
+  the default would force `geometry=GeometryType.CARTESIAN` onto 23
+  intentionally-Cartesian test sites — pure verbosity, zero added safety.
+  Instead, the FieldDataset → recipe → operator path now threads the
+  dataset's geometry through as a kwarg via `_Recipe.passes_geometry`
+  in `compute.py`. Today this is a no-op (the early geometry guard at
+  `compute_field` still raises for non-Cartesian) but it pre-wires the
+  recipe path so spherical/cylindrical "just work" once the operators
+  themselves implement them.
+  **Revisit when:** spherical/cylindrical operator implementations land
+  (Step 10 extension). At that point, relax the early raise in
+  `compute_field` for `passes_geometry` recipes.
 
 - [ ] **Step 32: Separate `four_velocity` quantity type**
   `u1/u2/u3` (four-velocity, γv, unbounded) share `quantity_type="velocity"`
@@ -258,6 +265,6 @@ grow.
 | 28 | docs | Ecosystem positioning page | — |
 | 29 | interop | SPASE XML metadata export | — |
 | 30 | readers/selections | Reduced geometry after slicing | ✅ |
-| 31 | coordinates | Remove default geometry from operators | — |
+| 31 | coordinates | Remove default geometry from operators (deferred — see note) | ⏸ |
 | 32 | fields/units | Separate `four_velocity` quantity type | — |
 | 33 | fields/units | `specific_energy` quantity type for enthalpy | ✅ |
