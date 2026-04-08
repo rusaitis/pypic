@@ -116,6 +116,10 @@ uv.lock
 *.log
 examples/*
 !examples/.gitkeep
+# Reference examples used as test fixtures (tests/test_config.py and
+# tests/test_examples.py import these directly).
+!examples/ipic3d-double-harris.toml
+!examples/custom_reader_example.py
 
 # Test fixture data (small, committed)
 !tests/data/
