@@ -92,7 +92,7 @@ def add_circle(
     alpha: float = 0.6,
     linestyle: str = "--",
     linewidth: float = 0.8,
-    fontsize: float = 7.5,
+    fontsize: float | None = None,
     text_alpha: float = 0.9,
     variant: OverlayVariant | None = None,
     zorder: int = 5,
@@ -120,8 +120,9 @@ def add_circle(
         Line style (``"--"``, ``":"``, ``"-."``, etc.).
     linewidth : float
         Line width.
-    fontsize : float
-        Label font size.
+    fontsize : float | None
+        Label font size. ``None`` reads from the active theme's
+        ``annotation_fontsize`` field.
     text_alpha : float
         Label opacity.
     variant : {"alt"} or None
@@ -160,12 +161,15 @@ def add_circle(
         bg_color = _theme_val(bg_key, (0.07, 0.07, 0.07, 0.65))
         fg_color = _theme_val(fg_key, (0.88, 0.88, 0.88, 0.8))
 
+        default_fs = _theme_val("annotation_fontsize", 7.5)
+        fs = fontsize if fontsize is not None else default_fs
+
         angle_rad = math.radians(label_position)
         tx = center[0] + radius * math.cos(angle_rad)
         ty = center[1] + radius * math.sin(angle_rad)
         ax.text(
             tx, ty, label,
-            fontsize=fontsize, alpha=text_alpha, color=fg_color,
+            fontsize=fs, alpha=text_alpha, color=fg_color,
             ha="center", va="center",
             rotation=label_position - 90,
             rotation_mode="anchor",

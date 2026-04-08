@@ -60,3 +60,51 @@ class TestReconnectionRate:
         psi_prev = np.full((10, 10), 1.0)
         rate = reconnection_rate(psi, psi_prev, dt=1.0, x_point=(3, 3))
         np.testing.assert_allclose(rate, 2.0)
+
+
+class TestReconnectionEdgeCases:
+    """NaN handling and X-point near margin."""
+
+    def test_nan_in_psi_no_crash(self) -> None:
+        """A NaN in psi must not crash detection.
+
+        Saddles in NaN regions are either skipped or NaN-tagged; the
+        function must remain callable.
+        """
+        x = np.linspace(-5, 5, 51)
+        dx = x[1] - x[0]
+        xx, yy = np.meshgrid(x, x, indexing="ij")
+        psi = xx**2 - yy**2
+        psi[10, 10] = np.nan  # spike well away from the saddle at (25, 25)
+        # Should not raise; the saddle at the centre is still findable
+        saddles = find_saddle_points(psi, dx, dx)
+        assert isinstance(saddles, list)
+
+    def test_xpoint_just_inside_margin(self) -> None:
+        """A saddle near (but inside) the margin still gets reported.
+
+        With ``meshgrid(..., indexing='ij')`` the i-index of the returned
+        saddle tracks ``x`` and the j-index tracks ``y`` (see the existing
+        ``test_hyperbolic_saddle``). The shifted saddle below sits at
+        ``(x=3.5, y=0)``, i.e. ``(i=34, j=20)`` on a 41x41 grid spanning
+        ``[-5, 5]`` — only 6 cells from the upper-i edge but still inside
+        the 2-cell margin guard.
+        """
+        x = np.linspace(-5, 5, 41)
+        dx = x[1] - x[0]
+        xx, yy = np.meshgrid(x, x, indexing="ij")
+        psi = (xx - 3.5) ** 2 - yy**2
+        saddles = find_saddle_points(psi, dx, dx)
+        assert len(saddles) >= 1
+        rows_i = [r for r, _ in saddles]  # x-axis index
+        cols_j = [c for _, c in saddles]  # y-axis index
+        assert any(abs(r - 34) <= 2 for r in rows_i)
+        assert any(abs(c - 20) <= 2 for c in cols_j)
+
+    def test_reconnection_rate_preserves_nan(self) -> None:
+        """If psi has NaN at the X-point, the rate is NaN (not silently 0)."""
+        psi = np.zeros((10, 10))
+        psi_prev = np.zeros((10, 10))
+        psi[5, 5] = np.nan
+        rate = reconnection_rate(psi, psi_prev, dt=1.0, x_point=(5, 5))
+        assert np.isnan(rate)

@@ -23,7 +23,11 @@ def power_spectrum_1d(
 ) -> tuple[FloatArray, FloatArray]:
     r"""Compute 1D power spectral density along one axis.
 
-    $$P(k) = \frac{|\hat{f}(k)|^2 \, \Delta x}{N}$$
+    $$P(k) = \frac{|\hat{f}(k)|^2 \, \Delta x}{2\pi N}$$
+
+    With $k$ in radians per unit length, $dk = 2\pi/(N\Delta x)$, so
+    the $2\pi$ factor in the denominator makes $\int P(k)\, dk$
+    Parseval-consistent with the variance of the windowed signal.
 
     Uses ``np.fft.rfft`` (real input, positive frequencies only).
     For multi-dimensional input, the spectrum is averaged over the

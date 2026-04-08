@@ -185,6 +185,16 @@ def _trace_single_direction(
     return buf[: n + 1], reason
 
 
+# Standard PI controller constants for the Dormand-Prince step-size
+# adaptation. The formulas follow Hairer/Wanner "Solving ODEs I" §II.4.
+# Kept as module constants so the magic numbers are explained in one place.
+_DP_SAFETY = 0.9  # Safety factor: bias accepted steps slightly small
+_DP_GROWTH_MIN = 0.2  # Minimum step-size shrink ratio per accept/reject
+_DP_GROWTH_MAX = 5.0  # Maximum step-size growth ratio per accept
+_DP_ERR_FLOOR = 1e-15  # Avoid pow(0, ·) when err is exactly machine zero
+_DP_EXPONENT = -0.2  # -1/p with p = 5 (5th-order embedded method)
+
+
 # Dormand-Prince RK4(5) Butcher tableau (7 stages)
 # Rows = stages, columns = weights on previous stages
 _DP_A = np.array(
@@ -254,8 +264,14 @@ def _trace_single_direction_adaptive(
         err_norm = float(np.max(np.abs(err_vec) / scale))
         max_local_error = max(max_local_error, err_norm)
 
-        # Step size control: 0.9 safety factor, clamp growth to [0.2x, 5x]
-        factor = min(5.0, max(0.2, 0.9 * max(err_norm, 1e-15) ** (-0.2)))
+        # Step size control via standard PI controller (see _DP_* constants)
+        factor = min(
+            _DP_GROWTH_MAX,
+            max(
+                _DP_GROWTH_MIN,
+                _DP_SAFETY * max(err_norm, _DP_ERR_FLOOR) ** _DP_EXPONENT,
+            ),
+        )
         h_new = float(np.clip(h * factor, min_step, max_step))
 
         if err_norm <= 1.0 or h <= min_step:
@@ -371,6 +387,29 @@ def trace_field_line(
     ------
     ValueError
         If seed is outside domain or at a null point.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> from pypic.readers.base import FieldDataset, GridInfo
+    >>> from pypic.units import Normalization
+    >>> grid = GridInfo(dimensions=(8, 8, 8), spacing=(1.0, 1.0, 1.0))
+    >>> data = FieldDataset.from_arrays(
+    ...     {
+    ...         "B1": np.ones((8, 8, 8)),
+    ...         "B2": np.zeros((8, 8, 8)),
+    ...         "B3": np.zeros((8, 8, 8)),
+    ...     },
+    ...     grid,
+    ...     Normalization.identity(),
+    ... )
+    >>> fl = trace_field_line(
+    ...     data, (4.0, 4.0, 4.0), step_size=0.5, max_steps=4, direction="forward"
+    ... )
+    >>> fl.n_points
+    5
+    >>> bool(fl.points[-1, 0] > fl.points[0, 0])  # advances along +x
+    True
     """
     if direction not in _VALID_DIRECTIONS:
         msg = f"direction must be one of {sorted(_VALID_DIRECTIONS)}, got {direction!r}"
@@ -487,6 +526,29 @@ def trace_field_line_adaptive(
     ------
     ValueError
         If seed is outside domain or at a null point.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> from pypic.readers.base import FieldDataset, GridInfo
+    >>> from pypic.units import Normalization
+    >>> grid = GridInfo(dimensions=(8, 8, 8), spacing=(1.0, 1.0, 1.0))
+    >>> data = FieldDataset.from_arrays(
+    ...     {
+    ...         "B1": np.ones((8, 8, 8)),
+    ...         "B2": np.zeros((8, 8, 8)),
+    ...         "B3": np.zeros((8, 8, 8)),
+    ...     },
+    ...     grid,
+    ...     Normalization.identity(),
+    ... )
+    >>> fl = trace_field_line_adaptive(
+    ...     data, (4.0, 4.0, 4.0), max_steps=4, direction="forward"
+    ... )
+    >>> fl.metadata["method"]
+    'rk45_dopri'
+    >>> "max_local_error" in fl.metadata
+    True
     """
     if direction not in _VALID_DIRECTIONS:
         msg = f"direction must be one of {sorted(_VALID_DIRECTIONS)}, got {direction!r}"
@@ -597,6 +659,28 @@ def estimate_tracing_error(
     -------
     float
         L2 distance between original and refined endpoints.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> from pypic.readers.base import FieldDataset, GridInfo
+    >>> from pypic.units import Normalization
+    >>> grid = GridInfo(dimensions=(8, 8, 8), spacing=(1.0, 1.0, 1.0))
+    >>> data = FieldDataset.from_arrays(
+    ...     {
+    ...         "B1": np.ones((8, 8, 8)),
+    ...         "B2": np.zeros((8, 8, 8)),
+    ...         "B3": np.zeros((8, 8, 8)),
+    ...     },
+    ...     grid,
+    ...     Normalization.identity(),
+    ... )
+    >>> fl = trace_field_line(
+    ...     data, (4.0, 4.0, 4.0), step_size=1.0, max_steps=3, direction="forward"
+    ... )
+    >>> err = estimate_tracing_error(fl, data)
+    >>> err < 1e-9  # uniform field, RK4 is exact
+    True
     """
     for key in ("step_size", "n_steps"):
         if key not in field_line.metadata:

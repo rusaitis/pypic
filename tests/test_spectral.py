@@ -120,3 +120,51 @@ class TestPowerSpectrum3D:
         k, power = power_spectrum_3d(field, 0.5, 1.0, 2.0, n_bins=10)
         assert len(k) > 0
         assert np.all(np.isfinite(power))
+
+
+class TestSpectralEdgeCases:
+    """Edge cases: NaN, zeros, even/odd Nyquist, invalid windows."""
+
+    def test_all_zero_field_1d(self) -> None:
+        """All-zero field has zero power everywhere — no NaN, no inf."""
+        k, power = power_spectrum_1d(np.zeros(64), 1.0)
+        assert len(k) == len(power)
+        assert np.all(np.isfinite(power))
+        assert np.all(power == 0.0)
+
+    def test_nan_propagates_1d(self) -> None:
+        """NaN in input propagates to output (no silent dropping)."""
+        field = np.zeros(64)
+        field[10] = np.nan
+        _k, power = power_spectrum_1d(field, 1.0)
+        assert np.any(np.isnan(power))
+
+    def test_invalid_window_raises(self) -> None:
+        """Unknown window names raise (caller bug, surface immediately)."""
+        with pytest.raises(ValueError, match=r"not_a_real_window|Unknown window"):
+            power_spectrum_1d(np.ones(32), 1.0, window="not_a_real_window")
+
+    @pytest.mark.parametrize("n", [64, 65])
+    def test_nyquist_handling_parity(self, n: int) -> None:
+        """Even and odd N both produce monotonically increasing k."""
+        field = np.random.default_rng(0).standard_normal(n)
+        k, power = power_spectrum_1d(field, 1.0)
+        assert np.all(np.diff(k) > 0)
+        assert np.all(np.isfinite(power))
+
+    def test_all_zero_field_2d(self) -> None:
+        """2D zero field — empty bins are NaN, valid bins are 0."""
+        _k, power = power_spectrum_2d(np.zeros((32, 32)), 1.0, 1.0, n_bins=10)
+        # Output excludes empty bins; surviving entries must all be 0
+        assert np.all(power == 0.0)
+
+    def test_all_zero_field_3d(self) -> None:
+        """3D zero field — same property as 2D."""
+        _k, power = power_spectrum_3d(
+            np.zeros((16, 16, 16)),
+            1.0,
+            1.0,
+            1.0,
+            n_bins=8,
+        )
+        assert np.all(power == 0.0)

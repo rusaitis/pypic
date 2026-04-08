@@ -161,6 +161,9 @@ class PlotTheme:
     # Contour overlay
     contour_label_fontsize: float = 7.0
 
+    # Data-space annotations (reference circles, error labels, etc.)
+    annotation_fontsize: float = 7.5
+
     # Plot area
     plot_rounding: float = 0.0
 

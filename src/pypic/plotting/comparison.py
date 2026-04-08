@@ -243,7 +243,7 @@ def plot_comparison(
                 0.98,
                 f"$L_2$ = {l2:.2e}",
                 transform=diff_ax.transAxes,
-                fontsize=8,
+                fontsize=theme.annotation_fontsize,
                 va="top",
                 ha="left",
                 color=tc,

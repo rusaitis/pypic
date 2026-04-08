@@ -40,14 +40,18 @@ def _nearest_indices(
     for d in range(ndim):
         coords = coord_arrays[d]
         vals = points[:, d]
-        idx = np.searchsorted(coords, vals) - 1
-        idx = np.clip(idx, 0, len(coords) - 2)
-        closer_to_next = np.abs(vals - coords[idx + 1]) < np.abs(vals - coords[idx])
-        idx = np.where(closer_to_next, idx + 1, idx)
-        if len(coords) > 1:
-            half_dx = 0.5 * (coords[1] - coords[0])
-        else:
+        if len(coords) == 1:
+            # Degenerate axis (single grid node, e.g. 2D-in-3D layouts).
+            # Only valid index is 0; bounding-box uses a heuristic margin
+            # since there is no spacing to derive a half-cell from.
+            idx = np.zeros(n, dtype=np.intp)
             half_dx = 0.5 * abs(float(coords[0])) + 0.5
+        else:
+            idx = np.searchsorted(coords, vals) - 1
+            idx = np.clip(idx, 0, len(coords) - 2)
+            closer_to_next = np.abs(vals - coords[idx + 1]) < np.abs(vals - coords[idx])
+            idx = np.where(closer_to_next, idx + 1, idx)
+            half_dx = 0.5 * (coords[1] - coords[0])
         out = (vals < coords[0] - half_dx) | (vals > coords[-1] + half_dx)
         mask &= ~out
         indices[:, d] = idx

@@ -1310,6 +1310,73 @@ class TestPlotPowerSpectrum:
         plt.close(fig)
 
 
+class TestAnnotations:
+    """Smoke tests for data-space annotation helpers."""
+
+    def test_add_planet_returns_two_wedges(self) -> None:
+        from matplotlib.patches import Wedge
+
+        from pypic.plotting.annotations import add_planet
+
+        fig, ax = plt.subplots()
+        day, night = add_planet(ax, center=(0.0, 0.0), radius=1.0)
+        assert isinstance(day, Wedge)
+        assert isinstance(night, Wedge)
+        # Both wedges land on the axes
+        assert day in ax.patches
+        assert night in ax.patches
+        plt.close(fig)
+
+    @pytest.mark.parametrize(
+        "sun_direction",
+        ["left", "right", "up", "down"],
+    )
+    def test_add_planet_all_directions(self, sun_direction: str) -> None:
+        from pypic.plotting.annotations import add_planet
+
+        fig, ax = plt.subplots()
+        add_planet(ax, sun_direction=sun_direction)  # type: ignore[arg-type]
+        assert len(ax.patches) == 2
+        plt.close(fig)
+
+    def test_add_circle_returns_circle_patch(self) -> None:
+        from matplotlib.patches import Circle
+
+        from pypic.plotting.annotations import add_circle
+
+        fig, ax = plt.subplots()
+        c = add_circle(ax, radius=2.0)
+        assert isinstance(c, Circle)
+        assert c in ax.patches
+        plt.close(fig)
+
+    def test_add_circle_with_label_uses_theme_fontsize(self) -> None:
+        """Default fontsize=None falls back to theme.annotation_fontsize."""
+        from pypic.plotting.annotations import add_circle
+
+        theme = get_theme()
+        fig, ax = plt.subplots()
+        with use_theme(theme):
+            add_circle(ax, radius=2.0, label="boundary")
+        # Label text was added to the axes
+        labels = [t.get_text() for t in ax.texts]
+        assert "boundary" in labels
+        # And the text font size matches the theme default
+        annotation_text = next(t for t in ax.texts if t.get_text() == "boundary")
+        assert annotation_text.get_fontsize() == theme.annotation_fontsize
+        plt.close(fig)
+
+    def test_add_circle_explicit_fontsize_wins(self) -> None:
+        """An explicit fontsize argument overrides the theme value."""
+        from pypic.plotting.annotations import add_circle
+
+        fig, ax = plt.subplots()
+        add_circle(ax, radius=1.0, label="L1", fontsize=11.0)
+        text = next(t for t in ax.texts if t.get_text() == "L1")
+        assert text.get_fontsize() == 11.0
+        plt.close(fig)
+
+
 class TestPlotLineComparison:
     def test_basic(self, ds_2d: FieldDataset) -> None:
         from pypic.plotting import plot_line_comparison

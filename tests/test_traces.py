@@ -555,6 +555,47 @@ class TestSampling:
             sample_field(data, pts, "rho", method="cubic")
 
 
+class TestSamplingEdgeCases:
+    """Edge cases: degenerate grid axes, NaN coords."""
+
+    def test_single_node_axis_does_not_crash(self) -> None:
+        """A FieldDataset with one node along z should sample cleanly.
+
+        Regression for the ``np.clip(0, len-2)`` underflow path in
+        ``_nearest_indices`` (Unit 14b).
+        """
+        from pypic.readers.base import FieldDataset, GridInfo
+
+        grid = GridInfo(
+            dimensions=(4, 4, 1),
+            spacing=(1.0, 1.0, 1.0),
+            origin=(0.0, 0.0, 0.0),
+        )
+        # Field varies along x; constant along y, z
+        x = np.arange(4) * 1.0 + 0.5
+        field = np.broadcast_to(x[:, None, None], (4, 4, 1)).copy().astype(np.float64)
+        data = FieldDataset.from_arrays({"rho": field}, grid)
+        # Sample at y=0.5, z=0.5 (the only valid z slice)
+        pts = np.array([[0.5, 0.5, 0.5], [1.5, 0.5, 0.5], [2.5, 0.5, 0.5]])
+        values = sample_field(data, pts, "rho", method="nearest")
+        np.testing.assert_allclose(values, [0.5, 1.5, 2.5])
+
+    def test_single_node_axis_far_z_out_of_bounds(self) -> None:
+        """Querying far outside the (single) z node returns NaN, not garbage."""
+        from pypic.readers.base import FieldDataset, GridInfo
+
+        grid = GridInfo(
+            dimensions=(4, 4, 1),
+            spacing=(1.0, 1.0, 1.0),
+            origin=(0.0, 0.0, 0.0),
+        )
+        field = np.zeros((4, 4, 1), dtype=np.float64)
+        data = FieldDataset.from_arrays({"rho": field}, grid)
+        pts = np.array([[0.5, 0.5, 100.0]])  # z way outside the single node
+        values = sample_field(data, pts, "rho", method="nearest")
+        assert np.all(np.isnan(values))
+
+
 # --- Tracing algorithm tests ---
 
 
@@ -694,6 +735,31 @@ class TestTraceFieldLine:
 
         with pytest.raises(ValueError, match="outside"):
             trace_field_line(uniform_field_data, (1e6, 1e6, 1e6))
+
+    def test_callback_terminates_after_first_step(
+        self,
+        uniform_field_data: object,
+    ) -> None:
+        """A callback that returns True after one step yields a 2-point line."""
+        from pypic.traces import TerminationReason, trace_field_line
+
+        calls = {"n": 0}
+
+        def stop_after_one(_pt: np.ndarray) -> bool:
+            calls["n"] += 1
+            return calls["n"] >= 1
+
+        fl = trace_field_line(
+            uniform_field_data,
+            (10.0, 10.0, 10.0),
+            step_size=0.5,
+            max_steps=100,
+            direction="forward",
+            terminate=stop_after_one,
+        )
+        assert fl.metadata["reason"] == str(TerminationReason.CALLBACK)
+        # Seed + one accepted step = 2 points
+        assert fl.n_points == 2
 
 
 class TestTraceFieldLineAdaptive:
