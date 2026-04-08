@@ -17,8 +17,9 @@ from pypic.plotting._overlay_common import (
 )
 
 if TYPE_CHECKING:
+    from matplotlib.artist import Artist
     from matplotlib.axes import Axes
-    from matplotlib.offsetbox import AnchoredOffsetbox, DrawingArea
+    from matplotlib.offsetbox import AnchoredOffsetbox, DrawingArea, OffsetBox
 
 # _format_time_value and _format_status_text are re-exported so callers
 # (including tests) that imported them directly from this module still
@@ -31,15 +32,7 @@ __all__ = [
     "add_legend",
 ]
 
-_LOC_CODES: dict[str, int] = {
-    "upper right": 1,
-    "upper left": 2,
-    "lower left": 3,
-    "lower right": 4,
-    "upper center": 9,
-}
-
-_CORNERS: tuple[str, ...] = (
+_CORNERS: tuple[BadgeLoc, ...] = (
     "upper left",
     "upper right",
     "lower right",
@@ -50,17 +43,17 @@ _OCCUPIED_ATTR = "_pypic_occupied_corners"
 
 
 def _claim_corner(
-    ax: Axes, preferred: str, explicit: BadgeLoc | None = None
-) -> str:
+    ax: Axes, preferred: BadgeLoc, explicit: BadgeLoc | None = None
+) -> BadgeLoc:
     """Pick an overlay corner, avoiding already-occupied ones.
 
     If *explicit* is given it is used as-is (user override).  Otherwise
     *preferred* is tried first, then the remaining corners in clockwise
     order.  If all four are taken, *preferred* is returned anyway.
     """
-    occupied: set[str] = getattr(ax, _OCCUPIED_ATTR, set())
+    occupied: set[BadgeLoc] = getattr(ax, _OCCUPIED_ATTR, set())
 
-    chosen = explicit if explicit is not None else preferred
+    chosen: BadgeLoc = explicit if explicit is not None else preferred
     if explicit is None and chosen in occupied:
         for corner in _CORNERS:
             if corner not in occupied:
@@ -72,7 +65,9 @@ def _claim_corner(
     return chosen
 
 
-def _resolve_border(variant: OverlayVariant | None = None) -> tuple[float, ...]:
+def _resolve_border(
+    variant: OverlayVariant | None = None,
+) -> tuple[float, float, float, float]:
     """Return the overlay border color for the given variant."""
     from pypic.plotting.styles import _theme_val
 
@@ -83,7 +78,7 @@ def _resolve_border(variant: OverlayVariant | None = None) -> tuple[float, ...]:
 
 def _make_overlay_box(
     ax: Axes,
-    child: object,
+    child: OffsetBox,
     loc: BadgeLoc,
     bg_rgba: tuple[float, float, float, float],
     pad: float | None = None,
@@ -98,10 +93,9 @@ def _make_overlay_box(
         pad = _theme_val("overlay_padding", 0.4)
     margin: float = _theme_val("overlay_margin", 0.03)
 
-    loc_code = _LOC_CODES.get(loc, 1)
     has_bg = bg_rgba[3] >= 0.01
     box = AnchoredOffsetbox(
-        loc=loc_code,
+        loc=loc,
         child=child,
         pad=pad,
         borderpad=margin * 20,  # convert axes fraction to approx points
@@ -418,6 +412,7 @@ def add_badge(
             raise ValueError(msg)
         fraction = max(0.0, min(1.0, (step - start) / max(end - start, 1)))
 
+    child: OffsetBox
     if fraction is not None:
         # Scale bar width to match text length when using the default
         if auto_bar_width:
@@ -620,7 +615,7 @@ def add_legend(
     bg_rgba = resolve_rgba_override(bg_color, bg_alpha, (*default_bg, overlay_alpha))
     resolved_text = resolve_rgba_override(text_color, text_alpha, (*default_fg, 0.65))
 
-    rows: list[HPacker] = []
+    rows: list[Artist] = []
     line_height = fontsize * 0.4
     for entry in entries:
         drawing = DrawingArea(sample_width, line_height)
@@ -658,9 +653,12 @@ def add_legend(
         row = HPacker(children=[drawing, text], pad=0, sep=4, align="center")
         rows.append(row)
 
+    legend_child: OffsetBox
     if len(rows) > 1:
-        child = VPacker(children=rows, pad=0, sep=3, align="left")
+        legend_child = VPacker(children=rows, pad=0, sep=3, align="left")
     else:
-        child = rows[0]
+        legend_child = rows[0]  # type: ignore[assignment]  # HPacker is an OffsetBox
 
-    return _make_overlay_box(ax, child, actual_loc, bg_rgba, variant=variant)
+    return _make_overlay_box(
+        ax, legend_child, actual_loc, bg_rgba, variant=variant,
+    )

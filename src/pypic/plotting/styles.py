@@ -4,13 +4,15 @@ from __future__ import annotations
 
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 if TYPE_CHECKING:
     from collections.abc import Generator
 
     from matplotlib.axes import Axes
     from matplotlib.figure import Figure
+    from matplotlib.patches import FancyBboxPatch
+    from matplotlib.path import Path
 
 _COMMON_RC: dict[str, Any] = {
     "font.serif": ["DejaVu Serif", "Computer Modern", "Times"],
@@ -295,10 +297,13 @@ def get_active_theme() -> PlotTheme | None:
     return _active_theme
 
 
-def _theme_val(attr: str, default: Any) -> Any:  # noqa: ANN401
+def _theme_val[T](attr: str, default: T) -> T:
     """Read *attr* from the active or global default theme.
 
     Falls back to *default* only when no theme has been loaded at all.
+    The return type is inferred from the default — pass a typed literal
+    to get a typed result (e.g. ``_theme_val("font_overlay", 9.0)``
+    returns ``float``).
     """
     theme = _active_theme if _active_theme is not None else get_theme()
     return getattr(theme, attr, default)
@@ -475,7 +480,7 @@ def apply_grid(ax: Axes, theme: PlotTheme, *, minor: bool = False) -> None:
         )
 
 
-def _rounded_axes_path(aspect: float, r: float) -> object:
+def _rounded_axes_path(aspect: float, r: float) -> Path:
     """Build a rounded rectangle Path with aspect-corrected circular arcs."""
     from matplotlib.path import Path
 
@@ -518,7 +523,9 @@ def apply_rounding(ax: Axes) -> None:
     fig = ax.get_figure()
     if fig is None:
         return
-    renderer = fig.canvas.get_renderer()
+    # mpl backend stub gap: get_renderer() exists at runtime on the
+    # concrete backend canvas but not on FigureCanvasBase.
+    renderer = fig.canvas.get_renderer()  # type: ignore[attr-defined]
     bbox = ax.get_window_extent(renderer)
     aspect = bbox.width / bbox.height if bbox.height > 0 else 1.0
 
@@ -544,6 +551,9 @@ def style_legend(ax: Axes) -> None:
     """Round the legend box corners if a legend is present."""
     legend = ax.get_legend()
     if legend is not None:
-        legend.get_frame().set_boxstyle(_overlay_box_style())
+        # Legend frame is a FancyBboxPatch at runtime, not the base
+        # Rectangle the matplotlib stubs claim.
+        frame = cast("FancyBboxPatch", legend.get_frame())
+        frame.set_boxstyle(_overlay_box_style())
 
 

@@ -10,6 +10,7 @@ from pypic.plotting._guard import ensure_matplotlib
 
 if TYPE_CHECKING:
     from matplotlib.axes import Axes
+    from matplotlib.cm import ScalarMappable
     from matplotlib.figure import Figure
 
     from pypic.plotting.styles import ThemeArg
@@ -144,7 +145,7 @@ def plot_scatter(
     with use_theme(theme):
         fig, ax = get_or_create_axes(theme, ax, figsize)
 
-        mappable = None
+        mappable: ScalarMappable | None = None
         if density:
             hb = ax.hexbin(
                 x,

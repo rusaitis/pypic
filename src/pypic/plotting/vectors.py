@@ -21,10 +21,12 @@ if TYPE_CHECKING:
     from matplotlib.colors import Colormap
     from matplotlib.figure import Figure
 
+    from pypic.fields import FieldInfo
     from pypic.plotting._colorbar import ExtremesMode
     from pypic.plotting.styles import PlotTheme, ThemeArg
     from pypic.readers.base import FieldDataset
     from pypic.selections import PlaneSelection
+    from pypic.types import FloatArray
 
 
 def _resolve_plane_components(data: FieldDataset, field_prefix: str) -> tuple[str, str]:
@@ -61,11 +63,11 @@ def _resolve_vector_colors(
     data: FieldDataset,
     field: str,
     color_field: str | None,
-    magnitude: object,
+    magnitude: FloatArray,
     units: str | None,
     theme: PlotTheme,
     cmap: str | Colormap | None,
-) -> tuple[object, str, object]:
+) -> tuple[FloatArray, str, FieldInfo]:
     """Resolve color values, colormap name, and field info for vector plots.
 
     Returns

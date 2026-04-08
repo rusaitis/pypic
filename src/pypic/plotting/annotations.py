@@ -89,7 +89,7 @@ def add_circle(
     *,
     label: str | None = None,
     label_position: float = 45.0,
-    color: str | None = None,
+    color: str | tuple[float, float, float] | None = None,
     alpha: float = 0.6,
     linestyle: str = "--",
     linewidth: float = 0.8,

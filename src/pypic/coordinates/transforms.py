@@ -24,7 +24,7 @@ __all__ = [
 
 import re
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import numpy as np
 
@@ -496,7 +496,7 @@ def rotate_pressure_tensor(
                 if k == 0 and el == 0:
                     continue
                 result = result + r[i, k] * r[j, el] * p[k][el]
-        return result
+        return cast("FloatArray", result)
 
     return (
         _component(0, 0),

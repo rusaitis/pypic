@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 if TYPE_CHECKING:
     from matplotlib.axes import Axes
@@ -98,10 +98,13 @@ def get_or_create_axes(
         fig, ax = plt.subplots(figsize=figsize)
         return fig, ax
 
-    fig = ax.get_figure()
-    if fig is None:
+    raw_fig = ax.get_figure()
+    if raw_fig is None:
         msg = "Axes is not attached to a figure"
         raise RuntimeError(msg)
+    # Narrow Figure | SubFigure → Figure: pypic only creates top-level
+    # figures, never subfigures, so this is safe in practice.
+    fig = cast("Figure", raw_fig)
     apply_theme_to_figure(fig, theme)
     return fig, ax
 

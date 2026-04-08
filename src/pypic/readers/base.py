@@ -574,7 +574,8 @@ class FieldDataset:
                 rotated_fields.add(name)
 
         # Copy scalar fields unchanged
-        for name in self._ds.data_vars:
+        for raw_name in self._ds.data_vars:
+            name = str(raw_name)
             if name not in rotated_fields:
                 new_vars[name] = self._ds[name]
 
@@ -614,19 +615,20 @@ class FieldDataset:
             perm.append(source_orig)
             signs.append(float(np.sign(row[indices[source_orig]])))
 
-        # Transpose + flip arrays to match target axis ordering
+        # Transpose + flip arrays to match target axis ordering. By this
+        # point every entry in new_vars is a DataArray (rotated above or
+        # copied from self._ds), so .values and .attrs are always present.
         needs_transpose = perm != list(range(ndim))
         flip_axes = [i for i, s in enumerate(signs) if s < 0]
         if needs_transpose or flip_axes:
             for name, da in list(new_vars.items()):
-                arr = da.values if hasattr(da, "values") else da
+                arr = da.values
                 if needs_transpose:
                     arr = np.transpose(arr, perm)
                 for ax in flip_axes:
                     arr = np.flip(arr, axis=ax)
-                attrs = dict(da.attrs) if hasattr(da, "attrs") else {}
                 new_vars[name] = xr.DataArray(
-                    data=np.ascontiguousarray(arr), attrs=attrs,
+                    data=np.ascontiguousarray(arr), attrs=dict(da.attrs),
                 )
 
         # Compute new origin, spacing, dimensions from permuted source
@@ -675,10 +677,8 @@ class FieldDataset:
         }
         rebuilt_vars: dict[str, xr.DataArray] = {}
         for name, da in new_vars.items():
-            attrs = dict(da.attrs) if hasattr(da, "attrs") else {}
-            arr = da.values if hasattr(da, "values") else da
             rebuilt_vars[name] = xr.DataArray(
-                data=arr, dims=new_dim_names, attrs=attrs,
+                data=da.values, dims=new_dim_names, attrs=dict(da.attrs),
             )
         new_ds = xr.Dataset(rebuilt_vars, coords=coords)
 

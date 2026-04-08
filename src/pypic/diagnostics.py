@@ -8,7 +8,7 @@ dependency. Divergence delegates to ``pypic.coordinates.operators``.
 from __future__ import annotations
 
 import math
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import numpy as np
 
@@ -378,7 +378,7 @@ def spatial_rms(field: FloatArray) -> np.floating[Any]:
     >>> spatial_rms(np.array([3.0, 4.0]))
     np.float64(3.5355339059327378)
     """
-    return np.sqrt(np.nanmean(field**2))
+    return cast("np.floating[Any]", np.sqrt(np.nanmean(field**2)))
 
 
 def field_extrema(

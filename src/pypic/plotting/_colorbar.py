@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Literal
 
 if TYPE_CHECKING:
     from matplotlib.axes import Axes
+    from matplotlib.cm import ScalarMappable
     from matplotlib.colorbar import Colorbar
     from matplotlib.figure import Figure
 
@@ -25,7 +26,7 @@ def _compact_formatter(value: float, _pos: object) -> str:
 
 
 def _apply_extremes(
-    mappable: object,
+    mappable: ScalarMappable,
     *,
     mode: ExtremesMode = "semi",
     darken_factor: float = 0.75,
@@ -35,7 +36,7 @@ def _apply_extremes(
 
     Parameters
     ----------
-    mappable : object
+    mappable : ScalarMappable
         A ``ScalarMappable`` (e.g. from ``pcolormesh``).
     mode : "semi", "transparent", "darken", or None
         ``"semi"`` — endpoint colors at reduced opacity (*semi_alpha*).
@@ -80,7 +81,7 @@ def _style_colorbar(
     cb: Colorbar,
     label: str = "",
     *,
-    tick_color: str | tuple[float, ...] | None = None,
+    tick_color: str | tuple[float, float, float, float] | None = None,
 ) -> None:
     """Apply theme-consistent styling to a Colorbar (outline, ticks, label)."""
     import matplotlib as mpl
@@ -97,8 +98,12 @@ def _style_colorbar(
 
     if label:
         cb.set_label(label, color=tick_color)
-    cb.outline.set_linewidth(outline_w)
-    cb.outline.set_edgecolor(outline_rgba)
+    # cb.outline is typed Spine | None in mpl stubs; in practice always set.
+    # mpl stub bug: Spine inherits from Patch but the inherited setters
+    # confuse mypy ("Spine not callable"). Suppress the operator error.
+    assert cb.outline is not None
+    cb.outline.set_linewidth(outline_w)  # type: ignore[operator]
+    cb.outline.set_edgecolor(outline_rgba)  # type: ignore[operator]
     cb.ax.tick_params(
         width=outline_w, length=tick_len, colors=tick_color, labelcolor=tick_color
     )
@@ -107,7 +112,7 @@ def _style_colorbar(
 def add_colorbar(
     fig: Figure,
     ax: Axes,
-    mappable: object,
+    mappable: ScalarMappable,
     label: str,
     *,
     extend: str = "both",
@@ -140,14 +145,14 @@ def add_colorbar(
         size=_theme_val("colorbar_width", "4%"),
         pad=_theme_val("colorbar_pad", 0.05),
     )
-    cb = fig.colorbar(mappable, cax=cax, extend=extend)  # type: ignore[arg-type]
+    cb = fig.colorbar(mappable, cax=cax, extend=extend)
     _style_colorbar(cb, label)
     return cb
 
 
 def add_inset_colorbar(
     ax: Axes,
-    mappable: object,
+    mappable: ScalarMappable,
     label: str = "",
     *,
     loc: BadgeLoc | None = None,
@@ -240,14 +245,17 @@ def add_inset_colorbar(
         fontsize = _theme_val("font_overlay", 9.0)
 
     fig = ax.get_figure()
+    if fig is None:
+        msg = "axes has no parent figure"
+        raise RuntimeError(msg)
 
     _apply_extremes(mappable, mode=extremes)
     if extremes is None:
         extend = "neither"
 
     # --- Pass 1: render a provisional colorbar to measure text extents ---
-    prov_cax = ax.inset_axes([0.3, 0.3, width, height], zorder=5)
-    cb = fig.colorbar(  # type: ignore[union-attr]
+    prov_cax = ax.inset_axes((0.3, 0.3, width, height), zorder=5)
+    cb = fig.colorbar(
         mappable, cax=prov_cax, orientation="horizontal", extend=extend
     )
     if ticks is not None:
@@ -266,7 +274,7 @@ def add_inset_colorbar(
     if label:
         prov_cax.set_title(label, fontsize=fontsize, color=fg_rgba, pad=4)
 
-    renderer = fig.canvas.get_renderer()  # type: ignore[union-attr]
+    renderer = fig.canvas.get_renderer()  # type: ignore[attr-defined]  # mpl backend stub gap
     fig.draw(renderer)
     bbox_disp = prov_cax.get_tightbbox(renderer)
     bbox_ax = bbox_disp.transformed(ax.transAxes.inverted())  # type: ignore[union-attr]
@@ -307,8 +315,8 @@ def add_inset_colorbar(
 
     bar_x = bg_x + box_pad + overhang_left
     bar_y = bg_y + box_pad + overhang_bottom
-    cax = ax.inset_axes([bar_x, bar_y, width, height], zorder=5)
-    cb = fig.colorbar(  # type: ignore[union-attr]
+    cax = ax.inset_axes((bar_x, bar_y, width, height), zorder=5)
+    cb = fig.colorbar(
         mappable, cax=cax, orientation="horizontal", extend=extend
     )
     if ticks is not None:
@@ -352,21 +360,23 @@ def add_inset_colorbar(
     _orig_bar_x = bar_x
     _orig_bar_y = bar_y
 
-    # Remove the inset locator so set_position sticks across draws
-    cax.set_axes_locator(None)
+    # Remove the inset locator so set_position sticks across draws.
+    # mpl stubs declare locator as non-Optional but None is the documented
+    # way to clear it; cast away the bogus strictness.
+    cax.set_axes_locator(None)  # type: ignore[arg-type]
 
     def _resize_bg(event: object) -> None:
-        r = fig.canvas.get_renderer()  # type: ignore[union-attr]
+        r = fig.canvas.get_renderer()  # type: ignore[attr-defined]  # mpl backend stub gap
 
         # Temporarily put cax back at its original position to get a
         # stable tightbbox measurement (avoids feedback loops).
         ax_pos = ax.get_position()
-        cax.set_position([
+        cax.set_position((
             ax_pos.x0 + _orig_bar_x * ax_pos.width,
             ax_pos.y0 + _orig_bar_y * ax_pos.height,
             width * ax_pos.width,
             height * ax_pos.height,
-        ])
+        ))
 
         tb = cax.get_tightbbox(r)
         if tb is None:
@@ -393,14 +403,14 @@ def add_inset_colorbar(
         target_cy = new_bg_y + new_h / 2
         new_bar_x = _orig_bar_x + (target_cx - content_cx)
         new_bar_y = _orig_bar_y + (target_cy - content_cy)
-        cax.set_position([
+        cax.set_position((
             ax_pos.x0 + new_bar_x * ax_pos.width,
             ax_pos.y0 + new_bar_y * ax_pos.height,
             width * ax_pos.width,
             height * ax_pos.height,
-        ])
+        ))
 
-    fig.canvas.mpl_connect("draw_event", _resize_bg)  # type: ignore[union-attr]
+    fig.canvas.mpl_connect("draw_event", _resize_bg)
 
     return cb
 
@@ -408,7 +418,7 @@ def add_inset_colorbar(
 def attach_colorbar(
     fig: Figure,
     ax: Axes,
-    mappable: object,
+    mappable: ScalarMappable,
     label: str,
     colorbar: bool | Literal["inset"],
     *,
@@ -424,7 +434,7 @@ def attach_colorbar(
         Parent figure (used for standard colorbars).
     ax : Axes
         Target axes.
-    mappable : object
+    mappable : ScalarMappable
         A ``ScalarMappable``.
     label : str
         Colorbar label.
