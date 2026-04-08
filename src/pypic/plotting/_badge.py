@@ -510,7 +510,12 @@ def add_label(
     bg_rgba = resolve_rgba_override(bg_color, bg_alpha, (*default_bg, overlay_alpha))
     resolved_text = resolve_rgba_override(text_color, text_alpha, (*default_fg, 0.65))
 
-    props = {"fontsize": fontsize, "fontweight": fontweight, "color": resolved_text, "ha": ha}
+    props = {
+        "fontsize": fontsize,
+        "fontweight": fontweight,
+        "color": resolved_text,
+        "ha": ha,
+    }
     text_area = TextArea(label, textprops=props, multilinebaseline=True)
 
     # Extra horizontal padding so the box looks square for single letters
@@ -594,7 +599,11 @@ def add_legend(
         fontsize = _theme_val("font_overlay", 9.0)
 
     if isinstance(entries, str):
-        entries = [LegendEntry(label=entries, color=color, linewidth=linewidth, alpha=entry_alpha)]
+        entries = [
+            LegendEntry(
+                label=entries, color=color, linewidth=linewidth, alpha=entry_alpha,
+            )
+        ]
     elif isinstance(entries, LegendEntry):
         entries = [entries]
 
@@ -640,7 +649,11 @@ def add_legend(
 
         text = TextArea(
             entry.label,
-            textprops={"fontsize": fontsize, "fontweight": "bold", "color": resolved_text},
+            textprops={
+                "fontsize": fontsize,
+                "fontweight": "bold",
+                "color": resolved_text,
+            },
         )
         row = HPacker(children=[drawing, text], pad=0, sep=4, align="center")
         rows.append(row)

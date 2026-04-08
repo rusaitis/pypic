@@ -192,7 +192,9 @@ class TestPhdf5Reader:
 
     def test_pressure_values(self, ds):
         """Exact P11 values: physical P = n·m·v_th² = |rho_c|·v_th²/|qom|."""
-        for s, (rho, uth, qom) in enumerate(zip(RHO_INIT, UTH, QOM)):
+        for s, (rho, uth, qom) in enumerate(
+            zip(RHO_INIT, UTH, QOM, strict=True)
+        ):
             expected = rho * uth**2 / abs(qom)
             assert_allclose(ds[f"P11_s{s}"], expected, atol=1e-14)
             p = ds[f"P11_s{s}"]
@@ -378,7 +380,7 @@ class TestH5hutReader:
 
     def test_pressure_p_over_rho_consistency(self, ds):
         """Physical P/|rho_c| = v_th²/|qom| (mass-weighted pressure)."""
-        for s, (uth, qom) in enumerate(zip(UTH, QOM)):
+        for s, (uth, qom) in enumerate(zip(UTH, QOM, strict=True)):
             p = ds[f"P11_s{s}"]
             rho = ds[f"rho_c_s{s}"]
             ratio = np.mean(p) / np.mean(np.abs(rho))

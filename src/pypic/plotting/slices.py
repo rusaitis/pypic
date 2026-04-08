@@ -195,7 +195,11 @@ def plot_field_slice(
         mesh = ax.pcolormesh(coords[0], coords[1], values.T, **mesh_kwargs)
 
         unit_str = units or ""
-        cb_label = colorbar_label if colorbar_label is not None else field_label(info, unit_str=unit_str)
+        cb_label = (
+            colorbar_label
+            if colorbar_label is not None
+            else field_label(info, unit_str=unit_str)
+        )
         attach_colorbar(
             fig, ax, mesh, cb_label, colorbar,
             extremes=extremes, variant=colorbar_variant, ticks=colorbar_ticks,

@@ -102,7 +102,7 @@ class _InteractiveTracer:
         """Draw subtle dashed crosshair lines at the seed position."""
         import pyvista as pv
 
-        L = self._crosshair_len  # noqa: N806
+        L = self._crosshair_len
         color = "#ff6600"
         opacity = 0.3
         width = 1.0
@@ -340,7 +340,10 @@ def main() -> None:
         plotter.add_key_event("Prior", tracer.nudge_z_up)    # Page Up
         plotter.add_key_event("Next", tracer.nudge_z_down)   # Page Down
 
-        print("Arrows: move seed | PgUp/PgDn: move z (3D mode) | T: trace | Z: toggle 3D | C: clear")
+        print(
+            "Arrows: move seed | PgUp/PgDn: move z (3D mode) | "
+            "T: trace | Z: toggle 3D | C: clear"
+        )
         plotter.show()
 
 

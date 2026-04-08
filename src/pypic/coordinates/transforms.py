@@ -1,11 +1,11 @@
-"""Coordinate frame transforms: affine mappings between reference frames.
+r"""Coordinate frame transforms: affine mappings between reference frames.
 
 A `FrameTransform` describes how to convert coordinates and vector fields
 from one named reference frame to another via an affine transformation:
 
-$$\\mathbf{x}_{target} = s \\cdot R \\cdot (\\mathbf{x}_{source} - \\mathbf{o})$$
+$$\mathbf{x}_{target} = s \cdot R \cdot (\mathbf{x}_{source} - \mathbf{o})$$
 
-where $\\mathbf{o}$ is the origin offset (subtracted before rotation),
+where $\mathbf{o}$ is the origin offset (subtracted before rotation),
 $R$ is the 3×3 rotation matrix, and $s$ is the uniform scale factor.
 """
 

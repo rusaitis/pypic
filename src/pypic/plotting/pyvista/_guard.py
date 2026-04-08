@@ -5,7 +5,7 @@ _HAS_PYVISTA: bool | None = None
 
 def ensure_pyvista() -> None:
     """Raise ``ImportError`` with install hint if pyvista is missing."""
-    global _HAS_PYVISTA  # noqa: PLW0603
+    global _HAS_PYVISTA
     if _HAS_PYVISTA is True:
         return
     try:

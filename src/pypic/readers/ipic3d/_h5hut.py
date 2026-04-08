@@ -6,7 +6,7 @@ import logging
 import re
 from typing import TYPE_CHECKING
 
-import h5py  # type: ignore[import-untyped]
+import h5py
 import numpy as np
 
 from pypic.readers.base import FieldDataset, SimulationConfig, TabularData
@@ -177,8 +177,9 @@ class IPic3DH5hutReader:
                         continue
                     field_data[canon_name] = _read_field(block, ipic_name)
 
-            # Per-species densities and currents
-            # Charge density and current stored as rho/(4pi) and J/(4pi) — Gaussian convention
+            # Per-species densities and currents.
+            # Charge density and current stored as rho/(4pi) and J/(4pi) —
+            # Gaussian convention.
             for s in range(nspec):
                 # Number density: N_{s} → n_s{s}
                 n_key = f"N_{s}"

@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 from typing import TYPE_CHECKING
 
-import h5py  # type: ignore[import-untyped]
+import h5py
 import numpy as np
 
 from pypic.readers.base import FieldDataset, ParticleData, SimulationConfig, TabularData

@@ -48,7 +48,7 @@ def _rounded_rect_points(
 
 def _vtk_viewport_coord() -> _vtk.vtkCoordinate:
     """Create a normalized-viewport coordinate transform."""
-    import vtk  # type: ignore[import-untyped]
+    import vtk
 
     coord = vtk.vtkCoordinate()
     coord.SetCoordinateSystemToNormalizedViewport()
@@ -141,7 +141,7 @@ def _draw_filled_polygon(
     :func:`draw_rounded_rect`, :func:`_draw_triangle`, and any other
     convex single-color filled shape in normalized viewport coordinates.
     """
-    import vtk  # type: ignore[import-untyped]
+    import vtk
 
     pts = vtk.vtkPoints()
     for px, py in points_2d:
@@ -234,7 +234,7 @@ def _draw_gradient_strip(
 
     Returns the ``vtkActor2D``.
     """
-    import vtk  # type: ignore[import-untyped]
+    import vtk
 
     dx = w / n_segments
     points = vtk.vtkPoints()
@@ -299,7 +299,7 @@ def _draw_polyline_border(
     line_width: float = 1.0,
 ) -> Any:
     """Draw a closed 2D polyline outline through *points_2d*."""
-    import vtk  # type: ignore[import-untyped]
+    import vtk
 
     pts = vtk.vtkPoints()
     for px, py in points_2d:
@@ -347,7 +347,7 @@ def _add_text_actor(
     own text-bbox justification rather than character-width estimation.
     *bold* toggles ``vtkTextProperty.SetBold``.
     """
-    import vtk  # type: ignore[import-untyped]
+    import vtk
 
     actor = vtk.vtkTextActor()
     actor.SetInput(text)
@@ -381,7 +381,7 @@ def _measure_text_width_px(
     DPI and font metrics match what will actually be drawn. Returns ``0.0``
     when the renderer cannot yet measure the text.
     """
-    import vtk  # type: ignore[import-untyped]
+    import vtk
 
     actor = vtk.vtkTextActor()
     actor.SetInput(text)
@@ -446,7 +446,7 @@ def _draw_tick_marks(
     line_width: float = 1.0,
 ) -> Any:
     """Draw short vertical tick lines. Returns ``vtkActor2D``."""
-    import vtk  # type: ignore[import-untyped]
+    import vtk
 
     points = vtk.vtkPoints()
     lines = vtk.vtkCellArray()

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import contextlib
 from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
@@ -155,8 +154,10 @@ class PlotTheme:
     # Multi-panel grid layout
     figsize_per_col: float = 4.5
     figsize_per_row: float = 4.0
-    panel_label_scale_sparse: float = 1.55  # single-row grids — labels can stay small
-    panel_label_scale_dense: float = 1.78   # multi-row grids — bump labels for legibility
+    # single-row grids — labels can stay small
+    panel_label_scale_sparse: float = 1.55
+    # multi-row grids — bump labels for legibility
+    panel_label_scale_dense: float = 1.78
 
     # Contour overlay
     contour_label_fontsize: float = 7.0

@@ -636,8 +636,8 @@ class TestOverlayVariant:
         assert 0 < alpha <= 1
 
     def test_alt_variant_returns_alt_colors(self) -> None:
-        bg, fg, alpha = _detect_overlay_defaults("alt")
-        bg_default, fg_default, alpha_default = _detect_overlay_defaults(None)
+        bg, _fg, alpha = _detect_overlay_defaults("alt")
+        bg_default, _fg_default, alpha_default = _detect_overlay_defaults(None)
         # Alt should differ from default in at least alpha
         assert alpha != alpha_default or bg != bg_default
 

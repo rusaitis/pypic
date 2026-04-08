@@ -20,7 +20,6 @@ from pypic.coordinates.transforms import (
 from pypic.readers.base import FieldDataset, GridInfo
 from pypic.units import Normalization
 
-
 # ---------------------------------------------------------------------------
 # FrameTransform dataclass
 # ---------------------------------------------------------------------------
@@ -51,7 +50,11 @@ class TestFrameTransform:
 
     def test_non_orthogonal_rejected(self) -> None:
         with pytest.raises(ValueError, match="not orthogonal"):
-            FrameTransform("a", "b", rotation=((2.0, 0.0, 0.0), (0.0, 1.0, 0.0), (0.0, 0.0, 1.0)))
+            FrameTransform(
+                "a",
+                "b",
+                rotation=((2.0, 0.0, 0.0), (0.0, 1.0, 0.0), (0.0, 0.0, 1.0)),
+            )
 
     def test_negative_scale_rejected(self) -> None:
         with pytest.raises(ValueError, match="scale"):
@@ -134,7 +137,9 @@ class TestRotateVectorComponents:
 
     def test_magnitude_preserved(self) -> None:
         rng = np.random.default_rng(42)
-        v1, v2, v3 = rng.standard_normal(10), rng.standard_normal(10), rng.standard_normal(10)
+        v1 = rng.standard_normal(10)
+        v2 = rng.standard_normal(10)
+        v3 = rng.standard_normal(10)
         # Arbitrary rotation
         theta = 0.7
         R = np.array([
@@ -153,7 +158,7 @@ class TestRotateVectorComponents:
         v2 = np.zeros(shape)
         v3 = np.zeros(shape)
         R = np.array([[0, 1, 0], [-1, 0, 0], [0, 0, 1]], dtype=float)
-        r1, r2, r3 = rotate_vector_components(v1, v2, v3, R)
+        r1, r2, _r3 = rotate_vector_components(v1, v2, v3, R)
         assert r1.shape == shape
         assert_allclose(r1, 0.0, atol=1e-15)
         assert_allclose(r2, -1.0, atol=1e-15)
@@ -182,8 +187,12 @@ class TestRotatePressureTensor:
 
     def test_trace_invariant(self) -> None:
         rng = np.random.default_rng(99)
-        p11, p22, p33 = rng.standard_normal(5), rng.standard_normal(5), rng.standard_normal(5)
-        p12, p13, p23 = rng.standard_normal(5), rng.standard_normal(5), rng.standard_normal(5)
+        p11 = rng.standard_normal(5)
+        p22 = rng.standard_normal(5)
+        p33 = rng.standard_normal(5)
+        p12 = rng.standard_normal(5)
+        p13 = rng.standard_normal(5)
+        p23 = rng.standard_normal(5)
         # Arbitrary rotation
         theta = 1.3
         R = np.array([
@@ -416,7 +425,11 @@ class TestFieldDatasetTransformTo:
 
     def test_frame_label_updated(self) -> None:
         ds = _make_dataset(
-            {"B1": np.ones((4, 3, 2)), "B2": np.ones((4, 3, 2)), "B3": np.ones((4, 3, 2))},
+            {
+                "B1": np.ones((4, 3, 2)),
+                "B2": np.ones((4, 3, 2)),
+                "B3": np.ones((4, 3, 2)),
+            },
             transforms={"GSM": _YZ_SWAP},
         )
         result = ds.transform_to("GSM")
@@ -424,7 +437,11 @@ class TestFieldDatasetTransformTo:
 
     def test_axis_names_updated(self) -> None:
         ds = _make_dataset(
-            {"B1": np.ones((4, 3, 2)), "B2": np.ones((4, 3, 2)), "B3": np.ones((4, 3, 2))},
+            {
+                "B1": np.ones((4, 3, 2)),
+                "B2": np.ones((4, 3, 2)),
+                "B3": np.ones((4, 3, 2)),
+            },
             transforms={"GSM": _YZ_SWAP},
         )
         result = ds.transform_to("GSM")
@@ -433,7 +450,11 @@ class TestFieldDatasetTransformTo:
     def test_grid_origin_shifted(self) -> None:
         t = FrameTransform("sim", "GSM", origin=(10.0, 5.0, 3.0))
         ds = _make_dataset(
-            {"B1": np.ones((4, 3, 2)), "B2": np.ones((4, 3, 2)), "B3": np.ones((4, 3, 2))},
+            {
+                "B1": np.ones((4, 3, 2)),
+                "B2": np.ones((4, 3, 2)),
+                "B3": np.ones((4, 3, 2)),
+            },
             transforms={"GSM": t},
         )
         result = ds.transform_to("GSM")
@@ -445,7 +466,11 @@ class TestFieldDatasetTransformTo:
     def test_grid_spacing_scaled(self) -> None:
         t = FrameTransform("sim", "GSM", scale=2.0)
         ds = _make_dataset(
-            {"B1": np.ones((4, 3, 2)), "B2": np.ones((4, 3, 2)), "B3": np.ones((4, 3, 2))},
+            {
+                "B1": np.ones((4, 3, 2)),
+                "B2": np.ones((4, 3, 2)),
+                "B3": np.ones((4, 3, 2)),
+            },
             transforms={"GSM": t},
         )
         result = ds.transform_to("GSM")
@@ -481,7 +506,11 @@ class TestFieldDatasetTransformTo:
 
     def test_normalization_preserved(self) -> None:
         ds = _make_dataset(
-            {"B1": np.ones((4, 3, 2)), "B2": np.ones((4, 3, 2)), "B3": np.ones((4, 3, 2))},
+            {
+                "B1": np.ones((4, 3, 2)),
+                "B2": np.ones((4, 3, 2)),
+                "B3": np.ones((4, 3, 2)),
+            },
             transforms={"GSM": _YZ_SWAP},
         )
         result = ds.transform_to("GSM")
@@ -497,7 +526,11 @@ class TestFieldDatasetTransformTo:
         )
         t = FrameTransform("sim", "rotated", rotation=r)
         ds = _make_dataset(
-            {"B1": np.ones((4, 3, 2)), "B2": np.ones((4, 3, 2)), "B3": np.ones((4, 3, 2))},
+            {
+                "B1": np.ones((4, 3, 2)),
+                "B2": np.ones((4, 3, 2)),
+                "B3": np.ones((4, 3, 2)),
+            },
             transforms={"rotated": t},
         )
         with pytest.raises(NotImplementedError, match="signed permutation"):

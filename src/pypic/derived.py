@@ -344,7 +344,8 @@ def thermal_energy_density_trace(
 ) -> FloatArray:
     r"""Compute thermal energy density from the pressure tensor trace.
 
-    $$e_{th} = \frac{1}{2}\mathrm{Tr}(\mathbf{P}) = \frac{1}{2}(P_{11} + P_{22} + P_{33})$$
+    $$e_{th} = \tfrac{1}{2}\mathrm{Tr}(\mathbf{P})
+    = \tfrac{1}{2}(P_{11} + P_{22} + P_{33})$$
 
     Unlike ``thermal_energy_density`` (which uses $P/(\gamma-1)$), this
     form is exact for any dimensionality or adiabatic index — it is the
@@ -368,7 +369,7 @@ def thermal_energy_density_trace(
     ...     np.array([2.0]), np.array([1.0]), np.array([1.0]))
     array([2.])
     """
-    return 0.5 * (p11 + p22 + p33)  # type: ignore[no-any-return]
+    return 0.5 * (p11 + p22 + p33)
 
 
 def poynting_flux(
@@ -1044,7 +1045,7 @@ def bulk_velocity(
     array([0.25])
     """
     with np.errstate(invalid="ignore", divide="ignore"):
-        return j / rho_c  # type: ignore[no-any-return]
+        return j / rho_c
 
 
 def kinetic_energy_flux_component(
@@ -1090,7 +1091,7 @@ def kinetic_energy_flux_component(
     """
     n = np.abs(rho_c) / abs(charge)
     v_sq = v1**2 + v2**2 + v3**2
-    return 0.5 * n * mass * v_sq * v_comp  # type: ignore[no-any-return]
+    return 0.5 * n * mass * v_sq * v_comp
 
 
 def heat_flux_component(
@@ -1122,7 +1123,7 @@ def heat_flux_component(
     >>> heat_flux_component(np.array([10.0]), np.array([4.0]))
     array([6.])
     """
-    return ef_comp - kef_comp  # type: ignore[no-any-return]
+    return ef_comp - kef_comp
 
 
 def enthalpy_flux_component(
@@ -1161,7 +1162,7 @@ def enthalpy_flux_component(
     >>> enthalpy_flux_component(np.array([1.0]), np.array([2.0]), 5/3)
     array([5.])
     """
-    return (gamma / (gamma - 1.0)) * pressure * v_comp  # type: ignore[no-any-return]
+    return (gamma / (gamma - 1.0)) * pressure * v_comp
 
 
 def conductive_heat_flux_component(
@@ -1197,7 +1198,7 @@ def conductive_heat_flux_component(
     >>> conductive_heat_flux_component(np.array([6.0]), np.array([5.0]))
     array([1.])
     """
-    return hf_comp - ehf_comp  # type: ignore[no-any-return]
+    return hf_comp - ehf_comp
 
 
 def species_mass_density(
@@ -1229,7 +1230,7 @@ def species_mass_density(
     >>> species_mass_density(np.array([-2.0]), -1.0, 0.5)
     array([1.])
     """
-    return np.abs(rho_c) * mass / abs(charge)  # type: ignore[no-any-return]
+    return np.abs(rho_c) * mass / abs(charge)
 
 
 def total_pressure(p_e: FloatArray, p_i: FloatArray) -> FloatArray:
@@ -1255,7 +1256,7 @@ def total_pressure(p_e: FloatArray, p_i: FloatArray) -> FloatArray:
     >>> total_pressure(np.array([2.0]), np.array([3.0]))
     array([5.])
     """
-    return p_e + p_i  # type: ignore[no-any-return]
+    return p_e + p_i
 
 
 def isotropic_pressure(
@@ -1292,7 +1293,7 @@ def isotropic_pressure(
     >>> isotropic_pressure(np.array([3.0]), np.array([6.0]), np.array([9.0]))
     array([6.])
     """
-    return (p11 + p22 + p33) / 3  # type: ignore[no-any-return]
+    return (p11 + p22 + p33) / 3
 
 
 def parallel_pressure(

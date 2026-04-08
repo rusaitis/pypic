@@ -6,9 +6,9 @@ from pypic.compute import available_quantities
 from pypic.coordinates import (
     CARTESIAN,
     CYLINDRICAL,
-    FrameTransform,
     SPHERICAL,
     CoordinateGeometry,
+    FrameTransform,
     GeometryType,
     curl,
     divergence,

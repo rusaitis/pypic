@@ -46,7 +46,11 @@ def apply_theme(
     if fig_bg and fig_bg != "none":
         plotter.set_background(fig_bg)
     else:
-        text_lum = 0.299 * t.text_color[0] + 0.587 * t.text_color[1] + 0.114 * t.text_color[2]
+        text_lum = (
+            0.299 * t.text_color[0]
+            + 0.587 * t.text_color[1]
+            + 0.114 * t.text_color[2]
+        )
         plotter.set_background("#1e1e1e" if text_lum > 0.5 else "#fafafa")
 
     # Hide default corner orientation widget — use add_axis_triad() instead

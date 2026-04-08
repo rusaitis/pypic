@@ -80,7 +80,9 @@ def apply_physical_extent(
         )
 
     grid = config.grid
-    grid_extent = tuple(d * s for d, s in zip(grid.dimensions, grid.spacing))
+    grid_extent = tuple(
+        d * s for d, s in zip(grid.dimensions, grid.spacing, strict=True)
+    )
     computed_scale: float | None = None
 
     new_transforms: dict[str, FrameTransform] = {}

@@ -303,10 +303,7 @@ def add_inset_colorbar(
         bg_x = 0.5 - total_w / 2
     else:
         bg_x = pad
-    if "upper" in actual_loc:
-        bg_y = 1.0 - pad - total_h
-    else:
-        bg_y = pad
+    bg_y = 1.0 - pad - total_h if "upper" in actual_loc else pad
 
     bar_x = bg_x + box_pad + overhang_left
     bar_y = bg_y + box_pad + overhang_bottom
@@ -358,7 +355,7 @@ def add_inset_colorbar(
     # Remove the inset locator so set_position sticks across draws
     cax.set_axes_locator(None)
 
-    def _resize_bg(event: object) -> None:  # noqa: ARG001
+    def _resize_bg(event: object) -> None:
         r = fig.canvas.get_renderer()  # type: ignore[union-attr]
 
         # Temporarily put cax back at its original position to get a
@@ -385,10 +382,7 @@ def add_inset_colorbar(
             new_bg_x = 0.5 - new_w / 2
         else:
             new_bg_x = pad
-        if "upper" in _loc_str:
-            new_bg_y = 1.0 - pad - new_h
-        else:
-            new_bg_y = pad
+        new_bg_y = 1.0 - pad - new_h if "upper" in _loc_str else pad
 
         bg_patch.set_bounds(new_bg_x, new_bg_y, new_w, new_h)
 

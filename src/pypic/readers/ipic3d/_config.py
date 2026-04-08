@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Any
 
-import h5py  # type: ignore[import-untyped]
+import h5py
 
 from pypic.coordinates.geometry import CARTESIAN
 from pypic.readers._config_helpers import merge_simulation_toml

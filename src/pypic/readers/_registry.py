@@ -382,7 +382,10 @@ class Simulation:
             loaded = set(ds.field_names())
             for name in fields:
                 # A request is satisfied if any expansion of it was loaded
-                if not loaded & self._expanded_names(name, alias_map, canonical or set()):
+                expanded = self._expanded_names(
+                    name, alias_map, canonical or set(),
+                )
+                if not loaded & expanded:
                     log.warning(
                         "fields=%r: %r matched no fields in the dataset",
                         list(fields), name,

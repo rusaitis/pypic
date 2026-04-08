@@ -35,7 +35,7 @@ import logging
 import re
 from typing import TYPE_CHECKING, Any
 
-import h5py  # type: ignore[import-untyped]
+import h5py
 import numpy as np
 
 from pypic.coordinates.geometry import CARTESIAN, GEOMETRY_BY_NAME

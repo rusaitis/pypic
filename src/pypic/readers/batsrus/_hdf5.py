@@ -53,7 +53,7 @@ def read_batl(
     BATLData
         Frozen dataclass with block-structured field data and metadata.
     """
-    import h5py  # type: ignore[import-untyped]
+    import h5py
 
     with h5py.File(path, "r") as f:
         # Metadata

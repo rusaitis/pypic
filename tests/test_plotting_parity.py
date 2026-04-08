@@ -12,7 +12,7 @@ Unit 9 of the cleanup sweep — see ``TASKS-cleanup.md``.
 from __future__ import annotations
 
 import inspect
-from typing import Callable
+from collections.abc import Callable
 
 import pytest
 
@@ -24,7 +24,7 @@ from pypic.plotting.annotations import add_circle, add_planet  # noqa: E402
 
 
 def _params(func: Callable[..., object]) -> set[str]:
-    """Return the public keyword parameters of *func* (excluding the first positional)."""
+    """Return the public kwargs of *func* (excluding the first positional)."""
     sig = inspect.signature(func)
     names = list(sig.parameters)
     # Drop the leading positional (ax / plotter / fig) — it's the backend
@@ -37,7 +37,12 @@ def _params(func: Callable[..., object]) -> set[str]:
 # backend; each entry is a (param, side, reason) triple where *side*
 # is "mpl" or "pv". Add an entry here when introducing a backend-only
 # parameter and document why.
-PAIRS: list[tuple[Callable[..., object], Callable[..., object], list[tuple[str, str, str]]]] = [
+Pair = tuple[
+    Callable[..., object],
+    Callable[..., object],
+    list[tuple[str, str, str]],
+]
+PAIRS: list[Pair] = [
     # ── add_badge ─────────────────────────────────────────────────────
     (
         mpl_plot.add_badge,
@@ -45,7 +50,7 @@ PAIRS: list[tuple[Callable[..., object], Callable[..., object], list[tuple[str, 
         [
             ("width", "pv", "Legacy alias for bar_width (predates rename)"),
             ("height", "pv", "Legacy alias for bar_height (predates rename)"),
-            ("theme", "pv", "Pyvista has no use_theme() context — explicit theme arg"),
+            ("theme", "pv", "Pyvista has no use_theme() — explicit theme arg"),
         ],
     ),
     # ── add_label ─────────────────────────────────────────────────────
@@ -53,7 +58,7 @@ PAIRS: list[tuple[Callable[..., object], Callable[..., object], list[tuple[str, 
         mpl_plot.add_label,
         pv_plot.add_label,
         [
-            ("width", "pv", "Box width override (no equivalent in mpl AnchoredOffsetbox path)"),
+            ("width", "pv", "Box width override (no mpl AnchoredOffsetbox analog)"),
             ("height", "pv", "Box height override"),
             ("theme", "pv", "Pyvista has no use_theme() context"),
         ],
@@ -70,15 +75,15 @@ PAIRS: list[tuple[Callable[..., object], Callable[..., object], list[tuple[str, 
             ("mappable", "mpl", "Pyvista builds its own gradient strip from cmap+clim"),
             ("pad", "mpl", "Inset offset; pyvista positions via overlay_margin"),
             ("n_ticks", "mpl", "Pyvista uses n_labels (same role, different name)"),
-            ("fontsize", "mpl", "Pyvista derives font size from theme.colorbar_*_font_scale"),
+            ("fontsize", "mpl", "Pyvista uses theme.colorbar_*_font_scale"),
             ("bg_color", "mpl", "Pyvista colorbar uses theme overlay variant only"),
             ("bg_alpha", "mpl", "Pyvista colorbar uses theme overlay variant only"),
-            ("text_color", "mpl", "Pyvista colorbar uses theme overlay variant only"),
+            ("text_color", "mpl", "Pyvista colorbar uses theme overlay variant"),
             ("text_alpha", "mpl", "Pyvista colorbar uses theme overlay variant only"),
             # pv-only: pyvista needs the cmap/clim because there is no mappable
-            ("cmap", "pv", "No matplotlib mappable to inspect; user passes cmap directly"),
-            ("clim", "pv", "No matplotlib mappable to inspect; user passes clim directly"),
-            ("fmt", "pv", "Tick label format (mpl uses MaxNLocator + FuncFormatter internally)"),
+            ("cmap", "pv", "No mpl mappable to inspect; user passes cmap directly"),
+            ("clim", "pv", "No mpl mappable to inspect; user passes clim directly"),
+            ("fmt", "pv", "Tick format (mpl uses MaxNLocator + FuncFormatter)"),
             ("n_labels", "pv", "Mirrors mpl's n_ticks under a different name"),
             ("theme", "pv", "Pyvista has no use_theme() context"),
         ],
@@ -94,7 +99,7 @@ PAIRS: list[tuple[Callable[..., object], Callable[..., object], list[tuple[str, 
             ("edgecolor", "mpl", "2D wedge has a stroke; 3D sphere does not"),
             ("linewidth", "mpl", "2D wedge stroke width"),
             ("zorder", "mpl", "2D z-ordering; pyvista uses depth from the camera"),
-            ("resolution", "pv", "Sphere tessellation count (no analog for a 2D wedge)"),
+            ("resolution", "pv", "Sphere tessellation count (no 2D wedge analog)"),
         ],
     ),
     # ── add_circle (mpl) ↔ add_reference_circles (pv) ─────────────────
@@ -110,7 +115,7 @@ PAIRS: list[tuple[Callable[..., object], Callable[..., object], list[tuple[str, 
             ("label", "mpl", "Mpl supports a perimeter label; pyvista does not"),
             ("label_position", "mpl", "Label angle on the perimeter"),
             ("alpha", "mpl", "Mpl uses `alpha`; pyvista uses `opacity`"),
-            ("linestyle", "mpl", "Mpl line style; pyvista renders dashed via point gaps"),
+            ("linestyle", "mpl", "Mpl style; pyvista renders dashed via point gaps"),
             ("linewidth", "mpl", "Mpl uses `linewidth`; pyvista uses `width`"),
             ("fontsize", "mpl", "Label font size — pyvista has no labels"),
             ("text_alpha", "mpl", "Label opacity — pyvista has no labels"),
@@ -128,7 +133,7 @@ PAIRS: list[tuple[Callable[..., object], Callable[..., object], list[tuple[str, 
 
 
 @pytest.mark.parametrize(
-    "mpl_func,pv_func,gaps",
+    ("mpl_func", "pv_func", "gaps"),
     PAIRS,
     ids=[f"{m.__name__}↔{p.__name__}" for m, p, _ in PAIRS],
 )
@@ -153,23 +158,27 @@ def test_paired_function_parity(
 
     msg_parts = []
     if missing_from_allowlist_mpl:
+        names = sorted(missing_from_allowlist_mpl)
         msg_parts.append(
-            f"mpl-only params not in allowlist: {sorted(missing_from_allowlist_mpl)} "
+            f"mpl-only params not in allowlist: {names} "
             f"(add to PAIRS or lift to pyvista)"
         )
     if extras_in_allowlist_mpl:
+        names = sorted(extras_in_allowlist_mpl)
         msg_parts.append(
-            f"allowlist mpl entries that no longer exist: {sorted(extras_in_allowlist_mpl)} "
+            f"allowlist mpl entries that no longer exist: {names} "
             f"(remove from PAIRS)"
         )
     if missing_from_allowlist_pv:
+        names = sorted(missing_from_allowlist_pv)
         msg_parts.append(
-            f"pv-only params not in allowlist: {sorted(missing_from_allowlist_pv)} "
+            f"pv-only params not in allowlist: {names} "
             f"(add to PAIRS or lift to matplotlib)"
         )
     if extras_in_allowlist_pv:
+        names = sorted(extras_in_allowlist_pv)
         msg_parts.append(
-            f"allowlist pv entries that no longer exist: {sorted(extras_in_allowlist_pv)} "
+            f"allowlist pv entries that no longer exist: {names} "
             f"(remove from PAIRS)"
         )
     assert not msg_parts, "; ".join(msg_parts)
@@ -183,7 +192,7 @@ def test_pyvista_colorbar_accepts_lifted_params() -> None:
 
 
 def test_pyvista_equatorial_surface_accepts_lifted_params() -> None:
-    """add_equatorial_surface should expose extremes / colorbar_ticks for parity with plot_field_slice."""
+    """add_equatorial_surface should expose extremes / colorbar_ticks (parity)."""
     sig = inspect.signature(pv_plot.add_equatorial_surface)
     assert "extremes" in sig.parameters
     assert "colorbar_ticks" in sig.parameters

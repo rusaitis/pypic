@@ -90,7 +90,11 @@ def add_axis_triad(
     c = np.asarray(center, dtype=float)
 
     # Scale font from theme; pyvista font_size is ~3x matplotlib pt for similar weight
-    fs = font_size if font_size is not None else int(t.font_label * t.axis_triad_font_scale)
+    fs = (
+        font_size
+        if font_size is not None
+        else int(t.font_label * t.axis_triad_font_scale)
+    )
 
     lw = t.line_width  # default 1.5
     cone_h = t.arrow_size * 0.1  # 4.0 → 0.4

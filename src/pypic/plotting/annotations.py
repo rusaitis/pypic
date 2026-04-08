@@ -4,13 +4,14 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Literal
 
-from pypic.plotting._badge import OverlayVariant
 from pypic.plotting._guard import ensure_matplotlib
 from pypic.plotting.styles import _theme_val
 
 if TYPE_CHECKING:
     from matplotlib.axes import Axes
     from matplotlib.patches import Circle, Wedge
+
+    from pypic.plotting._badge import OverlayVariant
 
 SunDirection = Literal["left", "right", "up", "down"]
 

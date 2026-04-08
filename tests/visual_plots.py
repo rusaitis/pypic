@@ -321,12 +321,17 @@ def generate(theme: PlotTheme) -> None:
 
     # 24. Scalar + vector overlay — streamlines
     fig, ax = plot_field_slice(ds_a, "|B|", theme=theme, step=100, time=5.0)
-    plot_streamlines(ds_a, "B", ax=ax, theme=theme, colorbar=False, legend=False, title="")
+    plot_streamlines(
+        ds_a, "B", ax=ax, theme=theme, colorbar=False, legend=False, title="",
+    )
     _save(fig, "overlay_streamlines", theme)
 
     # 25. Scalar + vector overlay — quiver
     fig, ax = plot_field_slice(ds_a, "rho_m", theme=theme, step=100)
-    plot_quiver(ds_a, "V", ax=ax, stride=3, theme=theme, colorbar=False, legend=False, title="")
+    plot_quiver(
+        ds_a, "V", ax=ax, stride=3, theme=theme,
+        colorbar=False, legend=False, title="",
+    )
     _save(fig, "overlay_quiver", theme)
 
     # 26. Multi-panel field grid
@@ -460,7 +465,9 @@ def generate(theme: PlotTheme) -> None:
 
     # 39. Overlay with badge
     fig, ax = plot_field_slice(ds_a, "|B|", theme=theme, step=100, badge=True)
-    plot_streamlines(ds_a, "B", ax=ax, theme=theme, colorbar=False, legend=False, title="")
+    plot_streamlines(
+        ds_a, "B", ax=ax, theme=theme, colorbar=False, legend=False, title="",
+    )
     _save(fig, "overlay_badge", theme)
 
     # 40. Kymograph — Bx current sheet drift

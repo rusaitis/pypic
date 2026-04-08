@@ -17,7 +17,6 @@ from pypic.coordinates.geometry import (
     CoordinateGeometry,
     GeometryType,
 )
-
 from pypic.coordinates.transforms import FrameTransform
 
 if TYPE_CHECKING:
@@ -635,7 +634,7 @@ class FieldDataset:
         new_origin_list: list[float] = []
         new_spacing_list: list[float] = []
         new_dims_list: list[int] = []
-        for target_i, (src_i, sign) in enumerate(zip(perm, signs)):
+        for src_i, sign in zip(perm, signs, strict=True):
             src_coords = old_coords[src_i]
             t_first = dx_scale * sign * (src_coords[0] - t_origin[indices[src_i]])
             t_last = dx_scale * sign * (src_coords[-1] - t_origin[indices[src_i]])

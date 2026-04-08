@@ -226,7 +226,7 @@ class TestSphereSelection:
         assert_array_equal(result["Bx"][finite_mask], result["B1"][finite_mask])
 
     def test_center_dim_mismatch_raises(self, cartesian_3d: FieldDataset) -> None:
-        with pytest.raises(ValueError, match="2 components.*3 dimensions"):
+        with pytest.raises(ValueError, match=r"2 components.*3 dimensions"):
             SphereSelection(center=(0.0, 0.0), radius=1.0).apply(cartesian_3d)
 
     def test_negative_radius_raises(self, cartesian_3d: FieldDataset) -> None:

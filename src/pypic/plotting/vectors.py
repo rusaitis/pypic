@@ -289,7 +289,7 @@ def plot_streamlines(
         u = u[::s, ::s]
         v = v[::s, ::s]
         if use_colormap:
-            color_values = color_values[::s, ::s]  # type: ignore[possibly-undefined]
+            color_values = color_values[::s, ::s]
         if isinstance(lw_arg, np.ndarray):
             lw_arg = lw_arg[::s, ::s]
 
@@ -325,7 +325,11 @@ def plot_streamlines(
         if use_colormap:
             from matplotlib.colors import Normalize
 
-            norm = Normalize(vmin=vmin, vmax=vmax) if vmin is not None or vmax is not None else None
+            norm = (
+                Normalize(vmin=vmin, vmax=vmax)
+                if vmin is not None or vmax is not None
+                else None
+            )
             stream = ax.streamplot(
                 coords[0],
                 coords[1],
@@ -356,7 +360,8 @@ def plot_streamlines(
 
         if alpha < 1.0:
             stream.lines.set_alpha(alpha)
-            # stream.arrows.set_alpha doesn't work — arrows are individual FancyArrowPatch children
+            # stream.arrows.set_alpha doesn't work — arrows are individual
+            # FancyArrowPatch children
             from matplotlib.patches import FancyArrowPatch
 
             for child in ax.get_children():

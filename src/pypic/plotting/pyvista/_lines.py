@@ -58,10 +58,9 @@ def _prepare_scalar(
     display_name = scalar
     if units is not None and data is not None:
         # Get the SI conversion factor from a single-value probe
-        si_val = float(data.normalization.to_si(
-            data.field_info(scalar).quantity_type if data.field_info(scalar) else "b_field",
-            1.0,
-        ))
+        info = data.field_info(scalar)
+        quantity_type = info.quantity_type if info else "b_field"
+        si_val = float(data.normalization.to_si(quantity_type, 1.0))
         from pypic.compute import display_unit_factor
 
         unit_factor = display_unit_factor(units)
@@ -429,7 +428,10 @@ def add_trajectories(
     if scalar is not None and clim is None:
         all_vals = []
         for tr in traces:
-            built_in = {"time": tr.time, "speed": np.sqrt(np.sum(tr.velocity**2, axis=1))}
+            built_in = {
+                "time": tr.time,
+                "speed": np.sqrt(np.sum(tr.velocity**2, axis=1)),
+            }
             all_scalars = {**tr.scalars, **built_in}
             if scalar in all_scalars:
                 all_vals.append(all_scalars[scalar])
