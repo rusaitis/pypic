@@ -291,9 +291,7 @@ class TestResolveFieldColormap:
             if quantity_type
             else None
         )
-        cmap_name, cmap_obj = resolve_field_colormap(
-            name, values, theme, info=info
-        )
+        cmap_name, cmap_obj = resolve_field_colormap(name, values, theme, info=info)
         # Returned tuple is internally consistent
         assert cmap_obj.name == cmap_name
         # Picks the right family from the theme
@@ -953,7 +951,9 @@ class TestFileThemes:
         assert len(themes) >= 5
 
     def test_available_themes_skips_malformed(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         from pypic.plotting import available_themes, export_themes
 
@@ -964,7 +964,9 @@ class TestFileThemes:
         assert "bad" not in themes
 
     def test_user_theme_overrides_bundled(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         from pypic.plotting import export_themes
         from pypic.plotting.styles import _resolve_theme_arg
@@ -985,7 +987,9 @@ class TestFileThemes:
         assert theme.name == "dark"
 
     def test_custom_theme_from_user_dir(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         from pypic.plotting import save_theme
 
@@ -1033,10 +1037,10 @@ class TestOverlayAutoPlacement:
             add_legend(ax, LegendEntry(label="v", color="white"))
             add_badge(ax, step=1)
         occupied = getattr(ax, _OCCUPIED_ATTR)
-        assert "upper left" in occupied      # label
-        assert "lower right" in occupied     # colorbar
-        assert "lower left" in occupied      # legend
-        assert "upper right" in occupied     # badge
+        assert "upper left" in occupied  # label
+        assert "lower right" in occupied  # colorbar
+        assert "lower left" in occupied  # legend
+        assert "upper right" in occupied  # badge
         plt.close(fig)
 
     def test_bumps_to_free_corner(self) -> None:
@@ -1071,9 +1075,7 @@ class TestFieldGridNewParams:
     def test_shared_vmin_vmax(self, ds_2d: FieldDataset) -> None:
         from pypic.plotting import plot_field_grid
 
-        fig, _axes = plot_field_grid(
-            ds_2d, ["B1", "B2"], ncols=2, vmin=-2.0, vmax=2.0
-        )
+        fig, _axes = plot_field_grid(ds_2d, ["B1", "B2"], ncols=2, vmin=-2.0, vmax=2.0)
         assert isinstance(fig, Figure)
         plt.close(fig)
 
@@ -1100,9 +1102,7 @@ class TestFieldGridNewParams:
     def test_log_scale(self, ds_2d: FieldDataset) -> None:
         from pypic.plotting import plot_field_grid
 
-        fig, _axes = plot_field_grid(
-            ds_2d, ["rho_m", "P"], ncols=2, log_scale=True
-        )
+        fig, _axes = plot_field_grid(ds_2d, ["rho_m", "P"], ncols=2, log_scale=True)
         assert isinstance(fig, Figure)
         plt.close(fig)
 
@@ -1126,7 +1126,11 @@ class TestComparisonNewParams:
     def test_log_scale_with_symmetric_warns(self, ds_2d: FieldDataset) -> None:
         with pytest.warns(UserWarning, match="log_scale=True ignored"):
             fig, _ = plot_comparison(
-                ds_2d, ds_2d, "B1", log_scale=True, symmetric=True,
+                ds_2d,
+                ds_2d,
+                "B1",
+                log_scale=True,
+                symmetric=True,
             )
         plt.close(fig)
 
@@ -1196,9 +1200,13 @@ class TestPlotKymograph:
         coords = np.arange(4, dtype=float)
         times = np.arange(2, dtype=float)
         fig, ax = plot_kymograph(
-            values, coords, times,
-            xlabel="$x$ [$d_i$]", ylabel="$t$ [$\\Omega_i^{-1}$]",
-            title="Bz kymograph", label="$B_z$",
+            values,
+            coords,
+            times,
+            xlabel="$x$ [$d_i$]",
+            ylabel="$t$ [$\\Omega_i^{-1}$]",
+            title="Bz kymograph",
+            label="$B_z$",
         )
         assert ax.get_xlabel() == "$x$ [$d_i$]"
         assert ax.get_title() == "Bz kymograph"
@@ -1258,7 +1266,11 @@ class TestPlotScatter:
         from pypic.plotting import plot_scatter
 
         fig, _ax = plot_scatter(
-            ds_2d, "B1", "B2", density=True, color_field="rho_m",
+            ds_2d,
+            "B1",
+            "B2",
+            density=True,
+            color_field="rho_m",
         )
         plt.close(fig)
 
@@ -1288,7 +1300,9 @@ class TestPlotPowerSpectrum:
         k = np.linspace(0.1, 10, 50)
         power = k ** (-5.0 / 3.0)
         fig, _ax = plot_power_spectrum(
-            k, power, reference_slopes=[-5.0 / 3.0, -3.0],
+            k,
+            power,
+            reference_slopes=[-5.0 / 3.0, -3.0],
         )
         plt.close(fig)
 
@@ -1390,7 +1404,10 @@ class TestPlotLineComparison:
         from pypic.plotting import plot_line_comparison
 
         fig, ax = plot_line_comparison(
-            [ds_2d, ds_2d], "B1", axis="x", labels=["run A", "run B"],
+            [ds_2d, ds_2d],
+            "B1",
+            axis="x",
+            labels=["run A", "run B"],
         )
         assert ax.get_legend() is not None
         plt.close(fig)
@@ -1400,7 +1417,10 @@ class TestPlotLineComparison:
 
         fig_ext, ax_ext = plt.subplots()
         _, ax = plot_line_comparison(
-            [ds_2d, ds_2d], "B1", axis="x", ax=ax_ext,
+            [ds_2d, ds_2d],
+            "B1",
+            axis="x",
+            ax=ax_ext,
         )
         assert ax is ax_ext
         plt.close(fig_ext)

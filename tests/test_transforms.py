@@ -142,11 +142,13 @@ class TestRotateVectorComponents:
         v3 = rng.standard_normal(10)
         # Arbitrary rotation
         theta = 0.7
-        R = np.array([
-            [np.cos(theta), -np.sin(theta), 0],
-            [np.sin(theta), np.cos(theta), 0],
-            [0, 0, 1],
-        ])
+        R = np.array(
+            [
+                [np.cos(theta), -np.sin(theta), 0],
+                [np.sin(theta), np.cos(theta), 0],
+                [0, 0, 1],
+            ]
+        )
         r1, r2, r3 = rotate_vector_components(v1, v2, v3, R)
         mag_before = v1**2 + v2**2 + v3**2
         mag_after = r1**2 + r2**2 + r3**2
@@ -195,11 +197,13 @@ class TestRotatePressureTensor:
         p23 = rng.standard_normal(5)
         # Arbitrary rotation
         theta = 1.3
-        R = np.array([
-            [np.cos(theta), -np.sin(theta), 0],
-            [np.sin(theta), np.cos(theta), 0],
-            [0, 0, 1],
-        ])
+        R = np.array(
+            [
+                [np.cos(theta), -np.sin(theta), 0],
+                [np.sin(theta), np.cos(theta), 0],
+                [0, 0, 1],
+            ]
+        )
         rp = rotate_pressure_tensor(p11, p22, p33, p12, p13, p23, R)
         trace_before = p11 + p22 + p33
         trace_after = rp[0] + rp[1] + rp[2]
@@ -362,7 +366,8 @@ class TestFindPressureTensorGroups:
 # ---------------------------------------------------------------------------
 
 _YZ_SWAP: FrameTransform = FrameTransform(
-    "sim", "GSM",
+    "sim",
+    "GSM",
     rotation=((1.0, 0.0, 0.0), (0.0, 0.0, 1.0), (0.0, 1.0, 0.0)),
     target_axis_names=("x_GSM", "y_GSM", "z_GSM"),
 )
@@ -374,12 +379,17 @@ def _make_dataset(
     transforms: dict[str, FrameTransform] | None = None,
 ) -> FieldDataset:
     grid = GridInfo(
-        dimensions=(4, 3, 2), spacing=(1.0, 1.0, 1.0),
-        origin=(0.0, 0.0, 0.0), geometry=CARTESIAN,
+        dimensions=(4, 3, 2),
+        spacing=(1.0, 1.0, 1.0),
+        origin=(0.0, 0.0, 0.0),
+        geometry=CARTESIAN,
     )
     return FieldDataset.from_arrays(
-        fields, grid, Normalization.identity(),
-        transforms=transforms, frame="sim",
+        fields,
+        grid,
+        Normalization.identity(),
+        transforms=transforms,
+        frame="sim",
     )
 
 

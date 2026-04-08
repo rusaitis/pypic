@@ -192,9 +192,7 @@ class TestPhdf5Reader:
 
     def test_pressure_values(self, ds):
         """Exact P11 values: physical P = n·m·v_th² = |rho_c|·v_th²/|qom|."""
-        for s, (rho, uth, qom) in enumerate(
-            zip(RHO_INIT, UTH, QOM, strict=True)
-        ):
+        for s, (rho, uth, qom) in enumerate(zip(RHO_INIT, UTH, QOM, strict=True)):
             expected = rho * uth**2 / abs(qom)
             assert_allclose(ds[f"P11_s{s}"], expected, atol=1e-14)
             p = ds[f"P11_s{s}"]
@@ -544,9 +542,7 @@ class TestAuxiliaryErrors:
         with pytest.raises(KeyError, match="Unknown iPIC3D auxiliary"):
             load_ipic3d_auxiliary(tmp_path, "no_such_dataset")
 
-    def test_missing_conserved_raises_file_not_found(
-        self, tmp_path: Path
-    ) -> None:
+    def test_missing_conserved_raises_file_not_found(self, tmp_path: Path) -> None:
         with pytest.raises(FileNotFoundError, match="ConservedQuantities"):
             load_ipic3d_auxiliary(tmp_path, "conserved_quantities")
 

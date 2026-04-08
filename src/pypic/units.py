@@ -253,8 +253,14 @@ class Normalization:
         return all(
             getattr(self, f"{q}_ref") == 1.0
             for q in (
-                "length", "time", "velocity", "b_field",
-                "e_field", "density", "mass", "charge",
+                "length",
+                "time",
+                "velocity",
+                "b_field",
+                "e_field",
+                "density",
+                "mass",
+                "charge",
             )
         )
 

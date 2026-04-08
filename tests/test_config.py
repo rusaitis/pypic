@@ -724,10 +724,12 @@ class TestPhysicalExtent:
         from pypic.units import Normalization
 
         cfg = SimulationConfig(
-            model_name="t", model_type="PIC",
+            model_name="t",
+            model_type="PIC",
             grid=GridInfo((10,), (1.0,), (0.0,), CARTESIAN),
             normalization=Normalization.identity(),
-            species=(), physics={},
+            species=(),
+            physics={},
         )
         with pytest.raises(ValueError, match="Unknown physical_extent_unit"):
             apply_physical_extent(cfg, (5.0,), "parsec")
@@ -740,10 +742,12 @@ class TestPhysicalExtent:
 
         t = FrameTransform("sim", "phys")
         cfg = SimulationConfig(
-            model_name="t", model_type="PIC",
+            model_name="t",
+            model_type="PIC",
             grid=GridInfo((100, 100, 100), (1.0, 1.0, 1.0), (0.0, 0.0, 0.0), CARTESIAN),
             normalization=Normalization.identity(),
-            species=(), physics={},
+            species=(),
+            physics={},
             transforms={"phys": t},
         )
         with pytest.raises(ValueError, match="non-uniform"):

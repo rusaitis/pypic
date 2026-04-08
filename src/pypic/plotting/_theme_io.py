@@ -29,7 +29,8 @@ RGBA = tuple[float, float, float, float]
 
 
 def _parse_rgba(
-    val: str | list[float], default_alpha: float = 1.0,
+    val: str | list[float],
+    default_alpha: float = 1.0,
 ) -> RGBA:
     """Parse a TOML color value to an RGBA tuple.
 
@@ -201,9 +202,7 @@ def load_theme(path: str | Path) -> PlotTheme:
         else defaults.secondary_text_color
     )
     grid_color = (
-        _parse_rgba(colors["grid"], 0.08)
-        if "grid" in colors
-        else defaults.grid_color
+        _parse_rgba(colors["grid"], 0.08) if "grid" in colors else defaults.grid_color
     )
     overlay_color = (
         _parse_rgba(colors["overlay"], 0.65)
@@ -236,9 +235,7 @@ def load_theme(path: str | Path) -> PlotTheme:
         else (0.5, 0.5, 0.5, 0.3)
     )
     track_color = (
-        _parse_rgba(colors["track"], 0.3)
-        if "track" in colors
-        else defaults.track_color
+        _parse_rgba(colors["track"], 0.3) if "track" in colors else defaults.track_color
     )
     track_alt_color = (
         _parse_rgba(colors["track_alt"], 0.4)
@@ -330,9 +327,7 @@ def save_theme(theme: PlotTheme, path: str | Path) -> None:
     lines.append(f"overlay = {_rgba_to_toml(theme.overlay_color)}")
     lines.append(f"overlay_text = {_rgba_to_toml(theme.overlay_text_color)}")
     lines.append(f"overlay_alt = {_rgba_to_toml(theme.overlay_alt_color)}")
-    lines.append(
-        f"overlay_alt_text = {_rgba_to_toml(theme.overlay_alt_text_color)}"
-    )
+    lines.append(f"overlay_alt_text = {_rgba_to_toml(theme.overlay_alt_text_color)}")
     lines.append(f"overlay_border = {_rgba_to_toml(theme.overlay_border_color)}")
     lines.append(
         f"overlay_alt_border = {_rgba_to_toml(theme.overlay_alt_border_color)}"

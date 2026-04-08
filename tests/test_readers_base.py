@@ -36,9 +36,7 @@ def sample_fields():
 
 @pytest.fixture
 def sample_dataset(sample_grid):
-    return make_synthetic_fielddataset(
-        sample_grid, ("B1", "B2", "B3", "rho_c")
-    )
+    return make_synthetic_fielddataset(sample_grid, ("B1", "B2", "B3", "rho_c"))
 
 
 class TestGridInfo:

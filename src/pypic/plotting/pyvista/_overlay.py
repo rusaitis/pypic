@@ -17,19 +17,24 @@ if TYPE_CHECKING:
 # These are the empirically-tuned constants that translate the theme's
 # point-like values into viewport coords for every overlay (badge, label,
 # colorbar). Centralized so a single tweak affects all overlays uniformly.
-_PAD_X_FRAC = 0.06    # × theme.overlay_padding → horizontal inner padding
-_PAD_Y_FRAC = 0.025   # × theme.overlay_padding → vertical inner padding
-_ROUND_FRAC = 0.02    # × theme.overlay_rounding → corner radius
+_PAD_X_FRAC = 0.06  # × theme.overlay_padding → horizontal inner padding
+_PAD_Y_FRAC = 0.025  # × theme.overlay_padding → vertical inner padding
+_ROUND_FRAC = 0.02  # × theme.overlay_rounding → corner radius
 
 # Font→viewport-height conversion ratios. pyvista font_size is roughly
 # pixels at 1000px window height, so font_size/1000 ≈ raw text height in
 # viewport coordinates. The ratio tunes that to a comfortable line height.
-_TEXT_H_RATIO = 2.0   # full-line text (titles, badge text, label text)
-_TICK_H_RATIO = 1.5   # compact tick labels (colorbar)
+_TEXT_H_RATIO = 2.0  # full-line text (titles, badge text, label text)
+_TICK_H_RATIO = 1.5  # compact tick labels (colorbar)
 
 
 def _rounded_rect_points(
-    x: float, y: float, w: float, h: float, rounding: float, n_arc: int = 6,
+    x: float,
+    y: float,
+    w: float,
+    h: float,
+    rounding: float,
+    n_arc: int = 6,
 ) -> list[tuple[float, float]]:
     """Compute corner-arc points for a rounded rectangle."""
     r = min(rounding, w * 0.3, h * 0.3)
@@ -56,7 +61,10 @@ def _vtk_viewport_coord() -> _vtk.vtkCoordinate:
 
 
 def _position_xy(
-    position: str, box_w: float, box_h: float, edge_margin: float,
+    position: str,
+    box_w: float,
+    box_h: float,
+    edge_margin: float,
 ) -> tuple[float, float]:
     """Map a corner/center position string to (x, y) in normalized viewport.
 
@@ -100,7 +108,8 @@ def _text_height(font_size: int, ratio: float = _TEXT_H_RATIO) -> float:
 
 
 def _resolve_overlay_colors(
-    theme: PlotTheme, variant: str | None,
+    theme: PlotTheme,
+    variant: str | None,
 ) -> tuple[
     tuple[float, float, float, float],
     tuple[float, float, float, float],
@@ -185,7 +194,10 @@ def draw_rounded_rect(
     Returns the ``vtkActor2D`` for later modification or removal.
     """
     return _draw_filled_polygon(
-        plotter, _rounded_rect_points(x, y, w, h, rounding), color, opacity,
+        plotter,
+        _rounded_rect_points(x, y, w, h, rounding),
+        color,
+        opacity,
     )
 
 
@@ -205,8 +217,11 @@ def draw_rounded_rect_border(
     Returns the ``vtkActor2D`` for later modification or removal.
     """
     return _draw_polyline_border(
-        plotter, _rounded_rect_points(x, y, w, h, rounding),
-        color, opacity, line_width,
+        plotter,
+        _rounded_rect_points(x, y, w, h, rounding),
+        color,
+        opacity,
+        line_width,
     )
 
 
@@ -373,7 +388,9 @@ def _add_text_actor(
 
 
 def _measure_text_width_px(
-    plotter: Any, text: str, font_size: int,
+    plotter: Any,
+    text: str,
+    font_size: int,
 ) -> float:
     """Return the rendered width of *text* at *font_size* in pixels.
 
@@ -415,9 +432,7 @@ def _fit_fonts_to_strip(
     strip_w_px = strip_w * ww
 
     if tick_labels:
-        widths = [
-            _measure_text_width_px(plotter, lab, tick_fs) for lab in tick_labels
-        ]
+        widths = [_measure_text_width_px(plotter, lab, tick_fs) for lab in tick_labels]
         total = sum(widths)
         if len(widths) > 1 and tick_labels[0]:
             # Reserve roughly one extra character of breathing room per gap
@@ -617,7 +632,12 @@ def add_colorbar(
     # Auto-fit fonts. Tick labels are constrained to the gradient region;
     # the label can use the full visual strip width since it sits above.
     tick_fs, title_fs = _fit_fonts_to_strip(
-        plotter, gradient_w, tick_labels, label, tick_fs, title_fs,
+        plotter,
+        gradient_w,
+        tick_labels,
+        label,
+        tick_fs,
+        title_fs,
     )
 
     # Vertical dimension estimates (after possible font shrinkage)
@@ -625,8 +645,8 @@ def add_colorbar(
     tick_h = _text_height(tick_fs, ratio=_TICK_H_RATIO)
 
     # Gaps and tick mark length
-    label_gap = 0.008   # space between top of label and bottom of tick mark
-    title_gap = 0.010   # space between top of strip and bottom of title
+    label_gap = 0.008  # space between top of label and bottom of tick mark
+    title_gap = 0.010  # space between top of strip and bottom of title
     tick_mark_h = 0.006
 
     # Padding (and rounding base) shared with badge/label via _overlay_layout
@@ -664,26 +684,41 @@ def add_colorbar(
     if span < 1e-12:
         ticks_x = [gradient_x + gradient_w * 0.5]
     else:
-        ticks_x = [
-            gradient_x + (v - lo) / span * gradient_w for v in tick_values
-        ]
+        ticks_x = [gradient_x + (v - lo) / span * gradient_w for v in tick_values]
 
     # --- Draw layers (back to front) ---
 
     # 1. Background
     rounding = min(base_rounding, bg_w * 0.2, bg_h * 0.2)
     draw_rounded_rect(
-        plotter, bg_x, bg_y, bg_w, bg_h, rounding,
-        bg_color[:3], bg_color[3],
+        plotter,
+        bg_x,
+        bg_y,
+        bg_w,
+        bg_h,
+        rounding,
+        bg_color[:3],
+        bg_color[3],
     )
     draw_rounded_rect_border(
-        plotter, bg_x, bg_y, bg_w, bg_h, rounding,
-        border_color[:3], border_color[3],
+        plotter,
+        bg_x,
+        bg_y,
+        bg_w,
+        bg_h,
+        rounding,
+        border_color[:3],
+        border_color[3],
     )
 
     # 2. Inner gradient + optional under/over triangle extensions + outline
     _draw_gradient_strip(
-        plotter, gradient_x, strip_y, gradient_w, strip_h, cmap,
+        plotter,
+        gradient_x,
+        strip_y,
+        gradient_w,
+        strip_h,
+        cmap,
     )
 
     y_mid = strip_y + strip_h * 0.5
@@ -736,26 +771,45 @@ def add_colorbar(
     if extend_min:
         outline_pts.append((strip_x, y_mid))
     _draw_polyline_border(
-        plotter, outline_pts, border_color[:3], border_color[3], line_width=1.0,
+        plotter,
+        outline_pts,
+        border_color[:3],
+        border_color[3],
+        line_width=1.0,
     )
 
     # 3. Tick marks
     text_rgb = text_color[:3]
     _draw_tick_marks(
-        plotter, ticks_x, tick_mark_top, tick_mark_bottom, text_rgb,
-        opacity=0.85, line_width=1.5,
+        plotter,
+        ticks_x,
+        tick_mark_top,
+        tick_mark_bottom,
+        text_rgb,
+        opacity=0.85,
+        line_width=1.5,
     )
 
     # 4. Label (centered above the strip)
     if label:
         _add_text_actor(
-            plotter, label, title_x, title_y, title_fs, text_rgb,
+            plotter,
+            label,
+            title_x,
+            title_y,
+            title_fs,
+            text_rgb,
             h_align="center",
         )
 
     # 5. Tick labels (centered on each tick)
     for tx, tick_label in zip(ticks_x, tick_labels, strict=True):
         _add_text_actor(
-            plotter, tick_label, tx, tick_label_y, tick_fs, text_rgb,
+            plotter,
+            tick_label,
+            tx,
+            tick_label_y,
+            tick_fs,
+            text_rgb,
             h_align="center",
         )

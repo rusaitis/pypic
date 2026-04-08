@@ -24,11 +24,13 @@ def _polyline_from_points(points: np.ndarray) -> pv.PolyData:
 
     n = points.shape[0]
     polyline = _pv.PolyData(points)
-    cells = np.column_stack([
-        np.full(n - 1, 2, dtype=int),
-        np.arange(n - 1),
-        np.arange(1, n),
-    ]).ravel()
+    cells = np.column_stack(
+        [
+            np.full(n - 1, 2, dtype=int),
+            np.arange(n - 1),
+            np.arange(1, n),
+        ]
+    ).ravel()
     polyline.lines = cells
     return polyline
 
@@ -156,14 +158,21 @@ def add_field_line(
             from pypic.plotting.pyvista._overlay import add_colorbar
 
             add_colorbar(
-                plotter, resolved_cmap, clim, label=display_name,
-                loc=scalar_bar_position, theme=theme,
+                plotter,
+                resolved_cmap,
+                clim,
+                label=display_name,
+                loc=scalar_bar_position,
+                theme=theme,
             )
 
         return actor
     tube = polyline.tube(radius=radius)
     return plotter.add_mesh(
-        tube, color=color or "white", opacity=opacity, show_scalar_bar=False,
+        tube,
+        color=color or "white",
+        opacity=opacity,
+        show_scalar_bar=False,
     )
 
 
@@ -367,14 +376,21 @@ def add_trajectory(
             from pypic.plotting.pyvista._overlay import add_colorbar
 
             add_colorbar(
-                plotter, resolved_cmap, clim, label=scalar,
-                loc=scalar_bar_position, theme=theme,
+                plotter,
+                resolved_cmap,
+                clim,
+                label=scalar,
+                loc=scalar_bar_position,
+                theme=theme,
             )
 
         return actor
     tube = polyline.tube(radius=radius)
     return plotter.add_mesh(
-        tube, color=color or "white", opacity=opacity, show_scalar_bar=False,
+        tube,
+        color=color or "white",
+        opacity=opacity,
+        show_scalar_bar=False,
     )
 
 

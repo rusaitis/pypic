@@ -27,11 +27,29 @@ class TestRegistryIntegrity:
         from pypic.compute import _try_species_recipe
 
         raw_field_targets = {
-            "Te", "Ti", "Pe", "Pi",
-            "EF1", "EF2", "EF3", "EF_s0", "EF_s1",
-            "EF1_s0", "EF2_s0", "EF3_s0", "EF1_s1", "EF2_s1", "EF3_s1",
-            "KEF_s0", "KEF_s1", "HF_s0", "HF_s1",
-            "EHF_s0", "EHF_s1", "q_s0", "q_s1",
+            "Te",
+            "Ti",
+            "Pe",
+            "Pi",
+            "EF1",
+            "EF2",
+            "EF3",
+            "EF_s0",
+            "EF_s1",
+            "EF1_s0",
+            "EF2_s0",
+            "EF3_s0",
+            "EF1_s1",
+            "EF2_s1",
+            "EF3_s1",
+            "KEF_s0",
+            "KEF_s1",
+            "HF_s0",
+            "HF_s1",
+            "EHF_s0",
+            "EHF_s1",
+            "q_s0",
+            "q_s1",
         }
         for alias, target in _COMPUTE_ALIASES.items():
             in_registry = target in _REGISTRY

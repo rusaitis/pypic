@@ -22,9 +22,7 @@ def _lum(c: tuple[float, float, float]) -> float:
     Each channel is gamma-corrected before the standard
     ``0.2126 R + 0.7152 G + 0.0722 B`` weighting.
     """
-    r, g, b = (
-        v / 12.92 if v <= 0.04045 else ((v + 0.055) / 1.055) ** 2.4 for v in c
-    )
+    r, g, b = (v / 12.92 if v <= 0.04045 else ((v + 0.055) / 1.055) ** 2.4 for v in c)
     return 0.2126 * r + 0.7152 * g + 0.0722 * b
 
 
@@ -84,10 +82,6 @@ def resolve_rgba_override(
 
     from matplotlib.colors import to_rgb
 
-    rgb = (
-        to_rgb(color)
-        if isinstance(color, str)
-        else (color[0], color[1], color[2])
-    )
+    rgb = to_rgb(color) if isinstance(color, str) else (color[0], color[1], color[2])
     a = alpha if alpha is not None else fallback[3]
     return (rgb[0], rgb[1], rgb[2], a)

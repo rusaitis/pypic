@@ -331,9 +331,7 @@ class Simulation:
                 # their target is a vector prefix, not a scalar name.
                 resolved = alias_map.get(
                     name,
-                    _COMPUTE_ALIASES.get(
-                        name, _GROUP_ALIASES.get(name, name)
-                    ),
+                    _COMPUTE_ALIASES.get(name, _GROUP_ALIASES.get(name, name)),
                 )
                 expanded.add(resolved)
                 # Expand vector group shorthand:
@@ -384,12 +382,15 @@ class Simulation:
             for name in fields:
                 # A request is satisfied if any expansion of it was loaded
                 expanded = self._expanded_names(
-                    name, alias_map, canonical or set(),
+                    name,
+                    alias_map,
+                    canonical or set(),
                 )
                 if not loaded & expanded:
                     log.warning(
                         "fields=%r: %r matched no fields in the dataset",
-                        list(fields), name,
+                        list(fields),
+                        name,
                     )
 
         return ds
@@ -654,7 +655,9 @@ def open_simulation(
             )
             result = registry_snapshot[name].factory(path, **kwargs)
             return Simulation(
-                result[0], _maybe_apply_extent(result[1]), path,
+                result[0],
+                _maybe_apply_extent(result[1]),
+                path,
                 probe_results=frozen_probes,
             )
         except Exception as exc:

@@ -47,9 +47,7 @@ def apply_theme(
         plotter.set_background(fig_bg)
     else:
         text_lum = (
-            0.299 * t.text_color[0]
-            + 0.587 * t.text_color[1]
-            + 0.114 * t.text_color[2]
+            0.299 * t.text_color[0] + 0.587 * t.text_color[1] + 0.114 * t.text_color[2]
         )
         plotter.set_background("#1e1e1e" if text_lum > 0.5 else "#fafafa")
 
@@ -58,7 +56,8 @@ def apply_theme(
 
 
 def _add_themed_orientation_cube(
-    plotter: pv.Plotter, theme: PlotTheme,
+    plotter: pv.Plotter,
+    theme: PlotTheme,
 ) -> None:
     """Add the camera orientation cube widget with themed colors.
 
@@ -189,6 +188,7 @@ def create_plotter(
         plotter.add_key_event("1", plotter.view_xy)
         plotter.add_key_event("2", plotter.view_xz)
         plotter.add_key_event("3", plotter.view_yz)
+
         # Stepwise keyboard orbit around the focal point.
         # azimuth/elevation orbit the camera around the focal point,
         # which is what you want for scientific data viewing.
@@ -214,6 +214,7 @@ def create_plotter(
         def _level_up() -> None:
             plotter.camera.up = (0.0, 0.0, 1.0)
             plotter.render()
+
         plotter.add_key_event("u", _level_up)
     return plotter
 

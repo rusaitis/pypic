@@ -109,7 +109,12 @@ def plot_power_spectrum(
                     frac = Fraction(slope).limit_denominator(10)
                     slope_str = f"{frac.numerator}/{frac.denominator}"
                 ax.loglog(
-                    k, ref_line, "--", alpha=0.4, color="gray", linewidth=0.8,
+                    k,
+                    ref_line,
+                    "--",
+                    alpha=0.4,
+                    color="gray",
+                    linewidth=0.8,
                     label=f"$k^{{{slope_str}}}$",
                 )
 

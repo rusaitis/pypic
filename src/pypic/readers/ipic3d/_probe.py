@@ -19,9 +19,7 @@ _CORE_SIGNALS: list[tuple[str, float]] = [
 
 def _has_subdir_prefix(path: Path, prefix: str) -> bool:
     """Check whether *path* contains a subdirectory starting with *prefix*."""
-    return any(
-        d.is_dir() and d.name.startswith(prefix) for d in path.iterdir()
-    )
+    return any(d.is_dir() and d.name.startswith(prefix) for d in path.iterdir())
 
 
 def can_read_confidence(path: Path) -> float:

@@ -112,9 +112,7 @@ def generate(theme: PlotTheme) -> None:
     _save(fig, "comparison", theme)
 
     # 4. Line overlay — B components along x
-    fig, ax = plot_line(
-        ds_a, "B1", axis="x", theme=theme, label="$B_x$", color="C0"
-    )
+    fig, ax = plot_line(ds_a, "B1", axis="x", theme=theme, label="$B_x$", color="C0")
     plot_line(ds_a, "B2", axis="x", ax=ax, theme=theme, label="$B_y$", color="C1")
     plot_line(ds_a, "B3", axis="x", ax=ax, theme=theme, label="$B_z$", color="C2")
     ax.set_title("Magnetic field components along x")
@@ -164,12 +162,19 @@ def generate(theme: PlotTheme) -> None:
         add_badge(axes[0, 2], step=100, time=5.0, loc="lower left")
         add_badge(axes[1, 0], step=100, label="cycle", loc="upper left")
         add_badge(
-            axes[1, 1], step=42, label="",
-            bg_color="#1a5276", text_color="gold", bg_alpha=0.75,
+            axes[1, 1],
+            step=42,
+            label="",
+            bg_color="#1a5276",
+            text_color="gold",
+            bg_alpha=0.75,
             loc="upper right",
         )
         add_badge(
-            axes[1, 2], time=0.005, time_units="ns", label="time",
+            axes[1, 2],
+            time=0.005,
+            time_units="ns",
+            label="time",
             loc="lower right",
         )
         fig.suptitle("Badge placement showcase", fontsize=13)
@@ -200,9 +205,7 @@ def generate(theme: PlotTheme) -> None:
     _save(fig, "streamlines_B", theme)
 
     # 11. Streamlines — colored by |B|
-    fig, _ = plot_streamlines(
-        ds_a, "B", color_field="|B|", theme=theme, step=100
-    )
+    fig, _ = plot_streamlines(ds_a, "B", color_field="|B|", theme=theme, step=100)
     _save(fig, "streamlines_B_color_Bmag", theme)
 
     # 12. Quiver — V field on midplane
@@ -228,16 +231,28 @@ def generate(theme: PlotTheme) -> None:
     # 15. Streamlines overlay — black lines on scalar field
     fig, ax = plot_field_slice(ds_a, "rho_m", theme=theme, step=100)
     plot_streamlines(
-        ds_a, "B", ax=ax, color="black", linewidth=0.8, alpha=0.6,
-        colorbar=False, theme=theme,
+        ds_a,
+        "B",
+        ax=ax,
+        color="black",
+        linewidth=0.8,
+        alpha=0.6,
+        colorbar=False,
+        theme=theme,
     )
     _save(fig, "streamlines_overlay", theme)
 
     # 16. Quiver overlay — white arrows on scalar field
     fig, ax = plot_field_slice(ds_a, "|B|", theme=theme, step=100)
     plot_quiver(
-        ds_a, "V", ax=ax, color="white", alpha=0.7, stride=3,
-        colorbar=False, theme=theme,
+        ds_a,
+        "V",
+        ax=ax,
+        color="white",
+        alpha=0.7,
+        stride=3,
+        colorbar=False,
+        theme=theme,
     )
     _save(fig, "quiver_overlay", theme)
 
@@ -266,24 +281,46 @@ def generate(theme: PlotTheme) -> None:
     fig, ax = plot_field_slice(ds_a, "rho_m", theme=theme, colorbar=False, step=100)
     mesh = ax.get_children()[0]
     add_inset_colorbar(
-        ax, mesh, r"$\rho_m$", variant="darker", loc="lower left", fontsize=8,
+        ax,
+        mesh,
+        r"$\rho_m$",
+        variant="darker",
+        loc="lower left",
+        fontsize=8,
     )
     _save(fig, "inset_colorbar_manual", theme)
 
     # 21. Multi-entry vector legend (B + V overlaid)
     fig, ax = plot_field_slice(ds_a, "rho_m", theme=theme, step=100)
     plot_streamlines(
-        ds_a, "B", ax=ax, color="black", linewidth=0.8, alpha=0.6,
-        colorbar=False, legend=False, theme=theme,
+        ds_a,
+        "B",
+        ax=ax,
+        color="black",
+        linewidth=0.8,
+        alpha=0.6,
+        colorbar=False,
+        legend=False,
+        theme=theme,
     )
     plot_quiver(
-        ds_a, "V", ax=ax, color="red", alpha=0.7, stride=3,
-        colorbar=False, legend=False, theme=theme,
+        ds_a,
+        "V",
+        ax=ax,
+        color="red",
+        alpha=0.7,
+        stride=3,
+        colorbar=False,
+        legend=False,
+        theme=theme,
     )
-    add_legend(ax, [
-        LegendEntry(label="B field", color="black", linewidth=0.8, alpha=0.6),
-        LegendEntry(label="V flow", color="red", alpha=0.7),
-    ])
+    add_legend(
+        ax,
+        [
+            LegendEntry(label="B field", color="black", linewidth=0.8, alpha=0.6),
+            LegendEntry(label="V flow", color="red", alpha=0.7),
+        ],
+    )
     _save(fig, "multi_entry_vector_legend", theme)
 
     # 22. Panel label grid (2x3 with a-f)
@@ -305,11 +342,17 @@ def generate(theme: PlotTheme) -> None:
         add_label(ax1, "a")
         add_badge(ax1, step=100, time=5.0, loc="upper right")
         plot_streamlines(
-            ds_a, "B", ax=ax1, color="black", linewidth=0.8, alpha=0.5,
-            colorbar=False, legend=False, theme=theme,
+            ds_a,
+            "B",
+            ax=ax1,
+            color="black",
+            linewidth=0.8,
+            alpha=0.5,
+            colorbar=False,
+            legend=False,
+            theme=theme,
         )
-        add_legend(ax1, LegendEntry(label="B", color="black"),
-                          loc="lower left")
+        add_legend(ax1, LegendEntry(label="B", color="black"), loc="lower left")
 
         plot_field_slice(ds_b, "rho_m", ax=ax2, theme=theme)
         add_label(ax2, "b")
@@ -322,34 +365,59 @@ def generate(theme: PlotTheme) -> None:
     # 24. Scalar + vector overlay — streamlines
     fig, ax = plot_field_slice(ds_a, "|B|", theme=theme, step=100, time=5.0)
     plot_streamlines(
-        ds_a, "B", ax=ax, theme=theme, colorbar=False, legend=False, title="",
+        ds_a,
+        "B",
+        ax=ax,
+        theme=theme,
+        colorbar=False,
+        legend=False,
+        title="",
     )
     _save(fig, "overlay_streamlines", theme)
 
     # 25. Scalar + vector overlay — quiver
     fig, ax = plot_field_slice(ds_a, "rho_m", theme=theme, step=100)
     plot_quiver(
-        ds_a, "V", ax=ax, stride=3, theme=theme,
-        colorbar=False, legend=False, title="",
+        ds_a,
+        "V",
+        ax=ax,
+        stride=3,
+        theme=theme,
+        colorbar=False,
+        legend=False,
+        title="",
     )
     _save(fig, "overlay_quiver", theme)
 
     # 26. Multi-panel field grid
     fig, _ = plot_field_grid(
-        ds_a, ["B1", "|B|", "beta", "v_A", "e_B", "rho_m"],
-        ncols=3, theme=theme, step=100, colorbar="inset",
+        ds_a,
+        ["B1", "|B|", "beta", "v_A", "e_B", "rho_m"],
+        ncols=3,
+        theme=theme,
+        step=100,
+        colorbar="inset",
     )
     _save(fig, "field_grid", theme)
 
     # 27. Cross-section — B1 with x-cut
     fig, _ = plot_cross_section(
-        ds_a, "B1", cut_axis="x", theme=theme, step=100,
+        ds_a,
+        "B1",
+        cut_axis="x",
+        theme=theme,
+        step=100,
     )
     _save(fig, "cross_section_x", theme)
 
     # 28. Cross-section — |B| with y-cut
     fig, _ = plot_cross_section(
-        ds_a, "|B|", cut_axis="y", cut_index=10, theme=theme, step=100,
+        ds_a,
+        "|B|",
+        cut_axis="y",
+        cut_index=10,
+        theme=theme,
+        step=100,
     )
     _save(fig, "cross_section_y", theme)
 
@@ -360,21 +428,33 @@ def generate(theme: PlotTheme) -> None:
 
     # 30. Multi-field line overlay (plot_lines)
     fig, _ = plot_lines(
-        ds_a, ["B1", "B2", "B3"], axis="x",
+        ds_a,
+        ["B1", "B2", "B3"],
+        axis="x",
         labels=["$B_x$", "$B_y$", "$B_z$"],
-        theme=theme, title="B components along x",
+        theme=theme,
+        title="B components along x",
     )
     _save(fig, "plot_lines", theme)
 
     # 31. Log scale — density
     fig, _ = plot_field_slice(
-        ds_a, "rho_m", theme=theme, log_scale=True, step=100,
+        ds_a,
+        "rho_m",
+        theme=theme,
+        log_scale=True,
+        step=100,
     )
     _save(fig, "log_scale_rho", theme)
 
     # 32. badge=True shortcut
     fig, _ = plot_field_slice(
-        ds_a, "B1", theme=theme, step=100, time=5.0, badge=True,
+        ds_a,
+        "B1",
+        theme=theme,
+        step=100,
+        time=5.0,
+        badge=True,
     )
     _save(fig, "badge_shortcut", theme)
 
@@ -385,53 +465,92 @@ def generate(theme: PlotTheme) -> None:
 
     # 34. coord_units as tuple
     fig, _ = plot_field_slice(
-        ds_a, "B1", theme=theme, coord_units=("$d_i$", "$d_i$"), step=100,
+        ds_a,
+        "B1",
+        theme=theme,
+        coord_units=("$d_i$", "$d_i$"),
+        step=100,
     )
     _save(fig, "coord_units_tuple", theme)
 
     # 35. Comparison with error metric
     fig, _ = plot_comparison(
-        ds_a, ds_b, "B1", theme=theme,
-        labels=("y₀=7.5", "y₀=8.0"), show_error=True,
+        ds_a,
+        ds_b,
+        "B1",
+        theme=theme,
+        labels=("y₀=7.5", "y₀=8.0"),
+        show_error=True,
     )
     _save(fig, "comparison_with_error", theme)
 
     # 36. Extremes modes — transparent, semi, none, darken
     fig, ax = plot_field_slice(
-        ds_a, "|B|", theme=theme, step=100,
-        vmin=0.2, vmax=0.8, extremes="transparent",
+        ds_a,
+        "|B|",
+        theme=theme,
+        step=100,
+        vmin=0.2,
+        vmax=0.8,
+        extremes="transparent",
         title="|B| clipped — transparent outside",
     )
     _save(fig, "transparent_extremes", theme)
 
     fig, ax = plot_field_slice(
-        ds_a, "rho_m", theme=theme, step=100, colorbar="inset",
+        ds_a,
+        "rho_m",
+        theme=theme,
+        step=100,
+        colorbar="inset",
     )
     plot_field_slice(
-        ds_a, "B1", theme=theme, ax=ax, colorbar=False,
-        vmin=-0.3, vmax=0.3, extremes="transparent", alpha=0.7,
+        ds_a,
+        "B1",
+        theme=theme,
+        ax=ax,
+        colorbar=False,
+        vmin=-0.3,
+        vmax=0.3,
+        extremes="transparent",
+        alpha=0.7,
         cmap="coolwarm",
     )
     ax.set_title(r"$\rho_m$ + transparent $B_x$ overlay")
     _save(fig, "transparent_overlay", theme)
 
     fig, _ = plot_field_slice(
-        ds_a, "|B|", theme=theme, step=100,
-        vmin=0.2, vmax=0.8, extremes="semi",
+        ds_a,
+        "|B|",
+        theme=theme,
+        step=100,
+        vmin=0.2,
+        vmax=0.8,
+        extremes="semi",
         title="|B| clipped — semi-transparent outside",
     )
     _save(fig, "semi_extremes", theme)
 
     fig, _ = plot_field_slice(
-        ds_a, "|B|", theme=theme, step=100,
-        vmin=0.2, vmax=0.8, extremes=None,
+        ds_a,
+        "|B|",
+        theme=theme,
+        step=100,
+        vmin=0.2,
+        vmax=0.8,
+        extremes=None,
         title="|B| clipped — matplotlib default",
     )
     _save(fig, "none_extremes", theme)
 
     fig, _ = plot_field_slice(
-        ds_a, "|B|", theme=theme, step=100,
-        vmin=0.2, vmax=0.8, extremes="darken",
+        ds_a,
+        "|B|",
+        theme=theme,
+        step=100,
+        vmin=0.2,
+        vmax=0.8,
+        extremes="darken",
         title="|B| clipped — darkened outside",
     )
     _save(fig, "darken_extremes", theme)
@@ -439,7 +558,10 @@ def generate(theme: PlotTheme) -> None:
     # 37. Customized theme — larger fonts
     big_theme = theme.customize(name="talk", font_size=14, axes_titlesize=16)
     fig, _ = plot_field_slice(
-        ds_a, "|B|", theme=big_theme, step=100,
+        ds_a,
+        "|B|",
+        theme=big_theme,
+        step=100,
     )
     _save(fig, "customized_theme", theme)
 
@@ -453,10 +575,16 @@ def generate(theme: PlotTheme) -> None:
         add_badge(axes[0, 2], time="13:34", loc="upper right")
         add_badge(axes[1, 0], "Run A: high β", loc="upper left")
         add_badge(
-            axes[1, 1], step=250, step_range=(0, 500), loc="upper right",
+            axes[1, 1],
+            step=250,
+            step_range=(0, 500),
+            loc="upper right",
         )
         add_badge(
-            axes[1, 2], "Processing...", progress=0.4, loc="upper right",
+            axes[1, 2],
+            "Processing...",
+            progress=0.4,
+            loc="upper right",
         )
         fig.suptitle("Badge variants", fontsize=13)
         fig.tight_layout()
@@ -466,7 +594,13 @@ def generate(theme: PlotTheme) -> None:
     # 39. Overlay with badge
     fig, ax = plot_field_slice(ds_a, "|B|", theme=theme, step=100, badge=True)
     plot_streamlines(
-        ds_a, "B", ax=ax, theme=theme, colorbar=False, legend=False, title="",
+        ds_a,
+        "B",
+        ax=ax,
+        theme=theme,
+        colorbar=False,
+        legend=False,
+        title="",
     )
     _save(fig, "overlay_badge", theme)
 

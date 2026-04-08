@@ -217,9 +217,7 @@ def plot_comparison(
             else:
                 mesh_kwargs["vmin"] = panel_vmin
                 mesh_kwargs["vmax"] = panel_vmax
-            mesh = ax.pcolormesh(
-                coords[0], coords[1], values.T, **mesh_kwargs
-            )
+            mesh = ax.pcolormesh(coords[0], coords[1], values.T, **mesh_kwargs)
             label = f"\u0394 {cb_label}" if key == "diff" else cb_label
             attach_colorbar(fig, ax, mesh, label, colorbar, extremes=extremes)
             cu_x, cu_y = resolve_coord_units(coord_units)

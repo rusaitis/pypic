@@ -34,7 +34,7 @@ def _label_values(ticks: list[float]) -> list[float]:
 def _rgba_to_hex(rgba: tuple[float, float, float, float]) -> str:
     """Convert an RGBA float tuple to a hex color string (ignoring alpha)."""
     r, g, b, _a = rgba
-    return f"#{int(r*255):02x}{int(g*255):02x}{int(b*255):02x}"
+    return f"#{int(r * 255):02x}{int(g * 255):02x}{int(b * 255):02x}"
 
 
 def _frame_labels(data: Any) -> tuple[str, str, str]:

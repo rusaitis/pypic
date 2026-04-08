@@ -93,7 +93,8 @@ _REGISTRY: dict[str, _Recipe] = {
     "e_k": _Recipe(derived.kinetic_energy_density, ("rho_m", "|V|")),
     "e_th": _Recipe(derived.thermal_energy_density, ("P",), needs_gamma=True),
     "e_th_trace": _Recipe(
-        derived.thermal_energy_density_trace, ("P11", "P22", "P33"),
+        derived.thermal_energy_density_trace,
+        ("P11", "P22", "P33"),
     ),
     # Thermodynamic
     "h": _Recipe(derived.enthalpy, ("P", "rho_m"), needs_gamma=True),
@@ -127,13 +128,19 @@ _REGISTRY: dict[str, _Recipe] = {
     ),
     # Enthalpy flux (total, MHD): EHF_i = (gamma/(gamma-1)) P V_i
     "EHF1": _Recipe(
-        derived.enthalpy_flux_component, ("P", "V1"), needs_gamma=True,
+        derived.enthalpy_flux_component,
+        ("P", "V1"),
+        needs_gamma=True,
     ),
     "EHF2": _Recipe(
-        derived.enthalpy_flux_component, ("P", "V2"), needs_gamma=True,
+        derived.enthalpy_flux_component,
+        ("P", "V2"),
+        needs_gamma=True,
     ),
     "EHF3": _Recipe(
-        derived.enthalpy_flux_component, ("P", "V3"), needs_gamma=True,
+        derived.enthalpy_flux_component,
+        ("P", "V3"),
+        needs_gamma=True,
     ),
     # Species-dependent: electrons (species 0)
     "omega_pe": _Recipe(
@@ -216,12 +223,16 @@ _REGISTRY: dict[str, _Recipe] = {
     "agyrotropy": _Recipe(derived.agyrotropy, _PRESSURE_TENSOR_AND_B),
     # Grid-dependent diagnostics
     "div_B": _Recipe(
-        diagnostics.div_b, ("B1", "B2", "B3"),
-        needs_grid=True, passes_geometry=True,
+        diagnostics.div_b,
+        ("B1", "B2", "B3"),
+        needs_grid=True,
+        passes_geometry=True,
     ),
     "div_E": _Recipe(
-        diagnostics.div_e, ("E1", "E2", "E3"),
-        needs_grid=True, passes_geometry=True,
+        diagnostics.div_e,
+        ("E1", "E2", "E3"),
+        needs_grid=True,
+        passes_geometry=True,
     ),
     # Curl of B (tuple return — component selects)
     "curl_B1": _Recipe(
@@ -270,9 +281,7 @@ _REGISTRY: dict[str, _Recipe] = {
     # Vorticity magnitude — depends on vort1/2/3
     "|vort|": _Recipe(derived.velocity_magnitude, ("vort1", "vort2", "vort3")),
     # Reconnection diagnostics
-    "J_dot_E": _Recipe(
-        derived.j_dot_e, ("J1", "J2", "J3", "E1", "E2", "E3")
-    ),
+    "J_dot_E": _Recipe(derived.j_dot_e, ("J1", "J2", "J3", "E1", "E2", "E3")),
     # Non-ideal electric field E' = E + VxB (component selects)
     "E_prime_1": _Recipe(
         derived.non_ideal_electric_field,
@@ -405,7 +414,9 @@ _SPECIES_TEMPLATES: dict[str, _SpeciesTemplate] = {
         derived.kinetic_energy_density, ("rho_m_s{N}", "|V|_s{N}"), _SpeciesArgs.NONE
     ),
     "e_th": _SpeciesTemplate(
-        derived.thermal_energy_density, ("P_s{N}",), _SpeciesArgs.NONE,
+        derived.thermal_energy_density,
+        ("P_s{N}",),
+        _SpeciesArgs.NONE,
         needs_gamma=True,
     ),
     "e_th_trace": _SpeciesTemplate(
@@ -414,11 +425,15 @@ _SPECIES_TEMPLATES: dict[str, _SpeciesTemplate] = {
         _SpeciesArgs.NONE,
     ),
     "e_int": _SpeciesTemplate(
-        derived.internal_energy, ("P_s{N}", "rho_m_s{N}"), _SpeciesArgs.NONE,
+        derived.internal_energy,
+        ("P_s{N}", "rho_m_s{N}"),
+        _SpeciesArgs.NONE,
         needs_gamma=True,
     ),
     "h": _SpeciesTemplate(
-        derived.enthalpy, ("P_s{N}", "rho_m_s{N}"), _SpeciesArgs.NONE,
+        derived.enthalpy,
+        ("P_s{N}", "rho_m_s{N}"),
+        _SpeciesArgs.NONE,
         needs_gamma=True,
     ),
     # Kinetic energy flux: KEF_i = (1/2) n m |V|² V_i

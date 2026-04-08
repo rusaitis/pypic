@@ -179,9 +179,7 @@ def identity_transform(frame: str) -> FrameTransform:
     return FrameTransform(source_frame=frame, target_frame=frame)
 
 
-def compose_transforms(
-    first: FrameTransform, second: FrameTransform
-) -> FrameTransform:
+def compose_transforms(first: FrameTransform, second: FrameTransform) -> FrameTransform:
     r"""Compose two transforms: apply *first* then *second*.
 
     If *first* maps A→B and *second* maps B→C, the result maps A→C.
@@ -303,8 +301,10 @@ def resolve_transform(
         if (mid, target_frame) in edges:
             return compose_transforms(first, edges[(mid, target_frame)])
 
-    available = sorted({t.source_frame for t in transforms.values()}
-                       | {t.target_frame for t in transforms.values()})
+    available = sorted(
+        {t.source_frame for t in transforms.values()}
+        | {t.target_frame for t in transforms.values()}
+    )
     msg = (
         f"No transform path from {source_frame!r} to {target_frame!r}. "
         f"Available frames: {available}"
@@ -360,11 +360,7 @@ def find_vector_triplets(
             prefix, component, species = m.groups()
             key = f"{prefix}_s{species}" if species else prefix
             groups.setdefault(key, {})[int(component)] = name
-    return [
-        (g[1], g[2], g[3])
-        for g in groups.values()
-        if 1 in g and 2 in g and 3 in g
-    ]
+    return [(g[1], g[2], g[3]) for g in groups.values() if 1 in g and 2 in g and 3 in g]
 
 
 _PRESSURE_RE = re.compile(r"^P(\d)(\d)(?:_s(\d+))?$")

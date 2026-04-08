@@ -124,7 +124,7 @@ class PlotTheme:
     axis_arrows: bool = True
 
     # Ticks
-    tick_direction: str = "in"           # "in", "out", or "inout"
+    tick_direction: str = "in"  # "in", "out", or "inout"
     tick_major_length: float = 4.0
     tick_major_width: float = 0.6
     tick_minor_length: float = 2.0
@@ -309,9 +309,15 @@ def _theme_val[T](attr: str, default: T) -> T:
     return getattr(theme, attr, default)
 
 
-_GENERIC_FAMILIES = frozenset({
-    "serif", "sans-serif", "monospace", "cursive", "fantasy",
-})
+_GENERIC_FAMILIES = frozenset(
+    {
+        "serif",
+        "sans-serif",
+        "monospace",
+        "cursive",
+        "fantasy",
+    }
+)
 
 
 def _available_fonts(families: tuple[str, ...]) -> list[str]:
@@ -493,22 +499,44 @@ def _rounded_axes_path(aspect: float, r: float) -> Path:
     c4 = Path.CURVE4
     return Path(
         [
-            (rx, 0), (1 - rx, 0),
-            (1 - rx + kx, 0), (1, ry - ky), (1, ry),
+            (rx, 0),
+            (1 - rx, 0),
+            (1 - rx + kx, 0),
+            (1, ry - ky),
+            (1, ry),
             (1, 1 - ry),
-            (1, 1 - ry + ky), (1 - rx + kx, 1), (1 - rx, 1),
+            (1, 1 - ry + ky),
+            (1 - rx + kx, 1),
+            (1 - rx, 1),
             (rx, 1),
-            (rx - kx, 1), (0, 1 - ry + ky), (0, 1 - ry),
+            (rx - kx, 1),
+            (0, 1 - ry + ky),
+            (0, 1 - ry),
             (0, ry),
-            (0, ry - ky), (rx - kx, 0), (rx, 0),
+            (0, ry - ky),
+            (rx - kx, 0),
+            (rx, 0),
             (rx, 0),
         ],
         [
-            Path.MOVETO, Path.LINETO,
-            c4, c4, c4, Path.LINETO,
-            c4, c4, c4, Path.LINETO,
-            c4, c4, c4, Path.LINETO,
-            c4, c4, c4, Path.CLOSEPOLY,
+            Path.MOVETO,
+            Path.LINETO,
+            c4,
+            c4,
+            c4,
+            Path.LINETO,
+            c4,
+            c4,
+            c4,
+            Path.LINETO,
+            c4,
+            c4,
+            c4,
+            Path.LINETO,
+            c4,
+            c4,
+            c4,
+            Path.CLOSEPOLY,
         ],
     )
 
@@ -555,5 +583,3 @@ def style_legend(ax: Axes) -> None:
         # Rectangle the matplotlib stubs claim.
         frame = cast("FancyBboxPatch", legend.get_frame())
         frame.set_boxstyle(_overlay_box_style())
-
-

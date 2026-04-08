@@ -166,8 +166,7 @@ def test_paired_function_parity(
     if extras_in_allowlist_mpl:
         names = sorted(extras_in_allowlist_mpl)
         msg_parts.append(
-            f"allowlist mpl entries that no longer exist: {names} "
-            f"(remove from PAIRS)"
+            f"allowlist mpl entries that no longer exist: {names} (remove from PAIRS)"
         )
     if missing_from_allowlist_pv:
         names = sorted(missing_from_allowlist_pv)
@@ -178,8 +177,7 @@ def test_paired_function_parity(
     if extras_in_allowlist_pv:
         names = sorted(extras_in_allowlist_pv)
         msg_parts.append(
-            f"allowlist pv entries that no longer exist: {names} "
-            f"(remove from PAIRS)"
+            f"allowlist pv entries that no longer exist: {names} (remove from PAIRS)"
         )
     assert not msg_parts, "; ".join(msg_parts)
 

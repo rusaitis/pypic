@@ -661,30 +661,46 @@ class TestJDotE:
     def test_hand_calculation(self):
         """J=(1,2,0), E=(3,0,1) → J·E = 1*3 + 2*0 + 0*1 = 3."""
         result = j_dot_e(
-            np.array([1.0]), np.array([2.0]), np.array([0.0]),
-            np.array([3.0]), np.array([0.0]), np.array([1.0]),
+            np.array([1.0]),
+            np.array([2.0]),
+            np.array([0.0]),
+            np.array([3.0]),
+            np.array([0.0]),
+            np.array([1.0]),
         )
         np.testing.assert_allclose(result, 3.0, rtol=1e-15)
 
     def test_orthogonal_gives_zero(self):
         """J perpendicular to E → J·E = 0."""
         result = j_dot_e(
-            np.array([1.0]), np.array([0.0]), np.array([0.0]),
-            np.array([0.0]), np.array([1.0]), np.array([0.0]),
+            np.array([1.0]),
+            np.array([0.0]),
+            np.array([0.0]),
+            np.array([0.0]),
+            np.array([1.0]),
+            np.array([0.0]),
         )
         np.testing.assert_allclose(result, 0.0, atol=1e-15)
 
     def test_negative_means_fields_gain_energy(self):
         result = j_dot_e(
-            np.array([1.0]), np.array([0.0]), np.array([0.0]),
-            np.array([-2.0]), np.array([0.0]), np.array([0.0]),
+            np.array([1.0]),
+            np.array([0.0]),
+            np.array([0.0]),
+            np.array([-2.0]),
+            np.array([0.0]),
+            np.array([0.0]),
         )
         assert result[0] < 0
 
     def test_nan_propagation(self):
         result = j_dot_e(
-            np.array([np.nan]), np.array([0.0]), np.array([0.0]),
-            np.array([1.0]), np.array([0.0]), np.array([0.0]),
+            np.array([np.nan]),
+            np.array([0.0]),
+            np.array([0.0]),
+            np.array([1.0]),
+            np.array([0.0]),
+            np.array([0.0]),
         )
         assert np.isnan(result[0])
 
@@ -693,8 +709,12 @@ class TestIdealElectricField:
     def test_hand_calculation(self):
         """V=(1,0,0), B=(0,0,1) -> -VxB = -(0,-1,0) = (0,1,0)."""
         e1, e2, e3 = ideal_electric_field(
-            np.array([1.0]), np.array([0.0]), np.array([0.0]),
-            np.array([0.0]), np.array([0.0]), np.array([1.0]),
+            np.array([1.0]),
+            np.array([0.0]),
+            np.array([0.0]),
+            np.array([0.0]),
+            np.array([0.0]),
+            np.array([1.0]),
         )
         np.testing.assert_allclose(e1, 0.0, atol=1e-15)
         np.testing.assert_allclose(e2, 1.0, rtol=1e-15)
@@ -702,8 +722,12 @@ class TestIdealElectricField:
 
     def test_zero_velocity_gives_zero(self):
         e1, e2, e3 = ideal_electric_field(
-            np.array([0.0]), np.array([0.0]), np.array([0.0]),
-            np.array([1.0]), np.array([2.0]), np.array([3.0]),
+            np.array([0.0]),
+            np.array([0.0]),
+            np.array([0.0]),
+            np.array([1.0]),
+            np.array([2.0]),
+            np.array([3.0]),
         )
         np.testing.assert_allclose(e1, 0.0, atol=1e-15)
         np.testing.assert_allclose(e2, 0.0, atol=1e-15)
@@ -715,9 +739,15 @@ class TestNonIdealElectricField:
         """When E = -VxB exactly, E' = E + VxB = 0 (frozen-in)."""
         # V=(1,0,0), B=(0,1,0), VxB = (0,0,1), E_ideal = (0,0,-1)
         e1, e2, e3 = non_ideal_electric_field(
-            np.array([0.0]), np.array([0.0]), np.array([-1.0]),  # E = -VxB
-            np.array([1.0]), np.array([0.0]), np.array([0.0]),   # V
-            np.array([0.0]), np.array([1.0]), np.array([0.0]),   # B
+            np.array([0.0]),
+            np.array([0.0]),
+            np.array([-1.0]),  # E = -VxB
+            np.array([1.0]),
+            np.array([0.0]),
+            np.array([0.0]),  # V
+            np.array([0.0]),
+            np.array([1.0]),
+            np.array([0.0]),  # B
         )
         np.testing.assert_allclose(e1, 0.0, atol=1e-15)
         np.testing.assert_allclose(e2, 0.0, atol=1e-15)
@@ -726,9 +756,15 @@ class TestNonIdealElectricField:
     def test_hand_calculation(self):
         """E=(0,0,0.5), V=(1,0,0), B=(0,1,0), VxB=(0,0,1), E'=(0,0,1.5)."""
         _e1, _e2, e3 = non_ideal_electric_field(
-            np.array([0.0]), np.array([0.0]), np.array([0.5]),
-            np.array([1.0]), np.array([0.0]), np.array([0.0]),
-            np.array([0.0]), np.array([1.0]), np.array([0.0]),
+            np.array([0.0]),
+            np.array([0.0]),
+            np.array([0.5]),
+            np.array([1.0]),
+            np.array([0.0]),
+            np.array([0.0]),
+            np.array([0.0]),
+            np.array([1.0]),
+            np.array([0.0]),
         )
         np.testing.assert_allclose(e3, 1.5, rtol=1e-15)
 
@@ -738,10 +774,23 @@ class TestNonIdealElectricField:
         b = np.array([0.2, -0.4, 0.8])
         e = np.array([0.1, 0.2, 0.3])
         e_id1, e_id2, e_id3 = ideal_electric_field(
-            v[:1], v[1:2], v[2:], b[:1], b[1:2], b[2:],
+            v[:1],
+            v[1:2],
+            v[2:],
+            b[:1],
+            b[1:2],
+            b[2:],
         )
         ep1, ep2, ep3 = non_ideal_electric_field(
-            e[:1], e[1:2], e[2:], v[:1], v[1:2], v[2:], b[:1], b[1:2], b[2:],
+            e[:1],
+            e[1:2],
+            e[2:],
+            v[:1],
+            v[1:2],
+            v[2:],
+            b[:1],
+            b[1:2],
+            b[2:],
         )
         np.testing.assert_allclose(ep1, e[:1] - e_id1, rtol=1e-14)
         np.testing.assert_allclose(ep2, e[1:2] - e_id2, rtol=1e-14)
@@ -752,9 +801,14 @@ class TestHallElectricField:
     def test_hand_calculation(self):
         """J=(1,0,0), B=(0,0,1), n=2, |q|=1, JxB=(0,-1,0), E_Hall=(0,-0.5,0)."""
         e1, e2, e3 = hall_electric_field(
-            np.array([1.0]), np.array([0.0]), np.array([0.0]),
-            np.array([0.0]), np.array([0.0]), np.array([1.0]),
-            np.array([2.0]), 1.0,
+            np.array([1.0]),
+            np.array([0.0]),
+            np.array([0.0]),
+            np.array([0.0]),
+            np.array([0.0]),
+            np.array([1.0]),
+            np.array([2.0]),
+            1.0,
         )
         np.testing.assert_allclose(e1, 0.0, atol=1e-15)
         np.testing.assert_allclose(e2, -0.5, rtol=1e-15)
@@ -763,8 +817,12 @@ class TestHallElectricField:
     def test_charge_sign_independence(self):
         """Result is the same for positive and negative charge (abs used)."""
         args = (
-            np.array([1.0]), np.array([0.0]), np.array([0.0]),
-            np.array([0.0]), np.array([1.0]), np.array([0.0]),
+            np.array([1.0]),
+            np.array([0.0]),
+            np.array([0.0]),
+            np.array([0.0]),
+            np.array([1.0]),
+            np.array([0.0]),
             np.array([1.0]),
         )
         pos = hall_electric_field(*args, 1.0)
@@ -774,9 +832,14 @@ class TestHallElectricField:
 
     def test_zero_density_gives_nan(self):
         _e1, e2, _e3 = hall_electric_field(
-            np.array([1.0]), np.array([0.0]), np.array([0.0]),
-            np.array([0.0]), np.array([0.0]), np.array([1.0]),
-            np.array([0.0]), 1.0,
+            np.array([1.0]),
+            np.array([0.0]),
+            np.array([0.0]),
+            np.array([0.0]),
+            np.array([0.0]),
+            np.array([1.0]),
+            np.array([0.0]),
+            1.0,
         )
         assert np.isnan(e2[0])
 
@@ -785,7 +848,9 @@ class TestFirehoseParameter:
     def test_isotropic_is_stable(self):
         """Equal pressures: F = (P-P)/(B²/2) - 1 = -1."""
         result = firehose_parameter(
-            np.array([2.0]), np.array([2.0]), np.array([1.0]),
+            np.array([2.0]),
+            np.array([2.0]),
+            np.array([1.0]),
         )
         np.testing.assert_allclose(result, -1.0, rtol=1e-15)
 
@@ -793,20 +858,26 @@ class TestFirehoseParameter:
         """P_par - P_perp = B²/2 → F = 0."""
         # B=2 → B²/2 = 2, so P_par - P_perp = 2
         result = firehose_parameter(
-            np.array([3.0]), np.array([1.0]), np.array([2.0]),
+            np.array([3.0]),
+            np.array([1.0]),
+            np.array([2.0]),
         )
         np.testing.assert_allclose(result, 0.0, atol=1e-15)
 
     def test_unstable(self):
         """Large parallel excess → F > 0."""
         result = firehose_parameter(
-            np.array([10.0]), np.array([1.0]), np.array([1.0]),
+            np.array([10.0]),
+            np.array([1.0]),
+            np.array([1.0]),
         )
         assert result[0] > 0
 
     def test_zero_b_gives_nan(self):
         result = firehose_parameter(
-            np.array([1.0]), np.array([0.5]), np.array([0.0]),
+            np.array([1.0]),
+            np.array([0.5]),
+            np.array([0.0]),
         )
         assert np.isnan(result[0])
 
@@ -816,13 +887,17 @@ class TestMirrorParameter:
         """P_par = P_perp: M = 1 - 1 - 1/β_perp = -1/β_perp < 0."""
         # P=1, B=1 → β_perp = 2*1/1 = 2, M = 1 - 1 - 0.5 = -0.5
         result = mirror_parameter(
-            np.array([1.0]), np.array([1.0]), np.array([1.0]),
+            np.array([1.0]),
+            np.array([1.0]),
+            np.array([1.0]),
         )
         np.testing.assert_allclose(result, -0.5, rtol=1e-14)
 
     def test_zero_b_gives_nan(self):
         result = mirror_parameter(
-            np.array([1.0]), np.array([1.0]), np.array([0.0]),
+            np.array([1.0]),
+            np.array([1.0]),
+            np.array([0.0]),
         )
         assert np.isnan(result[0])
 
@@ -830,7 +905,9 @@ class TestMirrorParameter:
         """When β_perp → ∞, M → P_perp/P_par - 1."""
         # B very small → β_perp very large → 1/β_perp ≈ 0
         result = mirror_parameter(
-            np.array([1.0]), np.array([3.0]), np.array([1e-6]),
+            np.array([1.0]),
+            np.array([3.0]),
+            np.array([1e-6]),
         )
         np.testing.assert_allclose(result, 2.0, atol=0.01)
 
@@ -838,29 +915,45 @@ class TestMirrorParameter:
 class TestMagneticShearAngle:
     def test_parallel(self):
         angle = magnetic_shear_angle(
-            np.array([1.0]), np.array([0.0]), np.array([0.0]),
-            np.array([2.0]), np.array([0.0]), np.array([0.0]),
+            np.array([1.0]),
+            np.array([0.0]),
+            np.array([0.0]),
+            np.array([2.0]),
+            np.array([0.0]),
+            np.array([0.0]),
         )
         np.testing.assert_allclose(angle, 0.0, atol=1e-15)
 
     def test_antiparallel(self):
         angle = magnetic_shear_angle(
-            np.array([1.0]), np.array([0.0]), np.array([0.0]),
-            np.array([-1.0]), np.array([0.0]), np.array([0.0]),
+            np.array([1.0]),
+            np.array([0.0]),
+            np.array([0.0]),
+            np.array([-1.0]),
+            np.array([0.0]),
+            np.array([0.0]),
         )
         np.testing.assert_allclose(angle, np.pi, rtol=1e-14)
 
     def test_perpendicular(self):
         angle = magnetic_shear_angle(
-            np.array([1.0]), np.array([0.0]), np.array([0.0]),
-            np.array([0.0]), np.array([1.0]), np.array([0.0]),
+            np.array([1.0]),
+            np.array([0.0]),
+            np.array([0.0]),
+            np.array([0.0]),
+            np.array([1.0]),
+            np.array([0.0]),
         )
         np.testing.assert_allclose(angle, np.pi / 2, rtol=1e-14)
 
     def test_45_degrees(self):
         angle = magnetic_shear_angle(
-            np.array([1.0]), np.array([1.0]), np.array([0.0]),
-            np.array([1.0]), np.array([0.0]), np.array([0.0]),
+            np.array([1.0]),
+            np.array([1.0]),
+            np.array([0.0]),
+            np.array([1.0]),
+            np.array([0.0]),
+            np.array([0.0]),
         )
         np.testing.assert_allclose(angle, np.pi / 4, rtol=1e-14)
 
@@ -905,14 +998,10 @@ class TestMagneticFluxFunction:
 
 # (label, callable_taking_one_array) — magnitudes and 1-arg energy/scale funcs
 _FAMILY_1ARG: list[tuple[str, Callable[..., Any]]] = [
-    ("magnetic_field_magnitude",
-     lambda a: magnetic_field_magnitude(a, a, a)),
-    ("electric_field_magnitude",
-     lambda a: electric_field_magnitude(a, a, a)),
-    ("current_density_magnitude",
-     lambda a: current_density_magnitude(a, a, a)),
-    ("velocity_magnitude",
-     lambda a: velocity_magnitude(a, a, a)),
+    ("magnetic_field_magnitude", lambda a: magnetic_field_magnitude(a, a, a)),
+    ("electric_field_magnitude", lambda a: electric_field_magnitude(a, a, a)),
+    ("current_density_magnitude", lambda a: current_density_magnitude(a, a, a)),
+    ("velocity_magnitude", lambda a: velocity_magnitude(a, a, a)),
     ("magnetic_energy_density", magnetic_energy_density),
     ("electric_energy_density", electric_energy_density),
     ("thermal_energy_density", thermal_energy_density),
@@ -928,37 +1017,42 @@ _FAMILY_2ARG: list[tuple[str, Callable[..., Any]]] = [
 # (label, callable_taking_(rho_array,)) — density-dependent funcs that
 # should return NaN (not raise) for negative density input.
 _DENSITY_DEPENDENT: list[tuple[str, Callable[..., Any]]] = [
-    ("alfven_speed",
-     lambda n: alfven_speed(np.array([1.0]), n)),
-    ("plasma_frequency",
-     lambda n: plasma_frequency(n, charge=1.0, mass=1.0)),
-    ("skin_depth",
-     lambda n: skin_depth(n, charge=1.0, mass=1.0)),
-    ("debye_length",
-     lambda n: debye_length(np.array([1.0]), n, charge=1.0)),
-    ("sound_speed",
-     lambda n: sound_speed(np.array([1.0]), n)),
+    ("alfven_speed", lambda n: alfven_speed(np.array([1.0]), n)),
+    ("plasma_frequency", lambda n: plasma_frequency(n, charge=1.0, mass=1.0)),
+    ("skin_depth", lambda n: skin_depth(n, charge=1.0, mass=1.0)),
+    ("debye_length", lambda n: debye_length(np.array([1.0]), n, charge=1.0)),
+    ("sound_speed", lambda n: sound_speed(np.array([1.0]), n)),
 ]
 
 # (label, q+ callable, q- callable) — charge-dependent funcs whose
 # physical magnitudes must be invariant under charge sign flip.
 # Includes skin_depth which the existing per-class tests miss.
 _CHARGE_INVARIANT: list[tuple[str, Callable[..., Any], Callable[..., Any]]] = [
-    ("gyrofrequency",
-     lambda: gyrofrequency(np.array([2.0]), charge=1.0, mass=1.5),
-     lambda: gyrofrequency(np.array([2.0]), charge=-1.0, mass=1.5)),
-    ("plasma_frequency",
-     lambda: plasma_frequency(np.array([2.0]), charge=1.0, mass=1.5),
-     lambda: plasma_frequency(np.array([2.0]), charge=-1.0, mass=1.5)),
-    ("skin_depth",
-     lambda: skin_depth(np.array([2.0]), charge=1.0, mass=1.5, c=1.0),
-     lambda: skin_depth(np.array([2.0]), charge=-1.0, mass=1.5, c=1.0)),
-    ("gyroradius",
-     lambda: gyroradius(np.array([2.0]), np.array([3.0]), charge=1.0, mass=1.5),
-     lambda: gyroradius(np.array([2.0]), np.array([3.0]), charge=-1.0, mass=1.5)),
-    ("debye_length",
-     lambda: debye_length(np.array([2.0]), np.array([3.0]), charge=1.0),
-     lambda: debye_length(np.array([2.0]), np.array([3.0]), charge=-1.0)),
+    (
+        "gyrofrequency",
+        lambda: gyrofrequency(np.array([2.0]), charge=1.0, mass=1.5),
+        lambda: gyrofrequency(np.array([2.0]), charge=-1.0, mass=1.5),
+    ),
+    (
+        "plasma_frequency",
+        lambda: plasma_frequency(np.array([2.0]), charge=1.0, mass=1.5),
+        lambda: plasma_frequency(np.array([2.0]), charge=-1.0, mass=1.5),
+    ),
+    (
+        "skin_depth",
+        lambda: skin_depth(np.array([2.0]), charge=1.0, mass=1.5, c=1.0),
+        lambda: skin_depth(np.array([2.0]), charge=-1.0, mass=1.5, c=1.0),
+    ),
+    (
+        "gyroradius",
+        lambda: gyroradius(np.array([2.0]), np.array([3.0]), charge=1.0, mass=1.5),
+        lambda: gyroradius(np.array([2.0]), np.array([3.0]), charge=-1.0, mass=1.5),
+    ),
+    (
+        "debye_length",
+        lambda: debye_length(np.array([2.0]), np.array([3.0]), charge=1.0),
+        lambda: debye_length(np.array([2.0]), np.array([3.0]), charge=-1.0),
+    ),
 ]
 
 
@@ -999,8 +1093,8 @@ class TestEdgeCaseInvariants:
             result = func(one, one)
             if result.shape != (1,):
                 failures.append(f"{label}: shape={result.shape}, expected (1,)")
-        assert not failures, (
-            "Single-element shape regressions:\n  - " + "\n  - ".join(failures)
+        assert not failures, "Single-element shape regressions:\n  - " + "\n  - ".join(
+            failures
         )
 
     def test_negative_density_returns_nan(self) -> None:
@@ -1022,11 +1116,9 @@ class TestEdgeCaseInvariants:
                     failures.append(f"{label}: raised {type(e).__name__}: {e}")
                     continue
                 if not np.isnan(result[0]):
-                    failures.append(
-                        f"{label}: returned {result[0]!r}, expected NaN"
-                    )
-        assert not failures, (
-            "Negative-density NaN regressions:\n  - " + "\n  - ".join(failures)
+                    failures.append(f"{label}: returned {result[0]!r}, expected NaN")
+        assert not failures, "Negative-density NaN regressions:\n  - " + "\n  - ".join(
+            failures
         )
 
     def test_charge_sign_invariance(self) -> None:
@@ -1067,15 +1159,21 @@ class TestDebyeLengthScaling:
         ],
     )
     def test_temperature_scaling(
-        self, t_factor: float, expected_factor: float,
+        self,
+        t_factor: float,
+        expected_factor: float,
     ) -> None:
         r"""$\lambda_D \propto \sqrt{T}$."""
         base = debye_length(np.array([1.0]), np.array([1.0]), charge=1.0)
         scaled = debye_length(
-            np.array([t_factor]), np.array([1.0]), charge=1.0,
+            np.array([t_factor]),
+            np.array([1.0]),
+            charge=1.0,
         )
         np.testing.assert_allclose(
-            scaled, expected_factor * base, rtol=1e-15,
+            scaled,
+            expected_factor * base,
+            rtol=1e-15,
         )
 
     @pytest.mark.parametrize(
@@ -1088,13 +1186,19 @@ class TestDebyeLengthScaling:
         ],
     )
     def test_density_scaling(
-        self, n_factor: float, expected_factor: float,
+        self,
+        n_factor: float,
+        expected_factor: float,
     ) -> None:
         r"""$\lambda_D \propto 1/\sqrt{n}$."""
         base = debye_length(np.array([1.0]), np.array([1.0]), charge=1.0)
         scaled = debye_length(
-            np.array([1.0]), np.array([n_factor]), charge=1.0,
+            np.array([1.0]),
+            np.array([n_factor]),
+            charge=1.0,
         )
         np.testing.assert_allclose(
-            scaled, expected_factor * base, rtol=1e-15,
+            scaled,
+            expected_factor * base,
+            rtol=1e-15,
         )

@@ -270,9 +270,7 @@ class TestScoreSignals:
 
         (tmp_path / "config.toml").touch()
         (tmp_path / "data.h5").touch()
-        score = score_signals(
-            tmp_path, [("*.toml", 0.5), ("*.h5", 0.3), ("*.nc", 0.9)]
-        )
+        score = score_signals(tmp_path, [("*.toml", 0.5), ("*.h5", 0.3), ("*.nc", 0.9)])
         assert score == pytest.approx(0.8)
 
     def test_score_clamped_to_one(self, tmp_path: Path) -> None:

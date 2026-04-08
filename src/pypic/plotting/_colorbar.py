@@ -229,9 +229,7 @@ def add_inset_colorbar(
 
     default_bg, default_fg, overlay_alpha = _detect_overlay_defaults(variant)
 
-    bg_rgba = resolve_rgba_override(
-        bg_color, bg_alpha, (*default_bg, overlay_alpha)
-    )
+    bg_rgba = resolve_rgba_override(bg_color, bg_alpha, (*default_bg, overlay_alpha))
     fg_rgba = resolve_rgba_override(text_color, text_alpha, (*default_fg, 0.65))
 
     rounding: float = _theme_val("overlay_rounding", 0.6)
@@ -255,9 +253,7 @@ def add_inset_colorbar(
 
     # --- Pass 1: render a provisional colorbar to measure text extents ---
     prov_cax = ax.inset_axes((0.3, 0.3, width, height), zorder=5)
-    cb = fig.colorbar(
-        mappable, cax=prov_cax, orientation="horizontal", extend=extend
-    )
+    cb = fig.colorbar(mappable, cax=prov_cax, orientation="horizontal", extend=extend)
     if ticks is not None:
         cb.set_ticks(ticks)
     else:
@@ -267,9 +263,14 @@ def add_inset_colorbar(
     prov_cax.xaxis.set_major_formatter(FuncFormatter(_compact_formatter))
     prov_cax.xaxis.get_offset_text().set_visible(False)
     prov_cax.tick_params(
-        labelsize=fontsize, colors=fg_rgba,
-        top=True, bottom=False, labeltop=False, labelbottom=True,
-        direction="in", width=0.6,
+        labelsize=fontsize,
+        colors=fg_rgba,
+        top=True,
+        bottom=False,
+        labeltop=False,
+        labelbottom=True,
+        direction="in",
+        width=0.6,
     )
     if label:
         prov_cax.set_title(label, fontsize=fontsize, color=fg_rgba, pad=4)
@@ -316,9 +317,7 @@ def add_inset_colorbar(
     bar_x = bg_x + box_pad + overhang_left
     bar_y = bg_y + box_pad + overhang_bottom
     cax = ax.inset_axes((bar_x, bar_y, width, height), zorder=5)
-    cb = fig.colorbar(
-        mappable, cax=cax, orientation="horizontal", extend=extend
-    )
+    cb = fig.colorbar(mappable, cax=cax, orientation="horizontal", extend=extend)
     if ticks is not None:
         cb.set_ticks(ticks)
     else:
@@ -328,9 +327,14 @@ def add_inset_colorbar(
     cax.xaxis.set_major_formatter(FuncFormatter(_compact_formatter))
     cax.xaxis.get_offset_text().set_visible(False)
     cax.tick_params(
-        labelsize=fontsize, colors=fg_rgba,
-        top=True, bottom=False, labeltop=False, labelbottom=True,
-        direction="in", width=0.6,
+        labelsize=fontsize,
+        colors=fg_rgba,
+        top=True,
+        bottom=False,
+        labeltop=False,
+        labelbottom=True,
+        direction="in",
+        width=0.6,
     )
     if label:
         cax.set_title(label, fontsize=fontsize, color=fg_rgba, pad=4)
@@ -371,12 +375,14 @@ def add_inset_colorbar(
         # Temporarily put cax back at its original position to get a
         # stable tightbbox measurement (avoids feedback loops).
         ax_pos = ax.get_position()
-        cax.set_position((
-            ax_pos.x0 + _orig_bar_x * ax_pos.width,
-            ax_pos.y0 + _orig_bar_y * ax_pos.height,
-            width * ax_pos.width,
-            height * ax_pos.height,
-        ))
+        cax.set_position(
+            (
+                ax_pos.x0 + _orig_bar_x * ax_pos.width,
+                ax_pos.y0 + _orig_bar_y * ax_pos.height,
+                width * ax_pos.width,
+                height * ax_pos.height,
+            )
+        )
 
         tb = cax.get_tightbbox(r)
         if tb is None:
@@ -403,12 +409,14 @@ def add_inset_colorbar(
         target_cy = new_bg_y + new_h / 2
         new_bar_x = _orig_bar_x + (target_cx - content_cx)
         new_bar_y = _orig_bar_y + (target_cy - content_cy)
-        cax.set_position((
-            ax_pos.x0 + new_bar_x * ax_pos.width,
-            ax_pos.y0 + new_bar_y * ax_pos.height,
-            width * ax_pos.width,
-            height * ax_pos.height,
-        ))
+        cax.set_position(
+            (
+                ax_pos.x0 + new_bar_x * ax_pos.width,
+                ax_pos.y0 + new_bar_y * ax_pos.height,
+                width * ax_pos.width,
+                height * ax_pos.height,
+            )
+        )
 
     fig.canvas.mpl_connect("draw_event", _resize_bg)
 
@@ -452,7 +460,12 @@ def attach_colorbar(
         return
     if colorbar == "inset":
         add_inset_colorbar(
-            ax, mappable, label, extremes=extremes, variant=variant, ticks=ticks,
+            ax,
+            mappable,
+            label,
+            extremes=extremes,
+            variant=variant,
+            ticks=ticks,
         )
     else:
         cb = add_colorbar(fig, ax, mappable, label, extremes=extremes)

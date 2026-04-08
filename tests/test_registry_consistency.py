@@ -34,82 +34,189 @@ from pypic.units import Normalization
 # aliases (Bx, By, Bz, n_e, n_i, …) are intentionally excluded —
 # they're tested implicitly because the alias maps point at these names.
 
-CANONICAL_NAMES: frozenset[str] = frozenset({
-    # ── Electromagnetic ──────────────────────────────────────────────
-    "B1", "B2", "B3", "B0_1", "B0_2", "B0_3",
-    "E1", "E2", "E3",
-    "|B|", "|E|",
-    # ── Currents & velocities ────────────────────────────────────────
-    "J1", "J2", "J3", "|J|",
-    "V1", "V2", "V3", "|V|",
-    "Ve1", "Ve2", "Ve3", "|Ve|",
-    # Four-velocity (relativistic PIC)
-    "u1", "u2", "u3", "gamma_L",
-    # ── Densities & moments ──────────────────────────────────────────
-    "n_s0", "n_s1",
-    "rho_c", "rho_m",
-    # ── Pressure ─────────────────────────────────────────────────────
-    "P", "Pe", "Pi",
-    "P_par", "P_perp",
-    "P11", "P12", "P13", "P22", "P23", "P33",
-    "agyrotropy",
-    # ── Temperature ──────────────────────────────────────────────────
-    "Te", "Ti",
-    # ── Thermodynamic ────────────────────────────────────────────────
-    "h", "h_rel", "e_int",
-    "s", "s_e", "s_i", "s_gyro_e", "s_gyro_i",
-    "gamma_eos",
-    # ── Energy / flux ────────────────────────────────────────────────
-    "S1", "S2", "S3",
-    "EF1", "EF2", "EF3",
-    "EHF1", "EHF2", "EHF3",
-    "e_B", "e_E", "e_k", "e_th", "e_th_trace",
-    # ── Characteristic scales ────────────────────────────────────────
-    "d_e", "d_i", "r_e", "r_i",
-    "omega_pe", "omega_pi", "omega_ce", "omega_ci",
-    "lambda_D",
-    "v_A", "v_th_e", "v_th_i",
-    "c_s", "c_ia", "v_ms",
-    "M_A", "M_ms",
-    "beta", "beta_e", "beta_i",
-    "sigma",
-    # ── Differential operators ───────────────────────────────────────
-    "div_B", "div_E",
-    "curl_B1", "curl_B2", "curl_B3",
-    "vort1", "vort2", "vort3", "|vort|",
-    # ── Reconnection diagnostics ─────────────────────────────────────
-    "J_dot_E",
-    "E_prime_1", "E_prime_2", "E_prime_3",
-    "E_ideal_1", "E_ideal_2", "E_ideal_3",
-    "E_Hall_1", "E_Hall_2", "E_Hall_3",
-    "psi",
-    "firehose", "mirror",
-})
+CANONICAL_NAMES: frozenset[str] = frozenset(
+    {
+        # ── Electromagnetic ──────────────────────────────────────────────
+        "B1",
+        "B2",
+        "B3",
+        "B0_1",
+        "B0_2",
+        "B0_3",
+        "E1",
+        "E2",
+        "E3",
+        "|B|",
+        "|E|",
+        # ── Currents & velocities ────────────────────────────────────────
+        "J1",
+        "J2",
+        "J3",
+        "|J|",
+        "V1",
+        "V2",
+        "V3",
+        "|V|",
+        "Ve1",
+        "Ve2",
+        "Ve3",
+        "|Ve|",
+        # Four-velocity (relativistic PIC)
+        "u1",
+        "u2",
+        "u3",
+        "gamma_L",
+        # ── Densities & moments ──────────────────────────────────────────
+        "n_s0",
+        "n_s1",
+        "rho_c",
+        "rho_m",
+        # ── Pressure ─────────────────────────────────────────────────────
+        "P",
+        "Pe",
+        "Pi",
+        "P_par",
+        "P_perp",
+        "P11",
+        "P12",
+        "P13",
+        "P22",
+        "P23",
+        "P33",
+        "agyrotropy",
+        # ── Temperature ──────────────────────────────────────────────────
+        "Te",
+        "Ti",
+        # ── Thermodynamic ────────────────────────────────────────────────
+        "h",
+        "h_rel",
+        "e_int",
+        "s",
+        "s_e",
+        "s_i",
+        "s_gyro_e",
+        "s_gyro_i",
+        "gamma_eos",
+        # ── Energy / flux ────────────────────────────────────────────────
+        "S1",
+        "S2",
+        "S3",
+        "EF1",
+        "EF2",
+        "EF3",
+        "EHF1",
+        "EHF2",
+        "EHF3",
+        "e_B",
+        "e_E",
+        "e_k",
+        "e_th",
+        "e_th_trace",
+        # ── Characteristic scales ────────────────────────────────────────
+        "d_e",
+        "d_i",
+        "r_e",
+        "r_i",
+        "omega_pe",
+        "omega_pi",
+        "omega_ce",
+        "omega_ci",
+        "lambda_D",
+        "v_A",
+        "v_th_e",
+        "v_th_i",
+        "c_s",
+        "c_ia",
+        "v_ms",
+        "M_A",
+        "M_ms",
+        "beta",
+        "beta_e",
+        "beta_i",
+        "sigma",
+        # ── Differential operators ───────────────────────────────────────
+        "div_B",
+        "div_E",
+        "curl_B1",
+        "curl_B2",
+        "curl_B3",
+        "vort1",
+        "vort2",
+        "vort3",
+        "|vort|",
+        # ── Reconnection diagnostics ─────────────────────────────────────
+        "J_dot_E",
+        "E_prime_1",
+        "E_prime_2",
+        "E_prime_3",
+        "E_ideal_1",
+        "E_ideal_2",
+        "E_ideal_3",
+        "E_Hall_1",
+        "E_Hall_2",
+        "E_Hall_3",
+        "psi",
+        "firehose",
+        "mirror",
+    }
+)
 
 
 # Per-species name *prefixes* listed in SCHEMA.md (suffixed with _sN at
 # runtime). Each prefix is checked against synthetic species indices 0
 # and 5 so we exercise both the static `_REGISTRY` entries (s0/s1) and
 # the dynamic `_SPECIES_TEMPLATES` synthesis (s5).
-PER_SPECIES_PREFIXES: frozenset[str] = frozenset({
-    "n",         # n_s0, n_s5
-    "rho_c",     # rho_c_s0
-    "rho_m",     # rho_m_s0
-    "J1", "J2", "J3",
-    "V1", "V2", "V3", "|V|",
-    "P", "P11", "P22", "P33", "P12", "P13", "P23",
-    "T",
-    "EF1", "EF2", "EF3",
-    "KEF1", "KEF2", "KEF3",
-    "HF1", "HF2", "HF3",
-    "EHF1", "EHF2", "EHF3",
-    "q1", "q2", "q3",
-    "e_k", "e_th", "e_th_trace", "e_int",
-    "h",
-    "omega_p", "omega_c",
-    "d", "r", "v_th", "lambda_D",
-    "beta", "s", "s_gyro",
-})
+PER_SPECIES_PREFIXES: frozenset[str] = frozenset(
+    {
+        "n",  # n_s0, n_s5
+        "rho_c",  # rho_c_s0
+        "rho_m",  # rho_m_s0
+        "J1",
+        "J2",
+        "J3",
+        "V1",
+        "V2",
+        "V3",
+        "|V|",
+        "P",
+        "P11",
+        "P22",
+        "P33",
+        "P12",
+        "P13",
+        "P23",
+        "T",
+        "EF1",
+        "EF2",
+        "EF3",
+        "KEF1",
+        "KEF2",
+        "KEF3",
+        "HF1",
+        "HF2",
+        "HF3",
+        "EHF1",
+        "EHF2",
+        "EHF3",
+        "q1",
+        "q2",
+        "q3",
+        "e_k",
+        "e_th",
+        "e_th_trace",
+        "e_int",
+        "h",
+        "omega_p",
+        "omega_c",
+        "d",
+        "r",
+        "v_th",
+        "lambda_D",
+        "beta",
+        "s",
+        "s_gyro",
+    }
+)
 
 
 def _is_reachable(name: str) -> bool:
@@ -203,7 +310,8 @@ def test_all_field_info_entries_have_si_factor() -> None:
                 f"identity().si_factor() returned {factor}, expected 1.0"
             )
     assert not failures, _format_failures(
-        "_FIELD_INFO entries with broken SI conversion", failures,
+        "_FIELD_INFO entries with broken SI conversion",
+        failures,
     )
 
 
@@ -248,7 +356,8 @@ def test_all_species_template_dependencies_resolve() -> None:
         if unreachable:
             failures.append(f"{prefix!r} (as {name!r}) → {unreachable}")
     assert not failures, _format_failures(
-        "Species templates with broken dependencies", failures,
+        "Species templates with broken dependencies",
+        failures,
     )
 
 
@@ -287,5 +396,6 @@ def test_species_pattern_quantity_types_resolve() -> None:
         except ValueError:
             failures.append(f"{pattern.pattern!r} (quantity_type={qtype!r})")
     assert not failures, _format_failures(
-        "Species patterns with quantity_types lacking SI factors", failures,
+        "Species patterns with quantity_types lacking SI factors",
+        failures,
     )

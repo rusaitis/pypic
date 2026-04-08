@@ -161,13 +161,22 @@ def plot_scatter(
         else:
             if color is not None:
                 sc = ax.scatter(
-                    x, y, c=color, s=marker_size, alpha=alpha, cmap=cmap,
+                    x,
+                    y,
+                    c=color,
+                    s=marker_size,
+                    alpha=alpha,
+                    cmap=cmap,
                     edgecolors="none",
                 )
                 mappable = sc
             else:
                 ax.scatter(
-                    x, y, s=marker_size, alpha=alpha, edgecolors="none",
+                    x,
+                    y,
+                    s=marker_size,
+                    alpha=alpha,
+                    edgecolors="none",
                 )
 
         if log_x and not density:

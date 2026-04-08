@@ -201,8 +201,14 @@ def plot_field_slice(
             else field_label(info, unit_str=unit_str)
         )
         attach_colorbar(
-            fig, ax, mesh, cb_label, colorbar,
-            extremes=extremes, variant=colorbar_variant, ticks=colorbar_ticks,
+            fig,
+            ax,
+            mesh,
+            cb_label,
+            colorbar,
+            extremes=extremes,
+            variant=colorbar_variant,
+            ticks=colorbar_ticks,
         )
 
         cu_x, cu_y = resolve_coord_units(coord_units)
@@ -327,8 +333,10 @@ def add_contours(
     if labels:
         from pypic.plotting.styles import _theme_val
 
-        fs = label_fontsize if label_fontsize is not None else _theme_val(
-            "contour_label_fontsize", 7.0
+        fs = (
+            label_fontsize
+            if label_fontsize is not None
+            else _theme_val("contour_label_fontsize", 7.0)
         )
         ax.clabel(cs, inline=True, fontsize=fs)
 

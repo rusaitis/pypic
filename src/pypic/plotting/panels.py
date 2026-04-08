@@ -116,9 +116,7 @@ def plot_field_grid(
 
     # Scale overlay text for dense grids (harder to read at reduced size)
     label_scale = (
-        theme.panel_label_scale_sparse
-        if nrows == 1
-        else theme.panel_label_scale_dense
+        theme.panel_label_scale_sparse if nrows == 1 else theme.panel_label_scale_dense
     )
     label_fontsize = theme.font_overlay * label_scale
 
@@ -148,9 +146,7 @@ def plot_field_grid(
                 time=time,
             )
             if panel_labels:
-                add_label(
-                    axes_flat[i], chr(ord("a") + i), fontsize=label_fontsize
-                )
+                add_label(axes_flat[i], chr(ord("a") + i), fontsize=label_fontsize)
 
         # Hide unused axes
         for j in range(len(fields), len(axes_flat)):

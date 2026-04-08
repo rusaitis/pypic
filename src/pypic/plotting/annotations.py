@@ -68,13 +68,23 @@ def add_planet(
     sun_angle = _SUN_ANGLES[sun_direction]
 
     day = Wedge(
-        center, radius, sun_angle - 90, sun_angle + 90,
-        facecolor=day_color, edgecolor=edgecolor, linewidth=linewidth,
+        center,
+        radius,
+        sun_angle - 90,
+        sun_angle + 90,
+        facecolor=day_color,
+        edgecolor=edgecolor,
+        linewidth=linewidth,
         zorder=zorder,
     )
     night = Wedge(
-        center, radius, sun_angle + 90, sun_angle + 270,
-        facecolor=night_color, edgecolor=edgecolor, linewidth=linewidth,
+        center,
+        radius,
+        sun_angle + 90,
+        sun_angle + 270,
+        facecolor=night_color,
+        edgecolor=edgecolor,
+        linewidth=linewidth,
         zorder=zorder,
     )
     ax.add_patch(day)
@@ -148,9 +158,14 @@ def add_circle(
         color = grid_rgba[:3]  # RGB only, alpha controlled separately
 
     circle = Circle(
-        center, radius,
-        facecolor="none", edgecolor=color, alpha=alpha,
-        linestyle=linestyle, linewidth=linewidth, zorder=zorder,
+        center,
+        radius,
+        facecolor="none",
+        edgecolor=color,
+        alpha=alpha,
+        linestyle=linestyle,
+        linewidth=linewidth,
+        zorder=zorder,
     )
     ax.add_patch(circle)
 
@@ -169,9 +184,14 @@ def add_circle(
         tx = center[0] + radius * math.cos(angle_rad)
         ty = center[1] + radius * math.sin(angle_rad)
         ax.text(
-            tx, ty, label,
-            fontsize=fs, alpha=text_alpha, color=fg_color,
-            ha="center", va="center",
+            tx,
+            ty,
+            label,
+            fontsize=fs,
+            alpha=text_alpha,
+            color=fg_color,
+            ha="center",
+            va="center",
             rotation=label_position - 90,
             rotation_mode="anchor",
             zorder=zorder,

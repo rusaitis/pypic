@@ -596,7 +596,10 @@ def add_legend(
     if isinstance(entries, str):
         entries = [
             LegendEntry(
-                label=entries, color=color, linewidth=linewidth, alpha=entry_alpha,
+                label=entries,
+                color=color,
+                linewidth=linewidth,
+                alpha=entry_alpha,
             )
         ]
     elif isinstance(entries, LegendEntry):
@@ -660,5 +663,9 @@ def add_legend(
         legend_child = rows[0]  # type: ignore[assignment]  # HPacker is an OffsetBox
 
     return _make_overlay_box(
-        ax, legend_child, actual_loc, bg_rgba, variant=variant,
+        ax,
+        legend_child,
+        actual_loc,
+        bg_rgba,
+        variant=variant,
     )

@@ -144,14 +144,16 @@ def add_badge(
     )
 
     t = _resolve_theme(theme)
-    default_bg, default_border, default_text, default_track = (
-        _resolve_overlay_colors(t, variant)
+    default_bg, default_border, default_text, default_track = _resolve_overlay_colors(
+        t, variant
     )
 
     # Apply color overrides on top of theme/variant defaults
     bg_rgba = resolve_rgba_override(bg_color, bg_alpha, default_bg)
     text_rgba = resolve_rgba_override(
-        text_color, text_alpha, (*default_text[:3], text_alpha),
+        text_color,
+        text_alpha,
+        (*default_text[:3], text_alpha),
     )
     track_rgba = resolve_rgba_override(track_color, None, default_track)
 
@@ -176,18 +178,14 @@ def add_badge(
     if not status_text and progress is None:
         return
 
-    fs = (
-        fontsize
-        if fontsize is not None
-        else int(t.font_overlay * t.badge_font_scale)
-    )
+    fs = fontsize if fontsize is not None else int(t.font_overlay * t.badge_font_scale)
     text_h = _text_height(int(fs))
 
     # Padding/rounding shared with colorbar/label via _overlay_layout.
     # The badge uses pad_y as its single inner padding (it's symmetric).
     _, pad, rounding = _overlay_layout(t)
-    edge_margin = t.overlay_margin          # distance from window edge
-    margin = t.overlay_margin * 0.5        # inset for bar/text within box
+    edge_margin = t.overlay_margin  # distance from window edge
+    margin = t.overlay_margin * 0.5  # inset for bar/text within box
     bar_h = t.progress_bar_height * 0.002
     box_w = t.progress_bar_width * 0.0025  # 80.0 → 0.20
     box_h = (
@@ -210,9 +208,7 @@ def add_badge(
     if effective_width is None and status_text:
         text_px = _measure_text_width_px(plotter, status_text, int(fs))
         ww = (
-            float(plotter.window_size[0])
-            if hasattr(plotter, "window_size")
-            else 1600.0
+            float(plotter.window_size[0]) if hasattr(plotter, "window_size") else 1600.0
         )
         if ww > 0:
             text_w_norm = text_px / ww
@@ -225,12 +221,24 @@ def add_badge(
 
     # Background rounded rectangle with subtle border
     draw_rounded_rect(
-        plotter, origin_x, origin_y, box_w, box_h, rounding,
-        bg_rgba[:3], bg_rgba[3],
+        plotter,
+        origin_x,
+        origin_y,
+        box_w,
+        box_h,
+        rounding,
+        bg_rgba[:3],
+        bg_rgba[3],
     )
     draw_rounded_rect_border(
-        plotter, origin_x, origin_y, box_w, box_h, rounding,
-        default_border[:3], default_border[3],
+        plotter,
+        origin_x,
+        origin_y,
+        box_w,
+        box_h,
+        rounding,
+        default_border[:3],
+        default_border[3],
     )
 
     # Progress bar (track + fill)
@@ -243,8 +251,14 @@ def add_badge(
 
         # Track
         draw_rounded_rect(
-            plotter, bar_x, bar_y, bar_w_draw, bar_h, bar_r,
-            track_rgba[:3], track_rgba[3],
+            plotter,
+            bar_x,
+            bar_y,
+            bar_w_draw,
+            bar_h,
+            bar_r,
+            track_rgba[:3],
+            track_rgba[3],
         )
 
         # Fill
@@ -254,8 +268,14 @@ def add_badge(
             accent_rgb = to_rgb(bar_color) if bar_color else to_rgb(t.accent_color)
             fill_w = max(bar_h, bar_w_draw * fraction)
             draw_rounded_rect(
-                plotter, bar_x, bar_y, fill_w, bar_h, bar_r,
-                accent_rgb, bar_alpha,
+                plotter,
+                bar_x,
+                bar_y,
+                fill_w,
+                bar_h,
+                bar_r,
+                accent_rgb,
+                bar_alpha,
             )
 
     # Text label (left-aligned within the box)
@@ -263,7 +283,12 @@ def add_badge(
         text_x = origin_x + margin
         text_y = origin_y + box_h - pad - text_h
         _add_text_actor(
-            plotter, status_text, text_x, text_y, int(fs), text_rgba[:3],
+            plotter,
+            status_text,
+            text_x,
+            text_y,
+            int(fs),
+            text_rgba[:3],
             h_align="left",
         )
 
@@ -362,12 +387,15 @@ def add_label(
 
     t = _resolve_theme(theme)
     default_bg, default_border, default_text, _ = _resolve_overlay_colors(
-        t, variant,
+        t,
+        variant,
     )
 
     bg_rgba = resolve_rgba_override(bg_color, bg_alpha, default_bg)
     text_rgba = resolve_rgba_override(
-        text_color, text_alpha, (*default_text[:3], text_alpha),
+        text_color,
+        text_alpha,
+        (*default_text[:3], text_alpha),
     )
 
     is_phrase = " " in label
@@ -389,11 +417,7 @@ def add_label(
     # Measure rendered text width and compute the box width.
     # Single tokens get square padding so panel letters look like a chip.
     text_px = _measure_text_width_px(plotter, label, fontsize_int)
-    ww = (
-        float(plotter.window_size[0])
-        if hasattr(plotter, "window_size")
-        else 1600.0
-    )
+    ww = float(plotter.window_size[0]) if hasattr(plotter, "window_size") else 1600.0
     text_w_norm = text_px / ww if ww > 0 else 0.0
     if is_phrase:
         box_w = text_w_norm + 2 * pad_x
@@ -413,12 +437,24 @@ def add_label(
     # Background rounded rect with subtle border
     rounding = min(base_rounding, box_w * 0.2, box_h * 0.2)
     draw_rounded_rect(
-        plotter, origin_x, origin_y, box_w, box_h, rounding,
-        bg_rgba[:3], bg_rgba[3],
+        plotter,
+        origin_x,
+        origin_y,
+        box_w,
+        box_h,
+        rounding,
+        bg_rgba[:3],
+        bg_rgba[3],
     )
     draw_rounded_rect_border(
-        plotter, origin_x, origin_y, box_w, box_h, rounding,
-        default_border[:3], default_border[3],
+        plotter,
+        origin_x,
+        origin_y,
+        box_w,
+        box_h,
+        rounding,
+        default_border[:3],
+        default_border[3],
     )
 
     # Label text — horizontal anchor depends on ha; vertical is always
@@ -431,7 +467,12 @@ def add_label(
         text_x = origin_x + box_w * 0.5
     text_y = origin_y + (box_h - text_h) * 0.5
     _add_text_actor(
-        plotter, label, text_x, text_y, fontsize_int, text_rgba[:3],
+        plotter,
+        label,
+        text_x,
+        text_y,
+        fontsize_int,
+        text_rgba[:3],
         h_align=ha,
         bold=bold,
     )

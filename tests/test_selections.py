@@ -105,9 +105,7 @@ class TestPlaneSelection:
         result = PlaneSelection(normal=normal, index=0).apply(cartesian_3d)
         assert result.grid.surviving_axis_names == expected_names
 
-    def test_surviving_axis_names_spherical(
-        self, spherical_3d: FieldDataset
-    ) -> None:
+    def test_surviving_axis_names_spherical(self, spherical_3d: FieldDataset) -> None:
         result = PlaneSelection(normal="θ", index=1).apply(spherical_3d)
         assert result.grid.surviving_axis_names == ("r", "φ")
 

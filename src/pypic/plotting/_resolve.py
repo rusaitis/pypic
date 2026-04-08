@@ -131,9 +131,7 @@ def default_midplane(data: FieldDataset) -> PlaneSelection | None:
     return None
 
 
-def prepare_data(
-    data: FieldDataset, plane: PlaneSelection | None
-) -> FieldDataset:
+def prepare_data(data: FieldDataset, plane: PlaneSelection | None) -> FieldDataset:
     """Apply default midplane (if 3D) and validate for 2D plotting.
 
     Parameters

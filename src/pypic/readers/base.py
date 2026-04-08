@@ -536,9 +536,7 @@ class FieldDataset:
                     f"from {self._frame!r} to {target_frame!r}"
                 )
                 raise KeyError(msg)
-            transform = resolve_transform(
-                self._frame, target_frame, self._transforms
-            )
+            transform = resolve_transform(self._frame, target_frame, self._transforms)
         rotation = transform.rotation_matrix
         dim_names = list(self._grid.surviving_axis_names)
 
@@ -561,13 +559,15 @@ class FieldDataset:
             self.field_names()
         ):
             rp = rotate_pressure_tensor(
-                self[p11], self[p22], self[p33],
-                self[p12], self[p13], self[p23],
+                self[p11],
+                self[p22],
+                self[p33],
+                self[p12],
+                self[p13],
+                self[p23],
                 rotation,
             )
-            for name, arr in zip(
-                [p11, p22, p33, p12, p13, p23], rp, strict=True
-            ):
+            for name, arr in zip([p11, p22, p33, p12, p13, p23], rp, strict=True):
                 new_vars[name] = xr.DataArray(
                     data=arr, dims=dim_names, attrs=dict(self._ds[name].attrs)
                 )
@@ -607,7 +607,7 @@ class FieldDataset:
         # Determine axis permutation and sign from rotation matrix.
         # For each TARGET axis (row of R), find which SOURCE axis
         # it draws from (the single nonzero column) and its sign.
-        perm: list[int] = []   # perm[target_i] = source local index
+        perm: list[int] = []  # perm[target_i] = source local index
         signs: list[float] = []  # sign of the mapping
         for target_i in indices:
             row = rotation[target_i, :]
@@ -628,7 +628,8 @@ class FieldDataset:
                 for ax in flip_axes:
                     arr = np.flip(arr, axis=ax)
                 new_vars[name] = xr.DataArray(
-                    data=np.ascontiguousarray(arr), attrs=dict(da.attrs),
+                    data=np.ascontiguousarray(arr),
+                    attrs=dict(da.attrs),
                 )
 
         # Compute new origin, spacing, dimensions from permuted source
@@ -671,14 +672,13 @@ class FieldDataset:
         # Rebuild xr.Dataset with transformed coordinates
         new_dim_names = list(new_grid.surviving_axis_names)
         coord_arrays = new_grid.coordinate_arrays()
-        coords = {
-            new_dim_names[i]: coord_arrays[i]
-            for i in range(len(new_dim_names))
-        }
+        coords = {new_dim_names[i]: coord_arrays[i] for i in range(len(new_dim_names))}
         rebuilt_vars: dict[str, xr.DataArray] = {}
         for name, da in new_vars.items():
             rebuilt_vars[name] = xr.DataArray(
-                data=da.values, dims=new_dim_names, attrs=dict(da.attrs),
+                data=da.values,
+                dims=new_dim_names,
+                attrs=dict(da.attrs),
             )
         new_ds = xr.Dataset(rebuilt_vars, coords=coords)
 
@@ -1522,9 +1522,7 @@ def supports_selective_read(reader: SimulationReader) -> bool:
     return "fields" in sig.parameters
 
 
-def score_signals(
-    path: Path, signals: Sequence[tuple[str, float]]
-) -> float:
+def score_signals(path: Path, signals: Sequence[tuple[str, float]]) -> float:
     """Sum weights of glob patterns that match entries under *path*.
 
     For each ``(pattern, weight)`` pair the helper checks whether

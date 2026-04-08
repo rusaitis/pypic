@@ -75,8 +75,7 @@ def apply_physical_extent(
     if unit_factor is None:
         valid = ", ".join(sorted(LENGTH_UNITS))
         raise ValueError(
-            f"Unknown physical_extent_unit {physical_extent_unit!r}. "
-            f"Valid: {valid}"
+            f"Unknown physical_extent_unit {physical_extent_unit!r}. Valid: {valid}"
         )
 
     grid = config.grid
@@ -116,7 +115,10 @@ def apply_physical_extent(
                 log.warning(
                     "Scale mismatch: transform %r has scale=%.4f, but "
                     "physical_extent implies scale=%.4f (%.1f%% difference)",
-                    name, transform.scale, computed_scale, rel_diff * 100,
+                    name,
+                    transform.scale,
+                    computed_scale,
+                    rel_diff * 100,
                 )
 
     new_metadata = dict(config.metadata)

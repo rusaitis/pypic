@@ -62,8 +62,7 @@ def _seed_points(
     """Generate seed points at given L-shells in the noon-midnight plane."""
     seeds: list[tuple[float, float, float]] = []
     latitudes = (
-        [0.0] if n_per_shell == 1
-        else np.linspace(-25.0, 25.0, n_per_shell).tolist()
+        [0.0] if n_per_shell == 1 else np.linspace(-25.0, 25.0, n_per_shell).tolist()
     )
     for l_val in l_shells:
         for lat_deg in latitudes:
@@ -110,25 +109,39 @@ class _InteractiveTracer:
         # X-line and Y-line on the equatorial plane (z=0)
         x_line = pv.Line((x - L, y, 0), (x + L, y, 0))
         self.plotter.add_mesh(  # type: ignore[union-attr]
-            x_line, color=color, opacity=opacity, line_width=width,
-            name="_cross_x", render_lines_as_tubes=False,
+            x_line,
+            color=color,
+            opacity=opacity,
+            line_width=width,
+            name="_cross_x",
+            render_lines_as_tubes=False,
         )
         y_line = pv.Line((x, y - L, 0), (x, y + L, 0))
         self.plotter.add_mesh(  # type: ignore[union-attr]
-            y_line, color=color, opacity=opacity, line_width=width,
-            name="_cross_y", render_lines_as_tubes=False,
+            y_line,
+            color=color,
+            opacity=opacity,
+            line_width=width,
+            name="_cross_y",
+            render_lines_as_tubes=False,
         )
         # Vertical z-line from plane to sphere (visible when off-plane)
         if abs(z) > 0.01:
             z_line = pv.Line((x, y, 0), (x, y, z))
             self.plotter.add_mesh(  # type: ignore[union-attr]
-                z_line, color=color, opacity=opacity * 1.5, line_width=width,
-                name="_cross_z", render_lines_as_tubes=False,
+                z_line,
+                color=color,
+                opacity=opacity * 1.5,
+                line_width=width,
+                name="_cross_z",
+                render_lines_as_tubes=False,
             )
             # Small dot on the equatorial plane beneath the sphere
             dot = pv.Sphere(radius=0.06, center=(x, y, 0))
             self.plotter.add_mesh(  # type: ignore[union-attr]
-                dot, color=color, opacity=opacity,
+                dot,
+                color=color,
+                opacity=opacity,
                 name="_cross_dot",
             )
         else:
@@ -197,9 +210,12 @@ class _InteractiveTracer:
         """Trace a field line from the current seed (T key)."""
         try:
             fl = trace_field_line(
-                self.ds, self.seed,
-                step_size=0.1, max_steps=5000,
-                direction="both", null_threshold=1e-6,
+                self.ds,
+                self.seed,
+                step_size=0.1,
+                max_steps=5000,
+                direction="both",
+                null_threshold=1e-6,
                 interpolator=self.interp,
             )
         except ValueError as exc:
@@ -213,9 +229,13 @@ class _InteractiveTracer:
         fl = fl.with_scalars(**{"|B|": bmag})
 
         add_field_line(
-            self.plotter, fl,  # type: ignore[arg-type]
-            scalar="|B|", cmap=self.cmap,
-            clim=(0, self.vmax), signed=False, radius=0.06,
+            self.plotter,
+            fl,  # type: ignore[arg-type]
+            scalar="|B|",
+            cmap=self.cmap,
+            clim=(0, self.vmax),
+            signed=False,
+            radius=0.06,
         )
         self._trace_count += 1
         print(f"  Traced line #{self._trace_count} ({fl.n_points} points)")
@@ -237,7 +257,9 @@ def main() -> None:
         help=f"Theme name or number ({', '.join(numbered)})",
     )
     parser.add_argument(
-        "--save", action="store_true", help="Save screenshot instead of interactive",
+        "--save",
+        action="store_true",
+        help="Save screenshot instead of interactive",
     )
     args = parser.parse_args()
     key = names[int(args.theme) - 1] if args.theme.isdigit() else args.theme
@@ -259,8 +281,13 @@ def main() -> None:
     for seed in seeds:
         try:
             fl = trace_field_line(
-                ds, seed, step_size=0.1, max_steps=5000,
-                direction="both", null_threshold=1e-6, interpolator=interp,
+                ds,
+                seed,
+                step_size=0.1,
+                max_steps=5000,
+                direction="both",
+                null_threshold=1e-6,
+                interpolator=interp,
             )
             lines.append(fl)
         except ValueError:
@@ -289,10 +316,15 @@ def main() -> None:
     add_planet(plotter, radius=PLANET_RADIUS)
 
     add_field_lines(
-        plotter, colored_lines,
-        scalar="|B|", cmap=cmap,
-        clim=(0, vmax), signed=False, radius=0.05,
-        show_scalar_bar=True, scalar_bar_position="lower_right",
+        plotter,
+        colored_lines,
+        scalar="|B|",
+        cmap=cmap,
+        clim=(0, vmax),
+        signed=False,
+        radius=0.05,
+        show_scalar_bar=True,
+        scalar_bar_position="lower_right",
     )
 
     lim = 5.5
@@ -337,8 +369,8 @@ def main() -> None:
         plotter.add_key_event("Right", tracer.nudge_right)
         plotter.add_key_event("Up", tracer.nudge_up)
         plotter.add_key_event("Down", tracer.nudge_down)
-        plotter.add_key_event("Prior", tracer.nudge_z_up)    # Page Up
-        plotter.add_key_event("Next", tracer.nudge_z_down)   # Page Down
+        plotter.add_key_event("Prior", tracer.nudge_z_up)  # Page Up
+        plotter.add_key_event("Next", tracer.nudge_z_down)  # Page Down
 
         print(
             "Arrows: move seed | PgUp/PgDn: move z (3D mode) | "

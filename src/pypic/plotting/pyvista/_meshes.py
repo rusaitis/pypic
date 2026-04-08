@@ -117,7 +117,7 @@ def add_reference_circles(
     t = _resolve_theme(theme)
     gc = t.grid_color
     if color is None:
-        color = f"#{int(gc[0]*255):02x}{int(gc[1]*255):02x}{int(gc[2]*255):02x}"
+        color = f"#{int(gc[0] * 255):02x}{int(gc[1] * 255):02x}{int(gc[2] * 255):02x}"
     if opacity is None:
         opacity = min(1.0, gc[3] * 4)
     if width is None:
@@ -125,11 +125,13 @@ def add_reference_circles(
 
     theta = np.linspace(0, 2 * np.pi, n_points)
     for r in radii:
-        ring = np.column_stack([
-            center[0] + r * np.cos(theta),
-            center[1] + r * np.sin(theta),
-            np.full(n_points, z),
-        ])
+        ring = np.column_stack(
+            [
+                center[0] + r * np.cos(theta),
+                center[1] + r * np.sin(theta),
+                np.full(n_points, z),
+            ]
+        )
         actor = plotter.add_lines(ring, color=color, width=width)
         actor.GetProperty().SetOpacity(opacity)
 
@@ -162,9 +164,7 @@ def _auto_resolve(
     t = _resolve_theme(theme)
 
     # Colormap: shared dispatcher with the matplotlib backend.
-    _, resolved_cmap = resolve_field_colormap(
-        field, values, t, info=info, cmap=cmap
-    )
+    _, resolved_cmap = resolve_field_colormap(field, values, t, info=info, cmap=cmap)
 
     # Clim: user override > auto (symmetric for signed, (0, max) for positive)
     if clim is None:
@@ -279,8 +279,13 @@ def add_equatorial_surface(
     import pyvista as _pv
 
     values, resolved_cmap, clim, label = _auto_resolve(
-        data_2d, field, units=units, cmap=cmap, clim=clim,
-        scalar_label=scalar_label, theme=theme,
+        data_2d,
+        field,
+        units=units,
+        cmap=cmap,
+        clim=clim,
+        scalar_label=scalar_label,
+        theme=theme,
     )
 
     coords = data_2d.grid.coordinate_arrays()
@@ -328,9 +333,15 @@ def add_equatorial_surface(
         from pypic.plotting.pyvista._overlay import add_colorbar
 
         add_colorbar(
-            plotter, resolved_cmap, clim, label=label,
-            loc=scalar_bar_position, fmt=fmt,
-            extremes=extremes, ticks=colorbar_ticks, theme=theme,
+            plotter,
+            resolved_cmap,
+            clim,
+            label=label,
+            loc=scalar_bar_position,
+            fmt=fmt,
+            extremes=extremes,
+            ticks=colorbar_ticks,
+            theme=theme,
         )
 
     return actor
