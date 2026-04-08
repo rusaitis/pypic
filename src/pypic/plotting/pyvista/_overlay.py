@@ -483,11 +483,13 @@ def add_colorbar(
     *,
     loc: str = "lower right",
     extend: str = "both",
+    extremes: str | None = "semi",
     variant: str | None = None,
     width: float | None = None,
     height: float | None = None,
     fmt: str | None = None,
     n_labels: int = 5,
+    ticks: list[float] | None = None,
     theme: PlotTheme | None = None,
 ) -> None:
     r"""Draw a fully custom colorbar using VTK 2D primitives.
@@ -497,11 +499,9 @@ def add_colorbar(
     drawn in normalized viewport coordinates for pixel-perfect
     positioning independent of window size.
 
-    Parameters match :func:`pypic.plotting.add_colorbar` (matplotlib)
-    where possible: *label* replaces the former *title* to align with
-    matplotlib's colorbar ``label=`` convention, and *loc* replaces
-    the former *position* for parity with :func:`add_badge` and
-    :func:`add_label`.
+    Parameters match :func:`pypic.plotting.add_inset_colorbar` (matplotlib)
+    where possible: *label* aligns with matplotlib's colorbar ``label=``
+    convention, and *loc* matches :func:`add_badge` / :func:`add_label`.
 
     Parameters
     ----------
@@ -521,6 +521,12 @@ def add_colorbar(
     extend : str
         Triangular under/over indicators on the strip ends:
         ``"both"`` (default), ``"min"``, ``"max"``, or ``"neither"``.
+    extremes : "semi", "transparent", "darken", or None
+        How to style the extension triangles. ``"semi"`` (default)
+        renders them at ~30% opacity; ``"darken"`` multiplies the
+        endpoint RGB by 0.75; ``"transparent"`` skips the triangles
+        entirely; ``None`` uses the cmap's under/over colors at full
+        opacity. Mirrors :func:`pypic.plotting.add_inset_colorbar`.
     variant : str or None
         ``None`` uses the primary overlay colors; ``"alt"`` uses
         ``theme.overlay_alt_*`` (matching the matplotlib badge variant).
@@ -533,9 +539,13 @@ def add_colorbar(
         coordinates. ``None`` uses the default ``0.015``.
     fmt : str or None
         Number format for tick labels. ``None`` auto-selects from
-        the clim range.
+        the clim range. Ignored when *ticks* is provided.
     n_labels : int
-        Target number of tick labels.
+        Target number of tick labels. Ignored when *ticks* is provided.
+    ticks : list[float] or None
+        Explicit tick positions in data units. ``None`` (default)
+        auto-generates ticks from *clim* and *n_labels*. Mirrors the
+        ``ticks`` parameter on :func:`pypic.plotting.add_inset_colorbar`.
     theme : PlotTheme or None
         Theme for colors and fonts.
     """
@@ -556,6 +566,18 @@ def add_colorbar(
     extend_min = extend in ("both", "min")
     extend_max = extend in ("both", "max")
 
+    # Extremes mode: "transparent" hides the triangles entirely; the
+    # other modes are applied to the triangle color/opacity at draw time.
+    if extremes == "transparent":
+        extend_min = False
+        extend_max = False
+    if extremes == "semi":
+        tri_rgb_factor, tri_opacity = 1.0, 0.3
+    elif extremes == "darken":
+        tri_rgb_factor, tri_opacity = 0.75, 1.0
+    else:  # None or unrecognized → full opacity
+        tri_rgb_factor, tri_opacity = 1.0, 1.0
+
     bg_color, border_color, text_color, _ = _resolve_overlay_colors(t, variant)
 
     # Initial font sizes (scaled from theme via theme-defined multipliers)
@@ -568,10 +590,14 @@ def add_colorbar(
     strip_w = width if width is not None else 0.30 + tick_fs * 0.003
     strip_h = height if height is not None else 0.015
 
-    # Tick values and labels (need strip_w to know spacing budget)
+    # Tick values and labels (need strip_w to know spacing budget).
+    # User-supplied *ticks* override the auto-generated ones, mirroring
+    # add_inset_colorbar's ``ticks`` parameter on the matplotlib side.
     lo, hi = clim
     span = hi - lo
-    if span < 1e-12:
+    if ticks is not None:
+        tick_values = list(ticks)
+    elif span < 1e-12:
         tick_values = [lo]
     else:
         step = _nice_step(span, max(n_labels - 1, 1))
@@ -663,7 +689,9 @@ def add_colorbar(
     y_mid = strip_y + strip_h * 0.5
     # Triangles use cmap.get_under() / get_over() so that callers can
     # customize them via cmap.set_under() / set_over(). When not set,
-    # these return the gradient endpoints (cmap(0) / cmap(1)).
+    # these return the gradient endpoints (cmap(0) / cmap(1)). The
+    # *extremes* mode then scales the rgb (darken) and/or the opacity
+    # (semi) — same vocabulary as the matplotlib backend.
     if extend_min:
         under_rgba = cmap.get_under()
         _draw_triangle(
@@ -671,7 +699,12 @@ def add_colorbar(
             (gradient_x, strip_y),
             (gradient_x, strip_y + strip_h),
             (strip_x, y_mid),
-            (under_rgba[0], under_rgba[1], under_rgba[2]),
+            (
+                under_rgba[0] * tri_rgb_factor,
+                under_rgba[1] * tri_rgb_factor,
+                under_rgba[2] * tri_rgb_factor,
+            ),
+            tri_opacity,
         )
     if extend_max:
         over_rgba = cmap.get_over()
@@ -680,7 +713,12 @@ def add_colorbar(
             (gradient_x + gradient_w, strip_y + strip_h),
             (gradient_x + gradient_w, strip_y),
             (strip_x + strip_w, y_mid),
-            (over_rgba[0], over_rgba[1], over_rgba[2]),
+            (
+                over_rgba[0] * tri_rgb_factor,
+                over_rgba[1] * tri_rgb_factor,
+                over_rgba[2] * tri_rgb_factor,
+            ),
+            tri_opacity,
         )
 
     # Outline tracing the (optionally extended) strip, clockwise from top-left.

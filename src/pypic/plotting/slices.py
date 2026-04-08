@@ -247,7 +247,7 @@ def add_contours(
     alpha: float = 0.7,
     linestyles: str = "solid",
     labels: bool = False,
-    label_fontsize: float = 7,
+    label_fontsize: float | None = None,
     **kwargs: Any,  # noqa: ANN401 — contour passthrough
 ) -> object:
     r"""Add contour lines to existing axes from a scalar field.
@@ -279,8 +279,9 @@ def add_contours(
         Line style (``"solid"``, ``"dashed"``, ``"dotted"``).
     labels : bool
         Whether to add inline contour labels.
-    label_fontsize : float
+    label_fontsize : float or None
         Font size for contour labels (when *labels* is ``True``).
+        ``None`` (default) reads from ``theme.contour_label_fontsize``.
     **kwargs
         Passed to ``ax.contour()``.
 
@@ -320,6 +321,11 @@ def add_contours(
     )
 
     if labels:
-        ax.clabel(cs, inline=True, fontsize=label_fontsize)
+        from pypic.plotting.styles import _theme_val
+
+        fs = label_fontsize if label_fontsize is not None else _theme_val(
+            "contour_label_fontsize", 7.0
+        )
+        ax.clabel(cs, inline=True, fontsize=fs)
 
     return cs

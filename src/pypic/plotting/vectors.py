@@ -84,8 +84,10 @@ def _resolve_vector_colors(
         color_name = color_field
     else:
         color_values = magnitude
-        # Display name for in-plane magnitude (e.g. "|B_plane|")
-        color_name = f"|{field}_{{plane}}|"
+        # Internal name routed to resolve_colormap only — the leading "|"
+        # is what triggers positive-definite detection. Never displayed:
+        # the rendered colorbar label comes from `info` below.
+        color_name = f"|{field}|"
 
     info = data.field_info(color_field if color_field is not None else f"|{field}|")
     cmap_name = resolve_colormap(

@@ -112,10 +112,15 @@ def plot_field_grid(
 
     nrows = math.ceil(len(fields) / ncols)
     if figsize is None:
-        figsize = (4.5 * ncols, 4.0 * nrows)
+        figsize = (theme.figsize_per_col * ncols, theme.figsize_per_row * nrows)
 
     # Scale overlay text for dense grids (harder to read at reduced size)
-    label_fontsize = theme.font_overlay * (1.55 if nrows == 1 else 1.78)
+    label_scale = (
+        theme.panel_label_scale_sparse
+        if nrows == 1
+        else theme.panel_label_scale_dense
+    )
+    label_fontsize = theme.font_overlay * label_scale
 
     with use_theme(theme):
         fig, axes_arr = plt.subplots(nrows, ncols, figsize=figsize, squeeze=False)

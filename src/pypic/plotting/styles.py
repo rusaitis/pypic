@@ -152,6 +152,15 @@ class PlotTheme:
     axis_triad_font_scale: float = 3.0
     grid_label_font_scale: float = 2.8
 
+    # Multi-panel grid layout
+    figsize_per_col: float = 4.5
+    figsize_per_row: float = 4.0
+    panel_label_scale_sparse: float = 1.55  # single-row grids — labels can stay small
+    panel_label_scale_dense: float = 1.78   # multi-row grids — bump labels for legibility
+
+    # Contour overlay
+    contour_label_fontsize: float = 7.0
+
     # Plot area
     plot_rounding: float = 0.0
 
@@ -183,6 +192,9 @@ class PlotTheme:
         >>> big = t.customize(font_title=16.0)
         >>> big.font_title
         16.0
+        >>> wide = t.customize(figsize_per_col=6.0)
+        >>> wide.figsize_per_col
+        6.0
         """
         import copy
         import dataclasses

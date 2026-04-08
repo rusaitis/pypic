@@ -200,6 +200,8 @@ def add_equatorial_surface(
     show_scalar_bar: bool = True,
     scalar_bar_position: str = "lower_right",
     fmt: str | None = None,
+    extremes: str | None = "semi",
+    colorbar_ticks: list[float] | None = None,
     theme: PlotTheme | None = None,
 ) -> pv.Actor:
     r"""Add a scalar surface from a 2D FieldDataset slice.
@@ -257,6 +259,15 @@ def add_equatorial_surface(
     fmt : str or None
         Number format for scalar bar labels. ``None`` auto-selects
         (``"%.0f"`` for integer-scale values, ``"%.1f"`` otherwise).
+    extremes : "semi", "transparent", "darken", or None
+        How to style the colorbar's under/over extension triangles.
+        ``"semi"`` (default) renders them at reduced opacity, mirroring
+        :func:`pypic.plotting.plot_field_slice`. ``None`` keeps full
+        opacity.
+    colorbar_ticks : list[float] or None
+        Explicit colorbar tick positions. ``None`` auto-generates from
+        *clim*. Mirrors the ``colorbar_ticks`` parameter on
+        :func:`pypic.plotting.plot_field_slice`.
     theme : PlotTheme or None
         Theme for colors and fonts.
 
@@ -318,7 +329,8 @@ def add_equatorial_surface(
 
         add_colorbar(
             plotter, resolved_cmap, clim, label=label,
-            loc=scalar_bar_position, fmt=fmt, theme=theme,
+            loc=scalar_bar_position, fmt=fmt,
+            extremes=extremes, ticks=colorbar_ticks, theme=theme,
         )
 
     return actor
