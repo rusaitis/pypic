@@ -25,10 +25,13 @@ from pypic.derived import (
     isotropic_pressure,
     j_dot_e,
     kinetic_energy_density,
+    lorentz_factor,
+    lorentz_factor_from_four_velocity,
     magnetic_energy_density,
     magnetic_field_magnitude,
     magnetic_flux_function,
     magnetic_shear_angle,
+    magnetization,
     magnetosonic_mach,
     magnetosonic_speed,
     mirror_parameter,
@@ -1206,3 +1209,158 @@ class TestDebyeLengthScaling:
             expected_factor * base,
             rtol=1e-15,
         )
+
+
+class TestLorentzFactor:
+    def test_stationary(self):
+        np.testing.assert_allclose(
+            lorentz_factor(np.array([0.0]), c=1.0), 1.0, rtol=1e-15
+        )
+
+    def test_known_value(self):
+        # v = 0.6c → γ = 1/√(1 - 0.36) = 1/√0.64 = 1/0.8 = 1.25
+        np.testing.assert_allclose(
+            lorentz_factor(np.array([0.6]), c=1.0), 1.25, rtol=1e-15
+        )
+
+    def test_nonunit_c(self):
+        # v = 6, c = 10 → v/c = 0.6 → γ = 1.25
+        np.testing.assert_allclose(
+            lorentz_factor(np.array([6.0]), c=10.0), 1.25, rtol=1e-15
+        )
+
+    def test_four_velocity_stationary(self):
+        np.testing.assert_allclose(
+            lorentz_factor_from_four_velocity(np.array([0.0]), c=1.0),
+            1.0,
+            rtol=1e-15,
+        )
+
+    def test_three_and_four_velocity_agree(self):
+        v = np.array([0.6, 0.8, 0.9, 0.99])
+        gamma_from_v = lorentz_factor(v, c=1.0)
+        u = gamma_from_v * v  # four-velocity = γv
+        gamma_from_u = lorentz_factor_from_four_velocity(u, c=1.0)
+        np.testing.assert_allclose(gamma_from_v, gamma_from_u, rtol=1e-14)
+
+
+class TestMagnetization:
+    def test_zero_field(self):
+        np.testing.assert_allclose(
+            magnetization(np.array([0.0]), np.array([1.0]), c=1.0),
+            0.0,
+            atol=1e-15,
+        )
+
+    def test_unit_sigma(self):
+        # B² = ρ c² → σ = 1
+        np.testing.assert_allclose(
+            magnetization(np.array([1.0]), np.array([1.0]), c=1.0),
+            1.0,
+            rtol=1e-15,
+        )
+
+    def test_nonunit_c(self):
+        # B=2, ρ=1, c=2 → σ = 4/(1·4) = 1
+        np.testing.assert_allclose(
+            magnetization(np.array([2.0]), np.array([1.0]), c=2.0),
+            1.0,
+            rtol=1e-15,
+        )
+
+
+class TestRelativisticLimits:
+    """Non-relativistic limit (v ≪ c) recovers classical formulas."""
+
+    def test_kinetic_energy_density_nonrel_limit(self):
+        # For v ≪ c: (γ-1)ρc² ≈ ½ρv² (Taylor: γ ≈ 1 + v²/(2c²))
+        rho = np.array([2.0])
+        v = np.array([0.001])  # v ≪ c
+        c = 1.0
+        gamma = lorentz_factor(v, c)
+        rel = kinetic_energy_density(rho, v, lorentz_factor=gamma, c=c)
+        nonrel = kinetic_energy_density(rho, v)
+        np.testing.assert_allclose(rel, nonrel, rtol=1e-5)
+
+    def test_alfven_speed_nonrel_limit(self):
+        # σ ≪ 1: rel v_A ≈ B/√ρ
+        b = np.array([0.01])
+        rho = np.array([1.0])
+        rel = alfven_speed(b, rho, c=1.0)
+        nonrel = alfven_speed(b, rho)
+        np.testing.assert_allclose(rel, nonrel, rtol=1e-3)
+
+    def test_alfven_speed_approaches_c(self):
+        # σ → ∞: v_A → c
+        b = np.array([1e6])
+        rho = np.array([1.0])
+        c = 1.0
+        v_a = alfven_speed(b, rho, c=c)
+        np.testing.assert_allclose(v_a, c, rtol=1e-6)
+
+    def test_magnetosonic_less_than_c(self):
+        # Relativistic v_ms is always < c
+        v_a = np.array([0.8])
+        c_s = np.array([0.7])
+        c = 1.0
+        v_ms = magnetosonic_speed(v_a, c_s, c=c)
+        assert float(v_ms[0]) < c
+
+    def test_magnetosonic_nonrel_limit(self):
+        # v_A, c_s ≪ c: correction term is negligible
+        v_a = np.array([0.001])
+        c_s = np.array([0.001])
+        rel = magnetosonic_speed(v_a, c_s, c=1.0)
+        nonrel = magnetosonic_speed(v_a, c_s)
+        np.testing.assert_allclose(rel, nonrel, rtol=1e-5)
+
+    def test_sound_speed_nonrel_limit(self):
+        # P ≪ ρc²: h_rel ≈ c², so rel c_s ≈ √(γP/ρ)
+        p = np.array([1e-6])
+        rho = np.array([1.0])
+        rel = sound_speed(p, rho, c=1.0)
+        nonrel = sound_speed(p, rho)
+        np.testing.assert_allclose(rel, nonrel, rtol=1e-3)
+
+    def test_gyrofrequency_with_lorentz_factor(self):
+        b = np.array([2.0])
+        gamma = np.array([2.0])
+        omega = gyrofrequency(b, charge=1.0, mass=1.0)
+        omega_rel = gyrofrequency(b, charge=1.0, mass=1.0, lorentz_factor=gamma)
+        np.testing.assert_allclose(omega_rel, omega / 2.0, rtol=1e-15)
+
+    def test_plasma_frequency_with_lorentz_factor(self):
+        n = np.array([4.0])
+        gamma = np.array([4.0])
+        omega = plasma_frequency(n, charge=1.0, mass=1.0)
+        omega_rel = plasma_frequency(n, charge=1.0, mass=1.0, lorentz_factor=gamma)
+        # ω_rel = ω / √γ = ω / 2
+        np.testing.assert_allclose(omega_rel, omega / 2.0, rtol=1e-15)
+
+    def test_thermal_speed_capped_at_c(self):
+        # Very hot plasma: v_th → c
+        t_hot = np.array([1e10])
+        v_rel = thermal_speed(t_hot, mass=1.0, c=1.0)
+        assert float(v_rel[0]) < 1.0
+
+    def test_thermal_speed_nonrel_limit(self):
+        t_cold = np.array([1e-6])
+        rel = thermal_speed(t_cold, mass=1.0, c=1.0)
+        nonrel = thermal_speed(t_cold, mass=1.0)
+        np.testing.assert_allclose(rel, nonrel, rtol=1e-5)
+
+    def test_gyroradius_with_lorentz_factor(self):
+        t = np.array([1.0])
+        b = np.array([1.0])
+        gamma = np.array([3.0])
+        r = gyroradius(t, b, charge=1.0, mass=1.0)
+        r_rel = gyroradius(t, b, charge=1.0, mass=1.0, lorentz_factor=gamma)
+        np.testing.assert_allclose(r_rel, 3.0 * r, rtol=1e-15)
+
+    def test_skin_depth_with_lorentz_factor(self):
+        n = np.array([1.0])
+        gamma = np.array([4.0])
+        d = skin_depth(n, charge=1.0, mass=1.0)
+        d_rel = skin_depth(n, charge=1.0, mass=1.0, lorentz_factor=gamma)
+        # d_rel = c / (ω_p/√γ) = d·√γ = d·2
+        np.testing.assert_allclose(d_rel, 2.0 * d, rtol=1e-15)

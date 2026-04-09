@@ -194,12 +194,20 @@ def plasma_beta(
 def alfven_speed(
     b: FloatArray,
     rho_m: FloatArray,
+    *,
+    c: float | None = None,
 ) -> FloatArray:
     r"""Compute the Alfvén speed.
 
     $$v_A = \frac{B}{\sqrt{\mu_0 \rho_m}}$$
 
     In normalized MHD units where $\mu_0 = 1$: $v_A = B / \sqrt{\rho_m}$.
+
+    When *c* is provided, uses the relativistic form:
+    $v_A = c\sqrt{\sigma / (1 + \sigma)}$ where
+    $\sigma = B^2 / (\rho_m c^2)$. This approaches $c$ as
+    $\sigma \to \infty$ and recovers $B/\sqrt{\rho_m}$ for
+    $\sigma \ll 1$.
 
     Parameters
     ----------
@@ -208,6 +216,8 @@ def alfven_speed(
     rho_m : NDArray
         Mass density in normalized units. Must be non-negative;
         negative values produce NaN (via ``sqrt``).
+    c : float or None
+        Speed of light. When provided, the relativistic formula is used.
 
     Returns
     -------
@@ -220,6 +230,9 @@ def alfven_speed(
     >>> alfven_speed(np.array([1.0]), np.array([4.0]))
     array([0.5])
     """
+    if c is not None:
+        sigma = _safe_divide(b**2, rho_m * c**2)
+        return c * np.sqrt(_safe_divide(sigma, 1.0 + sigma))
     return _safe_divide(b, np.sqrt(rho_m))
 
 
@@ -282,10 +295,17 @@ def electric_energy_density(
 def kinetic_energy_density(
     rho_m: FloatArray,
     v: FloatArray,
+    *,
+    lorentz_factor: FloatArray | None = None,
+    c: float = 1.0,
 ) -> FloatArray:
     r"""Compute the kinetic energy density.
 
     $$e_k = \frac{1}{2} \rho_m V^2$$
+
+    When *lorentz_factor* ($\gamma$) is provided, uses the relativistic
+    form: $e_k = (\gamma - 1)\,\rho_m\,c^2$, which recovers
+    $\frac{1}{2}\rho_m V^2$ for $V \ll c$.
 
     Parameters
     ----------
@@ -293,6 +313,11 @@ def kinetic_energy_density(
         Mass density in normalized units.
     v : NDArray
         Bulk velocity magnitude in normalized units.
+    lorentz_factor : NDArray or None
+        Bulk Lorentz factor $\gamma$. When provided, the relativistic
+        formula is used and *v* is ignored.
+    c : float
+        Speed of light in normalized units (only used with *lorentz_factor*).
 
     Returns
     -------
@@ -305,6 +330,8 @@ def kinetic_energy_density(
     >>> kinetic_energy_density(np.array([2.0]), np.array([3.0]))
     array([9.])
     """
+    if lorentz_factor is not None:
+        return (lorentz_factor - 1.0) * rho_m * c**2
     return 0.5 * rho_m * v**2
 
 
@@ -650,6 +677,8 @@ def temperature(
 def thermal_speed(
     temperature: FloatArray,
     mass: float,
+    *,
+    c: float | None = None,
 ) -> FloatArray:
     r"""Compute the thermal speed (NRL convention).
 
@@ -658,12 +687,17 @@ def thermal_speed(
     This is the 1D Maxwellian standard deviation $\sigma$ where
     $f(v_x) \propto \exp(-v_x^2 / (2\sigma^2))$ with $\sigma^2 = T/m$.
 
+    When *c* is provided, caps the result at $c$:
+    $v_{th,rel} = v_{th} / \sqrt{1 + v_{th}^2 / c^2}$.
+
     Parameters
     ----------
     temperature : NDArray
         Temperature in energy units (normalized).
     mass : float
         Particle mass in normalized units.
+    c : float or None
+        Speed of light. When provided, the relativistic cap is applied.
 
     Returns
     -------
@@ -676,19 +710,27 @@ def thermal_speed(
     >>> thermal_speed(np.array([4.0]), mass=1.0)
     array([2.])
     """
-    return np.sqrt(temperature / mass)  # type: ignore[no-any-return]
+    v_th: FloatArray = np.sqrt(temperature / mass)
+    if c is not None:
+        return v_th / np.sqrt(1.0 + v_th**2 / c**2)  # type: ignore[no-any-return]
+    return v_th
 
 
 def gyrofrequency(
     b: FloatArray,
     charge: float,
     mass: float,
+    *,
+    lorentz_factor: FloatArray | None = None,
 ) -> FloatArray:
     r"""Compute the cyclotron (gyro) frequency.
 
     $$\omega_c = \frac{|q| B}{m}$$
 
     Positive by convention (magnitude of charge is used).
+
+    When *lorentz_factor* ($\gamma$) is provided, uses the relativistic
+    form: $\omega_c = |q| B / (\gamma m)$.
 
     Parameters
     ----------
@@ -698,6 +740,9 @@ def gyrofrequency(
         Particle charge in normalized units (sign is stripped).
     mass : float
         Particle mass in normalized units.
+    lorentz_factor : NDArray or None
+        Lorentz factor (thermal or bulk). When provided, particles
+        gyrate slower by the factor $1/\gamma$.
 
     Returns
     -------
@@ -710,19 +755,27 @@ def gyrofrequency(
     >>> gyrofrequency(np.array([2.0]), charge=-1.0, mass=1.0)
     array([2.])
     """
-    return np.abs(charge) * b / mass  # type: ignore[no-any-return]
+    omega = np.abs(charge) * b / mass
+    if lorentz_factor is not None:
+        return _safe_divide(omega, lorentz_factor)
+    return omega  # type: ignore[no-any-return]
 
 
 def plasma_frequency(
     density: FloatArray,
     charge: float,
     mass: float,
+    *,
+    lorentz_factor: FloatArray | None = None,
 ) -> FloatArray:
     r"""Compute the plasma frequency.
 
     $$\omega_p = \sqrt{\frac{n q^2}{m}}$$
 
     In SI: $\omega_p = \sqrt{n e^2 / (\epsilon_0 m)}$.
+
+    When *lorentz_factor* ($\gamma$) is provided, uses the relativistic
+    form: $\omega_{p,rel} = \omega_p / \sqrt{\gamma}$.
 
     Parameters
     ----------
@@ -732,6 +785,9 @@ def plasma_frequency(
         Particle charge in normalized units.
     mass : float
         Particle mass in normalized units.
+    lorentz_factor : NDArray or None
+        Mean thermal Lorentz factor $\langle\gamma\rangle$. When
+        provided, reduces the effective plasma frequency.
 
     Returns
     -------
@@ -744,7 +800,10 @@ def plasma_frequency(
     >>> plasma_frequency(np.array([1.0]), charge=1.0, mass=1.0)
     array([1.])
     """
-    return np.sqrt(density * charge**2 / mass)  # type: ignore[no-any-return]
+    omega: FloatArray = np.sqrt(density * charge**2 / mass)
+    if lorentz_factor is not None:
+        return omega / np.sqrt(lorentz_factor)
+    return omega
 
 
 def skin_depth(
@@ -752,10 +811,15 @@ def skin_depth(
     charge: float,
     mass: float,
     c: float = 1.0,
+    *,
+    lorentz_factor: FloatArray | None = None,
 ) -> FloatArray:
     r"""Compute the skin depth (inertial length).
 
     $$d = \frac{c}{\omega_p}$$
+
+    When *lorentz_factor* is provided, uses the relativistically
+    corrected plasma frequency: $d_{rel} = c / \omega_{p,rel}$.
 
     Parameters
     ----------
@@ -767,6 +831,9 @@ def skin_depth(
         Particle mass in normalized units.
     c : float
         Speed of light in normalized units. Default is 1.0.
+    lorentz_factor : NDArray or None
+        Mean thermal Lorentz factor. Passed through to
+        :func:`plasma_frequency`.
 
     Returns
     -------
@@ -779,7 +846,9 @@ def skin_depth(
     >>> skin_depth(np.array([1.0]), charge=1.0, mass=1.0)
     array([1.])
     """
-    return c / plasma_frequency(density, charge, mass)
+    return c / plasma_frequency(
+        density, charge, mass, lorentz_factor=lorentz_factor
+    )
 
 
 def gyroradius(
@@ -787,12 +856,18 @@ def gyroradius(
     b: FloatArray,
     charge: float,
     mass: float,
+    *,
+    lorentz_factor: FloatArray | None = None,
 ) -> FloatArray:
     r"""Compute the thermal gyroradius (Larmor radius).
 
     $$r = \frac{v_{th}}{\omega_c} = \frac{\sqrt{m T}}{|q| B}$$
 
     Uses the NRL thermal speed convention $v_{th} = \sqrt{T/m}$.
+
+    When *lorentz_factor* ($\gamma$) is provided, the relativistic
+    cyclotron frequency $\omega_c / \gamma$ is used, giving
+    $r_{rel} = \gamma \cdot r$.
 
     Parameters
     ----------
@@ -804,6 +879,9 @@ def gyroradius(
         Particle charge in normalized units (sign is stripped).
     mass : float
         Particle mass in normalized units.
+    lorentz_factor : NDArray or None
+        Lorentz factor (thermal or bulk). When provided, the gyroradius
+        increases by a factor of $\gamma$.
 
     Returns
     -------
@@ -816,7 +894,10 @@ def gyroradius(
     >>> gyroradius(np.array([1.0]), np.array([1.0]), charge=1.0, mass=1.0)
     array([1.])
     """
-    return _safe_divide(np.sqrt(mass * temperature), np.abs(charge) * b)
+    r = _safe_divide(np.sqrt(mass * temperature), np.abs(charge) * b)
+    if lorentz_factor is not None:
+        return r * lorentz_factor
+    return r
 
 
 def debye_length(
@@ -857,10 +938,16 @@ def sound_speed(
     pressure: FloatArray,
     rho_m: FloatArray,
     gamma: float = 5.0 / 3.0,
+    *,
+    c: float | None = None,
 ) -> FloatArray:
     r"""Compute the MHD sound speed.
 
     $$c_s = \sqrt{\frac{\gamma P}{\rho_m}}$$
+
+    When *c* is provided, uses the relativistic form:
+    $c_s = c\sqrt{\gamma P / (\rho_m h_{rel})}$ where
+    $h_{rel} = c^2 + \gamma P / ((\gamma-1)\rho_m)$.
 
     Parameters
     ----------
@@ -870,6 +957,8 @@ def sound_speed(
         Mass density in normalized units.
     gamma : float
         Adiabatic index. Default is $5/3$.
+    c : float or None
+        Speed of light. When provided, the relativistic formula is used.
 
     Returns
     -------
@@ -882,6 +971,9 @@ def sound_speed(
     >>> sound_speed(np.array([3.0]), np.array([5.0]))
     array([1.])
     """
+    if c is not None:
+        h_rel = relativistic_enthalpy(pressure, rho_m, gamma, c)
+        return c * np.sqrt(_safe_divide(gamma * pressure, rho_m * h_rel))
     return np.sqrt(_safe_divide(gamma * pressure, rho_m))
 
 
@@ -929,6 +1021,8 @@ def ion_acoustic_speed(
 def magnetosonic_speed(
     v_a: FloatArray,
     c_s: FloatArray,
+    *,
+    c: float | None = None,
 ) -> FloatArray:
     r"""Compute the fast magnetosonic speed (perpendicular propagation).
 
@@ -936,12 +1030,19 @@ def magnetosonic_speed(
 
     This is the maximum fast-mode phase speed at $\theta = 90°$.
 
+    When *c* is provided, uses the relativistic composition:
+    $v_{ms}^2 = v_A^2 + c_s^2 - v_A^2 c_s^2 / c^2$, which
+    guarantees $v_{ms} < c$.
+
     Parameters
     ----------
     v_a : NDArray
         Alfvén speed in normalized units.
     c_s : NDArray
         Sound speed in normalized units.
+    c : float or None
+        Speed of light. When provided, the relativistic composition
+        formula is used.
 
     Returns
     -------
@@ -954,6 +1055,10 @@ def magnetosonic_speed(
     >>> magnetosonic_speed(np.array([3.0]), np.array([4.0]))
     array([5.])
     """
+    if c is not None:
+        return np.sqrt(
+            v_a**2 + c_s**2 - v_a**2 * c_s**2 / c**2
+        )
     return np.sqrt(v_a**2 + c_s**2)
 
 
@@ -1924,6 +2029,113 @@ def magnetic_flux_function(
     return -np.cumsum(b2 * dx, axis=0)
 
 
+def lorentz_factor(
+    v: FloatArray,
+    c: float = 1.0,
+) -> FloatArray:
+    r"""Compute the bulk Lorentz factor from three-velocity magnitude.
+
+    $$\gamma = \frac{1}{\sqrt{1 - v^2/c^2}}$$
+
+    Bounded $[1, \infty)$. Suffers from catastrophic cancellation when
+    $v \approx c$; prefer :func:`lorentz_factor_from_four_velocity` when
+    four-velocity data is available.
+
+    Parameters
+    ----------
+    v : NDArray
+        Bulk velocity magnitude $|\mathbf{V}|$ in normalized units.
+    c : float
+        Speed of light in normalized units. Default is 1.0.
+
+    Returns
+    -------
+    NDArray
+        Lorentz factor $\gamma \geq 1$.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> lorentz_factor(np.array([0.0]), c=1.0)
+    array([1.])
+    >>> np.testing.assert_allclose(
+    ...     lorentz_factor(np.array([0.6]), c=1.0), 1.25, rtol=1e-15)
+    """
+    return 1.0 / np.sqrt(1.0 - v**2 / c**2)  # type: ignore[no-any-return]
+
+
+def lorentz_factor_from_four_velocity(
+    u: FloatArray,
+    c: float = 1.0,
+) -> FloatArray:
+    r"""Compute the Lorentz factor from four-velocity magnitude.
+
+    $$\gamma = \sqrt{1 + u^2/c^2}$$
+
+    where $u = \gamma v$ is the spatial part of the four-velocity.
+    Numerically stable at all speeds — no catastrophic cancellation
+    near $v \approx c$. Preferred when four-velocity data is available
+    (TRISTAN-MP, Zeltron, OSIRIS).
+
+    Parameters
+    ----------
+    u : NDArray
+        Four-velocity magnitude $|\mathbf{u}| = \gamma |\mathbf{v}|$.
+    c : float
+        Speed of light in normalized units. Default is 1.0.
+
+    Returns
+    -------
+    NDArray
+        Lorentz factor $\gamma \geq 1$.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> lorentz_factor_from_four_velocity(np.array([0.0]), c=1.0)
+    array([1.])
+    """
+    return np.sqrt(1.0 + u**2 / c**2)  # type: ignore[no-any-return]
+
+
+def magnetization(
+    b: FloatArray,
+    rho_m: FloatArray,
+    c: float = 1.0,
+) -> FloatArray:
+    r"""Compute the magnetization parameter.
+
+    $$\sigma = \frac{B^2}{\rho_m c^2}$$
+
+    Measures the ratio of magnetic energy density to rest-mass energy
+    density. $\sigma \ll 1$: matter-dominated (non-relativistic MHD).
+    $\sigma \gg 1$: magnetically dominated (pulsar winds, jets).
+
+    Parameters
+    ----------
+    b : NDArray
+        Magnetic field magnitude in normalized units.
+    rho_m : NDArray
+        Mass density in normalized units.
+    c : float
+        Speed of light in normalized units. Default is 1.0.
+
+    Returns
+    -------
+    NDArray
+        Magnetization parameter $\sigma$ (dimensionless).
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> magnetization(np.array([1.0]), np.array([1.0]), c=1.0)
+    array([1.])
+    >>> magnetization(np.array([2.0]), np.array([1.0]), c=2.0)
+    array([1.])
+    """
+    return _safe_divide(b**2, rho_m * c**2)
+
+
 __all__ = [
     "agyrotropy",
     "alfven_mach",
@@ -1950,10 +2162,13 @@ __all__ = [
     "j_dot_e",
     "kinetic_energy_density",
     "kinetic_energy_flux_component",
+    "lorentz_factor",
+    "lorentz_factor_from_four_velocity",
     "magnetic_energy_density",
     "magnetic_field_magnitude",
     "magnetic_flux_function",
     "magnetic_shear_angle",
+    "magnetization",
     "magnetosonic_mach",
     "magnetosonic_speed",
     "mirror_parameter",

@@ -64,6 +64,7 @@ class QuantityType(StrEnum):
     B_FIELD = "b_field"
     E_FIELD = "e_field"
     VELOCITY = "velocity"
+    FOUR_VELOCITY = "four_velocity"
     LENGTH = "length"
     TIME = "time"
     DENSITY = "density"
@@ -88,6 +89,7 @@ _QUANTITY_UNITS: dict[str, str] = {
     "b_field": "T",
     "e_field": "V/m",
     "velocity": "m/s",
+    "four_velocity": "m/s",
     "length": "m",
     "time": "s",
     "density": "m^-3",
@@ -184,9 +186,9 @@ _FIELD_INFO: dict[str, FieldInfo] = {
     "v_th_e": _FI("velocity", "Electron thermal speed", "m/s", r"$v_{th,e}$"),
     "v_th_i": _FI("velocity", "Ion thermal speed", "m/s", r"$v_{th,i}$"),
     # Four-velocity
-    "u1": _FI("velocity", "Four-velocity component 1", "m/s", r"$u_1$"),
-    "u2": _FI("velocity", "Four-velocity component 2", "m/s", r"$u_2$"),
-    "u3": _FI("velocity", "Four-velocity component 3", "m/s", r"$u_3$"),
+    "u1": _FI("four_velocity", "Four-velocity component 1", "m/s", r"$u_1$"),
+    "u2": _FI("four_velocity", "Four-velocity component 2", "m/s", r"$u_2$"),
+    "u3": _FI("four_velocity", "Four-velocity component 3", "m/s", r"$u_3$"),
     # Densities
     "rho_m": _FI("mass_density", "Mass density", "kg/m^3", r"$\rho_m$"),
     "rho_c": _FI("charge_density", "Charge density", "C/m^3", r"$\rho_c$"),

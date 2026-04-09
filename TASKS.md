@@ -63,7 +63,7 @@ Each step produces something testable. No step starts until the previous step's 
 - [x] **Step 13: FieldDataset — compute() and in_units()**
   `compute(name)` dispatches string to derived function ("|B|", "beta", "v_A", "M_A", "|vort|", "vort1"/"vort2"/"vort3", ...). `in_si(field)` for SI conversion. `in_units(field, unit_str)` for display units ("nT", "km/s"). `QuantityType` StrEnum, `_FIELD_INFO` registry with `FieldInfo` metadata (quantity_type, long_name, si_unit, latex). `register_field()` / `unregister_field()` for custom fields. `FieldDataset.with_field()` attaches fields with xarray attrs carrying metadata through slicing. Attrs-first lookup in `field_info()` / `in_si()` (xarray attrs override global registry). Geometry-aware label localization. Per-species regex patterns for auto-generated metadata.
 
-- [ ] **Step 14: plotting/slices — basic 2D visualization**
+- [x] **Step 14: plotting/slices — basic 2D visualization**
   `plot_field_slice` (plane selection, axis labels, colorbar). `plot_comparison` (three-panel: A | B | difference). Publication rcParams in `plotting/styles.py`.
 
 **Milestone: daily-use tool** — load iPIC3D data -> compute derived quantities -> compare runs -> select subregions -> convert units -> make paper figures.
@@ -78,7 +78,7 @@ Each step produces something testable. No step starts until the previous step's 
 - [x] **Step 16: selections — SphereSelection**
   Non-axis-aligned selection via `xr.where()`. Points outside sphere = NaN, grid shape preserved. NaN propagation in derived quantities and plotting. Also added `FieldDataset.where(cond)` as the general-purpose masking primitive.
 
-- [ ] **Step 18: derived (relativistic) — relativistic derived quantities**
+- [x] **Step 18: derived (relativistic) — relativistic derived quantities**
   `lorentz_factor()` (from three-velocity or four-velocity).
   `magnetization()` ($\sigma = B^2/\rho_m c^2$).
   Extend ~9 functions with optional `lorentz_factor` parameter:
@@ -212,7 +212,7 @@ grow.
   (Step 10 extension). At that point, relax the early raise in
   `compute_field` for `passes_geometry` recipes.
 
-- [ ] **Step 32: Separate `four_velocity` quantity type**
+- [x] **Step 32: Separate `four_velocity` quantity type**
   `u1/u2/u3` (four-velocity, γv, unbounded) share `quantity_type="velocity"`
   with `V1/V2/V3` (three-velocity, bounded by c). SI conversion is correct
   (both have units of m/s), but the shared type prevents distinguishing them
@@ -264,12 +264,12 @@ grow.
 | 11 | selections | Plane, Box | ✅ |
 | 12 | readers | iPIC3D, BATSRUS, OpenGGCM, Simple readers + registry + auto-detection | ✅ |
 | 13 | fields | compute(), in_units(), QuantityType, field metadata registry | ✅ |
-| 14 | plotting | 2D slices, comparison | — |
+| 14 | plotting | 2D slices, comparison | ✅ |
 | **—** | **—** | **Milestone: daily-use tool** | **—** |
 | 15 | coordinates | Frame transforms | ✅ |
 | 16 | selections | Sphere (NaN masking) | ✅ |
 | 17 | docs | MkDocs site | — |
-| 18 | derived | lorentz_factor, magnetization, rel. corrections | — |
+| 18 | derived | lorentz_factor, magnetization, rel. corrections | ✅ |
 | 19 | regrid | `regrid()`, `align_grids()`, `common_grid()` | — |
 | 20 | diagnostics | `compare_fields()`, `field_comparison_report()` | — |
 | 21 | cli | `info`, `fields`, `compare` subcommands (typer) | — |
@@ -284,6 +284,6 @@ grow.
 | 29 | interop | SPASE XML metadata export | — |
 | 30 | readers/selections | Reduced geometry after slicing | ✅ |
 | 31 | coordinates | Remove default geometry from operators (deferred — see note) | ⏸ |
-| 32 | fields/units | Separate `four_velocity` quantity type | — |
+| 32 | fields/units | Separate `four_velocity` quantity type | ✅ |
 | 33 | fields/units | `specific_energy` quantity type for enthalpy | ✅ |
 | 34 | readers | `StaggerInfo` provenance metadata | — |

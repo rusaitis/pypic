@@ -105,6 +105,8 @@ _REGISTRY: dict[str, _Recipe] = {
         needs_gamma=True,
         needs_c=True,
     ),
+    "gamma_L": _Recipe(derived.lorentz_factor, ("|V|",), needs_c=True),
+    "sigma": _Recipe(derived.magnetization, ("|B|", "rho_m"), needs_c=True),
     "e_int": _Recipe(derived.internal_energy, ("P", "rho_m"), needs_gamma=True),
     "s": _Recipe(derived.entropy, ("P", "rho_m"), needs_gamma=True),
     "s_e": _Recipe(derived.entropy, ("Pe", "n_s0"), needs_gamma=True),

@@ -380,6 +380,7 @@ _COMPOUND_FACTORS: dict[str, Callable[[Normalization], float]] = {
     "power_density": lambda n: (
         n.density_ref * n.mass_ref * n.velocity_ref**2 / n.time_ref
     ),
+    "four_velocity": lambda n: n.velocity_ref,
 }
 
 
