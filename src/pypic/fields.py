@@ -594,7 +594,7 @@ _SPECIES_INFO_PATTERNS: list[tuple[re.Pattern[str], str, str, str]] = [
     ),  # \d{0,2} matches both P11_s0 (tensor) and P_s0 (scalar)
     (
         re.compile(r"^rho_m_s(\d+)$"),
-        "density",
+        "mass_density",
         "Mass density (species {N})",
         r"$\rho_{{m,s{N}}}$",
     ),

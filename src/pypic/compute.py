@@ -971,7 +971,12 @@ def register_recipe(
             raise ValueError(msg)
         _REGISTRY[name] = recipe
 
-    _register_field(name, quantity_type, long_name=long_name, latex=latex)
+    try:
+        _register_field(name, quantity_type, long_name=long_name, latex=latex)
+    except Exception:
+        with _recipe_lock:
+            _REGISTRY.pop(name, None)
+        raise
 
 
 def unregister_recipe(name: str) -> None:
@@ -988,12 +993,17 @@ def unregister_recipe(name: str) -> None:
 
     with _recipe_lock:
         try:
-            del _REGISTRY[name]
+            recipe = _REGISTRY.pop(name)
         except KeyError:
             msg = f"No recipe registered for {name!r}"
             raise KeyError(msg) from None
 
-    _unregister_field(name)
+    try:
+        _unregister_field(name)
+    except Exception:
+        with _recipe_lock:
+            _REGISTRY[name] = recipe
+        raise
 
 
 __all__ = [
