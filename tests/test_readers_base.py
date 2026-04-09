@@ -388,3 +388,108 @@ class TestSimulationConfigImmutability:
         with pytest.raises(TypeError):
             cfg.physics.extra["eta"] = 999  # type: ignore[index]
         assert cfg.physics.gamma == pytest.approx(5.0 / 3.0)
+
+
+class TestWithDerived:
+    def test_single_field(self, sample_dataset):
+        ds = sample_dataset.with_derived("|B|")
+        assert ds.has_field("|B|")
+        expected = np.sqrt(
+            sample_dataset["B1"] ** 2
+            + sample_dataset["B2"] ** 2
+            + sample_dataset["B3"] ** 2
+        )
+        assert_allclose(ds["|B|"], expected)
+
+    def test_multiple_fields(self, sample_dataset):
+        ds = sample_dataset.with_derived("|B|", "e_B")
+        assert ds.has_field("|B|")
+        assert ds.has_field("e_B")
+
+    def test_idempotent_for_existing_fields(self, sample_dataset):
+        """Fields already in the dataset are not recomputed."""
+        ds = sample_dataset.with_derived("B1")
+        assert ds.has_field("B1")
+        assert_allclose(ds["B1"], sample_dataset["B1"])
+
+    def test_survives_isel(self, sample_dataset):
+        ds = sample_dataset.with_derived("|B|")
+        sliced = ds.isel(z=0)
+        assert sliced.has_field("|B|")
+        assert sliced["|B|"].shape == (8, 6)
+
+    def test_survives_plane_selection(self, sample_dataset):
+        from pypic.selections import PlaneSelection
+
+        ds = sample_dataset.with_derived("|B|")
+        sliced = PlaneSelection(normal="z").apply(ds)
+        assert sliced.has_field("|B|")
+
+    def test_unit_conversion(self, sample_dataset):
+        ds = sample_dataset.with_derived("|B|")
+        si_vals = ds.in_si("|B|")
+        assert si_vals.shape == ds["|B|"].shape
+
+    def test_field_info_populated(self, sample_dataset):
+        ds = sample_dataset.with_derived("|B|")
+        info = ds.field_info("|B|")
+        assert info.quantity_type == "b_field"
+
+    def test_chaining_avoids_recomputation(self):
+        """with_derived("|B|", "e_B") should compute |B| once."""
+        shape = (4, 3, 2)
+        ds = FieldDataset.from_arrays(
+            {"B1": np.ones(shape), "B2": np.zeros(shape), "B3": np.zeros(shape)},
+            GridInfo(dimensions=shape, spacing=(1.0, 1.0, 1.0)),
+            Normalization.identity(),
+        )
+        # |B| is a dependency of e_B, so computing it first helps
+        ds = ds.with_derived("|B|", "e_B")
+        assert ds.has_field("|B|")
+        assert ds.has_field("e_B")
+        # e_B = |B|^2 / 2 = 0.5
+        assert_allclose(ds["e_B"], 0.5)
+
+    def test_vector_siblings(self):
+        """Computing a vector component stores all sibling components."""
+        shape = (4, 3, 2)
+        ds = FieldDataset.from_arrays(
+            {
+                "E1": np.ones(shape),
+                "E2": np.zeros(shape),
+                "E3": np.zeros(shape),
+                "B1": np.zeros(shape),
+                "B2": np.zeros(shape),
+                "B3": np.ones(shape),
+            },
+            GridInfo(dimensions=shape, spacing=(1.0, 1.0, 1.0)),
+            Normalization.identity(),
+        )
+        ds = ds.with_derived("S1")
+        # Poynting flux siblings S2, S3 should also be stored
+        assert ds.has_field("S1")
+        assert ds.has_field("S2")
+        assert ds.has_field("S3")
+
+
+class TestWithFieldAutoFill:
+    def test_known_field_auto_fills(self, sample_dataset):
+        """with_field for a registered name auto-fills metadata."""
+        b_mag = np.ones(sample_dataset.grid.dimensions)
+        ds = sample_dataset.with_field("|B|", b_mag)
+        info = ds.field_info("|B|")
+        assert info.quantity_type == "b_field"
+        assert info.long_name != ""
+
+    def test_unknown_field_without_qt_raises(self, sample_dataset):
+        data = np.ones(sample_dataset.grid.dimensions)
+        with pytest.raises(ValueError, match="Unknown field"):
+            sample_dataset.with_field("totally_unknown_xyz", data)
+
+    def test_explicit_override(self, sample_dataset):
+        """Explicit quantity_type overrides registry."""
+        b_mag = np.ones(sample_dataset.grid.dimensions)
+        ds = sample_dataset.with_field("|B|", b_mag, "pressure")
+        info = ds.field_info("|B|")
+        # attrs-level metadata takes precedence
+        assert info.quantity_type == "pressure"

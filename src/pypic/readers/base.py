@@ -913,7 +913,7 @@ class FieldDataset:
         self,
         name: str,
         data: FloatArray,
-        quantity_type: QuantityType | str,
+        quantity_type: QuantityType | str | None = None,
         *,
         long_name: str = "",
         latex: str = "",
@@ -924,14 +924,19 @@ class FieldDataset:
         ``in_si()``, ``field_info()``, and unit conversion work without
         global ``register_field()`` calls.
 
+        When *quantity_type* is ``None``, metadata is looked up from the
+        field registry automatically. For unregistered fields, provide
+        *quantity_type* explicitly.
+
         Parameters
         ----------
         name : str
             Field name.
         data : FloatArray
             Array matching the grid dimensions.
-        quantity_type : QuantityType | str
+        quantity_type : QuantityType | str | None
             Physical quantity type (e.g. ``QuantityType.VELOCITY``).
+            When ``None``, auto-filled from the field registry.
         long_name : str
             Human-readable label for plot titles.
         latex : str
@@ -945,16 +950,31 @@ class FieldDataset:
         Raises
         ------
         ValueError
-            If *quantity_type* is not recognized.
+            If *quantity_type* is not recognized, or is ``None`` and
+            the field name is not in the registry.
         """
         from pypic.fields import _QUANTITY_UNITS
+        from pypic.fields import field_info as _field_info
 
         expected = tuple(self._grid.dimensions)
         if data.shape != expected:
             msg = f"Array shape {data.shape} doesn't match grid dimensions {expected}"
             raise ValueError(msg)
 
-        qt = str(quantity_type)
+        if quantity_type is None:
+            try:
+                info = _field_info(name, axis_names=self._grid.geometry.axis_names)
+            except KeyError:
+                msg = f"Unknown field {name!r}; provide quantity_type explicitly"
+                raise ValueError(msg) from None
+            qt = info.quantity_type
+            if not long_name:
+                long_name = info.long_name
+            if not latex:
+                latex = info.latex
+        else:
+            qt = str(quantity_type)
+
         if qt not in _QUANTITY_UNITS:
             valid = sorted(_QUANTITY_UNITS)
             msg = f"Unknown quantity_type {qt!r}. Valid: {valid}"
@@ -981,6 +1001,113 @@ class FieldDataset:
             frame=self._frame,
             transforms=self._transforms,
         )
+
+    def with_derived(self, *names: str) -> FieldDataset:
+        """Return a new dataset with derived fields computed and stored.
+
+        For each name, computes the field (if not already present),
+        looks up metadata from the field registry, and attaches it
+        with full metadata. Fields already in the dataset are skipped.
+
+        When a vector-component recipe is encountered (e.g. ``"S1"``
+        from Poynting flux), all sibling components (``"S2"``, ``"S3"``)
+        are computed from a single function call and stored together.
+
+        Parameters
+        ----------
+        *names : str
+            Derived quantity names (e.g. ``"|B|"``, ``"beta"``).
+
+        Returns
+        -------
+        FieldDataset
+            New dataset with the computed fields attached.
+
+        Examples
+        --------
+        >>> import numpy as np
+        >>> from pypic.units import Normalization
+        >>> grid = GridInfo(
+        ...     dimensions=(4, 3, 2), spacing=(1.0, 1.0, 1.0),
+        ...     geometry=CARTESIAN,
+        ... )
+        >>> ds = FieldDataset.from_arrays(
+        ...     {"B1": np.full((4,3,2), 3.0),
+        ...      "B2": np.full((4,3,2), 4.0),
+        ...      "B3": np.zeros((4,3,2))},
+        ...     grid, Normalization.identity(),
+        ... )
+        >>> ds = ds.with_derived("|B|")
+        >>> ds.has_field("|B|")
+        True
+        >>> ds["|B|"][0, 0, 0]
+        np.float64(5.0)
+        """
+        from pypic.compute import (
+            _find_sibling_components,
+            compute_field,
+        )
+
+        result = self
+        for name in names:
+            if result.has_field(name):
+                continue
+
+            # Check for vector-component siblings (e.g. S1→S2,S3)
+            siblings = _find_sibling_components(name)
+            if siblings:
+                # Compute the full vector result once, store all components
+                result = result._attach_vector_siblings(name, siblings)
+            else:
+                data = compute_field(name, result)
+                result = result.with_field(name, data)
+        return result
+
+    def _attach_vector_siblings(
+        self,
+        trigger_name: str,
+        siblings: dict[str, int],
+    ) -> FieldDataset:
+        """Compute a tuple-returning function once, store all components."""
+        # Compute just the trigger — the full tuple is computed internally.
+        # To get the full tuple, we replicate the compute logic but keep
+        # all components instead of selecting one.
+        from pypic.compute import (
+            _append_species_params,
+            _get_c,
+            _get_gamma,
+            _get_recipe,
+            _get_species_args,
+            _resolve_name,
+            compute_field,
+        )
+
+        canonical = _resolve_name(trigger_name)
+        recipe = _get_recipe(canonical)
+        args: list[Any] = []
+        for field_name in recipe.fields:
+            args.append(compute_field(field_name, self))
+
+        species_args = _get_species_args(self, recipe)
+        if species_args and recipe.species_args is not None:
+            _append_species_params(args, species_args, recipe.species_args)
+        if recipe.needs_gamma:
+            args.append(_get_gamma(self))
+        if recipe.needs_c:
+            args.append(_get_c(self))
+
+        kwargs: dict[str, Any] = {}
+        if recipe.needs_grid:
+            args.extend(self.grid.spacing)
+            if recipe.passes_geometry:
+                kwargs["geometry"] = self.grid.geometry.type
+        full_result = recipe.func(*args, **kwargs)
+
+        result = self
+        for sib_name, comp_idx in siblings.items():
+            if not result.has_field(sib_name):
+                result = result.with_field(sib_name, full_result[comp_idx])
+        return result
 
     def field_info(self, name: str) -> FieldInfo:
         """Return metadata for a field or derived quantity.

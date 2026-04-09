@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import difflib
 import re
+import threading
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import TYPE_CHECKING, Any
@@ -23,7 +24,7 @@ from pypic._aliases import (
 )
 from pypic.coordinates import operators
 from pypic.coordinates.geometry import GeometryType
-from pypic.fields import _FIELD_INFO, _SPECIES_QUANTITY_PATTERNS
+from pypic.fields import _FIELD_INFO, _SPECIES_QUANTITY_PATTERNS, QuantityType
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -866,10 +867,141 @@ def field_dependencies(name: str, _depth: int = 0) -> set[str]:
     return deps
 
 
+_recipe_lock = threading.Lock()
+
+
+def _find_sibling_components(name: str) -> dict[str, int]:
+    r"""Find all recipes sharing the same func/fields as *name*.
+
+    Returns a ``{name: component_index}`` dict for component-based
+    recipes (e.g. ``S1/S2/S3``, ``curl_B1/2/3``). Returns an empty
+    dict if *name* has no ``component``.
+    """
+    canonical = _resolve_name(name)
+    try:
+        recipe = _get_recipe(canonical)
+    except KeyError:
+        return {}
+    if recipe.component is None:
+        return {}
+    siblings: dict[str, int] = {}
+    for reg_name, reg_recipe in _REGISTRY.items():
+        if (
+            reg_recipe.func is recipe.func
+            and reg_recipe.fields == recipe.fields
+            and reg_recipe.component is not None
+        ):
+            siblings[reg_name] = reg_recipe.component
+    return siblings
+
+
+def register_recipe(
+    name: str,
+    func: Callable[..., Any],
+    fields: tuple[str, ...],
+    quantity_type: QuantityType | str,
+    *,
+    needs_grid: bool = False,
+    needs_gamma: bool = False,
+    needs_c: bool = False,
+    long_name: str = "",
+    latex: str = "",
+) -> None:
+    r"""Register a custom derived quantity.
+
+    Registers both the computation recipe and the field metadata,
+    so ``compute()``, ``in_si()``, ``field_info()``, and
+    ``with_derived()`` all work for the custom field.
+
+    Parameters
+    ----------
+    name : str
+        Quantity name (e.g. ``"R_reconnection"``).
+    func : Callable
+        Pure function: takes arrays (one per field in *fields*),
+        plus grid spacing if *needs_grid*, plus gamma if
+        *needs_gamma*, plus c if *needs_c*. Returns a single array.
+    fields : tuple[str, ...]
+        Input field names (canonical or derived). Resolved
+        recursively at compute time.
+    quantity_type : QuantityType | str
+        Physical quantity type for SI conversion.
+    needs_grid : bool
+        If ``True``, grid spacing ``(dx, dy, dz)`` is appended to args.
+    needs_gamma : bool
+        If ``True``, adiabatic index $\gamma$ is appended to args.
+    needs_c : bool
+        If ``True``, speed of light $c$ is appended to args.
+    long_name : str
+        Human-readable label for plot titles.
+    latex : str
+        LaTeX symbol for plot labels.
+
+    Raises
+    ------
+    ValueError
+        If *name* already exists in the recipe registry.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> register_recipe(
+    ...     "e_mag_ratio",
+    ...     func=lambda eb, ee: eb / (eb + ee),
+    ...     fields=("e_B", "e_E"),
+    ...     quantity_type="dimensionless",
+    ...     long_name="Magnetic-to-total EM energy ratio",
+    ... )
+    >>> "e_mag_ratio" in available_quantities()
+    True
+    >>> unregister_recipe("e_mag_ratio")
+    """
+    from pypic.fields import register_field as _register_field
+
+    recipe = _Recipe(
+        func=func,
+        fields=fields,
+        needs_grid=needs_grid,
+        needs_gamma=needs_gamma,
+        needs_c=needs_c,
+    )
+    with _recipe_lock:
+        if name in _REGISTRY:
+            msg = f"Recipe {name!r} already registered"
+            raise ValueError(msg)
+        _REGISTRY[name] = recipe
+
+    _register_field(name, quantity_type, long_name=long_name, latex=latex)
+
+
+def unregister_recipe(name: str) -> None:
+    r"""Remove a custom derived quantity.
+
+    Removes both the computation recipe and the field metadata.
+
+    Raises
+    ------
+    KeyError
+        If *name* is not registered.
+    """
+    from pypic.fields import unregister_field as _unregister_field
+
+    with _recipe_lock:
+        try:
+            del _REGISTRY[name]
+        except KeyError:
+            msg = f"No recipe registered for {name!r}"
+            raise KeyError(msg) from None
+
+    _unregister_field(name)
+
+
 __all__ = [
     "available_quantities",
     "compute_field",
     "display_unit_factor",
     "field_dependencies",
     "field_si_factor",
+    "register_recipe",
+    "unregister_recipe",
 ]

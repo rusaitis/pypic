@@ -2,7 +2,12 @@
 
 __version__ = "0.1.0"
 
-from pypic.compute import available_quantities
+from pypic.compute import (
+    available_quantities,
+    field_dependencies,
+    register_recipe,
+    unregister_recipe,
+)
 from pypic.coordinates import (
     CARTESIAN,
     CYLINDRICAL,
@@ -177,6 +182,7 @@ __all__ = [
     "enthalpy",
     "entropy",
     "estimate_tracing_error",
+    "field_dependencies",
     "field_difference",
     "field_energy",
     "field_info",
@@ -213,6 +219,7 @@ __all__ = [
     "read_phdf5_particles",
     "register_field",
     "register_reader",
+    "register_recipe",
     "registered_readers",
     "relativistic_enthalpy",
     "skin_depth",
@@ -226,5 +233,6 @@ __all__ = [
     "unit_label",
     "unregister_field",
     "unregister_reader",
+    "unregister_recipe",
     "velocity_magnitude",
 ]

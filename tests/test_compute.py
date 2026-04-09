@@ -9,6 +9,8 @@ from pypic.compute import (
     compute_field,
     display_unit_factor,
     field_si_factor,
+    register_recipe,
+    unregister_recipe,
 )
 from pypic.coordinates.geometry import SPHERICAL
 from pypic.readers.base import FieldDataset, GridInfo
@@ -734,3 +736,78 @@ class TestGeometryGuard:
         ds = FieldDataset.from_arrays(data, grid, Normalization.identity())
         with pytest.raises(NotImplementedError, match="Cartesian"):
             compute_field(field, ds)
+
+
+class TestRegisterRecipe:
+    def test_register_and_compute(self):
+        """Custom recipe is computable via compute_field."""
+        register_recipe(
+            "e_mag_ratio",
+            func=lambda eb, ee: eb / (eb + ee),
+            fields=("e_B", "e_E"),
+            quantity_type="dimensionless",
+            long_name="Magnetic-to-total EM energy ratio",
+        )
+        try:
+            ds = make_test_dataset(
+                {
+                    "B1": np.ones((4, 3, 2)),
+                    "B2": np.zeros((4, 3, 2)),
+                    "B3": np.zeros((4, 3, 2)),
+                    "E1": np.ones((4, 3, 2)),
+                    "E2": np.zeros((4, 3, 2)),
+                    "E3": np.zeros((4, 3, 2)),
+                },
+            )
+            result = compute_field("e_mag_ratio", ds)
+            assert result.shape == (4, 3, 2)
+            assert "e_mag_ratio" in available_quantities()
+        finally:
+            unregister_recipe("e_mag_ratio")
+
+    def test_unregister_removes_recipe_and_metadata(self):
+        register_recipe(
+            "_test_tmp",
+            func=lambda b: b * 2,
+            fields=("|B|",),
+            quantity_type="b_field",
+        )
+        assert "_test_tmp" in _REGISTRY
+        unregister_recipe("_test_tmp")
+        assert "_test_tmp" not in _REGISTRY
+
+    def test_duplicate_name_raises(self):
+        register_recipe(
+            "_test_dup",
+            func=lambda b: b,
+            fields=("|B|",),
+            quantity_type="dimensionless",
+        )
+        try:
+            with pytest.raises(ValueError, match="already registered"):
+                register_recipe(
+                    "_test_dup",
+                    func=lambda b: b,
+                    fields=("|B|",),
+                    quantity_type="dimensionless",
+                )
+        finally:
+            unregister_recipe("_test_dup")
+
+    def test_unregister_nonexistent_raises(self):
+        with pytest.raises(KeyError, match="No recipe"):
+            unregister_recipe("_nonexistent_recipe_xyz")
+
+    def test_si_conversion_works(self):
+        """Registered recipe quantity_type enables SI conversion."""
+        register_recipe(
+            "_test_si",
+            func=lambda b: b * 2,
+            fields=("|B|",),
+            quantity_type="b_field",
+        )
+        try:
+            factor = field_si_factor("_test_si", Normalization.identity())
+            assert factor == 1.0
+        finally:
+            unregister_recipe("_test_si")
