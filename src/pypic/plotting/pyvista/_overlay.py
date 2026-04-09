@@ -28,7 +28,7 @@ _TEXT_H_RATIO = 2.0  # full-line text (titles, badge text, label text)
 _TICK_H_RATIO = 1.5  # compact tick labels (colorbar)
 
 # Colorbar gradient strip default dimensions (viewport fractions).
-_STRIP_W_BASE = 0.30  # base width
+_STRIP_W_BASE = 0.3  # base width
 _STRIP_W_FONT_SCALE = 0.003  # extra width per tick font-size unit
 _STRIP_H_DEFAULT = 0.015  # height
 

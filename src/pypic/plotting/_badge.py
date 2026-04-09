@@ -12,6 +12,7 @@ from pypic.plotting._format import (
 )
 from pypic.plotting._guard import ensure_matplotlib
 from pypic.plotting._overlay_common import (
+    ALPHA_VISIBLE,
     contrast_ratio,
     resolve_rgba_override,
 )
@@ -34,19 +35,17 @@ __all__ = [
 
 # Overlay layout constants — centralized so every overlay (badge, legend,
 # label, progress bar) uses the same visual language.
-_ALPHA_VISIBLE = 0.01  # minimum alpha to consider "has background"
 _OVERLAY_BORDER_LW = 0.5  # edge linewidth on all overlay boxes
 _BLEND_FACTOR = 0.4  # darken/lighten blend toward black/white
 _CHAR_WIDTH_RATIO = 0.55  # average glyph width / font size (monospace ≈ 0.6)
 _LINE_HEIGHT_RATIO = 0.4  # DrawingArea height / font size for legend lines
 _ARROW_SCALE = 2.5  # arrow tip size relative to line width
 _ARROW_MUTATION = 1.5  # FancyArrowPatch mutation_scale / arrow_size
-_SINGLE_CHAR_PAD = 0.12  # extra h-pad so single-letter labels look square
+_SINGLE_CHAR_PAD = 0.1  # extra h-pad so single-letter labels look square
 _MIN_VISIBLE_FILL = 0.02  # skip bar fill below 2% (invisible at badge scale)
 _BAR_WIDTH_MIN = 60.0  # auto-sized progress bar minimum width (points)
 _BAR_WIDTH_MAX = 200.0  # auto-sized progress bar maximum width (points)
 _OVERLAY_SEP = 3  # standard VPacker/HPacker separator (points)
-_LEGEND_HSEP = 4  # HPacker separator between line sample and label
 
 _CORNERS: tuple[BadgeLoc, ...] = (
     "upper left",
@@ -109,7 +108,7 @@ def _make_overlay_box(
         pad = _theme_val("overlay_padding", 0.4)
     margin: float = _theme_val("overlay_margin", 0.03)
 
-    has_bg = bg_rgba[3] >= _ALPHA_VISIBLE
+    has_bg = bg_rgba[3] >= ALPHA_VISIBLE
     box = AnchoredOffsetbox(
         loc=loc,
         child=child,
@@ -673,7 +672,7 @@ def add_legend(
                 "color": resolved_text,
             },
         )
-        row = HPacker(children=[drawing, text], pad=0, sep=_LEGEND_HSEP, align="center")
+        row = HPacker(children=[drawing, text], pad=0, sep=_OVERLAY_SEP, align="center")
         rows.append(row)
 
     legend_child: OffsetBox

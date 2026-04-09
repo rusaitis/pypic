@@ -526,12 +526,6 @@ def _try_species_recipe(name: str) -> _Recipe | None:
     )
 
 
-# Maps field/derived names to physical quantity types for SI conversion.
-# Derived from the canonical registry in fields.py — single source of truth.
-_FIELD_QUANTITY_MAP: dict[str, str] = {
-    name: info.quantity_type for name, info in _FIELD_INFO.items()
-}
-
 # Display unit conversion: unit string → SI value
 _DISPLAY_UNITS: dict[str, float] = {
     "T": 1.0,
@@ -780,12 +774,13 @@ def field_si_factor(name: str, normalization: Normalization) -> float:
         If the quantity type for *name* is unknown.
     """
     canonical = _resolve_name(name)
-    quantity_type = _FIELD_QUANTITY_MAP.get(canonical)
-    if quantity_type is None:
+    info = _FIELD_INFO.get(canonical)
+    if info is None:
         # Resolve field aliases (Bx→B1, B_x→B1, P_e→Pe, etc.)
         fallback = _get_field_alias_fallback()
         canonical = fallback.get(canonical, canonical)
-        quantity_type = _FIELD_QUANTITY_MAP.get(canonical)
+        info = _FIELD_INFO.get(canonical)
+    quantity_type: str | None = info.quantity_type if info is not None else None
     if quantity_type is None:
         # Try regex patterns for per-species fields (n_s2, J1_s3, etc.)
         for pattern, qtype in _SPECIES_QUANTITY_PATTERNS:
@@ -794,8 +789,7 @@ def field_si_factor(name: str, normalization: Normalization) -> float:
                 break
     if quantity_type is None:
         msg = (
-            f"No SI conversion known for {name!r}. "
-            f"Known fields: {sorted(_FIELD_QUANTITY_MAP)}"
+            f"No SI conversion known for {name!r}. Known fields: {sorted(_FIELD_INFO)}"
         )
         raise ValueError(msg)
     return normalization.si_factor(quantity_type)

@@ -12,10 +12,11 @@ if TYPE_CHECKING:
 
     from pypic.plotting._badge import BadgeLoc, OverlayVariant
 
+from pypic.plotting._overlay_common import ALPHA_VISIBLE
+
 ExtremesMode = Literal["darken", "semi", "transparent"] | None
 
 # Inset colorbar layout — conversion factors from theme points to axes fraction.
-_ALPHA_VISIBLE = 0.01  # minimum alpha to consider "has background"
 _PAD_TO_AXES_FRAC = 0.05  # overlay_padding (points) → axes-fraction padding
 _ROUNDING_TO_AXES_FRAC = 0.04  # overlay_rounding (points) → FancyBboxPatch rounding
 
@@ -348,7 +349,7 @@ def add_inset_colorbar(
     cax.set_facecolor("none")
 
     # Background patch — initial size from provisional measurement
-    has_bg = bg_rgba[3] >= _ALPHA_VISIBLE
+    has_bg = bg_rgba[3] >= ALPHA_VISIBLE
     bg_patch = FancyBboxPatch(
         (bg_x, bg_y),
         total_w,

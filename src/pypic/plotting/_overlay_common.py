@@ -15,6 +15,10 @@ if TYPE_CHECKING:
     Rgb = tuple[float, float, float]
     Rgba = tuple[float, float, float, float]
 
+# Shared overlay visibility threshold — any alpha below this is treated
+# as "no background".  Used by both matplotlib and pyvista overlay code.
+ALPHA_VISIBLE = 0.01
+
 
 def _lum(c: tuple[float, float, float]) -> float:
     """Relative luminance of an sRGB color per WCAG 2.x.

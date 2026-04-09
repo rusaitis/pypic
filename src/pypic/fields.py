@@ -1,9 +1,9 @@
 """Field metadata registry: names, units, and display labels.
 
 Maps every canonical field name to its physical quantity type, SI unit
-label, human-readable long name, and LaTeX symbol.  This is the single
-source of truth — ``compute._FIELD_QUANTITY_MAP`` is derived from
-``_FIELD_INFO``, not maintained separately.
+label, human-readable long name, and LaTeX symbol.  ``_FIELD_INFO`` is
+the single source of truth — ``compute.field_si_factor`` reads it
+directly at lookup time.
 """
 
 from __future__ import annotations
@@ -508,11 +508,6 @@ def register_field(
             log.warning("Overwriting existing field metadata for %r", name)
         _FIELD_INFO[name] = info
 
-        # Sync compute._FIELD_QUANTITY_MAP (same dict object, mutation propagates)
-        from pypic.compute import _FIELD_QUANTITY_MAP
-
-        _FIELD_QUANTITY_MAP[name] = quantity_type
-
 
 def unregister_field(name: str) -> None:
     """Remove custom field metadata.
@@ -528,10 +523,6 @@ def unregister_field(name: str) -> None:
         except KeyError:
             msg = f"No field metadata registered for {name!r}"
             raise KeyError(msg) from None
-
-        from pypic.compute import _FIELD_QUANTITY_MAP
-
-        _FIELD_QUANTITY_MAP.pop(name, None)
 
 
 _SPECIES_INFO_PATTERNS: list[tuple[re.Pattern[str], str, str, str]] = [

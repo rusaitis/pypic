@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from pypic.compute import _FIELD_QUANTITY_MAP, field_si_factor
+from pypic.compute import field_si_factor
 from pypic.fields import (
     _FIELD_INFO,
     _QUANTITY_UNITS,
@@ -46,10 +46,11 @@ class TestRegistryIntegrity:
                 f"_QUANTITY_UNITS[{info.quantity_type!r}]={expected_unit!r}"
             )
 
-    def test_field_quantity_map_derived_correctly(self) -> None:
+    def test_all_fields_have_valid_quantity_type(self) -> None:
         for name, info in _FIELD_INFO.items():
-            assert name in _FIELD_QUANTITY_MAP
-            assert _FIELD_QUANTITY_MAP[name] == info.quantity_type
+            assert info.quantity_type in _QUANTITY_UNITS, (
+                f"{name}: quantity_type {info.quantity_type!r} not in _QUANTITY_UNITS"
+            )
 
 
 class TestFieldInfoLookup:
@@ -377,14 +378,15 @@ class TestFieldRegistration:
         finally:
             unregister_field(name)
 
-    def test_syncs_field_quantity_map(self) -> None:
-        name = "_test_sync_map"
+    def test_register_visible_to_si_factor(self) -> None:
+        name = "_test_si_visible"
+        norm = Normalization.identity()
         try:
             register_field(name, "energy_density")
-            assert _FIELD_QUANTITY_MAP[name] == "energy_density"
+            factor = field_si_factor(name, norm)
+            assert isinstance(factor, float)
         finally:
             unregister_field(name)
-        assert name not in _FIELD_QUANTITY_MAP
 
     def test_register_with_enum(self) -> None:
         name = "_test_reg_enum"

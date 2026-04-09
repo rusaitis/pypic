@@ -157,8 +157,8 @@ class PlotTheme:
     figsize_per_col: float = 4.5
     figsize_per_row: float = 4.0
     # Panel label font multiplier (tuned for readability in single- vs multi-row)
-    panel_label_scale_sparse: float = 1.55
-    panel_label_scale_dense: float = 1.78
+    panel_label_scale_sparse: float = 1.5
+    panel_label_scale_dense: float = 1.8
 
     # Contour overlay
     contour_label_fontsize: float = 7.0
@@ -494,7 +494,7 @@ def _rounded_axes_path(aspect: float, r: float) -> Path:
     else:
         rx, ry = min(r, 0.5), min(r * aspect, 0.5)
 
-    kx, ky = 0.5523 * rx, 0.5523 * ry
+    kx, ky = 0.5523 * rx, 0.5523 * ry  # 4(sqrt2-1)/3, circular arc approx
     c4 = Path.CURVE4
     return Path(
         [
