@@ -1044,8 +1044,7 @@ def bulk_velocity(
     >>> bulk_velocity(np.array([0.5]), np.array([2.0]))
     array([0.25])
     """
-    with np.errstate(invalid="ignore", divide="ignore"):
-        return j / rho_c
+    return _safe_divide(j, rho_c)
 
 
 def kinetic_energy_flux_component(
@@ -1497,11 +1496,23 @@ def agyrotropy(
     perp_11 = p11 - 2.0 * p_dot_bhat_1 * bhat_1 + p_par * bhat_1**2
     perp_22 = p22 - 2.0 * p_dot_bhat_2 * bhat_2 + p_par * bhat_2**2
     perp_33 = p33 - 2.0 * p_dot_bhat_3 * bhat_3 + p_par * bhat_3**2
-    perp_12 = p12 - p_dot_bhat_1 * bhat_2 - bhat_1 * p_dot_bhat_2 + p_par * bhat_1 * bhat_2
-    perp_13 = p13 - p_dot_bhat_1 * bhat_3 - bhat_1 * p_dot_bhat_3 + p_par * bhat_1 * bhat_3
-    perp_23 = p23 - p_dot_bhat_2 * bhat_3 - bhat_2 * p_dot_bhat_3 + p_par * bhat_2 * bhat_3
+    perp_12 = (
+        p12 - p_dot_bhat_1 * bhat_2 - bhat_1 * p_dot_bhat_2
+        + p_par * bhat_1 * bhat_2
+    )
+    perp_13 = (
+        p13 - p_dot_bhat_1 * bhat_3 - bhat_1 * p_dot_bhat_3
+        + p_par * bhat_1 * bhat_3
+    )
+    perp_23 = (
+        p23 - p_dot_bhat_2 * bhat_3 - bhat_2 * p_dot_bhat_3
+        + p_par * bhat_2 * bhat_3
+    )
 
-    frobenius_norm_sq = perp_11**2 + perp_22**2 + perp_33**2 + 2.0 * (perp_12**2 + perp_13**2 + perp_23**2)
+    frobenius_norm_sq = (
+        perp_11**2 + perp_22**2 + perp_33**2
+        + 2.0 * (perp_12**2 + perp_13**2 + perp_23**2)
+    )
 
     invariant_2 = (invariant_1**2 - frobenius_norm_sq) / 2.0
 
@@ -1918,23 +1929,27 @@ __all__ = [
     "alfven_mach",
     "alfven_speed",
     "bulk_velocity",
+    "conductive_heat_flux_component",
     "current_density_magnitude",
     "debye_length",
     "electric_energy_density",
     "electric_field_magnitude",
     "enthalpy",
+    "enthalpy_flux_component",
     "entropy",
     "firehose_parameter",
     "gyrofrequency",
     "gyroradius",
     "gyrotropic_entropy",
     "hall_electric_field",
+    "heat_flux_component",
     "ideal_electric_field",
     "internal_energy",
     "ion_acoustic_speed",
     "isotropic_pressure",
     "j_dot_e",
     "kinetic_energy_density",
+    "kinetic_energy_flux_component",
     "magnetic_energy_density",
     "magnetic_field_magnitude",
     "magnetic_flux_function",
@@ -1951,8 +1966,11 @@ __all__ = [
     "relativistic_enthalpy",
     "skin_depth",
     "sound_speed",
+    "species_mass_density",
     "temperature",
     "thermal_energy_density",
+    "thermal_energy_density_trace",
     "thermal_speed",
+    "total_pressure",
     "velocity_magnitude",
 ]

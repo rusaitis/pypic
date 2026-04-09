@@ -106,8 +106,9 @@ class TestAlfvenSpeed:
         )
 
     def test_invalid_density_gives_nan(self):
-        assert np.isnan(alfven_speed(np.array([1.0]), np.array([0.0]))[0])
-        assert np.isnan(alfven_speed(np.array([1.0]), np.array([-1.0]))[0])
+        with np.errstate(invalid="ignore"):
+            assert np.isnan(alfven_speed(np.array([1.0]), np.array([0.0]))[0])
+            assert np.isnan(alfven_speed(np.array([1.0]), np.array([-1.0]))[0])
 
 
 class TestEnergyDensities:
@@ -226,10 +227,13 @@ class TestThermodynamics:
         np.testing.assert_allclose(result, expected, rtol=1e-15)
 
     def test_negative_pressure_gives_nan(self):
-        assert np.isnan(entropy(np.array([-1.0]), np.array([1.0]))[0])
-        assert np.isnan(
-            gyrotropic_entropy(np.array([-1.0]), np.array([1.0]), np.array([1.0]))[0]
-        )
+        with np.errstate(invalid="ignore"):
+            assert np.isnan(entropy(np.array([-1.0]), np.array([1.0]))[0])
+            assert np.isnan(
+                gyrotropic_entropy(
+                    np.array([-1.0]), np.array([1.0]), np.array([1.0])
+                )[0]
+            )
 
 
 class TestDefaultParameters:

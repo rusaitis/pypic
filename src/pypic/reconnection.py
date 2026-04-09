@@ -56,7 +56,7 @@ def find_saddle_points(
     -------
     list[tuple[int, int]]
         Grid indices ``(i, j)`` of saddle points, sorted by
-        $|\det(H)|$ descending (strongest first).
+        gradient magnitude ascending (closest to true critical point first).
 
     Raises
     ------

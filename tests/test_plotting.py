@@ -243,7 +243,11 @@ class TestSymmetricClim:
         assert symmetric_clim(np.array([-3.0, 1.0, 2.0])) == (-3.0, 3.0)
 
     def test_all_nan(self) -> None:
-        vmin, vmax = symmetric_clim(np.array([np.nan, np.nan]))
+        import warnings
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", RuntimeWarning)
+            vmin, vmax = symmetric_clim(np.array([np.nan, np.nan]))
         assert vmin < 0 < vmax  # epsilon expansion, not degenerate (0, 0)
 
 
