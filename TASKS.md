@@ -93,7 +93,7 @@ Each step produces something testable. No step starts until the previous step's 
 
 ## Phase 5: Documentation
 
-- [ ] **Step 17: MkDocs documentation site**
+- [x] **Step 17: MkDocs documentation site**
   Material theme + mkdocstrings + mathjax. API reference (one page per module), getting-started guide, tutorial (load -> derive -> select -> compare -> plot). `mkdocs build --strict` passes.
 
 ---
@@ -268,7 +268,7 @@ grow.
 | **—** | **—** | **Milestone: daily-use tool** | **—** |
 | 15 | coordinates | Frame transforms | ✅ |
 | 16 | selections | Sphere (NaN masking) | ✅ |
-| 17 | docs | MkDocs site | — |
+| 17 | docs | MkDocs site | ✅ |
 | 18 | derived | lorentz_factor, magnetization, rel. corrections | ✅ |
 | 19 | regrid | `regrid()`, `align_grids()`, `common_grid()` | — |
 | 20 | diagnostics | `compare_fields()`, `field_comparison_report()` | — |

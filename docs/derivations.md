@@ -391,7 +391,7 @@ $s_{gyro} = \ln(P_\parallel P_\perp^2 / n^5)$ and the
     The exponent 5 arises from the geometric constraint
     ($3$ from parallel + $2$ from perpendicular), **not** from the
     adiabatic index $\gamma = 5/3$. See
-    [Conventions](conventions.md#γ-convention-for-pic-entropy) for this
+    [Conventions](conventions.md#gamma-convention-for-pic-entropy) for this
     distinction.
 
     **Instability thresholds.** When the CGL invariants are violated

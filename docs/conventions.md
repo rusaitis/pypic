@@ -2,11 +2,11 @@
 
 Detailed physics conventions for derived quantities in pypic.
 These notes supplement the equation tables in [equations.md](equations.md)
-and the field name tables in [SCHEMA.md](../SCHEMA.md).
+and the field name tables in [SCHEMA](schema.md).
 When TASKS.md Steps 7-8 are implemented, the relevant sections
 will migrate into function docstrings in `derived.py`.
 
-## γ Convention for PIC Entropy
+## Gamma Convention for PIC Entropy
 
 PIC codes have no equation of state, so γ in the isotropic entropy
 formula $s = \ln(P / n^\gamma)$ is chosen by the number of

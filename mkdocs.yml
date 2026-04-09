@@ -43,10 +43,13 @@ extra_javascript:
 
 nav:
   - Home: index.md
+  - Getting Started: getting-started.md
+  - Tutorial: tutorial.md
   - Physics Reference:
     - Derivations: derivations.md
     - Equations: equations.md
     - Conventions: conventions.md
+    - Schema: schema.md
   - API Reference:
     - Derived Quantities: api/derived.md
     - Diagnostics: api/diagnostics.md

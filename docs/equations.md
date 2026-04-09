@@ -1,7 +1,7 @@
 # Physics Equations Reference
 
 Complete equation reference for all derived quantities in pypic.
-For canonical field names and data types, see [SCHEMA.md](../SCHEMA.md).
+For canonical field names and data types, see [SCHEMA](schema.md).
 For detailed convention discussions, see [conventions.md](conventions.md).
 
 **Normalization:** All computation uses code (normalized) units. In PIC
@@ -79,7 +79,7 @@ $\mu_0$ separates them.
     per particle), with $\gamma = 5/3$ (3D) by default. The gyrotropic exponent
     of 5 is independent of $\gamma$ — it arises from the CGL double-adiabatic
     invariants, not from the equation of state.
-    See [conventions.md § γ Convention](conventions.md#γ-convention-for-pic-entropy).
+    See [conventions.md § γ Convention](conventions.md#gamma-convention-for-pic-entropy).
 
 [^2]: `h_rel` uses the constant-$\Gamma$ (Synge-type) approximation;
     see [@MigMc] for the variable-$\Gamma$ treatment.
