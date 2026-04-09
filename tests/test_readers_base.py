@@ -14,7 +14,7 @@ from pypic.readers.base import (
     SimulationReader,
     _default_aliases,
 )
-from pypic.units import Normalization, SpeciesInfo
+from pypic.units import Normalization, PhysicsParams, SpeciesInfo
 from tests._helpers import make_synthetic_fielddataset, make_uniform_grid
 
 
@@ -211,12 +211,12 @@ class TestFieldDatasetSlicing:
             sample_grid,
             Normalization.identity(),
             species=species,
-            physics={"eta": 0.01},
+            physics=PhysicsParams(extra={"eta": 0.01}),
             metadata={"run": "test"},
         )
         sliced = ds.isel(z=0)
         assert sliced.species == species
-        assert sliced.physics == {"eta": 0.01}
+        assert sliced.physics.extra["eta"] == 0.01
         assert sliced.metadata == {"run": "test"}
         assert sliced.normalization is ds.normalization
 
@@ -348,7 +348,7 @@ class TestSimulationReader:
 class TestSimulationConfigImmutability:
     def test_physics_not_mutable(self):
         from pypic.readers.base import SimulationConfig
-        from pypic.units import Normalization, SpeciesInfo
+        from pypic.units import Normalization, PhysicsParams, SpeciesInfo
 
         cfg = SimulationConfig(
             model_name="test",
@@ -361,19 +361,18 @@ class TestSimulationConfigImmutability:
             ),
             normalization=Normalization.identity(),
             species=(SpeciesInfo(name="e", charge=-1.0, mass=1.0),),
-            physics={"gamma": 5.0 / 3.0},
+            physics=PhysicsParams(gamma=5.0 / 3.0),
             metadata={"run_id": "abc"},
         )
-        with pytest.raises(TypeError):
-            cfg.physics["gamma"] = 999  # type: ignore[index]
+        with pytest.raises(AttributeError):
+            cfg.physics.gamma = 999  # type: ignore[misc]
         with pytest.raises(TypeError):
             cfg.metadata["new_key"] = "bad"  # type: ignore[index]
 
-    def test_original_dict_not_shared(self):
+    def test_physics_extra_not_mutable(self):
         from pypic.readers.base import SimulationConfig
-        from pypic.units import Normalization
+        from pypic.units import Normalization, PhysicsParams
 
-        orig = {"gamma": 5.0 / 3.0}
         cfg = SimulationConfig(
             model_name="test",
             model_type="PIC",
@@ -384,7 +383,8 @@ class TestSimulationConfigImmutability:
                 geometry=CARTESIAN,
             ),
             normalization=Normalization.identity(),
-            physics=orig,
+            physics=PhysicsParams(gamma=5.0 / 3.0, extra={"eta": 0.01}),
         )
-        orig["gamma"] = 999
-        assert cfg.physics["gamma"] == pytest.approx(5.0 / 3.0)
+        with pytest.raises(TypeError):
+            cfg.physics.extra["eta"] = 999  # type: ignore[index]
+        assert cfg.physics.gamma == pytest.approx(5.0 / 3.0)

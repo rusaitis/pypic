@@ -25,7 +25,7 @@ from pypic.readers.base import SimulationConfig
 from pypic.readers.openggcm._grid import OpenGGCMGrid, parse_grid_file
 from pypic.readers.openggcm._probe import can_read_confidence
 from pypic.readers.openggcm._reader import OpenGGCMReader, _make_grid_info
-from pypic.units import Normalization
+from pypic.units import Normalization, PhysicsParams
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -100,7 +100,7 @@ def open_openggcm(
         model_type="MHD",
         grid=grid_info,
         normalization=normalization or Normalization.identity(),
-        physics={"gamma": 5.0 / 3.0},
+        physics=PhysicsParams(),
         frame="GSM",
         metadata={
             "grid_file": grid_file.name,

@@ -27,7 +27,7 @@ from pypic.readers.batsrus._grid import (
 from pypic.readers.batsrus._hdf5 import read_batl
 from pypic.readers.batsrus._header import BATSRUSHeader, parse_header
 from pypic.readers.batsrus._idl import read_idl_cells, read_out_file
-from pypic.units import Normalization
+from pypic.units import Normalization, PhysicsParams
 
 log = logging.getLogger(__name__)
 
@@ -202,7 +202,7 @@ class BATSRUSReader:
                 self._config, header, grid=grid, sim_dir=path
             )
 
-        physics: dict[str, Any] = {"gamma": self._config.gamma}
+        physics = PhysicsParams(gamma=self._config.gamma)
         metadata: dict[str, Any] = {
             "step": header.n_step,
             "time": header.time,
@@ -272,7 +272,7 @@ class BATSRUSReader:
                 self._config, grid=grid, sim_dir=path
             )
 
-        physics: dict[str, Any] = {"gamma": self._config.gamma}
+        physics = PhysicsParams(gamma=self._config.gamma)
         metadata: dict[str, Any] = {
             "step": batl.n_step,
             "time": batl.time,
@@ -332,7 +332,7 @@ class BATSRUSReader:
         )
 
         normalization = Normalization.identity()
-        physics: dict[str, Any] = {"gamma": self._config.gamma}
+        physics = PhysicsParams(gamma=self._config.gamma)
         metadata_out: dict[str, Any] = {
             "step": out_meta.get("step", step),
             "time": out_meta.get("time", 0.0),

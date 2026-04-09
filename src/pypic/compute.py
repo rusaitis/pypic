@@ -617,13 +617,13 @@ def _get_species_args(
 
 
 def _get_gamma(dataset: FieldDataset) -> float:
-    """Get the adiabatic index from physics config, default 5/3."""
-    return float(dataset.physics.get("gamma", 5.0 / 3.0))
+    """Get the adiabatic index from physics params."""
+    return dataset.physics.gamma
 
 
 def _get_c(dataset: FieldDataset) -> float:
-    """Get the speed of light from physics config, default 1.0."""
-    return float(dataset.physics.get("c", 1.0))
+    """Get the speed of light from physics params."""
+    return dataset.physics.c
 
 
 def _append_species_params(

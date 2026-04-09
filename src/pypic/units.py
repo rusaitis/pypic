@@ -2,17 +2,18 @@
 
 from __future__ import annotations
 
-__all__ = ["Normalization", "PhysicsConstants", "SpeciesInfo"]
+__all__ = ["Normalization", "PhysicsConstants", "PhysicsParams", "SpeciesInfo"]
 
 import math
-from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from dataclasses import dataclass, field
+from types import MappingProxyType
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 from scipy import constants
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Callable, Mapping
 
     from pypic.types import Numeric, Vector3
 
@@ -575,3 +576,44 @@ class SpeciesInfo:
                 f"Provide charge+mass, charge_to_mass alone, or all three."
             )
             raise ValueError(msg)
+
+
+@dataclass(frozen=True, slots=True)
+class PhysicsParams:
+    r"""Typed physics parameters consumed by the compute pipeline.
+
+    Known fields have defaults matching the standard non-relativistic
+    PIC/MHD conventions.  Reader-specific parameters (iPIC3D theta,
+    BATSRUS divb_method, etc.) go in *extra*.
+
+    Parameters
+    ----------
+    gamma : float
+        Adiabatic index ($\gamma = c_p / c_v$).
+    c : float
+        Speed of light in normalized units.
+    relativistic : bool
+        Use relativistic formulas for derived quantities.
+    extra : dict[str, Any]
+        Open-ended reader-specific parameters.
+
+    Examples
+    --------
+    >>> p = PhysicsParams()
+    >>> p.gamma
+    1.6666666666666667
+    >>> p.c
+    1.0
+    >>> p = PhysicsParams(gamma=1.4, extra={"eta": 0.01})
+    >>> p.extra["eta"]
+    0.01
+    """
+
+    gamma: float = 5.0 / 3.0
+    c: float = 1.0
+    relativistic: bool = False
+    extra: Mapping[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.extra, MappingProxyType):
+            object.__setattr__(self, "extra", MappingProxyType(dict(self.extra)))

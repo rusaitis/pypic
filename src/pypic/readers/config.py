@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 from pypic.coordinates.geometry import GEOMETRY_BY_NAME, CoordinateGeometry
 from pypic.coordinates.transforms import FrameTransform
 from pypic.readers.base import GridInfo, SimulationConfig
-from pypic.units import Normalization, SpeciesInfo
+from pypic.units import Normalization, PhysicsParams, SpeciesInfo
 
 log = logging.getLogger(__name__)
 
@@ -238,7 +238,7 @@ def load_config(path: Path) -> SimulationConfig:
         grid=grid,
         normalization=normalization,
         species=species,
-        physics=raw.get("physics", {}),
+        physics=_parse_physics(raw.get("physics", {})),
         frame=frame,
         transforms=transforms,
         metadata=metadata,
@@ -251,6 +251,27 @@ def load_config(path: Path) -> SimulationConfig:
         config = apply_physical_extent(config, phys_ext, phys_unit)
 
     return config
+
+
+def _parse_physics(raw: dict[str, Any]) -> PhysicsParams:
+    """Extract typed physics params from TOML ``[physics]`` section."""
+    # Flatten: look for known keys at top level or in subsections (pic/mhd)
+    flat: dict[str, Any] = {}
+    extra: dict[str, Any] = {}
+    for key, val in raw.items():
+        if isinstance(val, dict):
+            flat.update(val)
+            extra[key] = val
+        else:
+            flat[key] = val
+    gamma = float(flat.get("gamma", 5.0 / 3.0))
+    c = float(flat.get("speed_of_light", flat.get("c", 1.0)))
+    relativistic = bool(flat.get("relativistic", False))
+    # Non-typed leftovers go in extra
+    for k, v in flat.items():
+        if k not in {"gamma", "speed_of_light", "c", "relativistic"}:
+            extra[k] = v
+    return PhysicsParams(gamma=gamma, c=c, relativistic=relativistic, extra=extra)
 
 
 def _parse_transforms(

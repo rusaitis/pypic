@@ -116,7 +116,7 @@ from pypic.traces import (
     trace_field_line,
     trace_field_line_adaptive,
 )
-from pypic.units import Normalization, PhysicsConstants, SpeciesInfo
+from pypic.units import Normalization, PhysicsConstants, PhysicsParams, SpeciesInfo
 
 __all__ = [
     "CARTESIAN",
@@ -146,6 +146,7 @@ __all__ = [
     "ParticleDataReader",
     "ParticleTrace",
     "PhysicsConstants",
+    "PhysicsParams",
     "PlaneSelection",
     "ProbeResult",
     "QuantityType",

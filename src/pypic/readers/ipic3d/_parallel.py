@@ -216,7 +216,7 @@ class IPic3DParallelReader:
             sc.grid,
             sc.normalization,
             species=sc.species,
-            physics=dict(sc.physics),
+            physics=sc.physics,
             metadata={**dict(sc.metadata), "step": step},
             frame=sc.frame,
             transforms=sc.transforms or None,

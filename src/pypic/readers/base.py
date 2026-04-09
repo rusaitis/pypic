@@ -18,6 +18,7 @@ from pypic.coordinates.geometry import (
     GeometryType,
 )
 from pypic.coordinates.transforms import FrameTransform
+from pypic.units import PhysicsParams
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence
@@ -293,8 +294,8 @@ class FieldDataset:
         Unit normalization for this data.
     species : Sequence[SpeciesInfo] | None
         Species definitions, if applicable.
-    physics : dict[str, Any] | None
-        Physics parameters (e.g. resistivity, viscosity).
+    physics : PhysicsParams | None
+        Physics parameters (adiabatic index, speed of light, etc.).
     metadata : dict[str, Any] | None
         Arbitrary metadata (run name, code version, etc.).
     aliases : dict[str, str] | None
@@ -325,7 +326,7 @@ class FieldDataset:
         normalization: Normalization,
         *,
         species: Sequence[SpeciesInfo] | None = None,
-        physics: dict[str, Any] | None = None,
+        physics: PhysicsParams | None = None,
         metadata: dict[str, Any] | None = None,
         aliases: dict[str, str] | None = None,
         frame: str = "simulation",
@@ -335,7 +336,7 @@ class FieldDataset:
         self._grid = grid
         self._normalization = normalization
         self._species = tuple(species) if species is not None else ()
-        self._physics = physics if physics is not None else {}
+        self._physics = physics if physics is not None else PhysicsParams()
         self._metadata = metadata if metadata is not None else {}
         self._frame = frame
         self._transforms = dict(transforms) if transforms is not None else {}
@@ -360,7 +361,7 @@ class FieldDataset:
         normalization: Normalization | None = None,
         *,
         species: Sequence[SpeciesInfo] | None = None,
-        physics: dict[str, Any] | None = None,
+        physics: PhysicsParams | None = None,
         metadata: dict[str, Any] | None = None,
         aliases: dict[str, str] | None = None,
         frame: str = "simulation",
@@ -379,7 +380,7 @@ class FieldDataset:
             Unit normalization.  Defaults to ``Normalization.identity()``.
         species : Sequence[SpeciesInfo] | None
             Species definitions, if applicable.
-        physics : dict[str, Any] | None
+        physics : PhysicsParams | None
             Physics parameters.
         metadata : dict[str, Any] | None
             Arbitrary metadata.
@@ -451,9 +452,9 @@ class FieldDataset:
         return self._species
 
     @property
-    def physics(self) -> MappingProxyType[str, Any]:
-        """Physics parameters (read-only view)."""
-        return MappingProxyType(self._physics)
+    def physics(self) -> PhysicsParams:
+        """Physics parameters."""
+        return self._physics
 
     @property
     def metadata(self) -> MappingProxyType[str, Any]:
@@ -1146,8 +1147,8 @@ class SimulationConfig:
         Unit system.
     species : tuple[SpeciesInfo, ...]
         Species definitions (tuple for immutability).
-    physics : dict[str, Any]
-        Physics parameters (immutable after construction).
+    physics : PhysicsParams
+        Physics parameters (frozen dataclass).
     frame : str
         Reference frame label (e.g. ``"GSM"``, ``"simulation"``).
     metadata : dict[str, Any]
@@ -1174,7 +1175,7 @@ class SimulationConfig:
     grid: GridInfo
     normalization: Normalization
     species: tuple[SpeciesInfo, ...] = ()
-    physics: dict[str, Any] = field(default_factory=dict)  # frozen via __post_init__
+    physics: PhysicsParams = field(default_factory=lambda: PhysicsParams())
     frame: str = "simulation"
     transforms: dict[str, FrameTransform] = field(default_factory=dict)
     metadata: dict[str, Any] = field(default_factory=dict)  # frozen via __post_init__
@@ -1182,7 +1183,6 @@ class SimulationConfig:
     def __post_init__(self) -> None:
         # Wrap mutable dicts in read-only proxies to enforce true immutability.
         # Callers pass plain dicts; frozen assignment uses object.__setattr__.
-        object.__setattr__(self, "physics", MappingProxyType(dict(self.physics)))
         object.__setattr__(
             self,
             "transforms",

@@ -20,7 +20,7 @@ from pypic.readers.base import (
     GridInfo,
     SimulationConfig,
 )
-from pypic.units import Normalization
+from pypic.units import Normalization, PhysicsParams
 from tests._helpers import make_uniform_grid
 
 if TYPE_CHECKING:
@@ -44,7 +44,7 @@ def _sample_config(
         model_type="MHD",
         grid=grid or _sample_grid(),
         normalization=Normalization.identity(),
-        physics={"gamma": 5.0 / 3.0},
+        physics=PhysicsParams(gamma=5.0 / 3.0),
     )
 
 
@@ -264,7 +264,7 @@ class TestReadTimestepWithConfig:
         config = _sample_config()
         reader = SimpleReader(config=config)
         ds = reader.read_timestep(canonical_dir, 0)
-        assert ds.physics["gamma"] == pytest.approx(5.0 / 3.0)
+        assert ds.physics.gamma == pytest.approx(5.0 / 3.0)
 
     def test_explicit_grid_without_config(
         self,
@@ -573,7 +573,7 @@ class TestCustomReadRaw:
         reader = NoFileReader(config=config)
         ds = reader.read_timestep(tmp_path, 0)
         assert ds.grid.dimensions == DIMS
-        assert ds.physics["gamma"] == pytest.approx(5.0 / 3.0)
+        assert ds.physics.gamma == pytest.approx(5.0 / 3.0)
 
     def test_transposed_hdf5(
         self,

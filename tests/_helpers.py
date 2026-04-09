@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING, cast
 import numpy as np
 
 from pypic.readers.base import FieldDataset, GridInfo
-from pypic.units import Normalization, SpeciesInfo
+from pypic.units import Normalization, PhysicsParams, SpeciesInfo
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -29,7 +29,7 @@ def make_test_dataset(
     *,
     shape: tuple[int, ...] = (4, 3, 2),
     species: list[SpeciesInfo] | None = None,
-    physics: dict | None = None,
+    physics: PhysicsParams | None = None,
     normalization: Normalization | None = None,
 ) -> FieldDataset:
     """Build a FieldDataset with unit spacing for tests."""

@@ -9,6 +9,7 @@ import pytest
 from scipy import constants
 
 from pypic.readers.config import LENGTH_UNITS, apply_physical_extent, load_config
+from pypic.units import PhysicsParams
 
 EXAMPLE_TOML = (
     Path(__file__).resolve().parent.parent / "examples" / "ipic3d-double-harris.toml"
@@ -29,7 +30,9 @@ class TestIPIC3DDoubleHarris:
     def test_model_and_metadata(self, cfg):
         assert cfg.model_name == "iPIC3D"
         assert cfg.model_type == "PIC"
-        assert cfg.physics == {"pic": {"theta": 0.5, "speed_of_light": 1.0}}
+        assert cfg.physics.c == 1.0
+        assert cfg.physics.gamma == pytest.approx(5.0 / 3.0)
+        assert cfg.physics.extra["theta"] == 0.5
         assert cfg.metadata["description"] == "Double Harris sheet reconnection"
 
     def test_grid(self, cfg):
@@ -729,7 +732,7 @@ class TestPhysicalExtent:
             grid=GridInfo((10,), (1.0,), (0.0,), CARTESIAN),
             normalization=Normalization.identity(),
             species=(),
-            physics={},
+            physics=PhysicsParams(),
         )
         with pytest.raises(ValueError, match="Unknown physical_extent_unit"):
             apply_physical_extent(cfg, (5.0,), "parsec")
@@ -747,7 +750,7 @@ class TestPhysicalExtent:
             grid=GridInfo((100, 100, 100), (1.0, 1.0, 1.0), (0.0, 0.0, 0.0), CARTESIAN),
             normalization=Normalization.identity(),
             species=(),
-            physics={},
+            physics=PhysicsParams(),
             transforms={"phys": t},
         )
         with pytest.raises(ValueError, match="non-uniform"):

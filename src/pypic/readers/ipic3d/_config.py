@@ -13,7 +13,7 @@ import h5py
 from pypic.coordinates.geometry import CARTESIAN
 from pypic.readers._config_helpers import merge_simulation_toml
 from pypic.readers.base import GridInfo, SimulationConfig
-from pypic.units import Normalization, SpeciesInfo
+from pypic.units import Normalization, PhysicsParams, SpeciesInfo
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -454,12 +454,10 @@ def to_simulation_config(
         ),
     )
 
-    physics: dict[str, Any] = {
-        "theta": cfg.th,
-        "c": cfg.c,
-        "b0": cfg.b0,
-    }
-    physics.update(cfg.extra)
+    physics = PhysicsParams(
+        c=cfg.c,
+        extra={"theta": cfg.th, "b0": cfg.b0, **cfg.extra},
+    )
 
     metadata: dict[str, Any] = {
         "grid_centering": "node",

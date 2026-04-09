@@ -12,7 +12,7 @@ from pypic.compute import (
 )
 from pypic.coordinates.geometry import SPHERICAL
 from pypic.readers.base import FieldDataset, GridInfo
-from pypic.units import Normalization
+from pypic.units import Normalization, PhysicsParams
 from tests._helpers import ELECTRONS, IONS, make_test_dataset
 
 
@@ -263,7 +263,7 @@ class TestSpeciesDependent:
             data,
             shape=shape,
             species=[ELECTRONS, IONS],
-            physics={"c": 2.0},
+            physics=PhysicsParams(c=2.0),
         )
         result = compute_field("d_e", ds)
         # d_e = c / omega_pe = 2 / sqrt(1 * 1 / (1/256)) = 2/16 = 0.125
@@ -352,7 +352,7 @@ class TestPhysicsConfig:
             "P": np.full(shape, 3.0),
             "rho_m": np.full(shape, 3.0),
         }
-        ds = make_test_dataset(data, shape=shape, physics={"gamma": 2.0})
+        ds = make_test_dataset(data, shape=shape, physics=PhysicsParams(gamma=2.0))
         result = compute_field("c_s", ds)
         # c_s = sqrt(gamma * P / rho_m) = sqrt(2 * 3 / 3) = sqrt(2)
         np.testing.assert_allclose(result, np.sqrt(2.0), rtol=1e-15)

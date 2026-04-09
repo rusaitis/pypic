@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, Any
 from pypic.coordinates import CARTESIAN, GEOMETRY_BY_NAME
 from pypic.readers._config_helpers import merge_simulation_toml
 from pypic.readers.base import GridInfo, SimulationConfig
-from pypic.units import Normalization
+from pypic.units import Normalization, PhysicsParams
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -272,13 +272,14 @@ def to_simulation_config(
             dt=config.dt_fixed,
         )
 
-    physics: dict[str, Any] = {"gamma": config.gamma}
+    extra: dict[str, Any] = {}
     if config.use_splitb:
-        physics["use_splitb"] = True
+        extra["use_splitb"] = True
     if config.divb_method:
-        physics["divb_method"] = config.divb_method
+        extra["divb_method"] = config.divb_method
     if config.solar_wind:
-        physics["solar_wind"] = config.solar_wind
+        extra["solar_wind"] = config.solar_wind
+    physics = PhysicsParams(gamma=config.gamma, extra=extra)
 
     meta: dict[str, Any] = dict(config.metadata)
     if config.start_time:

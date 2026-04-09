@@ -524,5 +524,5 @@ class TestParamInSplitbDivb:
 
         config = parse_param_in(tmp_path / "PARAM.in")
         sim = to_simulation_config(config)
-        assert sim.physics["use_splitb"] is True
-        assert sim.physics["divb_method"] == "CT8"
+        assert sim.physics.extra["use_splitb"] is True
+        assert sim.physics.extra["divb_method"] == "CT8"

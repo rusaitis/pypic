@@ -298,10 +298,12 @@ class SimpleReader:
                 normalization = self._resolve_normalization(f)
                 metadata = self._read_metadata(f, step)
 
-        physics: dict[str, Any] = {}
+        from pypic.units import PhysicsParams
+
+        physics: PhysicsParams = PhysicsParams()
         species: tuple[SpeciesInfo, ...] = ()
         if self._config is not None:
-            physics = dict(self._config.physics)
+            physics = self._config.physics
             species = self._config.species
 
         return FieldDataset.from_arrays(

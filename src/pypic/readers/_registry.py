@@ -20,7 +20,7 @@ if TYPE_CHECKING:
         SimulationReader,
         TabularData,
     )
-    from pypic.units import Normalization, SpeciesInfo
+    from pypic.units import Normalization, PhysicsParams, SpeciesInfo
 
     type CanReadFunction = Callable[[Path], float]
     type ReaderFactory = Callable[..., tuple[SimulationReader, SimulationConfig]]
@@ -223,9 +223,9 @@ class Simulation:
         return self._config.species
 
     @property
-    def physics(self) -> MappingProxyType[str, Any]:
-        """Physics parameters (read-only view)."""
-        return self._config.physics  # type: ignore[return-value]  # MappingProxyType at runtime
+    def physics(self) -> PhysicsParams:
+        """Physics parameters."""
+        return self._config.physics
 
     @property
     def shrink_factor(self) -> float:
