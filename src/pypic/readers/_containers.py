@@ -1,0 +1,345 @@
+"""Immutable data containers: SimulationConfig, TabularData, ParticleData."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from types import MappingProxyType
+from typing import TYPE_CHECKING, Any
+
+import numpy as np
+
+from pypic.coordinates.geometry import CARTESIAN  # noqa: F401 — used in doctests
+from pypic.readers._grid import GridInfo  # noqa: TC001 — used in doctests
+from pypic.units import PhysicsParams
+
+if TYPE_CHECKING:
+    from pypic.coordinates.transforms import FrameTransform
+    from pypic.types import FloatArray
+    from pypic.units import Normalization, SpeciesInfo
+
+
+@dataclass(frozen=True, slots=True)
+class SimulationConfig:
+    """Parsed simulation configuration from a TOML config file.
+
+    Parameters
+    ----------
+    model_name : str
+        Human-readable name for the simulation run.
+    model_type : str
+        Simulation type identifier (e.g. ``"pic"``, ``"mhd"``).
+    grid : GridInfo
+        Grid metadata (includes coordinate geometry).
+    normalization : Normalization
+        Unit system.
+    species : tuple[SpeciesInfo, ...]
+        Species definitions (tuple for immutability).
+    physics : PhysicsParams
+        Physics parameters (frozen dataclass).
+    frame : str
+        Reference frame label (e.g. ``"GSM"``, ``"simulation"``).
+    metadata : dict[str, Any]
+        Additional configuration data (immutable after construction).
+
+    Examples
+    --------
+    >>> from pypic.units import Normalization, SpeciesInfo
+    >>> cfg = SimulationConfig(
+    ...     model_name="test", model_type="pic",
+    ...     grid=GridInfo(
+    ...         dimensions=(4,), spacing=(1.0,), origin=(0.0,),
+    ...         geometry=CARTESIAN,
+    ...     ),
+    ...     normalization=Normalization.identity(),
+    ...     species=(SpeciesInfo(name="e", charge=-1.0, mass=1.0),),
+    ... )
+    >>> cfg.model_name
+    'test'
+    """
+
+    model_name: str
+    model_type: str
+    grid: GridInfo
+    normalization: Normalization
+    species: tuple[SpeciesInfo, ...] = ()
+    physics: PhysicsParams = field(default_factory=lambda: PhysicsParams())
+    frame: str = "simulation"
+    transforms: dict[str, FrameTransform] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)  # frozen via __post_init__
+
+    def __post_init__(self) -> None:
+        # Wrap mutable dicts in read-only proxies to enforce true immutability.
+        # Callers pass plain dicts; frozen assignment uses object.__setattr__.
+        object.__setattr__(
+            self,
+            "transforms",
+            MappingProxyType(dict(self.transforms)),
+        )
+        object.__setattr__(self, "metadata", MappingProxyType(dict(self.metadata)))
+
+
+@dataclass(frozen=True, slots=True)
+class TabularData:
+    r"""Generic columnar container for auxiliary time-series data.
+
+    Stores named 1-D arrays sharing a common length, with optional
+    index column designation.  Used for conserved quantities, solver
+    diagnostics, virtual satellite probes, etc.
+
+    Parameters
+    ----------
+    name : str
+        Dataset label (e.g. ``"conserved_quantities"``).
+    columns : dict[str, FloatArray]
+        Column name → 1-D array mapping.  All arrays must have
+        the same length.
+    index_column : str | None
+        Which column serves as the index (e.g. ``"cycle"``).
+        ``None`` means row-indexed.
+    metadata : dict[str, Any]
+        Source info (reader name, file path, etc.).
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> tab = TabularData(
+    ...     name="diagnostics",
+    ...     columns={"cycle": np.array([0.0, 1.0, 2.0]),
+    ...              "energy": np.array([1.0, 0.9, 0.8])},
+    ...     index_column="cycle",
+    ... )
+    >>> tab["energy"]
+    array([1. , 0.9, 0.8])
+    >>> len(tab)
+    3
+    >>> "cycle" in tab
+    True
+    >>> tab.column_names
+    ['cycle', 'energy']
+    """
+
+    name: str
+    columns: dict[str, FloatArray]  # frozen at runtime via __post_init__
+    index_column: str | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)  # frozen at runtime
+
+    def __post_init__(self) -> None:
+        # Validate before freezing
+        if self.columns:
+            lengths = {k: len(v) for k, v in self.columns.items()}
+            unique_lengths = set(lengths.values())
+            if len(unique_lengths) > 1:
+                msg = f"All columns must have equal length, got {lengths}"
+                raise ValueError(msg)
+        if self.index_column is not None and self.index_column not in self.columns:
+            msg = (
+                f"index_column {self.index_column!r} not found "
+                f"in columns: {sorted(self.columns)}"
+            )
+            raise ValueError(msg)
+        # Wrap mutable dicts in read-only proxies
+        object.__setattr__(self, "columns", MappingProxyType(dict(self.columns)))
+        object.__setattr__(self, "metadata", MappingProxyType(dict(self.metadata)))
+
+    def __getitem__(self, key: str) -> FloatArray:
+        """Return a column by name.
+
+        Parameters
+        ----------
+        key : str
+            Column name.
+
+        Returns
+        -------
+        FloatArray
+
+        Raises
+        ------
+        KeyError
+            If *key* is not a column name.
+        """
+        try:
+            return self.columns[key]
+        except KeyError:
+            msg = f"Column {key!r} not found. Available: {sorted(self.columns)}"
+            raise KeyError(msg) from None
+
+    def __contains__(self, key: object) -> bool:
+        """Check whether *key* is a column name."""
+        return key in self.columns
+
+    def __len__(self) -> int:
+        """Return the number of rows (common array length)."""
+        if not self.columns:
+            return 0
+        return len(next(iter(self.columns.values())))
+
+    @property
+    def column_names(self) -> list[str]:
+        """Sorted list of column names."""
+        return sorted(self.columns)
+
+    @property
+    def index(self) -> FloatArray:
+        """Index array: the designated index column, or ``np.arange(len)``."""
+        if self.index_column is not None:
+            return self.columns[self.index_column]
+        return np.arange(len(self), dtype=np.float64)
+
+
+@dataclass(frozen=True, slots=True)
+class ParticleData:
+    r"""Container for particle data from a single species at one timestep.
+
+    Stores position and velocity as ``(N, 3)`` arrays with selective
+    loading: either can be ``None`` if not requested.  The ``charge``
+    array is **always** loaded because per-particle $q$ doubles as a
+    unique particle identifier (each particle's weight is unique at
+    full float64 precision in restart files).
+
+    Parameters
+    ----------
+    species_index : int
+        Zero-based species index.
+    species_name : str
+        Human-readable species name (e.g. ``"electrons"``).
+    position : FloatArray | None
+        Particle positions, shape ``(N, 3)``. ``None`` if not loaded.
+    velocity : FloatArray | None
+        Particle velocities, shape ``(N, 3)``. ``None`` if not loaded.
+    charge : FloatArray
+        Per-particle charge/weight, shape ``(N,)``. Always float64.
+    n_particles : int
+        Total particle count.
+    id : np.ndarray | None
+        Integer particle tracking IDs, shape ``(N,)``. ``None`` if not
+        available or not requested.
+    metadata : dict[str, Any]
+        Source info (file path, format, etc.).
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> pcl = ParticleData(
+    ...     species_index=0, species_name="electrons",
+    ...     position=np.zeros((10, 3)),
+    ...     velocity=np.ones((10, 3)),
+    ...     charge=np.full(10, -1.0),
+    ...     n_particles=10, metadata={},
+    ... )
+    >>> pcl.x.shape
+    (10,)
+    >>> len(pcl)
+    10
+    """
+
+    species_index: int
+    species_name: str
+    position: FloatArray | None
+    velocity: FloatArray | None
+    charge: FloatArray
+    n_particles: int
+    metadata: dict[str, Any]  # frozen at runtime via __post_init__
+    id: np.ndarray | None = None
+
+    def __post_init__(self) -> None:
+        if self.position is None and self.velocity is None:
+            msg = "At least one of position or velocity must be provided"
+            raise ValueError(msg)
+        if self.charge.dtype != np.float64:
+            msg = (
+                f"charge must be float64 (particle ID precision), "
+                f"got {self.charge.dtype}"
+            )
+            raise ValueError(msg)
+        if self.charge.shape != (self.n_particles,):
+            msg = (
+                f"charge shape {self.charge.shape} does not match "
+                f"n_particles ({self.n_particles},)"
+            )
+            raise ValueError(msg)
+        if self.position is not None and self.position.shape != (self.n_particles, 3):
+            msg = (
+                f"position shape {self.position.shape} does not match "
+                f"(n_particles, 3) = ({self.n_particles}, 3)"
+            )
+            raise ValueError(msg)
+        if self.velocity is not None and self.velocity.shape != (self.n_particles, 3):
+            msg = (
+                f"velocity shape {self.velocity.shape} does not match "
+                f"(n_particles, 3) = ({self.n_particles}, 3)"
+            )
+            raise ValueError(msg)
+        if self.id is not None and self.id.shape != (self.n_particles,):
+            msg = (
+                f"id shape {self.id.shape} does not match "
+                f"n_particles ({self.n_particles},)"
+            )
+            raise ValueError(msg)
+        object.__setattr__(self, "metadata", MappingProxyType(dict(self.metadata)))
+
+    @property
+    def x(self) -> FloatArray:
+        """X positions (view into ``position[:, 0]``)."""
+        if self.position is None:
+            msg = "position was not loaded"
+            raise ValueError(msg)
+        return self.position[:, 0]
+
+    @property
+    def y(self) -> FloatArray:
+        """Y positions (view into ``position[:, 1]``)."""
+        if self.position is None:
+            msg = "position was not loaded"
+            raise ValueError(msg)
+        return self.position[:, 1]
+
+    @property
+    def z(self) -> FloatArray:
+        """Z positions (view into ``position[:, 2]``)."""
+        if self.position is None:
+            msg = "position was not loaded"
+            raise ValueError(msg)
+        return self.position[:, 2]
+
+    @property
+    def vx(self) -> FloatArray:
+        """X velocities (view into ``velocity[:, 0]``)."""
+        if self.velocity is None:
+            msg = "velocity was not loaded"
+            raise ValueError(msg)
+        return self.velocity[:, 0]
+
+    @property
+    def vy(self) -> FloatArray:
+        """Y velocities (view into ``velocity[:, 1]``)."""
+        if self.velocity is None:
+            msg = "velocity was not loaded"
+            raise ValueError(msg)
+        return self.velocity[:, 1]
+
+    @property
+    def vz(self) -> FloatArray:
+        """Z velocities (view into ``velocity[:, 2]``)."""
+        if self.velocity is None:
+            msg = "velocity was not loaded"
+            raise ValueError(msg)
+        return self.velocity[:, 2]
+
+    def __len__(self) -> int:
+        return self.n_particles
+
+    def __repr__(self) -> str:
+        loaded = []
+        if self.position is not None:
+            loaded.append("position")
+        if self.velocity is not None:
+            loaded.append("velocity")
+        loaded.append("charge")
+        if self.id is not None:
+            loaded.append("id")
+        return (
+            f"ParticleData({self.species_name!r}, "
+            f"n={self.n_particles:,}, "
+            f"loaded=[{', '.join(loaded)}])"
+        )

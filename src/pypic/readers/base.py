@@ -1,28 +1,47 @@
-"""Core data containers: GridInfo, FieldDataset, SimulationReader, SimulationConfig."""
+"""FieldDataset and re-exports from _grid, _containers, _protocols."""
 
 from __future__ import annotations
 
 import copy
-from dataclasses import dataclass, field
 from types import MappingProxyType
-from typing import TYPE_CHECKING, Any, Protocol, assert_never, runtime_checkable
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 import xarray as xr
 
 from pypic.coordinates.geometry import (
-    CARTESIAN,
+    CARTESIAN,  # noqa: F401 — used in doctests
     CYLINDRICAL,  # noqa: F401 — used in doctests
     SPHERICAL,  # noqa: F401 — used in doctests
-    CoordinateGeometry,
-    GeometryType,
 )
 from pypic.coordinates.transforms import FrameTransform
+from pypic.readers._containers import ParticleData, SimulationConfig, TabularData
+from pypic.readers._grid import (
+    _CARTESIAN_ALIASES,
+    _CARTESIAN_UNDERSCORE_ALIASES,
+    _CYLINDRICAL_ALIASES,
+    _CYLINDRICAL_UNDERSCORE_ALIASES,
+    _FIELD_PREFIX_PAIRS,
+    _NUMBERED_UNDERSCORE_ALIASES,
+    _SCALAR_UNDERSCORE_ALIASES,
+    _SPECIES_ALIASES,
+    _SPHERICAL_ALIASES,
+    _SPHERICAL_UNDERSCORE_ALIASES,
+    GridInfo,
+    _build_grid_from_dataset,
+    _default_aliases,
+)
+from pypic.readers._protocols import (
+    AuxiliaryDataReader,
+    ParticleDataReader,
+    SimulationReader,
+    score_signals,
+    supports_selective_read,
+)
 from pypic.units import PhysicsParams
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence
-    from pathlib import Path
 
     from xarray import Dataset
 
@@ -30,250 +49,32 @@ if TYPE_CHECKING:
     from pypic.types import FloatArray
     from pypic.units import Normalization, SpeciesInfo
 
-
-@dataclass(frozen=True, slots=True)
-class GridInfo:
-    r"""Structured grid metadata for 1D/2D/3D simulation domains.
-
-    Parameters
-    ----------
-    dimensions : tuple[int, ...]
-        Number of cells along each axis.
-    spacing : tuple[float, ...]
-        Cell size along each axis in code units.
-    origin : tuple[float, ...]
-        Lower-left corner coordinate of the domain.
-    geometry : CoordinateGeometry
-        Coordinate system (Cartesian, spherical, cylindrical).
-    dt : float | None
-        Timestep size in code units, if known.
-    boundary : tuple[str, ...] | None
-        Boundary condition per axis (e.g. ``("periodic", "open", "periodic")``).
-
-    Examples
-    --------
-    >>> grid = GridInfo(
-    ...     dimensions=(4,), spacing=(0.5,), origin=(0.0,),
-    ...     geometry=CARTESIAN,
-    ... )
-    >>> grid.coordinate_arrays()[0]
-    array([0.25, 0.75, 1.25, 1.75])
-    """
-
-    dimensions: tuple[int, ...]
-    spacing: tuple[float, ...]
-    origin: tuple[float, ...] = ()
-    geometry: CoordinateGeometry = CARTESIAN
-    dt: float | None = None
-    boundary: tuple[str, ...] | None = None
-    surviving_axes: tuple[int, ...] | None = None
-
-    def __post_init__(self) -> None:
-        ndim = len(self.dimensions)
-        if not self.origin:
-            object.__setattr__(self, "origin", (0.0,) * ndim)
-        if len(self.spacing) != ndim or len(self.origin) != ndim:
-            msg = (
-                f"Length mismatch: dimensions({ndim}), "
-                f"spacing({len(self.spacing)}), origin({len(self.origin)})"
-            )
-            raise ValueError(msg)
-        for i, d in enumerate(self.dimensions):
-            if d <= 0:
-                raise ValueError(f"dimensions[{i}] must be > 0, got {d}")
-        for i, s in enumerate(self.spacing):
-            if s <= 0:
-                raise ValueError(f"spacing[{i}] must be > 0, got {s}")
-        if self.dt is not None and self.dt <= 0:
-            raise ValueError(f"dt must be > 0, got {self.dt}")
-        if self.boundary is not None and len(self.boundary) != ndim:
-            msg = (
-                f"boundary length ({len(self.boundary)}) "
-                f"must match dimensions length ({ndim})"
-            )
-            raise ValueError(msg)
-        if self.surviving_axes is not None and len(self.surviving_axes) != ndim:
-            msg = (
-                f"surviving_axes length ({len(self.surviving_axes)}) "
-                f"must match dimensions length ({ndim})"
-            )
-            raise ValueError(msg)
-
-    @property
-    def surviving_axis_names(self) -> tuple[str, ...]:
-        """Axis names for the current dimensions.
-
-        After slicing, returns only the names of axes that survived
-        (e.g. ``("x", "z")`` after removing the y-axis). When no
-        slicing has occurred, returns the first *ndim* names from
-        the geometry.
-
-        Examples
-        --------
-        >>> grid = GridInfo(
-        ...     dimensions=(4, 3, 2), spacing=(1.0, 1.0, 1.0),
-        ...     geometry=CARTESIAN,
-        ... )
-        >>> grid.surviving_axis_names
-        ('x', 'y', 'z')
-        >>> import copy
-        >>> sliced = copy.replace(
-        ...     grid, dimensions=(4, 2), spacing=(1.0, 1.0),
-        ...     origin=(0.0, 0.0), surviving_axes=(0, 2),
-        ... )
-        >>> sliced.surviving_axis_names
-        ('x', 'z')
-        """
-        if self.surviving_axes is not None:
-            return tuple(self.geometry.axis_names[i] for i in self.surviving_axes)
-        return self.geometry.axis_names[: len(self.dimensions)]
-
-    def coordinate_arrays(self) -> tuple[FloatArray, ...]:
-        r"""Cell-centered coordinate arrays for each axis.
-
-        Returns
-        -------
-        tuple[FloatArray, ...]
-            One 1-D array per axis: ``origin[i] + (arange(n) + 0.5) * dx[i]``.
-
-        Examples
-        --------
-        >>> grid = GridInfo(
-        ...     dimensions=(3, 2), spacing=(1.0, 2.0), origin=(0.0, 0.0),
-        ...     geometry=CARTESIAN,
-        ... )
-        >>> x, y = grid.coordinate_arrays()
-        >>> x
-        array([0.5, 1.5, 2.5])
-        >>> y
-        array([1., 3.])
-        """
-        return tuple(
-            self.origin[i] + (np.arange(self.dimensions[i]) + 0.5) * self.spacing[i]
-            for i in range(len(self.dimensions))
-        )
-
-
-_FIELD_PREFIX_PAIRS = (
-    ("B", "B"),
-    ("B0", "B0"),  # split-B background field (BATSRUS)
-    ("E", "E"),
-    ("EF", "EF"),  # per-species energy flux (iPIC3D H5hut)
-    ("J", "J"),
-    ("V", "V"),
-    ("v", "V"),  # lowercase convenience alias
-    ("Ve", "Ve"),
-    ("S", "S"),
-    ("u", "u"),  # four-velocity
-)
-
-
-def _build_aliases(
-    suffixes: tuple[str, str, str], *, separator: str = ""
-) -> dict[str, str]:
-    """Generate field name aliases for a coordinate system.
-
-    Parameters
-    ----------
-    suffixes : tuple[str, str, str]
-        Coordinate suffixes (e.g. ``("x", "y", "z")``).
-    separator : str
-        Separator between prefix and suffix. ``""`` gives ``Bx``,
-        ``"_"`` gives ``B_x``.
-    """
-    aliases: dict[str, str] = {}
-    for alias_prefix, canonical_prefix in _FIELD_PREFIX_PAIRS:
-        for i, suffix in enumerate(suffixes, 1):
-            aliases[f"{alias_prefix}{separator}{suffix}"] = f"{canonical_prefix}{i}"
-    return aliases
-
-
-_CARTESIAN_ALIASES = _build_aliases(("x", "y", "z"))
-_SPHERICAL_ALIASES = _build_aliases(("r", "theta", "phi"))
-_CYLINDRICAL_ALIASES = _build_aliases(("r", "phi", "z"))
-
-_CARTESIAN_UNDERSCORE_ALIASES = _build_aliases(("x", "y", "z"), separator="_")
-_SPHERICAL_UNDERSCORE_ALIASES = _build_aliases(("r", "theta", "phi"), separator="_")
-_CYLINDRICAL_UNDERSCORE_ALIASES = _build_aliases(("r", "phi", "z"), separator="_")
-
-# Numbered underscore aliases (B_1→B1, E_2→E2, etc.) — geometry-independent
-_NUMBERED_UNDERSCORE_ALIASES: dict[str, str] = {}
-for _alias_pfx, _canon_pfx in _FIELD_PREFIX_PAIRS:
-    for _i in (1, 2, 3):
-        _NUMBERED_UNDERSCORE_ALIASES[f"{_alias_pfx}_{_i}"] = f"{_canon_pfx}{_i}"
-
-# Scalar underscore aliases (P_e→Pe, T_i→Ti, pressure tensor components)
-_SCALAR_UNDERSCORE_ALIASES: dict[str, str] = {
-    "P_e": "Pe",
-    "P_i": "Pi",
-    "T_e": "Te",
-    "T_i": "Ti",
-    "P_11": "P11",
-    "P_12": "P12",
-    "P_13": "P13",
-    "P_22": "P22",
-    "P_23": "P23",
-    "P_33": "P33",
-}
-
-# Species-convenience aliases (geometry-independent)
-_SPECIES_ALIASES: dict[str, str] = {
-    "n_e": "n_s0",
-    "n_i": "n_s1",
-}
-
-
-def _default_aliases(geometry: CoordinateGeometry) -> dict[str, str]:
-    """Return geometry-specific field name aliases plus species aliases."""
-    match geometry.type:
-        case GeometryType.CARTESIAN:
-            aliases = dict(_CARTESIAN_ALIASES)
-            aliases.update(_CARTESIAN_UNDERSCORE_ALIASES)
-        case GeometryType.SPHERICAL:
-            aliases = dict(_SPHERICAL_ALIASES)
-            aliases.update(_SPHERICAL_UNDERSCORE_ALIASES)
-        case GeometryType.CYLINDRICAL:
-            aliases = dict(_CYLINDRICAL_ALIASES)
-            aliases.update(_CYLINDRICAL_UNDERSCORE_ALIASES)
-        case _ as unreachable:
-            assert_never(unreachable)
-    aliases.update(_NUMBERED_UNDERSCORE_ALIASES)
-    aliases.update(_SCALAR_UNDERSCORE_ALIASES)
-    aliases.update(_SPECIES_ALIASES)
-    return aliases
-
-
-def _build_grid_from_dataset(old_grid: GridInfo, new_ds: Dataset) -> GridInfo:
-    """Derive a reduced GridInfo from a sliced xr.Dataset."""
-    current_names = old_grid.surviving_axis_names
-    surviving: list[tuple[int, str]] = []  # (local_index, name)
-
-    for local_idx, name in enumerate(current_names):
-        if name in new_ds.dims:
-            surviving.append((local_idx, name))
-
-    # Map local indices back to original 3D geometry axis indices
-    if old_grid.surviving_axes is not None:
-        new_surviving = tuple(old_grid.surviving_axes[li] for li, _ in surviving)
-    else:
-        new_surviving = tuple(li for li, _ in surviving)
-
-    new_boundary = None
-    if old_grid.boundary is not None:
-        new_boundary = tuple(old_grid.boundary[i] for i, _ in surviving)
-
-    return copy.replace(
-        old_grid,
-        dimensions=tuple(int(new_ds.sizes[name]) for _, name in surviving),
-        spacing=tuple(old_grid.spacing[i] for i, _ in surviving),
-        origin=tuple(
-            # invert cell-center formula: coord[0] = origin + 0.5*spacing
-            float(new_ds.coords[name].values[0]) - 0.5 * old_grid.spacing[i]
-            for i, name in surviving
-        ),
-        boundary=new_boundary,
-        surviving_axes=new_surviving,
-    )
+# Re-export everything for backward compatibility — dozens of internal
+# modules import from ``pypic.readers.base``.
+__all__ = [
+    "_CARTESIAN_ALIASES",
+    "_CARTESIAN_UNDERSCORE_ALIASES",
+    "_CYLINDRICAL_ALIASES",
+    "_CYLINDRICAL_UNDERSCORE_ALIASES",
+    "_FIELD_PREFIX_PAIRS",
+    "_NUMBERED_UNDERSCORE_ALIASES",
+    "_SCALAR_UNDERSCORE_ALIASES",
+    "_SPECIES_ALIASES",
+    "_SPHERICAL_ALIASES",
+    "_SPHERICAL_UNDERSCORE_ALIASES",
+    "AuxiliaryDataReader",
+    "FieldDataset",
+    "GridInfo",
+    "ParticleData",
+    "ParticleDataReader",
+    "SimulationConfig",
+    "SimulationReader",
+    "TabularData",
+    "_build_grid_from_dataset",
+    "_default_aliases",
+    "score_signals",
+    "supports_selective_read",
+]
 
 
 class FieldDataset:
@@ -1239,475 +1040,3 @@ class FieldDataset:
         axis_names = list(self._grid.surviving_axis_names)
         mask_da = xr.DataArray(cond, dims=axis_names)
         return self._wrap_sliced(self._ds.where(mask_da, other=other))
-
-
-@runtime_checkable
-class SimulationReader(Protocol):
-    """Protocol for simulation-specific file readers.
-
-    Any class with ``read_timestep`` and ``available_timesteps`` methods
-    satisfies this protocol — no inheritance required.
-    """
-
-    def read_timestep(self, path: Path, step: int) -> FieldDataset:
-        """Read field data for a single timestep."""
-        ...
-
-    def available_timesteps(self, path: Path) -> list[int]:
-        """Return sorted list of available timestep indices."""
-        ...
-
-
-@dataclass(frozen=True, slots=True)
-class SimulationConfig:
-    """Parsed simulation configuration from a TOML config file.
-
-    Parameters
-    ----------
-    model_name : str
-        Human-readable name for the simulation run.
-    model_type : str
-        Simulation type identifier (e.g. ``"pic"``, ``"mhd"``).
-    grid : GridInfo
-        Grid metadata (includes coordinate geometry).
-    normalization : Normalization
-        Unit system.
-    species : tuple[SpeciesInfo, ...]
-        Species definitions (tuple for immutability).
-    physics : PhysicsParams
-        Physics parameters (frozen dataclass).
-    frame : str
-        Reference frame label (e.g. ``"GSM"``, ``"simulation"``).
-    metadata : dict[str, Any]
-        Additional configuration data (immutable after construction).
-
-    Examples
-    --------
-    >>> from pypic.units import Normalization, SpeciesInfo
-    >>> cfg = SimulationConfig(
-    ...     model_name="test", model_type="pic",
-    ...     grid=GridInfo(
-    ...         dimensions=(4,), spacing=(1.0,), origin=(0.0,),
-    ...         geometry=CARTESIAN,
-    ...     ),
-    ...     normalization=Normalization.identity(),
-    ...     species=(SpeciesInfo(name="e", charge=-1.0, mass=1.0),),
-    ... )
-    >>> cfg.model_name
-    'test'
-    """
-
-    model_name: str
-    model_type: str
-    grid: GridInfo
-    normalization: Normalization
-    species: tuple[SpeciesInfo, ...] = ()
-    physics: PhysicsParams = field(default_factory=lambda: PhysicsParams())
-    frame: str = "simulation"
-    transforms: dict[str, FrameTransform] = field(default_factory=dict)
-    metadata: dict[str, Any] = field(default_factory=dict)  # frozen via __post_init__
-
-    def __post_init__(self) -> None:
-        # Wrap mutable dicts in read-only proxies to enforce true immutability.
-        # Callers pass plain dicts; frozen assignment uses object.__setattr__.
-        object.__setattr__(
-            self,
-            "transforms",
-            MappingProxyType(dict(self.transforms)),
-        )
-        object.__setattr__(self, "metadata", MappingProxyType(dict(self.metadata)))
-
-
-@dataclass(frozen=True, slots=True)
-class TabularData:
-    r"""Generic columnar container for auxiliary time-series data.
-
-    Stores named 1-D arrays sharing a common length, with optional
-    index column designation.  Used for conserved quantities, solver
-    diagnostics, virtual satellite probes, etc.
-
-    Parameters
-    ----------
-    name : str
-        Dataset label (e.g. ``"conserved_quantities"``).
-    columns : dict[str, FloatArray]
-        Column name → 1-D array mapping.  All arrays must have
-        the same length.
-    index_column : str | None
-        Which column serves as the index (e.g. ``"cycle"``).
-        ``None`` means row-indexed.
-    metadata : dict[str, Any]
-        Source info (reader name, file path, etc.).
-
-    Examples
-    --------
-    >>> import numpy as np
-    >>> tab = TabularData(
-    ...     name="diagnostics",
-    ...     columns={"cycle": np.array([0.0, 1.0, 2.0]),
-    ...              "energy": np.array([1.0, 0.9, 0.8])},
-    ...     index_column="cycle",
-    ... )
-    >>> tab["energy"]
-    array([1. , 0.9, 0.8])
-    >>> len(tab)
-    3
-    >>> "cycle" in tab
-    True
-    >>> tab.column_names
-    ['cycle', 'energy']
-    """
-
-    name: str
-    columns: dict[str, FloatArray]  # frozen at runtime via __post_init__
-    index_column: str | None = None
-    metadata: dict[str, Any] = field(default_factory=dict)  # frozen at runtime
-
-    def __post_init__(self) -> None:
-        # Validate before freezing
-        if self.columns:
-            lengths = {k: len(v) for k, v in self.columns.items()}
-            unique_lengths = set(lengths.values())
-            if len(unique_lengths) > 1:
-                msg = f"All columns must have equal length, got {lengths}"
-                raise ValueError(msg)
-        if self.index_column is not None and self.index_column not in self.columns:
-            msg = (
-                f"index_column {self.index_column!r} not found "
-                f"in columns: {sorted(self.columns)}"
-            )
-            raise ValueError(msg)
-        # Wrap mutable dicts in read-only proxies
-        object.__setattr__(self, "columns", MappingProxyType(dict(self.columns)))
-        object.__setattr__(self, "metadata", MappingProxyType(dict(self.metadata)))
-
-    def __getitem__(self, key: str) -> FloatArray:
-        """Return a column by name.
-
-        Parameters
-        ----------
-        key : str
-            Column name.
-
-        Returns
-        -------
-        FloatArray
-
-        Raises
-        ------
-        KeyError
-            If *key* is not a column name.
-        """
-        try:
-            return self.columns[key]
-        except KeyError:
-            msg = f"Column {key!r} not found. Available: {sorted(self.columns)}"
-            raise KeyError(msg) from None
-
-    def __contains__(self, key: object) -> bool:
-        """Check whether *key* is a column name."""
-        return key in self.columns
-
-    def __len__(self) -> int:
-        """Return the number of rows (common array length)."""
-        if not self.columns:
-            return 0
-        return len(next(iter(self.columns.values())))
-
-    @property
-    def column_names(self) -> list[str]:
-        """Sorted list of column names."""
-        return sorted(self.columns)
-
-    @property
-    def index(self) -> FloatArray:
-        """Index array: the designated index column, or ``np.arange(len)``."""
-        if self.index_column is not None:
-            return self.columns[self.index_column]
-        return np.arange(len(self), dtype=np.float64)
-
-
-@dataclass(frozen=True, slots=True)
-class ParticleData:
-    r"""Container for particle data from a single species at one timestep.
-
-    Stores position and velocity as ``(N, 3)`` arrays with selective
-    loading: either can be ``None`` if not requested.  The ``charge``
-    array is **always** loaded because per-particle $q$ doubles as a
-    unique particle identifier (each particle's weight is unique at
-    full float64 precision in restart files).
-
-    Parameters
-    ----------
-    species_index : int
-        Zero-based species index.
-    species_name : str
-        Human-readable species name (e.g. ``"electrons"``).
-    position : FloatArray | None
-        Particle positions, shape ``(N, 3)``. ``None`` if not loaded.
-    velocity : FloatArray | None
-        Particle velocities, shape ``(N, 3)``. ``None`` if not loaded.
-    charge : FloatArray
-        Per-particle charge/weight, shape ``(N,)``. Always float64.
-    n_particles : int
-        Total particle count.
-    id : np.ndarray | None
-        Integer particle tracking IDs, shape ``(N,)``. ``None`` if not
-        available or not requested.
-    metadata : dict[str, Any]
-        Source info (file path, format, etc.).
-
-    Examples
-    --------
-    >>> import numpy as np
-    >>> pcl = ParticleData(
-    ...     species_index=0, species_name="electrons",
-    ...     position=np.zeros((10, 3)),
-    ...     velocity=np.ones((10, 3)),
-    ...     charge=np.full(10, -1.0),
-    ...     n_particles=10, metadata={},
-    ... )
-    >>> pcl.x.shape
-    (10,)
-    >>> len(pcl)
-    10
-    """
-
-    species_index: int
-    species_name: str
-    position: FloatArray | None
-    velocity: FloatArray | None
-    charge: FloatArray
-    n_particles: int
-    metadata: dict[str, Any]  # frozen at runtime via __post_init__
-    id: np.ndarray | None = None
-
-    def __post_init__(self) -> None:
-        if self.position is None and self.velocity is None:
-            msg = "At least one of position or velocity must be provided"
-            raise ValueError(msg)
-        if self.charge.dtype != np.float64:
-            msg = (
-                f"charge must be float64 (particle ID precision), "
-                f"got {self.charge.dtype}"
-            )
-            raise ValueError(msg)
-        if self.charge.shape != (self.n_particles,):
-            msg = (
-                f"charge shape {self.charge.shape} does not match "
-                f"n_particles ({self.n_particles},)"
-            )
-            raise ValueError(msg)
-        if self.position is not None and self.position.shape != (self.n_particles, 3):
-            msg = (
-                f"position shape {self.position.shape} does not match "
-                f"(n_particles, 3) = ({self.n_particles}, 3)"
-            )
-            raise ValueError(msg)
-        if self.velocity is not None and self.velocity.shape != (self.n_particles, 3):
-            msg = (
-                f"velocity shape {self.velocity.shape} does not match "
-                f"(n_particles, 3) = ({self.n_particles}, 3)"
-            )
-            raise ValueError(msg)
-        if self.id is not None and self.id.shape != (self.n_particles,):
-            msg = (
-                f"id shape {self.id.shape} does not match "
-                f"n_particles ({self.n_particles},)"
-            )
-            raise ValueError(msg)
-        object.__setattr__(self, "metadata", MappingProxyType(dict(self.metadata)))
-
-    @property
-    def x(self) -> FloatArray:
-        """X positions (view into ``position[:, 0]``)."""
-        if self.position is None:
-            msg = "position was not loaded"
-            raise ValueError(msg)
-        return self.position[:, 0]
-
-    @property
-    def y(self) -> FloatArray:
-        """Y positions (view into ``position[:, 1]``)."""
-        if self.position is None:
-            msg = "position was not loaded"
-            raise ValueError(msg)
-        return self.position[:, 1]
-
-    @property
-    def z(self) -> FloatArray:
-        """Z positions (view into ``position[:, 2]``)."""
-        if self.position is None:
-            msg = "position was not loaded"
-            raise ValueError(msg)
-        return self.position[:, 2]
-
-    @property
-    def vx(self) -> FloatArray:
-        """X velocities (view into ``velocity[:, 0]``)."""
-        if self.velocity is None:
-            msg = "velocity was not loaded"
-            raise ValueError(msg)
-        return self.velocity[:, 0]
-
-    @property
-    def vy(self) -> FloatArray:
-        """Y velocities (view into ``velocity[:, 1]``)."""
-        if self.velocity is None:
-            msg = "velocity was not loaded"
-            raise ValueError(msg)
-        return self.velocity[:, 1]
-
-    @property
-    def vz(self) -> FloatArray:
-        """Z velocities (view into ``velocity[:, 2]``)."""
-        if self.velocity is None:
-            msg = "velocity was not loaded"
-            raise ValueError(msg)
-        return self.velocity[:, 2]
-
-    def __len__(self) -> int:
-        return self.n_particles
-
-    def __repr__(self) -> str:
-        loaded = []
-        if self.position is not None:
-            loaded.append("position")
-        if self.velocity is not None:
-            loaded.append("velocity")
-        loaded.append("charge")
-        if self.id is not None:
-            loaded.append("id")
-        return (
-            f"ParticleData({self.species_name!r}, "
-            f"n={self.n_particles:,}, "
-            f"loaded=[{', '.join(loaded)}])"
-        )
-
-
-@runtime_checkable
-class ParticleDataReader(Protocol):
-    """Opt-in protocol for readers that provide particle data.
-
-    Readers implement this alongside ``SimulationReader`` to advertise
-    and load per-species particle arrays (position, velocity, charge).
-    """
-
-    def available_particle_steps(self, path: Path) -> list[int]:
-        """Return sorted timestep indices that have particle data."""
-        ...
-
-    def read_particles(
-        self,
-        path: Path,
-        step: int,
-        species: int,
-        *,
-        columns: Iterable[str] | None = None,
-    ) -> ParticleData:
-        """Load particle data for one species at one timestep.
-
-        Parameters
-        ----------
-        path : Path
-            Simulation output directory.
-        step : int
-            Timestep index.
-        species : int
-            Zero-based species index.
-        columns : Iterable[str] | None
-            Subset of ``{"position", "velocity"}`` to load.
-            ``None`` loads all.  ``charge`` is always loaded.
-        """
-        ...
-
-
-def supports_selective_read(reader: SimulationReader) -> bool:
-    """Check whether *reader* accepts a ``fields`` keyword on ``read_timestep``.
-
-    Inspects the method signature once at dispatch time.  This is more
-    reliable than ``@runtime_checkable`` protocols (which only check
-    method names, not parameter signatures) and clearer than calling
-    ``inspect.signature`` inline at the call site.
-
-    Examples
-    --------
-    >>> class Selective:
-    ...     def read_timestep(self, path, step, *, fields=None): ...
-    ...     def available_timesteps(self, path): return []
-    >>> supports_selective_read(Selective())
-    True
-    >>> class Basic:
-    ...     def read_timestep(self, path, step): ...
-    ...     def available_timesteps(self, path): return []
-    >>> supports_selective_read(Basic())
-    False
-    """
-    import inspect
-
-    sig = inspect.signature(reader.read_timestep)
-    return "fields" in sig.parameters
-
-
-def score_signals(path: Path, signals: Sequence[tuple[str, float]]) -> float:
-    """Sum weights of glob patterns that match entries under *path*.
-
-    For each ``(pattern, weight)`` pair the helper checks whether
-    ``path.glob(pattern)`` yields at least one entry and, if so, adds
-    ``weight`` to the running score. Intended for reader probe functions
-    (``can_read_confidence``) so the glob-and-accumulate boilerplate does
-    not get duplicated across every reader.
-
-    Signals that require reading file contents, filtering matches by
-    regex, or distinguishing files from directories should be evaluated
-    by the caller and added on top of the returned score. The caller is
-    responsible for any conditional logic beyond "pattern present → add
-    weight".
-
-    Parameters
-    ----------
-    path : Path
-        Directory to scan. Non-directories return ``0.0`` immediately.
-    signals : Sequence[tuple[str, float]]
-        Pairs of ``(glob_pattern, weight)`` to test against *path*.
-
-    Returns
-    -------
-    float
-        Sum of matching weights, clamped to ``[0.0, 1.0]``.
-
-    Examples
-    --------
-    >>> import tempfile
-    >>> from pathlib import Path
-    >>> with tempfile.TemporaryDirectory() as d:
-    ...     p = Path(d)
-    ...     (p / "config.toml").touch()
-    ...     (p / "data.h5").touch()
-    ...     score_signals(p, [("*.toml", 0.5), ("*.h5", 0.3), ("*.nc", 0.9)])
-    0.8
-    """
-    if not path.is_dir():
-        return 0.0
-    score = 0.0
-    for pattern, weight in signals:
-        if next(path.glob(pattern), None) is not None:
-            score += weight
-    return min(score, 1.0)
-
-
-@runtime_checkable
-class AuxiliaryDataReader(Protocol):
-    """Opt-in protocol for readers that provide auxiliary tabular data.
-
-    Readers implement this alongside ``SimulationReader`` to advertise
-    and load non-field data (conserved quantities, diagnostics, probes).
-    """
-
-    def available_auxiliary(self, path: Path) -> list[str]:
-        """Return names of auxiliary datasets discoverable at *path*."""
-        ...
-
-    def load_auxiliary(self, path: Path, name: str) -> TabularData:
-        """Load a named auxiliary dataset from *path*."""
-        ...
