@@ -391,11 +391,11 @@ class FieldDataset:
         # The grid transformation (transpose + flip) only works for
         # signed permutation matrices (axis swaps and reflections).
         # General rotations would require interpolation onto a new grid.
-        r_sub = rotation[np.ix_(indices, indices)]
-        abs_r = np.abs(r_sub)
+        rotation_sub = rotation[np.ix_(indices, indices)]
+        abs_rotation = np.abs(rotation_sub)
         if not (
-            np.allclose(np.sum(abs_r, axis=1), 1.0, atol=1e-6)
-            and np.allclose(np.sum(abs_r, axis=0), 1.0, atol=1e-6)
+            np.allclose(np.sum(abs_rotation, axis=1), 1.0, atol=1e-6)
+            and np.allclose(np.sum(abs_rotation, axis=0), 1.0, atol=1e-6)
         ):
             raise NotImplementedError(
                 "transform_to() only supports axis-swap/reflection "
@@ -403,30 +403,30 @@ class FieldDataset:
                 "rotations require grid interpolation (not yet implemented)."
             )
 
-        t_origin = np.array(transform.origin, dtype=np.float64)
+        transform_origin = np.array(transform.origin, dtype=np.float64)
         dx_scale = transform.scale
 
         # Determine axis permutation and sign from rotation matrix.
         # For each TARGET axis (row of R), find which SOURCE axis
         # it draws from (the single nonzero column) and its sign.
-        perm: list[int] = []  # perm[target_i] = source local index
-        signs: list[float] = []  # sign of the mapping
+        axis_permutation: list[int] = []  # [target_i] = source local index
+        axis_signs: list[float] = []  # sign of the mapping
         for target_i in indices:
             row = rotation[target_i, :]
             source_orig = int(np.argmax(np.abs(row[indices])))
-            perm.append(source_orig)
-            signs.append(float(np.sign(row[indices[source_orig]])))
+            axis_permutation.append(source_orig)
+            axis_signs.append(float(np.sign(row[indices[source_orig]])))
 
         # Transpose + flip arrays to match target axis ordering. By this
         # point every entry in new_vars is a DataArray (rotated above or
         # copied from self._ds), so .values and .attrs are always present.
-        needs_transpose = perm != list(range(ndim))
-        flip_axes = [i for i, s in enumerate(signs) if s < 0]
+        needs_transpose = axis_permutation != list(range(ndim))
+        flip_axes = [i for i, s in enumerate(axis_signs) if s < 0]
         if needs_transpose or flip_axes:
             for name, da in list(new_vars.items()):
                 arr = da.values
                 if needs_transpose:
-                    arr = np.transpose(arr, perm)
+                    arr = np.transpose(arr, axis_permutation)
                 for ax in flip_axes:
                     arr = np.flip(arr, axis=ax)
                 new_vars[name] = xr.DataArray(
@@ -439,12 +439,12 @@ class FieldDataset:
         new_origin_list: list[float] = []
         new_spacing_list: list[float] = []
         new_dims_list: list[int] = []
-        for src_i, sign in zip(perm, signs, strict=True):
+        for src_i, sign in zip(axis_permutation, axis_signs, strict=True):
             src_coords = old_coords[src_i]
-            t_first = dx_scale * sign * (src_coords[0] - t_origin[indices[src_i]])
-            t_last = dx_scale * sign * (src_coords[-1] - t_origin[indices[src_i]])
+            coord_first = dx_scale * sign * (src_coords[0] - transform_origin[indices[src_i]])
+            coord_last = dx_scale * sign * (src_coords[-1] - transform_origin[indices[src_i]])
             dx = dx_scale * self._grid.spacing[src_i]
-            new_origin_list.append(float(min(t_first, t_last)) - 0.5 * dx)
+            new_origin_list.append(float(min(coord_first, coord_last)) - 0.5 * dx)
             new_spacing_list.append(dx)
             new_dims_list.append(self._grid.dimensions[src_i])
 
@@ -452,7 +452,8 @@ class FieldDataset:
         new_surviving = None
         if self._grid.surviving_axes is not None:
             new_surviving = tuple(
-                self._grid.surviving_axes[perm[i]] for i in range(ndim)
+                self._grid.surviving_axes[axis_permutation[i]]
+                for i in range(ndim)
             )
 
         # Update geometry axis names if specified
@@ -905,9 +906,9 @@ class FieldDataset:
         full_result = recipe.func(*args, **kwargs)
 
         result = self
-        for sib_name, comp_idx in siblings.items():
-            if not result.has_field(sib_name):
-                result = result.with_field(sib_name, full_result[comp_idx])
+        for sibling_name, component_index in siblings.items():
+            if not result.has_field(sibling_name):
+                result = result.with_field(sibling_name, full_result[component_index])
         return result
 
     def field_info(self, name: str) -> FieldInfo:

@@ -278,8 +278,8 @@ def power_spectrum_3d(
     kx = 2.0 * np.pi * np.fft.fftfreq(nx, d=dx)
     ky = 2.0 * np.pi * np.fft.fftfreq(ny, d=dy)
     kz = 2.0 * np.pi * np.fft.fftfreq(nz, d=dz)
-    kx_g, ky_g, kz_g = np.meshgrid(kx, ky, kz, indexing="ij")
-    k_radial = np.sqrt(kx_g**2 + ky_g**2 + kz_g**2)
+    kx_grid, ky_grid, kz_grid = np.meshgrid(kx, ky, kz, indexing="ij")
+    k_radial = np.sqrt(kx_grid**2 + ky_grid**2 + kz_grid**2)
 
     # Spherical shell binning (exclude DC)
     k_flat = k_radial.ravel()

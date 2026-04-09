@@ -245,22 +245,27 @@ def _build_grid_from_dataset(old_grid: GridInfo, new_ds: Dataset) -> GridInfo:
 
     # Map local indices back to original 3D geometry axis indices
     if old_grid.surviving_axes is not None:
-        new_surviving = tuple(old_grid.surviving_axes[li] for li, _ in surviving)
+        new_surviving = tuple(
+            old_grid.surviving_axes[local_idx] for local_idx, _ in surviving
+        )
     else:
-        new_surviving = tuple(li for li, _ in surviving)
+        new_surviving = tuple(local_idx for local_idx, _ in surviving)
 
     new_boundary = None
     if old_grid.boundary is not None:
-        new_boundary = tuple(old_grid.boundary[i] for i, _ in surviving)
+        new_boundary = tuple(
+            old_grid.boundary[local_idx] for local_idx, _ in surviving
+        )
 
     return copy.replace(
         old_grid,
         dimensions=tuple(int(new_ds.sizes[name]) for _, name in surviving),
-        spacing=tuple(old_grid.spacing[i] for i, _ in surviving),
+        spacing=tuple(old_grid.spacing[local_idx] for local_idx, _ in surviving),
         origin=tuple(
             # invert cell-center formula: coord[0] = origin + 0.5*spacing
-            float(new_ds.coords[name].values[0]) - 0.5 * old_grid.spacing[i]
-            for i, name in surviving
+            float(new_ds.coords[name].values[0])
+            - 0.5 * old_grid.spacing[local_idx]
+            for local_idx, name in surviving
         ),
         boundary=new_boundary,
         surviving_axes=new_surviving,

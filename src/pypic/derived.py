@@ -1089,9 +1089,9 @@ def kinetic_energy_flux_component(
     >>> kinetic_energy_flux_component(v, v, z, z, np.array([1.0]), 1.0, 1.0)
     array([4.])
     """
-    n = np.abs(rho_c) / abs(charge)
-    v_sq = v1**2 + v2**2 + v3**2
-    return 0.5 * n * mass * v_sq * v_comp
+    number_density = np.abs(rho_c) / abs(charge)
+    velocity_sq = v1**2 + v2**2 + v3**2
+    return 0.5 * number_density * mass * velocity_sq * v_comp
 
 
 def heat_flux_component(
@@ -1348,12 +1348,12 @@ def parallel_pressure(
     ... )
     array([3.])
     """
-    bh1, bh2, bh3 = _unit_vector(b1, b2, b3)
+    bhat_1, bhat_2, bhat_3 = _unit_vector(b1, b2, b3)
     result: FloatArray = (
-        bh1**2 * p11
-        + bh2**2 * p22
-        + bh3**2 * p33
-        + 2.0 * (bh1 * bh2 * p12 + bh1 * bh3 * p13 + bh2 * bh3 * p23)
+        bhat_1**2 * p11
+        + bhat_2**2 * p22
+        + bhat_3**2 * p33
+        + 2.0 * (bhat_1 * bhat_2 * p12 + bhat_1 * bhat_3 * p13 + bhat_2 * bhat_3 * p23)
     )
     return result
 
@@ -1477,35 +1477,35 @@ def agyrotropy(
     ... )
     array([0.])
     """
-    bh1, bh2, bh3 = _unit_vector(b1, b2, b3)
+    bhat_1, bhat_2, bhat_3 = _unit_vector(b1, b2, b3)
 
     p_par = (
-        bh1**2 * p11
-        + bh2**2 * p22
-        + bh3**2 * p33
-        + 2.0 * (bh1 * bh2 * p12 + bh1 * bh3 * p13 + bh2 * bh3 * p23)
+        bhat_1**2 * p11
+        + bhat_2**2 * p22
+        + bhat_3**2 * p33
+        + 2.0 * (bhat_1 * bhat_2 * p12 + bhat_1 * bhat_3 * p13 + bhat_2 * bhat_3 * p23)
     )
 
-    i_1 = p11 + p22 + p33 - p_par
+    invariant_1 = p11 + p22 + p33 - p_par
 
     # Double-projected perpendicular tensor: Π = (I-b̂b̂)·P·(I-b̂b̂)
     # Π_ij = P_ij - (Pb̂)_i b̂_j - b̂_i (Pb̂)_j + P_∥ b̂_i b̂_j
-    pb1 = p11 * bh1 + p12 * bh2 + p13 * bh3
-    pb2 = p12 * bh1 + p22 * bh2 + p23 * bh3
-    pb3 = p13 * bh1 + p23 * bh2 + p33 * bh3
+    p_dot_bhat_1 = p11 * bhat_1 + p12 * bhat_2 + p13 * bhat_3
+    p_dot_bhat_2 = p12 * bhat_1 + p22 * bhat_2 + p23 * bhat_3
+    p_dot_bhat_3 = p13 * bhat_1 + p23 * bhat_2 + p33 * bhat_3
 
-    pi11 = p11 - 2.0 * pb1 * bh1 + p_par * bh1**2
-    pi22 = p22 - 2.0 * pb2 * bh2 + p_par * bh2**2
-    pi33 = p33 - 2.0 * pb3 * bh3 + p_par * bh3**2
-    pi12 = p12 - pb1 * bh2 - bh1 * pb2 + p_par * bh1 * bh2
-    pi13 = p13 - pb1 * bh3 - bh1 * pb3 + p_par * bh1 * bh3
-    pi23 = p23 - pb2 * bh3 - bh2 * pb3 + p_par * bh2 * bh3
+    perp_11 = p11 - 2.0 * p_dot_bhat_1 * bhat_1 + p_par * bhat_1**2
+    perp_22 = p22 - 2.0 * p_dot_bhat_2 * bhat_2 + p_par * bhat_2**2
+    perp_33 = p33 - 2.0 * p_dot_bhat_3 * bhat_3 + p_par * bhat_3**2
+    perp_12 = p12 - p_dot_bhat_1 * bhat_2 - bhat_1 * p_dot_bhat_2 + p_par * bhat_1 * bhat_2
+    perp_13 = p13 - p_dot_bhat_1 * bhat_3 - bhat_1 * p_dot_bhat_3 + p_par * bhat_1 * bhat_3
+    perp_23 = p23 - p_dot_bhat_2 * bhat_3 - bhat_2 * p_dot_bhat_3 + p_par * bhat_2 * bhat_3
 
-    n_f = pi11**2 + pi22**2 + pi33**2 + 2.0 * (pi12**2 + pi13**2 + pi23**2)
+    frobenius_norm_sq = perp_11**2 + perp_22**2 + perp_33**2 + 2.0 * (perp_12**2 + perp_13**2 + perp_23**2)
 
-    i_2 = (i_1**2 - n_f) / 2.0
+    invariant_2 = (invariant_1**2 - frobenius_norm_sq) / 2.0
 
-    result: FloatArray = 1.0 - _safe_divide(4.0 * i_2, i_1**2)
+    result: FloatArray = 1.0 - _safe_divide(4.0 * invariant_2, invariant_1**2)
     return result
 
 
@@ -1728,11 +1728,11 @@ def hall_electric_field(
     >>> e2.item()
     -0.5
     """
-    nq = n * abs(charge)
+    charge_density_abs = n * abs(charge)
     return (
-        _safe_divide(j2 * b3 - j3 * b2, nq),
-        _safe_divide(j3 * b1 - j1 * b3, nq),
-        _safe_divide(j1 * b2 - j2 * b1, nq),
+        _safe_divide(j2 * b3 - j3 * b2, charge_density_abs),
+        _safe_divide(j3 * b1 - j1 * b3, charge_density_abs),
+        _safe_divide(j1 * b2 - j2 * b1, charge_density_abs),
     )
 
 
