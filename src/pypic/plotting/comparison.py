@@ -139,6 +139,12 @@ def plot_comparison(
 
     values_a = resolve_field_values(data_a, field, units)
     values_b = resolve_field_values(data_b, field, units)
+    if values_a.shape != values_b.shape:
+        msg = (
+            f"Grid shape mismatch: {values_a.shape} vs {values_b.shape}. "
+            f"Regrid datasets to a common grid before comparing."
+        )
+        raise ValueError(msg)
     diff = values_a - values_b
 
     info = data_a.field_info(field)

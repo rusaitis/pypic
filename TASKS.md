@@ -103,6 +103,7 @@ Each step produces something testable. No step starts until the previous step's 
 - [ ] **Step 19: `pypic.regrid` — uniform-to-uniform interpolation**
   `regrid(source, target_grid, *, method="linear") -> FieldDataset` using `scipy.interpolate.RegularGridInterpolator`. `align_grids(a, b) -> (FieldDataset, FieldDataset)` regrids both to the finer grid's intersection domain. `common_grid(a, b) -> GridInfo` computes that target. Cartesian only (raise `NotImplementedError` for spherical/cylindrical, matching `operators.py` pattern). NaN-fill outside source domain. Preserves normalization, species, physics metadata.
   - *Not* a replacement for BATSRUS AMR regridding (block-avg/NN in `batsrus/_grid.py` operates on raw AMR cell data pre-FieldDataset; this module operates on assembled uniform grids via interpolation — different problems, different algorithms).
+  - *Not* responsible for destaggering. Readers destagger to co-located grids on load (see Step 34). This module operates on already-co-located `FieldDataset` grids.
 
 - [ ] **Step 20: cross-grid comparison diagnostics**
   `compare_fields(a, b, field, *, metric="l2") -> float` — aligns grids then computes error. `field_comparison_report(a, b, *, fields=None) -> dict[str, dict[str, float]]` — L2 + Linf for all common fields. These are the only diagnostics functions that touch FieldDataset (existing ones are pure-array); justified because cross-grid comparison inherently needs grid metadata.
@@ -227,6 +228,23 @@ grow.
   bug masked by `identity()` normalization in tests. Fixed by adding a
   `"specific_energy"` quantity type with the correct factor.
 
+- [ ] **Step 34: `StaggerInfo` provenance metadata**
+  Optional frozen dataclass recording original grid stagger convention
+  before destaggering: which fields lived on faces, edges, nodes, or
+  cell centers. Stored in `FieldDataset.metadata["stagger"]` by readers
+  that load from staggered-mesh codes (ARMS, Athena++, BATSRUS
+  face-centered). Purely informational — not used in computation or
+  operators. Enables provenance tracking and documentation of
+  interpolation order used during destaggering.
+  **Architecture note:** Readers are responsible for destaggering to
+  co-located grids. `FieldDataset` always represents a single co-located
+  grid. Diagnostics like `div_b` on destaggered data measure interpolation
+  error + actual divergence; for staggered codes, O(dx²) residual is
+  expected and does not indicate a simulation defect. Carrying stagger
+  through the pipeline (stagger-aware operators) is explicitly out of
+  scope — the complexity cost outweighs the benefit for analysis workflows.
+  **Depends on:** Step 12 (readers).
+
 ---
 
 ## Summary
@@ -268,3 +286,4 @@ grow.
 | 31 | coordinates | Remove default geometry from operators (deferred — see note) | ⏸ |
 | 32 | fields/units | Separate `four_velocity` quantity type | — |
 | 33 | fields/units | `specific_energy` quantity type for enthalpy | ✅ |
+| 34 | readers | `StaggerInfo` provenance metadata | — |

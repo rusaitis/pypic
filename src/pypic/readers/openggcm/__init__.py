@@ -21,6 +21,7 @@ import logging
 import re
 from typing import TYPE_CHECKING
 
+from pypic.readers._config_helpers import merge_simulation_toml
 from pypic.readers.base import SimulationConfig
 from pypic.readers.openggcm._grid import OpenGGCMGrid, parse_grid_file
 from pypic.readers.openggcm._probe import can_read_confidence
@@ -95,7 +96,7 @@ def open_openggcm(
     reader = OpenGGCMReader(grid, prefix, normalization)
 
     grid_info = _make_grid_info(grid)
-    config = SimulationConfig(
+    base_config = SimulationConfig(
         model_name="OpenGGCM",
         model_type="MHD",
         grid=grid_info,
@@ -109,6 +110,7 @@ def open_openggcm(
         },
     )
 
+    config = merge_simulation_toml(path, base_config)
     return reader, config
 
 

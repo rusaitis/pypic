@@ -14,6 +14,8 @@ See @README.md for the project information.
 - No `astropy.units` in computation path (10-100x overhead).
 - No hardcoded coordinate frame names (GSM, GSE, etc.) in function signatures.
 - No `# --- Section Header ---` comment blocks. Use module structure instead.
+- **Readers destagger to co-located grids.** Staggered-mesh codes (ARMS, Athena++, BATSRUS face-centered) store fields on different grid locations (B on faces, E on edges, etc.). Each reader interpolates to a single co-located (cell-center or node) grid on load. `FieldDataset` always represents one co-located grid. Original stagger convention recorded in `StaggerInfo` metadata for provenance — not used in computation. Destaggering is a reader concern, not a regridding concern.
+- **Compare in SI by default, code units when appropriate.** Cross-model comparison converts to SI via `in_si()` at the comparison boundary — different normalizations make code units incomparable. Same-model comparisons (identical normalization) can compare in code units directly, and dimensionless quantities (beta, Mach, entropy) need no conversion at all. Comparison functions should accept a `units` parameter: `"si"` (default for cross-model safety), `"code"` (same-normalization runs), or a display unit string.
 
 ## Python
 

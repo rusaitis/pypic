@@ -71,6 +71,12 @@ origin = [x_min, y_min, z_min]     # optional, default [0, 0, 0]
 dt = 0.0                           # optional: timestep in code units (essential for time-series analysis)
 boundary = ["periodic", "periodic", "periodic"]  # optional: boundary type per axis
                                    #   "periodic" | "reflecting" | "conducting" | "open"
+stagger = "cell"                   # optional: "cell" | "node" | "staggered"
+                                   #   "cell" = all fields at cell centers (default)
+                                   #   "node" = all fields at cell vertices (e.g. iPIC3D)
+                                   #   "staggered" = Yee mesh (B faces, E edges, etc.)
+                                   #   Readers destagger to co-located grid on load.
+                                   #   Informational only — FieldDataset is always co-located.
 ```
 
 ### [units]
@@ -512,7 +518,8 @@ output_{step:06d}.h5
 │   ├── origin      [attr: (min1, min2, min3)]
 │   ├── dt          [attr: float64, code units]
 │   ├── boundary    [attr: ("periodic", "periodic", "periodic")]
-│   └── geometry    [attr: "cartesian"]  # determines index interpretation
+│   ├── geometry    [attr: "cartesian"]  # determines index interpretation
+│   └── stagger     [attr: "cell"]      # original grid stagger type (provenance)
 │
 ├── normalization/                # group: unit conversion metadata
 │   ├── system      [attr: "PIC"]

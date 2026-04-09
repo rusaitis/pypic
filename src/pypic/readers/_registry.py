@@ -135,6 +135,21 @@ class Simulation:
         sim = open_simulation(path)            # preferred
         reader, config = open_simulation(path) # still works
 
+    **Cross-model comparison workflow:**
+
+    1. Open both simulations via ``open_simulation()``.
+    2. Read matching timesteps from each.
+    3. Regrid to a common grid via ``align_grids()`` (Step 19, not yet
+       implemented — until then, datasets must share the same grid shape).
+    4. Compare fields: use ``in_si()`` for cross-model comparison
+       (different normalizations make code units incomparable), or
+       compare in code units for same-model parameter studies (identical
+       normalization). Dimensionless quantities (beta, Mach number,
+       entropy) need no conversion.
+
+    Known limitations: no automatic timestep alignment across simulations
+    (different codes use different step numbering and output cadences).
+
     Parameters
     ----------
     reader : SimulationReader
