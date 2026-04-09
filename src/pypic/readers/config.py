@@ -93,7 +93,7 @@ def apply_physical_extent(
 
         computed_scale = float(np.mean(scales))
         for s in scales:
-            if abs(s - computed_scale) / abs(computed_scale) > 0.05:
+            if abs(s - computed_scale) / abs(computed_scale) > 0.05:  # 5% tolerance
                 raise ValueError(
                     f"physical_extent implies non-uniform scale for "
                     f"transform {name!r}: per-axis ratios {scales.tolist()}"

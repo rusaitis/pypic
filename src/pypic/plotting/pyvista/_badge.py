@@ -26,6 +26,8 @@ if TYPE_CHECKING:
 
     from pypic.plotting.styles import PlotTheme
 
+_DEFAULT_WINDOW_W = 1600.0  # fallback when window_size is unavailable
+
 
 def add_badge(
     plotter: pv.Plotter,
@@ -186,8 +188,9 @@ def add_badge(
     _, pad, rounding = _overlay_layout(t)
     edge_margin = t.overlay_margin  # distance from window edge
     margin = t.overlay_margin * 0.5  # inset for bar/text within box
+    # Theme values (points) → viewport fractions: 4.0 → 0.008, 80.0 → 0.20
     bar_h = t.progress_bar_height * 0.002
-    box_w = t.progress_bar_width * 0.0025  # 80.0 → 0.20
+    box_w = t.progress_bar_width * 0.0025
     box_h = (
         pad
         + (text_h if status_text else 0)
@@ -208,7 +211,9 @@ def add_badge(
     if effective_width is None and status_text:
         text_px = _measure_text_width_px(plotter, status_text, int(fs))
         ww = (
-            float(plotter.window_size[0]) if hasattr(plotter, "window_size") else 1600.0
+            float(plotter.window_size[0])
+            if hasattr(plotter, "window_size")
+            else _DEFAULT_WINDOW_W
         )
         if ww > 0:
             text_w_norm = text_px / ww
@@ -247,7 +252,7 @@ def add_badge(
         bar_x = origin_x + margin
         bar_y = origin_y + pad
         bar_w_draw = box_w - 2 * margin
-        bar_r = t.progress_bar_rounding * 0.005
+        bar_r = t.progress_bar_rounding * 0.005  # points → viewport fraction
 
         # Track
         draw_rounded_rect(

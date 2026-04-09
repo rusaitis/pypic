@@ -257,6 +257,7 @@ def to_simulation_config(
             ndim = 3 if config.n_root_blocks[2] > 1 else 2
             domain_min = config.domain_min[:ndim]
             domain_max = config.domain_max[:ndim]
+            # BATSRUS AMR: 8 cells per root block per axis
             dims = tuple(8 * n for n in config.n_root_blocks[:ndim])
             spacing = tuple(
                 (mx - mn) / d

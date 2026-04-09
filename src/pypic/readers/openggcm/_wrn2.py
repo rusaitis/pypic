@@ -126,7 +126,7 @@ def decompress_field(
         return np.full(count, zmin, dtype=np.float64)
 
     result = np.empty(count, dtype=np.float64)
-    dzi = (zmax - zmin) / 4410.0
+    dzi = (zmax - zmin) / 4410.0  # 94 × 47 - 8: max usable 12.5-bit index
     pos = 0
 
     for k in range(0, count, 64):
@@ -180,8 +180,8 @@ def _build_exp_lut(zmin: float, zmax: float) -> FloatArray:
     FloatArray
         Shape ``(4418,)`` lookup table.
     """
-    dzi = (zmax - zmin) / 4410.0
-    i3 = np.arange(4418, dtype=np.float64)
+    dzi = (zmax - zmin) / 4410.0  # 94 × 47 - 8: max usable 12.5-bit index
+    i3 = np.arange(4418, dtype=np.float64)  # 94 × 47 = 4418 possible values
     return np.exp(dzi * i3 + zmin)
 
 

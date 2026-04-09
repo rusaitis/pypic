@@ -27,6 +27,11 @@ _ROUND_FRAC = 0.02  # × theme.overlay_rounding → corner radius
 _TEXT_H_RATIO = 2.0  # full-line text (titles, badge text, label text)
 _TICK_H_RATIO = 1.5  # compact tick labels (colorbar)
 
+# Colorbar gradient strip default dimensions (viewport fractions).
+_STRIP_W_BASE = 0.30  # base width
+_STRIP_W_FONT_SCALE = 0.003  # extra width per tick font-size unit
+_STRIP_H_DEFAULT = 0.015  # height
+
 
 def _rounded_rect_points(
     x: float,
@@ -602,8 +607,10 @@ def add_colorbar(
     # Gradient strip dimensions: explicit overrides or derived defaults.
     # The default strip width grows slightly with font size so longer
     # tick labels still fit at the original tick font size.
-    strip_w = width if width is not None else 0.30 + tick_fs * 0.003
-    strip_h = height if height is not None else 0.015
+    strip_w = (
+        width if width is not None else _STRIP_W_BASE + tick_fs * _STRIP_W_FONT_SCALE
+    )
+    strip_h = height if height is not None else _STRIP_H_DEFAULT
 
     # Tick values and labels (need strip_w to know spacing budget).
     # User-supplied *ticks* override the auto-generated ones, mirroring

@@ -32,6 +32,22 @@ __all__ = [
     "add_legend",
 ]
 
+# Overlay layout constants — centralized so every overlay (badge, legend,
+# label, progress bar) uses the same visual language.
+_ALPHA_VISIBLE = 0.01  # minimum alpha to consider "has background"
+_OVERLAY_BORDER_LW = 0.5  # edge linewidth on all overlay boxes
+_BLEND_FACTOR = 0.4  # darken/lighten blend toward black/white
+_CHAR_WIDTH_RATIO = 0.55  # average glyph width / font size (monospace ≈ 0.6)
+_LINE_HEIGHT_RATIO = 0.4  # DrawingArea height / font size for legend lines
+_ARROW_SCALE = 2.5  # arrow tip size relative to line width
+_ARROW_MUTATION = 1.5  # FancyArrowPatch mutation_scale / arrow_size
+_SINGLE_CHAR_PAD = 0.12  # extra h-pad so single-letter labels look square
+_MIN_VISIBLE_FILL = 0.02  # skip bar fill below 2% (invisible at badge scale)
+_BAR_WIDTH_MIN = 60.0  # auto-sized progress bar minimum width (points)
+_BAR_WIDTH_MAX = 200.0  # auto-sized progress bar maximum width (points)
+_OVERLAY_SEP = 3  # standard VPacker/HPacker separator (points)
+_LEGEND_HSEP = 4  # HPacker separator between line sample and label
+
 _CORNERS: tuple[BadgeLoc, ...] = (
     "upper left",
     "upper right",
@@ -93,19 +109,20 @@ def _make_overlay_box(
         pad = _theme_val("overlay_padding", 0.4)
     margin: float = _theme_val("overlay_margin", 0.03)
 
-    has_bg = bg_rgba[3] >= 0.01
+    has_bg = bg_rgba[3] >= _ALPHA_VISIBLE
     box = AnchoredOffsetbox(
         loc=loc,
         child=child,
         pad=pad,
-        borderpad=margin * 20,  # convert axes fraction to approx points
+        # AnchoredOffsetbox pad unit is font-size; ×20 ≈ points
+        borderpad=margin * 20,
         frameon=has_bg,
     )
     if has_bg:
         box.patch.set_boxstyle(_overlay_box_style())
         box.patch.set_facecolor(bg_rgba)
         box.patch.set_edgecolor(_resolve_border(variant))
-        box.patch.set_linewidth(0.5)
+        box.patch.set_linewidth(_OVERLAY_BORDER_LW)
     ax.add_artist(box)
     return box
 
@@ -153,7 +170,6 @@ def _detect_overlay_defaults(
         )
 
     # Primary overlay color from theme
-    alpha = 0.65
     if theme is not None and any(c > 0 for c in theme.overlay_color[:3]):
         default_bg: tuple[float, float, float] = theme.overlay_color[:3]
         alpha = theme.overlay_color[3]
@@ -163,7 +179,8 @@ def _detect_overlay_defaults(
         luminance = 0.299 * bg[0] + 0.587 * bg[1] + 0.114 * bg[2]
         if variant is None:
             variant = "darker" if luminance < 0.5 else "lighter"
-        f = 0.4
+        alpha = 0.65  # fallback when no theme — matches default overlay_color[3]
+        f = _BLEND_FACTOR
         if variant == "darker":
             default_bg = (bg[0] * f, bg[1] * f, bg[2] * f)
         else:
@@ -225,6 +242,7 @@ def _build_progress_bar(
     from pypic.plotting.styles import _theme_val
 
     overlay_rounding: float = _theme_val("overlay_rounding", 0.6)
+    # ×0.7 reduces rounding relative to bar height; cap at half for pill shape
     rounding = min(overlay_rounding * bar_height * 0.7, bar_height / 2)
     box_style = f"round,pad=0,rounding_size={rounding}"
 
@@ -238,11 +256,11 @@ def _build_progress_bar(
         boxstyle=box_style,
         facecolor=track_color,
         edgecolor=border,
-        linewidth=0.5,
+        linewidth=_OVERLAY_BORDER_LW,
     )
     drawing.add_artist(track)
 
-    if fraction >= 0.02:
+    if fraction >= _MIN_VISIBLE_FILL:
         fill_width = bar_width * fraction
         fill = FancyBboxPatch(
             (0, 0),
@@ -416,8 +434,8 @@ def add_badge(
     if fraction is not None:
         # Scale bar width to match text length when using the default
         if auto_bar_width:
-            estimated = len(status_text) * fontsize * 0.55
-            bar_width = max(60, min(200, estimated))
+            estimated = len(status_text) * fontsize * _CHAR_WIDTH_RATIO
+            bar_width = max(_BAR_WIDTH_MIN, min(_BAR_WIDTH_MAX, estimated))
         bar = _build_progress_bar(
             max(0.0, min(1.0, fraction)),
             bar_width,
@@ -427,7 +445,9 @@ def add_badge(
             track_rgba,
             variant=variant,
         )
-        child = VPacker(children=[text_area, bar], pad=0, sep=3, align="left")
+        child = VPacker(
+            children=[text_area, bar], pad=0, sep=_OVERLAY_SEP, align="left"
+        )
     else:
         child = text_area
 
@@ -514,7 +534,7 @@ def add_label(
     text_area = TextArea(label, textprops=props, multilinebaseline=True)
 
     # Extra horizontal padding so the box looks square for single letters
-    pad = 0 if is_phrase else fontsize * 0.12
+    pad = 0 if is_phrase else fontsize * _SINGLE_CHAR_PAD
     child = HPacker(children=[text_area], pad=pad, sep=0, align="center")
 
     return _make_overlay_box(ax, child, actual_loc, bg_rgba, variant=variant)
@@ -619,12 +639,12 @@ def add_legend(
     resolved_text = resolve_rgba_override(text_color, text_alpha, (*default_fg, 0.65))
 
     rows: list[Artist] = []
-    line_height = fontsize * 0.4
+    line_height = fontsize * _LINE_HEIGHT_RATIO
     for entry in entries:
         drawing = DrawingArea(sample_width, line_height)
         mid_y = line_height / 2
         base_arrow: float = _theme_val("arrow_size", 4.0)
-        arrow_size = max(base_arrow, entry.linewidth * 2.5)
+        arrow_size = max(base_arrow, entry.linewidth * _ARROW_SCALE)
         line = Line2D(
             [0, sample_width - arrow_size],
             [mid_y, mid_y],
@@ -638,7 +658,7 @@ def add_legend(
             (sample_width - arrow_size, mid_y),
             (sample_width, mid_y),
             arrowstyle="-|>",
-            mutation_scale=arrow_size * 1.5,
+            mutation_scale=arrow_size * _ARROW_MUTATION,
             color=entry.color,
             linewidth=entry.linewidth,
             alpha=entry.alpha,
@@ -653,12 +673,12 @@ def add_legend(
                 "color": resolved_text,
             },
         )
-        row = HPacker(children=[drawing, text], pad=0, sep=4, align="center")
+        row = HPacker(children=[drawing, text], pad=0, sep=_LEGEND_HSEP, align="center")
         rows.append(row)
 
     legend_child: OffsetBox
     if len(rows) > 1:
-        legend_child = VPacker(children=rows, pad=0, sep=3, align="left")
+        legend_child = VPacker(children=rows, pad=0, sep=_OVERLAY_SEP, align="left")
     else:
         legend_child = rows[0]  # type: ignore[assignment]  # HPacker is an OffsetBox
 

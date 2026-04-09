@@ -14,6 +14,11 @@ if TYPE_CHECKING:
 
 ExtremesMode = Literal["darken", "semi", "transparent"] | None
 
+# Inset colorbar layout — conversion factors from theme points to axes fraction.
+_ALPHA_VISIBLE = 0.01  # minimum alpha to consider "has background"
+_PAD_TO_AXES_FRAC = 0.05  # overlay_padding (points) → axes-fraction padding
+_ROUNDING_TO_AXES_FRAC = 0.04  # overlay_rounding (points) → FancyBboxPatch rounding
+
 
 def _compact_formatter(value: float, _pos: object) -> str:
     """Format tick values compactly, keeping scientific notation on one line."""
@@ -237,7 +242,7 @@ def add_inset_colorbar(
     if pad is None:
         pad = _theme_val("overlay_margin", 0.03) * 0.5
 
-    box_pad = overlay_pad * 0.05  # convert points to axes fraction
+    box_pad = overlay_pad * _PAD_TO_AXES_FRAC
 
     if fontsize is None:
         fontsize = _theme_val("font_overlay", 9.0)
@@ -251,8 +256,9 @@ def add_inset_colorbar(
     if extremes is None:
         extend = "neither"
 
-    # --- Pass 1: render a provisional colorbar to measure text extents ---
-    prov_cax = ax.inset_axes((0.3, 0.3, width, height), zorder=5)
+    # --- Pass 1: provisional colorbar at arbitrary position for measurement ---
+    _prov = 0.3  # arbitrary axes-fraction origin; overwritten in pass 2
+    prov_cax = ax.inset_axes((_prov, _prov, width, height), zorder=5)
     cb = fig.colorbar(mappable, cax=prov_cax, orientation="horizontal", extend=extend)
     if ticks is not None:
         cb.set_ticks(ticks)
@@ -262,6 +268,7 @@ def add_inset_colorbar(
     _style_colorbar(cb, tick_color=fg_rgba)
     prov_cax.xaxis.set_major_formatter(FuncFormatter(_compact_formatter))
     prov_cax.xaxis.get_offset_text().set_visible(False)
+    tick_w: float = _theme_val("colorbar_outline_width", 0.3) * 2
     prov_cax.tick_params(
         labelsize=fontsize,
         colors=fg_rgba,
@@ -270,7 +277,7 @@ def add_inset_colorbar(
         labeltop=False,
         labelbottom=True,
         direction="in",
-        width=0.6,
+        width=tick_w,
     )
     if label:
         prov_cax.set_title(label, fontsize=fontsize, color=fg_rgba, pad=4)
@@ -281,10 +288,10 @@ def add_inset_colorbar(
     bbox_ax = bbox_disp.transformed(ax.transAxes.inverted())  # type: ignore[union-attr]
 
     # Overhangs: how much text extends beyond the bar on each side
-    overhang_left = 0.3 - bbox_ax.x0
-    overhang_right = bbox_ax.x1 - (0.3 + width)
-    overhang_bottom = 0.3 - bbox_ax.y0
-    overhang_top = bbox_ax.y1 - (0.3 + height)
+    overhang_left = _prov - bbox_ax.x0
+    overhang_right = bbox_ax.x1 - (_prov + width)
+    overhang_bottom = _prov - bbox_ax.y0
+    overhang_top = bbox_ax.y1 - (_prov + height)
 
     # Ensure content width accommodates the title if it's wider than the bar.
     # get_tightbbox can underestimate title extent, so measure explicitly.
@@ -334,22 +341,22 @@ def add_inset_colorbar(
         labeltop=False,
         labelbottom=True,
         direction="in",
-        width=0.6,
+        width=tick_w,
     )
     if label:
         cax.set_title(label, fontsize=fontsize, color=fg_rgba, pad=4)
     cax.set_facecolor("none")
 
     # Background patch — initial size from provisional measurement
-    has_bg = bg_rgba[3] >= 0.01
+    has_bg = bg_rgba[3] >= _ALPHA_VISIBLE
     bg_patch = FancyBboxPatch(
         (bg_x, bg_y),
         total_w,
         total_h,
-        boxstyle=f"round,pad=0,rounding_size={rounding * 0.04:.4f}",
+        boxstyle=f"round,pad=0,rounding_size={rounding * _ROUNDING_TO_AXES_FRAC:.4f}",
         facecolor=bg_rgba if has_bg else "none",
         edgecolor=_resolve_border(variant),
-        linewidth=0.5,
+        linewidth=0.5,  # matches _badge._OVERLAY_BORDER_LW
         transform=ax.transAxes,
         zorder=4.9,
     )

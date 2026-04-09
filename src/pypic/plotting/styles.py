@@ -153,12 +153,11 @@ class PlotTheme:
     axis_triad_font_scale: float = 3.0
     grid_label_font_scale: float = 2.8
 
-    # Multi-panel grid layout
+    # Multi-panel grid layout (near-square panels at journal column width)
     figsize_per_col: float = 4.5
     figsize_per_row: float = 4.0
-    # single-row grids — labels can stay small
+    # Panel label font multiplier (tuned for readability in single- vs multi-row)
     panel_label_scale_sparse: float = 1.55
-    # multi-row grids — bump labels for legibility
     panel_label_scale_dense: float = 1.78
 
     # Contour overlay
