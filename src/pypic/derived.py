@@ -297,15 +297,16 @@ def kinetic_energy_density(
     v: FloatArray,
     *,
     lorentz_factor: FloatArray | None = None,
-    c: float = 1.0,
+    c: float | None = None,
 ) -> FloatArray:
     r"""Compute the kinetic energy density.
 
     $$e_k = \frac{1}{2} \rho_m V^2$$
 
-    When *lorentz_factor* ($\gamma$) is provided, uses the relativistic
-    form: $e_k = (\gamma - 1)\,\rho_m\,c^2$, which recovers
-    $\frac{1}{2}\rho_m V^2$ for $V \ll c$.
+    When *c* is provided, uses the relativistic form:
+    $e_k = (\gamma - 1)\,\rho_m\,c^2$. The Lorentz factor is computed
+    from *v* unless *lorentz_factor* is given explicitly (e.g. from
+    four-velocity data where $\gamma$ is more accurate).
 
     Parameters
     ----------
@@ -314,10 +315,10 @@ def kinetic_energy_density(
     v : NDArray
         Bulk velocity magnitude in normalized units.
     lorentz_factor : NDArray or None
-        Bulk Lorentz factor $\gamma$. When provided, the relativistic
-        formula is used and *v* is ignored.
-    c : float
-        Speed of light in normalized units (only used with *lorentz_factor*).
+        Pre-computed Lorentz factor $\gamma$. When omitted and *c* is
+        provided, $\gamma$ is computed from *v* and *c*.
+    c : float or None
+        Speed of light. When provided, the relativistic formula is used.
 
     Returns
     -------
@@ -330,7 +331,9 @@ def kinetic_energy_density(
     >>> kinetic_energy_density(np.array([2.0]), np.array([3.0]))
     array([9.])
     """
-    if lorentz_factor is not None:
+    if c is not None:
+        if lorentz_factor is None:
+            lorentz_factor = 1.0 / np.sqrt(1.0 - v**2 / c**2)
         return (lorentz_factor - 1.0) * rho_m * c**2
     return 0.5 * rho_m * v**2
 
@@ -489,10 +492,16 @@ def enthalpy(
     pressure: FloatArray,
     rho_m: FloatArray,
     gamma: float = 5.0 / 3.0,
+    *,
+    c: float | None = None,
 ) -> FloatArray:
     r"""Compute the specific enthalpy.
 
     $$h = \frac{\gamma P}{(\gamma - 1) \rho_m}$$
+
+    When *c* is provided, uses the relativistic form (constant-$\Gamma$
+    Synge-type approximation):
+    $h_{rel} = c^2 + \gamma P / ((\gamma-1)\rho_m)$.
 
     Parameters
     ----------
@@ -502,6 +511,9 @@ def enthalpy(
         Mass density in normalized units.
     gamma : float
         Adiabatic index. Default is $5/3$ (3D).
+    c : float or None
+        Speed of light. When provided, the relativistic rest-energy
+        term $c^2$ is included.
 
     Returns
     -------
@@ -514,7 +526,10 @@ def enthalpy(
     >>> enthalpy(np.array([1.0]), np.array([1.0]))
     array([2.5])
     """
-    return _safe_divide(gamma * pressure, (gamma - 1.0) * rho_m)
+    h = _safe_divide(gamma * pressure, (gamma - 1.0) * rho_m)
+    if c is not None:
+        return c**2 + h
+    return h
 
 
 def relativistic_enthalpy(
@@ -551,7 +566,7 @@ def relativistic_enthalpy(
     >>> relativistic_enthalpy(np.array([1.0]), np.array([1.0]))
     array([3.5])
     """
-    return c**2 + enthalpy(pressure, rho_m, gamma)
+    return enthalpy(pressure, rho_m, gamma, c=c)
 
 
 def entropy(
@@ -972,7 +987,7 @@ def sound_speed(
     array([1.])
     """
     if c is not None:
-        h_rel = relativistic_enthalpy(pressure, rho_m, gamma, c)
+        h_rel = enthalpy(pressure, rho_m, gamma, c=c)
         return c * np.sqrt(_safe_divide(gamma * pressure, rho_m * h_rel))
     return np.sqrt(_safe_divide(gamma * pressure, rho_m))
 

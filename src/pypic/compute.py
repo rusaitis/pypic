@@ -61,6 +61,10 @@ class _Recipe:
     # out because ``magnetic_flux_function`` has its own (Cartesian-only)
     # generalization path documented in its docstring.
     passes_geometry: bool = False
+    # When True and ``physics.relativistic`` is set on the dataset,
+    # ``c`` is injected as a keyword argument, activating the
+    # relativistic branch of functions with a ``c=None`` kwarg.
+    supports_relativistic: bool = False
 
 
 _PRESSURE_TENSOR_FIELDS = ("P11", "P22", "P33", "P12", "P13", "P23")
@@ -77,28 +81,39 @@ _REGISTRY: dict[str, _Recipe] = {
     "beta": _Recipe(derived.plasma_beta, ("P", "|B|")),
     "beta_e": _Recipe(derived.plasma_beta, ("Pe", "|B|")),
     "beta_i": _Recipe(derived.plasma_beta, ("Pi", "|B|")),
-    "v_A": _Recipe(derived.alfven_speed, ("|B|", "rho_m")),
-    "c_s": _Recipe(derived.sound_speed, ("P", "rho_m"), needs_gamma=True),
+    "v_A": _Recipe(derived.alfven_speed, ("|B|", "rho_m"), supports_relativistic=True),
+    "c_s": _Recipe(
+        derived.sound_speed, ("P", "rho_m"), needs_gamma=True,
+        supports_relativistic=True,
+    ),
     "c_ia": _Recipe(
         derived.ion_acoustic_speed,
         ("Te", "Ti"),
         species_index=1,
         species_args=_SpeciesArgs.MASS_ONLY,
     ),
-    "v_ms": _Recipe(derived.magnetosonic_speed, ("v_A", "c_s")),
+    "v_ms": _Recipe(
+        derived.magnetosonic_speed, ("v_A", "c_s"), supports_relativistic=True,
+    ),
     "M_A": _Recipe(derived.alfven_mach, ("|V|", "v_A")),
     "M_ms": _Recipe(derived.magnetosonic_mach, ("|V|", "v_ms")),
     # Energies
     "e_B": _Recipe(derived.magnetic_energy_density, ("|B|",)),
     "e_E": _Recipe(derived.electric_energy_density, ("|E|",)),
-    "e_k": _Recipe(derived.kinetic_energy_density, ("rho_m", "|V|")),
+    "e_k": _Recipe(
+        derived.kinetic_energy_density, ("rho_m", "|V|"),
+        supports_relativistic=True,
+    ),
     "e_th": _Recipe(derived.thermal_energy_density, ("P",), needs_gamma=True),
     "e_th_trace": _Recipe(
         derived.thermal_energy_density_trace,
         ("P11", "P22", "P33"),
     ),
     # Thermodynamic
-    "h": _Recipe(derived.enthalpy, ("P", "rho_m"), needs_gamma=True),
+    "h": _Recipe(
+        derived.enthalpy, ("P", "rho_m"), needs_gamma=True,
+        supports_relativistic=True,
+    ),
     "h_rel": _Recipe(
         derived.relativistic_enthalpy,
         ("P", "rho_m"),
@@ -170,6 +185,7 @@ _REGISTRY: dict[str, _Recipe] = {
         ("Te",),
         species_index=0,
         species_args=_SpeciesArgs.MASS_ONLY,
+        supports_relativistic=True,
     ),
     "r_e": _Recipe(
         derived.gyroradius,
@@ -208,6 +224,7 @@ _REGISTRY: dict[str, _Recipe] = {
         ("Ti",),
         species_index=1,
         species_args=_SpeciesArgs.MASS_ONLY,
+        supports_relativistic=True,
     ),
     "r_i": _Recipe(
         derived.gyroradius,
@@ -752,8 +769,14 @@ def compute_field(name: str, dataset: FieldDataset, _depth: int = 0) -> FloatArr
     if recipe.needs_c:
         args.append(_get_c(dataset))
 
-    # Append grid spacing
+    # Auto-inject c for relativistic simulations: when the dataset
+    # declares physics.relativistic=True, functions with a c=None kwarg
+    # get the speed of light passed in, activating their relativistic branch.
     kwargs: dict[str, Any] = {}
+    if recipe.supports_relativistic and dataset.physics.relativistic:
+        kwargs["c"] = _get_c(dataset)
+
+    # Append grid spacing
     if recipe.needs_grid:
         if dataset.grid.geometry.type != GeometryType.CARTESIAN:
             msg = (
