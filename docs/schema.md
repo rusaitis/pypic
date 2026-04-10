@@ -7,7 +7,7 @@ used across the plasma simulation platform:
 
 - **Python analysis toolkit** — reads this format, computes derived quantities
 - **Rust plasma code** — writes this format as simulation output
-- **Three.js viewer** — consumes this format via the FastAPI server
+- **Three.js viewer** — consumes this format via the Starlette/FastAPI server
 
 Any simulation code (iPIC3D, BATSRUS, the Rust code, or future codes) can
 produce data conforming to this schema. Any consumer that reads this schema
@@ -584,4 +584,4 @@ to this canonical layout. The Rust simulation writes this layout directly.
 - **Exhaustive physics parameter lists.** The `[physics]` section is open-ended by design.
 - **Native file layouts** of existing codes. Readers handle the translation.
 - **Internal data structures** of any project. Each project maps to/from the schema at its boundaries.
-- **API response format.** Defined in the FastAPI/viewer project, not here.
+- **API response format.** Defined in the Starlette/FastAPI/viewer project, not here.

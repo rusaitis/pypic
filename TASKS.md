@@ -288,7 +288,7 @@ grow.
 
 ## Phase 13: Cross-Project Integration
 
-- [ ] **Step 37: `pypic.server` — Arrow IPC streaming via FastAPI**
+- [ ] **Step 37: `pypic.server` — Arrow IPC streaming via Starlette/FastAPI**
   Zero-copy field data serving to webpic (Three.js viewer). Selections from the viewer UI map to pypic `Selection` objects server-side. Lazy I/O via xarray/dask serves only requested slices from disk. Arrow IPC replaces raw ArrayBuffers with structured metadata (field names, coordinates, units, normalization) in a single response. Uses `xr.Dataset` → Arrow conversion. Readable in JS (`apache-arrow`) and Rust (`arrow-rs`), aligning all three projects on one interchange format. Derived quantities computed server-side via `compute()`, unit conversion via `in_si()` / `in_units()`. Optional dep: `fastapi`, `uvicorn`, `pyarrow` under `server` extra. The server is a separate entry point, not part of the library import path.
   **Depends on:** Steps 24-25 (Zarr/Arrow foundations).
 
@@ -297,7 +297,7 @@ grow.
   **Depends on:** Step 20 (cross-grid comparison diagnostics).
 
 - [ ] **Step 39: webpic data pipeline documentation**
-  End-to-end guide for the full platform: rustpic (Rust simulation) → HDF5 → pypic (Python analysis) → FastAPI + Arrow IPC → webpic (Three.js/WebGPU visualization). Documents the schema.md contract that keeps Python, Rust, and JavaScript in sync. Selection round-trip: viewer UI selection → server `Selection` object → `FieldDataset` slice → Arrow IPC → GPU buffer. Coordinate transform pipeline: viewer requests a frame → server calls `transform_to()` → transformed data streamed. Covers: authentication model, chunked transfer for large datasets, WebSocket option for time-series animation.
+  End-to-end guide for the full platform: rustpic (Rust simulation) → HDF5 → pypic (Python analysis) → Starlette/FastAPI + Arrow IPC → webpic (Three.js/WebGPU visualization). Documents the schema.md contract that keeps Python, Rust, and JavaScript in sync. Selection round-trip: viewer UI selection → server `Selection` object → `FieldDataset` slice → Arrow IPC → GPU buffer. Coordinate transform pipeline: viewer requests a frame → server calls `transform_to()` → transformed data streamed. Covers: authentication model, chunked transfer for large datasets, WebSocket option for time-series animation.
 
 ---
 
@@ -347,6 +347,6 @@ grow.
 | 34 | readers | `StaggerInfo` provenance metadata | ✅ |
 | 41 | probes | Virtual probe/spacecraft sampling + time-series | — |
 | 41b | probes | SPICE-driven probe trajectories | — |
-| 37 | server | Arrow IPC streaming via FastAPI → webpic | — |
+| 37 | server | Arrow IPC streaming via Starlette/FastAPI → webpic | — |
 | 38 | readers | rustpic reader + cross-project validation | — |
 | 39 | docs | webpic data pipeline end-to-end guide | — |

@@ -11,7 +11,7 @@ See @README.md for the project information.
 - **Core containers at top level.** `FieldDataset` (`dataset.py`), `GridInfo` (`grid.py`), and `SimulationConfig`/`TabularData`/`ParticleData`/`StaggerInfo` (`containers.py`) live at the `pypic/` top level — not in `readers/`. Reader protocols (`SimulationReader`, etc.) stay in `readers/_protocols.py`. Dependency direction: `grid` ← `containers` ← `dataset` ← everything else.
 - **Selections describe regions, not data.** `PlaneSelection`, `BoxSelection` etc. are frozen dataclasses. `apply(data) → FieldDataset` returns a new standard FieldDataset.
 - **Explicit public API.** Every package `__init__.py` re-exports public names and declares `__all__`. Users import from `pypic` or `pypic.coordinates`, never from internal modules.
-- **No server in the library.** FastAPI lives in a separate project.
+- **Server is optional, not core.** `pypic.server` provides a Starlette/FastAPI data-serving layer for the Three.js/WebGPU viewer (webpic), gated behind a `server` extra. Core library imports never trigger server dependencies.
 - No `astropy.units` in computation path (10-100x overhead).
 - No hardcoded coordinate frame names (GSM, GSE, etc.) in function signatures.
 - No `# --- Section Header ---` comment blocks. Use module structure instead.
@@ -21,7 +21,7 @@ See @README.md for the project information.
 
 ## Python
 
-- **Python 3.13+** — enables `copy.replace()` for frozen dataclasses, `type` statement (PEP 695), improved error messages.
+- **Python 3.13+** — enables `copy.replace()` for frozen dataclasses (the hard dependency), improved error messages. `type` statement (PEP 695) is available from 3.12+.
 - **Tooling:** ruff (check + format, line length 88), uv, pytest with `--doctest-modules`, mypy strict.
 - **Type hints:** Required on public signatures. Modern syntax: `X | None`, `list[int]`, `tuple[float, ...]`.
 - **Type aliases:** PEP 695 `type` statements, not `TypeAlias`. `FloatArray` for array signatures, `Vector3` for 3-tuples. Defined in `pypic/types.py`.
@@ -52,12 +52,20 @@ NumPy-style with `r"""` raw strings (for LaTeX). `$...$` inline, `$$...$$` displ
 Required sections: one-line summary, LaTeX equation (if applicable), Parameters, Returns, Examples (runnable doctest).
 
 ```python
-def alfven_speed(b: FloatArray, rho_m: FloatArray) -> FloatArray:
+def alfven_speed(
+    b: FloatArray,
+    rho_m: FloatArray,
+    *,
+    c: float | None = None,
+) -> FloatArray:
     r"""Compute the Alfvén speed.
 
     $$v_A = \frac{B}{\sqrt{\mu_0 \rho_m}}$$
 
     In normalized MHD units where $\mu_0 = 1$: $v_A = B / \sqrt{\rho_m}$.
+
+    When *c* is provided, uses the relativistic form:
+    $v_A = c\sqrt{\sigma / (1 + \sigma)}$ where $\sigma = B^2 / (\rho_m c^2)$.
 
     Parameters
     ----------
@@ -65,6 +73,8 @@ def alfven_speed(b: FloatArray, rho_m: FloatArray) -> FloatArray:
         Magnetic field magnitude in normalized units.
     rho_m : NDArray
         Mass density in normalized units.
+    c : float or None
+        Speed of light. When provided, the relativistic formula is used.
 
     Returns
     -------
@@ -77,6 +87,9 @@ def alfven_speed(b: FloatArray, rho_m: FloatArray) -> FloatArray:
     >>> alfven_speed(np.array([1.0]), np.array([4.0]))
     array([0.5])
     """
+    if c is not None:
+        sigma = b**2 / (rho_m * c**2)
+        return c * np.sqrt(sigma / (1.0 + sigma))
     return b / np.sqrt(rho_m)
 ```
 
@@ -85,6 +98,7 @@ Docs built with MkDocs Material + mkdocstrings.
 ## Markdown
 
 - No `---` horizontal rules between sections — headings provide enough separation.
+- Tasks use numbered steps with `- [ ]` / `- [x]` checkboxes, checked off when complete.
 
 ## Testing
 
@@ -101,7 +115,7 @@ Docs built with MkDocs Material + mkdocstrings.
 ## Dependencies
 
 Core: `numpy`, `scipy`, `xarray`, `h5py`
-Optional: `matplotlib` (plotting), `dask` (lazy I/O for large files)
+Optional: `matplotlib` (2D plotting), `pyvista` (3D plotting), `dask` (lazy I/O for large files)
 Dev: `pytest`, `ruff`, `mypy`, `mkdocs-material`, `mkdocstrings`
 
 Do not add dependencies without justification. Prefer standard library where possible.
