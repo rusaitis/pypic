@@ -38,6 +38,9 @@ Each step produces something testable. No step starts until the previous step's 
 - [x] **Step 8: derived (part 2) — characteristic scales**
   Species-dependent: `thermal_speed`, `gyrofrequency`, `plasma_frequency`, `skin_depth`, `gyroradius`, `debye_length`, `sound_speed`, `ion_acoustic_speed`, `magnetosonic_speed`, `alfven_mach`, `magnetosonic_mach`, `parallel_pressure`, `perpendicular_pressure`, `agyrotropy`. Verify against NRL Formulary.
 
+- [ ] **Step 8b: per-species pressure decomposition in compute registry**
+  Wire `P_par_s0`, `P_perp_s0`, `P_par_s1`, `P_perp_s1`, `agyrotropy_s0`, `agyrotropy_s1` as compute recipes. The underlying functions (`parallel_pressure`, `perpendicular_pressure`, `agyrotropy`) already work on any tensor — the missing piece is registry plumbing: recipes that map per-species tensor components (`P11_s0`...`P33_s0`) + `B1/B2/B3` to the decomposition. Generalizes to N species via the existing `species_index` mechanism on `_Recipe`.
+
 - [x] **Step 9: diagnostics — comparison and validation**
   `l2_relative_error`, `linf_error`, `field_difference`, `field_energy`, `div_b`, `max_div_b`, `div_e`. Cartesian central differences.
 
@@ -133,6 +136,13 @@ Each step produces something testable. No step starts until the previous step's 
   **Shared flags:** `--output FILE` (default: display; file extension sets format — for batch steps, use template: `frames/B_{step:06d}.png`), `--format png|pdf|svg` (overrides extension), `--dpi INT` (default: 150), `--res WxH` (downsample to at most W×H grid points before plotting — fast previews for automated workflows and reduced token use when images are fed to LLMs), `--vmin/--vmax FLOAT` (color range), `--colormap CMAP` (overrides auto-detection). `--step` supports full syntax: `N`, `first`/`last`, `start:stop:stride`, `all` — batch steps with output template produce frame sequences for movies.
   `pypic plot <path> --field FIELD [--plane xy|xz|yz] [--index I] [--units UNIT] [--frame FRAME]` — reads, selects plane via `PlaneSelection`, resolves derived fields via `compute()`, converts via `in_units()`, transforms via `transform_to()`, calls `plot_field_slice`. Plane shorthand: `--plane xy` → `PlaneSelection(normal="z")`. Diverging colormap for signed fields, sequential for positive-definite.
   `pypic plot-compare <path_a> <path_b> --field FIELD [--plane xy|xz|yz] [--units si|code] [--diff-vmin FLOAT] [--diff-vmax FLOAT]` — accepts two directory paths, auto-detects each simulation independently (can be different codes, e.g. iPIC3D vs BATSRUS). Three-panel (A | B | difference) via `field_difference_dataset` + `plot_comparison`. Regrids to common grid automatically. `--vmin/--vmax` set the field panels; `--diff-vmin/--diff-vmax` set the difference panel independently. `--units` defaults to `si` for cross-model safety.
+
+- [ ] **Step 40: time-dependent frame transforms**
+  Extend `FrameTransform` to support rotation matrices that vary per timestep. Primary use case: GSE↔GSM depends on dipole tilt angle, which changes with time. Two approaches, both supported:
+  - **Parameter-driven:** `parameter = "dipole_tilt"` in `[coordinates.transforms]` names a time-varying quantity looked up per step from simulation metadata or auxiliary data. The rotation matrix is recomputed at each timestep.
+  - **SPICE kernels:** Optional integration with `spiceypy` for ephemeris-based transforms (GSE↔HEE↔RTN, planetary frames). `from_spice(frame_a, frame_b, epoch)` builds a `FrameTransform` from NAIF kernels. Optional dep: `spiceypy` under `spice` extra. Useful for comparing simulation output with spacecraft observations in the correct frame at the correct epoch.
+  `FieldDataset.transform_to(frame, *, epoch=None)` gains an optional epoch parameter. Static transforms (current behavior) are unchanged. Tests: round-trip GSE→GSM→GSE at known tilt angles against published rotation matrices.
+  **Depends on:** Step 15 (frame transforms).
 
 ---
 
@@ -257,7 +267,26 @@ grow.
 
 ---
 
-## Phase 12: Cross-Project Integration
+## Phase 12: Virtual Probes & Spacecraft
+
+- [ ] **Step 41: `pypic.probes` — virtual probe sampling**
+  `Probe` frozen dataclass: a named point `(x, y, z)` in the simulation domain. `ProbeArray`: collection of probes (detector arrays, virtual satellite constellations). `ProbeTrajectory`: time-varying position as `(t, x, y, z)` array — a spacecraft orbit or moving detector path. A fixed probe is a degenerate trajectory (constant position).
+  Core functions:
+  - `sample(probe, dataset) -> dict[str, float]` — interpolate all fields at the probe position for one timestep. Reuses `RegularGridInterpolator` from `traces/_sampling.py`.
+  - `sample_timeseries(probe, simulation, steps) -> TabularData` — sample across timesteps, producing time-series columns (time, B1, B2, B3, ...). Output is `TabularData` (already exists).
+  - `sample_trajectory(trajectory, simulation) -> TabularData` — sample along a moving path, one position per timestep.
+  - `sample_array(probes, dataset) -> TabularData` — sample all probes at one timestep, one row per probe.
+  Schema: `[[probes]]` section in simulation.toml (see schema.md § 8). Probes defined in config are available via `Simulation.probes`. CLI: `pypic probe <path> --name NAME --step all --field FIELD` for quick time-series extraction.
+  **iPIC3D integration:** iPIC3D outputs virtual satellite data at fixed probe locations via its own high-cadence sampling. `AuxiliaryDataReader` already loads this as `TabularData`. The probe framework can: (a) define new probes and resample from field output, (b) load iPIC3D native virtual satellite data, (c) compare the two (native has higher time resolution; resampled has all derived fields).
+  **Depends on:** `traces/_sampling.py` (interpolation), `TabularData` (output container).
+
+- [ ] **Step 41b: SPICE-driven probe trajectories**
+  `ProbeTrajectory.from_spice(target, observer, frame, epochs)` builds a trajectory from NAIF SPICE kernels via `spiceypy`. Enables direct comparison: load simulation, define a probe trajectory matching MMS/Cluster/PSP orbit, sample simulated fields along the real spacecraft path, compare with CDF observations (via SpacePy adapter, Step 27). Optional dep: `spiceypy` under `spice` extra.
+  **Depends on:** Step 41 (probes), Step 40 (SPICE frame transforms).
+
+---
+
+## Phase 13: Cross-Project Integration
 
 - [ ] **Step 37: `pypic.server` — Arrow IPC streaming via FastAPI**
   Zero-copy field data serving to webpic (Three.js viewer). Selections from the viewer UI map to pypic `Selection` objects server-side. Lazy I/O via xarray/dask serves only requested slices from disk. Arrow IPC replaces raw ArrayBuffers with structured metadata (field names, coordinates, units, normalization) in a single response. Uses `xr.Dataset` → Arrow conversion. Readable in JS (`apache-arrow`) and Rust (`arrow-rs`), aligning all three projects on one interchange format. Derived quantities computed server-side via `compute()`, unit conversion via `in_si()` / `in_units()`. Optional dep: `fastapi`, `uvicorn`, `pyarrow` under `server` extra. The server is a separate entry point, not part of the library import path.
@@ -284,6 +313,7 @@ grow.
 | 6 | readers | simulation.toml loader | ✅ |
 | 7 | derived | \|B\|, beta, v_A, Poynting flux, energies | ✅ |
 | 8 | derived | omega_pe, d_i, r_i, lambda_D, v_th, c_s | ✅ |
+| 8b | compute | Per-species P_par, P_perp, agyrotropy recipes | — |
 | 9 | diagnostics | L2 error, div B, field energy | ✅ |
 | 10 | coordinates | curl, div, grad (Cartesian) | ✅ |
 | 11 | selections | Plane, Box | ✅ |
@@ -303,6 +333,7 @@ grow.
 | 24 | io | Zarr export/import for FieldDataset | — |
 | 25 | io | Parquet/Arrow for ParticleData | — |
 | 26 | cli | `convert` subcommand | — |
+| 40 | coordinates | Time-dependent frame transforms (dipole tilt, SPICE) | — |
 | 23 | readers | VLasiator VLSV reader (FSgrid + DCCRG regrid) | — |
 | 35 | readers | VPIC reader (Yee mesh destaggering) | — |
 | 36 | readers | ARMS reader (block-AMR, spherical) | — |
@@ -314,6 +345,8 @@ grow.
 | 32 | fields/units | Separate `four_velocity` quantity type | ✅ |
 | 33 | fields/units | `specific_energy` quantity type for enthalpy | ✅ |
 | 34 | readers | `StaggerInfo` provenance metadata | ✅ |
+| 41 | probes | Virtual probe/spacecraft sampling + time-series | — |
+| 41b | probes | SPICE-driven probe trajectories | — |
 | 37 | server | Arrow IPC streaming via FastAPI → webpic | — |
 | 38 | readers | rustpic reader + cross-project validation | — |
 | 39 | docs | webpic data pipeline end-to-end guide | — |

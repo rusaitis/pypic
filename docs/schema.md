@@ -41,6 +41,7 @@ Every `simulation.toml` must have these sections:
 [physics]             # Model-specific physics parameters — open-ended
 [initial_conditions]  # Initial field/plasma configuration — open-ended
 [output]              # What fields are in the output files
+[[probes]]            # Virtual probes / spacecraft — repeatable
 ```
 
 ---
@@ -193,10 +194,11 @@ Transforms can chain: if transform A goes from "simulation" to "GSM" and
 transform B goes from "GSM" to "GSE", requesting "GSE" from "simulation"
 data chains both automatically.
 
-**Planned: time-dependent transforms.** Frames like GSE↔GSM depend on
-the dipole tilt angle, which varies per timestep. A future `parameter`
-field will name a time-varying quantity (e.g., `"dipole_tilt"`) looked
-up per step to compute the rotation matrix. Not yet implemented.
+**Time-dependent transforms.** Frames like GSE↔GSM depend on the
+dipole tilt angle, which varies per timestep. A `parameter` field
+names a time-varying quantity (e.g., `"dipole_tilt"`) looked up per
+step to compute the rotation matrix. SPICE kernels provide an
+alternative source for epoch-dependent rotations.
 
 ### [[species]]
 
@@ -273,6 +275,27 @@ include `rho_m` (mass density). Both may include `n_e`, `n_i`.
 
 See `examples/ipic3d_double_harris.toml` for a complete mapping from
 iPIC3D input to this schema.
+
+### [[probes]]
+
+Virtual probes (detectors, spacecraft) that sample fields at specific
+locations. Either **fixed** (constant position) or a **trajectory**
+(position varies with time). Repeatable.
+
+```toml
+[[probes]]
+name = "magnetopause_monitor"      # REQUIRED: human-readable label
+position = [10.0, 0.0, 0.0]       # fixed: [x, y, z] in code units
+fields = ["B1", "B2", "B3", "beta"]  # optional: fields to sample (default: all)
+
+[[probes]]
+name = "MMS1"                      # trajectory (virtual spacecraft)
+trajectory = "mms1_orbit.csv"      # CSV columns: t, x, y, z (code units)
+frame = "GSM"                      # optional: transform to simulation frame
+```
+
+Output: `TabularData` time-series (one row per timestep, columns per
+field). Multiple entries form probe arrays / constellations.
 
 ---
 
@@ -427,8 +450,8 @@ ion pressure tensor components `P11_s1`..`P33_s1`.
 Any code that evolves the full pressure tensor — PIC, hybrid, 10-moment
 MHD, CGL — can populate these fields. `P_par` and `P_perp` are
 decomposed from the **total** pressure tensor (`P11..P33`). Per-species
-decomposition (`P_par_s0`, `P_perp_s0`) from per-species tensors
-(`P11_s0..P33_s0`) is future work.
+decomposition (`P_par_s0`, `P_perp_s0`) uses the per-species tensors
+(`P11_s0..P33_s0`).
 
 ### Characteristic scales (derived)
 

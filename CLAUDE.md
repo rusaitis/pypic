@@ -8,6 +8,7 @@ See @README.md for the project information.
 - **Normalized internally, convert at boundaries.** All computation in code units. SI conversion only at I/O and display. See schema.md.
 - **Pure functions for physics.** `derived.py` and `diagnostics.py` functions are pure: arrays in, arrays out. No FieldDataset dependency. No side effects.
 - **Readers produce FieldDataset.** Each reader is a self-contained module. Adding a new simulation code = adding one .py file.
+- **Core containers at top level.** `FieldDataset` (`dataset.py`), `GridInfo` (`grid.py`), and `SimulationConfig`/`TabularData`/`ParticleData`/`StaggerInfo` (`containers.py`) live at the `pypic/` top level — not in `readers/`. Reader protocols (`SimulationReader`, etc.) stay in `readers/_protocols.py`. Dependency direction: `grid` ← `containers` ← `dataset` ← everything else.
 - **Selections describe regions, not data.** `PlaneSelection`, `BoxSelection` etc. are frozen dataclasses. `apply(data) → FieldDataset` returns a new standard FieldDataset.
 - **Explicit public API.** Every package `__init__.py` re-exports public names and declares `__all__`. Users import from `pypic` or `pypic.coordinates`, never from internal modules.
 - **No server in the library.** FastAPI lives in a separate project.
@@ -16,6 +17,7 @@ See @README.md for the project information.
 - No `# --- Section Header ---` comment blocks. Use module structure instead.
 - **Readers destagger to co-located grids.** Staggered-mesh codes (ARMS, Athena++, BATSRUS face-centered) store fields on different grid locations (B on faces, E on edges, etc.). Each reader interpolates to a single co-located (cell-center or node) grid on load. `FieldDataset` always represents one co-located grid. Original stagger convention recorded in `StaggerInfo` metadata for provenance — not used in computation. Destaggering is a reader concern, not a regridding concern.
 - **Compare in SI by default, code units when appropriate.** Cross-model comparison converts to SI via `in_si()` at the comparison boundary — different normalizations make code units incomparable. Same-model comparisons (identical normalization) can compare in code units directly, and dimensionless quantities (beta, Mach, entropy) need no conversion at all. Comparison functions should accept a `units` parameter: `"si"` (default for cross-model safety), `"code"` (same-normalization runs), or a display unit string.
+- **Relativistic via `c=None` kwarg.** Derived functions that have relativistic generalizations accept `c: float | None = None`. When `None` (default), the non-relativistic formula is used. When provided, the relativistic branch activates. `compute.py` auto-injects `c` via `supports_relativistic=True` on `_Recipe` when `physics.relativistic` is set in the dataset config — no manual kwarg passing needed for registered quantities.
 
 ## Python
 
