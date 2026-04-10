@@ -30,7 +30,7 @@ Each step produces something testable. No step starts until the previous step's 
 ## Phase 2: Physics
 
 - [x] **Step 6: readers/config — simulation.toml loader**
-  `load_config(path) -> SimulationConfig` via `tomllib`. Parses all SCHEMA.md sections: `[model]` -> name/type, `[grid]` -> `GridInfo`, `[units]` -> `Normalization`, `[coordinates]` -> `CoordinateGeometry` + frame, `[[species]]` -> `list[SpeciesInfo]`, `[physics]` -> dict. Optional: `[initial_conditions]`, `[output]` -> metadata.
+  `load_config(path) -> SimulationConfig` via `tomllib`. Parses all schema.md sections: `[model]` -> name/type, `[grid]` -> `GridInfo`, `[units]` -> `Normalization`, `[coordinates]` -> `CoordinateGeometry` + frame, `[[species]]` -> `list[SpeciesInfo]`, `[physics]` -> dict. Optional: `[initial_conditions]`, `[output]` -> metadata.
 
 - [x] **Step 7: derived (part 1) — field-level quantities**
   Pure NumPy functions: `magnetic_field_magnitude`, `electric_field_magnitude`, `current_density_magnitude`, `velocity_magnitude`, `plasma_beta`, `alfven_speed`, `poynting_flux`, `magnetic_energy_density`, `electric_energy_density`, `kinetic_energy_density`, `thermal_energy_density`, `internal_energy`, `enthalpy`, `relativistic_enthalpy`, `entropy`, `gyrotropic_entropy`.
@@ -111,7 +111,7 @@ Each step produces something testable. No step starts until the previous step's 
     - *Conservative regridding* — `method="conservative"`, integral-preserving interpolation for energy/mass budget studies (common in MHD validation papers). Linear interpolation does not conserve.
 
 - [ ] **Step 20: cross-grid comparison diagnostics**
-  `compare_fields(a, b, field, *, metric="l2", units="si") -> float` — aligns grids then computes error. Converts to SI by default before comparing (cross-model normalizations are incomparable in code units; see SCHEMA.md). `units="code"` for same-normalization runs. Resolves field aliases before matching (e.g. "Bx" in A, "B1" in B → same canonical field). Logs a warning when grid resolutions differ by more than 10× (e.g. iPIC3D kinetic-scale vs BATSRUS MHD-scale — interpolation works but the comparison may be physically meaningless). `field_comparison_report(a, b, *, fields=None, units="si") -> dict[str, dict[str, float]]` — L2 + Linf for all common fields, plus grid context (domain extent, resolution ratio) for interpretability. `field_difference_dataset(a, b, *, fields=None, units="si") -> FieldDataset` — returns a FieldDataset on the common grid with difference fields, directly plottable via `plot_comparison`. Delegates to existing pure diagnostics (`l2_relative_error`, `linf_error`, `field_difference` from `diagnostics.py`) after alignment — no reimplementation. These are the only diagnostics functions that touch FieldDataset (existing ones are pure-array); justified because cross-grid comparison inherently needs grid metadata.
+  `compare_fields(a, b, field, *, metric="l2", units="si") -> float` — aligns grids then computes error. Converts to SI by default before comparing (cross-model normalizations are incomparable in code units; see schema.md). `units="code"` for same-normalization runs. Resolves field aliases before matching (e.g. "Bx" in A, "B1" in B → same canonical field). Logs a warning when grid resolutions differ by more than 10× (e.g. iPIC3D kinetic-scale vs BATSRUS MHD-scale — interpolation works but the comparison may be physically meaningless). `field_comparison_report(a, b, *, fields=None, units="si") -> dict[str, dict[str, float]]` — L2 + Linf for all common fields, plus grid context (domain extent, resolution ratio) for interpretability. `field_difference_dataset(a, b, *, fields=None, units="si") -> FieldDataset` — returns a FieldDataset on the common grid with difference fields, directly plottable via `plot_comparison`. Delegates to existing pure diagnostics (`l2_relative_error`, `linf_error`, `field_difference` from `diagnostics.py`) after alignment — no reimplementation. These are the only diagnostics functions that touch FieldDataset (existing ones are pure-array); justified because cross-grid comparison inherently needs grid metadata.
   - **Future extension:** Volume-weighted metrics (metric-factor integration in L2/Linf norms) needed once spherical regridding lands — current unweighted norms are correct for uniform Cartesian only.
 
 ---
@@ -257,6 +257,21 @@ grow.
 
 ---
 
+## Phase 12: Cross-Project Integration
+
+- [ ] **Step 37: `pypic.server` — Arrow IPC streaming via FastAPI**
+  Zero-copy field data serving to webpic (Three.js viewer). Selections from the viewer UI map to pypic `Selection` objects server-side. Lazy I/O via xarray/dask serves only requested slices from disk. Arrow IPC replaces raw ArrayBuffers with structured metadata (field names, coordinates, units, normalization) in a single response. Uses `xr.Dataset` → Arrow conversion. Readable in JS (`apache-arrow`) and Rust (`arrow-rs`), aligning all three projects on one interchange format. Derived quantities computed server-side via `compute()`, unit conversion via `in_si()` / `in_units()`. Optional dep: `fastapi`, `uvicorn`, `pyarrow` under `server` extra. The server is a separate entry point, not part of the library import path.
+  **Depends on:** Steps 24-25 (Zarr/Arrow foundations).
+
+- [ ] **Step 38: `pypic.readers.rustpic` — Rust PIC code reader**
+  Reader for rustpic's schema.md-conformant HDF5 output. The Rust code writes the canonical HDF5 layout directly (Section 4 of schema.md), so this is essentially `SimpleReader` with rustpic-specific metadata extraction and validation. pypic serves as the **reference implementation** — validate Rust-computed derived quantities against Python results on the same problem. Cross-project integration tests: run both codes on identical initial conditions, compare via `field_comparison_report()`. `open_rustpic()` convenience function. Auto-detection via HDF5 `model` attribute = `"rustpic"`.
+  **Depends on:** Step 20 (cross-grid comparison diagnostics).
+
+- [ ] **Step 39: webpic data pipeline documentation**
+  End-to-end guide for the full platform: rustpic (Rust simulation) → HDF5 → pypic (Python analysis) → FastAPI + Arrow IPC → webpic (Three.js/WebGPU visualization). Documents the schema.md contract that keeps Python, Rust, and JavaScript in sync. Selection round-trip: viewer UI selection → server `Selection` object → `FieldDataset` slice → Arrow IPC → GPU buffer. Coordinate transform pipeline: viewer requests a frame → server calls `transform_to()` → transformed data streamed. Covers: authentication model, chunked transfer for large datasets, WebSocket option for time-series animation.
+
+---
+
 ## Summary
 
 | Step | Module | Delivers | Status |
@@ -299,3 +314,6 @@ grow.
 | 32 | fields/units | Separate `four_velocity` quantity type | ✅ |
 | 33 | fields/units | `specific_energy` quantity type for enthalpy | ✅ |
 | 34 | readers | `StaggerInfo` provenance metadata | ✅ |
+| 37 | server | Arrow IPC streaming via FastAPI → webpic | — |
+| 38 | readers | rustpic reader + cross-project validation | — |
+| 39 | docs | webpic data pipeline end-to-end guide | — |

@@ -15,7 +15,7 @@ To adapt this for your own simulation code:
 - Adjust ``FIELD_MAP`` to match your code's field naming.
 - Adjust ``file_pattern`` to match your code's filename convention.
 - Provide ``grid=GridInfo(...)`` if your files lack grid metadata.
-- Or drop a ``simulation.toml`` next to your data (see SCHEMA.md) and
+- Or drop a ``simulation.toml`` next to your data (see schema.md) and
   let ``open_simple`` pick it up automatically — no grid= needed.
 
 Run::
@@ -80,7 +80,7 @@ def generate_synthetic_data(output_dir: Path) -> None:
 
 # -- Field name mapping: your code's names → pypic canonical names --
 #
-# See SCHEMA.md for the full list of canonical field names.
+# See schema.md for the full list of canonical field names.
 # B1/B2/B3 = magnetic field components, rho_m = mass density, etc.
 
 FIELD_MAP = {

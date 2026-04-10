@@ -5,7 +5,7 @@ See @README.md for the project information.
 ## Architecture
 
 - **xarray as container, NumPy for computation.** `FieldDataset` wraps `xr.Dataset`. All derived/diagnostic functions take and return raw NumPy arrays. xarray never enters the computation path.
-- **Normalized internally, convert at boundaries.** All computation in code units. SI conversion only at I/O and display. See SCHEMA.md.
+- **Normalized internally, convert at boundaries.** All computation in code units. SI conversion only at I/O and display. See schema.md.
 - **Pure functions for physics.** `derived.py` and `diagnostics.py` functions are pure: arrays in, arrays out. No FieldDataset dependency. No side effects.
 - **Readers produce FieldDataset.** Each reader is a self-contained module. Adding a new simulation code = adding one .py file.
 - **Selections describe regions, not data.** `PlaneSelection`, `BoxSelection` etc. are frozen dataclasses. `apply(data) → FieldDataset` returns a new standard FieldDataset.
@@ -40,7 +40,7 @@ See @README.md for the project information.
 - **Functions:** Descriptive English — `magnetic_field_magnitude()`, `plasma_beta()`, `alfven_speed()`
 - **Parameters:** Short scientific — `bx`, `rho`, `dt`, `q_over_m`. The docstring provides the full description.
 - **Variables:** Descriptive in running code — `electron_density` not `ne`. Math symbols in docstrings.
-- **Field keys:** Short scientific strings — `"B1"`, `"rho_c"`, `"P"` (see SCHEMA.md)
+- **Field keys:** Short scientific strings — `"B1"`, `"rho_c"`, `"P"` (see schema.md)
 - **Constants:** `UPPER_SNAKE_CASE`. Use `scipy.constants` for physical constants, not hand-typed values.
 - **Booleans:** Name as questions — `is_periodic`, `has_field`.
 
@@ -119,7 +119,7 @@ See @TASKS.md for current implementation plan and progress.
 
 ## SCHEMA
 
-See @SCHEMA.md for the artchitecture between three modern overlaping projects in development: a Python PIC/MHD analysis/basic visualization tool, a Three.js/WebGPU 3D visualizer/analyzer, and a RUST MHD/PIC simulation code.
+See @docs/schema.md for the architecture between three modern overlapping projects in development: a Python PIC/MHD analysis/basic visualization tool, a Three.js/WebGPU 3D visualizer/analyzer, and a Rust MHD/PIC simulation code.
 
 ## Equations
 

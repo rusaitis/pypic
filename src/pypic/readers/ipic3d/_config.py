@@ -499,7 +499,7 @@ def to_toml(cfg: IPic3DConfig) -> str:
     Returns
     -------
     str
-        TOML content conforming to SCHEMA.md.
+        TOML content conforming to schema.md.
     """
     sim_config = to_simulation_config(cfg)
     lines: list[str] = []

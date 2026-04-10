@@ -23,7 +23,7 @@ To add a reader for your simulation code, either:
        from pypic.readers import register_reader
        register_reader("my_code", my_probe, my_factory)
 
-The canonical HDF5 layout (SCHEMA.md § 4) stores field arrays under
+The canonical HDF5 layout (schema.md § 4) stores field arrays under
 a ``fields/`` group and grid metadata as attributes on a ``grid/``
 group.  When files include this metadata, no ``config`` is needed.
 When they don't, pass ``config`` explicitly.

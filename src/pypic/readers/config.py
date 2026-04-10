@@ -156,7 +156,7 @@ def load_config(path: Path) -> SimulationConfig:
     Parameters
     ----------
     path : Path
-        Path to a TOML configuration file conforming to SCHEMA.md.
+        Path to a TOML configuration file conforming to schema.md.
 
     Returns
     -------

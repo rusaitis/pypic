@@ -1,6 +1,6 @@
-"""Mechanical consistency between SCHEMA.md, fields.py, and compute.py.
+"""Mechanical consistency between schema.md, fields.py, and compute.py.
 
-These tests treat the canonical name list from ``SCHEMA.md`` as the
+These tests treat the canonical name list from ``schema.md`` as the
 source of truth and assert the code registries can satisfy every name.
 They also verify that the registries themselves are internally
 consistent — every metadata entry has a working SI conversion, and
@@ -13,7 +13,7 @@ than fanned out across hundreds of parametrized cases — see the
 
 Unit 11 of the cleanup sweep — see ``TASKS-cleanup.md``.
 
-When SCHEMA.md grows a new canonical name, add it to ``CANONICAL_NAMES``
+When schema.md grows a new canonical name, add it to ``CANONICAL_NAMES``
 below. When a test fails, the fix is usually one of: register it in
 ``_FIELD_INFO``, add a recipe to ``compute._REGISTRY``, add an alias,
 or extend a species pattern.
@@ -27,10 +27,10 @@ from pypic.fields import _FIELD_INFO, _SPECIES_INFO_PATTERNS, field_info
 from pypic.units import Normalization
 
 # ---------------------------------------------------------------------------
-# Canonical name list — hand-curated from SCHEMA.md § 3
+# Canonical name list — hand-curated from schema.md § 3
 # ---------------------------------------------------------------------------
 # The keys here are the *canonical* (numbered, geometry-agnostic) names
-# documented in SCHEMA.md as belonging to pypic's vocabulary. Letter
+# documented in schema.md as belonging to pypic's vocabulary. Letter
 # aliases (Bx, By, Bz, n_e, n_i, …) are intentionally excluded —
 # they're tested implicitly because the alias maps point at these names.
 
@@ -162,7 +162,7 @@ CANONICAL_NAMES: frozenset[str] = frozenset(
 )
 
 
-# Per-species name *prefixes* listed in SCHEMA.md (suffixed with _sN at
+# Per-species name *prefixes* listed in schema.md (suffixed with _sN at
 # runtime). Each prefix is checked against synthetic species indices 0
 # and 5 so we exercise both the static `_REGISTRY` entries (s0/s1) and
 # the dynamic `_SPECIES_TEMPLATES` synthesis (s5).
@@ -252,7 +252,7 @@ def _format_failures(label: str, failures: list[str]) -> str:
 
 
 def test_all_schema_fields_are_reachable() -> None:
-    """Every name in SCHEMA.md must resolve via fields/compute/aliases."""
+    """Every name in schema.md must resolve via fields/compute/aliases."""
     unreachable = sorted(n for n in CANONICAL_NAMES if not _is_reachable(n))
     assert not unreachable, _format_failures(
         "SCHEMA names not reachable via _FIELD_INFO, compute._REGISTRY, "
@@ -281,7 +281,7 @@ def test_all_per_species_prefixes_resolve() -> None:
         if not _is_reachable(f"{prefix}_s{idx}")
     )
     assert not failures, _format_failures(
-        "Per-species names from SCHEMA.md not reachable — check "
+        "Per-species names from schema.md not reachable — check "
         "_SPECIES_INFO_PATTERNS in fields.py and _SPECIES_TEMPLATES in "
         "compute.py",
         failures,

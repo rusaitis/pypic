@@ -1,4 +1,4 @@
-# SCHEMA.md — Shared Data Contract
+# schema.md — Shared Data Contract
 
 ## Purpose
 

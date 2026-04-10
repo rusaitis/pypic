@@ -28,7 +28,7 @@ type ScaleFactors = tuple[ScaleFactor, ScaleFactor, ScaleFactor]
 class GeometryType(StrEnum):
     r"""Coordinate geometry type.
 
-    Values match the ``[coordinates] geometry`` key in SCHEMA.md.
+    Values match the ``[coordinates] geometry`` key in schema.md.
 
     Examples
     --------

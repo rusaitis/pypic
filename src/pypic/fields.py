@@ -529,7 +529,7 @@ def unregister_field(name: str) -> None:
 
 # Per-species field metadata via regex matching. Each entry is
 # (pattern, quantity_type, long_name_template, latex_template) where
-# {N} = species index and {C} = component index (see SCHEMA.md §3).
+# {N} = species index and {C} = component index (see schema.md §3).
 _SPECIES_INFO_PATTERNS: list[tuple[re.Pattern[str], str, str, str]] = [
     (
         re.compile(r"^n_s(\d+)$"),

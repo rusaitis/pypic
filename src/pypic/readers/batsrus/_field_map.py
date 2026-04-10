@@ -47,7 +47,7 @@ FIELD_NAME_MAP: dict[str, str] = {
     "Ni": "n_s1",
     # Charge density
     "RhoC": "rho_c",
-    # B0 splitting: background dipole field (BATSRUS-specific, not in SCHEMA.md)
+    # B0 splitting: background dipole field (BATSRUS-specific, not in schema.md)
     "b1x": "B1",
     "b1y": "B2",
     "b1z": "B3",
