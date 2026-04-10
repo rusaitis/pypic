@@ -8,7 +8,7 @@ import xarray as xr
 from numpy.testing import assert_allclose
 
 from pypic.coordinates import CARTESIAN, CYLINDRICAL, SPHERICAL
-from pypic.readers.base import (
+from pypic.readers._field_dataset import (
     FieldDataset,
     GridInfo,
     SimulationReader,
@@ -321,7 +321,7 @@ class TestSimulationReader:
     def test_supports_selective_read(self):
         from collections.abc import Iterable
 
-        from pypic.readers.base import supports_selective_read
+        from pypic.readers._field_dataset import supports_selective_read
 
         class WithFields:
             def read_timestep(
@@ -347,7 +347,7 @@ class TestSimulationReader:
 
 class TestSimulationConfigImmutability:
     def test_physics_not_mutable(self):
-        from pypic.readers.base import SimulationConfig
+        from pypic.readers._field_dataset import SimulationConfig
         from pypic.units import Normalization, PhysicsParams, SpeciesInfo
 
         cfg = SimulationConfig(
@@ -370,7 +370,7 @@ class TestSimulationConfigImmutability:
             cfg.metadata["new_key"] = "bad"  # type: ignore[index]
 
     def test_physics_extra_not_mutable(self):
-        from pypic.readers.base import SimulationConfig
+        from pypic.readers._field_dataset import SimulationConfig
         from pypic.units import Normalization, PhysicsParams
 
         cfg = SimulationConfig(

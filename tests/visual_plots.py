@@ -52,7 +52,7 @@ from pypic.plotting import (
     use_theme,
 )
 from pypic.plotting.styles import apply_rounding
-from pypic.readers.base import TabularData
+from pypic.readers._field_dataset import TabularData
 from tests._helpers import make_harris_dataset
 
 OUTPUT_DIR = Path(__file__).parent / "output"

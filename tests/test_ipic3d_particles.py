@@ -8,7 +8,7 @@ import numpy as np
 import pytest
 
 from pypic.readers._registry import Simulation
-from pypic.readers.base import ParticleData, ParticleDataReader
+from pypic.readers._field_dataset import ParticleData, ParticleDataReader
 from pypic.readers.ipic3d import (
     IPic3DParallelReader,
     detect_particle_steps,
@@ -406,7 +406,7 @@ class TestSimulationParticles:
         from unittest.mock import MagicMock
 
         from pypic.coordinates.geometry import CARTESIAN
-        from pypic.readers.base import GridInfo, SimulationConfig
+        from pypic.readers._field_dataset import GridInfo, SimulationConfig
         from pypic.units import Normalization, SpeciesInfo
 
         mock_reader = MagicMock()

@@ -39,7 +39,7 @@ from pypic.plotting._badge import (  # noqa: E402
 )
 from pypic.plotting._colormaps import is_positive_definite, symmetric_clim  # noqa: E402
 from pypic.plotting.styles import _resolve_theme_arg  # noqa: E402
-from pypic.readers.base import FieldDataset, GridInfo, TabularData  # noqa: E402
+from pypic.readers._field_dataset import FieldDataset, GridInfo, TabularData  # noqa: E402
 from pypic.selections import PlaneSelection  # noqa: E402
 from pypic.units import Normalization  # noqa: E402
 from tests._helpers import make_uniform_grid  # noqa: E402

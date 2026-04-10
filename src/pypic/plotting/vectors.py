@@ -24,7 +24,7 @@ if TYPE_CHECKING:
     from pypic.fields import FieldInfo
     from pypic.plotting._colorbar import ExtremesMode
     from pypic.plotting.styles import PlotTheme, ThemeArg
-    from pypic.readers.base import FieldDataset
+    from pypic.readers._field_dataset import FieldDataset
     from pypic.selections import PlaneSelection
     from pypic.types import FloatArray
 

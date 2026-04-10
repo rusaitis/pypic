@@ -14,7 +14,7 @@ if TYPE_CHECKING:
     from pypic.plotting._badge import OverlayVariant
     from pypic.plotting._colorbar import ExtremesMode
     from pypic.plotting.styles import ThemeArg
-    from pypic.readers.base import FieldDataset
+    from pypic.readers._field_dataset import FieldDataset
     from pypic.selections import PlaneSelection
 
 

@@ -16,7 +16,7 @@ from pypic.readers._registry import (
     registered_readers,
     unregister_reader,
 )
-from pypic.readers.base import (
+from pypic.readers._field_dataset import (
     FieldDataset,
     GridInfo,
     SimulationConfig,
@@ -254,19 +254,19 @@ class TestScoreSignals:
     """Unit tests for the shared ``readers.base.score_signals`` helper."""
 
     def test_non_directory_returns_zero(self, tmp_path: Path) -> None:
-        from pypic.readers.base import score_signals
+        from pypic.readers._field_dataset import score_signals
 
         f = tmp_path / "a_file"
         f.touch()
         assert score_signals(f, [("*", 0.5)]) == 0.0
 
     def test_empty_dir_zero(self, tmp_path: Path) -> None:
-        from pypic.readers.base import score_signals
+        from pypic.readers._field_dataset import score_signals
 
         assert score_signals(tmp_path, [("*.toml", 0.5)]) == 0.0
 
     def test_matching_patterns_accumulate(self, tmp_path: Path) -> None:
-        from pypic.readers.base import score_signals
+        from pypic.readers._field_dataset import score_signals
 
         (tmp_path / "config.toml").touch()
         (tmp_path / "data.h5").touch()
@@ -274,14 +274,14 @@ class TestScoreSignals:
         assert score == pytest.approx(0.8)
 
     def test_score_clamped_to_one(self, tmp_path: Path) -> None:
-        from pypic.readers.base import score_signals
+        from pypic.readers._field_dataset import score_signals
 
         (tmp_path / "a").touch()
         (tmp_path / "b").touch()
         assert score_signals(tmp_path, [("a", 0.8), ("b", 0.9)]) == 1.0
 
     def test_empty_signals_zero(self, tmp_path: Path) -> None:
-        from pypic.readers.base import score_signals
+        from pypic.readers._field_dataset import score_signals
 
         (tmp_path / "anything").touch()
         assert score_signals(tmp_path, []) == 0.0

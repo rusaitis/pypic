@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from pypic.readers.base import SimulationConfig
+    from pypic.readers._field_dataset import SimulationConfig
 
 
 def merge_simulation_toml(

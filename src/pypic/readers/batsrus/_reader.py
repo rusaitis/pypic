@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Any, assert_never
 import numpy as np
 
 from pypic.coordinates import CARTESIAN, GEOMETRY_BY_NAME
-from pypic.readers.base import FieldDataset, GridInfo, SimulationConfig
+from pypic.readers._field_dataset import FieldDataset, GridInfo, SimulationConfig
 from pypic.readers.batsrus._config import BATSRUSConfig, to_simulation_config
 from pypic.readers.batsrus._field_map import (
     FIELD_NAME_MAP,

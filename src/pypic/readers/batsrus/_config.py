@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Any
 
 from pypic.coordinates import CARTESIAN, GEOMETRY_BY_NAME
 from pypic.readers._config_helpers import merge_simulation_toml
-from pypic.readers.base import GridInfo, SimulationConfig
+from pypic.readers._field_dataset import GridInfo, SimulationConfig
 from pypic.units import Normalization, PhysicsParams
 
 if TYPE_CHECKING:

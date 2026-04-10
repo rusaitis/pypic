@@ -16,7 +16,7 @@ from pypic.readers._simple import (
     can_read_confidence,
     open_simple,
 )
-from pypic.readers.base import (
+from pypic.readers._field_dataset import (
     GridInfo,
     SimulationConfig,
 )

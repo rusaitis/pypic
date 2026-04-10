@@ -9,7 +9,7 @@ if TYPE_CHECKING:
     from matplotlib.figure import Figure
 
     from pypic.plotting.styles import PlotTheme
-    from pypic.readers.base import FieldDataset
+    from pypic.readers._field_dataset import FieldDataset
     from pypic.selections import PlaneSelection
     from pypic.types import FloatArray
 

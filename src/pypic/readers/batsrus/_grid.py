@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 from pypic.coordinates import CARTESIAN, CoordinateGeometry
-from pypic.readers.base import GridInfo
+from pypic.readers._field_dataset import GridInfo
 from pypic.readers.batsrus._field_map import FIELD_NAME_MAP, SKIP_FIELDS
 
 if TYPE_CHECKING:

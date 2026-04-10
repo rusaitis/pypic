@@ -314,7 +314,7 @@ def resolve_transform(
 
 def _build_vector_triplet_regex() -> re.Pattern[str]:
     """Build regex from the canonical vector prefixes in readers.base."""
-    from pypic.readers.base import _FIELD_PREFIX_PAIRS
+    from pypic.readers._field_dataset import _FIELD_PREFIX_PAIRS
 
     prefixes = sorted(
         {canon for _, canon in _FIELD_PREFIX_PAIRS},

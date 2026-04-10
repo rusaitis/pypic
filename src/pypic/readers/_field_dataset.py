@@ -50,7 +50,7 @@ if TYPE_CHECKING:
     from pypic.units import Normalization, SpeciesInfo
 
 # Re-export everything for backward compatibility — dozens of internal
-# modules import from ``pypic.readers.base``.
+# modules import from ``pypic.readers._field_dataset``.
 __all__ = [
     "_CARTESIAN_ALIASES",
     "_CARTESIAN_UNDERSCORE_ALIASES",

@@ -12,7 +12,7 @@ import h5py
 
 from pypic.coordinates.geometry import CARTESIAN
 from pypic.readers._config_helpers import merge_simulation_toml
-from pypic.readers.base import GridInfo, SimulationConfig
+from pypic.readers._field_dataset import GridInfo, SimulationConfig
 from pypic.units import Normalization, PhysicsParams, SpeciesInfo
 
 if TYPE_CHECKING:

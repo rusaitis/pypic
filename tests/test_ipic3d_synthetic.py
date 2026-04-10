@@ -14,7 +14,7 @@ import numpy as np
 import pytest
 from numpy.testing import assert_allclose
 
-from pypic.readers.base import TabularData
+from pypic.readers._field_dataset import TabularData
 from pypic.readers.ipic3d import (
     IPic3DH5hutReader,
     IPic3DParallelReader,

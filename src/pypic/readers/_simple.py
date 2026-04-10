@@ -39,7 +39,7 @@ import h5py
 import numpy as np
 
 from pypic.coordinates.geometry import CARTESIAN, GEOMETRY_BY_NAME
-from pypic.readers.base import FieldDataset, GridInfo, SimulationConfig, TabularData
+from pypic.readers._field_dataset import FieldDataset, GridInfo, SimulationConfig, TabularData
 from pypic.units import Normalization
 
 if TYPE_CHECKING:

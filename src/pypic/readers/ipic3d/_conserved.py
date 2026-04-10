@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from pypic.readers.base import TabularData
+from pypic.readers._field_dataset import TabularData
 
 if TYPE_CHECKING:
     from pathlib import Path

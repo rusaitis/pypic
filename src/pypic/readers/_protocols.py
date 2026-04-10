@@ -9,7 +9,7 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     from pypic.readers._containers import ParticleData, TabularData
-    from pypic.readers.base import FieldDataset
+    from pypic.readers._field_dataset import FieldDataset
 
 
 @runtime_checkable

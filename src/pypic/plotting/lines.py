@@ -11,7 +11,7 @@ if TYPE_CHECKING:
     from matplotlib.figure import Figure
 
     from pypic.plotting.styles import ThemeArg
-    from pypic.readers.base import FieldDataset, TabularData
+    from pypic.readers._field_dataset import FieldDataset, TabularData
 
 
 def plot_line(

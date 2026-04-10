@@ -10,7 +10,7 @@ import numpy as np
 import xarray as xr
 
 from pypic.coordinates.geometry import CARTESIAN
-from pypic.readers.base import FieldDataset, GridInfo
+from pypic.readers._field_dataset import FieldDataset, GridInfo
 from pypic.readers.openggcm._field_io import read_3df_file
 from pypic.readers.openggcm._field_map import (
     DEFAULT_SKIP,

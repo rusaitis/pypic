@@ -11,7 +11,7 @@ from pypic.readers._registry import (
     unregister_reader,
 )
 from pypic.readers._simple import SimpleReader, open_simple
-from pypic.readers.base import (
+from pypic.readers._field_dataset import (
     AuxiliaryDataReader,
     FieldDataset,
     GridInfo,

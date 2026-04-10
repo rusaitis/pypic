@@ -13,7 +13,7 @@ from pypic.fields import (
     unit_label,
     unregister_field,
 )
-from pypic.readers.base import FieldDataset, GridInfo
+from pypic.readers._field_dataset import FieldDataset, GridInfo
 from pypic.selections import PlaneSelection
 from pypic.units import _COMPOUND_FACTORS, _QUANTITIES, Normalization, SpeciesInfo
 

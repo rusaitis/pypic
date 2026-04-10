@@ -14,7 +14,7 @@ if TYPE_CHECKING:
     from matplotlib.colors import Colormap
 
     from pypic.plotting.styles import PlotTheme
-    from pypic.readers.base import FieldDataset
+    from pypic.readers._field_dataset import FieldDataset
 
 
 def add_planet(

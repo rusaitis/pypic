@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 
 from pypic.coordinates.geometry import GEOMETRY_BY_NAME, CoordinateGeometry
 from pypic.coordinates.transforms import FrameTransform
-from pypic.readers.base import GridInfo, SimulationConfig
+from pypic.readers._field_dataset import GridInfo, SimulationConfig
 from pypic.units import Normalization, PhysicsParams, SpeciesInfo
 
 log = logging.getLogger(__name__)

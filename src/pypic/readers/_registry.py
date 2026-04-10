@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable, Iterator
 
-    from pypic.readers.base import (
+    from pypic.readers._field_dataset import (
         FieldDataset,
         GridInfo,
         ParticleData,
@@ -164,7 +164,7 @@ class Simulation:
     >>> from unittest.mock import MagicMock
     >>> r = MagicMock()
     >>> r.available_timesteps.return_value = [0, 10]
-    >>> from pypic.readers.base import SimulationConfig, GridInfo
+    >>> from pypic.readers._field_dataset import SimulationConfig, GridInfo
     >>> from pypic.coordinates.geometry import CARTESIAN
     >>> from pypic.units import Normalization, SpeciesInfo
     >>> cfg = SimulationConfig(
@@ -325,7 +325,7 @@ class Simulation:
         -------
         FieldDataset
         """
-        from pypic.readers.base import _default_aliases, supports_selective_read
+        from pypic.readers._field_dataset import _default_aliases, supports_selective_read
 
         if fields is None and not kwargs:
             return self._reader.read_timestep(self._path, step)
@@ -413,7 +413,7 @@ class Simulation:
     @property
     def auxiliary_names(self) -> list[str]:
         """Names of available auxiliary datasets, or ``[]`` if unsupported."""
-        from pypic.readers.base import AuxiliaryDataReader
+        from pypic.readers._field_dataset import AuxiliaryDataReader
 
         if isinstance(self._reader, AuxiliaryDataReader):
             return self._reader.available_auxiliary(self._path)
@@ -422,7 +422,7 @@ class Simulation:
     @property
     def particle_steps(self) -> list[int]:
         """Timesteps with particle data, or ``[]`` if unsupported."""
-        from pypic.readers.base import ParticleDataReader
+        from pypic.readers._field_dataset import ParticleDataReader
 
         if isinstance(self._reader, ParticleDataReader):
             return self._reader.available_particle_steps(self._path)
@@ -456,7 +456,7 @@ class Simulation:
         TypeError
             If the reader does not support particle data.
         """
-        from pypic.readers.base import ParticleDataReader
+        from pypic.readers._field_dataset import ParticleDataReader
 
         if isinstance(self._reader, ParticleDataReader):
             return self._reader.read_particles(
@@ -485,7 +485,7 @@ class Simulation:
         TypeError
             If the reader does not support auxiliary data.
         """
-        from pypic.readers.base import AuxiliaryDataReader
+        from pypic.readers._field_dataset import AuxiliaryDataReader
 
         if isinstance(self._reader, AuxiliaryDataReader):
             return self._reader.load_auxiliary(self._path, name)

@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING, Any
 import numpy as np
 
 if TYPE_CHECKING:
-    from pypic.readers.base import FieldDataset
+    from pypic.readers._field_dataset import FieldDataset
     from pypic.traces._fieldline import FieldLine
     from pypic.traces._particletrace import ParticleTrace
     from pypic.types import FloatArray

@@ -10,7 +10,7 @@ Known unsuppressable (vulture cannot whitelist function parameters):
 """
 
 from pypic.coordinates.geometry import CoordinateGeometry
-from pypic.readers.base import (
+from pypic.readers._field_dataset import (
     FieldDataset,
     GridInfo,
     SimulationConfig,

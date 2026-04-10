@@ -48,7 +48,7 @@ from pypic.traces import (
 from tests._helpers import make_dipole_dataset
 
 if TYPE_CHECKING:
-    from pypic.readers.base import FieldDataset
+    from pypic.readers._field_dataset import FieldDataset
 
 PLANET_RADIUS = 1.0
 DOMAIN_HALF = 6.0

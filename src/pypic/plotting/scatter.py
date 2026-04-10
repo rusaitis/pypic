@@ -14,7 +14,7 @@ if TYPE_CHECKING:
     from matplotlib.figure import Figure
 
     from pypic.plotting.styles import ThemeArg
-    from pypic.readers.base import FieldDataset
+    from pypic.readers._field_dataset import FieldDataset
     from pypic.selections import PlaneSelection
 
 

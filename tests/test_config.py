@@ -723,7 +723,7 @@ class TestPhysicalExtent:
 
     def test_unknown_unit_raises(self, tmp_path: Path) -> None:
         from pypic.coordinates.geometry import CARTESIAN
-        from pypic.readers.base import GridInfo, SimulationConfig
+        from pypic.readers._field_dataset import GridInfo, SimulationConfig
         from pypic.units import Normalization
 
         cfg = SimulationConfig(
@@ -740,7 +740,7 @@ class TestPhysicalExtent:
     def test_non_uniform_scale_raises(self, tmp_path: Path) -> None:
         from pypic.coordinates.geometry import CARTESIAN
         from pypic.coordinates.transforms import FrameTransform
-        from pypic.readers.base import GridInfo, SimulationConfig
+        from pypic.readers._field_dataset import GridInfo, SimulationConfig
         from pypic.units import Normalization
 
         t = FrameTransform("sim", "phys")
@@ -769,7 +769,7 @@ class TestMergeSimulationToml:
     @pytest.fixture
     def base_config(self):  # type: ignore[no-untyped-def]
         from pypic.coordinates.geometry import CARTESIAN
-        from pypic.readers.base import GridInfo, SimulationConfig
+        from pypic.readers._field_dataset import GridInfo, SimulationConfig
         from pypic.units import Normalization
 
         return SimulationConfig(
@@ -849,7 +849,7 @@ fields = ["B1"]
         # Re-create base with a metadata key that the toml will also set
         from pypic.coordinates.geometry import CARTESIAN
         from pypic.readers._config_helpers import merge_simulation_toml
-        from pypic.readers.base import GridInfo, SimulationConfig
+        from pypic.readers._field_dataset import GridInfo, SimulationConfig
         from pypic.units import Normalization
 
         base = SimulationConfig(
