@@ -123,15 +123,7 @@ Each step produces something testable. No step starts until the previous step's 
 
 ---
 
-## Phase 8: VLasiator Reader
-
-- [ ] **Step 23: `pypic.readers.vlasiator` — VLSV reader via analysator**
-  `VLasiatorReader` implementing `SimulationReader`. Two-grid strategy: FSgrid fields (`fg_b`, `fg_e`) read directly as uniform arrays; DCCRG fields (`proton/vg_rho`, `proton/vg_v`, `proton/vg_p`) regridded to uniform at `target_resolution` (default: FSgrid resolution). DCCRG cell IDs encode position + refinement level — decode to (x, y, z, dx) then block-average/NN-repeat (like BATSRUS AMR pattern, not `pypic.regrid` which is for uniform→uniform).
-  Field mapping: `fg_b` → `B1/B2/B3`, `fg_e` → `E1/E2/E3`, `proton/vg_rho` → `n_s0`, `proton/vg_v` → `V1/V2/V3`, `proton/vg_p` (6 components) → pressure tensor. Species auto-detected from VLSV population names. Auto-detection: `.vlsv` extension + file signature. `open_vlasiator()` convenience function. Optional dep: `analysator` under `vlasiator` extra. All tests mock analysator.
-
----
-
-## Phase 9: Modern I/O Formats
+## Phase 8: Modern I/O Formats
 
 - [ ] **Step 24: `pypic.io` — Zarr export/import for FieldDataset**
   `to_zarr(fds, path)` leveraging `xr.Dataset.to_zarr()` + pypic metadata as group attrs (grid, normalization, species, physics). `from_zarr(path) -> FieldDataset` reconstructs everything. Round-trip guarantee. Default compression: zstd. Optional dep: `zarr>=3.0` under `zarr` extra.
@@ -142,6 +134,20 @@ Each step produces something testable. No step starts until the previous step's 
 
 - [ ] **Step 26: `pypic convert` CLI subcommand**
   `pypic convert <path> --step N --output DIR [--format zarr|parquet] [--fields F1,F2] [--target-resolution DX]`. Batch mode: `--all-steps`.
+
+---
+
+## Phase 9: Additional Readers
+
+- [ ] **Step 23: `pypic.readers.vlasiator` — VLSV reader via analysator**
+  `VLasiatorReader` implementing `SimulationReader`. Two-grid strategy: FSgrid fields (`fg_b`, `fg_e`) read directly as uniform arrays; DCCRG fields (`proton/vg_rho`, `proton/vg_v`, `proton/vg_p`) regridded to uniform at `target_resolution` (default: FSgrid resolution). DCCRG cell IDs encode position + refinement level — decode to (x, y, z, dx) then block-average/NN-repeat (like BATSRUS AMR pattern, not `pypic.regrid` which is for uniform→uniform).
+  Field mapping: `fg_b` → `B1/B2/B3`, `fg_e` → `E1/E2/E3`, `proton/vg_rho` → `n_s0`, `proton/vg_v` → `V1/V2/V3`, `proton/vg_p` (6 components) → pressure tensor. Species auto-detected from VLSV population names. Auto-detection: `.vlsv` extension + file signature. `open_vlasiator()` convenience function. Optional dep: `analysator` under `vlasiator` extra. All tests mock analysator.
+
+- [ ] **Step 35: `pypic.readers.vpic` — VPIC reader**
+  `VPICReader` implementing `SimulationReader`. VPIC writes per-rank binary files (band-interleaved by field) or HDF5 via `vpic_decks`. Field mapping: `cbx/cby/cbz` → `B1/B2/B3` (cell-centered B), `ex/ey/ez` → `E1/E2/E3` (Yee edge), `jfx/jfy/jfz` → `J1/J2/J3`, `rhob` → `rho_c`, per-species hydro files → density, velocity, pressure tensor. Yee mesh destaggering to co-located grid (linear interpolation, `StaggerInfo(convention="staggered")`). Metadata from `info` dumps or deck header. Auto-detection: `global.vpc` or `info` file presence. `open_vpic()` convenience function. All tests use synthetic fixtures.
+
+- [ ] **Step 36: `pypic.readers.arms` — ARMS reader**
+  `ARMSReader` implementing `SimulationReader`. ARMS (Adaptively Refined MHD Solver) outputs HDF5 with block-structured AMR. Regrid to uniform grid at `target_resolution` (like BATSRUS pattern). Field mapping from ARMS native names to canonical schema. Spherical geometry support (ARMS is commonly run in spherical coordinates for coronal/heliospheric simulations). `StaggerInfo(convention="staggered")` — ARMS uses a staggered mesh (CT for divergence-free B). Auto-detection: ARMS-specific HDF5 group structure. `open_arms()` convenience function. All tests use synthetic fixtures.
 
 ---
 
@@ -165,12 +171,12 @@ Each step produces something testable. No step starts until the previous step's 
 Steps 13-14 (compute/plot) ←── Step 22 (plot CLI)
                            ←── Step 21 (CLI core) ←── Step 26 (convert CLI)
 Step 19 (regrid) ←── Step 20 (cross-grid diagnostics) ←── Step 21
-                 ←── Step 23 (VLasiator, for DCCRG context)
 Step 5 (FieldDataset) ←── Steps 24, 25 (Zarr/Arrow)
+                      ←── Steps 23, 35, 36 (additional readers)
                       ←── Step 27 (interop adapters)
 ```
 
-Recommended implementation order: 19 → 20 → 21 → 22 → 23, with 24/25 parallelizable anytime, 26 after 21+24+25, 27–28 anytime after API stabilizes.
+Recommended implementation order: 19 → 20 → 21 → 22, with 24/25 parallelizable anytime, 26 after 21+24+25, 23/35/36 anytime after Step 12 (readers exist), 27–28 anytime after API stabilizes.
 
 ---
 
@@ -265,10 +271,12 @@ grow.
 | 21 | cli | `info`, `fields`, `compare` subcommands (typer) | — |
 | 21b | readers | `sim.available_fields()` lightweight field probe | — |
 | 22 | cli | `plot`, `plot-compare` subcommands | — |
-| 23 | readers | VLasiator VLSV reader (FSgrid + DCCRG regrid) | — |
 | 24 | io | Zarr export/import for FieldDataset | — |
 | 25 | io | Parquet/Arrow for ParticleData | — |
 | 26 | cli | `convert` subcommand | — |
+| 23 | readers | VLasiator VLSV reader (FSgrid + DCCRG regrid) | — |
+| 35 | readers | VPIC reader (Yee mesh destaggering) | — |
+| 36 | readers | ARMS reader (block-AMR, spherical) | — |
 | 27 | interop | yt, PlasmaPy, SpacePy thin adapters | — |
 | 28 | docs | Ecosystem positioning page | — |
 | 29 | interop | SPASE XML metadata export | — |
