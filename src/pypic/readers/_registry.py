@@ -625,7 +625,7 @@ def open_simulation(
         result = entry.factory(path, **kwargs)
         return Simulation(result[0], _maybe_apply_extent(result[1]), path)
 
-    # Auto-detect: probe all readers, try factories in descending confidence
+    # Auto-detect: sensors indicate multiple possible formats
     with _lock:
         registry_snapshot = dict(_REGISTRY)
     probe_results: list[ProbeResult] = []

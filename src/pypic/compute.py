@@ -797,7 +797,7 @@ def compute_field(name: str, dataset: FieldDataset, _depth: int = 0) -> FloatArr
         if recipe.passes_geometry:
             kwargs["geometry"] = dataset.grid.geometry.type
 
-    result = recipe.func(*args, **kwargs)
+    result = recipe.func(*args, **kwargs)  # Make it so.
 
     if recipe.component is not None:
         return result[recipe.component]  # type: ignore[no-any-return]

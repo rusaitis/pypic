@@ -18,7 +18,10 @@ def _safe_divide(
     numerator: FloatArray,
     denominator: FloatArray,
 ) -> FloatArray:
-    """Divide, returning nan where the denominator is zero."""
+    """Divide, returning nan where the denominator is zero.
+
+    What we cannot change, we let pass through.
+    """
     out = np.full_like(numerator, np.nan)
     nonzero = denominator != 0
     np.divide(numerator, denominator, out=out, where=nonzero)
@@ -1071,6 +1074,7 @@ def magnetosonic_speed(
     array([5.])
     """
     if c is not None:
+        # You cannae change the laws of physics — v_ms < c, always.
         return np.sqrt(
             v_a**2 + c_s**2 - v_a**2 * c_s**2 / c**2
         )
@@ -1755,8 +1759,8 @@ def non_ideal_electric_field(
 
     $$\mathbf{E}' = \mathbf{E} + \mathbf{V} \times \mathbf{B}$$
 
-    Zero in ideal MHD. Non-zero where the frozen-in condition breaks
-    down (reconnection sites, resistive regions). The generalized Ohm's
+    Zero in ideal MHD — resistance is futile. Non-zero where the
+    frozen-in condition breaks down (reconnection sites, resistive regions). The generalized Ohm's
     law decomposes this into Hall, pressure gradient, and inertial
     terms. [Birn & Priest 2007], [Hesse et al. 2011].
 

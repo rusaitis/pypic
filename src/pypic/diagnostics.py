@@ -95,6 +95,8 @@ def field_difference(
 ) -> FloatArray:
     r"""Compute the pointwise signed difference between two fields.
 
+    Waste no time arguing what a good field should be. Compute one.
+
     $$\Delta f_i = a_i - b_i$$
 
     Parameters
