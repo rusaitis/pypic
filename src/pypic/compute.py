@@ -29,7 +29,7 @@ from pypic.fields import _FIELD_INFO, _SPECIES_QUANTITY_PATTERNS, QuantityType
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from pypic.readers.base import FieldDataset
+    from pypic.readers._field_dataset import FieldDataset
     from pypic.types import FloatArray
     from pypic.units import Normalization
 
@@ -529,7 +529,8 @@ def _try_species_recipe(name: str) -> _Recipe | None:
     )
 
 
-# Display unit conversion: unit string → SI value
+# Display unit conversion: unit string → SI value.
+# Hand-curated instead of a prefix parser — life's too short to rewrite pint.
 _DISPLAY_UNITS: dict[str, float] = {
     "T": 1.0,
     "nT": 1e-9,
@@ -540,23 +541,47 @@ _DISPLAY_UNITS: dict[str, float] = {
     "km/s": 1e3,
     "m^-3": 1.0,
     "cm^-3": 1e6,
+    "/cc": 1e6,  # informal alias for cm^-3
+    "Mp/cc": 1e6 * constants.m_p,  # proton masses per cc (BATSRUS)
+    "amu/cc": 1e6 * constants.m_u,  # atomic mass units per cc (BATSRUS)
     "kg/m^3": 1.0,
     "Pa": 1.0,
     "nPa": 1e-9,
     "J/m^3": 1.0,
     "W/m^2": 1.0,
     "mW/m^2": 1e-3,
+    "W/m^3": 1.0,
     "Hz": 1.0,
     "rad/s": 1.0,
+    "s": 1.0,
+    "ms": 1e-3,
+    "us": 1e-6,
     "m": 1.0,
     "km": 1e3,
-    "R_E": 6.371e6,
+    "R_E": 6.371e6,  # NASA NSSDCA Planetary Fact Sheet
     "eV": constants.eV,
     "keV": 1e3 * constants.eV,
     "K": constants.k,
     "A/m^2": 1.0,
+    "uA/m^2": 1e-6,
+    "nA/m^2": 1e-9,
+    "uA/m2": 1e-6,  # BATSRUS header alias (no caret)
     "C/m^3": 1.0,
     "J/kg": 1.0,
+    "MeV": 1e6 * constants.eV,
+    "G": 1e-4,
+    "mG": 1e-7,
+    "pPa": 1e-12,
+    "cm/s": 1e-2,
+    "Mm": 1e6,
+    "RE": 6.371e6,  # alias for R_E
+    "R_S": 6.957e8,  # IAU 2015 nominal solar radius
+    "R_Moon": 1.7374e6,  # NASA NSSDCA Moon Fact Sheet
+    "R_Mercury": 2.4397e6,  # NASA NSSDCA Planetary Fact Sheet
+    "R_Mars": 3.3895e6,  # NASA NSSDCA Planetary Fact Sheet
+    "R_J": 6.9911e7,  # NASA NSSDCA Planetary Fact Sheet (volumetric mean)
+    "R_Saturn": 5.8232e7,  # NASA NSSDCA Planetary Fact Sheet (volumetric mean)
+    "AU": constants.au,
     "normalized": 1.0,
 }
 
