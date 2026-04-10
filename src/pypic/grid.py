@@ -253,9 +253,7 @@ def _build_grid_from_dataset(old_grid: GridInfo, new_ds: Dataset) -> GridInfo:
 
     new_boundary = None
     if old_grid.boundary is not None:
-        new_boundary = tuple(
-            old_grid.boundary[local_idx] for local_idx, _ in surviving
-        )
+        new_boundary = tuple(old_grid.boundary[local_idx] for local_idx, _ in surviving)
 
     return copy.replace(
         old_grid,
@@ -263,8 +261,7 @@ def _build_grid_from_dataset(old_grid: GridInfo, new_ds: Dataset) -> GridInfo:
         spacing=tuple(old_grid.spacing[local_idx] for local_idx, _ in surviving),
         origin=tuple(
             # invert cell-center formula: coord[0] = origin + 0.5*spacing
-            float(new_ds.coords[name].values[0])
-            - 0.5 * old_grid.spacing[local_idx]
+            float(new_ds.coords[name].values[0]) - 0.5 * old_grid.spacing[local_idx]
             for local_idx, name in surviving
         ),
         boundary=new_boundary,

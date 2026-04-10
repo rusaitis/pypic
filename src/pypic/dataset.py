@@ -396,8 +396,12 @@ class FieldDataset:
         new_dims_list: list[int] = []
         for src_i, sign in zip(axis_permutation, axis_signs, strict=True):
             src_coords = old_coords[src_i]
-            coord_first = dx_scale * sign * (src_coords[0] - transform_origin[indices[src_i]])
-            coord_last = dx_scale * sign * (src_coords[-1] - transform_origin[indices[src_i]])
+            coord_first = (
+                dx_scale * sign * (src_coords[0] - transform_origin[indices[src_i]])
+            )
+            coord_last = (
+                dx_scale * sign * (src_coords[-1] - transform_origin[indices[src_i]])
+            )
             dx = dx_scale * self._grid.spacing[src_i]
             new_origin_list.append(float(min(coord_first, coord_last)) - 0.5 * dx)
             new_spacing_list.append(dx)
@@ -407,8 +411,7 @@ class FieldDataset:
         new_surviving = None
         if self._grid.surviving_axes is not None:
             new_surviving = tuple(
-                self._grid.surviving_axes[axis_permutation[i]]
-                for i in range(ndim)
+                self._grid.surviving_axes[axis_permutation[i]] for i in range(ndim)
             )
 
         # Update geometry axis names if specified

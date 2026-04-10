@@ -864,9 +864,7 @@ def skin_depth(
     >>> skin_depth(np.array([1.0]), charge=1.0, mass=1.0)
     array([1.])
     """
-    return c / plasma_frequency(
-        density, charge, mass, lorentz_factor=lorentz_factor
-    )
+    return c / plasma_frequency(density, charge, mass, lorentz_factor=lorentz_factor)
 
 
 def gyroradius(
@@ -1075,9 +1073,7 @@ def magnetosonic_speed(
     """
     if c is not None:
         # You cannae change the laws of physics — v_ms < c, always.
-        return np.sqrt(
-            v_a**2 + c_s**2 - v_a**2 * c_s**2 / c**2
-        )
+        return np.sqrt(v_a**2 + c_s**2 - v_a**2 * c_s**2 / c**2)
     return np.sqrt(v_a**2 + c_s**2)
 
 
@@ -1621,20 +1617,19 @@ def agyrotropy(
     perp_22 = p22 - 2.0 * p_dot_bhat_2 * bhat_2 + p_par * bhat_2**2
     perp_33 = p33 - 2.0 * p_dot_bhat_3 * bhat_3 + p_par * bhat_3**2
     perp_12 = (
-        p12 - p_dot_bhat_1 * bhat_2 - bhat_1 * p_dot_bhat_2
-        + p_par * bhat_1 * bhat_2
+        p12 - p_dot_bhat_1 * bhat_2 - bhat_1 * p_dot_bhat_2 + p_par * bhat_1 * bhat_2
     )
     perp_13 = (
-        p13 - p_dot_bhat_1 * bhat_3 - bhat_1 * p_dot_bhat_3
-        + p_par * bhat_1 * bhat_3
+        p13 - p_dot_bhat_1 * bhat_3 - bhat_1 * p_dot_bhat_3 + p_par * bhat_1 * bhat_3
     )
     perp_23 = (
-        p23 - p_dot_bhat_2 * bhat_3 - bhat_2 * p_dot_bhat_3
-        + p_par * bhat_2 * bhat_3
+        p23 - p_dot_bhat_2 * bhat_3 - bhat_2 * p_dot_bhat_3 + p_par * bhat_2 * bhat_3
     )
 
     frobenius_norm_sq = (
-        perp_11**2 + perp_22**2 + perp_33**2
+        perp_11**2
+        + perp_22**2
+        + perp_33**2
         + 2.0 * (perp_12**2 + perp_13**2 + perp_23**2)
     )
 
@@ -1760,9 +1755,10 @@ def non_ideal_electric_field(
     $$\mathbf{E}' = \mathbf{E} + \mathbf{V} \times \mathbf{B}$$
 
     Zero in ideal MHD — resistance is futile. Non-zero where the
-    frozen-in condition breaks down (reconnection sites, resistive regions). The generalized Ohm's
-    law decomposes this into Hall, pressure gradient, and inertial
-    terms. [Birn & Priest 2007], [Hesse et al. 2011].
+    frozen-in condition breaks down (reconnection sites, resistive
+    regions). The generalized Ohm's law decomposes this into Hall,
+    pressure gradient, and inertial terms. [Birn & Priest 2007],
+    [Hesse et al. 2011].
 
     Parameters
     ----------

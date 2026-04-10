@@ -233,9 +233,9 @@ class TestThermodynamics:
         with np.errstate(invalid="ignore"):
             assert np.isnan(entropy(np.array([-1.0]), np.array([1.0]))[0])
             assert np.isnan(
-                gyrotropic_entropy(
-                    np.array([-1.0]), np.array([1.0]), np.array([1.0])
-                )[0]
+                gyrotropic_entropy(np.array([-1.0]), np.array([1.0]), np.array([1.0]))[
+                    0
+                ]
             )
 
 

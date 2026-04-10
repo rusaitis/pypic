@@ -33,6 +33,7 @@ if TYPE_CHECKING:
     from collections.abc import Iterable
     from pathlib import Path
 
+    from pypic.containers import SimulationConfig, TabularData
     from pypic.types import FloatArray
 
 log = logging.getLogger(__name__)

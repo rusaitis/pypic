@@ -10,6 +10,8 @@ import pytest
 if TYPE_CHECKING:
     from pathlib import Path
 
+    from pypic.grid import GridInfo
+
 matplotlib = pytest.importorskip("matplotlib")
 matplotlib.use("Agg")
 
@@ -19,7 +21,6 @@ from matplotlib.figure import Figure  # noqa: E402
 
 from pypic.containers import TabularData  # noqa: E402
 from pypic.dataset import FieldDataset  # noqa: E402
-from pypic.grid import GridInfo  # noqa: E402
 from pypic.plotting import (  # noqa: E402
     LegendEntry,
     add_badge,

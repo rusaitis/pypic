@@ -81,7 +81,6 @@ from pypic.fields import (
     unregister_field,
 )
 from pypic.grid import GridInfo
-from pypic.regrid import align_grids, common_grid, regrid
 from pypic.readers import (
     AuxiliaryDataReader,
     BATSRUSConfig,
@@ -118,6 +117,7 @@ from pypic.readers import (
     supports_selective_read,
     unregister_reader,
 )
+from pypic.regrid import align_grids, common_grid, regrid
 from pypic.selections import BoxSelection, PlaneSelection, SphereSelection
 from pypic.traces import (
     FieldLine,
@@ -135,7 +135,6 @@ __all__ = [
     "CYLINDRICAL",
     "SPHERICAL",
     "AuxiliaryDataReader",
-    "align_grids",
     "BATSRUSConfig",
     "BATSRUSOutputFormat",
     "BATSRUSReader",
@@ -177,6 +176,7 @@ __all__ = [
     "agyrotropy",
     "alfven_mach",
     "alfven_speed",
+    "align_grids",
     "available_quantities",
     "common_grid",
     "conserved_to_tabular",
@@ -230,11 +230,11 @@ __all__ = [
     "plasma_frequency",
     "poynting_flux",
     "read_phdf5_particles",
-    "regrid",
     "register_field",
     "register_reader",
     "register_recipe",
     "registered_readers",
+    "regrid",
     "relativistic_enthalpy",
     "skin_depth",
     "sound_speed",

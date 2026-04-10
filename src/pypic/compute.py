@@ -83,7 +83,9 @@ _REGISTRY: dict[str, _Recipe] = {
     "beta_i": _Recipe(derived.plasma_beta, ("Pi", "|B|")),
     "v_A": _Recipe(derived.alfven_speed, ("|B|", "rho_m"), supports_relativistic=True),
     "c_s": _Recipe(
-        derived.sound_speed, ("P", "rho_m"), needs_gamma=True,
+        derived.sound_speed,
+        ("P", "rho_m"),
+        needs_gamma=True,
         supports_relativistic=True,
     ),
     "c_ia": _Recipe(
@@ -93,7 +95,9 @@ _REGISTRY: dict[str, _Recipe] = {
         species_args=_SpeciesArgs.MASS_ONLY,
     ),
     "v_ms": _Recipe(
-        derived.magnetosonic_speed, ("v_A", "c_s"), supports_relativistic=True,
+        derived.magnetosonic_speed,
+        ("v_A", "c_s"),
+        supports_relativistic=True,
     ),
     "M_A": _Recipe(derived.alfven_mach, ("|V|", "v_A")),
     "M_ms": _Recipe(derived.magnetosonic_mach, ("|V|", "v_ms")),
@@ -101,7 +105,8 @@ _REGISTRY: dict[str, _Recipe] = {
     "e_B": _Recipe(derived.magnetic_energy_density, ("|B|",)),
     "e_E": _Recipe(derived.electric_energy_density, ("|E|",)),
     "e_k": _Recipe(
-        derived.kinetic_energy_density, ("rho_m", "|V|"),
+        derived.kinetic_energy_density,
+        ("rho_m", "|V|"),
         supports_relativistic=True,
     ),
     "e_th": _Recipe(derived.thermal_energy_density, ("P",), needs_gamma=True),
@@ -111,7 +116,9 @@ _REGISTRY: dict[str, _Recipe] = {
     ),
     # Thermodynamic
     "h": _Recipe(
-        derived.enthalpy, ("P", "rho_m"), needs_gamma=True,
+        derived.enthalpy,
+        ("P", "rho_m"),
+        needs_gamma=True,
         supports_relativistic=True,
     ),
     "h_rel": _Recipe(
