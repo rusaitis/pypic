@@ -81,6 +81,7 @@ from pypic.fields import (
     unregister_field,
 )
 from pypic.grid import GridInfo
+from pypic.regrid import align_grids, common_grid, regrid
 from pypic.readers import (
     AuxiliaryDataReader,
     BATSRUSConfig,
@@ -134,6 +135,7 @@ __all__ = [
     "CYLINDRICAL",
     "SPHERICAL",
     "AuxiliaryDataReader",
+    "align_grids",
     "BATSRUSConfig",
     "BATSRUSOutputFormat",
     "BATSRUSReader",
@@ -176,6 +178,7 @@ __all__ = [
     "alfven_mach",
     "alfven_speed",
     "available_quantities",
+    "common_grid",
     "conserved_to_tabular",
     "curl",
     "current_density_magnitude",
@@ -227,6 +230,7 @@ __all__ = [
     "plasma_frequency",
     "poynting_flux",
     "read_phdf5_particles",
+    "regrid",
     "register_field",
     "register_reader",
     "register_recipe",

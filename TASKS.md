@@ -103,7 +103,7 @@ Each step produces something testable. No step starts until the previous step's 
 
 ## Phase 6: Regridding & Cross-Model Comparison
 
-- [ ] **Step 19: `pypic.regrid` — uniform-to-uniform interpolation**
+- [x] **Step 19: `pypic.regrid` — uniform-to-uniform interpolation**
   `regrid(source, target_grid, *, method="linear", **kwargs) -> FieldDataset` using `scipy.interpolate.RegularGridInterpolator` (same pattern as `traces/_sampling.py`). `method` is `str` (not enum) so new interpolation strategies can be added without API changes; `**kwargs` forwarded to the interpolator for future options. `align_grids(a, b) -> (FieldDataset, FieldDataset)` regrids both to the finer grid's intersection domain. `common_grid(a, b) -> GridInfo` computes that target: intersection domain = `max(origin_a, origin_b)` to `min(extent_a, extent_b)`, spacing = `min(dx_a, dx_b)` per axis; raises if domains don't overlap. Cartesian only (raise `NotImplementedError` for spherical/cylindrical, matching `operators.py` pattern). NaN-fill outside source domain via `bounds_error=False, fill_value=np.nan`. Preserves normalization, species, physics metadata. Works for 1D, 2D, and 3D grids. No-op shortcut when source grid already matches target (avoids interpolation for same-resolution comparisons). Each field array is interpolated independently; derived fields on source are regridded as-is, not recomputed.
   - *Not* a replacement for BATSRUS AMR regridding (block-avg/NN in `batsrus/_grid.py` operates on raw AMR cell data pre-FieldDataset; this module operates on assembled uniform grids via interpolation — different problems, different algorithms).
   - *Not* responsible for destaggering. Readers destagger to co-located grids on load (see Step 34). This module operates on already-co-located `FieldDataset` grids.
@@ -325,7 +325,7 @@ grow.
 | 16 | selections | Sphere (NaN masking) | ✅ |
 | 17 | docs | MkDocs site | ✅ |
 | 18 | derived | lorentz_factor, magnetization, rel. corrections | ✅ |
-| 19 | regrid | `regrid()`, `align_grids()`, `common_grid()` | — |
+| 19 | regrid | `regrid()`, `align_grids()`, `common_grid()` | ✅ |
 | 20 | diagnostics | `compare_fields()`, `field_comparison_report()` | — |
 | 21 | cli | `info`, `fields`, `stats`, `compare` subcommands (typer) | — |
 | 21b | readers | `sim.available_fields()` lightweight field probe | — |
