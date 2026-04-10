@@ -22,7 +22,7 @@ from pypic.traces._fieldline import _VALID_DIRECTIONS
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from pypic.readers._field_dataset import FieldDataset
+    from pypic.dataset import FieldDataset
     from pypic.traces._fieldline import FieldLine
     from pypic.types import FloatArray, Vector3
 
@@ -391,7 +391,8 @@ def trace_field_line(
     Examples
     --------
     >>> import numpy as np
-    >>> from pypic.readers._field_dataset import FieldDataset, GridInfo
+    >>> from pypic.dataset import FieldDataset
+    >>> from pypic.grid import GridInfo
     >>> from pypic.units import Normalization
     >>> grid = GridInfo(dimensions=(8, 8, 8), spacing=(1.0, 1.0, 1.0))
     >>> data = FieldDataset.from_arrays(
@@ -530,7 +531,8 @@ def trace_field_line_adaptive(
     Examples
     --------
     >>> import numpy as np
-    >>> from pypic.readers._field_dataset import FieldDataset, GridInfo
+    >>> from pypic.dataset import FieldDataset
+    >>> from pypic.grid import GridInfo
     >>> from pypic.units import Normalization
     >>> grid = GridInfo(dimensions=(8, 8, 8), spacing=(1.0, 1.0, 1.0))
     >>> data = FieldDataset.from_arrays(
@@ -663,7 +665,8 @@ def estimate_tracing_error(
     Examples
     --------
     >>> import numpy as np
-    >>> from pypic.readers._field_dataset import FieldDataset, GridInfo
+    >>> from pypic.dataset import FieldDataset
+    >>> from pypic.grid import GridInfo
     >>> from pypic.units import Normalization
     >>> grid = GridInfo(dimensions=(8, 8, 8), spacing=(1.0, 1.0, 1.0))
     >>> data = FieldDataset.from_arrays(

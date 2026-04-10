@@ -11,10 +11,10 @@ if TYPE_CHECKING:
     from matplotlib.colors import Colormap
     from matplotlib.figure import Figure
 
+    from pypic.dataset import FieldDataset
     from pypic.plotting._badge import OverlayVariant
     from pypic.plotting._colorbar import ExtremesMode
     from pypic.plotting.styles import ThemeArg
-    from pypic.readers._field_dataset import FieldDataset
     from pypic.selections import PlaneSelection
 
 

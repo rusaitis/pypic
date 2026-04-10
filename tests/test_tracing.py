@@ -5,7 +5,8 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from pypic.readers._field_dataset import FieldDataset, GridInfo
+from pypic.dataset import FieldDataset
+from pypic.grid import GridInfo
 from pypic.traces import (
     FieldLine,
     VectorFieldInterpolator,

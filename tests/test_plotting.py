@@ -17,6 +17,9 @@ import matplotlib.pyplot as plt  # noqa: E402
 from matplotlib.axes import Axes  # noqa: E402
 from matplotlib.figure import Figure  # noqa: E402
 
+from pypic.containers import TabularData  # noqa: E402
+from pypic.dataset import FieldDataset  # noqa: E402
+from pypic.grid import GridInfo  # noqa: E402
 from pypic.plotting import (  # noqa: E402
     LegendEntry,
     add_badge,
@@ -39,7 +42,6 @@ from pypic.plotting._badge import (  # noqa: E402
 )
 from pypic.plotting._colormaps import is_positive_definite, symmetric_clim  # noqa: E402
 from pypic.plotting.styles import _resolve_theme_arg  # noqa: E402
-from pypic.readers._field_dataset import FieldDataset, GridInfo, TabularData  # noqa: E402
 from pypic.selections import PlaneSelection  # noqa: E402
 from pypic.units import Normalization  # noqa: E402
 from tests._helpers import make_uniform_grid  # noqa: E402

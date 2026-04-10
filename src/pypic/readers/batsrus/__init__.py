@@ -31,7 +31,8 @@ from pypic.readers.batsrus._probe import can_read_confidence
 from pypic.readers.batsrus._reader import BATSRUSReader
 
 if TYPE_CHECKING:
-    from pypic.readers._field_dataset import SimulationConfig, SimulationReader
+    from pypic.containers import SimulationConfig
+    from pypic.readers._protocols import SimulationReader
 
 
 class BATSRUSOutputFormat(StrEnum):

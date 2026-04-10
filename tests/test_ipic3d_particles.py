@@ -7,8 +7,9 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+from pypic.containers import ParticleData
+from pypic.readers._protocols import ParticleDataReader
 from pypic.readers._registry import Simulation
-from pypic.readers._field_dataset import ParticleData, ParticleDataReader
 from pypic.readers.ipic3d import (
     IPic3DParallelReader,
     detect_particle_steps,
@@ -405,8 +406,9 @@ class TestSimulationParticles:
     def test_unsupported_reader_raises_typeerror(self) -> None:
         from unittest.mock import MagicMock
 
+        from pypic.containers import SimulationConfig
         from pypic.coordinates.geometry import CARTESIAN
-        from pypic.readers._field_dataset import GridInfo, SimulationConfig
+        from pypic.grid import GridInfo
         from pypic.units import Normalization, SpeciesInfo
 
         mock_reader = MagicMock()

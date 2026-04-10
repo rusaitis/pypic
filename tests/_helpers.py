@@ -12,7 +12,8 @@ from typing import TYPE_CHECKING, cast
 
 import numpy as np
 
-from pypic.readers._field_dataset import FieldDataset, GridInfo
+from pypic.dataset import FieldDataset
+from pypic.grid import GridInfo
 from pypic.units import Normalization, PhysicsParams, SpeciesInfo
 
 if TYPE_CHECKING:

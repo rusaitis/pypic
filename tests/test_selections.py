@@ -7,7 +7,8 @@ import pytest
 from numpy.testing import assert_array_equal
 
 from pypic.coordinates import CARTESIAN, CoordinateGeometry, GeometryType
-from pypic.readers import FieldDataset, GridInfo
+from pypic.dataset import FieldDataset
+from pypic.grid import GridInfo
 from pypic.selections import BoxSelection, PlaneSelection, SphereSelection
 from pypic.units import Normalization
 

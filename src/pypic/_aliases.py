@@ -180,7 +180,7 @@ def _build_field_alias_fallback() -> dict[str, str]:
     This is safe because all B-field components map to the same SI
     quantity type regardless of which coordinate index they represent.
     """
-    from pypic.readers._field_dataset import (
+    from pypic.grid import (
         _CARTESIAN_ALIASES,
         _CARTESIAN_UNDERSCORE_ALIASES,
         _CYLINDRICAL_ALIASES,

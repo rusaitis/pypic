@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from pypic.readers._field_dataset import score_signals
+from pypic.readers._protocols import score_signals
 
 if TYPE_CHECKING:
     from pathlib import Path

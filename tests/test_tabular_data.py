@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 from numpy.testing import assert_allclose
 
-from pypic.readers._field_dataset import TabularData
+from pypic.containers import TabularData
 
 
 class TestConstruction:

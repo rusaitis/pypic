@@ -15,28 +15,10 @@ from pypic.coordinates.geometry import (
     SPHERICAL,  # noqa: F401 — used in doctests
 )
 from pypic.coordinates.transforms import FrameTransform
-from pypic.readers._containers import ParticleData, SimulationConfig, TabularData
-from pypic.readers._grid import (
-    _CARTESIAN_ALIASES,
-    _CARTESIAN_UNDERSCORE_ALIASES,
-    _CYLINDRICAL_ALIASES,
-    _CYLINDRICAL_UNDERSCORE_ALIASES,
-    _FIELD_PREFIX_PAIRS,
-    _NUMBERED_UNDERSCORE_ALIASES,
-    _SCALAR_UNDERSCORE_ALIASES,
-    _SPECIES_ALIASES,
-    _SPHERICAL_ALIASES,
-    _SPHERICAL_UNDERSCORE_ALIASES,
+from pypic.grid import (
     GridInfo,
     _build_grid_from_dataset,
     _default_aliases,
-)
-from pypic.readers._protocols import (
-    AuxiliaryDataReader,
-    ParticleDataReader,
-    SimulationReader,
-    score_signals,
-    supports_selective_read,
 )
 from pypic.units import PhysicsParams
 
@@ -48,33 +30,6 @@ if TYPE_CHECKING:
     from pypic.fields import FieldInfo, QuantityType
     from pypic.types import FloatArray
     from pypic.units import Normalization, SpeciesInfo
-
-# Re-export everything for backward compatibility — dozens of internal
-# modules import from ``pypic.readers._field_dataset``.
-__all__ = [
-    "_CARTESIAN_ALIASES",
-    "_CARTESIAN_UNDERSCORE_ALIASES",
-    "_CYLINDRICAL_ALIASES",
-    "_CYLINDRICAL_UNDERSCORE_ALIASES",
-    "_FIELD_PREFIX_PAIRS",
-    "_NUMBERED_UNDERSCORE_ALIASES",
-    "_SCALAR_UNDERSCORE_ALIASES",
-    "_SPECIES_ALIASES",
-    "_SPHERICAL_ALIASES",
-    "_SPHERICAL_UNDERSCORE_ALIASES",
-    "AuxiliaryDataReader",
-    "FieldDataset",
-    "GridInfo",
-    "ParticleData",
-    "ParticleDataReader",
-    "SimulationConfig",
-    "SimulationReader",
-    "TabularData",
-    "_build_grid_from_dataset",
-    "_default_aliases",
-    "score_signals",
-    "supports_selective_read",
-]
 
 
 class FieldDataset:

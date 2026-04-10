@@ -13,8 +13,8 @@ if TYPE_CHECKING:
     import pyvista as pv
     from matplotlib.colors import Colormap
 
+    from pypic.dataset import FieldDataset
     from pypic.plotting.styles import PlotTheme
-    from pypic.readers._field_dataset import FieldDataset
     from pypic.traces import FieldLine, ParticleTrace
 
 

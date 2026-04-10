@@ -13,7 +13,8 @@ from pypic.compute import (
     unregister_recipe,
 )
 from pypic.coordinates.geometry import SPHERICAL
-from pypic.readers._field_dataset import FieldDataset, GridInfo
+from pypic.dataset import FieldDataset
+from pypic.grid import GridInfo
 from pypic.units import Normalization, PhysicsParams
 from tests._helpers import ELECTRONS, IONS, make_test_dataset
 

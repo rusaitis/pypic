@@ -473,7 +473,8 @@ class TestSampling:
     @pytest.fixture
     def field_dataset(self) -> object:
         """3D FieldDataset with a simple scalar field."""
-        from pypic.readers._field_dataset import FieldDataset, GridInfo
+        from pypic.dataset import FieldDataset
+        from pypic.grid import GridInfo
 
         grid = GridInfo(
             dimensions=(4, 4, 4),
@@ -486,7 +487,7 @@ class TestSampling:
         return FieldDataset.from_arrays({"rho": field}, grid)
 
     def test_nearest_at_grid_nodes(self, field_dataset: object) -> None:
-        from pypic.readers._field_dataset import FieldDataset
+        from pypic.dataset import FieldDataset
 
         data = field_dataset
         assert isinstance(data, FieldDataset)
@@ -495,7 +496,7 @@ class TestSampling:
         np.testing.assert_allclose(values, [0.5, 1.5, 2.5])
 
     def test_outside_domain_returns_nan(self, field_dataset: object) -> None:
-        from pypic.readers._field_dataset import FieldDataset
+        from pypic.dataset import FieldDataset
 
         data = field_dataset
         assert isinstance(data, FieldDataset)
@@ -504,7 +505,7 @@ class TestSampling:
         assert np.all(np.isnan(values))
 
     def test_linear_interpolation(self, field_dataset: object) -> None:
-        from pypic.readers._field_dataset import FieldDataset
+        from pypic.dataset import FieldDataset
 
         data = field_dataset
         assert isinstance(data, FieldDataset)
@@ -514,7 +515,7 @@ class TestSampling:
         np.testing.assert_allclose(values, [1.0], atol=0.1)
 
     def test_attach_scalars_to_fieldline(self, field_dataset: object) -> None:
-        from pypic.readers._field_dataset import FieldDataset
+        from pypic.dataset import FieldDataset
 
         data = field_dataset
         assert isinstance(data, FieldDataset)
@@ -530,7 +531,7 @@ class TestSampling:
         np.testing.assert_allclose(fl2.scalars["rho"], [0.5, 1.5, 2.5])
 
     def test_attach_scalars_to_particletrace(self, field_dataset: object) -> None:
-        from pypic.readers._field_dataset import FieldDataset
+        from pypic.dataset import FieldDataset
 
         data = field_dataset
         assert isinstance(data, FieldDataset)
@@ -546,7 +547,7 @@ class TestSampling:
         assert "rho" in tr2.scalars
 
     def test_invalid_method_rejects(self, field_dataset: object) -> None:
-        from pypic.readers._field_dataset import FieldDataset
+        from pypic.dataset import FieldDataset
 
         data = field_dataset
         assert isinstance(data, FieldDataset)
@@ -564,7 +565,8 @@ class TestSamplingEdgeCases:
         Regression for the ``np.clip(0, len-2)`` underflow path in
         ``_nearest_indices`` (Unit 14b).
         """
-        from pypic.readers._field_dataset import FieldDataset, GridInfo
+        from pypic.dataset import FieldDataset
+        from pypic.grid import GridInfo
 
         grid = GridInfo(
             dimensions=(4, 4, 1),
@@ -582,7 +584,8 @@ class TestSamplingEdgeCases:
 
     def test_single_node_axis_far_z_out_of_bounds(self) -> None:
         """Querying far outside the (single) z node returns NaN, not garbage."""
-        from pypic.readers._field_dataset import FieldDataset, GridInfo
+        from pypic.dataset import FieldDataset
+        from pypic.grid import GridInfo
 
         grid = GridInfo(
             dimensions=(4, 4, 1),
@@ -602,7 +605,8 @@ class TestSamplingEdgeCases:
 @pytest.fixture
 def uniform_field_data():
     """3D uniform B=(1,0,0) field on a 20x20x20 grid for tracing tests."""
-    from pypic.readers._field_dataset import FieldDataset, GridInfo
+    from pypic.dataset import FieldDataset
+    from pypic.grid import GridInfo
 
     grid = GridInfo(
         dimensions=(20, 20, 20),

@@ -9,7 +9,7 @@ from pypic.compute import (
     compute_field,
     field_si_factor,
 )
-from pypic.readers._field_dataset import _default_aliases
+from pypic.dataset import _default_aliases
 from pypic.units import Normalization, SpeciesInfo
 from tests._helpers import ELECTRONS, IONS, make_test_dataset
 

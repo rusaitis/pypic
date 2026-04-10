@@ -10,10 +10,10 @@ from typing import TYPE_CHECKING, Any
 
 import h5py
 
+from pypic.containers import SimulationConfig, StaggerInfo
 from pypic.coordinates.geometry import CARTESIAN
+from pypic.grid import GridInfo
 from pypic.readers._config_helpers import merge_simulation_toml
-from pypic.readers._containers import StaggerInfo
-from pypic.readers._field_dataset import GridInfo, SimulationConfig
 from pypic.units import Normalization, PhysicsParams, SpeciesInfo
 
 if TYPE_CHECKING:

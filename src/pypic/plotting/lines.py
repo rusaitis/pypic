@@ -10,8 +10,9 @@ if TYPE_CHECKING:
     from matplotlib.axes import Axes
     from matplotlib.figure import Figure
 
+    from pypic.containers import TabularData
+    from pypic.dataset import FieldDataset
     from pypic.plotting.styles import ThemeArg
-    from pypic.readers._field_dataset import FieldDataset, TabularData
 
 
 def plot_line(

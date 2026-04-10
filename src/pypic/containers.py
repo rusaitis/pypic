@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Any
 import numpy as np
 
 from pypic.coordinates.geometry import CARTESIAN  # noqa: F401 — used in doctests
-from pypic.readers._grid import GridInfo  # noqa: TC001 — used in doctests
+from pypic.grid import GridInfo  # noqa: TC001 — used in doctests
 from pypic.units import PhysicsParams
 
 if TYPE_CHECKING:

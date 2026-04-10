@@ -13,8 +13,8 @@ if TYPE_CHECKING:
     from matplotlib.cm import ScalarMappable
     from matplotlib.figure import Figure
 
+    from pypic.dataset import FieldDataset
     from pypic.plotting.styles import ThemeArg
-    from pypic.readers._field_dataset import FieldDataset
     from pypic.selections import PlaneSelection
 
 

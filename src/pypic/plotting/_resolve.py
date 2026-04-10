@@ -8,8 +8,8 @@ if TYPE_CHECKING:
     from matplotlib.axes import Axes
     from matplotlib.figure import Figure
 
+    from pypic.dataset import FieldDataset
     from pypic.plotting.styles import PlotTheme
-    from pypic.readers._field_dataset import FieldDataset
     from pypic.selections import PlaneSelection
     from pypic.types import FloatArray
 

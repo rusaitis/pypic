@@ -8,6 +8,12 @@ from pypic.compute import (
     register_recipe,
     unregister_recipe,
 )
+from pypic.containers import (
+    ParticleData,
+    SimulationConfig,
+    StaggerInfo,
+    TabularData,
+)
 from pypic.coordinates import (
     CARTESIAN,
     CYLINDRICAL,
@@ -19,6 +25,7 @@ from pypic.coordinates import (
     divergence,
     gradient,
 )
+from pypic.dataset import FieldDataset
 from pypic.derived import (
     agyrotropy,
     alfven_mach,
@@ -73,30 +80,25 @@ from pypic.fields import (
     unit_label,
     unregister_field,
 )
+from pypic.grid import GridInfo
 from pypic.readers import (
     AuxiliaryDataReader,
     BATSRUSConfig,
     BATSRUSOutputFormat,
     BATSRUSReader,
     ConservedQuantities,
-    FieldDataset,
-    GridInfo,
     IPic3DConfig,
     IPic3DH5hutReader,
     IPic3DParallelReader,
     IPic3DSerialReader,
     OpenGGCMGrid,
     OpenGGCMReader,
-    ParticleData,
     ParticleDataReader,
     ProbeResult,
     ReaderEntry,
     SimpleReader,
     Simulation,
-    SimulationConfig,
     SimulationReader,
-    StaggerInfo,
-    TabularData,
     conserved_to_tabular,
     detect_particle_steps,
     load_config,

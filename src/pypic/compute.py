@@ -29,7 +29,7 @@ from pypic.fields import _FIELD_INFO, _SPECIES_QUANTITY_PATTERNS, QuantityType
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from pypic.readers._field_dataset import FieldDataset
+    from pypic.dataset import FieldDataset
     from pypic.types import FloatArray
     from pypic.units import Normalization
 

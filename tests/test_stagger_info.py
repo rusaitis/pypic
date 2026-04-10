@@ -8,8 +8,9 @@ from types import MappingProxyType
 import numpy as np
 import pytest
 
-from pypic.readers._containers import StaggerInfo
-from pypic.readers._field_dataset import FieldDataset, GridInfo
+from pypic.containers import StaggerInfo
+from pypic.dataset import FieldDataset
+from pypic.grid import GridInfo
 from pypic.units import Normalization
 
 

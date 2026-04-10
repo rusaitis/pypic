@@ -21,8 +21,8 @@ import logging
 import re
 from typing import TYPE_CHECKING
 
+from pypic.containers import SimulationConfig
 from pypic.readers._config_helpers import merge_simulation_toml
-from pypic.readers._field_dataset import SimulationConfig
 from pypic.readers.openggcm._grid import OpenGGCMGrid, parse_grid_file
 from pypic.readers.openggcm._probe import can_read_confidence
 from pypic.readers.openggcm._reader import OpenGGCMReader, _make_grid_info

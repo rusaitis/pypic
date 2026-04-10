@@ -2,6 +2,7 @@ import numpy as np
 import pytest
 
 from pypic.compute import field_si_factor
+from pypic.dataset import FieldDataset
 from pypic.fields import (
     _FIELD_INFO,
     _QUANTITY_UNITS,
@@ -13,7 +14,7 @@ from pypic.fields import (
     unit_label,
     unregister_field,
 )
-from pypic.readers._field_dataset import FieldDataset, GridInfo
+from pypic.grid import GridInfo
 from pypic.selections import PlaneSelection
 from pypic.units import _COMPOUND_FACTORS, _QUANTITIES, Normalization, SpeciesInfo
 

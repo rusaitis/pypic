@@ -37,7 +37,7 @@ from pypic import (
     magnetic_field_magnitude,
     open_simple,
 )
-from pypic.readers import GridInfo
+from pypic.grid import GridInfo
 
 
 def generate_synthetic_data(output_dir: Path) -> None:
@@ -146,7 +146,12 @@ def main() -> None:
         class RootReader(SimpleReader):
             """Read root-level datasets, promote to float64."""
 
-            def _read_raw(self, filepath: Path, **kwargs) -> dict[str, np.ndarray]:
+            def _read_raw(  # type: ignore[override]
+                    self,
+                    filepath: Path,
+                    *,
+                    fields: set[str] | None = None,
+                ) -> dict[str, np.ndarray]:
                 with h5py.File(filepath, "r") as f:
                     return {
                         name: np.asarray(f[name], dtype=np.float64)

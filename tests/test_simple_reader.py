@@ -9,16 +9,14 @@ import numpy as np
 import pytest
 from numpy.testing import assert_allclose
 
+from pypic.containers import SimulationConfig
 from pypic.coordinates.geometry import CARTESIAN
+from pypic.grid import GridInfo
 from pypic.readers._simple import (
     SimpleReader,
     _parse_file_pattern,
     can_read_confidence,
     open_simple,
-)
-from pypic.readers._field_dataset import (
-    GridInfo,
-    SimulationConfig,
 )
 from pypic.units import Normalization, PhysicsParams
 from tests._helpers import make_uniform_grid

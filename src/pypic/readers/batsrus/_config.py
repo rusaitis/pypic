@@ -7,9 +7,10 @@ from dataclasses import dataclass, field
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Any
 
+from pypic.containers import SimulationConfig
 from pypic.coordinates import CARTESIAN, GEOMETRY_BY_NAME
+from pypic.grid import GridInfo
 from pypic.readers._config_helpers import merge_simulation_toml
-from pypic.readers._field_dataset import GridInfo, SimulationConfig
 from pypic.units import Normalization, PhysicsParams
 
 if TYPE_CHECKING:

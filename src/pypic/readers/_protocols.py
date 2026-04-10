@@ -8,8 +8,8 @@ if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence
     from pathlib import Path
 
-    from pypic.readers._containers import ParticleData, TabularData
-    from pypic.readers._field_dataset import FieldDataset
+    from pypic.containers import ParticleData, TabularData
+    from pypic.dataset import FieldDataset
 
 
 @runtime_checkable

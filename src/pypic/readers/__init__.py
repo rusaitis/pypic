@@ -1,16 +1,10 @@
-"""Simulation data readers and the FieldDataset container."""
+"""Simulation data readers and auto-detection registry."""
 
 from pypic.readers._config_helpers import merge_simulation_toml
-from pypic.readers._containers import StaggerInfo
-from pypic.readers._field_dataset import (
+from pypic.readers._protocols import (
     AuxiliaryDataReader,
-    FieldDataset,
-    GridInfo,
-    ParticleData,
     ParticleDataReader,
-    SimulationConfig,
     SimulationReader,
-    TabularData,
     score_signals,
     supports_selective_read,
 )
@@ -58,24 +52,18 @@ __all__ = [
     "BATSRUSOutputFormat",
     "BATSRUSReader",
     "ConservedQuantities",
-    "FieldDataset",
-    "GridInfo",
     "IPic3DConfig",
     "IPic3DH5hutReader",
     "IPic3DParallelReader",
     "IPic3DSerialReader",
     "OpenGGCMGrid",
     "OpenGGCMReader",
-    "ParticleData",
     "ParticleDataReader",
     "ProbeResult",
     "ReaderEntry",
     "SimpleReader",
     "Simulation",
-    "SimulationConfig",
     "SimulationReader",
-    "StaggerInfo",
-    "TabularData",
     "conserved_to_tabular",
     "detect_particle_steps",
     "load_config",

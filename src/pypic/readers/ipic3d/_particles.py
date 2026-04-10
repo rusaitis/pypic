@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 import h5py
 import numpy as np
 
-from pypic.readers._field_dataset import ParticleData
+from pypic.containers import ParticleData
 
 if TYPE_CHECKING:
     from collections.abc import Iterable

@@ -26,7 +26,8 @@ from pypic.readers.ipic3d._serial import IPic3DSerialReader
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from pypic.readers._field_dataset import SimulationConfig, SimulationReader
+    from pypic.containers import SimulationConfig
+    from pypic.readers._protocols import SimulationReader
 
 __all__ = [
     "ConservedQuantities",

@@ -17,7 +17,8 @@ from pypic.coordinates.transforms import (
     rotate_pressure_tensor,
     rotate_vector_components,
 )
-from pypic.readers._field_dataset import FieldDataset, GridInfo
+from pypic.dataset import FieldDataset
+from pypic.grid import GridInfo
 from pypic.units import Normalization
 
 # ---------------------------------------------------------------------------

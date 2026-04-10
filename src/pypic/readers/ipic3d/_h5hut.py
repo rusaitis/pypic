@@ -9,7 +9,8 @@ from typing import TYPE_CHECKING
 import h5py
 import numpy as np
 
-from pypic.readers._field_dataset import FieldDataset, SimulationConfig, TabularData
+from pypic.containers import SimulationConfig, TabularData
+from pypic.dataset import FieldDataset
 from pypic.readers.ipic3d._config import IPic3DConfig, to_simulation_config
 from pypic.readers.ipic3d._conserved import detect_conserved, load_ipic3d_auxiliary
 from pypic.readers.ipic3d._field_map import (

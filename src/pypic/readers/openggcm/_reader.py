@@ -9,9 +9,10 @@ from typing import TYPE_CHECKING
 import numpy as np
 import xarray as xr
 
+from pypic.containers import StaggerInfo
 from pypic.coordinates.geometry import CARTESIAN
-from pypic.readers._containers import StaggerInfo
-from pypic.readers._field_dataset import FieldDataset, GridInfo
+from pypic.dataset import FieldDataset
+from pypic.grid import GridInfo
 from pypic.readers.openggcm._field_io import read_3df_file
 from pypic.readers.openggcm._field_map import (
     DEFAULT_SKIP,

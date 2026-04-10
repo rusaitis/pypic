@@ -101,25 +101,38 @@ Each step produces something testable. No step starts until the previous step's 
 ## Phase 6: Regridding & Cross-Model Comparison
 
 - [ ] **Step 19: `pypic.regrid` — uniform-to-uniform interpolation**
-  `regrid(source, target_grid, *, method="linear") -> FieldDataset` using `scipy.interpolate.RegularGridInterpolator`. `align_grids(a, b) -> (FieldDataset, FieldDataset)` regrids both to the finer grid's intersection domain. `common_grid(a, b) -> GridInfo` computes that target. Cartesian only (raise `NotImplementedError` for spherical/cylindrical, matching `operators.py` pattern). NaN-fill outside source domain. Preserves normalization, species, physics metadata.
+  `regrid(source, target_grid, *, method="linear", **kwargs) -> FieldDataset` using `scipy.interpolate.RegularGridInterpolator` (same pattern as `traces/_sampling.py`). `method` is `str` (not enum) so new interpolation strategies can be added without API changes; `**kwargs` forwarded to the interpolator for future options. `align_grids(a, b) -> (FieldDataset, FieldDataset)` regrids both to the finer grid's intersection domain. `common_grid(a, b) -> GridInfo` computes that target: intersection domain = `max(origin_a, origin_b)` to `min(extent_a, extent_b)`, spacing = `min(dx_a, dx_b)` per axis; raises if domains don't overlap. Cartesian only (raise `NotImplementedError` for spherical/cylindrical, matching `operators.py` pattern). NaN-fill outside source domain via `bounds_error=False, fill_value=np.nan`. Preserves normalization, species, physics metadata. Works for 1D, 2D, and 3D grids. No-op shortcut when source grid already matches target (avoids interpolation for same-resolution comparisons). Each field array is interpolated independently; derived fields on source are regridded as-is, not recomputed.
   - *Not* a replacement for BATSRUS AMR regridding (block-avg/NN in `batsrus/_grid.py` operates on raw AMR cell data pre-FieldDataset; this module operates on assembled uniform grids via interpolation — different problems, different algorithms).
   - *Not* responsible for destaggering. Readers destagger to co-located grids on load (see Step 34). This module operates on already-co-located `FieldDataset` grids.
+  - *Not* responsible for time alignment — Step 19 is purely spatial. Temporal interpolation (comparing different codes at matching physical time when dt differs) is a separate concern.
+  - **Future extensions** (out of scope for initial implementation):
+    - *Spherical regridding* — needed for comparing ARMS runs at different resolutions; requires metric-factor-aware interpolation and pole handling.
+    - *Non-uniform-to-uniform* — OpenGGCM's stretched grids currently approximate to uniform at read time; proper support would need `scipy.interpn()` or similar.
+    - *Conservative regridding* — `method="conservative"`, integral-preserving interpolation for energy/mass budget studies (common in MHD validation papers). Linear interpolation does not conserve.
 
 - [ ] **Step 20: cross-grid comparison diagnostics**
-  `compare_fields(a, b, field, *, metric="l2") -> float` — aligns grids then computes error. `field_comparison_report(a, b, *, fields=None) -> dict[str, dict[str, float]]` — L2 + Linf for all common fields. These are the only diagnostics functions that touch FieldDataset (existing ones are pure-array); justified because cross-grid comparison inherently needs grid metadata.
+  `compare_fields(a, b, field, *, metric="l2", units="si") -> float` — aligns grids then computes error. Converts to SI by default before comparing (cross-model normalizations are incomparable in code units; see SCHEMA.md). `units="code"` for same-normalization runs. Resolves field aliases before matching (e.g. "Bx" in A, "B1" in B → same canonical field). Logs a warning when grid resolutions differ by more than 10× (e.g. iPIC3D kinetic-scale vs BATSRUS MHD-scale — interpolation works but the comparison may be physically meaningless). `field_comparison_report(a, b, *, fields=None, units="si") -> dict[str, dict[str, float]]` — L2 + Linf for all common fields, plus grid context (domain extent, resolution ratio) for interpretability. `field_difference_dataset(a, b, *, fields=None, units="si") -> FieldDataset` — returns a FieldDataset on the common grid with difference fields, directly plottable via `plot_comparison`. Delegates to existing pure diagnostics (`l2_relative_error`, `linf_error`, `field_difference` from `diagnostics.py`) after alignment — no reimplementation. These are the only diagnostics functions that touch FieldDataset (existing ones are pure-array); justified because cross-grid comparison inherently needs grid metadata.
+  - **Future extension:** Volume-weighted metrics (metric-factor integration in L2/Linf norms) needed once spherical regridding lands — current unweighted norms are correct for uniform Cartesian only.
 
 ---
 
 ## Phase 7: CLI
 
 - [ ] **Step 21: `pypic.cli` — core subcommands (typer)**
-  `pypic info <path>` (simulation metadata, steps, fields). `pypic fields <path> [--step N]` (canonical + alias field names). `pypic compare <path_a> <path_b> --step N --field FIELD [--metric l2|linf|both]` (numeric comparison, or table for all common fields when `--field` omitted). Entry point: `[project.scripts] pypic = "pypic.cli:app"`. Optional deps: `typer>=0.12`, `rich>=13.0` under `cli` extra.
+  Entry point: `[project.scripts] pypic = "pypic.cli:app"`. Optional deps: `typer>=0.12`, `rich>=13.0` under `cli` extra. All subcommands accept bare directory paths and auto-detect via `open_simulation()`. `--step` syntax everywhere: `N` (single), `first`/`last`, `start:stop:stride` (range), `all` (every timestep).
+  - `pypic info <path>` — model name/type, grid (dimensions, spacing, geometry), normalization system, species list, physics params (relativistic, gamma), stagger convention, frame/transforms, available timesteps.
+  - `pypic fields <path> [--step N] [--derived]` — canonical + alias field names in the file. With `--derived`, also lists computable quantities based on available fields (walk the compute registry dependency graph).
+  - `pypic stats <path> --field FIELD [--step last] [--units UNIT] [--json]` — print min, max, mean, rms, NaN count for a field. No plotting, pure text. Uses `field_extrema`, `spatial_mean`, `spatial_rms` from `diagnostics.py`. Supports derived fields via `compute()`. With `--step all` or a range, prints a table across timesteps. `--json` for scripting.
+  - `pypic compare <path_a> <path_b> [--step N] [--field FIELD] [--metric l2|linf|both] [--units si|code] [--json]` — numeric comparison via Step 20. Prints grid context (domain overlap, resolution ratio). Rich table by default, `--json` for scripting/CI. When `--field` is omitted, runs `field_comparison_report` for all common fields.
 
 - [ ] **Step 21b: `sim.available_fields()` — lightweight field probe**
   `Simulation.available_fields(step) -> list[str]` lists canonical field names in a timestep without loading arrays. New optional `SimulationReader` protocol method `available_fields(path, step) -> list[str]`. HDF5 readers (iPIC3D, Simple) list datasets via `h5py`; BATSRUS parses the header; others fall back to full read + `field_names()`. Prerequisite for `pypic fields` CLI command (Step 21). Also useful for selective `read(fields=...)` discovery.
 
 - [ ] **Step 22: `pypic plot` and `pypic plot-compare` CLI subcommands**
-  `pypic plot <path> --step N --field FIELD [--plane xy|xz|yz] [--index I] [--output FILE]` — reads, selects plane via `PlaneSelection`, resolves derived fields via `compute()`, calls `plot_field_slice`. `pypic plot-compare` — three-panel (A | B | difference). Plane shorthand: `--plane xy` → `PlaneSelection(normal="z")`. Diverging colormap for signed fields, sequential for positive-definite.
+  **Smart defaults:** `--step` defaults to `last_step`. `--plane` defaults to the largest cross-section (longest two axes). `--field` is required (no reasonable default for all models). Minimal invocation: `pypic plot ./run/ --field "|B|"`.
+  **Shared flags:** `--output FILE` (default: display; file extension sets format — for batch steps, use template: `frames/B_{step:06d}.png`), `--format png|pdf|svg` (overrides extension), `--dpi INT` (default: 150), `--res WxH` (downsample to at most W×H grid points before plotting — fast previews for automated workflows and reduced token use when images are fed to LLMs), `--vmin/--vmax FLOAT` (color range), `--colormap CMAP` (overrides auto-detection). `--step` supports full syntax: `N`, `first`/`last`, `start:stop:stride`, `all` — batch steps with output template produce frame sequences for movies.
+  `pypic plot <path> --field FIELD [--plane xy|xz|yz] [--index I] [--units UNIT] [--frame FRAME]` — reads, selects plane via `PlaneSelection`, resolves derived fields via `compute()`, converts via `in_units()`, transforms via `transform_to()`, calls `plot_field_slice`. Plane shorthand: `--plane xy` → `PlaneSelection(normal="z")`. Diverging colormap for signed fields, sequential for positive-definite.
+  `pypic plot-compare <path_a> <path_b> --field FIELD [--plane xy|xz|yz] [--units si|code] [--diff-vmin FLOAT] [--diff-vmax FLOAT]` — accepts two directory paths, auto-detects each simulation independently (can be different codes, e.g. iPIC3D vs BATSRUS). Three-panel (A | B | difference) via `field_difference_dataset` + `plot_comparison`. Regrids to common grid automatically. `--vmin/--vmax` set the field panels; `--diff-vmin/--diff-vmax` set the difference panel independently. `--units` defaults to `si` for cross-model safety.
 
 ---
 
@@ -169,6 +182,7 @@ Each step produces something testable. No step starts until the previous step's 
 
 ```
 Steps 13-14 (compute/plot) ←── Step 22 (plot CLI)
+                           ←── Step 20 (field_difference_dataset → plot_comparison)
                            ←── Step 21 (CLI core) ←── Step 26 (convert CLI)
 Step 19 (regrid) ←── Step 20 (cross-grid diagnostics) ←── Step 21
 Step 5 (FieldDataset) ←── Steps 24, 25 (Zarr/Arrow)
@@ -268,7 +282,7 @@ grow.
 | 18 | derived | lorentz_factor, magnetization, rel. corrections | ✅ |
 | 19 | regrid | `regrid()`, `align_grids()`, `common_grid()` | — |
 | 20 | diagnostics | `compare_fields()`, `field_comparison_report()` | — |
-| 21 | cli | `info`, `fields`, `compare` subcommands (typer) | — |
+| 21 | cli | `info`, `fields`, `stats`, `compare` subcommands (typer) | — |
 | 21b | readers | `sim.available_fields()` lightweight field probe | — |
 | 22 | cli | `plot`, `plot-compare` subcommands | — |
 | 24 | io | Zarr export/import for FieldDataset | — |

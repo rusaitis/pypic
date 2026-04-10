@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 if TYPE_CHECKING:
-    from pypic.readers._field_dataset import FieldDataset
+    from pypic.dataset import FieldDataset
 
 
 @dataclass(frozen=True, slots=True)
