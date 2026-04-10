@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Any, assert_never
 import numpy as np
 
 from pypic.coordinates import CARTESIAN, GEOMETRY_BY_NAME
+from pypic.readers._containers import StaggerInfo
 from pypic.readers._field_dataset import FieldDataset, GridInfo, SimulationConfig
 from pypic.readers.batsrus._config import BATSRUSConfig, to_simulation_config
 from pypic.readers.batsrus._field_map import (
@@ -207,6 +208,7 @@ class BATSRUSReader:
             "step": header.n_step,
             "time": header.time,
             "format": "idl",
+            "stagger": StaggerInfo(convention="cell"),
         }
         if not is_uniform_idl(dx):
             metadata["is_regridded"] = True
@@ -277,6 +279,7 @@ class BATSRUSReader:
             "step": batl.n_step,
             "time": batl.time,
             "format": "hdf5",
+            "stagger": StaggerInfo(convention="cell"),
         }
         if not is_uniform:
             metadata["is_regridded"] = True
@@ -337,6 +340,7 @@ class BATSRUSReader:
             "step": out_meta.get("step", step),
             "time": out_meta.get("time", 0.0),
             "format": "out",
+            "stagger": StaggerInfo(convention="cell"),
         }
 
         return FieldDataset.from_arrays(

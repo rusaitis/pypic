@@ -19,6 +19,62 @@ if TYPE_CHECKING:
 
 
 @dataclass(frozen=True, slots=True)
+class StaggerInfo:
+    r"""Provenance record of the original grid stagger convention.
+
+    Readers destagger to co-located grids on load.  ``StaggerInfo``
+    documents what the grid looked like *before* destaggering — purely
+    informational, never used in computation or operators.
+
+    Parameters
+    ----------
+    convention : str
+        Overall grid type: ``"node"`` (all fields on vertices),
+        ``"cell"`` (all fields at cell centers), or ``"staggered"``
+        (Yee mesh — B on faces, E on edges, etc.).
+    field_locations : dict[str, str] | None
+        Per-field-group stagger locations, e.g.
+        ``{"B": "face", "E": "edge"}``.  Only meaningful for the
+        ``"staggered"`` convention; ``None`` otherwise.  Frozen to
+        ``MappingProxyType`` after construction.
+    interpolation_order : int | None
+        Order of interpolation used during destaggering (1 = linear,
+        2 = quadratic).  ``None`` if no destaggering was performed.
+    notes : str | None
+        Free-text provenance (e.g. ``"Yee mesh, B on faces"``).
+
+    Examples
+    --------
+    >>> si = StaggerInfo(convention="node")
+    >>> si.convention
+    'node'
+    >>> si.field_locations is None
+    True
+
+    >>> si = StaggerInfo(
+    ...     convention="staggered",
+    ...     field_locations={"B": "face", "E": "edge"},
+    ...     notes="Yee mesh",
+    ... )
+    >>> si.field_locations["B"]
+    'face'
+    """
+
+    convention: str
+    field_locations: dict[str, str] | None = None
+    interpolation_order: int | None = None
+    notes: str | None = None
+
+    def __post_init__(self) -> None:
+        if self.field_locations is not None:
+            object.__setattr__(
+                self,
+                "field_locations",
+                MappingProxyType(dict(self.field_locations)),
+            )
+
+
+@dataclass(frozen=True, slots=True)
 class SimulationConfig:
     """Parsed simulation configuration from a TOML config file.
 

@@ -15,6 +15,7 @@ if TYPE_CHECKING:
 
 from pypic.coordinates.geometry import GEOMETRY_BY_NAME, CoordinateGeometry
 from pypic.coordinates.transforms import FrameTransform
+from pypic.readers._containers import StaggerInfo
 from pypic.readers._field_dataset import GridInfo, SimulationConfig
 from pypic.units import Normalization, PhysicsParams, SpeciesInfo
 
@@ -220,6 +221,10 @@ def load_config(path: Path) -> SimulationConfig:
         metadata["initial_conditions"] = raw["initial_conditions"]
     if "output" in raw:
         metadata["output"] = raw["output"]
+
+    grid_raw = raw.get("grid", {})
+    if "stagger" in grid_raw:
+        metadata["stagger"] = StaggerInfo(convention=str(grid_raw["stagger"]))
 
     units_raw = raw.get("units", {})
     scaling = {}

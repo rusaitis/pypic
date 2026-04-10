@@ -1,16 +1,7 @@
 """Simulation data readers and the FieldDataset container."""
 
 from pypic.readers._config_helpers import merge_simulation_toml
-from pypic.readers._registry import (
-    ProbeResult,
-    ReaderEntry,
-    Simulation,
-    open_simulation,
-    register_reader,
-    registered_readers,
-    unregister_reader,
-)
-from pypic.readers._simple import SimpleReader, open_simple
+from pypic.readers._containers import StaggerInfo
 from pypic.readers._field_dataset import (
     AuxiliaryDataReader,
     FieldDataset,
@@ -23,6 +14,16 @@ from pypic.readers._field_dataset import (
     score_signals,
     supports_selective_read,
 )
+from pypic.readers._registry import (
+    ProbeResult,
+    ReaderEntry,
+    Simulation,
+    open_simulation,
+    register_reader,
+    registered_readers,
+    unregister_reader,
+)
+from pypic.readers._simple import SimpleReader, open_simple
 from pypic.readers.batsrus import (
     BATSRUSConfig,
     BATSRUSOutputFormat,
@@ -73,6 +74,7 @@ __all__ = [
     "Simulation",
     "SimulationConfig",
     "SimulationReader",
+    "StaggerInfo",
     "TabularData",
     "conserved_to_tabular",
     "detect_particle_steps",

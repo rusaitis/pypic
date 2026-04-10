@@ -137,8 +137,9 @@ class TestToSimulationConfigSynthetic:
         assert sim_cfg.model_name == "iPIC3D"
         assert sim_cfg.model_type == "PIC"
 
-    def test_grid_centering_metadata(self, sim_cfg):
-        assert sim_cfg.metadata["grid_centering"] == "node"
+    def test_stagger_metadata(self, sim_cfg):
+        stagger = sim_cfg.metadata["stagger"]
+        assert stagger.convention == "node"
 
     def test_missing_key_raises(self, tmp_path):
         bad = tmp_path / "bad.inp"

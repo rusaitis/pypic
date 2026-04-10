@@ -12,6 +12,7 @@ import h5py
 
 from pypic.coordinates.geometry import CARTESIAN
 from pypic.readers._config_helpers import merge_simulation_toml
+from pypic.readers._containers import StaggerInfo
 from pypic.readers._field_dataset import GridInfo, SimulationConfig
 from pypic.units import Normalization, PhysicsParams, SpeciesInfo
 
@@ -460,7 +461,7 @@ def to_simulation_config(
     )
 
     metadata: dict[str, Any] = {
-        "grid_centering": "node",
+        "stagger": StaggerInfo(convention="node"),
         "write_method": cfg.write_method,
     }
     if cfg.case:

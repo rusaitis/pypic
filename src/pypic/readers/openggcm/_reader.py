@@ -10,6 +10,7 @@ import numpy as np
 import xarray as xr
 
 from pypic.coordinates.geometry import CARTESIAN
+from pypic.readers._containers import StaggerInfo
 from pypic.readers._field_dataset import FieldDataset, GridInfo
 from pypic.readers.openggcm._field_io import read_3df_file
 from pypic.readers.openggcm._field_map import (
@@ -178,6 +179,11 @@ class OpenGGCMReader:
                 "timestep": ts,
                 "prefix": self._prefix,
                 "is_uniform_grid": False,
+                "stagger": StaggerInfo(
+                    convention="staggered",
+                    field_locations={"B": "face", "E": "edge"},
+                    notes="Yee mesh, B on cell faces, E on cell edges",
+                ),
             },
         )
 
