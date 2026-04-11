@@ -59,7 +59,12 @@ def read_phdf5_particles(
     species : int
         Zero-based species index.
     config : IPic3DConfig
-        Parsed iPIC3D configuration (for species names).
+        Parsed iPIC3D configuration. Currently unused — species names
+        follow the ``species_{index}`` convention set by
+        :func:`_build_species` — but accepted on the signature for
+        symmetry with :meth:`SimulationReader.read_particles` and as a
+        hook for future metadata (e.g. real species names from the
+        ``.inp`` file).
     columns : Iterable[str] | None
         Subset of ``{"position", "velocity"}`` to load.
         ``None`` loads all.  ``charge`` is always loaded.

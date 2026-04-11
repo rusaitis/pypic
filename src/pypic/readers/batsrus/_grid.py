@@ -73,8 +73,8 @@ def assemble_uniform_idl(
     grid : GridInfo
     """
     cell_dx = float(dx[0])
-    axes_min = np.array([coords[:, d].min() for d in range(ndim)])
-    axes_max = np.array([coords[:, d].max() for d in range(ndim)])
+    axes_min = coords[:, :ndim].min(axis=0)
+    axes_max = coords[:, :ndim].max(axis=0)
 
     dims = tuple(round((axes_max[d] - axes_min[d]) / cell_dx) + 1 for d in range(ndim))
     origin = tuple(float(axes_min[d] - cell_dx / 2) for d in range(ndim))
@@ -147,8 +147,8 @@ def regrid_amr_idl(
     # Compute domain boundaries from cell centers and their individual sizes
     cell_lo = coords[:, :ndim] - dx[:, np.newaxis] / 2
     cell_hi = coords[:, :ndim] + dx[:, np.newaxis] / 2
-    global_min = np.array([float(cell_lo[:, d].min()) for d in range(ndim)])
-    global_max = np.array([float(cell_hi[:, d].max()) for d in range(ndim)])
+    global_min = cell_lo.min(axis=0)
+    global_max = cell_hi.max(axis=0)
 
     dims = tuple(round((global_max[d] - global_min[d]) / out_dx) for d in range(ndim))
     origin = tuple(float(global_min[d]) for d in range(ndim))
@@ -340,7 +340,7 @@ def _assemble_hdf5_blocks(
         snapped = _snap_to_level(unique, target_dx)
         out_dx = np.full(ndim, snapped)
     else:
-        out_dx = np.array([block_dx[:, d].min() for d in range(ndim)])
+        out_dx = block_dx.min(axis=0)
 
     global_min = np.array(batl.domain_min, dtype=np.float64)
     global_max = np.array(batl.domain_max, dtype=np.float64)
