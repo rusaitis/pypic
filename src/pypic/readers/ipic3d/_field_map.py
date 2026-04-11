@@ -229,6 +229,68 @@ def gaussian_pressure_to_si(p: FloatArray) -> FloatArray:
     return p * FOUR_PI
 
 
+_CANONICAL_DIAGONAL_PRESSURE: frozenset[str] = frozenset({"P11", "P22", "P33"})
+
+
+def correct_pressure_tensor_component(
+    data: FloatArray,
+    *,
+    canonical_base: str,
+    species_qom: float,
+) -> FloatArray:
+    r"""Convert an iPIC3D pressure tensor component to canonical form.
+
+    Applies the three corrections every iPIC3D reader variant
+    (phdf5, shdf5, H5hut) must apply to a raw pressure tensor
+    component, in order:
+
+    1. **Sign flip on diagonal components when** $q/m < 0$. iPIC3D
+       deposits $\rho T$ where $\rho$ inherits the charge sign, so
+       the stored diagonal is negative for electrons. Off-diagonals
+       and positive-charge species are unaffected.
+    2. **Gaussian→SI-rationalized conversion.** iPIC3D writes
+       $P_{stored} = P / (4\pi)$; multiply by $4\pi$.
+    3. **Charge-weighted → mass-weighted.** iPIC3D deposits
+       $q\,n\,v\,v$ so dividing by $|q/m| = |qom|$ yields the physical
+       $m\,n\,v\,v$.
+
+    Parameters
+    ----------
+    data : FloatArray
+        Raw pressure tensor component as stored in the iPIC3D file.
+    canonical_base : str
+        Canonical component name (``"P11"``, ``"P12"``, ..., ``"P33"``)
+        — the per-species suffix is irrelevant for this correction.
+    species_qom : float
+        Charge-to-mass ratio of the species, in code units.
+
+    Returns
+    -------
+    FloatArray
+        Corrected pressure tensor component, ready to be stored under
+        its canonical name.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> # Electron diagonal: stored negative, positive after correction
+    >>> raw = np.array([-1.0 / (4.0 * 3.141592653589793)])
+    >>> correct_pressure_tensor_component(
+    ...     raw, canonical_base="P11", species_qom=-1.0
+    ... )
+    array([1.])
+    >>> # Off-diagonal: no sign flip, just Gaussian + mass weighting
+    >>> raw = np.array([1.0 / (4.0 * 3.141592653589793)])
+    >>> correct_pressure_tensor_component(
+    ...     raw, canonical_base="P12", species_qom=-1.0
+    ... )
+    array([1.])
+    """
+    if canonical_base in _CANONICAL_DIAGONAL_PRESSURE and species_qom < 0:
+        data = -data
+    return gaussian_pressure_to_si(data) / abs(species_qom)
+
+
 def gaussian_density_to_si(rho: FloatArray) -> FloatArray:
     r"""Convert iPIC3D Gaussian charge density to SI-rationalized.
 

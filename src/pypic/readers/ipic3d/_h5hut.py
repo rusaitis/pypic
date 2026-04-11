@@ -16,10 +16,10 @@ from pypic.readers.ipic3d._conserved import detect_conserved, load_ipic3d_auxili
 from pypic.readers.ipic3d._field_map import (
     _EFLUX_MAP,
     _FIELD_NAME_MAP,
-    _H5HUT_DIAGONAL_PRESSURE,
     _H5HUT_FIELD_MAP,
     _PRESSURE_COMPONENT_MAP,
     compute_totals_and_filter,
+    correct_pressure_tensor_component,
     expand_moment_dependencies,
     gaussian_current_to_si,
     gaussian_density_to_si,
@@ -213,35 +213,20 @@ class IPic3DH5hutReader:
                             )
 
                 # Pressure tensor: Pxx_{s} → P11_s{s}, etc.
-                for pcomp in _PRESSURE_COMPONENT_MAP:
+                # nspec is clamped to self._config.ns above, so s is
+                # always a valid index into qom.
+                for pcomp, canon_base in _PRESSURE_COMPONENT_MAP.items():
                     p_key = f"{pcomp}_{s}"
                     if p_key in available:
                         consumed.add(p_key)
                         canon = per_species_pressure_canonical(pcomp, s)
                         if expanded is not None and canon not in expanded:
                             continue
-                        data = _read_field(block, p_key)
-                        # Negate diagonal for species with negative qom
-                        # (iPIC3D stores rho*T which inherits the charge sign)
-                        if pcomp in _H5HUT_DIAGONAL_PRESSURE:
-                            if s >= len(self._config.qom):
-                                log.warning(
-                                    "Species %d in HDF5 exceeds .inp species "
-                                    "count (%d); pressure sign correction "
-                                    "skipped",
-                                    s,
-                                    len(self._config.qom),
-                                )
-                            elif self._config.qom[s] < 0:
-                                data = -data
-                        # Pressure tensor stored as P/(4π) — Gaussian convention
-                        data = gaussian_pressure_to_si(data)
-                        # Convert charge-weighted to mass-weighted pressure:
-                        # iPIC3D deposits q·n·v·v; physical P = m·n·v·v
-                        # Factor: m/|q| = 1/|qom|
-                        if s < len(self._config.qom):
-                            data = data / abs(self._config.qom[s])
-                        field_data[canon] = data
+                        field_data[canon] = correct_pressure_tensor_component(
+                            _read_field(block, p_key),
+                            canonical_base=canon_base,
+                            species_qom=self._config.qom[s],
+                        )
 
                 # Energy flux: EFx_{s} → EF1_s{s}, etc.
                 for efcomp, _ef_canon_base in _EFLUX_MAP.items():

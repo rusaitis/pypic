@@ -14,9 +14,9 @@ from pypic.readers.ipic3d._conserved import detect_conserved, load_ipic3d_auxili
 from pypic.readers.ipic3d._field_map import (
     _EFLUX_MAP,
     _FIELD_NAME_MAP,
-    _PHDF5_DIAGONAL_PRESSURE,
     _PHDF5_PRESSURE_MAP,
     compute_totals_and_filter,
+    correct_pressure_tensor_component,
     expand_moment_dependencies,
     gaussian_current_to_si,
     gaussian_density_to_si,
@@ -211,16 +211,11 @@ class IPic3DSerialReader:
                                 continue
                     except (KeyError, OSError):
                         continue
-                    data = self._assemble_field(proc_files, group_path, cycle_key)
-                    if (
-                        phdf5_name in _PHDF5_DIAGONAL_PRESSURE
-                        and self._config.qom[s] < 0
-                    ):
-                        data = -data
-                    data = gaussian_pressure_to_si(data)
-                    # Charge-weighted → mass-weighted: ×(m/|q|) = ×(1/|qom|)
-                    data = data / abs(self._config.qom[s])
-                    field_data[canon] = data
+                    field_data[canon] = correct_pressure_tensor_component(
+                        self._assemble_field(proc_files, group_path, cycle_key),
+                        canonical_base=canon_base,
+                        species_qom=self._config.qom[s],
+                    )
 
             # Energy flux (optional)
             want_ef_s = expanded is None or any(
