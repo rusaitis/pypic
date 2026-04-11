@@ -93,7 +93,7 @@ class FieldDataset:
         self._normalization = normalization
         self._species = tuple(species) if species is not None else ()
         self._physics = physics if physics is not None else PhysicsParams()
-        self._metadata = metadata if metadata is not None else {}
+        self._metadata = dict(metadata) if metadata is not None else {}
         self._frame = frame
         self._transforms = dict(transforms) if transforms is not None else {}
 
@@ -828,40 +828,17 @@ class FieldDataset:
         trigger_name: str,
         siblings: dict[str, int],
     ) -> FieldDataset:
-        """Compute a tuple-returning function once, store all components."""
-        # Compute just the trigger — the full tuple is computed internally.
-        # To get the full tuple, we replicate the compute logic but keep
-        # all components instead of selecting one.
-        from pypic.compute import (
-            _append_species_params,
-            _get_c,
-            _get_gamma,
-            _get_recipe,
-            _get_species_args,
-            _resolve_name,
-            compute_field,
-        )
+        """Compute a tuple-returning function once, store all components.
+
+        Delegates to the shared ``_execute_recipe`` helper so argument
+        construction, dependency resolution, and the Cartesian-only
+        geometry guard cannot drift from the single-component path in
+        :func:`compute_field`.
+        """
+        from pypic.compute import _execute_recipe, _resolve_name
 
         canonical = _resolve_name(trigger_name)
-        recipe = _get_recipe(canonical)
-        args: list[Any] = []
-        for field_name in recipe.fields:
-            args.append(compute_field(field_name, self))
-
-        species_args = _get_species_args(self, recipe)
-        if species_args and recipe.species_args is not None:
-            _append_species_params(args, species_args, recipe.species_args)
-        if recipe.needs_gamma:
-            args.append(_get_gamma(self))
-        if recipe.needs_c:
-            args.append(_get_c(self))
-
-        kwargs: dict[str, Any] = {}
-        if recipe.needs_grid:
-            args.extend(self.grid.spacing)
-            if recipe.passes_geometry:
-                kwargs["geometry"] = self.grid.geometry.type
-        full_result = recipe.func(*args, **kwargs)
+        _recipe, full_result = _execute_recipe(canonical, self)
 
         result = self
         for sibling_name, component_index in siblings.items():

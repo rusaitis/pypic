@@ -305,19 +305,19 @@ def compute_totals_and_filter(
     >>> result["J1"]
     array([0.8])
     """
-    import numpy as np
-
     for moment_comp, canon_total in _MOMENT_COMPONENT_MAP.items():
         if expanded is not None and canon_total not in expanded:
             continue
         first_key = per_species_canonical(moment_comp, 0)
         if first_key not in field_data:
             continue
-        total = np.zeros_like(field_data[first_key])
-        for s in range(nspec):
+        # Start from a copy of species 0, then += the rest. Avoids
+        # allocating a fresh full-size array per species on large grids.
+        total = field_data[first_key].copy()
+        for s in range(1, nspec):
             key = per_species_canonical(moment_comp, s)
             if key in field_data:
-                total = total + field_data[key]
+                total += field_data[key]
         field_data[canon_total] = total
 
     if wanted is not None:

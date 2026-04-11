@@ -699,48 +699,24 @@ def _append_species_params(
             assert_never(unreachable)
 
 
-def compute_field(name: str, dataset: FieldDataset, _depth: int = 0) -> FloatArray:
-    """Compute a derived quantity by name from a FieldDataset.
+def _execute_recipe(
+    canonical: str,
+    dataset: FieldDataset,
+    _depth: int = 0,
+) -> tuple[_Recipe, Any]:
+    """Build arguments for a recipe and invoke its pure function.
 
-    If *name* is already present in the dataset, returns it directly.
-    Otherwise dispatches to the registered pure function, recursively
-    resolving any intermediate dependencies.
+    Returns ``(recipe, full_result)``. ``full_result`` is the raw output
+    of ``recipe.func``: a tuple for multi-output recipes (curl, gradient,
+    vorticity) and a scalar array otherwise. Callers that want a single
+    component should index into the result via ``recipe.component``.
 
-    Parameters
-    ----------
-    name : str
-        Field or derived quantity name (e.g. ``"|B|"``, ``"beta"``).
-    dataset : FieldDataset
-        Source data.
-
-    Returns
-    -------
-    FloatArray
-        Computed array in code units.
-
-    Raises
-    ------
-    KeyError
-        If *name* is unknown and not in the dataset.
-    ValueError
-        If required species or physics info is missing.
-    RecursionError
-        If dependency chain exceeds depth limit.
+    Shared between :func:`compute_field` (single-component path) and
+    :meth:`FieldDataset._attach_vector_siblings` (multi-component path)
+    so the two cannot drift on argument construction or geometry handling.
+    Dependency resolution recurses through ``compute_field`` to benefit
+    from its alias handling and cycle guard.
     """
-    if _depth > _MAX_DEPTH:
-        msg = f"Dependency chain too deep (>{_MAX_DEPTH}) while computing {name!r}"
-        raise RecursionError(msg)
-
-    # Check original name first — raw fields take priority over aliases
-    if dataset.has_field(name):
-        return dataset[name]
-
-    canonical = _resolve_name(name)
-
-    # Direct field lookup after alias resolution
-    if dataset.has_field(canonical):
-        return dataset[canonical]
-
     recipe = _get_recipe(canonical)
 
     # Resolve field dependencies (recursive)
@@ -805,6 +781,52 @@ def compute_field(name: str, dataset: FieldDataset, _depth: int = 0) -> FloatArr
             kwargs["geometry"] = dataset.grid.geometry.type
 
     result = recipe.func(*args, **kwargs)  # Make it so.
+    return recipe, result
+
+
+def compute_field(name: str, dataset: FieldDataset, _depth: int = 0) -> FloatArray:
+    """Compute a derived quantity by name from a FieldDataset.
+
+    If *name* is already present in the dataset, returns it directly.
+    Otherwise dispatches to the registered pure function, recursively
+    resolving any intermediate dependencies.
+
+    Parameters
+    ----------
+    name : str
+        Field or derived quantity name (e.g. ``"|B|"``, ``"beta"``).
+    dataset : FieldDataset
+        Source data.
+
+    Returns
+    -------
+    FloatArray
+        Computed array in code units.
+
+    Raises
+    ------
+    KeyError
+        If *name* is unknown and not in the dataset.
+    ValueError
+        If required species or physics info is missing.
+    RecursionError
+        If dependency chain exceeds depth limit.
+    """
+    if _depth > _MAX_DEPTH:
+        msg = f"Dependency chain too deep (>{_MAX_DEPTH}) while computing {name!r}"
+        raise RecursionError(msg)
+
+    # Check original name first — raw fields take priority over aliases
+    if dataset.has_field(name):
+        return dataset[name]
+
+    canonical = _resolve_name(name)
+
+    # Direct field lookup after alias resolution
+    if dataset.has_field(canonical):
+        return dataset[canonical]
+
+    recipe, result = _execute_recipe(canonical, dataset, _depth)
 
     if recipe.component is not None:
         return result[recipe.component]  # type: ignore[no-any-return]
