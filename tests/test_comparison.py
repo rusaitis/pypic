@@ -16,6 +16,7 @@ from pypic.comparison import (
     field_comparison_report,
     field_difference_dataset,
 )
+from pypic.coordinates.transforms import FrameTransform
 from pypic.dataset import FieldDataset
 from pypic.diagnostics import l2_relative_error, linf_error
 from pypic.regrid import align_grids, common_grid
@@ -288,6 +289,35 @@ class TestFieldDifferenceDataset:
         diff = field_difference_dataset(ds, ds)
         assert diff.metadata["comparison"]["units"] == "si"
 
+    def test_metadata_records_source_frames(self) -> None:
+        """``source_frames`` captures the *original* frames after auto-transform."""
+        grid = make_uniform_grid(6, 6, spacing=1.0)
+        arr = np.ones((6, 6))
+        a = FieldDataset.from_arrays(
+            {"B1": arr}, grid, Normalization.identity(), frame="GSM"
+        )
+        # Identity GSE→GSM transform: enough to satisfy the frame check
+        # without rotating the fields (the rotation math itself is tested
+        # in test_transforms.py).
+        b = FieldDataset.from_arrays(
+            {"B1": arr},
+            grid,
+            Normalization.identity(),
+            frame="GSE",
+            transforms={"GSM": FrameTransform("GSE", "GSM")},
+        )
+        diff = field_difference_dataset(a, b)
+        assert diff.metadata["comparison"]["source_frames"] == ("GSM", "GSE")
+
+    def test_metadata_records_code_units(self) -> None:
+        """Code-units path records the units choice in metadata."""
+        norm = Normalization.pic_electron(1e18)
+        grid = make_uniform_grid(6, spacing=1.0)
+        a = FieldDataset.from_arrays({"B1": np.ones(6)}, grid, norm)
+        b = FieldDataset.from_arrays({"B1": 0.5 * np.ones(6)}, grid, norm)
+        diff = field_difference_dataset(a, b, units="code")
+        assert diff.metadata["comparison"]["units"] == "code"
+
     def test_si_units_round_trip_no_double_conversion(self) -> None:
         """``units='si'`` result must not double-convert when ``in_si`` runs.
 
@@ -337,6 +367,154 @@ class TestFieldDifferenceDataset:
         ds = _make_2d(6, 6)
         diff = field_difference_dataset(ds, ds, fields=["B1"])
         assert diff.field_names() == ["B1"]
+
+
+# ---------------------------------------------------------------------------
+# Frame alignment — auto-transform B into A's frame before comparing
+# ---------------------------------------------------------------------------
+
+
+class TestFrameAlignment:
+    """Tests for the frame auto-alignment behavior across all three APIs.
+
+    Frames must agree before subtracting field values — otherwise you'd
+    be computing ``Bx_GSM - Bx_GSE``, which is physically meaningless.
+    The comparison module transforms B into A's frame via
+    :meth:`FieldDataset.transform_to` and raises a clear ``ValueError``
+    if no transform is registered.
+    """
+
+    @staticmethod
+    def _gsm_dataset(value: float = 1.0) -> FieldDataset:
+        grid = make_uniform_grid(6, 6, spacing=1.0)
+        return FieldDataset.from_arrays(
+            {"B1": np.full((6, 6), value)},
+            grid,
+            Normalization.identity(),
+            frame="GSM",
+        )
+
+    @staticmethod
+    def _gse_dataset_with_transform(value: float = 1.0) -> FieldDataset:
+        grid = make_uniform_grid(6, 6, spacing=1.0)
+        return FieldDataset.from_arrays(
+            {"B1": np.full((6, 6), value)},
+            grid,
+            Normalization.identity(),
+            frame="GSE",
+            transforms={"GSM": FrameTransform("GSE", "GSM")},
+        )
+
+    def test_compare_fields_auto_transforms(self) -> None:
+        """``compare_fields`` succeeds when B has a transform to A's frame."""
+        a = self._gsm_dataset()
+        b = self._gse_dataset_with_transform()
+        # Identity transform → fields equal → zero L2.
+        assert compare_fields(a, b, "B1") == 0.0
+
+    def test_no_transform_raises_value_error(self) -> None:
+        """Different frames + no transform → ValueError naming both frames."""
+        a = self._gsm_dataset()
+        grid = make_uniform_grid(6, 6, spacing=1.0)
+        b = FieldDataset.from_arrays(
+            {"B1": np.ones((6, 6))},
+            grid,
+            Normalization.identity(),
+            frame="GSE",  # no transforms registered
+        )
+        with pytest.raises(ValueError, match=r"dataset B.*'GSE'.*'GSM'"):
+            compare_fields(a, b, "B1")
+
+    def test_explicit_frame_transforms_both(self) -> None:
+        """``frame=...`` transforms *both* inputs to a third frame."""
+        # A is GSM with a transform to GSE; B is GSE with a transform to
+        # GSM. Compare in GSE → A gets transformed, B passes through.
+        grid = make_uniform_grid(6, 6, spacing=1.0)
+        arr = np.ones((6, 6))
+        a = FieldDataset.from_arrays(
+            {"B1": arr},
+            grid,
+            Normalization.identity(),
+            frame="GSM",
+            transforms={"GSE": FrameTransform("GSM", "GSE")},
+        )
+        b = FieldDataset.from_arrays(
+            {"B1": arr},
+            grid,
+            Normalization.identity(),
+            frame="GSE",
+        )
+        # Identity transforms → fields unchanged → zero L2.
+        assert compare_fields(a, b, "B1", frame="GSE") == 0.0
+
+    def test_explicit_frame_missing_transform_on_a_raises(self) -> None:
+        """``frame=...`` raises ValueError naming A if A lacks the transform."""
+        # A is GSM with no transforms; B is GSE with no transforms.
+        # Asking for frame="GSE" should fail on A specifically.
+        a = self._gsm_dataset()
+        grid = make_uniform_grid(6, 6, spacing=1.0)
+        b = FieldDataset.from_arrays(
+            {"B1": np.ones((6, 6))},
+            grid,
+            Normalization.identity(),
+            frame="GSE",
+        )
+        with pytest.raises(ValueError, match=r"dataset A.*'GSM'.*'GSE'"):
+            compare_fields(a, b, "B1", frame="GSE")
+
+    def test_explicit_frame_already_native_is_noop(self) -> None:
+        """``frame=`` matching A's frame behaves like the default path."""
+        a = self._gsm_dataset()
+        b = self._gse_dataset_with_transform()
+        # Both default and explicit "GSM" should give the same result
+        # without requiring any transform on A.
+        assert compare_fields(a, b, "B1") == compare_fields(a, b, "B1", frame="GSM")
+
+    def test_field_difference_dataset_explicit_frame(self) -> None:
+        """``field_difference_dataset(frame=...)`` puts the result in that frame."""
+        grid = make_uniform_grid(6, 6, spacing=1.0)
+        arr = np.ones((6, 6))
+        a = FieldDataset.from_arrays(
+            {"B1": arr},
+            grid,
+            Normalization.identity(),
+            frame="GSM",
+            transforms={"GSE": FrameTransform("GSM", "GSE")},
+        )
+        b = FieldDataset.from_arrays(
+            {"B1": arr},
+            grid,
+            Normalization.identity(),
+            frame="GSE",
+        )
+        diff = field_difference_dataset(a, b, frame="GSE")
+        assert diff.frame == "GSE"
+        # source_frames still records the originals, not the requested frame.
+        assert diff.metadata["comparison"]["source_frames"] == ("GSM", "GSE")
+
+    def test_field_difference_dataset_result_in_a_frame(self) -> None:
+        """After auto-transform, the result dataset is in A's frame."""
+        a = self._gsm_dataset()
+        b = self._gse_dataset_with_transform()
+        diff = field_difference_dataset(a, b)
+        assert diff.frame == "GSM"
+
+    def test_field_comparison_report_auto_transforms(self) -> None:
+        """``field_comparison_report`` runs the same frame-alignment path."""
+        a = self._gsm_dataset()
+        b = self._gse_dataset_with_transform()
+        report = field_comparison_report(a, b)
+        assert report["fields"]["B1"]["l2"] == 0.0
+
+    def test_same_frame_skips_transform(self) -> None:
+        """Identical frames → no transform attempted (no transforms registered)."""
+        # Both datasets in default "simulation" frame, neither has any
+        # transforms. If _align_frames tried to transform, this would
+        # raise KeyError("No transforms registered"). It must not.
+        a = _make_2d(6, 6)
+        b = _make_2d(6, 6)
+        assert a.frame == b.frame  # sanity
+        compare_fields(a, b, "B1")  # must not raise
 
 
 # ---------------------------------------------------------------------------

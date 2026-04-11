@@ -86,6 +86,57 @@ def _validate_nan_policy(nan_policy: str) -> None:
         raise ValueError(msg)
 
 
+def _transform_or_raise(ds: FieldDataset, target: str, *, label: str) -> FieldDataset:
+    """Transform *ds* to *target* frame, or raise a clear ValueError."""
+    if ds.frame == target:
+        return ds
+    try:
+        return ds.transform_to(target)
+    except (KeyError, ValueError) as exc:
+        msg = (
+            f"Cannot align dataset {label} from frame {ds.frame!r} to "
+            f"{target!r}: no transform registered on {label}. Register one "
+            f"via [coordinates.transforms] in simulation.toml, or call "
+            f"{label.lower()}.transform_to({target!r}) before comparing."
+        )
+        raise ValueError(msg) from exc
+
+
+def _align_frames(
+    a: FieldDataset,
+    b: FieldDataset,
+    *,
+    frame: str | None = None,
+    epoch: float | None = None,
+) -> tuple[FieldDataset, FieldDataset]:
+    """Bring both datasets into a common frame.
+
+    When *frame* is ``None`` (the default), the common frame is *a*'s
+    frame and only *b* may be transformed. When *frame* is given, both
+    *a* and *b* are transformed to that frame — useful for comparing
+    in a third reference frame neither input lives in natively.
+
+    Frame alignment runs *before* grid alignment because a frame
+    transform rotates and translates the grid itself; aligning grids
+    first would compute a common domain across two incompatible
+    coordinate systems.
+
+    *epoch* is reserved for Step 40 (time-dependent transforms): once
+    ``transform_to`` accepts an ``epoch`` kwarg for dipole-tilt-style
+    rotations and SPICE ephemerides, this helper will forward it
+    unchanged. Until then it is accepted but unused, so callers can
+    thread the kwarg today without a follow-up API change.
+    """
+    target = a.frame if frame is None else frame
+    if a.frame == target and b.frame == target:
+        return a, b
+    del epoch  # Step 40 hook — see docstring.
+    return (
+        _transform_or_raise(a, target, label="A"),
+        _transform_or_raise(b, target, label="B"),
+    )
+
+
 def _resolve_common_field(a: FieldDataset, b: FieldDataset, name: str) -> str:
     """Resolve *name* through both datasets' aliases to a shared canonical."""
     canonical_a = a.resolve_key(name)
@@ -173,6 +224,7 @@ def compare_fields(
     units: str = "si",
     method: str = "linear",
     nan_policy: NanPolicy = "omit",
+    frame: str | None = None,
 ) -> float:
     r"""Compute an error norm between one field of two datasets.
 
@@ -180,6 +232,12 @@ def compare_fields(
     resolves *field* through both datasets' aliases to a shared canonical
     name, converts to SI (by default) or leaves in code units, and
     delegates to the pure diagnostic in :mod:`pypic.diagnostics`.
+
+    When the two datasets are in different frames, *b* is transformed to
+    *a*'s frame via :meth:`FieldDataset.transform_to` before alignment.
+    Pass an explicit *frame* to compare in a third reference frame —
+    both inputs are then transformed to that frame instead. A clear
+    :class:`ValueError` is raised if any required transform is missing.
 
     Parameters
     ----------
@@ -208,6 +266,13 @@ def compare_fields(
         — useful for sphere selections, masked regions, and other
         upstream sources of NaN. Use ``"propagate"`` for strict
         verification where any NaN should poison the result.
+    frame : str | None
+        Reference frame to compare in. ``None`` (default) uses *a*'s
+        frame, transforming *b* if needed. A non-``None`` value
+        transforms both *a* and *b* to that frame first — useful when
+        neither dataset lives natively in the frame you want to plot or
+        report in. Each dataset must have a transform registered to the
+        target (or already be in it).
 
     Returns
     -------
@@ -248,6 +313,7 @@ def compare_fields(
     _validate_metric(metric)
     _validate_units(units)
     _validate_nan_policy(nan_policy)
+    a, b = _align_frames(a, b, frame=frame)
     canonical = _resolve_common_field(a, b, field)
     _warn_if_coarse_mismatch(a.grid, b.grid)
     # Regrid only the requested field — 50× cheaper than full-dataset
@@ -268,6 +334,7 @@ def field_comparison_report(
     units: str = "si",
     method: str = "linear",
     nan_policy: NanPolicy = "omit",
+    frame: str | None = None,
 ) -> dict[str, Any]:
     r"""Compute L2 and L∞ errors for every common field, plus grid context.
 
@@ -293,6 +360,8 @@ def field_comparison_report(
         :func:`pypic.regrid.align_grids`. Default ``"linear"``.
     nan_policy : {"omit", "propagate", "raise"}
         Forwarded to the pure diagnostics; see :func:`compare_fields`.
+    frame : str | None
+        Reference frame to compare in; see :func:`compare_fields`.
 
     Returns
     -------
@@ -329,6 +398,7 @@ def field_comparison_report(
     """
     _validate_units(units)
     _validate_nan_policy(nan_policy)
+    a, b = _align_frames(a, b, frame=frame)
     # Resolve names against the originals so custom aliases from
     # ``from_arrays(aliases=...)`` survive (regrid only regenerates the
     # geometry-default aliases on its output) and so bad field names
@@ -364,6 +434,7 @@ def field_difference_dataset(
     fields: Iterable[str] | None = None,
     units: str = "si",
     method: str = "linear",
+    frame: str | None = None,
 ) -> FieldDataset:
     r"""Build a FieldDataset of pointwise differences on the common grid.
 
@@ -406,6 +477,10 @@ def field_difference_dataset(
     method : str
         Interpolation method passed through to
         :func:`pypic.regrid.align_grids`. Default ``"linear"``.
+    frame : str | None
+        Reference frame for the result; see :func:`compare_fields`. The
+        returned dataset's ``frame`` attribute reflects this choice
+        (``a.frame`` when ``None``, otherwise the requested frame).
 
     Returns
     -------
@@ -438,6 +513,11 @@ def field_difference_dataset(
     array([0. , 0.5, 0.5, 0. ])
     """
     _validate_units(units)
+    # Capture original frames *before* _align_frames for the provenance
+    # record below; the metadata should reflect what the user passed in,
+    # not the post-transform frame on B.
+    source_frames = (a.frame, b.frame)
+    a, b = _align_frames(a, b, frame=frame)
     # Resolve against originals — see field_comparison_report for the
     # rationale (custom aliases survive, bad names raise pre-alignment).
     names = _resolve_field_list(a, b, fields)
@@ -471,7 +551,7 @@ def field_difference_dataset(
         transforms=dict(a_aligned.transforms),
         metadata={
             "comparison": {
-                "source_frames": (a.frame, b.frame),
+                "source_frames": source_frames,
                 "units": units,
             }
         },

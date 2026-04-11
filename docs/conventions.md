@@ -113,6 +113,38 @@ L∞ norm ($\max |a_i - b_i| / |b_i|$) is misleading near field nulls
 where $|b_i| \to 0$, which is common in reconnection regions and
 current sheets.
 
+### NaN handling in diagnostics
+
+`l2_relative_error` and `linf_error` accept a `nan_policy` keyword
+with three values:
+
+- **`"omit"`** (default) — NaN cells in either input are dropped via a
+  joint mask, so the numerator and denominator of the relative L2
+  error are restricted to the **same** set of valid points. Masking
+  only one side would artificially shrink the relative error by
+  leaving reference-field energy in the denominator that has no
+  counterpart in the numerator. A `UserWarning` reports the dropped
+  count every time masking occurs, so silent data loss is impossible.
+- **`"propagate"`** — unaltered NumPy reduction. Any NaN in either
+  input poisons the result. Use this for strict convergence and
+  verification tests where a NaN anywhere is itself the bug.
+- **`"raise"`** — any NaN in either input raises `ValueError` with
+  the cell count. Use this in pipelines where the upstream contract
+  guarantees no NaN and a violation should halt the run.
+
+The default is `"omit"` because the routine sources of NaN in pypic
+are legitimate: `SphereSelection` and `FieldDataset.where()` mask
+regions with NaN by design, `pypic.regrid` fills out-of-domain cells
+with NaN by design, and cross-grid comparisons against a smaller
+dataset produce NaN boundary cells by construction. Propagating NaN
+through these would make the common case (compare two runs after
+slicing) silently useless.
+
+The policy applies to the pure-array diagnostics in
+`pypic.diagnostics`. The comparison wrappers in `pypic.comparison`
+forward the same keyword unchanged — one knob, one semantics,
+whether you are passing NumPy arrays or `FieldDataset` pairs.
+
 ### Field energy as volume integral
 
 `field_energy` computes $\sum f_{ijk} \cdot \Delta V$ (a volume
