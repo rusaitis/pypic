@@ -316,6 +316,93 @@ class TestRegrid:
         with pytest.raises(ValueError, match=r"2D source.*3D target"):
             regrid(ds_2d, target_3d)
 
+    def test_empty_dataset_preserves_grid(self) -> None:
+        """A FieldDataset with no fields regrids to a new empty dataset."""
+        coarse = make_uniform_grid(4, spacing=1.0)
+        ds = FieldDataset.from_arrays({}, coarse, Normalization.identity())
+        fine = make_uniform_grid(8, spacing=0.5)
+        result = regrid(ds, fine)
+        assert result.field_names() == []
+        assert result.grid.dimensions == (8,)
+        assert result.grid.spacing == (0.5,)
+
+    def test_single_cell_grid_trivial(self) -> None:
+        """Single-cell source + single-cell target is a trivial passthrough."""
+        grid = make_uniform_grid(1, spacing=1.0, origin=0.0)
+        ds = FieldDataset.from_arrays(
+            {"f": np.array([3.14])}, grid, Normalization.identity()
+        )
+        # Target grid equals source — no-op shortcut fires.
+        result = regrid(ds, grid)
+        assert result is ds
+
+    def test_fields_subset_selects_requested(self) -> None:
+        """``fields=`` regrids only the named subset."""
+        coarse = make_uniform_grid(4, spacing=1.0)
+        ds = FieldDataset.from_arrays(
+            {"B1": np.ones(4), "B2": 2.0 * np.ones(4), "rho_m": np.zeros(4)},
+            coarse,
+            Normalization.identity(),
+        )
+        fine = make_uniform_grid(8, spacing=0.5)
+        result = regrid(ds, fine, fields=["B1", "rho_m"])
+        assert sorted(result.field_names()) == ["B1", "rho_m"]
+        assert result["B1"].shape == (8,)
+
+    def test_fields_subset_by_alias(self) -> None:
+        """``fields=`` resolves aliases to canonical names."""
+        coarse = make_uniform_grid(4, 4, 4, spacing=1.0)
+        ds = FieldDataset.from_arrays(
+            {"B1": np.ones((4, 4, 4)), "B2": np.ones((4, 4, 4))},
+            coarse,
+            Normalization.identity(),
+        )
+        fine = make_uniform_grid(8, 8, 8, spacing=0.5)
+        # "Bx" is the Cartesian alias for "B1".
+        result = regrid(ds, fine, fields=["Bx"])
+        assert result.field_names() == ["B1"]
+
+    def test_fields_subset_unknown_raises(self) -> None:
+        coarse = make_uniform_grid(4, spacing=1.0)
+        ds = FieldDataset.from_arrays(
+            {"B1": np.ones(4)}, coarse, Normalization.identity()
+        )
+        fine = make_uniform_grid(8, spacing=0.5)
+        with pytest.raises(KeyError):
+            regrid(ds, fine, fields=["not_a_field"])
+
+    def test_fields_subset_matches_full_on_shared_names(self) -> None:
+        """Regridding a subset produces the same values as the full regrid."""
+        coarse = make_uniform_grid(6, 5, spacing=(1.0, 1.0))
+        cx, cy = np.meshgrid(*coarse.coordinate_arrays(), indexing="ij")
+        ds = FieldDataset.from_arrays(
+            {
+                "B1": cx + 0.1 * cy,
+                "B2": 2.0 * cy - cx,
+                "rho_m": np.exp(-0.05 * (cx - 3.0) ** 2),
+            },
+            coarse,
+            Normalization.identity(),
+        )
+        fine = make_uniform_grid(10, 8, spacing=(0.5, 0.6), origin=(1.0, 1.0))
+        full = regrid(ds, fine)
+        subset = regrid(ds, fine, fields=["B1", "rho_m"])
+        assert_allclose(subset["B1"], full["B1"], atol=0.0, rtol=0.0)
+        assert_allclose(subset["rho_m"], full["rho_m"], atol=0.0, rtol=0.0)
+
+    def test_noop_shortcut_with_subset_still_filters(self) -> None:
+        """Same-grid regrid with a subset must still drop unrequested fields."""
+        grid = make_uniform_grid(4, spacing=1.0)
+        ds = FieldDataset.from_arrays(
+            {"B1": np.ones(4), "B2": 2.0 * np.ones(4)},
+            grid,
+            Normalization.identity(),
+        )
+        result = regrid(ds, ds.grid, fields=["B1"])
+        # Identical-grid shortcut must not fire when the caller asked
+        # for a strict subset — otherwise B2 would leak through.
+        assert result.field_names() == ["B1"]
+
 
 # ---------------------------------------------------------------------------
 # align_grids
@@ -373,3 +460,29 @@ class TestAlignGrids:
         ra_ab, _rb_ab = align_grids(ds1, ds2)
         ra_ba, _rb_ba = align_grids(ds2, ds1)
         assert ra_ab.grid == ra_ba.grid
+
+    def test_fields_subset_forwarded(self) -> None:
+        """``fields=`` forwards to both regrid calls."""
+        g1 = make_uniform_grid(6, 6, spacing=1.0)
+        g2 = make_uniform_grid(12, 12, spacing=0.5)
+        a = FieldDataset.from_arrays(
+            {
+                "B1": np.ones((6, 6)),
+                "B2": 2.0 * np.ones((6, 6)),
+                "rho_m": np.zeros((6, 6)),
+            },
+            g1,
+            Normalization.identity(),
+        )
+        b = FieldDataset.from_arrays(
+            {
+                "B1": np.ones((12, 12)),
+                "B2": 2.0 * np.ones((12, 12)),
+                "rho_m": np.zeros((12, 12)),
+            },
+            g2,
+            Normalization.identity(),
+        )
+        ra, rb = align_grids(a, b, fields=["B1"])
+        assert ra.field_names() == ["B1"]
+        assert rb.field_names() == ["B1"]

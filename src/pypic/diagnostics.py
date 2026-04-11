@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import math
 import warnings
+from pathlib import Path
 from typing import TYPE_CHECKING, Literal, cast
 
 import numpy as np
@@ -23,6 +24,14 @@ if TYPE_CHECKING:
 
 
 type NanPolicy = Literal["omit", "propagate", "raise"]
+
+# Anchor for ``warnings.warn(skip_file_prefixes=...)`` so NaN warnings
+# point at the user's call site regardless of how deeply pypic itself
+# wraps the diagnostic (direct, via ``compare_fields``, via CLI
+# commands, ...). Python walks up the stack until it exits the pypic
+# package prefix. Computed once at import time from this module's own
+# file location.
+_PYPIC_PREFIX = (str(Path(__file__).parent),)
 
 
 def _apply_nan_policy(
@@ -64,14 +73,14 @@ def _apply_nan_policy(
         warnings.warn(
             f"{function_name}: all {n_nan} cell(s) are NaN, result undefined",
             UserWarning,
-            stacklevel=3,
+            skip_file_prefixes=_PYPIC_PREFIX,
         )
         return None
     fraction = 100.0 * n_nan / nan_mask.size
     warnings.warn(
         f"{function_name}: ignored {n_nan} NaN cell(s) ({fraction:.2f}% of input)",
         UserWarning,
-        stacklevel=3,
+        skip_file_prefixes=_PYPIC_PREFIX,
     )
     return computed[valid], reference[valid]
 

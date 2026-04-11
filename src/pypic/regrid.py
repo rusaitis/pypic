@@ -39,6 +39,8 @@ from pypic.coordinates.geometry import GeometryType
 from pypic.grid import GridInfo
 
 if TYPE_CHECKING:
+    from collections.abc import Iterable
+
     from pypic.dataset import FieldDataset
     from pypic.types import FloatArray
 
@@ -141,13 +143,21 @@ def common_grid(a: GridInfo, b: GridInfo) -> GridInfo:
         sample_lo = max(los_a[i], los_b[i])
         sample_hi = min(his_a[i], his_b[i])
         if sample_lo > sample_hi:
-            msg = f"Grids do not overlap along axis {i}"
+            msg = (
+                f"Grids do not overlap along axis {i}: "
+                f"a samples [{los_a[i]:g}, {his_a[i]:g}], "
+                f"b samples [{los_b[i]:g}, {his_b[i]:g}]"
+            )
             raise ValueError(msg)
 
         dx = min(a.spacing[i], b.spacing[i])
         # Number of samples on a closed interval [sample_lo, sample_hi]
-        # at uniform spacing dx. Tolerance absorbs FP error when
-        # (sample_hi - sample_lo) / dx is exactly integer.
+        # at uniform spacing dx. The 1e-9 tolerance absorbs FP rounding
+        # when ``(sample_hi - sample_lo) / dx`` is an exact integer;
+        # safe for all spacings PIC/MHD readers emit (typically 1e-6
+        # upward in code units). For pathologically small spacings
+        # (< ~1e-9) the slack would shadow a legitimate sub-step, but
+        # that regime does not arise in fluid/kinetic output.
         n = max(1, int((sample_hi - sample_lo) / dx + 1e-9) + 1)
         new_origin.append(sample_lo - 0.5 * dx)
         new_spacing.append(dx)
@@ -165,10 +175,11 @@ def regrid(
     source: FieldDataset,
     target_grid: GridInfo,
     *,
+    fields: Iterable[str] | None = None,
     method: str = "linear",
     **kwargs: Any,  # noqa: ANN401 — scipy passthrough
 ) -> FieldDataset:
-    r"""Interpolate all fields from *source* onto *target_grid*.
+    r"""Interpolate fields from *source* onto *target_grid*.
 
     Each field array is interpolated independently using
     :class:`~scipy.interpolate.RegularGridInterpolator`.  Points in
@@ -181,6 +192,14 @@ def regrid(
         Dataset on the original grid.
     target_grid : GridInfo
         Target grid specification.
+    fields : Iterable[str] | None
+        Canonical field names (or aliases) to regrid. ``None`` (default)
+        regrids every field in *source*. Passing a subset avoids wasted
+        interpolation when a caller only needs a handful of fields from
+        a large dataset — the stacked-field interpolator is still built
+        once, but only over the requested subset. Raises ``KeyError`` on
+        unknown names (including close-match suggestions from
+        :meth:`FieldDataset.resolve_key`).
     method : str
         Interpolation method forwarded to ``RegularGridInterpolator``
         (e.g. ``"linear"``, ``"nearest"``, ``"cubic"``).
@@ -191,9 +210,11 @@ def regrid(
     Returns
     -------
     FieldDataset
-        New dataset on *target_grid* with all fields interpolated and
-        all metadata (normalization, species, physics, frame, transforms)
-        preserved from *source*.
+        New dataset on *target_grid* with the selected fields
+        interpolated and all metadata (normalization, species, physics,
+        frame, transforms) preserved from *source*. Metadata survives
+        the regrid unchanged — see :func:`field_difference_dataset` for
+        the comparison helper that deliberately replaces it.
 
     Raises
     ------
@@ -201,6 +222,8 @@ def regrid(
         If either grid is non-Cartesian.
     ValueError
         If source and target dimensionalities differ.
+    KeyError
+        If *fields* names a field that does not exist in *source*.
 
     Examples
     --------
@@ -227,8 +250,22 @@ def regrid(
         msg = f"Cannot regrid {src_ndim}D source onto {tgt_ndim}D target grid"
         raise ValueError(msg)
 
-    # No-op shortcut when grids are identical.
-    if source.grid == target_grid:
+    # Resolve the field selection *before* the no-op shortcut so that
+    # bad names always raise, even when no interpolation runs.
+    if fields is None:
+        names = list(source.field_names())
+    else:
+        seen: dict[str, None] = {}
+        for raw in fields:
+            seen[source.resolve_key(raw)] = None
+        names = list(seen)
+
+    # No-op shortcut: identical grids and a selection that covers every
+    # field (or None). A strict subset still needs to build a narrower
+    # dataset, so it falls through to the construction path below.
+    if source.grid == target_grid and (
+        fields is None or set(names) == set(source.field_names())
+    ):
         return source
 
     src_coords = source.grid.coordinate_arrays()
@@ -242,12 +279,11 @@ def regrid(
     }
     interp_kwargs.update(kwargs)
 
-    # Stack all fields into one trailing value-dimension so the
-    # RegularGridInterpolator is built and evaluated once. Every field
-    # shares the source grid, target mesh, and interpolation options,
-    # so per-field reconstruction is pure Python overhead (and actual
-    # precomputation for ``method="cubic"``/``"quintic"``).
-    names = list(source.field_names())
+    # Stack the requested fields into one trailing value-dimension so
+    # the RegularGridInterpolator is built and evaluated once. Every
+    # field shares the source grid, target mesh, and interpolation
+    # options, so per-field reconstruction is pure Python overhead (and
+    # avoids per-field precomputation for ``method="cubic"``/``"quintic"``).
     new_fields: dict[str, FloatArray] = {}
     if names:
         stacked = np.stack([source[n] for n in names], axis=-1)
@@ -274,6 +310,7 @@ def align_grids(
     a: FieldDataset,
     b: FieldDataset,
     *,
+    fields: Iterable[str] | None = None,
     method: str = "linear",
     **kwargs: Any,  # noqa: ANN401 — scipy passthrough
 ) -> tuple[FieldDataset, FieldDataset]:
@@ -287,6 +324,13 @@ def align_grids(
     ----------
     a, b : FieldDataset
         Input datasets on (possibly different) uniform Cartesian grids.
+    fields : Iterable[str] | None
+        Canonical field names (or aliases) to keep on the output. When
+        *None* (default) every field in each dataset is regridded, which
+        matches the historical behavior. Pass a subset to skip wasted
+        interpolation — each name is resolved through **both** source
+        alias tables independently, so ``"Bx"`` works even when one side
+        only exposes the canonical ``"B1"``.
     method : str
         Interpolation method (default ``"linear"``).
     **kwargs
@@ -303,6 +347,8 @@ def align_grids(
         If either grid is non-Cartesian.
     ValueError
         If dimensionalities differ or domains do not overlap.
+    KeyError
+        If *fields* names a field missing in either dataset.
 
     Examples
     --------
@@ -323,7 +369,12 @@ def align_grids(
     True
     """
     target = common_grid(a.grid, b.grid)
+    # Materialize the selection now so both regrid calls see the same
+    # field list — resolution happens against each dataset's own alias
+    # table inside regrid(), which matters when one side uses canonical
+    # names and the other exposes an extra alias.
+    field_list = list(fields) if fields is not None else None
     return (
-        regrid(a, target, method=method, **kwargs),
-        regrid(b, target, method=method, **kwargs),
+        regrid(a, target, fields=field_list, method=method, **kwargs),
+        regrid(b, target, fields=field_list, method=method, **kwargs),
     )

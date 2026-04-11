@@ -37,6 +37,7 @@ import warnings
 from typing import TYPE_CHECKING, Any
 
 from pypic.diagnostics import (
+    _PYPIC_PREFIX,
     NanPolicy,
     field_difference,
     l2_relative_error,
@@ -77,6 +78,9 @@ def _validate_metric(metric: str) -> None:
 
 
 def _validate_nan_policy(nan_policy: str) -> None:
+    # Duplicates the check inside ``_apply_nan_policy`` intentionally:
+    # a bad policy caught *here* fails before the expensive alignment
+    # step, turning a wasted multi-field regrid into an instant error.
     if nan_policy not in _ALLOWED_NAN_POLICIES:
         msg = f"nan_policy must be one of {_ALLOWED_NAN_POLICIES!r}, got {nan_policy!r}"
         raise ValueError(msg)
@@ -139,7 +143,15 @@ def _resolution_ratio(a: GridInfo, b: GridInfo) -> tuple[float, ...]:
 
 
 def _warn_if_coarse_mismatch(a: GridInfo, b: GridInfo) -> None:
-    """Warn once if any axis' spacing ratio exceeds the threshold."""
+    """Warn at most once per call if any axis spacing ratio exceeds the threshold.
+
+    The warning fires for the first axis that crosses
+    :data:`_RESOLUTION_WARNING_THRESHOLD` and then returns, by design:
+    a user running ``compare_fields(kinetic, mhd)`` wants one heads-up
+    about the cross-scale comparison, not three redundant ones when all
+    axes are 50× off. ``skip_file_prefixes`` routes the warning past
+    the pypic frames to the user's call site regardless of layering.
+    """
     ratios = _resolution_ratio(a, b)
     for axis, ratio in enumerate(ratios):
         if ratio > _RESOLUTION_WARNING_THRESHOLD:
@@ -147,7 +159,7 @@ def _warn_if_coarse_mismatch(a: GridInfo, b: GridInfo) -> None:
                 f"Grid resolutions differ by {ratio:.1f}x along axis {axis} — "
                 f"cross-scale comparison may be physically meaningless",
                 UserWarning,
-                stacklevel=3,
+                skip_file_prefixes=_PYPIC_PREFIX,
             )
             return
 
@@ -238,7 +250,9 @@ def compare_fields(
     _validate_nan_policy(nan_policy)
     canonical = _resolve_common_field(a, b, field)
     _warn_if_coarse_mismatch(a.grid, b.grid)
-    a_aligned, b_aligned = align_grids(a, b, method=method)
+    # Regrid only the requested field — 50× cheaper than full-dataset
+    # alignment on a multi-moment PIC dump.
+    a_aligned, b_aligned = align_grids(a, b, fields=[canonical], method=method)
     va = _extract_values(a_aligned, canonical, units)
     vb = _extract_values(b_aligned, canonical, units)
     if metric == "l2":
@@ -321,7 +335,7 @@ def field_comparison_report(
     # raise *before* the expensive alignment step.
     names = _resolve_field_list(a, b, fields)
     _warn_if_coarse_mismatch(a.grid, b.grid)
-    a_aligned, b_aligned = align_grids(a, b, method=method)
+    a_aligned, b_aligned = align_grids(a, b, fields=names, method=method)
 
     per_field: dict[str, dict[str, float]] = {}
     for name in names:
@@ -355,14 +369,29 @@ def field_difference_dataset(
 
     Each requested field is computed as ``a[name] - b[name]`` after the
     two datasets are aligned. The returned dataset inherits *a*'s
-    normalization, species, physics, and frame metadata, so the result
-    plugs directly into :func:`pypic.plotting.plot_field_slice`. For the
-    three-panel A | B | diff layout, run :func:`pypic.regrid.align_grids`
-    yourself and pass the pair to :func:`pypic.plotting.plot_comparison`
-    — that path does not need this helper.
+    species, physics, and frame metadata, so the result plugs directly
+    into :func:`pypic.plotting.plot_field_slice`. For the three-panel
+    A | B | diff layout, run :func:`pypic.regrid.align_grids` yourself
+    and pass the pair to :func:`pypic.plotting.plot_comparison` — that
+    path does not need this helper.
 
-    When ``units="si"``, the stored arrays carry SI values even though
-    the dataset's normalization is from *a*; the SI choice is recorded
+    Unlike :func:`pypic.regrid.regrid`, which preserves *a*'s original
+    metadata dict verbatim, this function **replaces** ``.metadata``
+    with a fresh ``{"comparison": {"source_frames": ..., "units": ...}}``
+    record — the diff is a new artifact, not a regrid of *a*, and any
+    per-step provenance on the sources would be misleading if copied.
+
+    NaN cells in either input pass through the difference array
+    unchanged (NaN minus anything = NaN). There is no ``nan_policy``
+    parameter because :func:`field_difference` itself is pure
+    subtraction; use :func:`compare_fields` with ``nan_policy=...`` or
+    :func:`~pypic.diagnostics.l2_relative_error` directly if you need
+    masked reductions.
+
+    When ``units="si"``, the stored arrays carry SI values but the
+    dataset's normalization is set to :meth:`Normalization.identity`
+    so that :meth:`FieldDataset.in_si` returns the same values instead
+    of re-applying the SI factor. The actual unit choice is recorded
     in ``metadata["comparison"]["units"]`` for provenance.
 
     Parameters
@@ -377,11 +406,6 @@ def field_difference_dataset(
     method : str
         Interpolation method passed through to
         :func:`pypic.regrid.align_grids`. Default ``"linear"``.
-
-        NaN cells in either input pass through to the difference array
-        unchanged. Use the diagnostic functions or :func:`compare_fields`
-        with ``nan_policy`` if you need to mask them when computing
-        downstream metrics.
 
     Returns
     -------
@@ -418,7 +442,7 @@ def field_difference_dataset(
     # rationale (custom aliases survive, bad names raise pre-alignment).
     names = _resolve_field_list(a, b, fields)
     _warn_if_coarse_mismatch(a.grid, b.grid)
-    a_aligned, b_aligned = align_grids(a, b, method=method)
+    a_aligned, b_aligned = align_grids(a, b, fields=names, method=method)
 
     diff_fields: dict[str, FloatArray] = {}
     for name in names:
