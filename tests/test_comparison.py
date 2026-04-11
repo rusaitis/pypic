@@ -462,6 +462,35 @@ class TestFrameAlignment:
         with pytest.raises(ValueError, match=r"dataset A.*'GSM'.*'GSE'"):
             compare_fields(a, b, "B1", frame="GSE")
 
+    def test_explicit_frame_missing_transform_on_b_raises(self) -> None:
+        """``frame=...`` raises ValueError naming B if B lacks the transform."""
+        # A is GSM with a transform to GSE; B is HEE with no transforms.
+        # Asking for frame="GSE" succeeds on A and fails on B specifically.
+        grid = make_uniform_grid(6, 6, spacing=1.0)
+        arr = np.ones((6, 6))
+        a = FieldDataset.from_arrays(
+            {"B1": arr},
+            grid,
+            Normalization.identity(),
+            frame="GSM",
+            transforms={"GSE": FrameTransform("GSM", "GSE")},
+        )
+        b = FieldDataset.from_arrays(
+            {"B1": arr},
+            grid,
+            Normalization.identity(),
+            frame="HEE",
+        )
+        with pytest.raises(ValueError, match=r"dataset B.*'HEE'.*'GSE'"):
+            compare_fields(a, b, "B1", frame="GSE")
+
+    def test_empty_frame_string_raises(self) -> None:
+        """``frame=''`` is rejected at the boundary, not deep in transform_to."""
+        a = self._gsm_dataset()
+        b = self._gsm_dataset()
+        with pytest.raises(ValueError, match="non-empty string"):
+            compare_fields(a, b, "B1", frame="")
+
     def test_explicit_frame_already_native_is_noop(self) -> None:
         """``frame=`` matching A's frame behaves like the default path."""
         a = self._gsm_dataset()

@@ -127,6 +127,9 @@ def _align_frames(
     unchanged. Until then it is accepted but unused, so callers can
     thread the kwarg today without a follow-up API change.
     """
+    if frame is not None and not frame:
+        msg = "frame must be a non-empty string"
+        raise ValueError(msg)
     target = a.frame if frame is None else frame
     if a.frame == target and b.frame == target:
         return a, b
