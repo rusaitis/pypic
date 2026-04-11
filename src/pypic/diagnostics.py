@@ -8,7 +8,8 @@ dependency. Divergence delegates to ``pypic.coordinates.operators``.
 from __future__ import annotations
 
 import math
-from typing import TYPE_CHECKING, cast
+import warnings
+from typing import TYPE_CHECKING, Literal, cast
 
 import numpy as np
 
@@ -21,9 +22,65 @@ if TYPE_CHECKING:
     from pypic.types import FloatArray
 
 
+type NanPolicy = Literal["omit", "propagate", "raise"]
+
+
+def _apply_nan_policy(
+    computed: FloatArray,
+    reference: FloatArray,
+    *,
+    nan_policy: NanPolicy,
+    function_name: str,
+) -> tuple[FloatArray, FloatArray] | None:
+    """Apply *nan_policy* to a (computed, reference) pair.
+
+    Returns the (possibly masked) pair to feed into the metric, or
+    ``None`` to signal "all cells masked, return NaN".
+
+    For ``"omit"``, NaN cells in either input are dropped from both
+    arrays via a joint mask, so downstream relative norms compare the
+    same set of points in numerator and denominator. Emits a
+    :class:`UserWarning` reporting the dropped count when masking
+    occurs (no warning when both inputs are NaN-free).
+    """
+    if nan_policy not in ("omit", "propagate", "raise"):
+        msg = f"nan_policy must be 'omit', 'propagate', or 'raise', got {nan_policy!r}"
+        raise ValueError(msg)
+
+    if nan_policy == "propagate":
+        return computed, reference
+
+    nan_mask = np.isnan(computed) | np.isnan(reference)
+    n_nan = int(nan_mask.sum())
+    if n_nan == 0:
+        return computed, reference
+
+    if nan_policy == "raise":
+        msg = f"{function_name}: input contains {n_nan} NaN cell(s)"
+        raise ValueError(msg)
+
+    valid = ~nan_mask
+    if not valid.any():
+        warnings.warn(
+            f"{function_name}: all {n_nan} cell(s) are NaN, result undefined",
+            UserWarning,
+            stacklevel=3,
+        )
+        return None
+    fraction = 100.0 * n_nan / nan_mask.size
+    warnings.warn(
+        f"{function_name}: ignored {n_nan} NaN cell(s) ({fraction:.2f}% of input)",
+        UserWarning,
+        stacklevel=3,
+    )
+    return computed[valid], reference[valid]
+
+
 def l2_relative_error(
     computed: FloatArray,
     reference: FloatArray,
+    *,
+    nan_policy: NanPolicy = "omit",
 ) -> np.floating[Any]:
     r"""Compute the discrete relative L2 error norm.
 
@@ -39,12 +96,20 @@ def l2_relative_error(
         Computed field values.
     reference : NDArray
         Reference (exact or baseline) field values.
+    nan_policy : {"omit", "propagate", "raise"}, default "omit"
+        How to handle NaN cells in either input. ``"omit"`` masks them
+        out (both numerator and denominator restricted to the same valid
+        set, so the relative error stays mathematically coherent) and
+        emits a :class:`UserWarning` reporting the dropped count.
+        ``"propagate"`` is the unaltered NumPy reduction — any NaN
+        poisons the result. ``"raise"`` errors on any NaN.
 
     Returns
     -------
     np.floating
-        Relative L2 error. Returns ``inf`` if the reference is all zeros,
-        ``nan`` if both are all zeros.
+        Relative L2 error. ``inf`` if the reference is all zeros over
+        the valid cells, ``nan`` if both are all zeros or no valid
+        cells remain.
 
     Examples
     --------
@@ -52,14 +117,25 @@ def l2_relative_error(
     >>> l2_relative_error(np.array([1.0, 2.0]), np.array([1.0, 2.0]))
     np.float64(0.0)
     """
-    diff_norm = np.sqrt(np.sum((computed - reference) ** 2))
-    ref_norm = np.sqrt(np.sum(reference**2))
+    masked = _apply_nan_policy(
+        computed,
+        reference,
+        nan_policy=nan_policy,
+        function_name="l2_relative_error",
+    )
+    if masked is None:
+        return cast("np.floating[Any]", np.float64(np.nan))
+    c, r = masked
+    diff_norm = np.sqrt(np.sum((c - r) ** 2))
+    ref_norm = np.sqrt(np.sum(r**2))
     return diff_norm / ref_norm  # type: ignore[no-any-return]  # inf or nan when ref_norm == 0
 
 
 def linf_error(
     computed: FloatArray,
     reference: FloatArray,
+    *,
+    nan_policy: NanPolicy = "omit",
 ) -> np.floating[Any]:
     r"""Compute the absolute L-infinity (max-norm) error.
 
@@ -74,11 +150,15 @@ def linf_error(
         Computed field values.
     reference : NDArray
         Reference (exact or baseline) field values.
+    nan_policy : {"omit", "propagate", "raise"}, default "omit"
+        How to handle NaN cells in either input. See
+        :func:`l2_relative_error` for the full semantics.
 
     Returns
     -------
     np.floating
-        Maximum absolute pointwise error.
+        Maximum absolute pointwise error. ``nan`` if no valid cells
+        remain (``"omit"`` with all-NaN input).
 
     Examples
     --------
@@ -86,7 +166,16 @@ def linf_error(
     >>> linf_error(np.array([1.0, 3.0]), np.array([1.0, 2.0]))
     np.float64(1.0)
     """
-    return np.max(np.abs(computed - reference))
+    masked = _apply_nan_policy(
+        computed,
+        reference,
+        nan_policy=nan_policy,
+        function_name="linf_error",
+    )
+    if masked is None:
+        return cast("np.floating[Any]", np.float64(np.nan))
+    c, r = masked
+    return np.max(np.abs(c - r))
 
 
 def field_difference(

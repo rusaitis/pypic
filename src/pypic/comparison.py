@@ -36,7 +36,12 @@ from __future__ import annotations
 import warnings
 from typing import TYPE_CHECKING, Any
 
-from pypic.diagnostics import field_difference, l2_relative_error, linf_error
+from pypic.diagnostics import (
+    NanPolicy,
+    field_difference,
+    l2_relative_error,
+    linf_error,
+)
 from pypic.regrid import align_grids
 
 if TYPE_CHECKING:
@@ -55,13 +60,32 @@ __all__ = [
 
 _ALLOWED_UNITS = ("si", "code")
 _ALLOWED_METRICS = ("l2", "linf")
+_ALLOWED_NAN_POLICIES = ("omit", "propagate", "raise")
 _RESOLUTION_WARNING_THRESHOLD = 10.0
+
+
+def _validate_units(units: str) -> None:
+    if units not in _ALLOWED_UNITS:
+        msg = f"units must be one of {_ALLOWED_UNITS!r}, got {units!r}"
+        raise ValueError(msg)
+
+
+def _validate_metric(metric: str) -> None:
+    if metric not in _ALLOWED_METRICS:
+        msg = f"metric must be one of {_ALLOWED_METRICS!r}, got {metric!r}"
+        raise ValueError(msg)
+
+
+def _validate_nan_policy(nan_policy: str) -> None:
+    if nan_policy not in _ALLOWED_NAN_POLICIES:
+        msg = f"nan_policy must be one of {_ALLOWED_NAN_POLICIES!r}, got {nan_policy!r}"
+        raise ValueError(msg)
 
 
 def _resolve_common_field(a: FieldDataset, b: FieldDataset, name: str) -> str:
     """Resolve *name* through both datasets' aliases to a shared canonical."""
-    canonical_a = a._resolve_key(name)
-    canonical_b = b._resolve_key(name)
+    canonical_a = a.resolve_key(name)
+    canonical_b = b.resolve_key(name)
     if canonical_a != canonical_b:
         msg = (
             f"Field {name!r} resolves to different canonical names in the two "
@@ -97,13 +121,14 @@ def _resolve_field_list(
 
 
 def _extract_values(ds: FieldDataset, canonical_name: str, units: str) -> FloatArray:
-    """Return the field array in the requested units."""
+    """Return the field array in the requested units.
+
+    *units* is assumed pre-validated by the public function — see
+    :func:`_validate_units`.
+    """
     if units == "si":
         return ds.in_si(canonical_name)
-    if units == "code":
-        return ds[canonical_name]
-    msg = f"units must be one of {_ALLOWED_UNITS!r}, got {units!r}"
-    raise ValueError(msg)
+    return ds[canonical_name]
 
 
 def _resolution_ratio(a: GridInfo, b: GridInfo) -> tuple[float, ...]:
@@ -134,6 +159,8 @@ def compare_fields(
     *,
     metric: str = "l2",
     units: str = "si",
+    method: str = "linear",
+    nan_policy: NanPolicy = "omit",
 ) -> float:
     r"""Compute an error norm between one field of two datasets.
 
@@ -159,6 +186,16 @@ def compare_fields(
         before comparing — the default, safe for cross-model runs.
         ``"code"`` compares raw code-unit values; valid only when both
         datasets share a normalization.
+    method : str
+        Interpolation method passed through to
+        :func:`pypic.regrid.align_grids` (e.g. ``"linear"``,
+        ``"nearest"``, ``"cubic"``). Default ``"linear"``.
+    nan_policy : {"omit", "propagate", "raise"}
+        Forwarded to the pure diagnostic. Default ``"omit"`` masks NaN
+        cells from the metric (with a warning naming the dropped count)
+        — useful for sphere selections, masked regions, and other
+        upstream sources of NaN. Use ``"propagate"`` for strict
+        verification where any NaN should poison the result.
 
     Returns
     -------
@@ -169,7 +206,7 @@ def compare_fields(
     ------
     KeyError
         If *field* is missing in either dataset (message from
-        :meth:`FieldDataset._resolve_key` includes close-match suggestions).
+        :meth:`FieldDataset.resolve_key` includes close-match suggestions).
     ValueError
         If *metric* or *units* is unknown, if *field* resolves to
         different canonical names in the two datasets, or if the grids
@@ -196,17 +233,17 @@ def compare_fields(
     >>> float(compare_fields(ds, ds, "B1"))
     0.0
     """
+    _validate_metric(metric)
+    _validate_units(units)
+    _validate_nan_policy(nan_policy)
     canonical = _resolve_common_field(a, b, field)
     _warn_if_coarse_mismatch(a.grid, b.grid)
-    a_aligned, b_aligned = align_grids(a, b)
+    a_aligned, b_aligned = align_grids(a, b, method=method)
     va = _extract_values(a_aligned, canonical, units)
     vb = _extract_values(b_aligned, canonical, units)
     if metric == "l2":
-        return float(l2_relative_error(va, vb))
-    if metric == "linf":
-        return float(linf_error(va, vb))
-    msg = f"metric must be one of {_ALLOWED_METRICS!r}, got {metric!r}"
-    raise ValueError(msg)
+        return float(l2_relative_error(va, vb, nan_policy=nan_policy))
+    return float(linf_error(va, vb, nan_policy=nan_policy))
 
 
 def field_comparison_report(
@@ -215,6 +252,8 @@ def field_comparison_report(
     *,
     fields: Iterable[str] | None = None,
     units: str = "si",
+    method: str = "linear",
+    nan_policy: NanPolicy = "omit",
 ) -> dict[str, Any]:
     r"""Compute L2 and L∞ errors for every common field, plus grid context.
 
@@ -235,6 +274,11 @@ def field_comparison_report(
         may be aliases; they resolve through both datasets.
     units : {"si", "code"}
         Unit convention; see :func:`compare_fields`.
+    method : str
+        Interpolation method passed through to
+        :func:`pypic.regrid.align_grids`. Default ``"linear"``.
+    nan_policy : {"omit", "propagate", "raise"}
+        Forwarded to the pure diagnostics; see :func:`compare_fields`.
 
     Returns
     -------
@@ -269,17 +313,23 @@ def field_comparison_report(
     >>> report["units"]
     'si'
     """
+    _validate_units(units)
+    _validate_nan_policy(nan_policy)
+    # Resolve names against the originals so custom aliases from
+    # ``from_arrays(aliases=...)`` survive (regrid only regenerates the
+    # geometry-default aliases on its output) and so bad field names
+    # raise *before* the expensive alignment step.
+    names = _resolve_field_list(a, b, fields)
     _warn_if_coarse_mismatch(a.grid, b.grid)
-    a_aligned, b_aligned = align_grids(a, b)
-    names = _resolve_field_list(a_aligned, b_aligned, fields)
+    a_aligned, b_aligned = align_grids(a, b, method=method)
 
     per_field: dict[str, dict[str, float]] = {}
     for name in names:
         va = _extract_values(a_aligned, name, units)
         vb = _extract_values(b_aligned, name, units)
         per_field[name] = {
-            "l2": float(l2_relative_error(va, vb)),
-            "linf": float(linf_error(va, vb)),
+            "l2": float(l2_relative_error(va, vb, nan_policy=nan_policy)),
+            "linf": float(linf_error(va, vb, nan_policy=nan_policy)),
         }
 
     grid_context: dict[str, Any] = {
@@ -299,6 +349,7 @@ def field_difference_dataset(
     *,
     fields: Iterable[str] | None = None,
     units: str = "si",
+    method: str = "linear",
 ) -> FieldDataset:
     r"""Build a FieldDataset of pointwise differences on the common grid.
 
@@ -323,6 +374,14 @@ def field_difference_dataset(
         canonical names.
     units : {"si", "code"}
         Unit convention; see :func:`compare_fields`.
+    method : str
+        Interpolation method passed through to
+        :func:`pypic.regrid.align_grids`. Default ``"linear"``.
+
+        NaN cells in either input pass through to the difference array
+        unchanged. Use the diagnostic functions or :func:`compare_fields`
+        with ``nan_policy`` if you need to mask them when computing
+        downstream metrics.
 
     Returns
     -------
@@ -354,9 +413,12 @@ def field_difference_dataset(
     >>> diff["B1"]
     array([0. , 0.5, 0.5, 0. ])
     """
+    _validate_units(units)
+    # Resolve against originals — see field_comparison_report for the
+    # rationale (custom aliases survive, bad names raise pre-alignment).
+    names = _resolve_field_list(a, b, fields)
     _warn_if_coarse_mismatch(a.grid, b.grid)
-    a_aligned, b_aligned = align_grids(a, b)
-    names = _resolve_field_list(a_aligned, b_aligned, fields)
+    a_aligned, b_aligned = align_grids(a, b, method=method)
 
     diff_fields: dict[str, FloatArray] = {}
     for name in names:
@@ -365,11 +427,20 @@ def field_difference_dataset(
         diff_fields[name] = field_difference(va, vb)
 
     from pypic.dataset import FieldDataset as _FieldDataset
+    from pypic.units import Normalization
+
+    # When units="si" the stored arrays already carry SI values, so the
+    # result must use an identity normalization — otherwise calling
+    # in_si() on the returned dataset would re-apply the SI factor and
+    # silently double-convert. With identity, in_si() returns the same
+    # SI values and __getitem__ also returns SI (which is now both
+    # "code" and "SI" simultaneously, since the factors are 1.0).
+    result_norm = Normalization.identity() if units == "si" else a_aligned.normalization
 
     return _FieldDataset.from_arrays(
         diff_fields,
         a_aligned.grid,
-        a_aligned.normalization,
+        result_norm,
         species=list(a_aligned.species),
         physics=a_aligned.physics,
         frame=a_aligned.frame,

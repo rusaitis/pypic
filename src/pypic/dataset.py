@@ -455,8 +455,40 @@ class FieldDataset:
             transforms=self._transforms,
         )
 
-    def _resolve_key(self, key: str) -> str:
-        """Resolve a field key through aliases to the canonical name."""
+    def resolve_key(self, key: str) -> str:
+        """Resolve a field key through aliases to the canonical name.
+
+        Returns the canonical (data-vars) name for *key*, which may itself
+        be a canonical name or an alias from this dataset's alias table.
+        Raises :class:`KeyError` (with close-match suggestions) if *key*
+        matches neither.
+
+        Parameters
+        ----------
+        key : str
+            Canonical field name or alias.
+
+        Returns
+        -------
+        str
+            Canonical name in ``self._ds.data_vars``.
+
+        Examples
+        --------
+        >>> import numpy as np
+        >>> from pypic.units import Normalization
+        >>> grid = GridInfo(
+        ...     dimensions=(2,), spacing=(1.0,), origin=(0.0,),
+        ...     geometry=CARTESIAN,
+        ... )
+        >>> ds = FieldDataset.from_arrays(
+        ...     {"B1": np.ones(2)}, grid, Normalization.identity()
+        ... )
+        >>> ds.resolve_key("Bx")  # Cartesian alias
+        'B1'
+        >>> ds.resolve_key("B1")  # canonical
+        'B1'
+        """
         if key in self._ds.data_vars:
             return key
         canonical = self._aliases.get(key)
@@ -473,6 +505,11 @@ class FieldDataset:
             msg += f" Did you mean: {suggestions}?"
         raise KeyError(msg)
 
+    # Backwards-compatible internal alias for code that already imports
+    # the underscore name from outside this module. New code should call
+    # ``resolve_key`` directly.
+    _resolve_key = resolve_key
+
     def __getitem__(self, key: str) -> FloatArray:
         """Return field data as a NumPy array (zero-copy when possible).
 
@@ -485,7 +522,7 @@ class FieldDataset:
         -------
         NDArray
         """
-        resolved = self._resolve_key(key)
+        resolved = self.resolve_key(key)
         return self._ds[resolved].values
 
     def has_field(self, key: str) -> bool:
@@ -580,7 +617,7 @@ class FieldDataset:
         # caller, so we keep the order the caller asked for.
         resolved: dict[str, None] = {}
         for name in names:
-            resolved[self._resolve_key(name)] = None
+            resolved[self.resolve_key(name)] = None
 
         new_ds = self._ds[list(resolved)]
         return FieldDataset(
@@ -855,7 +892,7 @@ class FieldDataset:
         from pypic.fields import field_info as _field_info
 
         if self.has_field(name):
-            resolved = self._resolve_key(name)
+            resolved = self.resolve_key(name)
             attrs = self._ds[resolved].attrs
             qt = attrs.get("quantity_type")
             if qt is not None:
@@ -886,7 +923,7 @@ class FieldDataset:
         from pypic.compute import compute_field, field_si_factor
 
         if self.has_field(name):
-            resolved = self._resolve_key(name)
+            resolved = self.resolve_key(name)
             data = self._ds[resolved].values
             qt = self._ds[resolved].attrs.get("quantity_type")
             if qt is not None:

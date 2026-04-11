@@ -33,6 +33,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, assert_never
 
 import numpy as np
+from scipy.interpolate import RegularGridInterpolator
 
 from pypic.coordinates.geometry import GeometryType
 from pypic.grid import GridInfo
@@ -59,19 +60,39 @@ def _require_cartesian_grid(grid: GridInfo, label: str) -> None:
             assert_never(unreachable)
 
 
-def _grid_extent(grid: GridInfo) -> tuple[float, ...]:
-    """Upper-right corner of the domain: ``origin + dimensions * spacing``."""
-    return tuple(
-        grid.origin[i] + grid.dimensions[i] * grid.spacing[i]
+def _sample_bounds(
+    grid: GridInfo,
+) -> tuple[tuple[float, ...], tuple[float, ...]]:
+    """Per-axis ``(sample_lo, sample_hi)`` for a cell-centered grid.
+
+    `GridInfo.coordinate_arrays` is cell-centered, so the first valid
+    sample sits at ``origin + 0.5*dx`` and the last at
+    ``origin + (N - 0.5)*dx``. These are the inclusive bounds of the
+    range over which `RegularGridInterpolator` accepts queries — anything
+    outside becomes NaN. Use these (not the cell-volume edge
+    ``origin + N*dx``) when computing the overlap of two grids.
+    """
+    los = tuple(
+        grid.origin[i] + 0.5 * grid.spacing[i] for i in range(len(grid.dimensions))
+    )
+    his = tuple(
+        grid.origin[i] + (grid.dimensions[i] - 0.5) * grid.spacing[i]
         for i in range(len(grid.dimensions))
     )
+    return los, his
 
 
 def common_grid(a: GridInfo, b: GridInfo) -> GridInfo:
     r"""Compute the intersection grid at the finer resolution.
 
-    The result covers the spatial overlap of *a* and *b* with per-axis
-    spacing equal to ``min(a.spacing[i], b.spacing[i])``.
+    Returns a uniform Cartesian grid covering the **inclusive sample-range
+    intersection** of *a* and *b* with per-axis spacing
+    ``min(a.spacing[i], b.spacing[i])``. Because the bounds are computed
+    from cell-centered sample positions (``origin + 0.5*dx`` to
+    ``origin + (N - 0.5)*dx``) rather than cell-volume edges, every
+    sample on the returned grid lies strictly inside both source sample
+    ranges. This guarantees that interpolating either source onto the
+    common grid never produces a synthetic boundary NaN.
 
     Parameters
     ----------
@@ -88,7 +109,7 @@ def common_grid(a: GridInfo, b: GridInfo) -> GridInfo:
     NotImplementedError
         If either grid is non-Cartesian.
     ValueError
-        If dimensionalities differ or domains do not overlap.
+        If dimensionalities differ or sample ranges do not overlap.
 
     Examples
     --------
@@ -109,23 +130,26 @@ def common_grid(a: GridInfo, b: GridInfo) -> GridInfo:
         msg = f"Grid dimensionality mismatch: {ndim_a}D vs {ndim_b}D"
         raise ValueError(msg)
 
-    extent_a = _grid_extent(a)
-    extent_b = _grid_extent(b)
+    los_a, his_a = _sample_bounds(a)
+    los_b, his_b = _sample_bounds(b)
 
     new_origin: list[float] = []
     new_spacing: list[float] = []
     new_dims: list[int] = []
 
     for i in range(ndim_a):
-        lo = max(a.origin[i], b.origin[i])
-        hi = min(extent_a[i], extent_b[i])
-        if lo >= hi:
+        sample_lo = max(los_a[i], los_b[i])
+        sample_hi = min(his_a[i], his_b[i])
+        if sample_lo > sample_hi:
             msg = f"Grids do not overlap along axis {i}"
             raise ValueError(msg)
 
         dx = min(a.spacing[i], b.spacing[i])
-        n = max(1, int((hi - lo) / dx))
-        new_origin.append(lo)
+        # Number of samples on a closed interval [sample_lo, sample_hi]
+        # at uniform spacing dx. Tolerance absorbs FP error when
+        # (sample_hi - sample_lo) / dx is exactly integer.
+        n = max(1, int((sample_hi - sample_lo) / dx + 1e-9) + 1)
+        new_origin.append(sample_lo - 0.5 * dx)
         new_spacing.append(dx)
         new_dims.append(n)
 
@@ -207,8 +231,6 @@ def regrid(
     if source.grid == target_grid:
         return source
 
-    from scipy.interpolate import RegularGridInterpolator
-
     src_coords = source.grid.coordinate_arrays()
     tgt_coords = target_grid.coordinate_arrays()
     tgt_mesh = np.meshgrid(*tgt_coords, indexing="ij")
@@ -228,7 +250,7 @@ def regrid(
     names = list(source.field_names())
     new_fields: dict[str, FloatArray] = {}
     if names:
-        stacked = np.stack([np.asarray(source[n]) for n in names], axis=-1)
+        stacked = np.stack([source[n] for n in names], axis=-1)
         interp = RegularGridInterpolator(src_coords, stacked, **interp_kwargs)
         sampled = interp(tuple(tgt_mesh))
         for i, name in enumerate(names):

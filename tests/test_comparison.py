@@ -215,6 +215,39 @@ class TestFieldComparisonReport:
         report = field_comparison_report(a, b)
         assert report["grid"]["resolution_ratio"] == (2.0, 2.0)
 
+    def test_custom_alias_survives_alignment(self) -> None:
+        """Custom aliases passed to ``from_arrays`` resolve in the report.
+
+        Regression for #5 — pre-fix, ``_resolve_field_list`` was called
+        on the regridded datasets, whose alias tables only carry the
+        Cartesian defaults; user-supplied aliases were dropped, so
+        passing the alias name through ``fields=`` raised KeyError.
+        """
+        # Different grids → align_grids actually runs (no no-op).
+        grid_a = make_uniform_grid(6, 6, spacing=1.0)
+        grid_b = make_uniform_grid(12, 12, spacing=0.5)
+        a = FieldDataset.from_arrays(
+            {"B1": np.ones((6, 6))},
+            grid_a,
+            Normalization.identity(),
+            aliases={"my_alias": "B1"},
+        )
+        b = FieldDataset.from_arrays(
+            {"B1": np.ones((12, 12))},
+            grid_b,
+            Normalization.identity(),
+            aliases={"my_alias": "B1"},
+        )
+        report = field_comparison_report(a, b, fields=["my_alias"])
+        assert "B1" in report["fields"]
+
+    def test_bad_field_raises_before_alignment(self) -> None:
+        """Bad field name raises KeyError before paying align_grids cost."""
+        a = _make_2d(6, 6, dx=1.0)
+        b = _make_2d(12, 12, dx=0.5)
+        with pytest.raises(KeyError, match="not found"):
+            field_comparison_report(a, b, fields=["definitely_not_a_field"])
+
 
 # ---------------------------------------------------------------------------
 # field_difference_dataset
@@ -254,6 +287,36 @@ class TestFieldDifferenceDataset:
         ds = _make_2d(6, 6)
         diff = field_difference_dataset(ds, ds)
         assert diff.metadata["comparison"]["units"] == "si"
+
+    def test_si_units_round_trip_no_double_conversion(self) -> None:
+        """``units='si'`` result must not double-convert when ``in_si`` runs.
+
+        Pre-fix the result kept ``a.normalization`` (PIC, code units) but
+        stored SI values, so ``diff.in_si("B1")`` re-applied the SI factor
+        and silently squared it. Now the result is given identity
+        normalization so ``diff.in_si("B1")`` round-trips to ``diff["B1"]``.
+        """
+        norm = Normalization.pic_electron(1e18)
+        grid = make_uniform_grid(6, spacing=1.0)
+        a = FieldDataset.from_arrays({"B1": np.ones(6)}, grid, norm)
+        b = FieldDataset.from_arrays({"B1": 0.5 * np.ones(6)}, grid, norm)
+        diff = field_difference_dataset(a, b, units="si")
+        # Identity normalization → in_si() and __getitem__ agree.
+        assert_allclose(diff.in_si("B1"), diff["B1"], rtol=1e-12)
+        # And the stored values equal the SI difference of the inputs.
+        expected_si_diff = a.in_si("B1") - b.in_si("B1")
+        assert_allclose(diff["B1"], expected_si_diff, rtol=1e-12)
+
+    def test_code_units_keeps_source_normalization(self) -> None:
+        """``units='code'`` preserves *a*'s normalization (no identity swap)."""
+        norm = Normalization.pic_electron(1e18)
+        grid = make_uniform_grid(6, spacing=1.0)
+        a = FieldDataset.from_arrays({"B1": np.ones(6)}, grid, norm)
+        b = FieldDataset.from_arrays({"B1": 0.5 * np.ones(6)}, grid, norm)
+        diff = field_difference_dataset(a, b, units="code")
+        # Same normalization as the inputs → in_si applies the factor.
+        assert diff.normalization == norm
+        assert_allclose(diff.in_si("B1"), 0.5 * norm.si_factor("b_field"), rtol=1e-12)
 
     def test_plottable_via_plot_field_slice(self) -> None:
         pytest.importorskip("matplotlib")
@@ -326,6 +389,133 @@ class TestCoarseMismatchWarning:
             field_comparison_report(a, b)
         mismatches = [w for w in record if "cross-scale" in str(w.message)]
         assert len(mismatches) == 1
+
+
+# ---------------------------------------------------------------------------
+# NaN handling — regression for #1a (synthetic) and #1b (real masks)
+# ---------------------------------------------------------------------------
+
+
+class TestNaNHandling:
+    """Regression tests for the two distinct NaN sources in cross-grid comparison.
+
+    1. *Synthetic NaN* — fixed by tightening :func:`pypic.regrid.common_grid`
+       to inclusive sample bounds (#1a). Comparing different-resolution grids
+       on the same domain must not introduce boundary NaN.
+
+    2. *Real NaN* — fixed by adding ``nan_policy='omit'`` (default) to the
+       pure diagnostics (#1b). Upstream masks (sphere selections, divisions
+       near nulls) must produce a useful similarity score with a warning,
+       not a silently poisoned metric.
+    """
+
+    def test_synthetic_nan_eliminated_by_tight_common_grid(self) -> None:
+        """10-cell vs 5-cell, same domain, constant field → exact zero metric."""
+        # Pre-fix this case produced NaN: 10-cell samples [0.5..9.5] vs
+        # 5-cell samples [1..9]. The OLD common_grid spanned [0, 10] with
+        # dx=1, so target samples 0.5 and 9.5 fell outside the 5-cell
+        # source range and became NaN. After #1a, common_grid uses
+        # inclusive sample bounds → target samples land in [1..9], all
+        # valid in both sources, no synthetic NaN.
+        a = FieldDataset.from_arrays(
+            {"B1": np.full(10, 7.0)},
+            make_uniform_grid(10, spacing=1.0, origin=0.0),
+            Normalization.identity(),
+        )
+        b = FieldDataset.from_arrays(
+            {"B1": np.full(5, 7.0)},
+            make_uniform_grid(5, spacing=2.0, origin=0.0),
+            Normalization.identity(),
+        )
+        import warnings as _w
+
+        with _w.catch_warnings(record=True) as record:
+            _w.simplefilter("always")
+            l2 = compare_fields(a, b, "B1", metric="l2")
+            linf = compare_fields(a, b, "B1", metric="linf")
+        assert l2 == 0.0
+        assert linf == 0.0
+        # No NaN-handling warning fired — the tight common_grid prevented
+        # synthetic boundary NaN entirely.
+        nan_warnings = [w for w in record if "NaN" in str(w.message)]
+        assert nan_warnings == []
+
+    def test_real_nan_returns_finite_metric_with_warning(self) -> None:
+        """Upstream masks → finite L2/L∞ + UserWarning naming the count."""
+        # Same grid for both → align_grids is a no-op; arrays go straight
+        # to the pure diagnostic where ``nan_policy='omit'`` (default)
+        # masks the NaN cells.
+        grid = make_uniform_grid(10, spacing=1.0)
+        values_a = np.array([1.0, 2.0, 3.0, np.nan, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0])
+        values_b = np.array([1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, np.nan, 9.0, 10.0])
+        a = FieldDataset.from_arrays({"B1": values_a}, grid, Normalization.identity())
+        b = FieldDataset.from_arrays({"B1": values_b}, grid, Normalization.identity())
+
+        with pytest.warns(UserWarning, match=r"ignored 2 NaN") as record:
+            l2 = compare_fields(a, b, "B1", metric="l2")
+        # 8 valid cells, all identical → exact zero.
+        assert l2 == 0.0
+        # Exactly one warning per call (not one per cell).
+        nan_warnings = [w for w in record if "NaN" in str(w.message)]
+        assert len(nan_warnings) == 1
+
+        with pytest.warns(UserWarning, match=r"ignored 2 NaN"):
+            linf = compare_fields(a, b, "B1", metric="linf")
+        assert linf == 0.0
+
+    def test_real_nan_propagate_policy_returns_nan(self) -> None:
+        """``nan_policy='propagate'`` opts out of masking via the public API."""
+        grid = make_uniform_grid(10, spacing=1.0)
+        values_a = np.ones(10)
+        values_a[3] = np.nan
+        values_b = np.ones(10)
+        a = FieldDataset.from_arrays({"B1": values_a}, grid, Normalization.identity())
+        b = FieldDataset.from_arrays({"B1": values_b}, grid, Normalization.identity())
+        result = compare_fields(a, b, "B1", nan_policy="propagate")
+        assert np.isnan(result)
+
+
+# ---------------------------------------------------------------------------
+# method= passthrough
+# ---------------------------------------------------------------------------
+
+
+class TestMethodPassthrough:
+    """Tests for the ``method=`` kwarg threaded through the comparison API."""
+
+    def test_method_cubic_differs_from_linear_on_curved_field(self) -> None:
+        """``method='cubic'`` should give different L2 than ``'linear'``."""
+        # A is the smooth function sampled coarsely, B is sampled finely
+        # so it's effectively the ground truth. Linear interpolation
+        # under-samples curvature; cubic should fit it more closely.
+        coarse = make_uniform_grid(10, spacing=1.0)
+        fine = make_uniform_grid(40, spacing=0.25)
+        (cx,) = coarse.coordinate_arrays()
+        (fx,) = fine.coordinate_arrays()
+        a = FieldDataset.from_arrays(
+            {"B1": np.sin(cx)}, coarse, Normalization.identity()
+        )
+        b = FieldDataset.from_arrays({"B1": np.sin(fx)}, fine, Normalization.identity())
+        l2_linear = compare_fields(a, b, "B1", method="linear")
+        l2_cubic = compare_fields(a, b, "B1", method="cubic")
+        # Both nonzero (10-cell vs 40-cell sin(x) — interpolation error
+        # is real), and cubic is materially smaller than linear.
+        assert l2_linear > 0.0
+        assert l2_cubic > 0.0
+        assert l2_cubic < l2_linear
+
+    def test_method_validation_unknown_string_raises_via_scipy(self) -> None:
+        """An unknown ``method`` string surfaces scipy's error promptly."""
+        coarse = make_uniform_grid(6, spacing=1.0)
+        fine = make_uniform_grid(12, spacing=0.5)
+        a = FieldDataset.from_arrays(
+            {"B1": np.ones(6)}, coarse, Normalization.identity()
+        )
+        b = FieldDataset.from_arrays(
+            {"B1": np.ones(12)}, fine, Normalization.identity()
+        )
+        with pytest.raises(ValueError, match="method"):
+            compare_fields(a, b, "B1", method="not_a_real_method")
 
 
 # ---------------------------------------------------------------------------

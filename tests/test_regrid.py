@@ -60,13 +60,24 @@ class TestCommonGrid:
         g2 = make_uniform_grid(6, 12, spacing=(0.5, 1.0), origin=(2.0, 1.0))
         cg = common_grid(g1, g2)
         assert cg.spacing == (0.5, 0.5)
-        assert cg.origin == (2.0, 1.0)
-        # Check extent fits within both domains
+        # Origin is the *grid* origin (cell-edge); the first sample sits
+        # at origin + 0.5*dx and equals the per-axis sample-range overlap.
+        # Axis 0: g1 samples [0.5..9.5], g2 samples [2.25..4.75]
+        #         → first common sample = max(0.5, 2.25) = 2.25
+        #         → cg.origin = 2.25 - 0.25 = 2.0
+        # Axis 1: g1 samples [0.25..3.75], g2 samples [1.5..11.5]
+        #         → first common sample = max(0.25, 1.5) = 1.5
+        #         → cg.origin = 1.5 - 0.25 = 1.25
+        assert cg.origin == (2.0, 1.25)
+        # All cg samples must lie inside both source sample ranges.
+        cg_samples = cg.coordinate_arrays()
+        g1_samples = g1.coordinate_arrays()
+        g2_samples = g2.coordinate_arrays()
         for i in range(2):
-            cg_extent = cg.origin[i] + cg.dimensions[i] * cg.spacing[i]
-            g1_extent = g1.origin[i] + g1.dimensions[i] * g1.spacing[i]
-            g2_extent = g2.origin[i] + g2.dimensions[i] * g2.spacing[i]
-            assert cg_extent <= min(g1_extent, g2_extent) + 1e-12
+            assert cg_samples[i].min() >= g1_samples[i].min() - 1e-12
+            assert cg_samples[i].max() <= g1_samples[i].max() + 1e-12
+            assert cg_samples[i].min() >= g2_samples[i].min() - 1e-12
+            assert cg_samples[i].max() <= g2_samples[i].max() + 1e-12
 
     def test_ndim_mismatch_raises(self) -> None:
         g1 = make_uniform_grid(10)

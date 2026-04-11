@@ -41,9 +41,55 @@ class TestL2RelativeError:
         np.testing.assert_allclose(l2_relative_error(a, a), 0.0, atol=1e-15)
         assert np.isinf(l2_relative_error(a, b))
 
-    def test_nan_propagation(self):
-        result = l2_relative_error(np.array([np.nan, 1.0]), np.array([1.0, 1.0]))
+    def test_nan_omit_default_skips_and_warns(self):
+        """Default ``nan_policy='omit'`` masks NaN cells and warns."""
+        with pytest.warns(UserWarning, match=r"ignored 1 NaN"):
+            result = l2_relative_error(
+                np.array([np.nan, 1.0]),
+                np.array([1.0, 1.0]),
+            )
+        # Valid cell pair is [1.0] vs [1.0] → exact match.
+        assert result == 0.0
+
+    def test_nan_propagate_policy_keeps_nan(self):
+        """``nan_policy='propagate'`` preserves the historical behavior."""
+        result = l2_relative_error(
+            np.array([np.nan, 1.0]),
+            np.array([1.0, 1.0]),
+            nan_policy="propagate",
+        )
         assert np.isnan(result)
+
+    def test_nan_raise_policy_raises(self):
+        """``nan_policy='raise'`` errors on any NaN input."""
+        with pytest.raises(ValueError, match="NaN cell"):
+            l2_relative_error(
+                np.array([np.nan, 1.0]),
+                np.array([1.0, 1.0]),
+                nan_policy="raise",
+            )
+
+    def test_nan_all_masked_returns_nan(self):
+        """All-NaN input returns NaN with a higher-severity warning."""
+        with pytest.warns(UserWarning, match=r"all 2 cell"):
+            result = l2_relative_error(
+                np.array([np.nan, np.nan]),
+                np.array([1.0, 1.0]),
+            )
+        assert np.isnan(result)
+
+    def test_nan_denominator_uses_same_valid_set(self):
+        """L2 denominator must be restricted to the same valid cells."""
+        # Mask cell index 0 in computed; reference's cell-0 value (10.0)
+        # must NOT contribute to ||ref|| over valid cells, otherwise the
+        # relative error would be artificially shrunk.
+        with pytest.warns(UserWarning, match="ignored 1 NaN"):
+            result = l2_relative_error(
+                np.array([np.nan, 4.0]),
+                np.array([10.0, 3.0]),
+            )
+        # Numerator = sqrt((4-3)^2) = 1, denominator = sqrt(3^2) = 3.
+        np.testing.assert_allclose(result, 1.0 / 3.0, rtol=1e-15)
 
 
 class TestLinfError:
@@ -52,8 +98,36 @@ class TestLinfError:
         reference = np.array([1.0, 2.0, 4.0])
         np.testing.assert_allclose(linf_error(computed, reference), 3.0, rtol=1e-15)
 
-    def test_nan_propagation(self):
-        result = linf_error(np.array([np.nan, 1.0]), np.array([1.0, 1.0]))
+    def test_nan_omit_default_skips_and_warns(self):
+        with pytest.warns(UserWarning, match=r"ignored 1 NaN"):
+            result = linf_error(
+                np.array([np.nan, 1.0]),
+                np.array([1.0, 1.0]),
+            )
+        assert result == 0.0
+
+    def test_nan_propagate_policy_keeps_nan(self):
+        result = linf_error(
+            np.array([np.nan, 1.0]),
+            np.array([1.0, 1.0]),
+            nan_policy="propagate",
+        )
+        assert np.isnan(result)
+
+    def test_nan_raise_policy_raises(self):
+        with pytest.raises(ValueError, match="NaN cell"):
+            linf_error(
+                np.array([np.nan, 1.0]),
+                np.array([1.0, 1.0]),
+                nan_policy="raise",
+            )
+
+    def test_nan_all_masked_returns_nan(self):
+        with pytest.warns(UserWarning, match=r"all 2 cell"):
+            result = linf_error(
+                np.array([np.nan, np.nan]),
+                np.array([1.0, 1.0]),
+            )
         assert np.isnan(result)
 
 
