@@ -40,16 +40,13 @@ class TerminationReason(StrEnum):
 class VectorFieldInterpolator:
     r"""Pre-built trilinear interpolator for a 3-component vector field.
 
-    Wraps three ``RegularGridInterpolator`` instances (one per
-    component), built once and reused across all RK4 stages and
-    seed points.
+    Wraps a single ``RegularGridInterpolator`` over a stacked
+    ``(..., 3)`` value array so each ``__call__`` dispatches once
+    instead of three times. Built once and reused across all RK4
+    stages and seed points.
     """
 
-    _interps: tuple[
-        RegularGridInterpolator,
-        RegularGridInterpolator,
-        RegularGridInterpolator,
-    ]
+    _interp: RegularGridInterpolator
 
     @classmethod
     def from_dataset(
@@ -71,17 +68,18 @@ class VectorFieldInterpolator:
         VectorFieldInterpolator
         """
         coord_arrays = data.grid.coordinate_arrays()
-        interps = tuple(
-            RegularGridInterpolator(
-                coord_arrays,
-                np.asarray(data[c], dtype=np.float64),
-                method="linear",
-                bounds_error=False,
-                fill_value=np.nan,
-            )
-            for c in components
+        stacked = np.stack(
+            [np.asarray(data[c], dtype=np.float64) for c in components],
+            axis=-1,
         )
-        return cls(_interps=interps)  # type: ignore[arg-type]
+        interp = RegularGridInterpolator(
+            coord_arrays,
+            stacked,
+            method="linear",
+            bounds_error=False,
+            fill_value=np.nan,
+        )
+        return cls(_interp=interp)
 
     def __call__(self, point: FloatArray) -> FloatArray:
         """Evaluate the vector field at a single point.
@@ -96,10 +94,7 @@ class VectorFieldInterpolator:
         FloatArray
             Field vector, shape ``(3,)``. NaN if outside domain.
         """
-        pt = point.reshape(1, 3)
-        return np.array(
-            [float(interp(pt)[0]) for interp in self._interps],
-        )
+        return self._interp(point.reshape(1, 3))[0]  # type: ignore[no-any-return]
 
 
 def _rhs(

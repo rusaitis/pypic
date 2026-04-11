@@ -146,6 +146,40 @@ class TestVectorFieldInterpolator:
         result = interp(np.array([test_x, 5.0, 5.0]))
         np.testing.assert_allclose(result[0], test_x, atol=1e-10)
 
+    def test_stacked_matches_per_component(self) -> None:
+        """Stacked VectorFieldInterpolator matches three independent interps.
+
+        Regression for the refactor that collapses three per-component
+        ``RegularGridInterpolator`` calls into one call over a stacked
+        ``(..., 3)`` value array. Values at every sampled point must
+        equal the per-component result to machine precision.
+        """
+        from scipy.interpolate import RegularGridInterpolator
+
+        data = _make_helical_field()
+        coord_arrays = data.grid.coordinate_arrays()
+        solo = [
+            RegularGridInterpolator(
+                coord_arrays,
+                np.asarray(data[c], dtype=np.float64),
+                method="linear",
+                bounds_error=False,
+                fill_value=np.nan,
+            )
+            for c in ("B1", "B2", "B3")
+        ]
+        interp = VectorFieldInterpolator.from_dataset(data)
+
+        rng = np.random.default_rng(7)
+        interior_points = rng.uniform(1.0, 9.0, size=(30, 3))
+        out_of_bounds = np.array([[-5.0, 5.0, 5.0], [5.0, 5.0, 100.0]])
+        points = np.vstack([interior_points, out_of_bounds])
+
+        for pt in points:
+            expected = np.array([float(s(pt.reshape(1, 3))[0]) for s in solo])
+            result = interp(pt)
+            np.testing.assert_array_equal(result, expected)
+
 
 class TestTraceFixedUniform:
     def test_straight_line_forward(self) -> None:

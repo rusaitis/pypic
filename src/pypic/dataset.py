@@ -570,15 +570,19 @@ class FieldDataset:
         ...      "rho_c": np.array([0.5, 0.5])},
         ...     grid, Normalization.identity(),
         ... )
-        >>> sub = ds.select_fields(["B1", "rho_c"])
-        >>> sorted(sub.field_names())
-        ['B1', 'rho_c']
+        >>> sub = ds.select_fields(["rho_c", "B1"])
+        >>> sub.field_names()
+        ['rho_c', 'B1']
         """
-        resolved: set[str] = set()
+        # Dict-as-ordered-set: preserves caller insertion order while
+        # deduplicating on the resolved canonical name. Alphabetical
+        # sorting hides both request order and dataset order from the
+        # caller, so we keep the order the caller asked for.
+        resolved: dict[str, None] = {}
         for name in names:
-            resolved.add(self._resolve_key(name))
+            resolved[self._resolve_key(name)] = None
 
-        new_ds = self._ds[sorted(resolved)]
+        new_ds = self._ds[list(resolved)]
         return FieldDataset(
             new_ds,
             self._grid,

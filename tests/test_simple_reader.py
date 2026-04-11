@@ -650,6 +650,32 @@ class TestSelectFields:
         with pytest.raises(KeyError, match="nonexistent"):
             ds.select_fields(["nonexistent"])
 
+    def test_preserves_caller_order(
+        self,
+        canonical_dir: Path,
+    ) -> None:
+        """select_fields returns fields in the order the caller asked for.
+
+        Regression for the set+sorted round-trip that imposed
+        alphabetical order on output regardless of request order.
+        """
+        reader = SimpleReader()
+        ds = reader.read_timestep(canonical_dir, 0)
+        requested = ["rho_m", "B2", "B1"]
+        sub = ds.select_fields(requested)
+        assert sub.field_names() == requested
+
+    def test_deduplicates_aliases_preserving_first_occurrence(
+        self,
+        canonical_dir: Path,
+    ) -> None:
+        """Duplicate / aliased names collapse to one entry at first position."""
+        reader = SimpleReader()
+        ds = reader.read_timestep(canonical_dir, 0)
+        # "Bx" resolves to "B1" → same canonical field as the later "B1"
+        sub = ds.select_fields(["rho_m", "Bx", "B1"])
+        assert sub.field_names() == ["rho_m", "B1"]
+
 
 class TestSelectiveRead:
     def test_reads_only_requested_fields(
