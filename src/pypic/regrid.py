@@ -220,14 +220,19 @@ def regrid(
     }
     interp_kwargs.update(kwargs)
 
+    # Stack all fields into one trailing value-dimension so the
+    # RegularGridInterpolator is built and evaluated once. Every field
+    # shares the source grid, target mesh, and interpolation options,
+    # so per-field reconstruction is pure Python overhead (and actual
+    # precomputation for ``method="cubic"``/``"quintic"``).
+    names = list(source.field_names())
     new_fields: dict[str, FloatArray] = {}
-    for name in source.field_names():
-        interp = RegularGridInterpolator(
-            src_coords,
-            source[name],
-            **interp_kwargs,
-        )
-        new_fields[name] = interp(tuple(tgt_mesh))
+    if names:
+        stacked = np.stack([np.asarray(source[n]) for n in names], axis=-1)
+        interp = RegularGridInterpolator(src_coords, stacked, **interp_kwargs)
+        sampled = interp(tuple(tgt_mesh))
+        for i, name in enumerate(names):
+            new_fields[name] = sampled[..., i]
 
     from pypic.dataset import FieldDataset as _FieldDataset
 

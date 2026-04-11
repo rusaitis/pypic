@@ -27,6 +27,7 @@ from pypic.traces import (
     plane_crossings,
     resample_by_arc_length,
     sample_field,
+    sample_fields,
     speed,
     tangent_vectors,
 )
@@ -555,6 +556,66 @@ class TestSampling:
         pts = np.array([[0.5, 0.5, 0.5]])
         with pytest.raises(ValueError, match="Unknown interpolation"):
             sample_field(data, pts, "rho", method="cubic")
+
+
+class TestSampleFieldsBatching:
+    """Batched ``sample_fields`` matches per-field ``sample_field`` results.
+
+    Regression guard for the P3b refactor that shares the nearest-index
+    computation (``method="nearest"``) and interpolator construction
+    (``method="linear"``) across all requested fields in one call.
+    """
+
+    @pytest.fixture
+    def multi_field_dataset(self) -> FieldDataset:
+        """3D dataset with three distinct fields on the same grid."""
+        from pypic.grid import GridInfo
+
+        grid = GridInfo(
+            dimensions=(5, 4, 3),
+            spacing=(1.0, 1.0, 1.0),
+            origin=(0.0, 0.0, 0.0),
+        )
+        x, y, z = (
+            a.astype(np.float64)
+            for a in np.meshgrid(
+                np.arange(5) + 0.5,
+                np.arange(4) + 0.5,
+                np.arange(3) + 0.5,
+                indexing="ij",
+            )
+        )
+        return FieldDataset.from_arrays(
+            {"B1": x, "B2": 2.0 * y, "B3": x + y + z},
+            grid,
+            _identity(),
+        )
+
+    def test_empty_fields_returns_empty_dict(
+        self, multi_field_dataset: FieldDataset
+    ) -> None:
+        pts = np.array([[0.5, 0.5, 0.5]])
+        assert sample_fields(multi_field_dataset, pts, [], method="nearest") == {}
+
+    @pytest.mark.parametrize("method", ["nearest", "linear"])
+    def test_batched_matches_per_field(
+        self, multi_field_dataset: FieldDataset, method: str
+    ) -> None:
+        # Mix of in-bounds and out-of-bounds points to exercise the NaN mask.
+        pts = np.array(
+            [
+                [0.5, 0.5, 0.5],
+                [2.3, 1.7, 1.1],
+                [4.4, 3.4, 2.4],
+                [-1.0, 0.5, 0.5],
+                [100.0, 0.5, 0.5],
+            ]
+        )
+        names = ["B1", "B2", "B3"]
+        batched = sample_fields(multi_field_dataset, pts, names, method=method)
+        for name in names:
+            per_field = sample_field(multi_field_dataset, pts, name, method=method)
+            np.testing.assert_array_equal(batched[name], per_field)
 
 
 class TestSamplingEdgeCases:

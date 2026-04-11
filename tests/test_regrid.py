@@ -206,6 +206,37 @@ class TestRegrid:
         result = regrid(ds, fine)
         assert sorted(result.field_names()) == sorted(ds.field_names())
 
+    def test_multifield_matches_independent_single_field(self) -> None:
+        """Stacked multi-field regrid matches per-field regrids exactly.
+
+        Regression guard for the P2 optimization that stacks all fields
+        into a single RegularGridInterpolator call. Each field in a
+        joint regrid must equal the result of regridding that field
+        alone on the same grids.
+        """
+        coarse = make_uniform_grid(6, 5, 4, spacing=(1.0, 1.0, 1.0))
+        cx, cy, cz = np.meshgrid(*coarse.coordinate_arrays(), indexing="ij")
+        fields = {
+            "B1": cx + 0.1 * cy,
+            "B2": 2.0 * cy - cz,
+            "B3": cx * cy - cz**2,
+            "rho_m": np.exp(-0.05 * (cx - 3.0) ** 2),
+        }
+        norm = Normalization.identity()
+        joint = FieldDataset.from_arrays(fields, coarse, norm)
+        fine = make_uniform_grid(10, 8, 6, spacing=(0.5, 0.6, 0.6), origin=1.0)
+        joint_result = regrid(joint, fine)
+        for name, values in fields.items():
+            solo = FieldDataset.from_arrays({name: values}, coarse, norm)
+            solo_result = regrid(solo, fine)
+            assert_allclose(
+                joint_result[name],
+                solo_result[name],
+                atol=0.0,
+                rtol=0.0,
+                err_msg=f"Mismatch on field {name!r}",
+            )
+
     def test_metadata_preserved(self) -> None:
         species = [
             SpeciesInfo(name="electrons", charge=-1.0, mass=1 / 256),

@@ -136,6 +136,11 @@ def sample_fields(
 ) -> dict[str, FloatArray]:
     """Sample multiple fields at the same positions.
 
+    The nearest-index lookup (``method="nearest"``) or interpolator
+    construction (``method="linear"``) is performed once and reused
+    across all requested fields — the common case for trace workflows
+    that sample ``B1/B2/B3`` or several diagnostics at the same points.
+
     Parameters
     ----------
     data : FieldDataset
@@ -145,14 +150,46 @@ def sample_fields(
     fields : list[str]
         Field names to sample.
     method : str
-        Interpolation method.
+        Interpolation method: ``"nearest"`` or ``"linear"``.
 
     Returns
     -------
     dict[str, FloatArray]
         Field name → sampled values.
     """
-    return {f: sample_field(data, points, f, method=method) for f in fields}
+    if not fields:
+        return {}
+
+    coord_arrays = data.grid.coordinate_arrays()
+    arrays = {name: np.asarray(data[name]) for name in fields}
+
+    if method == "nearest":
+        indices, mask = _nearest_indices(coord_arrays, points)
+        idx_tuple = tuple(indices[mask, d] for d in range(len(coord_arrays)))
+        out: dict[str, FloatArray] = {}
+        for name, values in arrays.items():
+            result = np.full(points.shape[0], np.nan, dtype=np.float64)
+            if np.any(mask):
+                result[mask] = values[idx_tuple]
+            out[name] = result
+        return out
+
+    if method == "linear":
+        from scipy.interpolate import RegularGridInterpolator
+
+        stacked = np.stack(list(arrays.values()), axis=-1)
+        interp = RegularGridInterpolator(
+            coord_arrays,
+            stacked,
+            method="linear",
+            bounds_error=False,
+            fill_value=np.nan,
+        )
+        sampled = interp(points[:, : len(coord_arrays)])
+        return {name: sampled[..., i] for i, name in enumerate(arrays)}
+
+    msg = f"Unknown interpolation method {method!r}. Use 'nearest' or 'linear'."
+    raise ValueError(msg)
 
 
 def attach_scalars(
