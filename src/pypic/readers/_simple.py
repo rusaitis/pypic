@@ -376,11 +376,27 @@ class SimpleReader:
 
         Tries ``fields_group`` first; falls back to root when the
         group is ``"fields"`` and doesn't exist.
+
+        Raises
+        ------
+        TypeError
+            If *fields_group* resolves to a Dataset or other non-Group
+            HDF5 object — surfaces a misconfiguration with a clear
+            message instead of crashing downstream during iteration.
         """
         if not self._fields_group:
             return f
         if self._fields_group in f:
-            return f[self._fields_group]
+            grp = f[self._fields_group]
+            if not isinstance(grp, h5py.Group):
+                msg = (
+                    f"{self._fields_group!r} in {f.filename} is a "
+                    f"{type(grp).__name__}, expected a Group. Configure "
+                    f"fields_group= to point at an HDF5 Group containing "
+                    f"field datasets."
+                )
+                raise TypeError(msg)
+            return grp
         if self._fields_group != "fields":
             msg = (
                 f"Group {self._fields_group!r} not found in "

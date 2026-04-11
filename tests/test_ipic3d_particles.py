@@ -275,6 +275,8 @@ class TestPhdf5ParticleReader:
         pcl = read_phdf5_particles(FIXTURE_DIR, 0, 0, ipic3d_config)
         assert pcl.n_particles == 18
         assert len(pcl) == 18
+        assert pcl.position is not None
+        assert pcl.velocity is not None
         assert pcl.position.shape == (18, 3)
         assert pcl.velocity.shape == (18, 3)
         assert pcl.charge.shape == (18,)

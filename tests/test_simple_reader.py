@@ -347,6 +347,25 @@ class TestFieldsAtRoot:
         assert not ds.has_field("x")
 
 
+class TestFieldsGroupMisconfig:
+    def test_fields_group_pointing_at_dataset_raises(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        """fields_group= pointing at a Dataset (not a Group) fails with
+        a clear TypeError rather than a confusing downstream crash."""
+        filepath = tmp_path / "output_000000.h5"
+        with h5py.File(filepath, "w") as f:
+            # "fields" is a Dataset here, not a Group
+            f.create_dataset("fields", data=np.ones(DIMS))
+            g = f.create_group("grid")
+            for k, v in _grid_attrs().items():
+                g.attrs[k] = v
+        reader = SimpleReader(fields_group="fields")
+        with pytest.raises(TypeError, match="expected a Group"):
+            reader.read_timestep(tmp_path, 0)
+
+
 class TestMissingMetadataError:
     def test_no_grid_no_config_raises(
         self,

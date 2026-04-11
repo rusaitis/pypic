@@ -341,6 +341,7 @@ class Simulation:
             return self._reader.read_timestep(self._path, step)
 
         canonical: set[str] | None = None
+        alias_map: dict[str, str] = {}
         if fields is not None:
             import re
 

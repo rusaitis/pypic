@@ -237,6 +237,9 @@ def plot_streamlines(
     magnitude = np.sqrt(u**2 + v**2)
     use_colormap = color is None
 
+    color_values: FloatArray | None = None
+    cmap_name: str | None = None
+    info: FieldInfo | None = None
     if use_colormap:
         # Convert magnitude to display units when no explicit color_field
         display_magnitude = magnitude
@@ -291,6 +294,7 @@ def plot_streamlines(
         u = u[::s, ::s]
         v = v[::s, ::s]
         if use_colormap:
+            assert color_values is not None  # narrowed by use_colormap gate
             color_values = color_values[::s, ::s]
         if isinstance(lw_arg, np.ndarray):
             lw_arg = lw_arg[::s, ::s]
@@ -327,6 +331,8 @@ def plot_streamlines(
         if use_colormap:
             from matplotlib.colors import Normalize
 
+            assert color_values is not None  # narrowed by use_colormap gate
+            assert cmap_name is not None
             norm = (
                 Normalize(vmin=vmin, vmax=vmax)
                 if vmin is not None or vmax is not None
@@ -374,6 +380,7 @@ def plot_streamlines(
             from pypic.plotting._colorbar import attach_colorbar
             from pypic.plotting._labels import field_label
 
+            assert info is not None  # narrowed by use_colormap gate
             unit_str = units or ""
             cb_label = field_label(info, unit_str=unit_str)
             attach_colorbar(
@@ -405,9 +412,13 @@ def plot_streamlines(
 
         if title is not None:
             ax.set_title(title)
+        elif use_colormap:
+            assert info is not None  # narrowed by use_colormap gate
+            ax.set_title(figure_title(info, step=step, time=time))
         else:
-            _info = info if use_colormap else data.field_info(f"|{field}|")
-            ax.set_title(figure_title(_info, step=step, time=time))
+            ax.set_title(
+                figure_title(data.field_info(f"|{field}|"), step=step, time=time)
+            )
 
         if badge and (step is not None or time is not None):
             from pypic.plotting._badge import add_badge
@@ -536,6 +547,9 @@ def plot_quiver(
 
     use_colormap = color is None
 
+    color_values: FloatArray | None = None
+    cmap_name: str | None = None
+    info: FieldInfo | None = None
     if use_colormap:
         magnitude = np.sqrt(u**2 + v**2)
         color_values, cmap_name, info = _resolve_vector_colors(
@@ -563,6 +577,8 @@ def plot_quiver(
         fig, ax = get_or_create_axes(theme, ax, figsize)
 
         if use_colormap:
+            assert color_values is not None  # narrowed by use_colormap gate
+            assert cmap_name is not None
             color_sub = color_values[::s0, ::s1]
             quiv = ax.quiver(
                 xx.T,
@@ -591,6 +607,7 @@ def plot_quiver(
             from pypic.plotting._colorbar import attach_colorbar
             from pypic.plotting._labels import field_label
 
+            assert info is not None  # narrowed by use_colormap gate
             unit_str = units or ""
             cb_label = field_label(info, unit_str=unit_str)
             attach_colorbar(fig, ax, quiv, cb_label, colorbar, extremes=extremes)
@@ -615,9 +632,13 @@ def plot_quiver(
 
         if title is not None:
             ax.set_title(title)
+        elif use_colormap:
+            assert info is not None  # narrowed by use_colormap gate
+            ax.set_title(figure_title(info, step=step, time=time))
         else:
-            _info = info if use_colormap else data.field_info(f"|{field}|")
-            ax.set_title(figure_title(_info, step=step, time=time))
+            ax.set_title(
+                figure_title(data.field_info(f"|{field}|"), step=step, time=time)
+            )
 
         if badge and (step is not None or time is not None):
             from pypic.plotting._badge import add_badge

@@ -32,6 +32,7 @@ class TestStaggerInfoConstruction:
             notes="Yee mesh",
         )
         assert si.convention == "staggered"
+        assert si.field_locations is not None
         assert si.field_locations["B"] == "face"
         assert si.interpolation_order == 1
         assert si.notes == "Yee mesh"

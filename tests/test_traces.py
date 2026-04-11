@@ -8,6 +8,7 @@ from types import MappingProxyType
 import numpy as np
 import pytest
 
+from pypic.dataset import FieldDataset
 from pypic.traces import (
     FieldLine,
     ParticleTrace,
@@ -603,9 +604,8 @@ class TestSamplingEdgeCases:
 
 
 @pytest.fixture
-def uniform_field_data():
+def uniform_field_data() -> FieldDataset:
     """3D uniform B=(1,0,0) field on a 20x20x20 grid for tracing tests."""
-    from pypic.dataset import FieldDataset
     from pypic.grid import GridInfo
 
     grid = GridInfo(
@@ -623,13 +623,13 @@ def uniform_field_data():
 
 
 class TestVectorFieldInterpolator:
-    def test_from_dataset(self, uniform_field_data: object) -> None:
+    def test_from_dataset(self, uniform_field_data: FieldDataset) -> None:
         from pypic.traces import VectorFieldInterpolator
 
         interp = VectorFieldInterpolator.from_dataset(uniform_field_data)
         assert interp is not None
 
-    def test_call_inside_domain(self, uniform_field_data: object) -> None:
+    def test_call_inside_domain(self, uniform_field_data: FieldDataset) -> None:
         from pypic.traces import VectorFieldInterpolator
 
         interp = VectorFieldInterpolator.from_dataset(uniform_field_data)
@@ -638,7 +638,7 @@ class TestVectorFieldInterpolator:
         assert not np.any(np.isnan(result))
         np.testing.assert_allclose(result, [1.0, 0.0, 0.0])
 
-    def test_call_outside_domain(self, uniform_field_data: object) -> None:
+    def test_call_outside_domain(self, uniform_field_data: FieldDataset) -> None:
         from pypic.traces import VectorFieldInterpolator
 
         interp = VectorFieldInterpolator.from_dataset(uniform_field_data)
@@ -647,7 +647,9 @@ class TestVectorFieldInterpolator:
 
 
 class TestTraceFieldLine:
-    def test_uniform_field_straight_line(self, uniform_field_data: object) -> None:
+    def test_uniform_field_straight_line(
+        self, uniform_field_data: FieldDataset
+    ) -> None:
         from pypic.traces import trace_field_line
 
         seed = (10.0, 10.0, 10.0)
@@ -660,7 +662,7 @@ class TestTraceFieldLine:
         np.testing.assert_allclose(fl.points[:, 2], 10.0, atol=1e-10)
         assert fl.points[-1, 0] > fl.points[0, 0]
 
-    def test_forward_only(self, uniform_field_data: object) -> None:
+    def test_forward_only(self, uniform_field_data: FieldDataset) -> None:
         from pypic.traces import trace_field_line
 
         fl = trace_field_line(
@@ -675,7 +677,7 @@ class TestTraceFieldLine:
         diffs = np.diff(fl.points[:, 0])
         assert np.all(diffs >= 0)
 
-    def test_backward_only(self, uniform_field_data: object) -> None:
+    def test_backward_only(self, uniform_field_data: FieldDataset) -> None:
         from pypic.traces import trace_field_line
 
         fl = trace_field_line(
@@ -689,7 +691,7 @@ class TestTraceFieldLine:
         # Backward trace should go in -x direction; points stored start-to-end
         assert fl.points[0, 0] < fl.points[-1, 0]
 
-    def test_both_directions(self, uniform_field_data: object) -> None:
+    def test_both_directions(self, uniform_field_data: FieldDataset) -> None:
         from pypic.traces import trace_field_line
 
         fl = trace_field_line(
@@ -702,7 +704,7 @@ class TestTraceFieldLine:
         assert fl.direction == "both"
         assert fl.n_points > 3  # at least fwd + bwd + seed
 
-    def test_domain_exit_terminates(self, uniform_field_data: object) -> None:
+    def test_domain_exit_terminates(self, uniform_field_data: FieldDataset) -> None:
         from pypic.traces import TerminationReason, trace_field_line
 
         fl = trace_field_line(
@@ -714,7 +716,7 @@ class TestTraceFieldLine:
         )
         assert fl.metadata["reason"] == str(TerminationReason.DOMAIN_EXIT)
 
-    def test_terminate_callback(self, uniform_field_data: object) -> None:
+    def test_terminate_callback(self, uniform_field_data: FieldDataset) -> None:
         from pypic.traces import TerminationReason, trace_field_line
 
         fl = trace_field_line(
@@ -728,13 +730,15 @@ class TestTraceFieldLine:
         assert fl.metadata["reason"] == str(TerminationReason.CALLBACK)
         assert fl.points[-1, 0] > 12.0
 
-    def test_invalid_direction_rejects(self, uniform_field_data: object) -> None:
+    def test_invalid_direction_rejects(self, uniform_field_data: FieldDataset) -> None:
         from pypic.traces import trace_field_line
 
         with pytest.raises(ValueError, match="direction must be"):
             trace_field_line(uniform_field_data, (10.0, 10.0, 10.0), direction="up")
 
-    def test_seed_outside_domain_rejects(self, uniform_field_data: object) -> None:
+    def test_seed_outside_domain_rejects(
+        self, uniform_field_data: FieldDataset
+    ) -> None:
         from pypic.traces import trace_field_line
 
         with pytest.raises(ValueError, match="outside"):
@@ -742,7 +746,7 @@ class TestTraceFieldLine:
 
     def test_callback_terminates_after_first_step(
         self,
-        uniform_field_data: object,
+        uniform_field_data: FieldDataset,
     ) -> None:
         """A callback that returns True after one step yields a 2-point line."""
         from pypic.traces import TerminationReason, trace_field_line
@@ -767,7 +771,9 @@ class TestTraceFieldLine:
 
 
 class TestTraceFieldLineAdaptive:
-    def test_uniform_field_straight_line(self, uniform_field_data: object) -> None:
+    def test_uniform_field_straight_line(
+        self, uniform_field_data: FieldDataset
+    ) -> None:
         from pypic.traces import trace_field_line_adaptive
 
         seed = (10.0, 10.0, 10.0)
@@ -783,7 +789,9 @@ class TestTraceFieldLineAdaptive:
         np.testing.assert_allclose(fl.points[:, 2], 10.0, atol=1e-10)
         assert fl.points[-1, 0] > fl.points[0, 0]
 
-    def test_adaptive_stores_max_local_error(self, uniform_field_data: object) -> None:
+    def test_adaptive_stores_max_local_error(
+        self, uniform_field_data: FieldDataset
+    ) -> None:
         from pypic.traces import trace_field_line_adaptive
 
         fl = trace_field_line_adaptive(
@@ -797,7 +805,7 @@ class TestTraceFieldLineAdaptive:
 
 
 class TestEstimateTracingError:
-    def test_error_estimate(self, uniform_field_data: object) -> None:
+    def test_error_estimate(self, uniform_field_data: FieldDataset) -> None:
         from pypic.traces import estimate_tracing_error, trace_field_line
 
         fl = trace_field_line(

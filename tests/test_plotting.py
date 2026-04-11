@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 import pytest
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
     from pathlib import Path
 
     from pypic.grid import GridInfo
@@ -620,7 +621,7 @@ class TestStatusBadge:
 
         fig, ax = plt.subplots()
         box = add_badge(ax, step=1, bg_color="red", bg_alpha=0.5)
-        fc = box.patch.get_facecolor()
+        fc = np.asarray(box.patch.get_facecolor())
         np.testing.assert_allclose(fc[:3], to_rgba("red")[:3], atol=0.01)
         np.testing.assert_allclose(fc[3], 0.5, atol=0.01)
         plt.close(fig)
@@ -657,7 +658,7 @@ class TestOverlayVariant:
 
 class TestInsetColorbar:
     @pytest.fixture
-    def mesh_on_ax(self) -> tuple:
+    def mesh_on_ax(self) -> Iterator[tuple[Figure, Axes, Any]]:
         fig, ax = plt.subplots()
         data = np.random.default_rng(0).standard_normal((5, 5))
         mesh = ax.pcolormesh(data)
