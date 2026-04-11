@@ -208,6 +208,18 @@ class TestCompareFields:
         with pytest.raises(ValueError, match="different canonical names"):
             compare_fields(a, b, "shared")
 
+    def test_bad_method_rejected_on_same_grid(self) -> None:
+        """Same-grid smoke test still validates ``method``.
+
+        Regression: the ``regrid`` no-op shortcut used to bypass method
+        validation, so ``compare_fields(ds, ds, "B1", method="bogus")``
+        silently used linear interpolation. Now the typo raises at
+        :func:`pypic.regrid.regrid` before any alignment happens.
+        """
+        ds = _make_1d(4, 1.0, 0.0)
+        with pytest.raises(ValueError, match="Unknown interpolation method"):
+            compare_fields(ds, ds, "B1", method="not_a_real_method")
+
 
 # ---------------------------------------------------------------------------
 # field_comparison_report
@@ -341,6 +353,12 @@ class TestFieldComparisonReport:
         )
         with pytest.raises(ValueError, match="share a normalization"):
             field_comparison_report(a, b, units="code")
+
+    def test_bad_method_rejected_on_same_grid(self) -> None:
+        """Same-grid smoke test still validates ``method``."""
+        ds = _make_2d(6, 6)
+        with pytest.raises(ValueError, match="Unknown interpolation method"):
+            field_comparison_report(ds, ds, method="not_a_real_method")
 
 
 # ---------------------------------------------------------------------------
@@ -494,6 +512,12 @@ class TestFieldDifferenceDataset:
         )
         with pytest.raises(ValueError, match="share a normalization"):
             field_difference_dataset(a, b, units="code")
+
+    def test_bad_method_rejected_on_same_grid(self) -> None:
+        """Same-grid smoke test still validates ``method``."""
+        ds = _make_2d(6, 6)
+        with pytest.raises(ValueError, match="Unknown interpolation method"):
+            field_difference_dataset(ds, ds, method="not_a_real_method")
 
 
 # ---------------------------------------------------------------------------

@@ -46,6 +46,14 @@ if TYPE_CHECKING:
 
 __all__ = ["align_grids", "common_grid", "regrid"]
 
+# Mirror of scipy's ``RegularGridInterpolator`` method vocabulary so the
+# no-op shortcut below rejects the same typos a live interpolation
+# would. Kept as a hardcoded set rather than reaching into scipy
+# internals; the list has been stable since scipy 1.10.
+_VALID_INTERPOLATION_METHODS: frozenset[str] = frozenset(
+    {"linear", "nearest", "slinear", "cubic", "quintic", "pchip"}
+)
+
 
 def _require_cartesian_grid(grid: GridInfo, label: str) -> None:
     """Raise if *grid* uses a non-Cartesian geometry."""
@@ -248,6 +256,17 @@ def regrid(
     tgt_ndim = len(target_grid.dimensions)
     if src_ndim != tgt_ndim:
         msg = f"Cannot regrid {src_ndim}D source onto {tgt_ndim}D target grid"
+        raise ValueError(msg)
+
+    # Validate method *before* the no-op shortcut so that typos raise
+    # regardless of whether interpolation actually runs — otherwise
+    # same-grid callers (including the classic ``compare_fields(ds, ds,
+    # ...)`` smoke test) silently accept unknown methods.
+    if method not in _VALID_INTERPOLATION_METHODS:
+        msg = (
+            f"Unknown interpolation method {method!r}. Must be one of "
+            f"{sorted(_VALID_INTERPOLATION_METHODS)}."
+        )
         raise ValueError(msg)
 
     # Resolve the field selection *before* the no-op shortcut so that

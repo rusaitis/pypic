@@ -127,6 +127,31 @@ class TestRegrid:
         # Equal grids trigger the no-op shortcut.
         assert result is ds
 
+    def test_noop_rejects_bad_method(self) -> None:
+        """Same-grid shortcut still validates *method*.
+
+        Regression: the no-op path used to return ``source`` unchanged
+        before ``method`` reached ``RegularGridInterpolator``, so typos
+        silently succeeded on the smoke-test path while the live path
+        correctly rejected them.
+        """
+        grid = make_uniform_grid(8, spacing=0.5)
+        ds = FieldDataset.from_arrays(
+            {"B1": np.ones(8)}, grid, Normalization.identity()
+        )
+        with pytest.raises(ValueError, match="Unknown interpolation method"):
+            regrid(ds, ds.grid, method="not_a_real_method")
+
+    def test_live_path_rejects_bad_method(self) -> None:
+        """Cross-grid path rejects the same bad *method* as the no-op path."""
+        coarse = make_uniform_grid(8, spacing=1.0)
+        fine = make_uniform_grid(16, spacing=0.5)
+        ds = FieldDataset.from_arrays(
+            {"B1": np.ones(8)}, coarse, Normalization.identity()
+        )
+        with pytest.raises(ValueError, match="Unknown interpolation method"):
+            regrid(ds, fine, method="not_a_real_method")
+
     def test_linear_1d_exact(self) -> None:
         """Linear interpolation of a linear function is exact."""
         # Coarse: 10 cells, dx=1.0 → centers [0.5, 9.5].
