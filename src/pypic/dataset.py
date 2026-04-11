@@ -251,8 +251,10 @@ class FieldDataset:
 
         Applies an affine transformation: translates the grid origin,
         scales coordinates, and rotates vector field components and
-        pressure tensors. Scalar fields pass through unchanged. The
-        array memory layout is not transposed.
+        pressure tensors. Scalar values pass through unchanged. When the
+        rotation includes an axis swap or reflection, field arrays are
+        copied to a contiguous buffer in the new axis order; pure
+        translations and identity rotations only touch metadata.
 
         Parameters
         ----------
@@ -295,48 +297,10 @@ class FieldDataset:
                 raise KeyError(msg)
             transform = resolve_transform(self._frame, target_frame, self._transforms)
         rotation = transform.rotation_matrix
-        dim_names = list(self._grid.surviving_axis_names)
 
-        # Start with a copy of all data variables
-        new_vars: dict[str, xr.DataArray] = {}
-        rotated_fields: set[str] = set()
-
-        # Rotate vector triplets
-        for n1, n2, n3 in find_vector_triplets(self.field_names()):
-            v1, v2, v3 = self[n1], self[n2], self[n3]
-            r1, r2, r3 = rotate_vector_components(v1, v2, v3, rotation)
-            for name, arr in [(n1, r1), (n2, r2), (n3, r3)]:
-                new_vars[name] = xr.DataArray(
-                    data=arr, dims=dim_names, attrs=dict(self._ds[name].attrs)
-                )
-                rotated_fields.add(name)
-
-        # Rotate pressure tensors
-        for p11, p22, p33, p12, p13, p23 in find_pressure_tensor_groups(
-            self.field_names()
-        ):
-            rp = rotate_pressure_tensor(
-                self[p11],
-                self[p22],
-                self[p33],
-                self[p12],
-                self[p13],
-                self[p23],
-                rotation,
-            )
-            for name, arr in zip([p11, p22, p33, p12, p13, p23], rp, strict=True):
-                new_vars[name] = xr.DataArray(
-                    data=arr, dims=dim_names, attrs=dict(self._ds[name].attrs)
-                )
-                rotated_fields.add(name)
-
-        # Copy scalar fields unchanged
-        for raw_name in self._ds.data_vars:
-            name = str(raw_name)
-            if name not in rotated_fields:
-                new_vars[name] = self._ds[name]
-
-        # Transform grid: permute axes, flip reversed ones, shift origin
+        # Determine which axes survive and derive the axis permutation
+        # and sign map from the rotation matrix up front. All field
+        # arrays then flow through a single reorient → construct pass.
         if self._grid.surviving_axes is not None:
             indices = list(self._grid.surviving_axes)
         else:
@@ -358,38 +322,63 @@ class FieldDataset:
                 "rotations require grid interpolation (not yet implemented)."
             )
 
-        transform_origin = np.array(transform.origin, dtype=np.float64)
-        dx_scale = transform.scale
-
-        # Determine axis permutation and sign from rotation matrix.
-        # For each TARGET axis (row of R), find which SOURCE axis
-        # it draws from (the single nonzero column) and its sign.
-        axis_permutation: list[int] = []  # [target_i] = source local index
-        axis_signs: list[float] = []  # sign of the mapping
+        # Axis permutation (target_i → source local index) and sign.
+        axis_permutation: list[int] = []
+        axis_signs: list[float] = []
         for target_i in indices:
             row = rotation[target_i, :]
             source_orig = int(np.argmax(np.abs(row[indices])))
             axis_permutation.append(source_orig)
             axis_signs.append(float(np.sign(row[indices[source_orig]])))
 
-        # Transpose + flip arrays to match target axis ordering. By this
-        # point every entry in new_vars is a DataArray (rotated above or
-        # copied from self._ds), so .values and .attrs are always present.
         needs_transpose = axis_permutation != list(range(ndim))
         flip_axes = [i for i, s in enumerate(axis_signs) if s < 0]
-        if needs_transpose or flip_axes:
-            for name, da in list(new_vars.items()):
-                arr = da.values
-                if needs_transpose:
-                    arr = np.transpose(arr, axis_permutation)
-                for ax in flip_axes:
-                    arr = np.flip(arr, axis=ax)
-                new_vars[name] = xr.DataArray(
-                    data=np.ascontiguousarray(arr),
-                    attrs=dict(da.attrs),
-                )
+
+        def _reorient(arr: FloatArray) -> FloatArray:
+            if needs_transpose:
+                arr = np.transpose(arr, axis_permutation)
+            for ax in flip_axes:
+                arr = np.flip(arr, axis=ax)
+            if needs_transpose or flip_axes:
+                arr = np.ascontiguousarray(arr)
+            return arr
+
+        # Accumulate raw numpy arrays — no intermediate DataArray wrapping.
+        new_arrays: dict[str, FloatArray] = {}
+        rotated: set[str] = set()
+
+        for n1, n2, n3 in find_vector_triplets(self.field_names()):
+            r1, r2, r3 = rotate_vector_components(
+                self[n1], self[n2], self[n3], rotation
+            )
+            for name, arr in ((n1, r1), (n2, r2), (n3, r3)):
+                new_arrays[name] = _reorient(arr)
+                rotated.add(name)
+
+        for p11, p22, p33, p12, p13, p23 in find_pressure_tensor_groups(
+            self.field_names()
+        ):
+            rp = rotate_pressure_tensor(
+                self[p11],
+                self[p22],
+                self[p33],
+                self[p12],
+                self[p13],
+                self[p23],
+                rotation,
+            )
+            for name, arr in zip((p11, p22, p33, p12, p13, p23), rp, strict=True):
+                new_arrays[name] = _reorient(arr)
+                rotated.add(name)
+
+        for raw_name in self._ds.data_vars:
+            name = str(raw_name)
+            if name not in rotated:
+                new_arrays[name] = _reorient(self._ds[name].values)
 
         # Compute new origin, spacing, dimensions from permuted source
+        transform_origin = np.array(transform.origin, dtype=np.float64)
+        dx_scale = transform.scale
         old_coords = self._grid.coordinate_arrays()
         new_origin_list: list[float] = []
         new_spacing_list: list[float] = []
@@ -407,14 +396,12 @@ class FieldDataset:
             new_spacing_list.append(dx)
             new_dims_list.append(self._grid.dimensions[src_i])
 
-        # Map surviving_axes through the permutation
         new_surviving = None
         if self._grid.surviving_axes is not None:
             new_surviving = tuple(
                 self._grid.surviving_axes[axis_permutation[i]] for i in range(ndim)
             )
 
-        # Update geometry axis names if specified
         new_geometry = self._grid.geometry
         if transform.target_axis_names is not None:
             new_geometry = copy.replace(
@@ -430,18 +417,17 @@ class FieldDataset:
             surviving_axes=new_surviving,
         )
 
-        # Rebuild xr.Dataset with transformed coordinates
+        # Single Dataset construction: each field is wrapped exactly once.
         new_dim_names = list(new_grid.surviving_axis_names)
         coord_arrays = new_grid.coordinate_arrays()
         coords = {new_dim_names[i]: coord_arrays[i] for i in range(len(new_dim_names))}
-        rebuilt_vars: dict[str, xr.DataArray] = {}
-        for name, da in new_vars.items():
-            rebuilt_vars[name] = xr.DataArray(
-                data=da.values,
-                dims=new_dim_names,
-                attrs=dict(da.attrs),
-            )
-        new_ds = xr.Dataset(rebuilt_vars, coords=coords)
+        new_ds = xr.Dataset(
+            data_vars={
+                name: (new_dim_names, arr, dict(self._ds[name].attrs))
+                for name, arr in new_arrays.items()
+            },
+            coords=coords,
+        )
 
         return FieldDataset(
             new_ds,

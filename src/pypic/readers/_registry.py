@@ -301,6 +301,7 @@ class Simulation:
         step: int,
         *,
         fields: Iterable[str] | None = None,
+        strict_fields: bool = False,
         **kwargs: Any,  # noqa: ANN401 — reader-specific params (e.g. target_resolution)
     ) -> FieldDataset:
         """Read field data for a single timestep.
@@ -314,6 +315,11 @@ class Simulation:
             names (``"B1"``) and geometry aliases (``"Bx"``).  Readers
             that support selective I/O skip unwanted datasets; others
             read all fields then filter.
+        strict_fields : bool
+            When ``True``, raise ``KeyError`` if any name in *fields*
+            matches no loaded field (typo guard).  Default ``False``
+            only logs a warning — kept for backward compatibility and
+            exploratory use where some requested names are optional.
         **kwargs
             Forwarded to readers that accept extra parameters
             (e.g. ``target_resolution`` for BATSRUS).
@@ -321,6 +327,12 @@ class Simulation:
         Returns
         -------
         FieldDataset
+
+        Raises
+        ------
+        KeyError
+            If *strict_fields* is true and a requested field name
+            yielded nothing.
         """
         from pypic.grid import _default_aliases
         from pypic.readers._protocols import supports_selective_read
@@ -387,11 +399,17 @@ class Simulation:
         else:
             ds = self._reader.read_timestep(self._path, step)
             if canonical is not None:
-                ds = ds.select_fields(canonical)
+                # Filter to names actually present before narrowing the
+                # dataset; the post-read check below reports unmatched
+                # names uniformly for both reader paths.
+                available = set(ds.field_names())
+                ds = ds.select_fields(canonical & available)
 
-        # Warn for any user-requested name that yielded no loaded fields
+        # Warn (or raise, if strict_fields) for any user-requested name
+        # that yielded no loaded fields.
         if fields is not None:
             loaded = set(ds.field_names())
+            missing: list[str] = []
             for name in fields:
                 # A request is satisfied if any expansion of it was loaded
                 expanded = self._expanded_names(
@@ -400,6 +418,16 @@ class Simulation:
                     canonical or set(),
                 )
                 if not loaded & expanded:
+                    missing.append(name)
+            if missing:
+                if strict_fields:
+                    msg = (
+                        f"fields={list(fields)!r}: "
+                        f"{missing!r} matched no fields in the dataset. "
+                        f"Available: {sorted(loaded)!r}"
+                    )
+                    raise KeyError(msg)
+                for name in missing:
                     log.warning(
                         "fields=%r: %r matched no fields in the dataset",
                         list(fields),
