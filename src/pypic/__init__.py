@@ -2,6 +2,11 @@
 
 __version__ = "0.1.0"
 
+from pypic.comparison import (
+    compare_fields,
+    field_comparison_report,
+    field_difference_dataset,
+)
 from pypic.compute import (
     available_quantities,
     field_dependencies,
@@ -179,6 +184,7 @@ __all__ = [
     "align_grids",
     "available_quantities",
     "common_grid",
+    "compare_fields",
     "conserved_to_tabular",
     "curl",
     "current_density_magnitude",
@@ -192,8 +198,10 @@ __all__ = [
     "enthalpy",
     "entropy",
     "estimate_tracing_error",
+    "field_comparison_report",
     "field_dependencies",
     "field_difference",
+    "field_difference_dataset",
     "field_energy",
     "field_info",
     "gradient",

@@ -108,14 +108,20 @@ Each step produces something testable. No step starts until the previous step's 
   - *Not* a replacement for BATSRUS AMR regridding (block-avg/NN in `batsrus/_grid.py` operates on raw AMR cell data pre-FieldDataset; this module operates on assembled uniform grids via interpolation — different problems, different algorithms).
   - *Not* responsible for destaggering. Readers destagger to co-located grids on load (see Step 34). This module operates on already-co-located `FieldDataset` grids.
   - *Not* responsible for time alignment — Step 19 is purely spatial. Temporal interpolation (comparing different codes at matching physical time when dt differs) is a separate concern.
-  - **Future extensions** (out of scope for initial implementation):
-    - *Spherical regridding* — needed for comparing ARMS runs at different resolutions; requires metric-factor-aware interpolation and pole handling.
-    - *Non-uniform-to-uniform* — OpenGGCM's stretched grids currently approximate to uniform at read time; proper support would need `scipy.interpn()` or similar.
-    - *Conservative regridding* — `method="conservative"`, integral-preserving interpolation for energy/mass budget studies (common in MHD validation papers). Linear interpolation does not conserve.
+  - *Not* conservative. `method="linear"` does not preserve volume integrals of the field (energy, mass). Conservative regridding (`method="conservative"`) is a potential future option once an energy/mass-budget validation study motivates it; non-uniform-to-uniform support (OpenGGCM's stretched grids via `scipy.interpn`) is similarly deferred until a concrete user emerges.
 
-- [ ] **Step 20: cross-grid comparison diagnostics**
+- [ ] **Step 19b: spherical regridding for `pypic.regrid`**
+  Extend `regrid()` / `common_grid()` / `align_grids()` to handle `GeometryType.SPHERICAL`. Metric-factor-aware interpolation on $(r, \theta, \phi)$ grids (not just tensor-product linear in the raw indices — the $\sin\theta$ Jacobian matters near the poles). Pole handling: clamp $\theta \in [\epsilon, \pi - \epsilon]$ or switch to a local Cartesian chart near each pole. Intersection grid semantics: $r$ extends like Cartesian; $\theta$ intersected in $[0, \pi]$; $\phi$ intersected modulo $2\pi$ with wrap-around support.
+  Primary use case: comparing two ARMS runs at different angular resolutions (Step 36). Also unblocks Step 20b (volume-weighted comparison norms). Keeps the `NotImplementedError` branch in `_require_cartesian_grid` alive for cylindrical until that reader lands.
+  Tests: spherical harmonic round-trip ($Y_\ell^m$ sampled on a coarse grid, regridded to fine, residual bounded by the truncation order), pole fidelity (analytic $\cos\theta$ field, zero error at $\theta = 0, \pi$ within interpolation tolerance), $\phi$-wrap correctness (periodic field resampled across the $\phi = 2\pi$ seam).
+  **Depends on:** Step 19 (Cartesian regrid).
+
+- [x] **Step 20: cross-grid comparison diagnostics**
   `compare_fields(a, b, field, *, metric="l2", units="si") -> float` — aligns grids then computes error. Converts to SI by default before comparing (cross-model normalizations are incomparable in code units; see schema.md). `units="code"` for same-normalization runs. Resolves field aliases before matching (e.g. "Bx" in A, "B1" in B → same canonical field). Logs a warning when grid resolutions differ by more than 10× (e.g. iPIC3D kinetic-scale vs BATSRUS MHD-scale — interpolation works but the comparison may be physically meaningless). `field_comparison_report(a, b, *, fields=None, units="si") -> dict[str, dict[str, float]]` — L2 + Linf for all common fields, plus grid context (domain extent, resolution ratio) for interpretability. `field_difference_dataset(a, b, *, fields=None, units="si") -> FieldDataset` — returns a FieldDataset on the common grid with difference fields, directly plottable via `plot_comparison`. Delegates to existing pure diagnostics (`l2_relative_error`, `linf_error`, `field_difference` from `diagnostics.py`) after alignment — no reimplementation. These are the only diagnostics functions that touch FieldDataset (existing ones are pure-array); justified because cross-grid comparison inherently needs grid metadata.
-  - **Future extension:** Volume-weighted metrics (metric-factor integration in L2/Linf norms) needed once spherical regridding lands — current unweighted norms are correct for uniform Cartesian only.
+
+- [ ] **Step 20b: volume-weighted comparison norms**
+  Add metric-factor integration to `compare_fields()` / `field_comparison_report()` so L2 and L∞ correctly weight each cell by $\sqrt{|g|}\,d^n x$ instead of treating every sample uniformly. Current Step 20 is correct for uniform Cartesian grids (where $\Delta V$ cancels between numerator and denominator of the L2 norm), but wrong for spherical grids where cells near the poles or near $r = 0$ cover exponentially less volume. New API: `compare_fields(..., weighted: bool = False)` — defaults preserve current Cartesian behavior, `True` switches to the properly-weighted norm via `GridInfo.geometry.metric_factors()`. L∞ unaffected (max is a pointwise statistic). Tests: volume-weighted L2 of a radial shell equals the analytic shell volume; Cartesian result unchanged (regression test against current values).
+  **Depends on:** Step 19b (spherical regridding — without it there is no spherical dataset to compare and this step is vacuous).
 
 ---
 
@@ -195,6 +201,7 @@ Steps 13-14 (compute/plot) ←── Step 22 (plot CLI)
                            ←── Step 20 (field_difference_dataset → plot_comparison)
                            ←── Step 21 (CLI core) ←── Step 26 (convert CLI)
 Step 19 (regrid) ←── Step 20 (cross-grid diagnostics) ←── Step 21
+              ←── Step 19b (spherical regrid) ←── Step 20b (volume-weighted norms)
 Step 5 (FieldDataset) ←── Steps 24, 25 (Zarr/Arrow)
                       ←── Steps 23, 35, 36 (additional readers)
                       ←── Step 27 (interop adapters)
@@ -325,8 +332,10 @@ grow.
 | 16 | selections | Sphere (NaN masking) | ✅ |
 | 17 | docs | MkDocs site | ✅ |
 | 18 | derived | lorentz_factor, magnetization, rel. corrections | ✅ |
-| 19 | regrid | `regrid()`, `align_grids()`, `common_grid()` | ✅ |
-| 20 | diagnostics | `compare_fields()`, `field_comparison_report()` | — |
+| 19 | regrid | `regrid()`, `align_grids()`, `common_grid()` (Cartesian) | ✅ |
+| 19b | regrid | Spherical regridding (metric-aware, pole + $\phi$-wrap) | — |
+| 20 | comparison | `compare_fields()`, `field_comparison_report()`, `field_difference_dataset()` | ✅ |
+| 20b | comparison | Volume-weighted L2 norm via `weighted=True` | — |
 | 21 | cli | `info`, `fields`, `stats`, `compare` subcommands (typer) | — |
 | 21b | readers | `sim.available_fields()` lightweight field probe | — |
 | 22 | cli | `plot`, `plot-compare` subcommands | — |
