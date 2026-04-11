@@ -165,6 +165,31 @@ class TestCompareFields:
         # Identical data + same normalization → zero, no error.
         assert compare_fields(a, b, "B1", units="code") == 0.0
 
+    def test_alias_survives_frame_alignment(self) -> None:
+        """Custom alias resolves through compare_fields on the frame-aligned path.
+
+        Mirrors the same-named test in ``TestFieldComparisonReport`` —
+        same regression, different entry point.
+        """
+        grid = make_uniform_grid(6, 6, spacing=1.0)
+        arr = np.ones((6, 6))
+        a = FieldDataset.from_arrays(
+            {"B1": arr},
+            grid,
+            Normalization.identity(),
+            aliases={"my_alias": "B1"},
+            frame="GSM",
+        )
+        b = FieldDataset.from_arrays(
+            {"B1": arr},
+            grid,
+            Normalization.identity(),
+            aliases={"my_alias": "B1"},
+            frame="GSE",
+            transforms={"GSM": FrameTransform("GSE", "GSM")},
+        )
+        assert compare_fields(a, b, "my_alias") == 0.0
+
     def test_ambiguous_alias_mapping_raises(self) -> None:
         """Alias resolving to different canonicals across datasets fails loud."""
         grid = make_uniform_grid(4, spacing=1.0)
@@ -305,6 +330,18 @@ class TestFieldComparisonReport:
         report = field_comparison_report(a, b, fields=["my_alias"])
         assert "B1" in report["fields"]
 
+    def test_code_units_mismatched_normalization_raises(self) -> None:
+        """``units='code'`` refuses cross-normalization reports."""
+        grid = make_uniform_grid(4, spacing=1.0)
+        a = FieldDataset.from_arrays(
+            {"B1": np.ones(4)}, grid, Normalization.pic_electron(1e18)
+        )
+        b = FieldDataset.from_arrays(
+            {"B1": np.ones(4)}, grid, Normalization.mhd_standard(1e6, 1e-20, 1e-9)
+        )
+        with pytest.raises(ValueError, match="share a normalization"):
+            field_comparison_report(a, b, units="code")
+
 
 # ---------------------------------------------------------------------------
 # field_difference_dataset
@@ -423,6 +460,40 @@ class TestFieldDifferenceDataset:
         ds = _make_2d(6, 6)
         diff = field_difference_dataset(ds, ds, fields=["B1"])
         assert diff.field_names() == ["B1"]
+
+    def test_alias_survives_frame_alignment(self) -> None:
+        """Custom alias resolves through field_difference_dataset on the frame path."""
+        grid = make_uniform_grid(6, 6, spacing=1.0)
+        arr = np.ones((6, 6))
+        a = FieldDataset.from_arrays(
+            {"B1": arr},
+            grid,
+            Normalization.identity(),
+            aliases={"my_alias": "B1"},
+            frame="GSM",
+        )
+        b = FieldDataset.from_arrays(
+            {"B1": arr},
+            grid,
+            Normalization.identity(),
+            aliases={"my_alias": "B1"},
+            frame="GSE",
+            transforms={"GSM": FrameTransform("GSE", "GSM")},
+        )
+        diff = field_difference_dataset(a, b, fields=["my_alias"])
+        assert diff.field_names() == ["B1"]
+
+    def test_code_units_mismatched_normalization_raises(self) -> None:
+        """``units='code'`` refuses cross-normalization differences."""
+        grid = make_uniform_grid(4, spacing=1.0)
+        a = FieldDataset.from_arrays(
+            {"B1": np.ones(4)}, grid, Normalization.pic_electron(1e18)
+        )
+        b = FieldDataset.from_arrays(
+            {"B1": np.ones(4)}, grid, Normalization.mhd_standard(1e6, 1e-20, 1e-9)
+        )
+        with pytest.raises(ValueError, match="share a normalization"):
+            field_difference_dataset(a, b, units="code")
 
 
 # ---------------------------------------------------------------------------
