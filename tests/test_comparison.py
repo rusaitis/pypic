@@ -137,6 +137,34 @@ class TestCompareFields:
         l2_si = compare_fields(a, b, "B1", metric="l2", units="si")
         assert_allclose(l2_si, l2_code, rtol=1e-12)
 
+    def test_code_units_mismatched_normalization_raises(self) -> None:
+        """``units='code'`` refuses cross-normalization comparisons.
+
+        Comparing PIC code values to MHD code values is physically
+        meaningless even though the arithmetic succeeds — the value
+        of ``B1=1.0`` means very different SI quantities under each
+        normalization. The contract is that ``units='code'`` requires
+        matching normalizations; ``units='si'`` is the safe default.
+        """
+        grid = make_uniform_grid(4, spacing=1.0)
+        a = FieldDataset.from_arrays(
+            {"B1": np.ones(4)}, grid, Normalization.pic_electron(1e18)
+        )
+        b = FieldDataset.from_arrays(
+            {"B1": np.ones(4)}, grid, Normalization.mhd_standard(1e6, 1e-20, 1e-9)
+        )
+        with pytest.raises(ValueError, match="share a normalization"):
+            compare_fields(a, b, "B1", units="code")
+
+    def test_code_units_same_normalization_still_works(self) -> None:
+        """No regression: same normalization + ``units='code'`` is allowed."""
+        norm = Normalization.pic_electron(1e18)
+        grid = make_uniform_grid(4, spacing=1.0)
+        a = FieldDataset.from_arrays({"B1": np.ones(4)}, grid, norm)
+        b = FieldDataset.from_arrays({"B1": np.ones(4)}, grid, norm)
+        # Identical data + same normalization → zero, no error.
+        assert compare_fields(a, b, "B1", units="code") == 0.0
+
     def test_ambiguous_alias_mapping_raises(self) -> None:
         """Alias resolving to different canonicals across datasets fails loud."""
         grid = make_uniform_grid(4, spacing=1.0)
@@ -248,6 +276,34 @@ class TestFieldComparisonReport:
         b = _make_2d(12, 12, dx=0.5)
         with pytest.raises(KeyError, match="not found"):
             field_comparison_report(a, b, fields=["definitely_not_a_field"])
+
+    def test_custom_alias_survives_frame_alignment(self) -> None:
+        """Custom aliases survive when frame alignment is also required.
+
+        Regression: ``transform_to`` rebuilds the dataset without
+        forwarding ``aliases=...``, so resolving field names *after*
+        ``_align_frames`` would lose user aliases. The fix moves
+        resolution against the originals before either alignment step.
+        """
+        grid = make_uniform_grid(6, 6, spacing=1.0)
+        arr = np.ones((6, 6))
+        a = FieldDataset.from_arrays(
+            {"B1": arr},
+            grid,
+            Normalization.identity(),
+            aliases={"my_alias": "B1"},
+            frame="GSM",
+        )
+        b = FieldDataset.from_arrays(
+            {"B1": arr},
+            grid,
+            Normalization.identity(),
+            aliases={"my_alias": "B1"},
+            frame="GSE",
+            transforms={"GSM": FrameTransform("GSE", "GSM")},
+        )
+        report = field_comparison_report(a, b, fields=["my_alias"])
+        assert "B1" in report["fields"]
 
 
 # ---------------------------------------------------------------------------

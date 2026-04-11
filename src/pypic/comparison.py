@@ -86,6 +86,28 @@ def _validate_nan_policy(nan_policy: str) -> None:
         raise ValueError(msg)
 
 
+def _validate_code_units_compatible(
+    a: FieldDataset, b: FieldDataset, units: str
+) -> None:
+    """Refuse ``units='code'`` across mismatched normalizations.
+
+    Code-unit comparison is only meaningful when both datasets share a
+    normalization (same length/time/B/density references). Comparing
+    PIC code values to MHD code values is physically meaningless even
+    though the arithmetic succeeds — the *numeric* value of ``B1`` in
+    a PIC dump and a BATSRUS dump means very different things in SI.
+    Use ``units='si'`` for cross-model.
+    """
+    if units == "code" and a.normalization != b.normalization:
+        msg = (
+            "units='code' requires both datasets to share a normalization "
+            "(same length/time/B/density references), but A and B differ. "
+            "Pass units='si' to compare in SI, or align normalizations "
+            "upstream before calling."
+        )
+        raise ValueError(msg)
+
+
 def _transform_or_raise(ds: FieldDataset, target: str, *, label: str) -> FieldDataset:
     """Transform *ds* to *target* frame, or raise a clear ValueError."""
     if ds.frame == target:
@@ -316,8 +338,15 @@ def compare_fields(
     _validate_metric(metric)
     _validate_units(units)
     _validate_nan_policy(nan_policy)
-    a, b = _align_frames(a, b, frame=frame)
+    _validate_code_units_compatible(a, b, units)
+    # Resolve the field name against the *original* datasets — frame and
+    # grid alignment both rebuild datasets without forwarding custom
+    # aliases (transform_to drops aliases entirely; regrid only carries
+    # geometry-default ones), so resolving post-alignment would lose any
+    # alias from from_arrays(aliases=...). Canonical names survive both
+    # transforms, so the post-alignment _extract_values call still works.
     canonical = _resolve_common_field(a, b, field)
+    a, b = _align_frames(a, b, frame=frame)
     _warn_if_coarse_mismatch(a.grid, b.grid)
     # Regrid only the requested field — 50× cheaper than full-dataset
     # alignment on a multi-moment PIC dump.
@@ -401,12 +430,13 @@ def field_comparison_report(
     """
     _validate_units(units)
     _validate_nan_policy(nan_policy)
-    a, b = _align_frames(a, b, frame=frame)
-    # Resolve names against the originals so custom aliases from
-    # ``from_arrays(aliases=...)`` survive (regrid only regenerates the
-    # geometry-default aliases on its output) and so bad field names
-    # raise *before* the expensive alignment step.
+    _validate_code_units_compatible(a, b, units)
+    # Resolve names against the *originals* so custom aliases from
+    # ``from_arrays(aliases=...)`` survive — both transform_to and
+    # regrid drop user aliases, so resolving post-alignment would lose
+    # them. Bad names also raise *before* the expensive alignment step.
     names = _resolve_field_list(a, b, fields)
+    a, b = _align_frames(a, b, frame=frame)
     _warn_if_coarse_mismatch(a.grid, b.grid)
     a_aligned, b_aligned = align_grids(a, b, fields=names, method=method)
 
@@ -516,14 +546,16 @@ def field_difference_dataset(
     array([0. , 0.5, 0.5, 0. ])
     """
     _validate_units(units)
+    _validate_code_units_compatible(a, b, units)
     # Capture original frames *before* _align_frames for the provenance
     # record below; the metadata should reflect what the user passed in,
     # not the post-transform frame on B.
     source_frames = (a.frame, b.frame)
-    a, b = _align_frames(a, b, frame=frame)
     # Resolve against originals — see field_comparison_report for the
-    # rationale (custom aliases survive, bad names raise pre-alignment).
+    # rationale (custom aliases survive transform_to/regrid only when
+    # resolved up front; bad names raise pre-alignment).
     names = _resolve_field_list(a, b, fields)
+    a, b = _align_frames(a, b, frame=frame)
     _warn_if_coarse_mismatch(a.grid, b.grid)
     a_aligned, b_aligned = align_grids(a, b, fields=names, method=method)
 
