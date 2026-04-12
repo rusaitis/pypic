@@ -8,7 +8,7 @@ from pypic.plotting._guard import ensure_matplotlib
 
 if TYPE_CHECKING:
     from matplotlib.axes import Axes
-    from matplotlib.colors import Colormap
+    from matplotlib.colors import Colormap, Normalize
     from matplotlib.figure import Figure
 
     from pypic.dataset import FieldDataset
@@ -168,8 +168,7 @@ def plot_comparison(
     if use_symmetric is None:
         use_symmetric = not is_positive_definite(field, values_a, info)
 
-    # Log/symlog scale: incompatible with symmetric
-    norm: object = None
+    norm: Normalize | None = None
     if log_scale and use_symmetric:
         warnings.warn(
             "log_scale=True ignored because symmetric color limits are active",

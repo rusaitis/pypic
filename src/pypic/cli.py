@@ -753,12 +753,17 @@ def _render_plot(
             if linthresh is not None:
                 scale_kwargs["linthresh"] = linthresh
 
-        # Auto color limits when not provided
-        vmin, vmax = vmin_arg, vmax_arg
-        if vmin is None or vmax is None:
-            from pypic.plotting._resolve import prepare_data, resolve_field_values
+        from pypic.plotting._resolve import prepare_data, resolve_field_values
 
-            preview = prepare_data(ds, plane_sel)
+        vmin, vmax = vmin_arg, vmax_arg
+        preview = (
+            prepare_data(ds, plane_sel)
+            if (vmin is None or vmax is None or res is not None)
+            else None
+        )
+
+        if vmin is None or vmax is None:
+            assert preview is not None
             values = resolve_field_values(preview, field, units)
             info = preview.field_info(field)
             pos_def = is_positive_definite(field, values, info)
@@ -766,16 +771,13 @@ def _render_plot(
             vmin = vmin if vmin is not None else auto_vmin
             vmax = vmax if vmax is not None else auto_vmax
 
-        # Downsample if --res given
         if res is not None:
+            assert preview is not None
             max_w, max_h = _parse_resolution(res)
-            from pypic.plotting._resolve import prepare_data
-
-            preview_ds = prepare_data(ds, plane_sel)
-            dims = preview_ds.grid.dimensions
+            dims = preview.grid.dimensions
             stride_x = max(1, dims[0] // max_w)
             stride_y = max(1, dims[1] // max_h)
-            names = preview_ds.grid.surviving_axis_names
+            names = preview.grid.surviving_axis_names
             assert plane_sel is not None
             ds = plane_sel.apply(ds)
             ds = ds.isel(
@@ -907,62 +909,45 @@ def plot(
             )
             raise typer.BadParameter(msg) from None
 
+    def _resolve_output(sv: int) -> str | None:
+        if output and len(step_list) > 1:
+            return output.format(step=sv)
+        return output
+
+    def _run_frame(sv: int) -> None:
+        out = _resolve_output(sv)
+        if out:
+            Path(out).parent.mkdir(parents=True, exist_ok=True)
+        _render_plot(
+            path,
+            sv,
+            field,
+            plane,
+            index,
+            coord,
+            units,
+            frame,
+            out,
+            fmt,
+            dpi,
+            res,
+            color_vmin,
+            color_vmax,
+            colormap,
+            scale,
+            linthresh,
+        )
+
     if len(step_list) > 1 and jobs > 1:
         import concurrent.futures
 
-        def _worker(sv: int) -> None:
-            assert output is not None  # guarded by outer check
-            out = output.format(step=sv)
-            if out:
-                Path(out).parent.mkdir(parents=True, exist_ok=True)
-            _render_plot(
-                path,
-                sv,
-                field,
-                plane,
-                index,
-                coord,
-                units,
-                frame,
-                out,
-                fmt,
-                dpi,
-                res,
-                color_vmin,
-                color_vmax,
-                colormap,
-                scale,
-                linthresh,
-            )
-
-        with concurrent.futures.ProcessPoolExecutor(max_workers=jobs) as pool:
-            futs = [pool.submit(_worker, sv) for sv in step_list]
+        with concurrent.futures.ThreadPoolExecutor(max_workers=jobs) as pool:
+            futs = [pool.submit(_run_frame, sv) for sv in step_list]
             for fut in concurrent.futures.as_completed(futs):
                 fut.result()
     else:
         for sv in step_list:
-            out = output.format(step=sv) if output and len(step_list) > 1 else output
-            if out:
-                Path(out).parent.mkdir(parents=True, exist_ok=True)
-            _render_plot(
-                path,
-                sv,
-                field,
-                plane,
-                index,
-                coord,
-                units,
-                frame,
-                out,
-                fmt,
-                dpi,
-                res,
-                color_vmin,
-                color_vmax,
-                colormap,
-                scale,
-                linthresh,
-            )
+            _run_frame(sv)
 
 
 @app.command(name="plot-compare")
@@ -1060,30 +1045,23 @@ def plot_compare(
 
         ds_a, ds_b = align_grids(ds_a, ds_b, method=method)
 
-        # Determine plane from the common grid's largest cross-section
         plane_sel = _resolve_plane(ds_a.grid, plane, None, None)
 
         time = step_val * ds_a.grid.dt if ds_a.grid.dt else None
 
-        # plot_comparison accepts display-unit strings (e.g. "nT"), not
-        # "si"/"code" mode selectors.  When the user asks for SI, we
-        # convert both datasets beforehand and plot in those values
-        # (units=None).  When "code", plot directly.
-        plot_units: str | None = None
+        # Convert to SI before plotting when requested (plot_comparison
+        # only accepts display-unit strings, not "si"/"code" selectors)
         if comp_units == "si":
             import numpy as np
 
-            a_vals = ds_a.in_si(field)
-            b_vals = ds_b.in_si(field)
-            ds_a = ds_a.with_field(field, np.asarray(a_vals))
-            ds_b = ds_b.with_field(field, np.asarray(b_vals))
+            ds_a = ds_a.with_field(field, np.asarray(ds_a.in_si(field)))
+            ds_b = ds_b.with_field(field, np.asarray(ds_b.in_si(field)))
 
         fig, _ = plot_comparison(
             ds_a,
             ds_b,
             field,
             plane=plane_sel,
-            units=plot_units,
             vmin=color_vmin,
             vmax=color_vmax,
             diff_vmin=diff_vmin,
