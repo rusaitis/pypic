@@ -160,6 +160,13 @@ class TestPhdf5Reader:
         reader = IPic3DParallelReader(cfg)
         assert reader.available_timesteps(PHDF5_DIR) == [0]
 
+    def test_available_fields_matches_read(self, ds):
+        """Lightweight probe returns the same fields as a full read."""
+        cfg = parse_inp(PHDF5_DIR / "synthetic.inp")
+        reader = IPic3DParallelReader(cfg)
+        probed = reader.available_fields(PHDF5_DIR, 0)
+        assert probed == sorted(ds.field_names())
+
     def test_field_shapes(self, ds):
         assert ds["B1"].shape == (NX, NY, NZ)
 
@@ -225,6 +232,13 @@ class TestShdf5Reader:
         cfg = parse_inp(SHDF5_DIR / "synthetic_serial.inp")
         reader = IPic3DSerialReader(cfg)
         assert reader.available_timesteps(SHDF5_DIR) == [0]
+
+    def test_available_fields_matches_read(self, ds):
+        """Lightweight probe returns the same fields as a full read."""
+        cfg = parse_inp(SHDF5_DIR / "synthetic_serial.inp")
+        reader = IPic3DSerialReader(cfg)
+        probed = reader.available_fields(SHDF5_DIR, 0)
+        assert probed == sorted(ds.field_names())
 
     def test_field_shapes(self, ds):
         assert ds["B1"].shape == (NX, NY, NZ)
@@ -342,6 +356,13 @@ class TestH5hutReader:
         cfg = parse_inp(H5HUT_DIR / "SyntheticFixture.inp")
         reader = IPic3DH5hutReader(cfg)
         assert reader.available_timesteps(H5HUT_DIR) == [0]
+
+    def test_available_fields_matches_read(self, ds):
+        """Lightweight probe returns the same fields as a full read."""
+        cfg = parse_inp(H5HUT_DIR / "SyntheticFixture.inp")
+        reader = IPic3DH5hutReader(cfg)
+        probed = reader.available_fields(H5HUT_DIR, 0)
+        assert probed == sorted(ds.field_names())
 
     def test_field_shapes(self, ds):
         assert ds["B1"].shape == (NX, NY, NZ)

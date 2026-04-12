@@ -91,6 +91,72 @@ class BATSRUSReader:
 
         return sorted(steps)
 
+    def _build_var_mapping(self, var_names: tuple[str, ...]) -> dict[str, str | None]:
+        """Map native BATSRUS var names to canonical, return canonical→native."""
+        mapping: dict[str, str | None] = {}
+        for vname in var_names:
+            if vname in SKIP_FIELDS:
+                continue
+            canonical = FIELD_NAME_MAP.get(vname, vname)
+            mapping[canonical] = vname
+        return mapping
+
+    def _get_var_names(self, path: Path, step: int) -> tuple[str, ...]:
+        """Extract native variable names from header/metadata at *step*."""
+        import h5py
+
+        from pypic.readers.batsrus import BATSRUSOutputFormat
+
+        match self._output_format:
+            case BATSRUSOutputFormat.IDL:
+                header_file = self._find_file(path, step, ".h")
+                return parse_header(header_file).var_names
+            case BATSRUSOutputFormat.HDF5:
+                batl_file = self._find_file(path, step, ".batl")
+                with h5py.File(batl_file, "r") as f:
+                    return tuple(x.decode().strip() for x in f["NamePlotVar_V"][:])
+            case BATSRUSOutputFormat.OUT:
+                out_file = self._find_file(path, step, ".out")
+                return parse_header(out_file).var_names
+            case _ as unreachable:
+                assert_never(unreachable)
+
+    def available_fields_mapping(self, path: Path, step: int) -> dict[str, str | None]:
+        """Map canonical field names to native (on-disk) names at *step*.
+
+        Parses file headers or HDF5 metadata without loading arrays.
+
+        Parameters
+        ----------
+        path : Path
+            Directory containing the simulation output.
+        step : int
+            Timestep index.
+
+        Returns
+        -------
+        dict[str, str | None]
+            Canonical → native name.
+        """
+        return self._build_var_mapping(self._get_var_names(path, step))
+
+    def available_fields(self, path: Path, step: int) -> list[str]:
+        """List canonical field names at *step* without loading arrays.
+
+        Parameters
+        ----------
+        path : Path
+            Directory containing the simulation output.
+        step : int
+            Timestep index.
+
+        Returns
+        -------
+        list[str]
+            Sorted canonical field names.
+        """
+        return sorted(self.available_fields_mapping(path, step))
+
     def read_timestep(
         self,
         path: Path,

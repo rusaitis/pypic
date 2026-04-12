@@ -21,6 +21,7 @@ from pypic.readers.ipic3d._field_map import (
     gaussian_current_to_si,
     gaussian_density_to_si,
     gaussian_pressure_to_si,
+    infer_total_fields,
     per_species_canonical,
     per_species_eflux_canonical,
 )
@@ -76,6 +77,77 @@ class IPic3DSerialReader:
                 if m:
                     steps.append(int(m.group(1)))
         return sorted(steps)
+
+    def available_fields_mapping(self, path: Path, step: int) -> dict[str, str | None]:
+        """Map canonical field names to native (on-disk) names at *step*.
+
+        Opens ``proc0.hdf`` and inspects HDF5 group keys without
+        loading array data.
+
+        Parameters
+        ----------
+        path : Path
+            Simulation output directory.
+        step : int
+            Timestep index.
+
+        Returns
+        -------
+        dict[str, str | None]
+            Canonical → native name, ``None`` for computed totals.
+        """
+        proc0 = path / "proc0.hdf"
+        cycle_key = f"cycle_{step}"
+        ns = self._config.ns
+        mapping: dict[str, str | None] = {}
+
+        with h5py.File(proc0, "r") as f:
+            if "fields" in f:
+                for ipic_name in f["fields"]:
+                    if ipic_name in _FIELD_NAME_MAP:
+                        mapping[_FIELD_NAME_MAP[ipic_name]] = ipic_name
+
+            for s in range(ns):
+                species_group = f"moments/species_{s}"
+                if species_group not in f:
+                    continue
+                group = f[species_group]
+
+                for comp in ("Jx", "Jy", "Jz"):
+                    if comp in group and cycle_key in group[comp]:
+                        mapping[per_species_canonical(comp, s)] = comp
+
+                if "rho" in group and cycle_key in group["rho"]:
+                    mapping[per_species_canonical("rho", s)] = "rho"
+
+                for phdf5_name, canon_base in _PHDF5_PRESSURE_MAP.items():
+                    if phdf5_name in group and cycle_key in group[phdf5_name]:
+                        mapping[f"{canon_base}_s{s}"] = phdf5_name
+
+                for ef_name in _EFLUX_MAP:
+                    if ef_name in group and cycle_key in group[ef_name]:
+                        mapping[per_species_eflux_canonical(ef_name, s)] = ef_name
+
+        for total in infer_total_fields(set(mapping), ns):
+            mapping[total] = None
+        return mapping
+
+    def available_fields(self, path: Path, step: int) -> list[str]:
+        """List canonical field names at *step* without loading arrays.
+
+        Parameters
+        ----------
+        path : Path
+            Simulation output directory.
+        step : int
+            Timestep index.
+
+        Returns
+        -------
+        list[str]
+            Sorted canonical field names.
+        """
+        return sorted(self.available_fields_mapping(path, step))
 
     def _assemble_field(
         self,

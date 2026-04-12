@@ -232,6 +232,54 @@ class SimpleReader:
                 steps.append(int(m.group(1)))
         return sorted(steps)
 
+    def available_fields_mapping(self, path: Path, step: int) -> dict[str, str | None]:
+        """Map canonical field names to native (on-disk) names at *step*.
+
+        Opens the HDF5 file and lists dataset names in the fields
+        group, applying ``field_map`` if configured.
+
+        Parameters
+        ----------
+        path : Path
+            Directory containing the data files.
+        step : int
+            Timestep index.
+
+        Returns
+        -------
+        dict[str, str | None]
+            Canonical → native name.
+        """
+        filepath = path / self._file_pattern.format(step=step)
+        with h5py.File(filepath, "r") as f:
+            group = self._resolve_fields_group(f)
+            native_names = [
+                name
+                for name in group
+                if isinstance(group[name], h5py.Dataset) and group[name].ndim >= 2
+            ]
+        if self._field_map is not None:
+            fm = self._field_map
+            return {fm.get(n, n): n for n in native_names}
+        return {n: n for n in native_names}
+
+    def available_fields(self, path: Path, step: int) -> list[str]:
+        """List canonical field names at *step* without loading arrays.
+
+        Parameters
+        ----------
+        path : Path
+            Directory containing the data files.
+        step : int
+            Timestep index.
+
+        Returns
+        -------
+        list[str]
+            Sorted canonical field names.
+        """
+        return sorted(self.available_fields_mapping(path, step))
+
     def read_timestep(
         self,
         path: Path,

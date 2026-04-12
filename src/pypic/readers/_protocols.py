@@ -67,6 +67,29 @@ class ParticleDataReader(Protocol):
 
 
 @runtime_checkable
+class FieldListingReader(Protocol):
+    """Opt-in protocol for readers that can list available fields cheaply.
+
+    Readers implement this alongside ``SimulationReader`` to enumerate
+    canonical field names at a given timestep without loading array data
+    (e.g. by listing HDF5 dataset keys or parsing file headers).
+    """
+
+    def available_fields(self, path: Path, step: int) -> list[str]:
+        """Return sorted canonical field names available at *step*."""
+        ...
+
+    def available_fields_mapping(self, path: Path, step: int) -> dict[str, str | None]:
+        """Map canonical field names to their native (on-disk) names.
+
+        Returns a dict keyed by canonical name. The value is the native
+        name in the output file, or ``None`` for computed fields (e.g.
+        total ``J1`` summed from per-species ``Jx_0`` + ``Jx_1``).
+        """
+        ...
+
+
+@runtime_checkable
 class AuxiliaryDataReader(Protocol):
     """Opt-in protocol for readers that provide auxiliary tabular data.
 

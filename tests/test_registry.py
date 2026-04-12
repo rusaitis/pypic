@@ -579,6 +579,76 @@ class TestSimulationFacade:
         assert ds.has_field("B1")
         assert any("Typox" in record.message for record in caplog.records)
 
+    def test_available_fields_delegates_to_reader(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        """Simulation.available_fields uses FieldListingReader when present."""
+        from pypic.coordinates.geometry import CARTESIAN
+
+        grid = GridInfo(
+            dimensions=(2,), spacing=(1.0,), origin=(0.0,), geometry=CARTESIAN
+        )
+        norm = Normalization.identity()
+
+        class ListingReader:
+            def read_timestep(self, path: Path, step: int) -> FieldDataset:
+                return FieldDataset.from_arrays({"B1": np.ones(2)}, grid, norm)
+
+            def available_timesteps(self, path: Path) -> list[int]:
+                return [0]
+
+            def available_fields(self, path: Path, step: int) -> list[str]:
+                return ["B1", "B2", "E1"]
+
+            def available_fields_mapping(
+                self, path: Path, step: int
+            ) -> dict[str, str | None]:
+                return {"B1": "Bx", "B2": "By", "E1": "Ex"}
+
+        cfg = SimulationConfig(
+            model_name="test",
+            model_type="PIC",
+            grid=grid,
+            normalization=norm,
+        )
+        sim = Simulation(ListingReader(), cfg, tmp_path)
+        result = sim.available_fields(0)
+        assert result == ["B1", "B2", "E1"]
+        mapping = sim.available_fields_mapping(0)
+        assert mapping == {"B1": "Bx", "B2": "By", "E1": "Ex"}
+
+    def test_available_fields_fallback_without_protocol(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        """Simulation.available_fields falls back to read() + field_names()."""
+        from pypic.coordinates.geometry import CARTESIAN
+
+        grid = GridInfo(
+            dimensions=(2,), spacing=(1.0,), origin=(0.0,), geometry=CARTESIAN
+        )
+        norm = Normalization.identity()
+
+        class BasicReader:
+            def read_timestep(self, path: Path, step: int) -> FieldDataset:
+                return FieldDataset.from_arrays(
+                    {"B1": np.ones(2), "rho_m": np.ones(2)}, grid, norm
+                )
+
+            def available_timesteps(self, path: Path) -> list[int]:
+                return [0]
+
+        cfg = SimulationConfig(
+            model_name="test",
+            model_type="PIC",
+            grid=grid,
+            normalization=norm,
+        )
+        sim = Simulation(BasicReader(), cfg, tmp_path)
+        result = sim.available_fields(0)
+        assert result == ["B1", "rho_m"]
+
 
 class TestBatsrusProbeFilter:
     def test_c_headers_not_detected(self, tmp_path: Path) -> None:

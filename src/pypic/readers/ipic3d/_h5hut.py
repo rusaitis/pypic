@@ -24,6 +24,7 @@ from pypic.readers.ipic3d._field_map import (
     gaussian_current_to_si,
     gaussian_density_to_si,
     gaussian_pressure_to_si,
+    infer_total_fields,
     per_species_canonical,
     per_species_eflux_canonical,
     per_species_pressure_canonical,
@@ -93,6 +94,98 @@ class IPic3DH5hutReader:
             if m:
                 steps.append(int(m.group(1)))
         return sorted(steps)
+
+    def available_fields_mapping(self, path: Path, step: int) -> dict[str, str | None]:
+        """Map canonical field names to native (on-disk) names at *step*.
+
+        Opens the H5hut fields file and inspects ``Step#0/Block/``
+        keys. Unknown native keys pass through with the same name as
+        both key and value, matching :meth:`read_timestep`.
+
+        Parameters
+        ----------
+        path : Path
+            Simulation output directory.
+        step : int
+            Timestep (cycle) index.
+
+        Returns
+        -------
+        dict[str, str | None]
+            Canonical → native name, ``None`` for computed totals.
+        """
+        fields_file = self._find_fields_file(path, step)
+        ns = self._config.ns
+        mapping: dict[str, str | None] = {}
+        consumed: set[str] = set()
+
+        with h5py.File(fields_file, "r") as f:
+            block = f["Step#0"]["Block"]
+            available = set(block.keys())
+
+            for ipic_name, canon_name in _FIELD_NAME_MAP.items():
+                if ipic_name in available:
+                    consumed.add(ipic_name)
+                    mapping[canon_name] = ipic_name
+
+            for ipic_name, canon_name in _H5HUT_FIELD_MAP.items():
+                if ipic_name in available:
+                    consumed.add(ipic_name)
+                    mapping[canon_name] = ipic_name
+
+            for s in range(ns):
+                n_key = f"N_{s}"
+                if n_key in available:
+                    consumed.add(n_key)
+                    mapping[f"n_s{s}"] = n_key
+
+                rho_key = f"rho_{s}"
+                if rho_key in available:
+                    consumed.add(rho_key)
+                    mapping[per_species_canonical("rho", s)] = rho_key
+
+                for comp in ("Jx", "Jy", "Jz"):
+                    j_key = f"{comp}_{s}"
+                    if j_key in available:
+                        consumed.add(j_key)
+                        mapping[per_species_canonical(comp, s)] = j_key
+
+                for pcomp in _PRESSURE_COMPONENT_MAP:
+                    p_key = f"{pcomp}_{s}"
+                    if p_key in available:
+                        consumed.add(p_key)
+                        mapping[per_species_pressure_canonical(pcomp, s)] = p_key
+
+                for efcomp in _EFLUX_MAP:
+                    ef_key = f"{efcomp}_{s}"
+                    if ef_key in available:
+                        consumed.add(ef_key)
+                        mapping[per_species_eflux_canonical(efcomp, s)] = ef_key
+
+            # Passthrough: native name is both key and value
+            for native in available - consumed:
+                mapping[native] = native
+
+        for total in infer_total_fields(set(mapping), ns):
+            mapping[total] = None
+        return mapping
+
+    def available_fields(self, path: Path, step: int) -> list[str]:
+        """List canonical field names at *step* without loading arrays.
+
+        Parameters
+        ----------
+        path : Path
+            Simulation output directory.
+        step : int
+            Timestep (cycle) index.
+
+        Returns
+        -------
+        list[str]
+            Sorted canonical field names.
+        """
+        return sorted(self.available_fields_mapping(path, step))
 
     def _find_fields_file(self, path: Path, step: int) -> Path:
         """Locate the H5hut fields file for a given cycle."""

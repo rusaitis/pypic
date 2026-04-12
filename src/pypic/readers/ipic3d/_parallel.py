@@ -21,6 +21,7 @@ from pypic.readers.ipic3d._field_map import (
     gaussian_current_to_si,
     gaussian_density_to_si,
     gaussian_pressure_to_si,
+    infer_total_fields,
     per_species_canonical,
     per_species_eflux_canonical,
 )
@@ -76,6 +77,93 @@ class IPic3DParallelReader:
                 if m:
                     steps.append(int(m.group(1)))
         return sorted(steps)
+
+    def available_fields_mapping(self, path: Path, step: int) -> dict[str, str | None]:
+        """Map canonical field names to native (on-disk) names at *step*.
+
+        Probes HDF5 files in the ``Fields_XXXXX/`` and
+        ``Moments_XXXXX/`` directories without loading arrays.
+
+        Parameters
+        ----------
+        path : Path
+            Simulation output directory.
+        step : int
+            Timestep index.
+
+        Returns
+        -------
+        dict[str, str | None]
+            Canonical → native name, ``None`` for computed totals.
+        """
+        step_str = f"{step:05d}"
+        ns = self._config.ns
+        mapping: dict[str, str | None] = {}
+
+        # Electromagnetic fields
+        for prefix in ("B", "E"):
+            em_path = path / f"Fields_{step_str}" / f"{prefix}_{step_str}.h5"
+            if em_path.exists():
+                with h5py.File(em_path, "r") as f:
+                    for ipic_name in f["Fields"]:
+                        if ipic_name in _FIELD_NAME_MAP:
+                            mapping[_FIELD_NAME_MAP[ipic_name]] = ipic_name
+
+        # Per-species moments
+        for s in range(ns):
+            j_path = path / f"Moments_{step_str}" / f"J_species_{s}_{step_str}.h5"
+            if j_path.exists():
+                with h5py.File(j_path, "r") as f:
+                    group = f[f"Moments/species_{s}"]
+                    for comp in ("Jx", "Jy", "Jz"):
+                        if comp in group:
+                            mapping[per_species_canonical(comp, s)] = comp
+
+            rho_path = path / f"Moments_{step_str}" / f"rho_species_{s}_{step_str}.h5"
+            if rho_path.exists():
+                mapping[per_species_canonical("rho", s)] = "rho"
+
+            p_path = (
+                path / f"Moments_{step_str}" / f"Pressure_species_{s}_{step_str}.h5"
+            )
+            if p_path.exists():
+                with h5py.File(p_path, "r") as f:
+                    group = f[f"Moments/species_{s}"]
+                    for phdf5_name, canon_base in _PHDF5_PRESSURE_MAP.items():
+                        if phdf5_name in group:
+                            mapping[f"{canon_base}_s{s}"] = phdf5_name
+
+            ef_path = path / f"Moments_{step_str}" / f"E_flux_species_{s}_{step_str}.h5"
+            if ef_path.exists():
+                with h5py.File(ef_path, "r") as f:
+                    group = f[f"Moments/species_{s}"]
+                    for phdf5_name, _canon_base in _EFLUX_MAP.items():
+                        if phdf5_name in group:
+                            canon = per_species_eflux_canonical(phdf5_name, s)
+                            mapping[canon] = phdf5_name
+
+        # Total fields — computed, no single native source
+        for total in infer_total_fields(set(mapping), ns):
+            mapping[total] = None
+
+        return mapping
+
+    def available_fields(self, path: Path, step: int) -> list[str]:
+        """List canonical field names at *step* without loading arrays.
+
+        Parameters
+        ----------
+        path : Path
+            Simulation output directory.
+        step : int
+            Timestep index.
+
+        Returns
+        -------
+        list[str]
+            Sorted canonical field names.
+        """
+        return sorted(self.available_fields_mapping(path, step))
 
     def read_timestep(
         self,

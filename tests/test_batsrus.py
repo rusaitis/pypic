@@ -223,6 +223,13 @@ class TestIDLUniform:
         for name in ds.field_names():
             assert not np.any(np.isnan(ds[name])), f"{name} contains NaN"
 
+    def test_available_fields_matches_read(self) -> None:
+        """Lightweight probe returns the same fields as a full read."""
+        reader, _ = open_batsrus(IDL_DIR)
+        ds = reader.read_timestep(IDL_DIR, 0)
+        probed = reader.available_fields(IDL_DIR, 0)
+        assert probed == sorted(ds.field_names())
+
 
 class TestHDF5Uniform:
     """Test HDF5 BATL reader with uniform synthetic grid."""
@@ -233,6 +240,13 @@ class TestHDF5Uniform:
         for name in ds.field_names():
             assert ds[name].shape == (NX, NY), f"{name} has wrong shape"
             assert not np.any(np.isnan(ds[name])), f"{name} contains NaN"
+
+    def test_available_fields_matches_read(self) -> None:
+        """Lightweight probe returns the same fields as a full read."""
+        reader, _ = open_batsrus(HDF5_DIR)
+        ds = reader.read_timestep(HDF5_DIR, 0)
+        probed = reader.available_fields(HDF5_DIR, 0)
+        assert probed == sorted(ds.field_names())
 
     def test_cross_format_match_idl(self) -> None:
         """IDL and HDF5 produce identical fields for the same physics."""

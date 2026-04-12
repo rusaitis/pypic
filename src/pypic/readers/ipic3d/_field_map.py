@@ -204,6 +204,39 @@ def expand_moment_dependencies(
     return expanded
 
 
+def infer_total_fields(canonical_fields: set[str], nspec: int) -> set[str]:
+    r"""Infer which total fields would be computed from per-species sums.
+
+    ``compute_totals_and_filter`` sums per-species J and rho into
+    totals (J1, J2, J3, rho_c). This function predicts which totals
+    would be produced given a set of per-species canonical names,
+    without actually loading or summing arrays.
+
+    Parameters
+    ----------
+    canonical_fields : set[str]
+        Per-species canonical field names already discovered.
+    nspec : int
+        Number of particle species.
+
+    Returns
+    -------
+    set[str]
+        Total field names (subset of J1, J2, J3, rho_c) whose
+        per-species contributions are all present.
+
+    Examples
+    --------
+    >>> infer_total_fields({"J1_s0", "J1_s1", "rho_c_s0"}, nspec=2)
+    {'J1'}
+    """
+    totals: set[str] = set()
+    for _native, canon_total in _MOMENT_COMPONENT_MAP.items():
+        if all(f"{canon_total}_s{s}" in canonical_fields for s in range(nspec)):
+            totals.add(canon_total)
+    return totals
+
+
 def gaussian_pressure_to_si(p: FloatArray) -> FloatArray:
     r"""Convert iPIC3D Gaussian pressure tensor to SI-rationalized.
 

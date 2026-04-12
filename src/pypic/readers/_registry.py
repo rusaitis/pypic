@@ -437,6 +437,54 @@ class Simulation:
 
         return ds
 
+    def available_fields(self, step: int) -> list[str]:
+        """List canonical field names at *step* without loading arrays.
+
+        Uses the reader's lightweight probe when available (via
+        :class:`~pypic.readers._protocols.FieldListingReader`);
+        otherwise falls back to a full :meth:`read` and extracts
+        :meth:`~pypic.dataset.FieldDataset.field_names`.
+
+        Parameters
+        ----------
+        step : int
+            Timestep index.
+
+        Returns
+        -------
+        list[str]
+            Sorted canonical field names.
+        """
+        from pypic.readers._protocols import FieldListingReader
+
+        if isinstance(self._reader, FieldListingReader):
+            return self._reader.available_fields(self._path, step)
+        return sorted(self.read(step).field_names())
+
+    def available_fields_mapping(self, step: int) -> dict[str, str | None]:
+        """Map canonical field names to native (on-disk) names at *step*.
+
+        Uses the reader's lightweight probe when available; otherwise
+        falls back to :meth:`available_fields` with ``None`` for all
+        native names (native mapping unknown without reader support).
+
+        Parameters
+        ----------
+        step : int
+            Timestep index.
+
+        Returns
+        -------
+        dict[str, str | None]
+            Canonical name → native name, or ``None`` for computed
+            fields or when the reader has no mapping support.
+        """
+        from pypic.readers._protocols import FieldListingReader
+
+        if isinstance(self._reader, FieldListingReader):
+            return self._reader.available_fields_mapping(self._path, step)
+        return {name: None for name in self.available_fields(step)}
+
     @property
     def auxiliary_names(self) -> list[str]:
         """Names of available auxiliary datasets, or ``[]`` if unsupported."""

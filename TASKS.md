@@ -92,6 +92,13 @@ Each step produces something testable. No step starts until the previous step's 
   Priority: bulk-flow corrections first, thermal second.
   Tests: γ→1 recovers non-relativistic; σ→∞ gives v_A→c.
 
+- [ ] **Step 40: time-dependent frame transforms**
+  Extend `FrameTransform` to support rotation matrices that vary per timestep. Primary use case: GSE↔GSM depends on dipole tilt angle, which changes with time. Two approaches, both supported:
+  - **Parameter-driven:** `parameter = "dipole_tilt"` in `[coordinates.transforms]` names a time-varying quantity looked up per step from simulation metadata or auxiliary data. The rotation matrix is recomputed at each timestep.
+  - **SPICE kernels:** Optional integration with `spiceypy` for ephemeris-based transforms (GSE↔HEE↔RTN, planetary frames). `from_spice(frame_a, frame_b, epoch)` builds a `FrameTransform` from NAIF kernels. Optional dep: `spiceypy` under `spice` extra. Useful for comparing simulation output with spacecraft observations in the correct frame at the correct epoch.
+  `FieldDataset.transform_to(frame, *, epoch=None)` gains an optional epoch parameter. Static transforms (current behavior) are unchanged. Tests: round-trip GSE→GSM→GSE at known tilt angles against published rotation matrices.
+  **Depends on:** Step 15 (frame transforms).
+
 ---
 
 ## Phase 5: Documentation
@@ -127,28 +134,25 @@ Each step produces something testable. No step starts until the previous step's 
 
 ## Phase 7: CLI
 
-- [ ] **Step 21: `pypic.cli` — core subcommands (typer)**
-  Entry point: `[project.scripts] pypic = "pypic.cli:app"`. Optional deps: `typer>=0.12`, `rich>=13.0` under `cli` extra. All subcommands accept bare directory paths and auto-detect via `open_simulation()`. `--step` syntax everywhere: `N` (single), `first`/`last`, `start:stop:stride` (range), `all` (every timestep).
-  - `pypic info <path>` — model name/type, grid (dimensions, spacing, geometry), normalization system, species list, physics params (relativistic, gamma), stagger convention, frame/transforms, available timesteps.
-  - `pypic fields <path> [--step N] [--derived]` — canonical + alias field names in the file. With `--derived`, also lists computable quantities based on available fields (walk the compute registry dependency graph).
-  - `pypic stats <path> --field FIELD [--step last] [--units UNIT] [--json]` — print min, max, mean, rms, NaN count for a field. No plotting, pure text. Uses `field_extrema`, `spatial_mean`, `spatial_rms` from `diagnostics.py`. Supports derived fields via `compute()`. With `--step all` or a range, prints a table across timesteps. `--json` for scripting.
-  - `pypic compare <path_a> <path_b> [--step N] [--field FIELD] [--metric l2|linf|both] [--units si|code] [--json]` — numeric comparison via Step 20. Prints grid context (domain overlap, resolution ratio). Rich table by default, `--json` for scripting/CI. When `--field` is omitted, runs `field_comparison_report` for all common fields.
+- [x] **Step 21b: `sim.available_fields()` — lightweight field probe**
+  `Simulation.available_fields(step) -> list[str]` lists canonical field names in a timestep without loading arrays. `Simulation.available_fields_mapping(step) -> dict[str, str | None]` returns the canonical→native name mapping (`None` for computed totals like J1, rho_c). Both delegate to the `FieldListingReader` protocol (`available_fields` + `available_fields_mapping` methods); readers without the protocol fall back to full read + `field_names()`. Implemented on iPIC3D (parallel, serial, H5hut), BATSRUS (IDL, HDF5, OUT), and SimpleReader. OpenGGCM falls back. Shared `infer_total_fields()` helper in `ipic3d/_field_map.py` predicts computed totals from per-species fields.
 
-- [ ] **Step 21b: `sim.available_fields()` — lightweight field probe**
-  `Simulation.available_fields(step) -> list[str]` lists canonical field names in a timestep without loading arrays. New optional `SimulationReader` protocol method `available_fields(path, step) -> list[str]`. HDF5 readers (iPIC3D, Simple) list datasets via `h5py`; BATSRUS parses the header; others fall back to full read + `field_names()`. Prerequisite for `pypic fields` CLI command (Step 21). Also useful for selective `read(fields=...)` discovery.
+- [ ] **Step 21: `pypic.cli` — core subcommands (typer)**
+  Entry point: `[project.scripts] pypic = "pypic.cli:app"`. Optional deps: `typer>=0.12`, `rich>=13.0` under `cli` extra. All subcommands accept bare directory paths and auto-detect via `open_simulation()`.
+  **Global behavior:** `--version` prints version and exits. `--log-level {debug,info,warning,error}` (default `warning`) routes through `logging` — captures NaN-omit warnings, coarse-mismatch warnings, and reader diagnostics. `-q/--quiet` is shorthand for `--log-level error`. `pretty_exceptions_enable=False` on the typer app — scientific users want clean `ValueError: ...` on stderr, not Rich tracebacks; `--debug` re-enables them. Shell completion via typer built-in `--install-completion`/`--show-completion`.
+  **`--step` syntax** shared by all subcommands: `N` (single), `first`/`last`, `start:stop:stride` (range with **inclusive** stop — `0:100:10` = 11 frames including step 100), `all` (every timestep). Default: `last` for all subcommands.
+  - `pypic info <path> [--json]` — model name/type, grid (dimensions, spacing, geometry), normalization system, species list, physics params (relativistic, gamma), stagger convention, frame/transforms, available timesteps.
+  - `pypic fields <path> [--step N] [--derived] [--native] [--aux] [--all] [--json]` — canonical field names in the file. `--native` shows a native→canonical mapping table (Rosetta Stone between on-disk names and pypic schema — uses `available_fields_mapping()` from Step 21b). `--derived` lists computable quantities based on available fields (walk the compute registry dependency graph). `--aux` lists auxiliary datasets (`sim.auxiliary_names`). `--all` combines `--native --derived --aux`. `--json` for scripting.
+  - `pypic stats <path> --field FIELD [--step last] [--units UNIT] [--json]` — print min, max, mean, rms, NaN count for a field. No plotting, pure text. Uses `field_extrema`, `spatial_mean`, `spatial_rms` from `diagnostics.py`. Supports derived fields via `compute()`. With `--step all` or a range, prints a table across timesteps. `--json` for scripting.
+  - `pypic compare <path_a> <path_b> [--step N] [--field FIELD] [--metric l2|linf|both] [--units si|code] [--method linear|nearest|cubic] [--nan-policy omit|propagate|raise] [--frame FRAME] [--json]` — numeric comparison via Step 20. `--frame` matches the library's `frame=` kwarg: omitted uses A's frame (transforming B if needed), explicit value transforms both to that frame. `--method` and `--nan-policy` forward to the library as-is. Prints grid context (domain overlap, resolution ratio). Rich table by default, `--json` for scripting/CI. When `--field` is omitted, runs `field_comparison_report` for all common fields.
+  **Testing:** each subcommand exercised via `typer.testing.CliRunner` against synthetic datasets (no real simulation files in the test suite).
 
 - [ ] **Step 22: `pypic plot` and `pypic plot-compare` CLI subcommands**
   **Smart defaults:** `--step` defaults to `last_step`. `--plane` defaults to the largest cross-section (longest two axes). `--field` is required (no reasonable default for all models). Minimal invocation: `pypic plot ./run/ --field "|B|"`.
-  **Shared flags:** `--output FILE` (default: display; file extension sets format — for batch steps, use template: `frames/B_{step:06d}.png`), `--format png|pdf|svg` (overrides extension), `--dpi INT` (default: 150), `--res WxH` (downsample to at most W×H grid points before plotting — fast previews for automated workflows and reduced token use when images are fed to LLMs), `--vmin/--vmax FLOAT` (color range), `--colormap CMAP` (overrides auto-detection). `--step` supports full syntax: `N`, `first`/`last`, `start:stop:stride`, `all` — batch steps with output template produce frame sequences for movies.
-  `pypic plot <path> --field FIELD [--plane xy|xz|yz] [--index I] [--units UNIT] [--frame FRAME]` — reads, selects plane via `PlaneSelection`, resolves derived fields via `compute()`, converts via `in_units()`, transforms via `transform_to()`, calls `plot_field_slice`. Plane shorthand: `--plane xy` → `PlaneSelection(normal="z")`. Diverging colormap for signed fields, sequential for positive-definite.
-  `pypic plot-compare <path_a> <path_b> --field FIELD [--plane xy|xz|yz] [--units si|code] [--diff-vmin FLOAT] [--diff-vmax FLOAT]` — accepts two directory paths, auto-detects each simulation independently (can be different codes, e.g. iPIC3D vs BATSRUS). Three-panel (A | B | difference) via `field_difference_dataset` + `plot_comparison`. Regrids to common grid automatically. `--vmin/--vmax` set the field panels; `--diff-vmin/--diff-vmax` set the difference panel independently. `--units` defaults to `si` for cross-model safety.
-
-- [ ] **Step 40: time-dependent frame transforms**
-  Extend `FrameTransform` to support rotation matrices that vary per timestep. Primary use case: GSE↔GSM depends on dipole tilt angle, which changes with time. Two approaches, both supported:
-  - **Parameter-driven:** `parameter = "dipole_tilt"` in `[coordinates.transforms]` names a time-varying quantity looked up per step from simulation metadata or auxiliary data. The rotation matrix is recomputed at each timestep.
-  - **SPICE kernels:** Optional integration with `spiceypy` for ephemeris-based transforms (GSE↔HEE↔RTN, planetary frames). `from_spice(frame_a, frame_b, epoch)` builds a `FrameTransform` from NAIF kernels. Optional dep: `spiceypy` under `spice` extra. Useful for comparing simulation output with spacecraft observations in the correct frame at the correct epoch.
-  `FieldDataset.transform_to(frame, *, epoch=None)` gains an optional epoch parameter. Static transforms (current behavior) are unchanged. Tests: round-trip GSE→GSM→GSE at known tilt angles against published rotation matrices.
-  **Depends on:** Step 15 (frame transforms).
+  **Shared flags:** `--output FILE` (default: display; file extension sets format — for batch steps, use template: `frames/B_{step:06d}.png`), `--format png|pdf|svg` (overrides extension), `--dpi INT` (default: 150), `--res WxH` (downsample to at most W×H grid points via nearest-neighbor, preserving aspect ratio — fast previews and reduced token use when images are fed to LLMs), `--vmin/--vmax FLOAT` (color range override), `--colormap CMAP` (overrides auto-detection), `--jobs N` (parallel frame rendering for `--step all` via `ProcessPoolExecutor`; serial by default). `--step` supports full syntax.
+  **Auto color range** (when `--vmin`/`--vmax` omitted): default to `3σ` from the median, rounded to the nearest value in the 1-2-5 × 10^n sequence (..., 0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 50, ...). **Signed fields** (diverging colormap): `clim = ±round_nice(3σ)`, symmetric around 0 so the colormap's zero-crossing aligns with physical zero. **Positive-definite fields** (sequential colormap): `vmin = 0`, `vmax = round_nice(median + 3σ)`. Outliers clip at colormap extremes (matplotlib default). This avoids a single extreme cell (reconnection X-point, shock front) from washing out the range for the 99.7% of the domain that matters. Colormap auto-detection uses the existing `is_positive_definite()` logic in `plotting/_colormaps.py` (quantity_type + field name pattern + data fallback).
+  `pypic plot <path> --field FIELD [--plane xy|xz|yz] [--index I | --coord V] [--units UNIT] [--frame FRAME]` — reads, selects plane via `PlaneSelection`, resolves derived fields via `compute()`, converts via `in_units()`, transforms via `transform_to()`, calls `plot_field_slice`. Plane shorthand: `--plane xy` → `PlaneSelection(normal="z")`. `--index I` selects by cell index along the normal axis; `--coord V` selects by physical coordinate (nearest-cell snap via `GridInfo.coordinate_arrays()`). Default: midplane.
+  `pypic plot-compare <path_a> <path_b> --field FIELD [--plane xy|xz|yz] [--units si|code] [--diff-vmin FLOAT] [--diff-vmax FLOAT] [--frame FRAME]` — accepts two directory paths, auto-detects each simulation independently (can be different codes, e.g. iPIC3D vs BATSRUS). Three-panel (A | B | difference) via `field_difference_dataset` + `plot_comparison`. Regrids to common grid automatically; plane auto-detected from the **common grid's** longest two axes when `--plane` is omitted. `--vmin/--vmax` set the field panels; `--diff-vmin/--diff-vmax` set the difference panel (default: symmetric `±round_nice(3σ)` around 0 with diverging colormap). `--units` defaults to `si` for cross-model safety. `--frame` transforms both inputs before comparison.
 
 ---
 
@@ -199,15 +203,16 @@ Each step produces something testable. No step starts until the previous step's 
 ```
 Steps 13-14 (compute/plot) ←── Step 22 (plot CLI)
                            ←── Step 20 (field_difference_dataset → plot_comparison)
-                           ←── Step 21 (CLI core) ←── Step 26 (convert CLI)
+                           ←── Step 21b (available_fields) ←── Step 21 (CLI core) ←── Step 26 (convert CLI)
 Step 19 (regrid) ←── Step 20 (cross-grid diagnostics) ←── Step 21
               ←── Step 19b (spherical regrid) ←── Step 20b (volume-weighted norms)
+Step 15 (frame transforms) ←── Step 40 (time-dependent transforms)
 Step 5 (FieldDataset) ←── Steps 24, 25 (Zarr/Arrow)
                       ←── Steps 23, 35, 36 (additional readers)
                       ←── Step 27 (interop adapters)
 ```
 
-Recommended implementation order: 19 → 20 → 21 → 22, with 24/25 parallelizable anytime, 26 after 21+24+25, 23/35/36 anytime after Step 12 (readers exist), 27–28 anytime after API stabilizes.
+Recommended implementation order: 19 → 20 → 21b → 21 → 22, with 24/25 parallelizable anytime, 26 after 21+24+25, 40 anytime after Step 15, 23/35/36 anytime after Step 12 (readers exist), 27–28 anytime after API stabilizes.
 
 ---
 
@@ -332,17 +337,17 @@ grow.
 | 16 | selections | Sphere (NaN masking) | ✅ |
 | 17 | docs | MkDocs site | ✅ |
 | 18 | derived | lorentz_factor, magnetization, rel. corrections | ✅ |
+| 40 | coordinates | Time-dependent frame transforms (dipole tilt, SPICE) | — |
 | 19 | regrid | `regrid()`, `align_grids()`, `common_grid()` (Cartesian) | ✅ |
 | 19b | regrid | Spherical regridding (metric-aware, pole + $\phi$-wrap) | — |
 | 20 | comparison | `compare_fields()`, `field_comparison_report()`, `field_difference_dataset()` | ✅ |
 | 20b | comparison | Volume-weighted L2 norm via `weighted=True` | — |
+| 21b | readers | `sim.available_fields()` + `available_fields_mapping()` | ✅ |
 | 21 | cli | `info`, `fields`, `stats`, `compare` subcommands (typer) | — |
-| 21b | readers | `sim.available_fields()` lightweight field probe | — |
 | 22 | cli | `plot`, `plot-compare` subcommands | — |
 | 24 | io | Zarr export/import for FieldDataset | — |
 | 25 | io | Parquet/Arrow for ParticleData | — |
 | 26 | cli | `convert` subcommand | — |
-| 40 | coordinates | Time-dependent frame transforms (dipole tilt, SPICE) | — |
 | 23 | readers | VLasiator VLSV reader (FSgrid + DCCRG regrid) | — |
 | 35 | readers | VPIC reader (Yee mesh destaggering) | — |
 | 36 | readers | ARMS reader (block-AMR, spherical) | — |
