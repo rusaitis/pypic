@@ -82,6 +82,7 @@ def test_info_text(tmp_path):
     assert "test_sim" in result.output
     assert "4 x 4 x 4" in result.output
     assert "cartesian" in result.output
+    assert "Units:" in result.output
 
 
 def test_info_json(tmp_path):
@@ -93,6 +94,8 @@ def test_info_json(tmp_path):
     assert data["model_type"] == "MHD"
     assert data["grid"]["dimensions"] == [4, 4, 4]
     assert "steps" in data
+    assert "normalization" in data
+    assert "length_ref" in data["normalization"]
 
 
 # -- fields ------------------------------------------------------------------
@@ -107,12 +110,25 @@ def test_fields_default(tmp_path):
     assert "B3" in result.output
 
 
-def test_fields_native(tmp_path):
+def test_fields_mapping(tmp_path):
     d = _make_sim_dir(tmp_path)
-    result = runner.invoke(app, ["fields", str(d), "--native"])
+    result = runner.invoke(app, ["fields", str(d), "--mapping"])
     assert result.exit_code == 0, result.output
-    # Should show the mapping arrow
-    assert "\u2190" in result.output or "\u2192" in result.output
+    # Native on the left, → arrow, canonical on the right
+    assert "\u2192" in result.output
+    assert "B1" in result.output
+
+
+def test_fields_mapping_json_preserves_null(tmp_path):
+    d = _make_sim_dir(tmp_path)
+    result = runner.invoke(app, ["fields", str(d), "--mapping", "--json"])
+    assert result.exit_code == 0, result.output
+    data = json.loads(result.output)
+    mapping = data["native_mapping"]
+    # Native names should be strings or null, never "(computed)"
+    for val in mapping.values():
+        assert val is None or isinstance(val, str)
+        assert val != "(computed)"
 
 
 def test_fields_derived(tmp_path):
@@ -210,9 +226,11 @@ def test_compare_single_field(tmp_path):
     d = _make_sim_dir(tmp_path)
     result = runner.invoke(app, ["compare", str(d), str(d), "--field", "B1"])
     assert result.exit_code == 0, result.output
-    # Comparing identical datasets: L2 error should be 0
     assert "L2 relative error:" in result.output
     assert "L-inf error:" in result.output
+    # Grid context included in single-field output
+    assert "Grid:" in result.output
+    assert "A dims:" in result.output
 
 
 def test_compare_all_fields(tmp_path):
@@ -245,6 +263,44 @@ def test_bad_step(tmp_path):
     assert result.exit_code != 0
 
 
+def test_empty_step_range(tmp_path):
+    d = _make_sim_dir(tmp_path)
+    # Only step 0 exists; range 10:20 matches nothing
+    result = runner.invoke(app, ["fields", str(d), "--step", "10:20"])
+    assert result.exit_code != 0
+    assert "No available steps" in result.output
+
+
+def test_multi_step_rejected_by_fields(tmp_path):
+    d = _make_sim_dir(tmp_path, n_steps=3)
+    result = runner.invoke(app, ["fields", str(d), "--step", "all"])
+    assert result.exit_code != 0
+    assert "single step" in result.output
+
+
+def test_multi_step_rejected_by_compare(tmp_path):
+    d = _make_sim_dir(tmp_path, n_steps=3)
+    result = runner.invoke(app, ["compare", str(d), str(d), "--step", "all"])
+    assert result.exit_code != 0
+    assert "single step" in result.output
+
+
+def test_bad_log_level(tmp_path):
+    d = _make_sim_dir(tmp_path)
+    result = runner.invoke(app, ["--log-level", "banana", "info", str(d)])
+    assert result.exit_code != 0
+    assert "Invalid --log-level" in result.output
+
+
+def test_bad_metric(tmp_path):
+    d = _make_sim_dir(tmp_path)
+    result = runner.invoke(
+        app, ["compare", str(d), str(d), "--field", "B1", "--metric", "oops"]
+    )
+    assert result.exit_code != 0
+    assert "Invalid --metric" in result.output
+
+
 def test_missing_field(tmp_path):
     d = _make_sim_dir(tmp_path)
     result = runner.invoke(app, ["stats", str(d), "--field", "nonexistent_field"])
@@ -255,3 +311,27 @@ def test_quiet_flag(tmp_path):
     d = _make_sim_dir(tmp_path)
     result = runner.invoke(app, ["-q", "info", str(d)])
     assert result.exit_code == 0, result.output
+
+
+def test_quiet_suppresses_warnings(tmp_path):
+    """Verify -q routes warnings.warn through logging and suppresses them."""
+    d = tmp_path / "sim_nan"
+    d.mkdir()
+    (d / "simulation.toml").write_text(_TOML, encoding="utf-8")
+    shape = (4, 4, 4)
+    data = np.ones(shape)
+    data[0, 0, 0] = np.nan  # triggers NaN-omit warning in diagnostics
+    with h5py.File(d / "output_000000.h5", "w") as f:
+        grp = f.create_group("fields")
+        grp.create_dataset("B1", data=data)
+        grp.create_dataset("B2", data=data)
+        grp.create_dataset("B3", data=data)
+        f.attrs["model"] = "test_sim"
+        f.attrs["step"] = 0
+    # Without -q, compare triggers NaN warnings from diagnostics
+    result = runner.invoke(
+        app,
+        ["-q", "compare", str(d), str(d), "--field", "B1"],
+    )
+    assert result.exit_code == 0, result.output
+    assert "NaN" not in result.output

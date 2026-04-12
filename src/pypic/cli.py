@@ -58,7 +58,11 @@ def main(
 ) -> None:
     """Inspect and compare plasma simulation output."""
     level_name = "ERROR" if quiet else log_level.upper()
-    logging.basicConfig(level=getattr(logging, level_name, logging.WARNING))
+    if level_name not in ("DEBUG", "INFO", "WARNING", "ERROR"):
+        msg = f"Invalid --log-level {log_level!r}. Use debug, info, warning, or error."
+        raise typer.BadParameter(msg)
+    logging.basicConfig(level=getattr(logging, level_name))
+    logging.captureWarnings(True)
     if debug:
         app.pretty_exceptions_enable = True
 
@@ -71,6 +75,9 @@ def parse_steps(raw: str, sim: "Simulation") -> list[int]:
 
     Supports: ``N`` (single int), ``first``, ``last``, ``all``,
     ``start:stop:stride`` (inclusive stop).
+
+    Raises :class:`typer.BadParameter` on invalid syntax or when the
+    resolved list is empty.
     """
     raw = raw.strip()
     if raw == "all":
@@ -94,9 +101,16 @@ def parse_steps(raw: str, sim: "Simulation") -> list[int]:
         if stride <= 0:
             msg = f"Stride must be positive, got {stride}."
             raise typer.BadParameter(msg)
-        return [
+        result = [
             s for s in sim.steps if start <= s <= stop and (s - start) % stride == 0
         ]
+        if not result:
+            msg = (
+                f"No available steps match range {raw!r}. "
+                f"Available: {sim.steps[0]}..{sim.steps[-1]}"
+            )
+            raise typer.BadParameter(msg)
+        return result
     try:
         return [int(raw)]
     except ValueError:
@@ -110,13 +124,24 @@ def parse_steps(raw: str, sim: "Simulation") -> list[int]:
 # -- Helpers -----------------------------------------------------------------
 
 
+def _require_single_step(step_list: list[int], raw: str) -> int:
+    """Extract single step, raising if multiple were selected."""
+    if len(step_list) > 1:
+        msg = (
+            f"This command operates on a single step, "
+            f"but --step {raw!r} selected {len(step_list)}."
+        )
+        raise typer.BadParameter(msg)
+    return step_list[0]
+
+
 def _open(path: Path) -> "Simulation":
     """Open a simulation, translating errors to CLI messages."""
     from pypic.readers._registry import open_simulation
 
     try:
         return open_simulation(path)
-    except (FileNotFoundError, OSError) as exc:
+    except (FileNotFoundError, OSError, ExceptionGroup) as exc:
         typer.echo(f"Error: {exc}", err=True)
         raise typer.Exit(1) from None
 
@@ -135,11 +160,10 @@ def _get_field_array(
     """Read a field (or compute if derived), convert units."""
     import numpy as np
 
-    ds = sim.read(step)
-    arr = np.asarray(ds[field]) if ds.has_field(field) else ds.compute(field)
+    ds = sim.read(step, fields=[field])
     if units is not None:
         return ds.in_units(field, units)
-    return arr
+    return np.asarray(ds[field]) if ds.has_field(field) else ds.compute(field)
 
 
 # -- info --------------------------------------------------------------------
@@ -186,6 +210,22 @@ def info(
         f"gamma={physics.gamma:.4g}, c={physics.c:.4g}, relativistic={rel_str}"
     )
 
+    norm = sim.normalization
+    is_identity = all(
+        getattr(norm, a) == 1.0
+        for a in ("length_ref", "velocity_ref", "b_field_ref", "density_ref")
+    )
+    norm_str = (
+        "identity (SI)"
+        if is_identity
+        else (
+            f"l={norm.length_ref:.4g} m, v={norm.velocity_ref:.4g} m/s, "
+            f"B={norm.b_field_ref:.4g} T, n={norm.density_ref:.4g} m^-3"
+        )
+    )
+
+    stagger = cfg.metadata.get("stagger")
+
     lines = [
         f"Simulation: {sim.model_name} ({sim.model_type})",
         f"  Path:      {path}",
@@ -195,6 +235,9 @@ def info(
     ]
     if grid.dt is not None:
         lines.append(f"  dt:        {grid.dt:.4g}")
+    if stagger is not None:
+        lines.append(f"  Stagger:   {stagger.convention}")
+    lines.append(f"  Units:     {norm_str}")
     if cfg.species:
         lines.append(f"  Species:   {', '.join(species_parts)}")
     lines.append(f"  Physics:   {physics_str}")
@@ -214,6 +257,14 @@ def info(
             "geometry": geom,
             "dt": grid.dt,
         },
+        "normalization": {
+            "length_ref": norm.length_ref,
+            "time_ref": norm.time_ref,
+            "velocity_ref": norm.velocity_ref,
+            "b_field_ref": norm.b_field_ref,
+            "density_ref": norm.density_ref,
+        },
+        "stagger": stagger.convention if stagger is not None else None,
         "species": species_dicts,
         "physics": {
             "gamma": physics.gamma,
@@ -240,9 +291,9 @@ def fields(
     step: Annotated[
         str, typer.Option("--step", help="Timestep (default: last).")
     ] = "last",
-    native: Annotated[
+    mapping: Annotated[
         bool,
-        typer.Option("--native", help="Show native-to-canonical mapping."),
+        typer.Option("--mapping", help="Show native-to-canonical name mapping."),
     ] = False,
     derived: Annotated[
         bool,
@@ -253,7 +304,7 @@ def fields(
     ] = False,
     all_sections: Annotated[
         bool,
-        typer.Option("--all", help="Show native, derived, and auxiliary."),
+        typer.Option("--all", help="Show mapping, derived, and auxiliary."),
     ] = False,
     json_output: Annotated[
         bool, typer.Option("--json", help="Output as JSON.")
@@ -261,10 +312,9 @@ def fields(
 ) -> None:
     """List available fields at a timestep."""
     sim = _open(path)
-    step_list = parse_steps(step, sim)
-    step_val = step_list[0]
+    step_val = _require_single_step(parse_steps(step, sim), step)
 
-    show_native = native or all_sections
+    show_mapping = mapping or all_sections
     show_derived = derived or all_sections
     show_aux = aux or all_sections
 
@@ -279,17 +329,19 @@ def fields(
 
     lines: list[str] = []
 
-    if show_native:
-        mapping = sim.available_fields_mapping(step_val)
-        lines.append("Native \u2192 Canonical mapping:")
-        max_canon = max((len(k) for k in mapping), default=0)
-        for canon in sorted(mapping):
-            native_name = mapping[canon]
-            label = native_name if native_name is not None else "(computed)"
-            lines.append(f"  {canon:<{max_canon}}  \u2190  {label}")
-        data["native_mapping"] = {
-            k: v if v is not None else "(computed)" for k, v in sorted(mapping.items())
-        }
+    if show_mapping:
+        field_map = sim.available_fields_mapping(step_val)
+        lines.append("Native \u2192 Canonical:")
+        # Build display pairs: (native_label, canonical)
+        pairs = []
+        for canon in sorted(field_map):
+            native_name = field_map[canon]
+            pairs.append((native_name or "(computed)", canon))
+        max_native = max((len(p[0]) for p in pairs), default=0)
+        for native_label, canon in pairs:
+            lines.append(f"  {native_label:<{max_native}}  \u2192  {canon}")
+        # JSON preserves None for computed fields
+        data["native_mapping"] = dict(sorted(field_map.items()))
     else:
         lines.append("Fields:")
         for name in canonical:
@@ -453,17 +505,29 @@ def compare(
     ] = False,
 ) -> None:
     """Compare fields between two simulations."""
+    if metric not in ("l2", "linf", "both"):
+        msg = f"Invalid --metric {metric!r}. Use l2, linf, or both."
+        raise typer.BadParameter(msg)
+
     from pypic.comparison import compare_fields as cmp_fields
     from pypic.comparison import field_comparison_report
 
     sim_a = _open(path_a)
     sim_b = _open(path_b)
 
-    step_list = parse_steps(step, sim_a)
-    step_val = step_list[0]
+    step_val = _require_single_step(parse_steps(step, sim_a), step)
 
-    ds_a = sim_a.read(step_val)
-    ds_b = sim_b.read(step_val)
+    if step_val not in sim_b.steps:
+        typer.echo(
+            f"Error: step {step_val} not available in {path_b}. "
+            f"Available: {sim_b.steps}",
+            err=True,
+        )
+        raise typer.Exit(1)
+
+    read_fields = [field] if field is not None else None
+    ds_a = sim_a.read(step_val, fields=read_fields)
+    ds_b = sim_b.read(step_val, fields=read_fields)
 
     cmp_kwargs: dict[str, object] = {
         "units": comp_units,
@@ -492,6 +556,12 @@ def compare(
                 **cmp_kwargs,  # type: ignore[arg-type]
             )
 
+        grid_a, grid_b = ds_a.grid, ds_b.grid
+        res_ratio = [
+            sa / sb if sb else float("inf")
+            for sa, sb in zip(grid_a.spacing, grid_b.spacing, strict=True)
+        ]
+
         text_lines = [
             f"Comparing: {path_a} vs {path_b}",
             f"Field: {field}  Step: {step_val}  Units: {comp_units}",
@@ -500,6 +570,15 @@ def compare(
             text_lines.append(f"  L2 relative error: {results['l2']:.6g}")
         if "linf" in results:
             text_lines.append(f"  L-inf error:       {results['linf']:.6g}")
+        dims_a = " x ".join(str(d) for d in grid_a.dimensions)
+        dims_b = " x ".join(str(d) for d in grid_b.dimensions)
+        text_lines.append("")
+        text_lines.append("Grid:")
+        text_lines.append(f"  A dims: {dims_a}")
+        text_lines.append(f"  B dims: {dims_b}")
+        text_lines.append(
+            f"  Resolution ratio: {' x '.join(f'{r:.2g}' for r in res_ratio)}"
+        )
 
         data: dict[str, object] = {
             "path_a": str(path_a),
@@ -509,6 +588,11 @@ def compare(
             "units": comp_units,
             "metric": metric,
             **results,
+            "grid": {
+                "dimensions_a": list(grid_a.dimensions),
+                "dimensions_b": list(grid_b.dimensions),
+                "resolution_ratio": res_ratio,
+            },
         }
     else:
         report = field_comparison_report(
