@@ -424,6 +424,15 @@ class TestPlot:
         )
         assert result.exit_code == 0, result.output
 
+    def test_plane_normal_axis_name(self, tmp_path: Path) -> None:
+        """--plane accepts a single axis name as the normal (e.g. 'z')."""
+        d = _make_sim_dir(tmp_path)
+        out = str(tmp_path / "norm.png")
+        result = runner.invoke(
+            app, ["plot", str(d), "--field", "B1", "--plane", "z", "--output", out]
+        )
+        assert result.exit_code == 0, result.output
+
     def test_with_index(self, tmp_path: Path) -> None:
         d = _make_sim_dir(tmp_path)
         out = str(tmp_path / "idx.png")

@@ -171,16 +171,42 @@ def _get_field_array(
         raise typer.Exit(1) from None
 
 
-_PLANE_MAP = {"xy": "z", "xz": "y", "yz": "x"}
+_CARTESIAN_PLANE_MAP = {"xy": "z", "xz": "y", "yz": "x"}
 
 
-def _plane_normal(plane_str: str) -> str:
-    """Map a plane shorthand (``xy``, ``xz``, ``yz``) to a normal axis name."""
-    try:
-        return _PLANE_MAP[plane_str.lower()]
-    except KeyError:
-        msg = f"Invalid --plane {plane_str!r}. Use xy, xz, or yz."
-        raise typer.BadParameter(msg) from None
+def _plane_normal(plane_str: str, grid: GridInfo) -> str:
+    """Resolve a ``--plane`` value to the normal axis name.
+
+    Accepts Cartesian shorthands (``xy``, ``xz``, ``yz``), a pair of
+    axis names from the grid's geometry (e.g. ``rθ``, ``rφ``), or a
+    single axis name interpreted as the normal directly (e.g. ``z``,
+    ``φ``).
+    """
+    val = plane_str.lower()
+    axis_names = grid.geometry.axis_names
+
+    # Cartesian shorthands
+    if val in _CARTESIAN_PLANE_MAP:
+        return _CARTESIAN_PLANE_MAP[val]
+
+    # Single axis name → interpret as the normal axis directly
+    if val in axis_names:
+        return val
+
+    # Pair of axis names → normal is the remaining axis
+    if len(val) >= 2:
+        for i, name in enumerate(axis_names):
+            others = [n for j, n in enumerate(axis_names) if j != i]
+            pair = "".join(others)
+            if val == pair:
+                return name
+
+    names_str = ", ".join(axis_names)
+    msg = (
+        f"Invalid --plane {plane_str!r}. "
+        f"Use a pair of axis names or a single normal axis ({names_str})."
+    )
+    raise typer.BadParameter(msg)
 
 
 def _auto_plane_normal(grid: GridInfo) -> str:
@@ -210,7 +236,7 @@ def _resolve_plane(
         msg = "Cannot specify both --index and --coord."
         raise typer.BadParameter(msg)
 
-    normal = _plane_normal(plane_str) if plane_str else _auto_plane_normal(grid)
+    normal = _plane_normal(plane_str, grid) if plane_str else _auto_plane_normal(grid)
 
     if coord is not None:
         axis_idx = list(grid.geometry.axis_names).index(normal)
@@ -823,7 +849,7 @@ def plot(
     ] = "last",
     plane: Annotated[
         str | None,
-        typer.Option("--plane", help="Slice plane: xy, xz, or yz."),
+        typer.Option("--plane", help="Slice plane (xy/xz/yz, axis pair, or normal)."),
     ] = None,
     index: Annotated[
         int | None,
@@ -960,7 +986,7 @@ def plot_compare(
     ] = "last",
     plane: Annotated[
         str | None,
-        typer.Option("--plane", help="Slice plane: xy, xz, or yz."),
+        typer.Option("--plane", help="Slice plane (xy/xz/yz, axis pair, or normal)."),
     ] = None,
     comp_units: Annotated[
         str,
