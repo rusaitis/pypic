@@ -61,10 +61,9 @@ def main(
     if level_name not in ("DEBUG", "INFO", "WARNING", "ERROR"):
         msg = f"Invalid --log-level {log_level!r}. Use debug, info, warning, or error."
         raise typer.BadParameter(msg)
-    logging.basicConfig(level=getattr(logging, level_name))
+    logging.basicConfig(level=getattr(logging, level_name), force=True)
     logging.captureWarnings(True)
-    if debug:
-        app.pretty_exceptions_enable = True
+    app.pretty_exceptions_enable = debug
 
 
 # -- Step parsing ------------------------------------------------------------
@@ -508,6 +507,12 @@ def compare(
     if metric not in ("l2", "linf", "both"):
         msg = f"Invalid --metric {metric!r}. Use l2, linf, or both."
         raise typer.BadParameter(msg)
+    if comp_units not in ("si", "code"):
+        msg = f"Invalid --units {comp_units!r}. Use si or code."
+        raise typer.BadParameter(msg)
+    if nan_policy not in ("omit", "propagate", "raise"):
+        msg = f"Invalid --nan-policy {nan_policy!r}. Use omit, propagate, or raise."
+        raise typer.BadParameter(msg)
 
     from pypic.comparison import compare_fields as cmp_fields
     from pypic.comparison import field_comparison_report
@@ -558,7 +563,7 @@ def compare(
 
         grid_a, grid_b = ds_a.grid, ds_b.grid
         res_ratio = [
-            sa / sb if sb else float("inf")
+            max(sa, sb) / min(sa, sb) if min(sa, sb) else float("inf")
             for sa, sb in zip(grid_a.spacing, grid_b.spacing, strict=True)
         ]
 

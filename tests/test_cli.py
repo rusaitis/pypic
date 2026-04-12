@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from typing import TYPE_CHECKING
 
 import h5py
@@ -299,6 +300,36 @@ def test_bad_metric(tmp_path):
     )
     assert result.exit_code != 0
     assert "Invalid --metric" in result.output
+
+
+def test_bad_units(tmp_path):
+    d = _make_sim_dir(tmp_path)
+    result = runner.invoke(
+        app, ["compare", str(d), str(d), "--field", "B1", "--units", "cgs"]
+    )
+    assert result.exit_code != 0
+    assert "Invalid --units" in result.output
+
+
+def test_bad_nan_policy(tmp_path):
+    d = _make_sim_dir(tmp_path)
+    result = runner.invoke(
+        app,
+        ["compare", str(d), str(d), "--field", "B1", "--nan-policy", "ignore"],
+    )
+    assert result.exit_code != 0
+    assert "Invalid --nan-policy" in result.output
+
+
+def test_log_level_not_sticky(tmp_path):
+    """Verify logging config resets between invocations (force=True)."""
+    d = _make_sim_dir(tmp_path)
+    # First call with debug level
+    runner.invoke(app, ["--log-level", "debug", "info", str(d)])
+    # Second call with quiet — should not inherit debug
+    result = runner.invoke(app, ["-q", "info", str(d)])
+    assert result.exit_code == 0, result.output
+    assert logging.getLogger().level >= logging.ERROR
 
 
 def test_missing_field(tmp_path):
