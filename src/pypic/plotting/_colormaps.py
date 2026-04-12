@@ -207,3 +207,111 @@ def symmetric_clim(data: FloatArray) -> tuple[float, float]:
     if not np.isfinite(absmax) or absmax == 0.0:
         return (-1e-8, 1e-8)
     return (-absmax, absmax)
+
+
+def round_nice(value: float) -> float:
+    r"""Round a positive value to the nearest 1-2-5 $\times 10^n$ step.
+
+    The 1-2-5 sequence (..., 0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 50, ...)
+    produces clean colorbar tick labels and avoids awkward intermediate
+    values like 3 or 7.
+
+    Parameters
+    ----------
+    value : float
+        Positive value to round. Zero returns 0.
+
+    Returns
+    -------
+    float
+
+    Examples
+    --------
+    >>> round_nice(0.7)
+    0.5
+    >>> round_nice(3.5)
+    5.0
+    >>> round_nice(150.0)
+    200.0
+    """
+    if value <= 0:
+        return 0.0
+    import math
+
+    exponent = math.floor(math.log10(value))
+    mantissa = value / 10**exponent
+    candidates = (1.0, 2.0, 5.0, 10.0)
+    # On tie, pick the larger candidate (wider color range is safer)
+    best = min(candidates, key=lambda c: (abs(c - mantissa), -c))
+    return float(best * 10**exponent)
+
+
+def auto_clim(
+    values: FloatArray,
+    *,
+    positive_definite: bool,
+) -> tuple[float, float]:
+    r"""Compute auto color limits using 3$\sigma$ from the median.
+
+    Positive-definite fields get ``(0, round_nice(median + 3*sigma))``.
+    Signed fields get ``(-spread, spread)`` where
+    ``spread = round_nice(3*sigma)``, symmetric around zero so the
+    colormap's zero-crossing aligns with physical zero.
+
+    Parameters
+    ----------
+    values : FloatArray
+        Field values (may contain NaN).
+    positive_definite : bool
+        Whether the field is positive-definite.
+
+    Returns
+    -------
+    tuple[float, float]
+        ``(vmin, vmax)``
+    """
+    finite = values[np.isfinite(values)]
+    if finite.size == 0:
+        return (-1e-8, 1e-8) if not positive_definite else (0.0, 1e-8)
+
+    median = float(np.median(finite))
+    sigma = float(np.std(finite))
+
+    if sigma == 0.0:
+        if positive_definite:
+            return (0.0, round_nice(abs(median)) if median != 0 else 1e-8)
+        absmax = abs(median) if median != 0 else 1e-8
+        return (-round_nice(absmax), round_nice(absmax))
+
+    if positive_definite:
+        vmax = round_nice(median + 3.0 * sigma)
+        return (0.0, vmax if vmax > 0 else 1e-8)
+
+    spread = round_nice(3.0 * sigma)
+    return (-spread, spread)
+
+
+def _auto_linthresh(values: FloatArray) -> float:
+    """Auto-detect the linear threshold for symlog normalization.
+
+    Returns the median of the absolute nonzero finite values, which
+    places the linear/log transition at the typical magnitude of the
+    data — keeping the linear region around zero small enough to
+    resolve sign changes while letting the log tails capture the
+    dynamic range.
+
+    Parameters
+    ----------
+    values : FloatArray
+        Field values.
+
+    Returns
+    -------
+    float
+        Positive threshold. Falls back to 1e-8 if no valid data.
+    """
+    finite = values[np.isfinite(values)]
+    nonzero = np.abs(finite[finite != 0])
+    if nonzero.size == 0:
+        return 1e-8
+    return float(np.median(nonzero))

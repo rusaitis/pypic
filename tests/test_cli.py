@@ -19,6 +19,16 @@ from pypic.cli import app  # noqa: E402
 if TYPE_CHECKING:
     from pathlib import Path
 
+try:
+    import matplotlib
+
+    matplotlib.use("Agg")
+    _HAS_MPL = True
+except ImportError:
+    _HAS_MPL = False
+
+mpl_required = pytest.mark.skipif(not _HAS_MPL, reason="matplotlib required")
+
 runner = CliRunner()
 
 # Minimal simulation.toml for a SimpleReader-compatible dataset.
@@ -384,3 +394,295 @@ def test_quiet_suppresses_warnings(tmp_path):
     )
     assert result.exit_code == 0, result.output
     assert "NaN" not in result.output
+
+
+# -- plot --------------------------------------------------------------------
+
+
+@mpl_required
+class TestPlot:
+    def test_minimal(self, tmp_path: Path) -> None:
+        d = _make_sim_dir(tmp_path)
+        out = str(tmp_path / "out.png")
+        result = runner.invoke(app, ["plot", str(d), "--field", "B1", "--output", out])
+        assert result.exit_code == 0, result.output
+        assert (tmp_path / "out.png").exists()
+
+    def test_plane_xy(self, tmp_path: Path) -> None:
+        d = _make_sim_dir(tmp_path)
+        out = str(tmp_path / "xy.png")
+        result = runner.invoke(
+            app, ["plot", str(d), "--field", "B1", "--plane", "xy", "--output", out]
+        )
+        assert result.exit_code == 0, result.output
+
+    def test_plane_xz(self, tmp_path: Path) -> None:
+        d = _make_sim_dir(tmp_path)
+        out = str(tmp_path / "xz.png")
+        result = runner.invoke(
+            app, ["plot", str(d), "--field", "B1", "--plane", "xz", "--output", out]
+        )
+        assert result.exit_code == 0, result.output
+
+    def test_with_index(self, tmp_path: Path) -> None:
+        d = _make_sim_dir(tmp_path)
+        out = str(tmp_path / "idx.png")
+        result = runner.invoke(
+            app, ["plot", str(d), "--field", "B1", "--index", "2", "--output", out]
+        )
+        assert result.exit_code == 0, result.output
+
+    def test_with_coord(self, tmp_path: Path) -> None:
+        d = _make_sim_dir(tmp_path)
+        out = str(tmp_path / "coord.png")
+        result = runner.invoke(
+            app, ["plot", str(d), "--field", "B1", "--coord", "1.5", "--output", out]
+        )
+        assert result.exit_code == 0, result.output
+
+    def test_index_and_coord_conflict(self, tmp_path: Path) -> None:
+        d = _make_sim_dir(tmp_path)
+        out = str(tmp_path / "err.png")
+        result = runner.invoke(
+            app,
+            [
+                "plot",
+                str(d),
+                "--field",
+                "B1",
+                "--index",
+                "2",
+                "--coord",
+                "1.5",
+                "--output",
+                out,
+            ],
+        )
+        assert result.exit_code != 0
+
+    def test_derived_field(self, tmp_path: Path) -> None:
+        d = _make_sim_dir(tmp_path)
+        out = str(tmp_path / "mag.png")
+        result = runner.invoke(app, ["plot", str(d), "--field", "|B|", "--output", out])
+        assert result.exit_code == 0, result.output
+
+    def test_log_scale(self, tmp_path: Path) -> None:
+        d = _make_sim_dir(tmp_path)
+        out = str(tmp_path / "log.png")
+        result = runner.invoke(
+            app, ["plot", str(d), "--field", "|B|", "--scale", "log", "--output", out]
+        )
+        assert result.exit_code == 0, result.output
+
+    def test_symlog_scale(self, tmp_path: Path) -> None:
+        d = _make_sim_dir(tmp_path)
+        out = str(tmp_path / "sym.png")
+        result = runner.invoke(
+            app, ["plot", str(d), "--field", "B1", "--scale", "symlog", "--output", out]
+        )
+        assert result.exit_code == 0, result.output
+
+    def test_symlog_with_linthresh(self, tmp_path: Path) -> None:
+        d = _make_sim_dir(tmp_path)
+        out = str(tmp_path / "sym_lt.png")
+        result = runner.invoke(
+            app,
+            [
+                "plot",
+                str(d),
+                "--field",
+                "B1",
+                "--scale",
+                "symlog",
+                "--linthresh",
+                "0.1",
+                "--output",
+                out,
+            ],
+        )
+        assert result.exit_code == 0, result.output
+
+    def test_custom_clim(self, tmp_path: Path) -> None:
+        d = _make_sim_dir(tmp_path)
+        out = str(tmp_path / "clim.png")
+        result = runner.invoke(
+            app,
+            [
+                "plot",
+                str(d),
+                "--field",
+                "B1",
+                "--vmin",
+                "-1",
+                "--vmax",
+                "1",
+                "--output",
+                out,
+            ],
+        )
+        assert result.exit_code == 0, result.output
+
+    def test_colormap(self, tmp_path: Path) -> None:
+        d = _make_sim_dir(tmp_path)
+        out = str(tmp_path / "cmap.png")
+        result = runner.invoke(
+            app,
+            ["plot", str(d), "--field", "B1", "--colormap", "viridis", "--output", out],
+        )
+        assert result.exit_code == 0, result.output
+
+    def test_dpi(self, tmp_path: Path) -> None:
+        d = _make_sim_dir(tmp_path)
+        out = str(tmp_path / "dpi.png")
+        result = runner.invoke(
+            app,
+            ["plot", str(d), "--field", "B1", "--dpi", "72", "--output", out],
+        )
+        assert result.exit_code == 0, result.output
+        assert (tmp_path / "dpi.png").exists()
+
+    def test_format_override(self, tmp_path: Path) -> None:
+        d = _make_sim_dir(tmp_path)
+        out = str(tmp_path / "out.pdf")
+        result = runner.invoke(
+            app,
+            ["plot", str(d), "--field", "B1", "--format", "pdf", "--output", out],
+        )
+        assert result.exit_code == 0, result.output
+
+    def test_res_downsample(self, tmp_path: Path) -> None:
+        d = _make_sim_dir(tmp_path)
+        out = str(tmp_path / "lo.png")
+        result = runner.invoke(
+            app,
+            ["plot", str(d), "--field", "B1", "--res", "2x2", "--output", out],
+        )
+        assert result.exit_code == 0, result.output
+
+    def test_batch_steps(self, tmp_path: Path) -> None:
+        d = _make_sim_dir(tmp_path, n_steps=3)
+        tpl = str(tmp_path / "frames" / "B_{step:06d}.png")
+        result = runner.invoke(
+            app, ["plot", str(d), "--field", "B1", "--step", "all", "--output", tpl]
+        )
+        assert result.exit_code == 0, result.output
+        for i in range(3):
+            assert (tmp_path / "frames" / f"B_{i:06d}.png").exists()
+
+    def test_batch_no_output_error(self, tmp_path: Path) -> None:
+        d = _make_sim_dir(tmp_path, n_steps=3)
+        result = runner.invoke(app, ["plot", str(d), "--field", "B1", "--step", "all"])
+        assert result.exit_code != 0
+
+    def test_bad_scale(self, tmp_path: Path) -> None:
+        d = _make_sim_dir(tmp_path)
+        out = str(tmp_path / "err.png")
+        result = runner.invoke(
+            app, ["plot", str(d), "--field", "B1", "--scale", "banana", "--output", out]
+        )
+        assert result.exit_code != 0
+        assert "Invalid --scale" in result.output
+
+    def test_bad_plane(self, tmp_path: Path) -> None:
+        d = _make_sim_dir(tmp_path)
+        out = str(tmp_path / "err.png")
+        result = runner.invoke(
+            app, ["plot", str(d), "--field", "B1", "--plane", "ab", "--output", out]
+        )
+        assert result.exit_code != 0
+        assert "Invalid --plane" in result.output
+
+    def test_missing_field(self, tmp_path: Path) -> None:
+        d = _make_sim_dir(tmp_path)
+        out = str(tmp_path / "err.png")
+        result = runner.invoke(
+            app, ["plot", str(d), "--field", "nonexistent", "--output", out]
+        )
+        assert result.exit_code != 0
+        assert "Error:" in result.output
+
+
+# -- plot-compare ------------------------------------------------------------
+
+
+@mpl_required
+class TestPlotCompare:
+    def test_minimal(self, tmp_path: Path) -> None:
+        d = _make_sim_dir(tmp_path)
+        out = str(tmp_path / "cmp.png")
+        result = runner.invoke(
+            app,
+            ["plot-compare", str(d), str(d), "--field", "B1", "--output", out],
+        )
+        assert result.exit_code == 0, result.output
+        assert (tmp_path / "cmp.png").exists()
+
+    def test_with_plane(self, tmp_path: Path) -> None:
+        d = _make_sim_dir(tmp_path)
+        out = str(tmp_path / "cmp_xz.png")
+        result = runner.invoke(
+            app,
+            [
+                "plot-compare",
+                str(d),
+                str(d),
+                "--field",
+                "B1",
+                "--plane",
+                "xz",
+                "--output",
+                out,
+            ],
+        )
+        assert result.exit_code == 0, result.output
+
+    def test_diff_limits(self, tmp_path: Path) -> None:
+        d = _make_sim_dir(tmp_path)
+        out = str(tmp_path / "cmp_dl.png")
+        result = runner.invoke(
+            app,
+            [
+                "plot-compare",
+                str(d),
+                str(d),
+                "--field",
+                "B1",
+                "--diff-vmin",
+                "-0.5",
+                "--diff-vmax",
+                "0.5",
+                "--output",
+                out,
+            ],
+        )
+        assert result.exit_code == 0, result.output
+
+    def test_bad_units(self, tmp_path: Path) -> None:
+        d = _make_sim_dir(tmp_path)
+        out = str(tmp_path / "err.png")
+        result = runner.invoke(
+            app,
+            [
+                "plot-compare",
+                str(d),
+                str(d),
+                "--field",
+                "B1",
+                "--units",
+                "cgs",
+                "--output",
+                out,
+            ],
+        )
+        assert result.exit_code != 0
+        assert "Invalid --units" in result.output
+
+    def test_missing_field(self, tmp_path: Path) -> None:
+        d = _make_sim_dir(tmp_path)
+        out = str(tmp_path / "err.png")
+        result = runner.invoke(
+            app,
+            ["plot-compare", str(d), str(d), "--field", "nonexistent", "--output", out],
+        )
+        assert result.exit_code != 0
+        assert "Error:" in result.output

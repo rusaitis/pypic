@@ -32,6 +32,8 @@ def plot_field_slice(
     alpha: float = 1.0,
     symmetric: bool | None = None,
     log_scale: bool = False,
+    symlog: bool = False,
+    linthresh: float | None = None,
     title: str | None = None,
     step: int | None = None,
     time: float | None = None,
@@ -78,6 +80,15 @@ def plot_field_slice(
     log_scale : bool
         Use logarithmic color mapping (``LogNorm``). Non-positive values
         are masked with NaN. Ignored when *symmetric* is ``True``.
+    symlog : bool
+        Use symmetric-log color mapping (``SymLogNorm``). Combines a
+        linear region around zero with logarithmic tails — ideal for
+        signed fields with large dynamic range (current density,
+        vorticity). Mutually exclusive with *log_scale*.
+    linthresh : float | None
+        Linear threshold for symlog. Values within ``[-linthresh,
+        linthresh]`` are mapped linearly; outside is logarithmic.
+        ``None`` auto-detects from ``median(|nonzero values|)``.
     title : str | None
         Override auto-generated title.
     step : int | None
@@ -148,8 +159,8 @@ def plot_field_slice(
     if use_symmetric is None:
         use_symmetric = not is_positive_definite(field, values, info)
 
-    # Log scale: mask non-positive values; incompatible with symmetric
-    norm = None
+    # Log/symlog scale: mask non-positive values; incompatible with symmetric
+    norm: object = None
     if log_scale and use_symmetric:
         warnings.warn(
             "log_scale=True ignored because symmetric color limits are active",
@@ -169,6 +180,14 @@ def plot_field_slice(
             norm = LogNorm(vmin=auto_vmin, vmax=auto_vmax)
         values = plot_values
         # Don't pass vmin/vmax separately when using norm
+        vmin, vmax = None, None
+    elif symlog:
+        from matplotlib.colors import SymLogNorm
+
+        from pypic.plotting._colormaps import _auto_linthresh
+
+        lt = linthresh if linthresh is not None else _auto_linthresh(values)
+        norm = SymLogNorm(linthresh=lt, vmin=vmin, vmax=vmax)
         vmin, vmax = None, None
     elif vmin is None and vmax is None and use_symmetric:
         vmin, vmax = symmetric_clim(values)

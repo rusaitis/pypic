@@ -155,10 +155,33 @@ def prepare_data(data: FieldDataset, plane: PlaneSelection | None) -> FieldDatas
     return data
 
 
-def maybe_save(fig: Figure, save: str | None) -> None:
-    """Save figure to *save* path and close, if *save* is not None."""
+def maybe_save(
+    fig: Figure,
+    save: str | None,
+    *,
+    dpi: int | None = None,
+    fmt: str | None = None,
+) -> None:
+    """Save figure to *save* path and close, if *save* is not None.
+
+    Parameters
+    ----------
+    fig : Figure
+        Matplotlib figure.
+    save : str | None
+        Output path. ``None`` is a no-op.
+    dpi : int | None
+        Override DPI for the saved file.
+    fmt : str | None
+        Override format (e.g. ``"png"``, ``"pdf"``).
+    """
     if save is not None:
         import matplotlib.pyplot as plt
 
-        fig.savefig(save)
+        kwargs: dict[str, object] = {}
+        if dpi is not None:
+            kwargs["dpi"] = dpi
+        if fmt is not None:
+            kwargs["format"] = fmt
+        fig.savefig(save, **kwargs)  # type: ignore[arg-type]
         plt.close(fig)

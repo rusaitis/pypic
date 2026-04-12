@@ -16,6 +16,7 @@ from pypic.plotting._badge import (
     add_legend,
 )
 from pypic.plotting._colorbar import ExtremesMode, add_colorbar, add_inset_colorbar
+from pypic.plotting._colormaps import auto_clim, round_nice
 from pypic.plotting._theme_io import (
     available_themes,
     export_themes,
@@ -66,6 +67,7 @@ __all__ = [
     "add_planet",
     "apply_grid",
     "apply_theme_to_figure",
+    "auto_clim",
     "available_themes",
     "export_themes",
     "get_active_theme",
@@ -84,6 +86,7 @@ __all__ = [
     "plot_scatter",
     "plot_streamlines",
     "plot_time_series",
+    "round_nice",
     "save_theme",
     "set_theme",
     "style_legend",

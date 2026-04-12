@@ -30,10 +30,14 @@ def plot_comparison(
     diff_cmap: str | Colormap | None = None,
     vmin: float | None = None,
     vmax: float | None = None,
+    diff_vmin: float | None = None,
+    diff_vmax: float | None = None,
     labels: tuple[str, str] = ("A", "B"),
     alpha: float = 1.0,
     symmetric: bool | None = None,
     log_scale: bool = False,
+    symlog: bool = False,
+    linthresh: float | None = None,
     step: int | None = None,
     time: float | None = None,
     colorbar: bool | Literal["inset"] = True,
@@ -65,6 +69,9 @@ def plot_comparison(
         Override colormap for difference panel. Defaults to diverging.
     vmin, vmax : float | None
         Color limits for A/B panels. ``None`` for auto.
+    diff_vmin, diff_vmax : float | None
+        Color limits for the difference panel. ``None`` uses symmetric
+        limits from :func:`~pypic.plotting._colormaps.symmetric_clim`.
     labels : tuple[str, str]
         Panel labels for A and B.
     alpha : float
@@ -161,8 +168,8 @@ def plot_comparison(
     if use_symmetric is None:
         use_symmetric = not is_positive_definite(field, values_a, info)
 
-    # Log scale: incompatible with symmetric
-    norm = None
+    # Log/symlog scale: incompatible with symmetric
+    norm: object = None
     if log_scale and use_symmetric:
         warnings.warn(
             "log_scale=True ignored because symmetric color limits are active",
@@ -184,8 +191,18 @@ def plot_comparison(
 
         safe_min = combined_min if combined_min > 0 else 1e-10
         norm = LogNorm(vmin=safe_min, vmax=combined_max)
+    elif symlog:
+        from matplotlib.colors import SymLogNorm
 
-    diff_vmin, diff_vmax = symmetric_clim(diff)
+        from pypic.plotting._colormaps import _auto_linthresh
+
+        lt = linthresh if linthresh is not None else _auto_linthresh(values_a)
+        norm = SymLogNorm(linthresh=lt, vmin=combined_min, vmax=combined_max)
+
+    if diff_vmin is None or diff_vmax is None:
+        auto_dvmin, auto_dvmax = symmetric_clim(diff)
+        diff_vmin = diff_vmin if diff_vmin is not None else auto_dvmin
+        diff_vmax = diff_vmax if diff_vmax is not None else auto_dvmax
 
     unit_str = units if units else ""
     cb_label = field_label(info, unit_str=unit_str)

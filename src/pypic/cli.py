@@ -1,5 +1,7 @@
 """pypic command-line interface."""
 
+from __future__ import annotations
+
 import importlib.metadata
 import json
 import logging
@@ -9,7 +11,9 @@ from typing import TYPE_CHECKING, Annotated
 import typer
 
 if TYPE_CHECKING:
+    from pypic.grid import GridInfo
     from pypic.readers._registry import Simulation
+    from pypic.selections import PlaneSelection
     from pypic.types import FloatArray
 
 app = typer.Typer(
@@ -64,7 +68,7 @@ def main(
     app.pretty_exceptions_enable = debug
 
 
-def parse_steps(raw: str, sim: "Simulation") -> list[int]:
+def parse_steps(raw: str, sim: Simulation) -> list[int]:
     """Parse ``--step`` syntax into a list of timestep indices.
 
     Supports: ``N`` (single int), ``first``, ``last``, ``all``,
@@ -132,7 +136,7 @@ def _require_single_step(step_list: list[int], raw: str) -> int:
     return step_list[0]
 
 
-def _open(path: Path) -> "Simulation":
+def _open(path: Path) -> Simulation:
     """Open a simulation, translating errors to CLI messages."""
     from pypic.readers._registry import open_simulation
 
@@ -152,8 +156,8 @@ def _output(data: dict[str, object], text: str, *, json_mode: bool) -> None:
 
 
 def _get_field_array(
-    sim: "Simulation", step: int, field: str, units: str | None
-) -> "FloatArray":
+    sim: Simulation, step: int, field: str, units: str | None
+) -> FloatArray:
     """Read a field (or compute if derived), convert units."""
     import numpy as np
 
@@ -165,6 +169,68 @@ def _get_field_array(
     except KeyError as exc:
         typer.echo(f"Error: {exc}", err=True)
         raise typer.Exit(1) from None
+
+
+_PLANE_MAP = {"xy": "z", "xz": "y", "yz": "x"}
+
+
+def _plane_normal(plane_str: str) -> str:
+    """Map a plane shorthand (``xy``, ``xz``, ``yz``) to a normal axis name."""
+    try:
+        return _PLANE_MAP[plane_str.lower()]
+    except KeyError:
+        msg = f"Invalid --plane {plane_str!r}. Use xy, xz, or yz."
+        raise typer.BadParameter(msg) from None
+
+
+def _auto_plane_normal(grid: GridInfo) -> str:
+    """Pick the normal axis for the largest cross-section.
+
+    Selects the axis with the smallest physical extent so the
+    remaining two axes span the widest view.
+    """
+    extents = [d * s for d, s in zip(grid.dimensions, grid.spacing, strict=True)]
+    axis_names = grid.geometry.axis_names
+    min_idx = extents.index(min(extents))
+    return axis_names[min_idx]
+
+
+def _resolve_plane(
+    grid: GridInfo,
+    plane_str: str | None,
+    index: int | None,
+    coord: float | None,
+) -> PlaneSelection:
+    """Build a :class:`PlaneSelection` from CLI flags."""
+    import numpy as np
+
+    from pypic.selections import PlaneSelection
+
+    if index is not None and coord is not None:
+        msg = "Cannot specify both --index and --coord."
+        raise typer.BadParameter(msg)
+
+    normal = _plane_normal(plane_str) if plane_str else _auto_plane_normal(grid)
+
+    if coord is not None:
+        axis_idx = list(grid.geometry.axis_names).index(normal)
+        coord_arr = grid.coordinate_arrays()[axis_idx]
+        index = int(np.argmin(np.abs(coord_arr - coord)))
+
+    return PlaneSelection(normal=normal, index=index)
+
+
+def _parse_resolution(res_str: str) -> tuple[int, int]:
+    """Parse a ``WxH`` resolution string."""
+    parts = res_str.lower().split("x")
+    if len(parts) != 2:
+        msg = f"Invalid --res {res_str!r}. Use WxH (e.g. 256x256)."
+        raise typer.BadParameter(msg)
+    try:
+        return (int(parts[0]), int(parts[1]))
+    except ValueError:
+        msg = f"Non-integer values in --res {res_str!r}."
+        raise typer.BadParameter(msg) from None
 
 
 @app.command()
@@ -638,6 +704,407 @@ def compare(
         }
 
     _output(data, "\n".join(text_lines), json_mode=json_output)
+
+
+def _render_plot(
+    path: Path,
+    step_val: int,
+    field: str,
+    plane_str: str | None,
+    index: int | None,
+    coord: float | None,
+    units: str | None,
+    frame: str | None,
+    output: str | None,
+    fmt: str | None,
+    dpi: int,
+    res: str | None,
+    vmin_arg: float | None,
+    vmax_arg: float | None,
+    colormap: str | None,
+    scale: str,
+    linthresh: float | None,
+) -> None:
+    """Render a single plot frame (called once per step)."""
+    import matplotlib
+
+    matplotlib.use("Agg" if output else matplotlib.get_backend())
+
+    from pypic.plotting._colormaps import auto_clim, is_positive_definite
+    from pypic.plotting._resolve import maybe_save
+    from pypic.plotting.slices import plot_field_slice
+
+    sim = _open(path)
+    try:
+        ds = sim.read(step_val, fields=[field])
+
+        if frame is not None:
+            ds = ds.transform_to(frame)
+
+        plane_sel: PlaneSelection | None = _resolve_plane(
+            ds.grid, plane_str, index, coord
+        )
+
+        scale_kwargs: dict[str, object] = {}
+        if scale == "log":
+            scale_kwargs["log_scale"] = True
+        elif scale == "symlog":
+            scale_kwargs["symlog"] = True
+            if linthresh is not None:
+                scale_kwargs["linthresh"] = linthresh
+
+        # Auto color limits when not provided
+        vmin, vmax = vmin_arg, vmax_arg
+        if vmin is None or vmax is None:
+            from pypic.plotting._resolve import prepare_data, resolve_field_values
+
+            preview = prepare_data(ds, plane_sel)
+            values = resolve_field_values(preview, field, units)
+            info = preview.field_info(field)
+            pos_def = is_positive_definite(field, values, info)
+            auto_vmin, auto_vmax = auto_clim(values, positive_definite=pos_def)
+            vmin = vmin if vmin is not None else auto_vmin
+            vmax = vmax if vmax is not None else auto_vmax
+
+        # Downsample if --res given
+        if res is not None:
+            max_w, max_h = _parse_resolution(res)
+            from pypic.plotting._resolve import prepare_data
+
+            preview_ds = prepare_data(ds, plane_sel)
+            dims = preview_ds.grid.dimensions
+            stride_x = max(1, dims[0] // max_w)
+            stride_y = max(1, dims[1] // max_h)
+            names = preview_ds.grid.surviving_axis_names
+            assert plane_sel is not None
+            ds = plane_sel.apply(ds)
+            ds = ds.isel(
+                {
+                    names[0]: slice(None, None, stride_x),
+                    names[1]: slice(None, None, stride_y),
+                }
+            )
+            plane_sel = None  # already applied
+
+        time = step_val * ds.grid.dt if ds.grid.dt else None
+
+        fig, _ = plot_field_slice(
+            ds,
+            field,
+            plane=plane_sel,
+            units=units,
+            vmin=vmin,
+            vmax=vmax,
+            cmap=colormap,
+            step=step_val,
+            time=time,
+            **scale_kwargs,  # type: ignore[arg-type]
+        )
+    except KeyError as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(1) from None
+
+    if output is not None:
+        maybe_save(fig, output, dpi=dpi, fmt=fmt)
+    else:
+        import matplotlib.pyplot as plt
+
+        plt.show()
+
+
+@app.command()
+def plot(
+    path: Annotated[Path, typer.Argument(help="Simulation directory.")],
+    field: Annotated[str, typer.Option("--field", help="Field name.")],
+    step: Annotated[
+        str, typer.Option("--step", help="Timestep (default: last).")
+    ] = "last",
+    plane: Annotated[
+        str | None,
+        typer.Option("--plane", help="Slice plane: xy, xz, or yz."),
+    ] = None,
+    index: Annotated[
+        int | None,
+        typer.Option("--index", help="Cell index along normal axis."),
+    ] = None,
+    coord: Annotated[
+        float | None,
+        typer.Option("--coord", help="Physical coordinate along normal."),
+    ] = None,
+    units: Annotated[
+        str | None,
+        typer.Option("--units", help="Display units (e.g. nT, km/s)."),
+    ] = None,
+    frame: Annotated[
+        str | None,
+        typer.Option("--frame", help="Reference frame."),
+    ] = None,
+    output: Annotated[
+        str | None,
+        typer.Option("--output", help="Output file (batch template: {step:06d}.png)."),
+    ] = None,
+    fmt: Annotated[
+        str | None,
+        typer.Option("--format", help="Image format: png, pdf, svg."),
+    ] = None,
+    dpi: Annotated[
+        int,
+        typer.Option("--dpi", help="Output DPI."),
+    ] = 150,
+    res: Annotated[
+        str | None,
+        typer.Option("--res", help="Max grid resolution WxH for fast preview."),
+    ] = None,
+    color_vmin: Annotated[
+        float | None,
+        typer.Option("--vmin", help="Color range minimum."),
+    ] = None,
+    color_vmax: Annotated[
+        float | None,
+        typer.Option("--vmax", help="Color range maximum."),
+    ] = None,
+    colormap: Annotated[
+        str | None,
+        typer.Option("--colormap", help="Colormap name."),
+    ] = None,
+    scale: Annotated[
+        str,
+        typer.Option("--scale", help="Color scale: linear, log, or symlog."),
+    ] = "linear",
+    linthresh: Annotated[
+        float | None,
+        typer.Option("--linthresh", help="Linear threshold for symlog scale."),
+    ] = None,
+    jobs: Annotated[
+        int,
+        typer.Option("--jobs", help="Parallel workers for batch rendering."),
+    ] = 1,
+) -> None:
+    """Plot a 2D field slice."""
+    if scale not in ("linear", "log", "symlog"):
+        msg = f"Invalid --scale {scale!r}. Use linear, log, or symlog."
+        raise typer.BadParameter(msg)
+    if fmt is not None and fmt not in ("png", "pdf", "svg"):
+        msg = f"Invalid --format {fmt!r}. Use png, pdf, or svg."
+        raise typer.BadParameter(msg)
+
+    sim = _open(path)
+    step_list = parse_steps(step, sim)
+
+    if len(step_list) > 1:
+        if output is None:
+            msg = (
+                "Multi-step plotting requires --output with a template "
+                "(e.g. 'frames/{step:06d}.png')."
+            )
+            raise typer.BadParameter(msg)
+        try:
+            output.format(step=0)
+        except (KeyError, IndexError, ValueError):
+            msg = (
+                f"Output template {output!r} must contain "
+                "'{{step}}' for batch rendering."
+            )
+            raise typer.BadParameter(msg) from None
+
+    if len(step_list) > 1 and jobs > 1:
+        import concurrent.futures
+
+        def _worker(sv: int) -> None:
+            assert output is not None  # guarded by outer check
+            out = output.format(step=sv)
+            if out:
+                Path(out).parent.mkdir(parents=True, exist_ok=True)
+            _render_plot(
+                path,
+                sv,
+                field,
+                plane,
+                index,
+                coord,
+                units,
+                frame,
+                out,
+                fmt,
+                dpi,
+                res,
+                color_vmin,
+                color_vmax,
+                colormap,
+                scale,
+                linthresh,
+            )
+
+        with concurrent.futures.ProcessPoolExecutor(max_workers=jobs) as pool:
+            futs = [pool.submit(_worker, sv) for sv in step_list]
+            for fut in concurrent.futures.as_completed(futs):
+                fut.result()
+    else:
+        for sv in step_list:
+            out = output.format(step=sv) if output and len(step_list) > 1 else output
+            if out:
+                Path(out).parent.mkdir(parents=True, exist_ok=True)
+            _render_plot(
+                path,
+                sv,
+                field,
+                plane,
+                index,
+                coord,
+                units,
+                frame,
+                out,
+                fmt,
+                dpi,
+                res,
+                color_vmin,
+                color_vmax,
+                colormap,
+                scale,
+                linthresh,
+            )
+
+
+@app.command(name="plot-compare")
+def plot_compare(
+    path_a: Annotated[Path, typer.Argument(help="First simulation directory.")],
+    path_b: Annotated[Path, typer.Argument(help="Second simulation directory.")],
+    field: Annotated[str, typer.Option("--field", help="Field name.")],
+    step: Annotated[
+        str, typer.Option("--step", help="Timestep (default: last).")
+    ] = "last",
+    plane: Annotated[
+        str | None,
+        typer.Option("--plane", help="Slice plane: xy, xz, or yz."),
+    ] = None,
+    comp_units: Annotated[
+        str,
+        typer.Option("--units", help="Unit system: si or code."),
+    ] = "si",
+    frame: Annotated[
+        str | None,
+        typer.Option("--frame", help="Transform both to this reference frame."),
+    ] = None,
+    color_vmin: Annotated[
+        float | None,
+        typer.Option("--vmin", help="Field panel color minimum."),
+    ] = None,
+    color_vmax: Annotated[
+        float | None,
+        typer.Option("--vmax", help="Field panel color maximum."),
+    ] = None,
+    diff_vmin: Annotated[
+        float | None,
+        typer.Option("--diff-vmin", help="Difference panel color minimum."),
+    ] = None,
+    diff_vmax: Annotated[
+        float | None,
+        typer.Option("--diff-vmax", help="Difference panel color maximum."),
+    ] = None,
+    output: Annotated[
+        str | None,
+        typer.Option("--output", help="Output file."),
+    ] = None,
+    fmt: Annotated[
+        str | None,
+        typer.Option("--format", help="Image format: png, pdf, svg."),
+    ] = None,
+    dpi: Annotated[
+        int,
+        typer.Option("--dpi", help="Output DPI."),
+    ] = 150,
+    colormap: Annotated[
+        str | None,
+        typer.Option("--colormap", help="Colormap for field panels."),
+    ] = None,
+    method: Annotated[
+        str,
+        typer.Option("--method", help="Interpolation method for regridding."),
+    ] = "linear",
+) -> None:
+    """Three-panel comparison plot: A | B | difference."""
+    if comp_units not in ("si", "code"):
+        msg = f"Invalid --units {comp_units!r}. Use si or code."
+        raise typer.BadParameter(msg)
+    if fmt is not None and fmt not in ("png", "pdf", "svg"):
+        msg = f"Invalid --format {fmt!r}. Use png, pdf, or svg."
+        raise typer.BadParameter(msg)
+
+    import matplotlib
+
+    matplotlib.use("Agg" if output else matplotlib.get_backend())
+
+    from pypic.plotting._resolve import maybe_save
+    from pypic.plotting.comparison import plot_comparison
+    from pypic.regrid import align_grids
+
+    sim_a = _open(path_a)
+    sim_b = _open(path_b)
+
+    step_val = _require_single_step(parse_steps(step, sim_a), step)
+    if step_val not in sim_b.steps:
+        typer.echo(
+            f"Error: step {step_val} not available in {path_b}. "
+            f"Available: {sim_b.steps}",
+            err=True,
+        )
+        raise typer.Exit(1)
+
+    try:
+        ds_a = sim_a.read(step_val, fields=[field])
+        ds_b = sim_b.read(step_val, fields=[field])
+
+        if frame is not None:
+            ds_a = ds_a.transform_to(frame)
+            ds_b = ds_b.transform_to(frame)
+
+        ds_a, ds_b = align_grids(ds_a, ds_b, method=method)
+
+        # Determine plane from the common grid's largest cross-section
+        plane_sel = _resolve_plane(ds_a.grid, plane, None, None)
+
+        time = step_val * ds_a.grid.dt if ds_a.grid.dt else None
+
+        # plot_comparison accepts display-unit strings (e.g. "nT"), not
+        # "si"/"code" mode selectors.  When the user asks for SI, we
+        # convert both datasets beforehand and plot in those values
+        # (units=None).  When "code", plot directly.
+        plot_units: str | None = None
+        if comp_units == "si":
+            import numpy as np
+
+            a_vals = ds_a.in_si(field)
+            b_vals = ds_b.in_si(field)
+            ds_a = ds_a.with_field(field, np.asarray(a_vals))
+            ds_b = ds_b.with_field(field, np.asarray(b_vals))
+
+        fig, _ = plot_comparison(
+            ds_a,
+            ds_b,
+            field,
+            plane=plane_sel,
+            units=plot_units,
+            vmin=color_vmin,
+            vmax=color_vmax,
+            diff_vmin=diff_vmin,
+            diff_vmax=diff_vmax,
+            cmap=colormap,
+            step=step_val,
+            time=time,
+            labels=(path_a.name, path_b.name),
+            show_error=True,
+        )
+    except KeyError as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(1) from None
+
+    if output is not None:
+        Path(output).parent.mkdir(parents=True, exist_ok=True)
+        maybe_save(fig, output, dpi=dpi, fmt=fmt)
+    else:
+        import matplotlib.pyplot as plt
+
+        plt.show()
 
 
 if __name__ == "__main__":

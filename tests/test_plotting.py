@@ -42,7 +42,13 @@ from pypic.plotting._badge import (  # noqa: E402
     _detect_overlay_defaults,
     _format_status_text,
 )
-from pypic.plotting._colormaps import is_positive_definite, symmetric_clim  # noqa: E402
+from pypic.plotting._colormaps import (  # noqa: E402
+    _auto_linthresh,
+    auto_clim,
+    is_positive_definite,
+    round_nice,
+    symmetric_clim,
+)
 from pypic.plotting.styles import _resolve_theme_arg  # noqa: E402
 from pypic.selections import PlaneSelection  # noqa: E402
 from pypic.units import Normalization  # noqa: E402
@@ -1437,4 +1443,79 @@ class TestPlotLineComparison:
         from pypic.plotting import plot_line_comparison
 
         fig, _ax = plot_line_comparison([ds_2d, ds_2d], "|B|", axis="x")
+        plt.close(fig)
+
+
+class TestRoundNice:
+    @pytest.mark.parametrize(
+        ("value", "expected"),
+        [
+            (0.7, 0.5),
+            (1.3, 1.0),
+            (3.5, 5.0),
+            (150.0, 200.0),
+            (0.003, 0.002),
+            (7.0, 5.0),
+            (15.0, 20.0),
+            (0.11, 0.1),
+        ],
+    )
+    def test_round_nice_values(self, value: float, expected: float) -> None:
+        assert round_nice(value) == pytest.approx(expected)
+
+    def test_zero(self) -> None:
+        assert round_nice(0.0) == 0.0
+
+
+class TestAutoClim:
+    def test_signed_symmetric(self) -> None:
+        data = np.array([-2.0, -1.0, 0.0, 1.0, 2.0])
+        vmin, vmax = auto_clim(data, positive_definite=False)
+        assert vmin == -vmax
+        assert vmin < 0
+
+    def test_positive_definite(self) -> None:
+        data = np.array([1.0, 2.0, 3.0, 4.0, 5.0])
+        vmin, vmax = auto_clim(data, positive_definite=True)
+        assert vmin == 0.0
+        assert vmax > 0
+
+    def test_constant_field(self) -> None:
+        data = np.full(100, 5.0)
+        vmin, vmax = auto_clim(data, positive_definite=True)
+        assert vmin == 0.0
+        assert vmax > 0
+
+    def test_all_nan(self) -> None:
+        data = np.full(10, np.nan)
+        vmin, vmax = auto_clim(data, positive_definite=False)
+        assert vmin < 0
+        assert vmax > 0
+
+    def test_all_nan_positive(self) -> None:
+        data = np.full(10, np.nan)
+        vmin, vmax = auto_clim(data, positive_definite=True)
+        assert vmin == 0.0
+        assert vmax > 0
+
+
+class TestAutoLinthresh:
+    def test_typical_data(self) -> None:
+        data = np.array([-5.0, -1.0, 0.0, 1.0, 5.0])
+        lt = _auto_linthresh(data)
+        assert lt > 0
+
+    def test_all_zero(self) -> None:
+        data = np.zeros(10)
+        lt = _auto_linthresh(data)
+        assert lt == pytest.approx(1e-8)
+
+
+class TestSymlogSlice:
+    def test_symlog_renders(self, ds_2d: FieldDataset) -> None:
+        fig, _ax = plot_field_slice(ds_2d, "B1", symlog=True)
+        plt.close(fig)
+
+    def test_symlog_with_linthresh(self, ds_2d: FieldDataset) -> None:
+        fig, _ax = plot_field_slice(ds_2d, "B1", symlog=True, linthresh=0.1)
         plt.close(fig)
