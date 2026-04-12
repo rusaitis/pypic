@@ -264,6 +264,14 @@ def test_bad_step(tmp_path):
     assert result.exit_code != 0
 
 
+def test_step_not_available(tmp_path):
+    d = _make_sim_dir(tmp_path)
+    # Only step 0 exists
+    result = runner.invoke(app, ["fields", str(d), "--step", "999"])
+    assert result.exit_code != 0
+    assert "not available" in result.output
+
+
 def test_empty_step_range(tmp_path):
     d = _make_sim_dir(tmp_path)
     # Only step 0 exists; range 10:20 matches nothing
@@ -332,10 +340,20 @@ def test_log_level_not_sticky(tmp_path):
     assert logging.getLogger().level >= logging.ERROR
 
 
-def test_missing_field(tmp_path):
+def test_missing_field_stats(tmp_path):
     d = _make_sim_dir(tmp_path)
     result = runner.invoke(app, ["stats", str(d), "--field", "nonexistent_field"])
     assert result.exit_code != 0
+    assert "Error:" in result.output
+
+
+def test_missing_field_compare(tmp_path):
+    d = _make_sim_dir(tmp_path)
+    result = runner.invoke(
+        app, ["compare", str(d), str(d), "--field", "nonexistent_field"]
+    )
+    assert result.exit_code != 0
+    assert "Error:" in result.output
 
 
 def test_quiet_flag(tmp_path):

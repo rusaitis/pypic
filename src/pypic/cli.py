@@ -111,13 +111,19 @@ def parse_steps(raw: str, sim: "Simulation") -> list[int]:
             raise typer.BadParameter(msg)
         return result
     try:
-        return [int(raw)]
+        step_val = int(raw)
     except ValueError:
         msg = (
             f"Invalid --step value {raw!r}. "
             "Use a number, first, last, all, or start:stop:stride."
         )
         raise typer.BadParameter(msg) from None
+    if step_val not in sim.steps:
+        msg = (
+            f"Step {step_val} not available. Available: {sim.steps[0]}..{sim.steps[-1]}"
+        )
+        raise typer.BadParameter(msg)
+    return [step_val]
 
 
 # -- Helpers -----------------------------------------------------------------
@@ -159,10 +165,14 @@ def _get_field_array(
     """Read a field (or compute if derived), convert units."""
     import numpy as np
 
-    ds = sim.read(step, fields=[field])
-    if units is not None:
-        return ds.in_units(field, units)
-    return np.asarray(ds[field]) if ds.has_field(field) else ds.compute(field)
+    try:
+        ds = sim.read(step, fields=[field])
+        if units is not None:
+            return ds.in_units(field, units)
+        return np.asarray(ds[field]) if ds.has_field(field) else ds.compute(field)
+    except KeyError as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(1) from None
 
 
 # -- info --------------------------------------------------------------------
@@ -531,8 +541,12 @@ def compare(
         raise typer.Exit(1)
 
     read_fields = [field] if field is not None else None
-    ds_a = sim_a.read(step_val, fields=read_fields)
-    ds_b = sim_b.read(step_val, fields=read_fields)
+    try:
+        ds_a = sim_a.read(step_val, fields=read_fields)
+        ds_b = sim_b.read(step_val, fields=read_fields)
+    except KeyError as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(1) from None
 
     cmp_kwargs: dict[str, object] = {
         "units": comp_units,
@@ -544,22 +558,26 @@ def compare(
 
     if field is not None:
         results: dict[str, float] = {}
-        if metric in ("l2", "both"):
-            results["l2"] = cmp_fields(
-                ds_a,
-                ds_b,
-                field,
-                metric="l2",
-                **cmp_kwargs,  # type: ignore[arg-type]
-            )
-        if metric in ("linf", "both"):
-            results["linf"] = cmp_fields(
-                ds_a,
-                ds_b,
-                field,
-                metric="linf",
-                **cmp_kwargs,  # type: ignore[arg-type]
-            )
+        try:
+            if metric in ("l2", "both"):
+                results["l2"] = cmp_fields(
+                    ds_a,
+                    ds_b,
+                    field,
+                    metric="l2",
+                    **cmp_kwargs,  # type: ignore[arg-type]
+                )
+            if metric in ("linf", "both"):
+                results["linf"] = cmp_fields(
+                    ds_a,
+                    ds_b,
+                    field,
+                    metric="linf",
+                    **cmp_kwargs,  # type: ignore[arg-type]
+                )
+        except KeyError as exc:
+            typer.echo(f"Error: {exc}", err=True)
+            raise typer.Exit(1) from None
 
         grid_a, grid_b = ds_a.grid, ds_b.grid
         res_ratio = [
