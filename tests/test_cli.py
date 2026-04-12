@@ -1,0 +1,257 @@
+"""Tests for the pypic CLI."""
+
+from __future__ import annotations
+
+import json
+from typing import TYPE_CHECKING
+
+import h5py
+import numpy as np
+import pytest
+
+typer = pytest.importorskip("typer")
+
+from typer.testing import CliRunner  # noqa: E402
+
+from pypic.cli import app  # noqa: E402
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+runner = CliRunner()
+
+# Minimal simulation.toml for a SimpleReader-compatible dataset.
+_TOML = """\
+[model]
+name = "test_sim"
+type = "MHD"
+
+[grid]
+dimensions = [4, 4, 4]
+spacing = [1.0, 1.0, 1.0]
+origin = [0.0, 0.0, 0.0]
+dt = 0.1
+
+[units]
+system = "SI"
+
+[coordinates]
+geometry = "cartesian"
+frame = "simulation"
+
+[physics.mhd]
+gamma = 1.6667
+"""
+
+
+def _make_sim_dir(tmp_path: Path, *, n_steps: int = 1) -> Path:
+    """Create a minimal SimpleReader-compatible simulation directory."""
+    d = tmp_path / "sim"
+    d.mkdir()
+    (d / "simulation.toml").write_text(_TOML, encoding="utf-8")
+
+    rng = np.random.default_rng(42)
+    shape = (4, 4, 4)
+    for i in range(n_steps):
+        with h5py.File(d / f"output_{i:06d}.h5", "w") as f:
+            grp = f.create_group("fields")
+            grp.create_dataset("B1", data=rng.standard_normal(shape))
+            grp.create_dataset("B2", data=rng.standard_normal(shape))
+            grp.create_dataset("B3", data=rng.standard_normal(shape))
+            f.attrs["model"] = "test_sim"
+            f.attrs["step"] = i
+    return d
+
+
+# -- version -----------------------------------------------------------------
+
+
+def test_version():
+    result = runner.invoke(app, ["--version"])
+    assert result.exit_code == 0
+    assert "pypic" in result.output
+
+
+# -- info --------------------------------------------------------------------
+
+
+def test_info_text(tmp_path):
+    d = _make_sim_dir(tmp_path)
+    result = runner.invoke(app, ["info", str(d)])
+    assert result.exit_code == 0, result.output
+    assert "test_sim" in result.output
+    assert "4 x 4 x 4" in result.output
+    assert "cartesian" in result.output
+
+
+def test_info_json(tmp_path):
+    d = _make_sim_dir(tmp_path)
+    result = runner.invoke(app, ["info", str(d), "--json"])
+    assert result.exit_code == 0, result.output
+    data = json.loads(result.output)
+    assert data["model_name"] == "test_sim"
+    assert data["model_type"] == "MHD"
+    assert data["grid"]["dimensions"] == [4, 4, 4]
+    assert "steps" in data
+
+
+# -- fields ------------------------------------------------------------------
+
+
+def test_fields_default(tmp_path):
+    d = _make_sim_dir(tmp_path)
+    result = runner.invoke(app, ["fields", str(d)])
+    assert result.exit_code == 0, result.output
+    assert "B1" in result.output
+    assert "B2" in result.output
+    assert "B3" in result.output
+
+
+def test_fields_native(tmp_path):
+    d = _make_sim_dir(tmp_path)
+    result = runner.invoke(app, ["fields", str(d), "--native"])
+    assert result.exit_code == 0, result.output
+    # Should show the mapping arrow
+    assert "\u2190" in result.output or "\u2192" in result.output
+
+
+def test_fields_derived(tmp_path):
+    d = _make_sim_dir(tmp_path)
+    result = runner.invoke(app, ["fields", str(d), "--derived"])
+    assert result.exit_code == 0, result.output
+    # |B| should be computable from B1, B2, B3
+    assert "|B|" in result.output
+
+
+def test_fields_aux(tmp_path):
+    d = _make_sim_dir(tmp_path)
+    result = runner.invoke(app, ["fields", str(d), "--aux"])
+    assert result.exit_code == 0, result.output
+    assert "(none)" in result.output
+
+
+def test_fields_json(tmp_path):
+    d = _make_sim_dir(tmp_path)
+    result = runner.invoke(app, ["fields", str(d), "--json"])
+    assert result.exit_code == 0, result.output
+    data = json.loads(result.output)
+    assert "fields" in data
+    assert "B1" in data["fields"]
+
+
+def test_fields_all(tmp_path):
+    d = _make_sim_dir(tmp_path)
+    result = runner.invoke(app, ["fields", str(d), "--all"])
+    assert result.exit_code == 0, result.output
+    # --all combines native, derived, aux
+    assert "Derived" in result.output
+    assert "Auxiliary" in result.output
+
+
+# -- stats -------------------------------------------------------------------
+
+
+def test_stats_single_step(tmp_path):
+    d = _make_sim_dir(tmp_path)
+    result = runner.invoke(app, ["stats", str(d), "--field", "B1"])
+    assert result.exit_code == 0, result.output
+    assert "min:" in result.output
+    assert "max:" in result.output
+    assert "mean:" in result.output
+    assert "rms:" in result.output
+    assert "NaN:" in result.output
+
+
+def test_stats_derived(tmp_path):
+    d = _make_sim_dir(tmp_path)
+    result = runner.invoke(app, ["stats", str(d), "--field", "|B|"])
+    assert result.exit_code == 0, result.output
+    assert "min:" in result.output
+
+
+def test_stats_json(tmp_path):
+    d = _make_sim_dir(tmp_path)
+    result = runner.invoke(app, ["stats", str(d), "--field", "B1", "--json"])
+    assert result.exit_code == 0, result.output
+    data = json.loads(result.output)
+    assert "min" in data
+    assert "max" in data
+    assert "mean" in data
+    assert "rms" in data
+    assert "nan_count" in data
+    assert isinstance(data["min"], float)
+
+
+def test_stats_multi_step(tmp_path):
+    d = _make_sim_dir(tmp_path, n_steps=3)
+    result = runner.invoke(app, ["stats", str(d), "--field", "B1", "--step", "all"])
+    assert result.exit_code == 0, result.output
+    # Should have a header row and 3 data rows
+    lines = [ln for ln in result.output.strip().splitlines() if ln.strip()]
+    assert len(lines) >= 4  # header + label + 3 data rows
+
+
+def test_stats_multi_step_json(tmp_path):
+    d = _make_sim_dir(tmp_path, n_steps=3)
+    result = runner.invoke(
+        app,
+        ["stats", str(d), "--field", "B1", "--step", "all", "--json"],
+    )
+    assert result.exit_code == 0, result.output
+    data = json.loads(result.output)
+    assert "steps" in data
+    assert len(data["steps"]) == 3
+
+
+# -- compare -----------------------------------------------------------------
+
+
+def test_compare_single_field(tmp_path):
+    d = _make_sim_dir(tmp_path)
+    result = runner.invoke(app, ["compare", str(d), str(d), "--field", "B1"])
+    assert result.exit_code == 0, result.output
+    # Comparing identical datasets: L2 error should be 0
+    assert "L2 relative error:" in result.output
+    assert "L-inf error:" in result.output
+
+
+def test_compare_all_fields(tmp_path):
+    d = _make_sim_dir(tmp_path)
+    result = runner.invoke(app, ["compare", str(d), str(d)])
+    assert result.exit_code == 0, result.output
+    assert "B1" in result.output
+    assert "B2" in result.output
+
+
+def test_compare_json(tmp_path):
+    d = _make_sim_dir(tmp_path)
+    result = runner.invoke(
+        app,
+        ["compare", str(d), str(d), "--field", "B1", "--json"],
+    )
+    assert result.exit_code == 0, result.output
+    data = json.loads(result.output)
+    assert "l2" in data
+    assert "linf" in data
+    assert data["field"] == "B1"
+
+
+# -- error cases -------------------------------------------------------------
+
+
+def test_bad_step(tmp_path):
+    d = _make_sim_dir(tmp_path)
+    result = runner.invoke(app, ["fields", str(d), "--step", "banana"])
+    assert result.exit_code != 0
+
+
+def test_missing_field(tmp_path):
+    d = _make_sim_dir(tmp_path)
+    result = runner.invoke(app, ["stats", str(d), "--field", "nonexistent_field"])
+    assert result.exit_code != 0
+
+
+def test_quiet_flag(tmp_path):
+    d = _make_sim_dir(tmp_path)
+    result = runner.invoke(app, ["-q", "info", str(d)])
+    assert result.exit_code == 0, result.output

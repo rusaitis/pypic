@@ -744,6 +744,8 @@ def open_simulation(
                 path,
             )
             result = registry_snapshot[name].factory(path, **kwargs)
+            if isinstance(result, Simulation):
+                return result
             return Simulation(
                 result[0],
                 _maybe_apply_extent(result[1]),

@@ -137,7 +137,7 @@ Each step produces something testable. No step starts until the previous step's 
 - [x] **Step 21b: `sim.available_fields()` — lightweight field probe**
   `Simulation.available_fields(step) -> list[str]` lists canonical field names in a timestep without loading arrays. `Simulation.available_fields_mapping(step) -> dict[str, str | None]` returns the canonical→native name mapping (`None` for computed totals like J1, rho_c). Both delegate to the `FieldListingReader` protocol (`available_fields` + `available_fields_mapping` methods); readers without the protocol fall back to full read + `field_names()`. Implemented on iPIC3D (parallel, serial, H5hut), BATSRUS (IDL, HDF5, OUT), and SimpleReader. OpenGGCM falls back. Shared `infer_total_fields()` helper in `ipic3d/_field_map.py` predicts computed totals from per-species fields.
 
-- [ ] **Step 21: `pypic.cli` — core subcommands (typer)**
+- [x] **Step 21: `pypic.cli` — core subcommands (typer)**
   Entry point: `[project.scripts] pypic = "pypic.cli:app"`. Optional deps: `typer>=0.12`, `rich>=13.0` under `cli` extra. All subcommands accept bare directory paths and auto-detect via `open_simulation()`.
   **Global behavior:** `--version` prints version and exits. `--log-level {debug,info,warning,error}` (default `warning`) routes through `logging` — captures NaN-omit warnings, coarse-mismatch warnings, and reader diagnostics. `-q/--quiet` is shorthand for `--log-level error`. `pretty_exceptions_enable=False` on the typer app — scientific users want clean `ValueError: ...` on stderr, not Rich tracebacks; `--debug` re-enables them. Shell completion via typer built-in `--install-completion`/`--show-completion`.
   **`--step` syntax** shared by all subcommands: `N` (single), `first`/`last`, `start:stop:stride` (range with **inclusive** stop — `0:100:10` = 11 frames including step 100), `all` (every timestep). Default: `last` for all subcommands.
@@ -343,7 +343,7 @@ grow.
 | 20 | comparison | `compare_fields()`, `field_comparison_report()`, `field_difference_dataset()` | ✅ |
 | 20b | comparison | Volume-weighted L2 norm via `weighted=True` | — |
 | 21b | readers | `sim.available_fields()` + `available_fields_mapping()` | ✅ |
-| 21 | cli | `info`, `fields`, `stats`, `compare` subcommands (typer) | — |
+| 21 | cli | `info`, `fields`, `stats`, `compare` subcommands (typer) | ✅ |
 | 22 | cli | `plot`, `plot-compare` subcommands | — |
 | 24 | io | Zarr export/import for FieldDataset | — |
 | 25 | io | Parquet/Arrow for ParticleData | — |
