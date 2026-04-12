@@ -10,6 +10,7 @@ import typer
 
 if TYPE_CHECKING:
     from pypic.readers._registry import Simulation
+    from pypic.types import FloatArray
 
 app = typer.Typer(
     name="pypic",
@@ -17,9 +18,6 @@ app = typer.Typer(
     pretty_exceptions_enable=False,
     no_args_is_help=True,
 )
-
-
-# -- Global options ----------------------------------------------------------
 
 
 def _version_callback(value: bool) -> None:
@@ -64,9 +62,6 @@ def main(
     logging.basicConfig(level=getattr(logging, level_name), force=True)
     logging.captureWarnings(True)
     app.pretty_exceptions_enable = debug
-
-
-# -- Step parsing ------------------------------------------------------------
 
 
 def parse_steps(raw: str, sim: "Simulation") -> list[int]:
@@ -126,9 +121,6 @@ def parse_steps(raw: str, sim: "Simulation") -> list[int]:
     return [step_val]
 
 
-# -- Helpers -----------------------------------------------------------------
-
-
 def _require_single_step(step_list: list[int], raw: str) -> int:
     """Extract single step, raising if multiple were selected."""
     if len(step_list) > 1:
@@ -161,7 +153,7 @@ def _output(data: dict[str, object], text: str, *, json_mode: bool) -> None:
 
 def _get_field_array(
     sim: "Simulation", step: int, field: str, units: str | None
-) -> object:
+) -> "FloatArray":
     """Read a field (or compute if derived), convert units."""
     import numpy as np
 
@@ -173,9 +165,6 @@ def _get_field_array(
     except KeyError as exc:
         typer.echo(f"Error: {exc}", err=True)
         raise typer.Exit(1) from None
-
-
-# -- info --------------------------------------------------------------------
 
 
 @app.command()
@@ -220,13 +209,9 @@ def info(
     )
 
     norm = sim.normalization
-    is_identity = all(
-        getattr(norm, a) == 1.0
-        for a in ("length_ref", "velocity_ref", "b_field_ref", "density_ref")
-    )
     norm_str = (
         "identity (SI)"
-        if is_identity
+        if norm.is_identity
         else (
             f"l={norm.length_ref:.4g} m, v={norm.velocity_ref:.4g} m/s, "
             f"B={norm.b_field_ref:.4g} T, n={norm.density_ref:.4g} m^-3"
@@ -289,9 +274,6 @@ def info(
         },
     }
     _output(data, "\n".join(lines), json_mode=json_output)
-
-
-# -- fields ------------------------------------------------------------------
 
 
 @app.command()
@@ -391,9 +373,6 @@ def fields(
     _output(data, "\n".join(lines), json_mode=json_output)
 
 
-# -- stats -------------------------------------------------------------------
-
-
 @app.command()
 def stats(
     path: Annotated[Path, typer.Argument(help="Simulation directory.")],
@@ -419,15 +398,14 @@ def stats(
 
     def _compute_stats(step_val: int) -> dict[str, object]:
         arr = _get_field_array(sim, step_val, field, units)
-        arr_np = np.asarray(arr)
-        fmin, fmax = field_extrema(arr_np)
+        fmin, fmax = field_extrema(arr)
         return {
             "step": step_val,
             "min": float(fmin),
             "max": float(fmax),
-            "mean": float(spatial_mean(arr_np)),
-            "rms": float(spatial_rms(arr_np)),
-            "nan_count": int(np.isnan(arr_np).sum()),
+            "mean": float(spatial_mean(arr)),
+            "rms": float(spatial_rms(arr)),
+            "nan_count": int(np.isnan(arr).sum()),
         }
 
     unit_label = units if units is not None else "code"
@@ -470,9 +448,6 @@ def stats(
         }
 
     _output(data, "\n".join(text_lines), json_mode=json_output)
-
-
-# -- compare -----------------------------------------------------------------
 
 
 @app.command()
