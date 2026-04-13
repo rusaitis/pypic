@@ -32,6 +32,64 @@ __all__ = ["from_zarr", "to_zarr", "to_zarr_timeseries"]
 _log = logging.getLogger(__name__)
 
 
+def _ds_to_field_dataset(ds: xr.Dataset, source_label: str) -> FieldDataset:
+    """Decode pypic metadata from an xarray Dataset and construct a FieldDataset.
+
+    Shared by ``from_zarr`` (plain Zarr) and ``from_zarr_icechunk``.
+    """
+    pypic_attrs = ds.attrs.get("pypic")
+    if pypic_attrs is None:
+        msg = f"No 'pypic' metadata found in {source_label}"
+        raise ValueError(msg)
+
+    grid, normalization, species, physics, metadata, frame, transforms = (
+        decode_pypic_attrs(pypic_attrs)
+    )
+
+    # Strip the pypic key so it doesn't leak into the user-facing dataset.
+    # Work on a copy to avoid mutating the cached store attrs.
+    ds_attrs = dict(ds.attrs)
+    ds_attrs.pop("pypic", None)
+    ds.attrs = ds_attrs
+
+    return FieldDataset(
+        ds,
+        grid,
+        normalization,
+        species=species,
+        physics=physics,
+        metadata=metadata,
+        frame=frame,
+        transforms=transforms,
+    )
+
+
+def _resolve_timeseries_pairs(
+    source: Simulation | Iterable[tuple[float | int, FieldDataset]],
+    steps: Sequence[int] | None,
+    fields: Sequence[str] | None,
+) -> Iterable[tuple[float | int, FieldDataset]]:
+    """Normalize a timeseries source into an iterable of (time, FieldDataset).
+
+    Shared by ``to_zarr_timeseries`` and ``to_zarr_timeseries_icechunk``.
+    """
+    from pypic.readers._registry import Simulation as _Sim
+
+    if isinstance(source, _Sim):
+        step_list = list(steps) if steps is not None else source.steps
+        fields_list = list(fields) if fields is not None else None
+
+        def _iter_sim() -> Iterable[tuple[float | int, FieldDataset]]:
+            for step in step_list:
+                fds = source.read(step, fields=fields_list)
+                dt = fds.grid.dt
+                t: float | int = step * dt if dt is not None else step
+                yield t, fds
+
+        return _iter_sim()
+    return source
+
+
 def _default_encoding(ds: xr.Dataset) -> dict[str, dict[str, Any]]:
     """Build per-variable encoding with Blosc+zstd+bitshuffle compression."""
     from zarr.codecs import BloscCodec
@@ -124,6 +182,9 @@ def to_zarr(
     if backend is not None:
         msg = f"Unknown backend: {backend!r}. Use None or 'icechunk'."
         raise ValueError(msg)
+    if message is not None:
+        msg = "message= requires backend='icechunk'."
+        raise ValueError(msg)
 
     ensure_zarr()
     ds = fds.xr.copy(deep=False)
@@ -194,31 +255,7 @@ def from_zarr(
 
     ensure_zarr()
     ds = xr.open_zarr(str(path), consolidated=False)
-    pypic_attrs = ds.attrs.get("pypic")
-    if pypic_attrs is None:
-        msg = f"No 'pypic' metadata found in Zarr store at {path}"
-        raise ValueError(msg)
-
-    grid, normalization, species, physics, metadata, frame, transforms = (
-        decode_pypic_attrs(pypic_attrs)
-    )
-
-    # Strip the pypic key from attrs so it doesn't leak into the user-facing
-    # dataset.  Work on a copy to avoid mutating the cached store attrs.
-    ds_attrs = dict(ds.attrs)
-    ds_attrs.pop("pypic", None)
-    ds.attrs = ds_attrs
-
-    return FieldDataset(
-        ds,
-        grid,
-        normalization,
-        species=species,
-        physics=physics,
-        metadata=metadata,
-        frame=frame,
-        transforms=transforms,
-    )
+    return _ds_to_field_dataset(ds, f"Zarr store at {path}")
 
 
 def to_zarr_timeseries(
@@ -300,25 +337,12 @@ def to_zarr_timeseries(
     if backend is not None:
         msg = f"Unknown backend: {backend!r}. Use None or 'icechunk'."
         raise ValueError(msg)
+    if message is not None:
+        msg = "message= requires backend='icechunk'."
+        raise ValueError(msg)
+
     ensure_zarr()
-    pairs: Iterable[tuple[float | int, FieldDataset]]
-    from pypic.readers._registry import Simulation as _Sim
-
-    if isinstance(source, _Sim):
-        step_list = list(steps) if steps is not None else source.steps
-        fields_list = list(fields) if fields is not None else None
-
-        def _iter_sim() -> Iterable[tuple[float | int, FieldDataset]]:
-            for step in step_list:
-                fds = source.read(step, fields=fields_list)
-                dt = fds.grid.dt
-                t: float | int = step * dt if dt is not None else step
-                yield t, fds
-
-        pairs = _iter_sim()
-    else:
-        pairs = source
-
+    pairs = _resolve_timeseries_pairs(source, steps, fields)
     path_str = str(path)
     first = True
     pypic_attrs: dict[str, Any] | None = None

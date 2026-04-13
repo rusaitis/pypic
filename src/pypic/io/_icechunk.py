@@ -15,14 +15,18 @@ from typing import TYPE_CHECKING, Any
 
 import xarray as xr
 
-from pypic.dataset import FieldDataset
 from pypic.io._guard import ensure_icechunk
-from pypic.io._serialize import decode_pypic_attrs, encode_pypic_attrs
-from pypic.io.zarr import _build_encoding
+from pypic.io._serialize import encode_pypic_attrs
+from pypic.io.zarr import (
+    _build_encoding,
+    _ds_to_field_dataset,
+    _resolve_timeseries_pairs,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence
 
+    from pypic.dataset import FieldDataset
     from pypic.readers._registry import Simulation
 
 __all__ = [
@@ -137,11 +141,11 @@ def to_zarr_icechunk(
         encoding=_build_encoding(ds, dtype, encoding),
     )
 
+    n_fields = len(ds.data_vars)
     if message is None:
-        message = f"pypic: write {len(ds.data_vars)} fields"
+        message = f"pypic: write {n_fields} fields"
 
     snapshot_id: str = session.commit(message)
-    n_fields = len(ds.data_vars)
     _log.info("Wrote %d fields to %s (snapshot %s)", n_fields, path, snapshot_id)
     return snapshot_id
 
@@ -197,29 +201,7 @@ def from_zarr_icechunk(
         session = repo.readonly_session(branch=branch or "main")
 
     ds = xr.open_zarr(session.store, consolidated=False)
-    pypic_attrs = ds.attrs.get("pypic")
-    if pypic_attrs is None:
-        msg = f"No 'pypic' metadata found in Icechunk store at {path}"
-        raise ValueError(msg)
-
-    grid, normalization, species, physics, metadata, frame, transforms = (
-        decode_pypic_attrs(pypic_attrs)
-    )
-
-    ds_attrs = dict(ds.attrs)
-    ds_attrs.pop("pypic", None)
-    ds.attrs = ds_attrs
-
-    return FieldDataset(
-        ds,
-        grid,
-        normalization,
-        species=species,
-        physics=physics,
-        metadata=metadata,
-        frame=frame,
-        transforms=transforms,
-    )
+    return _ds_to_field_dataset(ds, f"Icechunk store at {path}")
 
 
 def to_zarr_timeseries_icechunk(
@@ -266,24 +248,7 @@ def to_zarr_timeseries_icechunk(
     ensure_icechunk()
     import zarr
 
-    pairs: Iterable[tuple[float | int, FieldDataset]]
-    from pypic.readers._registry import Simulation as _Sim
-
-    if isinstance(source, _Sim):
-        step_list = list(steps) if steps is not None else source.steps
-        fields_list = list(fields) if fields is not None else None
-
-        def _iter_sim() -> Iterable[tuple[float | int, FieldDataset]]:
-            for step in step_list:
-                fds = source.read(step, fields=fields_list)
-                dt = fds.grid.dt
-                t: float | int = step * dt if dt is not None else step
-                yield t, fds
-
-        pairs = _iter_sim()
-    else:
-        pairs = source
-
+    pairs = _resolve_timeseries_pairs(source, steps, fields)
     repo = open_icechunk_repo(path, create=True)
     session = repo.writable_session(branch)
 
