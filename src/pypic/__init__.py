@@ -86,6 +86,7 @@ from pypic.fields import (
     unregister_field,
 )
 from pypic.grid import GridInfo
+from pypic.io import from_zarr, to_zarr, to_zarr_timeseries
 from pypic.readers import (
     AuxiliaryDataReader,
     BATSRUSConfig,
@@ -204,6 +205,7 @@ __all__ = [
     "field_difference_dataset",
     "field_energy",
     "field_info",
+    "from_zarr",
     "gradient",
     "gyrofrequency",
     "gyroradius",
@@ -250,6 +252,8 @@ __all__ = [
     "temperature",
     "thermal_energy_density",
     "thermal_speed",
+    "to_zarr",
+    "to_zarr_timeseries",
     "trace_field_line",
     "trace_field_line_adaptive",
     "unit_label",
