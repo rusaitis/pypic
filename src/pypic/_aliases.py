@@ -19,6 +19,9 @@ _COMPUTE_ALIASES: dict[str, str] = {
     "Sx": "S1",
     "Sy": "S2",
     "Sz": "S3",
+    "poynting_flux_x": "S1",
+    "poynting_flux_y": "S2",
+    "poynting_flux_z": "S3",
     # Magnitude aliases (_mag suffix)
     "B_mag": "|B|",
     "Bmag": "|B|",
@@ -55,6 +58,14 @@ _COMPUTE_ALIASES: dict[str, str] = {
     "skin_depth_i": "d_i",
     "gyroradius_e": "r_e",
     "gyroradius_i": "r_i",
+    "debye_length": "lambda_D",
+    "debye_length_e": "lambda_D",
+    "parallel_pressure": "P_par",
+    "perpendicular_pressure": "P_perp",
+    "parallel_pressure_e": "P_par_e",
+    "parallel_pressure_i": "P_par_i",
+    "perpendicular_pressure_e": "P_perp_e",
+    "perpendicular_pressure_i": "P_perp_i",
     # Descriptive names — energies and thermodynamics
     "energy_magnetic": "e_B",
     "energy_electric": "e_E",
@@ -98,6 +109,8 @@ _COMPUTE_ALIASES: dict[str, str] = {
     # Structured v_th aliases
     "v_th_s0": "v_th_e",
     "v_th_s1": "v_th_i",
+    "thermal_speed_s0": "v_th_e",
+    "thermal_speed_s1": "v_th_i",
     # Structured r aliases
     "r_s0": "r_e",
     "r_s1": "r_i",
