@@ -86,7 +86,15 @@ from pypic.fields import (
     unregister_field,
 )
 from pypic.grid import GridInfo
-from pypic.io import from_zarr, open_virtual, to_zarr, to_zarr_timeseries
+from pypic.io import (
+    from_zarr,
+    icechunk_ancestry,
+    icechunk_create_tag,
+    open_icechunk_repo,
+    open_virtual,
+    to_zarr,
+    to_zarr_timeseries,
+)
 from pypic.readers import (
     AuxiliaryDataReader,
     BATSRUSConfig,
@@ -207,6 +215,8 @@ __all__ = [
     "field_info",
     "from_zarr",
     "gradient",
+    "icechunk_ancestry",
+    "icechunk_create_tag",
     "gyrofrequency",
     "gyroradius",
     "gyrotropic_entropy",
@@ -227,6 +237,7 @@ __all__ = [
     "magnetosonic_speed",
     "max_div_b",
     "open_batsrus",
+    "open_icechunk_repo",
     "open_virtual",
     "open_ipic3d",
     "open_openggcm",

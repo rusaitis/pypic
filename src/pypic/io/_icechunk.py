@@ -1,0 +1,383 @@
+"""Icechunk storage backend for versioned Zarr v3 I/O.
+
+Provides Git-like versioning (tags, snapshots, branches) and ACID
+transactions over Zarr v3 stores via the Icechunk Rust backend.
+
+Requires optional dependency ``icechunk>=1.1``.
+Install with ``pip install pypic[icechunk]``.
+"""
+
+from __future__ import annotations
+
+import logging
+from pathlib import Path
+from typing import TYPE_CHECKING, Any
+
+import xarray as xr
+
+from pypic.dataset import FieldDataset
+from pypic.io._guard import ensure_icechunk
+from pypic.io._serialize import decode_pypic_attrs, encode_pypic_attrs
+from pypic.io.zarr import _build_encoding
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable, Sequence
+
+    from pypic.readers._registry import Simulation
+
+__all__ = [
+    "from_zarr_icechunk",
+    "icechunk_ancestry",
+    "icechunk_create_tag",
+    "is_icechunk_store",
+    "open_icechunk_repo",
+    "to_zarr_icechunk",
+    "to_zarr_timeseries_icechunk",
+]
+
+_log = logging.getLogger(__name__)
+
+
+def is_icechunk_store(path: str | Path) -> bool:
+    """Check whether a local path is an Icechunk repository.
+
+    Detects the Icechunk on-disk layout by looking for the ``repo``
+    marker file.  Does not import icechunk — this is a fast filesystem
+    check used by ``from_zarr`` auto-detection.
+
+    Parameters
+    ----------
+    path : str or Path
+        Path to probe.
+
+    Returns
+    -------
+    bool
+        ``True`` if *path* looks like an Icechunk repository.
+    """
+    p = Path(path)
+    return (p / "repo").is_file() and (p / "snapshots").is_dir()
+
+
+def open_icechunk_repo(
+    path: str | Path,
+    *,
+    create: bool = False,
+) -> Any:  # noqa: ANN401
+    r"""Open (or create) a local Icechunk repository.
+
+    Parameters
+    ----------
+    path : str or Path
+        Directory for the repository.
+    create : bool
+        When ``True``, create the repository if it does not exist.
+
+    Returns
+    -------
+    icechunk.Repository
+        The repository handle.
+    """
+    ensure_icechunk()
+    import icechunk
+
+    storage = icechunk.local_filesystem_storage(str(path))
+    if create:
+        return icechunk.Repository.open_or_create(storage)
+    return icechunk.Repository.open(storage)
+
+
+def to_zarr_icechunk(
+    fds: FieldDataset,
+    path: str | Path,
+    *,
+    dtype: str | None = None,
+    encoding: dict[str, dict[str, Any]] | None = None,
+    message: str | None = None,
+    branch: str = "main",
+) -> str:
+    r"""Write a FieldDataset to an Icechunk-managed Zarr v3 store.
+
+    Creates (or opens) a local Icechunk repository at *path*, writes
+    all field data plus pypic metadata, and commits atomically.
+
+    Parameters
+    ----------
+    fds : FieldDataset
+        The dataset to write.
+    path : str or Path
+        Directory for the Icechunk repository.
+    dtype : str or None
+        Downcast dtype (e.g. ``"float32"``).
+    encoding : dict or None
+        Per-variable encoding overrides.
+    message : str or None
+        Commit message.  Defaults to ``"pypic: write <n> fields"``.
+    branch : str
+        Branch to commit to.  Default ``"main"``.
+
+    Returns
+    -------
+    str
+        The snapshot ID of the new commit.
+    """
+    ensure_icechunk()
+
+    repo = open_icechunk_repo(path, create=True)
+    session = repo.writable_session(branch)
+
+    ds = fds.xr.copy(deep=False)
+    ds.attrs["pypic"] = encode_pypic_attrs(fds)
+
+    ds.to_zarr(
+        session.store,
+        zarr_format=3,
+        consolidated=False,
+        mode="w",
+        encoding=_build_encoding(ds, dtype, encoding),
+    )
+
+    if message is None:
+        message = f"pypic: write {len(ds.data_vars)} fields"
+
+    snapshot_id: str = session.commit(message)
+    n_fields = len(ds.data_vars)
+    _log.info("Wrote %d fields to %s (snapshot %s)", n_fields, path, snapshot_id)
+    return snapshot_id
+
+
+def from_zarr_icechunk(
+    path: str | Path,
+    *,
+    branch: str | None = None,
+    tag: str | None = None,
+    snapshot_id: str | None = None,
+) -> FieldDataset:
+    r"""Read a FieldDataset from an Icechunk repository.
+
+    Auto-opens the repository at *path* and creates a read-only
+    session at the requested ref (branch tip, tag, or snapshot).
+
+    Parameters
+    ----------
+    path : str or Path
+        Path to the Icechunk repository.
+    branch : str or None
+        Branch to read from.  Default ``"main"`` when no ref is given.
+    tag : str or None
+        Tag to read from.
+    snapshot_id : str or None
+        Exact snapshot ID to read from.
+
+    Returns
+    -------
+    FieldDataset
+        Reconstructed dataset with full metadata.
+
+    Raises
+    ------
+    ValueError
+        If more than one of *branch*, *tag*, *snapshot_id* is specified,
+        or if no pypic metadata is found.
+    """
+    ensure_icechunk()
+
+    specified = sum(x is not None for x in (branch, tag, snapshot_id))
+    if specified > 1:
+        msg = "Specify at most one of branch, tag, or snapshot_id."
+        raise ValueError(msg)
+
+    repo = open_icechunk_repo(path)
+
+    if tag is not None:
+        session = repo.readonly_session(tag=tag)
+    elif snapshot_id is not None:
+        session = repo.readonly_session(snapshot_id=snapshot_id)
+    else:
+        session = repo.readonly_session(branch=branch or "main")
+
+    ds = xr.open_zarr(session.store, consolidated=False)
+    pypic_attrs = ds.attrs.get("pypic")
+    if pypic_attrs is None:
+        msg = f"No 'pypic' metadata found in Icechunk store at {path}"
+        raise ValueError(msg)
+
+    grid, normalization, species, physics, metadata, frame, transforms = (
+        decode_pypic_attrs(pypic_attrs)
+    )
+
+    ds_attrs = dict(ds.attrs)
+    ds_attrs.pop("pypic", None)
+    ds.attrs = ds_attrs
+
+    return FieldDataset(
+        ds,
+        grid,
+        normalization,
+        species=species,
+        physics=physics,
+        metadata=metadata,
+        frame=frame,
+        transforms=transforms,
+    )
+
+
+def to_zarr_timeseries_icechunk(
+    source: Simulation | Iterable[tuple[float | int, FieldDataset]],
+    path: str | Path,
+    *,
+    steps: Sequence[int] | None = None,
+    fields: Sequence[str] | None = None,
+    dtype: str | None = None,
+    encoding: dict[str, dict[str, Any]] | None = None,
+    message: str | None = None,
+    branch: str = "main",
+) -> str:
+    r"""Write multiple timesteps to an Icechunk-managed Zarr v3 store.
+
+    All timesteps are written within a single session and committed
+    atomically — either all land or none do.
+
+    Parameters
+    ----------
+    source : Simulation or Iterable[tuple[float | int, FieldDataset]]
+        Either a ``Simulation`` object or an iterable of ``(time, fds)``
+        pairs.
+    path : str or Path
+        Directory for the Icechunk repository.
+    steps : Sequence[int] or None
+        Timestep indices (only for ``Simulation`` source).
+    fields : Sequence[str] or None
+        Field names to include (only for ``Simulation`` source).
+    dtype : str or None
+        Downcast dtype (e.g. ``"float32"``).
+    encoding : dict or None
+        Per-variable encoding overrides.
+    message : str or None
+        Commit message.  Defaults to ``"pypic: write timeseries"``.
+    branch : str
+        Branch to commit to.  Default ``"main"``.
+
+    Returns
+    -------
+    str
+        The snapshot ID of the new commit.
+    """
+    ensure_icechunk()
+    import zarr
+
+    pairs: Iterable[tuple[float | int, FieldDataset]]
+    from pypic.readers._registry import Simulation as _Sim
+
+    if isinstance(source, _Sim):
+        step_list = list(steps) if steps is not None else source.steps
+        fields_list = list(fields) if fields is not None else None
+
+        def _iter_sim() -> Iterable[tuple[float | int, FieldDataset]]:
+            for step in step_list:
+                fds = source.read(step, fields=fields_list)
+                dt = fds.grid.dt
+                t: float | int = step * dt if dt is not None else step
+                yield t, fds
+
+        pairs = _iter_sim()
+    else:
+        pairs = source
+
+    repo = open_icechunk_repo(path, create=True)
+    session = repo.writable_session(branch)
+
+    first = True
+    pypic_attrs: dict[str, Any] | None = None
+    for time_val, fds in pairs:
+        ds = fds.xr.expand_dims(time=[float(time_val)])
+
+        if first:
+            pypic_attrs = encode_pypic_attrs(fds)
+            ds.to_zarr(
+                session.store,
+                zarr_format=3,
+                consolidated=False,
+                mode="w",
+                encoding=_build_encoding(ds, dtype, encoding),
+            )
+            first = False
+        else:
+            ds.to_zarr(
+                session.store,
+                consolidated=False,
+                mode="a",
+                append_dim="time",
+            )
+
+    if first:
+        msg = "No timesteps to write — source yielded zero items."
+        raise ValueError(msg)
+
+    store = zarr.open_group(session.store, mode="r+")
+    store.attrs["pypic"] = pypic_attrs
+
+    if message is None:
+        message = "pypic: write timeseries"
+
+    snapshot_id: str = session.commit(message)
+    _log.info("Wrote timeseries to %s (snapshot %s)", path, snapshot_id)
+    return snapshot_id
+
+
+def icechunk_create_tag(
+    path: str | Path,
+    tag: str,
+    *,
+    snapshot_id: str | None = None,
+    branch: str = "main",
+) -> None:
+    r"""Create a named tag in an Icechunk repository.
+
+    Parameters
+    ----------
+    path : str or Path
+        Path to the Icechunk repository.
+    tag : str
+        Tag name (e.g. ``"v1.0-paper-submission"``).
+    snapshot_id : str or None
+        Snapshot to tag.  Defaults to the tip of *branch*.
+    branch : str
+        Branch whose tip to tag (ignored when *snapshot_id* is given).
+    """
+    ensure_icechunk()
+
+    repo = open_icechunk_repo(path)
+    if snapshot_id is None:
+        snapshot_id = repo.lookup_branch(branch)
+    repo.create_tag(tag, snapshot_id)
+    _log.info("Tagged snapshot %s as %r in %s", snapshot_id, tag, path)
+
+
+def icechunk_ancestry(
+    path: str | Path,
+    *,
+    branch: str = "main",
+) -> list[dict[str, str]]:
+    r"""Return the commit history of an Icechunk repository.
+
+    Parameters
+    ----------
+    path : str or Path
+        Path to the Icechunk repository.
+    branch : str
+        Branch whose ancestry to inspect.
+
+    Returns
+    -------
+    list[dict[str, str]]
+        List of ``{"id": ..., "message": ...}`` dicts, most recent
+        first.
+    """
+    ensure_icechunk()
+
+    repo = open_icechunk_repo(path)
+    return [
+        {"id": info.id, "message": info.message}
+        for info in repo.ancestry(branch=branch)
+    ]

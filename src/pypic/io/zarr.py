@@ -62,7 +62,10 @@ def to_zarr(
     *,
     dtype: str | None = None,
     encoding: dict[str, dict[str, Any]] | None = None,
-) -> None:
+    backend: str | None = None,
+    message: str | None = None,
+    branch: str = "main",
+) -> str | None:
     r"""Write a FieldDataset to a Zarr v3 store.
 
     All pypic metadata (grid, normalization, species, physics, frame,
@@ -82,6 +85,18 @@ def to_zarr(
         Per-variable encoding overrides merged on top of the defaults
         (Blosc zstd + bitshuffle).  Keys are variable names, values
         are dicts passed to ``xr.Dataset.to_zarr(encoding=...)``.
+    backend : str or None
+        Storage backend.  ``None`` (default) for plain Zarr v3,
+        ``"icechunk"`` for versioned Icechunk storage.
+    message : str or None
+        Commit message (Icechunk only).
+    branch : str
+        Branch to commit to (Icechunk only).  Default ``"main"``.
+
+    Returns
+    -------
+    str or None
+        Snapshot ID when ``backend="icechunk"``, ``None`` otherwise.
 
     Examples
     --------
@@ -95,6 +110,21 @@ def to_zarr(
     ... )
     >>> # to_zarr(fds, "/tmp/test.zarr")  # writes to disk
     """
+    if backend == "icechunk":
+        from pypic.io._icechunk import to_zarr_icechunk
+
+        return to_zarr_icechunk(
+            fds,
+            path,
+            dtype=dtype,
+            encoding=encoding,
+            message=message,
+            branch=branch,
+        )
+    if backend is not None:
+        msg = f"Unknown backend: {backend!r}. Use None or 'icechunk'."
+        raise ValueError(msg)
+
     ensure_zarr()
     ds = fds.xr.copy(deep=False)
     ds.attrs["pypic"] = encode_pypic_attrs(fds)
@@ -107,18 +137,32 @@ def to_zarr(
         encoding=_build_encoding(ds, dtype, encoding),
     )
     _log.info("Wrote %d fields to %s", len(ds.data_vars), path)
+    return None
 
 
-def from_zarr(path: str | Path) -> FieldDataset:
+def from_zarr(
+    path: str | Path,
+    *,
+    branch: str | None = None,
+    tag: str | None = None,
+    snapshot_id: str | None = None,
+) -> FieldDataset:
     r"""Read a FieldDataset from a Zarr v3 store.
 
     Returns a lazy-loading dataset by default — field arrays are read
-    from disk on first access.
+    from disk on first access.  Icechunk repositories are auto-detected;
+    pass *branch*, *tag*, or *snapshot_id* to read a specific version.
 
     Parameters
     ----------
     path : str or Path
-        Path to the Zarr store directory.
+        Path to the Zarr store directory (or Icechunk repository).
+    branch : str or None
+        Icechunk branch to read from.
+    tag : str or None
+        Icechunk tag to read from.
+    snapshot_id : str or None
+        Icechunk snapshot ID to read from.
 
     Returns
     -------
@@ -129,6 +173,25 @@ def from_zarr(path: str | Path) -> FieldDataset:
     --------
     >>> # fds = from_zarr("/tmp/test.zarr")
     """
+    has_ref = any(x is not None for x in (branch, tag, snapshot_id))
+
+    if has_ref:
+        from pypic.io._icechunk import from_zarr_icechunk
+
+        return from_zarr_icechunk(
+            path,
+            branch=branch,
+            tag=tag,
+            snapshot_id=snapshot_id,
+        )
+
+    from pypic.io._icechunk import is_icechunk_store
+
+    if is_icechunk_store(path):
+        from pypic.io._icechunk import from_zarr_icechunk
+
+        return from_zarr_icechunk(path)
+
     ensure_zarr()
     ds = xr.open_zarr(str(path), consolidated=False)
     pypic_attrs = ds.attrs.get("pypic")
@@ -166,7 +229,10 @@ def to_zarr_timeseries(
     fields: Sequence[str] | None = None,
     dtype: str | None = None,
     encoding: dict[str, dict[str, Any]] | None = None,
-) -> None:
+    backend: str | None = None,
+    message: str | None = None,
+    branch: str = "main",
+) -> str | None:
     r"""Write multiple timesteps to a single Zarr v3 store.
 
     Each field becomes ``(nt, n1, n2, n3)`` with ``time`` as the first
@@ -190,6 +256,18 @@ def to_zarr_timeseries(
         Downcast dtype (e.g. ``"float32"``).
     encoding : dict or None
         Per-variable encoding overrides.
+    backend : str or None
+        Storage backend.  ``None`` for plain Zarr v3,
+        ``"icechunk"`` for versioned Icechunk storage.
+    message : str or None
+        Commit message (Icechunk only).
+    branch : str
+        Branch to commit to (Icechunk only).  Default ``"main"``.
+
+    Returns
+    -------
+    str or None
+        Snapshot ID when ``backend="icechunk"``, ``None`` otherwise.
 
     Examples
     --------
@@ -206,6 +284,22 @@ def to_zarr_timeseries(
     ... ]
     >>> # to_zarr_timeseries(pairs, "/tmp/ts.zarr")
     """
+    if backend == "icechunk":
+        from pypic.io._icechunk import to_zarr_timeseries_icechunk
+
+        return to_zarr_timeseries_icechunk(
+            source,
+            path,
+            steps=steps,
+            fields=fields,
+            dtype=dtype,
+            encoding=encoding,
+            message=message,
+            branch=branch,
+        )
+    if backend is not None:
+        msg = f"Unknown backend: {backend!r}. Use None or 'icechunk'."
+        raise ValueError(msg)
     ensure_zarr()
     pairs: Iterable[tuple[float | int, FieldDataset]]
     from pypic.readers._registry import Simulation as _Sim
@@ -261,3 +355,4 @@ def to_zarr_timeseries(
     store.attrs["pypic"] = pypic_attrs
 
     _log.info("Wrote timeseries to %s", path)
+    return None

@@ -97,13 +97,46 @@ def _read_metadata_from_h5(
 
 def _virtual_to_readable(
     vds: xr.Dataset,
+    *,
+    source_dir: str | None = None,
 ) -> xr.Dataset:
     """Convert a VirtualiZarr virtual dataset to a lazy-readable one.
 
-    Persists virtual references as an in-memory Kerchunk dict and
-    opens them via fsspec's reference filesystem, giving a normal
-    ``xr.Dataset`` that reads from the original files on demand.
+    When icechunk is installed, persists virtual references via
+    Icechunk's native Zarr v3 backend (in-memory store).  Falls back
+    to in-memory Kerchunk (Zarr v2) otherwise.
+
+    Parameters
+    ----------
+    source_dir : str or None
+        Parent directory of the source HDF5 file.  Required for the
+        Icechunk path to set up the virtual chunk container.
     """
+    from pypic.io._guard import has_icechunk
+
+    if has_icechunk() and source_dir is not None:
+        import icechunk
+
+        storage = icechunk.in_memory_storage()
+        config = icechunk.RepositoryConfig.default()
+        url_prefix = f"file://{source_dir}/"
+        container = icechunk.VirtualChunkContainer(
+            name="local",
+            url_prefix=url_prefix,
+            store=icechunk.local_filesystem_store(source_dir),
+        )
+        config.set_virtual_chunk_container(container)
+        repo = icechunk.Repository.create(
+            storage,
+            config=config,
+            authorize_virtual_chunk_access={url_prefix: None},
+        )
+        session = repo.writable_session("main")
+        vds.vz.to_icechunk(session.store)
+        session.commit("Virtual refs")
+        read_session = repo.readonly_session(branch="main")
+        return xr.open_zarr(read_session.store, consolidated=False)  # type: ignore[no-any-return]
+
     import fsspec
 
     refs = vds.vz.to_kerchunk(format="dict")
@@ -156,13 +189,12 @@ def open_virtual(
 
     Notes
     -----
-    Virtual references are persisted via in-memory Kerchunk dicts,
-    which use Zarr v2 format internally.  This is the only Zarr v2
-    code path in pypic — all other I/O uses Zarr v3.  The Kerchunk
-    intermediary is required because VirtualiZarr's native Zarr v3
-    virtual-reference backend is Icechunk (Step 24c).  HDF5 datasets
-    whose values are all equal to the fill value (typically 0.0) may
-    read back incorrectly through this path.
+    When ``icechunk`` is installed, virtual references use Icechunk's
+    native Zarr v3 backend (in-memory store), eliminating the
+    fill-value edge case present in the Kerchunk fallback path.
+    Without ``icechunk``, falls back to in-memory Kerchunk dicts
+    (Zarr v2 format) where HDF5 datasets whose values all equal the
+    fill value (typically 0.0) may read back incorrectly.
     """
     ensure_virtualizarr()
 
@@ -188,7 +220,7 @@ def open_virtual(
         loadable_variables=[],
     )
 
-    ds = _virtual_to_readable(vds)
+    ds = _virtual_to_readable(vds, source_dir=str(_Path(path_str).parent))
 
     if config is not None:
         grid = config.grid
