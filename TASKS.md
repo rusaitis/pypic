@@ -42,7 +42,7 @@ Each step produces something testable. No step starts until the previous step's 
 
 ## Phase 8: Modern I/O Formats
 
-- [ ] **Step 24: `pypic.io` — Zarr export/import for FieldDataset**
+- [x] **Step 24: `pypic.io` — Zarr export/import for FieldDataset**
   Zarr v3 + xarray for chunked, self-describing field data storage. Two write modes:
   - `to_zarr(fds, path)` — single timestep. Leverages `xr.Dataset.to_zarr()` with pypic metadata (grid, normalization, species, physics, frame) serialized to `xr.Dataset.attrs` as JSON-compatible dicts. Writes with `zarr_format=3, consolidated=False`.
   - `to_zarr_timeseries(simulation, path, *, steps, fields)` — multi-timestep store with `time` as a dimension. Each field becomes `(nt, nx, ny, nz)`, chunked along `time` so reading one step is O(1). Enables time-series analysis without scanning separate files.
@@ -55,7 +55,7 @@ Each step produces something testable. No step starts until the previous step's 
   **Sharding (cloud):** For cloud-hosted stores (S3, GCS, R2), enable sharding to group chunks into single storage objects, avoiding the small-files problem. Shards are the minimum write unit — the entire shard must fit in memory. Dask chunks must align with shard boundaries. Expose via `shards=` kwarg.
   **Version pinning:** `zarr>=3.1.0,<4` — versions 3.0.0–3.0.7 were yanked from PyPI due to a data-loss bug (append mode silently deleted data). v3.0.8 is the first safe release; v3.1+ is recommended. Requires `numcodecs>=0.16.0` (fixes BloscCodec defaulting to `typesize=1`, which produced 10–20× larger chunks). Optional deps under `zarr` extra.
 
-- [ ] **Step 24b: `pypic.io` — VirtualiZarr for legacy HDF5**
+- [x] **Step 24b: `pypic.io` — VirtualiZarr for legacy HDF5**
   `open_virtual(path) -> FieldDataset` creates lightweight virtual Zarr views over existing HDF5 simulation outputs by extracting byte-range metadata, enabling `xr.open_zarr()` access that transparently reads from original files without conversion. Uses VirtualiZarr v2.4+ (`open_virtual_dataset()`, standard `xr.concat`/`merge`). Virtual references can be persisted to Icechunk (Step 24c) for repeated fast access. Limitations: inherits source file chunking (contiguous HDF5 datasets become single chunks), potential issues with non-standard HDF5 compression filters. Optional dep: `virtualizarr>=2.4` under `zarr` extra.
   **Depends on:** Step 24 (Zarr foundations).
 

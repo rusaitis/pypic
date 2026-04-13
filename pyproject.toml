@@ -28,6 +28,8 @@ icechunk = [
     "numcodecs>=0.16.0",
     "zarr>=3.1.0,<4",
 ]
+arrow = ["pyarrow>=17.0"]
+duckdb = ["duckdb>=1.4", "pyarrow>=17.0"]
 
 [dependency-groups]
 dev = [

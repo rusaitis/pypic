@@ -1,10 +1,15 @@
-"""Optional-dependency guards for zarr, numcodecs, virtualizarr, and icechunk."""
+"""Optional-dependency guards for I/O backends.
+
+Covers zarr, numcodecs, virtualizarr, icechunk, pyarrow, and duckdb.
+"""
 
 from __future__ import annotations
 
 _HAS_ZARR: bool | None = None
 _HAS_VIRTUALIZARR: bool | None = None
 _HAS_ICECHUNK: bool | None = None
+_HAS_ARROW: bool | None = None
+_HAS_DUCKDB: bool | None = None
 
 
 def ensure_zarr() -> None:
@@ -91,4 +96,78 @@ def has_icechunk() -> bool:
         _HAS_ICECHUNK = False
         return False
     _HAS_ICECHUNK = True
+    return True
+
+
+def ensure_arrow() -> None:
+    """Raise ``ImportError`` with install hint if pyarrow is missing."""
+    global _HAS_ARROW
+    if _HAS_ARROW is True:
+        return
+    if _HAS_ARROW is False:
+        msg = (
+            "Missing pyarrow for pypic.io particle I/O. "
+            "Install with: pip install pypic[arrow]"
+        )
+        raise ImportError(msg) from None
+    try:
+        import pyarrow  # noqa: F401
+    except ImportError:
+        _HAS_ARROW = False
+        msg = (
+            "pyarrow is required for pypic.io particle I/O. "
+            "Install with: pip install pypic[arrow]"
+        )
+        raise ImportError(msg) from None
+    _HAS_ARROW = True
+
+
+def has_arrow() -> bool:
+    """Return ``True`` if pyarrow is importable (non-raising check)."""
+    global _HAS_ARROW
+    if _HAS_ARROW is not None:
+        return _HAS_ARROW
+    try:
+        import pyarrow  # noqa: F401
+    except ImportError:
+        _HAS_ARROW = False
+        return False
+    _HAS_ARROW = True
+    return True
+
+
+def ensure_duckdb() -> None:
+    """Raise ``ImportError`` with install hint if duckdb is missing."""
+    global _HAS_DUCKDB
+    if _HAS_DUCKDB is True:
+        return
+    if _HAS_DUCKDB is False:
+        msg = (
+            "Missing duckdb for pypic.io.query_sql. "
+            "Install with: pip install pypic[duckdb]"
+        )
+        raise ImportError(msg) from None
+    try:
+        import duckdb  # noqa: F401
+    except ImportError:
+        _HAS_DUCKDB = False
+        msg = (
+            "duckdb is required for pypic.io.query_sql. "
+            "Install with: pip install pypic[duckdb]"
+        )
+        raise ImportError(msg) from None
+    _HAS_DUCKDB = True
+
+
+def has_duckdb() -> bool:
+    """Return ``True`` if duckdb is importable (non-raising check)."""
+    global _HAS_DUCKDB
+    if _HAS_DUCKDB is not None:
+        return _HAS_DUCKDB
+    try:
+        import duckdb  # noqa: F401
+    except ImportError:
+        _HAS_DUCKDB = False
+        return False
+    _HAS_DUCKDB = True
     return True
