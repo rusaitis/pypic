@@ -267,10 +267,14 @@ def _parse_resolution(res_str: str) -> tuple[int, int]:
         msg = f"Invalid --res {res_str!r}. Use WxH (e.g. 256x256)."
         raise typer.BadParameter(msg)
     try:
-        return (int(parts[0]), int(parts[1]))
+        w, h = int(parts[0]), int(parts[1])
     except ValueError:
         msg = f"Non-integer values in --res {res_str!r}."
         raise typer.BadParameter(msg) from None
+    if w <= 0 or h <= 0:
+        msg = f"--res dimensions must be positive, got {res_str!r}."
+        raise typer.BadParameter(msg)
+    return (w, h)
 
 
 @app.command()
@@ -1173,13 +1177,20 @@ def plot(
             )
             raise typer.BadParameter(msg)
         try:
-            output.format(step=0)
+            test_path = output.format(step=0)
         except (KeyError, IndexError, ValueError):
             msg = (
                 f"Output template {output!r} must contain "
                 "'{{step}}' for batch rendering."
             )
             raise typer.BadParameter(msg) from None
+        if test_path == output.format(step=1):
+            msg = (
+                f"Output template {output!r} must contain a '{{step}}' "
+                "placeholder for batch rendering — all steps would "
+                "write to the same file."
+            )
+            raise typer.BadParameter(msg)
 
     def _resolve_output(sv: int) -> str | None:
         if output and len(step_list) > 1:
@@ -1215,9 +1226,36 @@ def plot(
 
     if len(step_list) > 1 and jobs > 1:
         import concurrent.futures
+        import functools
 
-        with concurrent.futures.ThreadPoolExecutor(max_workers=jobs) as pool:
-            futs = [pool.submit(_run_frame, sv) for sv in step_list]
+        # Matplotlib is not thread-safe, so use process-based workers.
+        # functools.partial on the module-level _render_plot is picklable.
+        render = functools.partial(
+            _render_plot,
+            path,
+            field=field,
+            plane_str=plane,
+            index=index,
+            coord=coord,
+            units=units,
+            frame=frame,
+            fmt=fmt,
+            dpi=dpi,
+            res=res,
+            vmin_arg=color_vmin,
+            vmax_arg=color_vmax,
+            colormap=colormap,
+            scale=scale,
+            linthresh=linthresh,
+            theme=theme,
+            contour_field=contour,
+            contour_levels=contour_levels,
+        )
+        with concurrent.futures.ProcessPoolExecutor(max_workers=jobs) as pool:
+            futs = [
+                pool.submit(render, step_val=sv, output=_resolve_output(sv))
+                for sv in step_list
+            ]
             for fut in concurrent.futures.as_completed(futs):
                 fut.result()
     else:
