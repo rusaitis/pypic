@@ -184,19 +184,20 @@ def _plane_normal(plane_str: str, grid: GridInfo) -> str:
     """
     val = plane_str.lower()
     axis_names = grid.geometry.axis_names
+    axis_lower = [n.lower() for n in axis_names]
 
     # Cartesian shorthands
     if val in _CARTESIAN_PLANE_MAP:
         return _CARTESIAN_PLANE_MAP[val]
 
     # Single axis name → interpret as the normal axis directly
-    if val in axis_names:
-        return val
+    if val in axis_lower:
+        return axis_names[axis_lower.index(val)]
 
     # Pair of axis names → normal is the remaining axis
     if len(val) >= 2:
         for i, name in enumerate(axis_names):
-            others = [n for j, n in enumerate(axis_names) if j != i]
+            others = [n for j, n in enumerate(axis_lower) if j != i]
             pair = "".join(others)
             if val == pair:
                 return name
@@ -507,9 +508,7 @@ def stats(
         ds = sim.read(step_val, fields=field_names)
         rows: list[dict[str, object]] = []
         for f in field_names:
-            arr = np.asarray(ds[f])
-            if units is not None:
-                arr = ds.in_units(f, units)
+            arr = ds.in_units(f, units) if units is not None else np.asarray(ds[f])
             rows.append({"field": f, "step": step_val, **_stats_from_array(arr)})
         max_name = max((len(str(r["field"])) for r in rows), default=5)
         hdr = (
@@ -811,15 +810,6 @@ def validate(
         e_mag = np.sqrt(e1**2 + e2**2 + e3**2)
         e_energy = float(field_energy(electric_energy_density(e_mag), ds.grid.spacing))
 
-    lines = [
-        f"Validation: {sim.model_name} ({sim.model_type})  Step: {step_val}",
-        f"  Fields:     {', '.join(field_names)}",
-    ]
-    if nan_fields:
-        nan_detail = ", ".join(f"{k}: {v}" for k, v in nan_fields.items())
-        lines.append(f"  NaN census: {total_nan} total ({nan_detail})")
-    else:
-        lines.append(f"  NaN census: {total_nan} total")
     # Energy drift from auxiliary time-series (code-agnostic)
     energy_drift_total: float | None = None
     energy_drift_last: float | None = None
@@ -836,6 +826,15 @@ def validate(
         except (KeyError, TypeError, IndexError):
             pass
 
+    lines = [
+        f"Validation: {sim.model_name} ({sim.model_type})  Step: {step_val}",
+        f"  Fields:     {', '.join(field_names)}",
+    ]
+    if nan_fields:
+        nan_detail = ", ".join(f"{k}: {v}" for k, v in nan_fields.items())
+        lines.append(f"  NaN census: {total_nan} total ({nan_detail})")
+    else:
+        lines.append(f"  NaN census: {total_nan} total")
     if div_b_val is not None:
         lines.append(f"  max |div B|: {div_b_val:.6g}")
     if b_energy is not None:
@@ -887,6 +886,7 @@ def _stitch_animation(
             typer.echo(f"Error: expected frame not found: {f}", err=True)
             raise typer.Exit(1)
 
+    Path(output_path).parent.mkdir(parents=True, exist_ok=True)
     # Use concat demuxer for arbitrary filenames
     concat_path = Path(frames[0]).parent / "_concat.txt"
     try:
@@ -1137,8 +1137,16 @@ def plot(
         msg = f"Invalid --format {fmt!r}. Use png, pdf, or svg."
         raise typer.BadParameter(msg)
 
+    if animate is not None and output is None:
+        msg = "--animate requires --output to know where frames are."
+        raise typer.BadParameter(msg)
+
     sim = _open(path)
     step_list = parse_steps(step, sim)
+
+    if animate is not None and len(step_list) < 2:
+        msg = "--animate requires multiple steps (use --step all or a range)."
+        raise typer.BadParameter(msg)
 
     if len(step_list) > 1:
         if output is None:
@@ -1200,12 +1208,7 @@ def plot(
             _run_frame(sv)
 
     if animate is not None:
-        if len(step_list) < 2:
-            msg = "--animate requires multiple steps (use --step all or a range)."
-            raise typer.BadParameter(msg)
-        if output is None:
-            msg = "--animate requires --output to know where frames are."
-            raise typer.BadParameter(msg)
+        assert output is not None  # validated above
         _stitch_animation(output, step_list, animate, fps)
 
 
