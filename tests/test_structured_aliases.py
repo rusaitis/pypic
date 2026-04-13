@@ -125,7 +125,7 @@ class TestDescriptiveComputeAliases:
             "rho_m": np.full(shape, 4.0),
         }
         ds = make_test_dataset(data, shape=shape)
-        result = compute_field("v_Alfven", ds)
+        result = compute_field("alfven_speed", ds)
         np.testing.assert_allclose(result, 0.5, rtol=1e-15)
 
     @pytest.mark.parametrize(
