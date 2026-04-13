@@ -678,6 +678,8 @@ def _get_species_args(
     """Extract charge and mass from species info for a recipe."""
     if recipe.species_index is None:
         return []
+    if recipe.species_args is _SpeciesArgs.NONE:
+        return []
     idx = recipe.species_index
     if not dataset.species or idx >= len(dataset.species):
         available = len(dataset.species)

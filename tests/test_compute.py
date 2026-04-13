@@ -806,6 +806,26 @@ class TestPerSpeciesPressureDecomposition:
         perp_sum = compute_field("P_perp_e", ds) + compute_field("P_perp_i", ds)
         np.testing.assert_allclose(total_perp, perp_sum, rtol=1e-15)
 
+    def test_dynamic_species_without_species_metadata(self):
+        """P_par_s2 works when tensor fields exist but species[2] is not."""
+        shape = (2, 2, 2)
+        data = {
+            "P11_s2": np.full(shape, 1.0),
+            "P22_s2": np.full(shape, 2.0),
+            "P33_s2": np.full(shape, 4.0),
+            "P12_s2": np.zeros(shape),
+            "P13_s2": np.zeros(shape),
+            "P23_s2": np.zeros(shape),
+            "B1": np.zeros(shape),
+            "B2": np.zeros(shape),
+            "B3": np.ones(shape),
+        }
+        ds = make_test_dataset(data, shape=shape)
+        # B along z → P_par = P33 = 4
+        np.testing.assert_allclose(
+            compute_field("P_par_s2", ds), 4.0, rtol=1e-15
+        )
+
 
 class TestGeometryGuard:
     @pytest.mark.parametrize(
