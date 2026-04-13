@@ -227,8 +227,12 @@ def _resolve_plane(
     plane_str: str | None,
     index: int | None,
     coord: float | None,
-) -> PlaneSelection:
-    """Build a :class:`PlaneSelection` from CLI flags."""
+) -> PlaneSelection | None:
+    """Build a :class:`PlaneSelection` from CLI flags.
+
+    Returns ``None`` for 2D grids when the user didn't request a
+    specific plane — the plotting layer handles 2D data directly.
+    """
     import numpy as np
 
     from pypic.selections import PlaneSelection
@@ -236,6 +240,15 @@ def _resolve_plane(
     if index is not None and coord is not None:
         msg = "Cannot specify both --index and --coord."
         raise typer.BadParameter(msg)
+
+    # 2D data: no slicing needed unless the user explicitly asked
+    if (
+        len(grid.dimensions) <= 2
+        and plane_str is None
+        and index is None
+        and coord is None
+    ):
+        return None
 
     normal = _plane_normal(plane_str, grid) if plane_str else _auto_plane_normal(grid)
 
@@ -675,7 +688,7 @@ def compare(
                     metric="linf",
                     **cmp_kwargs,  # type: ignore[arg-type]
                 )
-        except KeyError as exc:
+        except (KeyError, ValueError, NotImplementedError) as exc:
             typer.echo(f"Error: {exc}", err=True)
             raise typer.Exit(1) from None
 
@@ -718,11 +731,15 @@ def compare(
             },
         }
     else:
-        report = field_comparison_report(
-            ds_a,
-            ds_b,
-            **cmp_kwargs,  # type: ignore[arg-type]
-        )
+        try:
+            report = field_comparison_report(
+                ds_a,
+                ds_b,
+                **cmp_kwargs,  # type: ignore[arg-type]
+            )
+        except (ValueError, NotImplementedError) as exc:
+            typer.echo(f"Error: {exc}", err=True)
+            raise typer.Exit(1) from None
 
         text_lines = [
             f"Comparing: {path_a} vs {path_b}",
@@ -1339,7 +1356,7 @@ def plot_compare(
             show_error=True,
             theme=theme,
         )
-    except KeyError as exc:
+    except (KeyError, ValueError, NotImplementedError) as exc:
         typer.echo(f"Error: {exc}", err=True)
         raise typer.Exit(1) from None
 

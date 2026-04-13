@@ -827,3 +827,101 @@ class TestPlotAnimate:
         )
         assert result.exit_code != 0
         assert "multiple steps" in result.output
+
+
+# -- 2D dataset edge case ---------------------------------------------------
+
+_TOML_2D = """\
+[model]
+name = "test_2d"
+type = "MHD"
+
+[grid]
+dimensions = [8, 6]
+spacing = [1.0, 1.0]
+origin = [0.0, 0.0]
+
+[units]
+system = "SI"
+
+[coordinates]
+geometry = "cartesian"
+frame = "simulation"
+
+[physics.mhd]
+gamma = 1.6667
+"""
+
+
+def _make_2d_sim(tmp_path: Path) -> Path:
+    d = tmp_path / "sim2d"
+    d.mkdir()
+    (d / "simulation.toml").write_text(_TOML_2D, encoding="utf-8")
+    rng = np.random.default_rng(99)
+    shape = (8, 6)
+    with h5py.File(d / "output_000000.h5", "w") as f:
+        grp = f.create_group("fields")
+        grp.create_dataset("B1", data=rng.standard_normal(shape))
+        grp.create_dataset("B2", data=rng.standard_normal(shape))
+        f.attrs["model"] = "test_2d"
+        f.attrs["step"] = 0
+    return d
+
+
+@mpl_required
+def test_plot_2d_dataset(tmp_path: Path) -> None:
+    """plot works on already-2D data without --plane."""
+    d = _make_2d_sim(tmp_path)
+    out = str(tmp_path / "2d.png")
+    result = runner.invoke(app, ["plot", str(d), "--field", "B1", "--output", out])
+    assert result.exit_code == 0, result.output
+    assert (tmp_path / "2d.png").exists()
+
+
+def test_stats_2d_dataset(tmp_path: Path) -> None:
+    d = _make_2d_sim(tmp_path)
+    result = runner.invoke(app, ["stats", str(d), "--field", "B1"])
+    assert result.exit_code == 0, result.output
+
+
+# -- bad --method / --frame in compare and plot-compare ----------------------
+
+
+def test_compare_bad_method(tmp_path: Path) -> None:
+    d = _make_sim_dir(tmp_path)
+    result = runner.invoke(
+        app, ["compare", str(d), str(d), "--field", "B1", "--method", "banana"]
+    )
+    assert result.exit_code != 0
+    assert "Error:" in result.output
+
+
+def test_compare_bad_frame(tmp_path: Path) -> None:
+    d = _make_sim_dir(tmp_path)
+    result = runner.invoke(
+        app, ["compare", str(d), str(d), "--field", "B1", "--frame", "banana"]
+    )
+    assert result.exit_code != 0
+    assert "Error:" in result.output
+
+
+@mpl_required
+def test_plot_compare_bad_method(tmp_path: Path) -> None:
+    d = _make_sim_dir(tmp_path)
+    out = str(tmp_path / "err.png")
+    result = runner.invoke(
+        app,
+        [
+            "plot-compare",
+            str(d),
+            str(d),
+            "--field",
+            "B1",
+            "--method",
+            "banana",
+            "--output",
+            out,
+        ],
+    )
+    assert result.exit_code != 0
+    assert "Error:" in result.output
