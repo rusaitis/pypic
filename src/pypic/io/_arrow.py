@@ -11,7 +11,6 @@ Install with ``pip install pypic[arrow]``.
 from __future__ import annotations
 
 import json
-import logging
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
@@ -23,8 +22,6 @@ if TYPE_CHECKING:
     import pyarrow as pa
 
 __all__ = ["particles_from_arrow", "particles_to_arrow"]
-
-_log = logging.getLogger(__name__)
 
 _POSITION_COLS = ("x", "y", "z")
 _VELOCITY_COLS = ("vx", "vy", "vz")
@@ -55,6 +52,28 @@ def _decode_species_meta(schema_meta: dict[bytes, bytes] | None) -> dict[str, An
     if raw is None:
         return {"species_index": 0, "species_name": "unknown", "n_particles": 0}
     return json.loads(raw)  # type: ignore[no-any-return]
+
+
+def inject_species_meta(
+    table: pa.Table,
+    species_index: int,
+    species_name: str,
+) -> pa.Table:
+    """Inject species metadata into an Arrow table's schema metadata.
+
+    Used by ``particles_from_dataset`` and ``query_sql`` to attach
+    species info extracted from partition columns before calling
+    ``particles_from_arrow``.
+    """
+    meta = table.schema.metadata or {}
+    meta[b"pypic"] = json.dumps(
+        {
+            "species_index": species_index,
+            "species_name": species_name,
+            "n_particles": len(table),
+        }
+    ).encode("utf-8")
+    return table.replace_schema_metadata(meta)
 
 
 def particles_to_arrow(
@@ -106,14 +125,14 @@ def particles_to_arrow(
     if data.position is not None:
         for i, col_name in enumerate(_POSITION_COLS):
             col = data.position[:, i]
-            if position_dtype is not None:
+            if position_dtype is not None and col.dtype != np.dtype(position_dtype):
                 col = col.astype(position_dtype)
             arrays[col_name] = pa.array(col)
 
     if data.velocity is not None:
         for i, col_name in enumerate(_VELOCITY_COLS):
             col = data.velocity[:, i]
-            if velocity_dtype is not None:
+            if velocity_dtype is not None and col.dtype != np.dtype(velocity_dtype):
                 col = col.astype(velocity_dtype)
             arrays[col_name] = pa.array(col)
 

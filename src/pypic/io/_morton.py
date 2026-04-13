@@ -44,7 +44,7 @@ def _quantize(
     max_val = np.uint64((1 << bits) - 1)
     scaled = (arr - lo) / span
     return np.minimum(
-        (scaled * float(max_val + np.uint64(1))).astype(np.uint64),
+        (scaled * float(1 << bits)).astype(np.uint64),
         max_val,
     )
 

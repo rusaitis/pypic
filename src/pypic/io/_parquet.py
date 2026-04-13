@@ -21,7 +21,11 @@ import logging
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from pypic.io._arrow import particles_from_arrow, particles_to_arrow
+from pypic.io._arrow import (
+    inject_species_meta,
+    particles_from_arrow,
+    particles_to_arrow,
+)
 from pypic.io._guard import ensure_arrow
 from pypic.io._morton import morton_sort_indices
 
@@ -177,7 +181,7 @@ def _resolve_species_list(
     """Return ``[(index, name), ...]`` for the requested species."""
     all_species = source.config.species
     if species is None:
-        return [(sp.species_index, sp.name) for sp in _enumerate_species(all_species)]
+        return [(i, sp.name) for i, sp in enumerate(all_species)]
     result: list[tuple[int, str]] = []
     for s in species:
         if isinstance(s, int):
@@ -197,16 +201,6 @@ def _resolve_species_list(
                 msg = f"Species name {s!r} not found in simulation config"
                 raise KeyError(msg)
     return result
-
-
-def _enumerate_species(
-    species: tuple[Any, ...],
-) -> list[Any]:
-    """Return lightweight objects with species_index and name for iteration."""
-    return [
-        type("_SP", (), {"species_index": i, "name": sp.name})()
-        for i, sp in enumerate(species)
-    ]
 
 
 def particles_to_dataset(
@@ -345,7 +339,7 @@ def particles_from_dataset(
         step_str = f"{step:06d}"
         part_filter = pads.field("step") == step_str
     if species is not None:
-        species_str = _resolve_species_str(species, dataset)
+        species_str = _resolve_species_str(species, Path(path))
         sp_filter = pads.field("species") == species_str
         part_filter = sp_filter if part_filter is None else part_filter & sp_filter
 
@@ -397,35 +391,25 @@ def particles_from_dataset(
         species_index = species
 
     table = _strip_extra_columns(table)
-
-    # Inject species metadata so particles_from_arrow can reconstruct
-    import json
-
-    meta = table.schema.metadata or {}
-    meta[b"pypic"] = json.dumps(
-        {
-            "species_index": species_index,
-            "species_name": species_name,
-            "n_particles": len(table),
-        }
-    ).encode("utf-8")
-    table = table.replace_schema_metadata(meta)
-
+    table = inject_species_meta(table, species_index, species_name)
     return particles_from_arrow(table)
 
 
-def _resolve_species_str(species: str | int, dataset: object) -> str:
-    """Convert a species argument to the string used in partition keys."""
+def _resolve_species_str(species: str | int, root: Path) -> str:
+    """Convert a species argument to the string used in partition keys.
+
+    For string arguments, returns directly.  For integer indices,
+    discovers species names from the Hive directory structure
+    (stable across pyarrow versions, unlike expression repr parsing).
+    """
     if isinstance(species, str):
         return species
-    # Integer index — scan partition values to find the name at this index
-    # by discovering distinct species values in alphabetical order.
-    frag_species: set[str] = set()
-    for frag in dataset.get_fragments():  # type: ignore[attr-defined]
-        sp_val = _extract_partition_value(frag.partition_expression, "species")
-        if sp_val is not None:
-            frag_species.add(sp_val)
-    species_sorted = sorted(frag_species)
+    species_dirs: set[str] = set()
+    prefix = "species="
+    for p in root.glob("step=*/species=*"):
+        if p.is_dir() and p.name.startswith(prefix):
+            species_dirs.add(p.name[len(prefix) :])
+    species_sorted = sorted(species_dirs)
     if species >= len(species_sorted):
         msg = (
             f"Species index {species} out of range"
@@ -433,16 +417,3 @@ def _resolve_species_str(species: str | int, dataset: object) -> str:
         )
         raise IndexError(msg)
     return species_sorted[species]
-
-
-def _extract_partition_value(expr: object, field_name: str) -> str | None:
-    """Extract the value for a partition field from a fragment expression."""
-    s = str(expr)
-    # Expression string form: (step == "000000") and (species == "electrons")
-    key = f'{field_name} == "'
-    idx = s.find(key)
-    if idx == -1:
-        return None
-    start = idx + len(key)
-    end = s.index('"', start)
-    return s[start:end]

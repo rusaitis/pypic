@@ -57,15 +57,16 @@ def query_sql(
     ensure_arrow()
     import duckdb
 
-    from pypic.io._arrow import particles_from_arrow
+    from pypic.io._arrow import inject_species_meta, particles_from_arrow
     from pypic.io._parquet import _strip_extra_columns
 
     glob_pattern = str(Path(path) / "**" / "*.parquet")
+    escaped = glob_pattern.replace("'", "''")
     con = duckdb.connect()
     try:
         con.execute(
             f"CREATE VIEW particles AS "
-            f"SELECT * FROM parquet_scan('{glob_pattern}', "
+            f"SELECT * FROM parquet_scan('{escaped}', "
             f"hive_partitioning=true)"
         )
         result = con.execute(sql)
@@ -78,23 +79,11 @@ def query_sql(
 
     # DuckDB doesn't preserve Parquet schema metadata, so extract
     # species info from partition columns before stripping them.
-    import json
-
     species_name = "unknown"
     species_index = 0
     if "species" in arrow_table.column_names and len(arrow_table) > 0:
         species_name = str(arrow_table.column("species")[0].as_py())
 
     arrow_table = _strip_extra_columns(arrow_table)
-
-    meta = arrow_table.schema.metadata or {}
-    meta[b"pypic"] = json.dumps(
-        {
-            "species_index": species_index,
-            "species_name": species_name,
-            "n_particles": len(arrow_table),
-        }
-    ).encode("utf-8")
-    arrow_table = arrow_table.replace_schema_metadata(meta)
-
+    arrow_table = inject_species_meta(arrow_table, species_index, species_name)
     return particles_from_arrow(arrow_table)
