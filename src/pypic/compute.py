@@ -20,6 +20,7 @@ from scipy import constants
 from pypic import derived, diagnostics
 from pypic._aliases import (
     _COMPUTE_ALIASES,
+    _GROUP_ALIASES,
     _get_field_alias_fallback,
 )
 from pypic.coordinates import operators
@@ -662,6 +663,15 @@ def _get_recipe(name: str) -> _Recipe:
     dynamic = _try_species_recipe(canonical)
     if dynamic is not None:
         return dynamic
+    # Check if this is a vector group alias (e.g. "EFe" → read-time only)
+    if name in _GROUP_ALIASES or canonical in _GROUP_ALIASES:
+        group_name = name if name in _GROUP_ALIASES else canonical
+        msg = (
+            f"{name!r} is a vector group (expands to 3 components). "
+            f"Use {group_name}1/{group_name}2/{group_name}3 in compute(), "
+            f'or read(fields=["{group_name}"]) to load all three.'
+        )
+        raise KeyError(msg) from None
     all_names = available_quantities()
     suggestions = difflib.get_close_matches(name, all_names, n=3, cutoff=0.4)
     msg = f"Unknown derived quantity {name!r}."
