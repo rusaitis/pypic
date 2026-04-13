@@ -27,6 +27,7 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     from pypic.containers import SimulationConfig
+    from pypic.coordinates.transforms import FrameTransform
 
 __all__ = ["open_virtual"]
 
@@ -165,12 +166,14 @@ def open_virtual(
     """
     ensure_virtualizarr()
 
+    from pathlib import Path as _Path
+
     from obspec_utils.registry import ObjectStoreRegistry
     from obstore.store import LocalStore
     from virtualizarr import open_virtual_dataset
     from virtualizarr.parsers import HDFParser
 
-    path_str = str(path)
+    path_str = str(_Path(path).resolve())
     url = f"file://{path_str}"
 
     registry = ObjectStoreRegistry()  # type: ignore[var-annotated]
@@ -187,15 +190,14 @@ def open_virtual(
 
     ds = _virtual_to_readable(vds)
 
-    # Resolve metadata: explicit config takes priority, then HDF5 groups
     if config is not None:
         grid = config.grid
         normalization = config.normalization
         species = config.species
         physics = config.physics
-        metadata = dict(config.metadata)
+        metadata: dict[str, Any] = config.metadata
         frame = config.frame
-        transforms: dict[str, Any] | None = dict(config.transforms)
+        transforms: dict[str, FrameTransform] | None = config.transforms
     else:
         h5_grid, h5_norm, h5_extra = _read_metadata_from_h5(path_str)
         if h5_grid is None:
@@ -212,15 +214,17 @@ def open_virtual(
         frame = "simulation"
         transforms = None
 
-    # Rename phony dimensions to grid axis names
     dim_names = list(grid.surviving_axis_names)
     ds_dims = list(ds.dims)
-    if len(ds_dims) >= len(dim_names):
-        tail = ds_dims[-len(dim_names) :]
-        rename_map = {old: new for old, new in zip(tail, dim_names, strict=False)}
-        ds = ds.rename(rename_map)
+    if len(ds_dims) != len(dim_names):
+        msg = (
+            f"Dimension count mismatch: HDF5 has {len(ds_dims)} dimensions "
+            f"{ds_dims} but grid expects {len(dim_names)} {dim_names}."
+        )
+        raise ValueError(msg)
+    rename_map = {old: new for old, new in zip(ds_dims, dim_names, strict=True)}
+    ds = ds.rename(rename_map)
 
-    # Assign coordinate arrays from grid
     coord_arrays = grid.coordinate_arrays()
     coords = {dim_names[i]: coord_arrays[i] for i in range(len(dim_names))}
     ds = ds.assign_coords(coords)
