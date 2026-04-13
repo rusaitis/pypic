@@ -695,3 +695,135 @@ class TestPlotCompare:
         )
         assert result.exit_code != 0
         assert "Error:" in result.output
+
+
+# -- stats --field all -------------------------------------------------------
+
+
+def test_stats_field_all(tmp_path: Path) -> None:
+    d = _make_sim_dir(tmp_path)
+    result = runner.invoke(app, ["stats", str(d), "--field", "all"])
+    assert result.exit_code == 0, result.output
+    assert "B1" in result.output
+    assert "B2" in result.output
+    assert "B3" in result.output
+
+
+def test_stats_field_all_json(tmp_path: Path) -> None:
+    d = _make_sim_dir(tmp_path)
+    result = runner.invoke(app, ["stats", str(d), "--field", "all", "--json"])
+    assert result.exit_code == 0, result.output
+    data = json.loads(result.output)
+    assert "fields" in data
+    assert len(data["fields"]) >= 3
+    assert data["fields"][0]["field"] == "B1"
+
+
+# -- validate ----------------------------------------------------------------
+
+
+def test_validate_text(tmp_path: Path) -> None:
+    d = _make_sim_dir(tmp_path)
+    result = runner.invoke(app, ["validate", str(d)])
+    assert result.exit_code == 0, result.output
+    assert "Validation:" in result.output
+    assert "NaN census:" in result.output
+    assert "max |div B|:" in result.output
+    assert "B energy:" in result.output
+
+
+def test_validate_json(tmp_path: Path) -> None:
+    d = _make_sim_dir(tmp_path)
+    result = runner.invoke(app, ["validate", str(d), "--json"])
+    assert result.exit_code == 0, result.output
+    data = json.loads(result.output)
+    assert data["nan_total"] == 0
+    assert data["max_div_b"] is not None
+    assert data["b_energy"] is not None
+    assert isinstance(data["fields"], list)
+    # No auxiliary data in synthetic sim → energy drift is null
+    assert data["energy_drift_total_pct"] is None
+    assert data["energy_drift_last_pct"] is None
+
+
+# -- plot --theme ------------------------------------------------------------
+
+
+@mpl_required
+class TestPlotTheme:
+    def test_theme_dark(self, tmp_path: Path) -> None:
+        d = _make_sim_dir(tmp_path)
+        out = str(tmp_path / "dark.png")
+        result = runner.invoke(
+            app,
+            ["plot", str(d), "--field", "B1", "--theme", "dark", "--output", out],
+        )
+        assert result.exit_code == 0, result.output
+
+
+# -- plot --contour ----------------------------------------------------------
+
+
+@mpl_required
+class TestPlotContour:
+    def test_contour_overlay(self, tmp_path: Path) -> None:
+        d = _make_sim_dir(tmp_path)
+        out = str(tmp_path / "contour.png")
+        result = runner.invoke(
+            app,
+            [
+                "plot",
+                str(d),
+                "--field",
+                "B1",
+                "--contour",
+                "B2",
+                "--contour-levels",
+                "3",
+                "--output",
+                out,
+            ],
+        )
+        assert result.exit_code == 0, result.output
+        assert (tmp_path / "contour.png").exists()
+
+
+# -- plot-compare --theme ----------------------------------------------------
+
+
+@mpl_required
+class TestPlotCompareTheme:
+    def test_theme(self, tmp_path: Path) -> None:
+        d = _make_sim_dir(tmp_path)
+        out = str(tmp_path / "cmp_dark.png")
+        result = runner.invoke(
+            app,
+            [
+                "plot-compare",
+                str(d),
+                str(d),
+                "--field",
+                "B1",
+                "--theme",
+                "dark",
+                "--output",
+                out,
+            ],
+        )
+        assert result.exit_code == 0, result.output
+
+
+# -- plot --animate ----------------------------------------------------------
+
+
+@mpl_required
+class TestPlotAnimate:
+    def test_animate_requires_multistep(self, tmp_path: Path) -> None:
+        d = _make_sim_dir(tmp_path)
+        out = str(tmp_path / "out.png")
+        result = runner.invoke(
+            app,
+            ["plot", str(d), "--field", "B1", "--output", out, "--animate", "out.mp4"],
+        )
+        assert result.exit_code != 0
+        assert "multiple steps" in result.output

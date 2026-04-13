@@ -147,7 +147,7 @@ Each step produces something testable. No step starts until the previous step's 
   - `pypic compare <path_a> <path_b> [--step N] [--field FIELD] [--metric l2|linf|both] [--units si|code] [--method linear|nearest|cubic] [--nan-policy omit|propagate|raise] [--frame FRAME] [--json]` — numeric comparison via Step 20. `--frame` matches the library's `frame=` kwarg: omitted uses A's frame (transforming B if needed), explicit value transforms both to that frame. `--method` and `--nan-policy` forward to the library as-is. Prints grid context (domain overlap, resolution ratio). Rich table by default, `--json` for scripting/CI. When `--field` is omitted, runs `field_comparison_report` for all common fields.
   **Testing:** each subcommand exercised via `typer.testing.CliRunner` against synthetic datasets (no real simulation files in the test suite).
 
-- [ ] **Step 22: `pypic plot` and `pypic plot-compare` CLI subcommands**
+- [x] **Step 22: `pypic plot` and `pypic plot-compare` CLI subcommands**
   **Smart defaults:** `--step` defaults to `last_step`. `--plane` defaults to the largest cross-section (longest two axes). `--field` is required (no reasonable default for all models). Minimal invocation: `pypic plot ./run/ --field "|B|"`.
   **Shared flags:** `--output FILE` (default: display; file extension sets format — for batch steps, use template: `frames/B_{step:06d}.png`), `--format png|pdf|svg` (overrides extension), `--dpi INT` (default: 150), `--res WxH` (downsample to at most W×H grid points via nearest-neighbor, preserving aspect ratio — fast previews and reduced token use when images are fed to LLMs), `--vmin/--vmax FLOAT` (color range override), `--colormap CMAP` (overrides auto-detection), `--scale linear|log|symlog` (default: `linear`; `log` uses `LogNorm` — best for density/pressure/energy spanning decades; `symlog` uses `SymLogNorm` for signed fields with large dynamic range like current density or vorticity; `--linthresh FLOAT` sets the linear region width for symlog, default auto-detected from data as `median(|nonzero values|)`), `--jobs N` (parallel frame rendering for `--step all` via `ProcessPoolExecutor`; serial by default). `--step` supports full syntax.
   **Auto color range** (when `--vmin`/`--vmax` omitted): default to `3σ` from the median, rounded to the nearest value in the 1-2-5 × 10^n sequence (..., 0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 50, ...). **Signed fields** (diverging colormap): `clim = ±round_nice(3σ)`, symmetric around 0 so the colormap's zero-crossing aligns with physical zero. **Positive-definite fields** (sequential colormap): `vmin = 0`, `vmax = round_nice(median + 3σ)`. Outliers clip at colormap extremes (matplotlib default). This avoids a single extreme cell (reconnection X-point, shock front) from washing out the range for the 99.7% of the domain that matters. Colormap auto-detection uses the existing `is_positive_definite()` logic in `plotting/_colormaps.py` (quantity_type + field name pattern + data fallback).
@@ -344,7 +344,7 @@ grow.
 | 20b | comparison | Volume-weighted L2 norm via `weighted=True` | — |
 | 21b | readers | `sim.available_fields()` + `available_fields_mapping()` | ✅ |
 | 21 | cli | `info`, `fields`, `stats`, `compare` subcommands (typer) | ✅ |
-| 22 | cli | `plot`, `plot-compare` subcommands | — |
+| 22 | cli | `plot`, `plot-compare` subcommands | ✅ |
 | 24 | io | Zarr export/import for FieldDataset | — |
 | 25 | io | Parquet/Arrow for ParticleData | — |
 | 26 | cli | `convert` subcommand | — |

@@ -468,7 +468,9 @@ def fields(
 @app.command()
 def stats(
     path: Annotated[Path, typer.Argument(help="Simulation directory.")],
-    field: Annotated[str, typer.Option("--field", help="Field name.")],
+    field: Annotated[
+        str, typer.Option("--field", help="Field name ('all' for every field).")
+    ],
     step: Annotated[
         str, typer.Option("--step", help="Timestep (default: last).")
     ] = "last",
@@ -487,12 +489,11 @@ def stats(
 
     sim = _open(path)
     step_list = parse_steps(step, sim)
+    unit_label = units if units is not None else "code"
 
-    def _compute_stats(step_val: int) -> dict[str, object]:
-        arr = _get_field_array(sim, step_val, field, units)
+    def _stats_from_array(arr: FloatArray) -> dict[str, object]:
         fmin, fmax = field_extrema(arr)
         return {
-            "step": step_val,
             "min": float(fmin),
             "max": float(fmax),
             "mean": float(spatial_mean(arr)),
@@ -500,8 +501,41 @@ def stats(
             "nan_count": int(np.isnan(arr).sum()),
         }
 
-    unit_label = units if units is not None else "code"
-    all_results = [_compute_stats(s) for s in step_list]
+    if field == "all":
+        step_val = _require_single_step(step_list, step)
+        field_names = sim.available_fields(step_val)
+        ds = sim.read(step_val, fields=field_names)
+        rows: list[dict[str, object]] = []
+        for f in field_names:
+            arr = np.asarray(ds[f])
+            if units is not None:
+                arr = ds.in_units(f, units)
+            rows.append({"field": f, "step": step_val, **_stats_from_array(arr)})
+        max_name = max((len(str(r["field"])) for r in rows), default=5)
+        hdr = (
+            f"{'Field':<{max_name}}  {'min':>12}  {'max':>12}  "
+            f"{'mean':>12}  {'rms':>12}  {'NaN':>5}"
+        )
+        text_lines = [f"Step: {step_val}  Units: {unit_label}", hdr]
+        for r in rows:
+            text_lines.append(
+                f"{r['field']!s:<{max_name}}  {r['min']:>12.6g}  "
+                f"{r['max']:>12.6g}  {r['mean']:>12.6g}  "
+                f"{r['rms']:>12.6g}  {r['nan_count']:>5}"
+            )
+        data: dict[str, object] = {
+            "path": str(path),
+            "step": step_val,
+            "units": unit_label,
+            "fields": rows,
+        }
+        _output(data, "\n".join(text_lines), json_mode=json_output)
+        return
+
+    all_results = [
+        {"step": s, **_stats_from_array(_get_field_array(sim, s, field, units))}
+        for s in step_list
+    ]
 
     if len(all_results) == 1:
         r = all_results[0]
@@ -513,7 +547,7 @@ def stats(
             f"  rms:    {r['rms']:.6g}",
             f"  NaN:    {r['nan_count']}",
         ]
-        data: dict[str, object] = {
+        data = {
             "path": str(path),
             "field": field,
             "units": unit_label,
@@ -732,6 +766,161 @@ def compare(
     _output(data, "\n".join(text_lines), json_mode=json_output)
 
 
+@app.command()
+def validate(
+    path: Annotated[Path, typer.Argument(help="Simulation directory.")],
+    step: Annotated[
+        str, typer.Option("--step", help="Timestep (default: last).")
+    ] = "last",
+    json_output: Annotated[
+        bool, typer.Option("--json", help="Output as JSON.")
+    ] = False,
+) -> None:
+    """Quick health check: NaN census, div B, field energy."""
+    import numpy as np
+
+    from pypic.derived import electric_energy_density, magnetic_energy_density
+    from pypic.diagnostics import field_energy, max_div_b
+
+    sim = _open(path)
+    step_val = _require_single_step(parse_steps(step, sim), step)
+    ds = sim.read(step_val)
+
+    field_names = sorted(ds.field_names())
+    nan_fields: dict[str, int] = {}
+    for name in field_names:
+        count = int(np.isnan(ds[name]).sum())
+        if count > 0:
+            nan_fields[name] = count
+    total_nan = sum(nan_fields.values())
+
+    has_b = all(ds.has_field(f) for f in ("B1", "B2", "B3"))
+    has_e = all(ds.has_field(f) for f in ("E1", "E2", "E3"))
+
+    div_b_val: float | None = None
+    b_energy: float | None = None
+    e_energy: float | None = None
+
+    if has_b:
+        b1, b2, b3 = ds["B1"], ds["B2"], ds["B3"]
+        b_mag = np.sqrt(b1**2 + b2**2 + b3**2)
+        div_b_val = float(max_div_b(b1, b2, b3, *ds.grid.spacing))
+        b_energy = float(field_energy(magnetic_energy_density(b_mag), ds.grid.spacing))
+    if has_e:
+        e1, e2, e3 = ds["E1"], ds["E2"], ds["E3"]
+        e_mag = np.sqrt(e1**2 + e2**2 + e3**2)
+        e_energy = float(field_energy(electric_energy_density(e_mag), ds.grid.spacing))
+
+    lines = [
+        f"Validation: {sim.model_name} ({sim.model_type})  Step: {step_val}",
+        f"  Fields:     {', '.join(field_names)}",
+    ]
+    if nan_fields:
+        nan_detail = ", ".join(f"{k}: {v}" for k, v in nan_fields.items())
+        lines.append(f"  NaN census: {total_nan} total ({nan_detail})")
+    else:
+        lines.append(f"  NaN census: {total_nan} total")
+    # Energy drift from auxiliary time-series (code-agnostic)
+    energy_drift_total: float | None = None
+    energy_drift_last: float | None = None
+    if "conserved_quantities" in sim.auxiliary_names:
+        try:
+            tab = sim.auxiliary("conserved_quantities")
+            if "total_energy" in tab and len(tab) >= 2:
+                e_arr = tab["total_energy"]
+                e0 = float(e_arr[0])
+                if e0 != 0:
+                    abs_e0 = abs(e0)
+                    energy_drift_total = float((e_arr[-1] - e0) / abs_e0 * 100)
+                    energy_drift_last = float((e_arr[-1] - e_arr[-2]) / abs_e0 * 100)
+        except (KeyError, TypeError, IndexError):
+            pass
+
+    if div_b_val is not None:
+        lines.append(f"  max |div B|: {div_b_val:.6g}")
+    if b_energy is not None:
+        lines.append(f"  B energy:   {b_energy:.6g}")
+    if e_energy is not None:
+        lines.append(f"  E energy:   {e_energy:.6g}")
+    if energy_drift_total is not None:
+        lines.append(f"  ΔE total:   {energy_drift_total:+.4g}%")
+    if energy_drift_last is not None:
+        lines.append(f"  ΔE last step: {energy_drift_last:+.4g}%")
+
+    result: dict[str, object] = {
+        "path": str(path),
+        "model_name": sim.model_name,
+        "model_type": sim.model_type,
+        "step": step_val,
+        "fields": field_names,
+        "nan_total": total_nan,
+        "nan_fields": nan_fields,
+        "max_div_b": div_b_val,
+        "b_energy": b_energy,
+        "e_energy": e_energy,
+        "energy_drift_total_pct": energy_drift_total,
+        "energy_drift_last_pct": energy_drift_last,
+    }
+    _output(result, "\n".join(lines), json_mode=json_output)
+
+
+def _stitch_animation(
+    frame_template: str,
+    steps: list[int],
+    output_path: str,
+    fps: int,
+) -> None:
+    """Stitch rendered frames into a video via ffmpeg."""
+    import shutil
+    import subprocess
+
+    if shutil.which("ffmpeg") is None:
+        typer.echo(
+            "Error: ffmpeg not found. Install ffmpeg for animation export.",
+            err=True,
+        )
+        raise typer.Exit(1)
+
+    frames = [frame_template.format(step=s) for s in steps]
+    for f in frames:
+        if not Path(f).exists():
+            typer.echo(f"Error: expected frame not found: {f}", err=True)
+            raise typer.Exit(1)
+
+    # Use concat demuxer for arbitrary filenames
+    concat_path = Path(frames[0]).parent / "_concat.txt"
+    try:
+        concat_path.write_text(
+            "\n".join(f"file '{Path(f).resolve()}'" for f in frames),
+            encoding="utf-8",
+        )
+        cmd = [
+            "ffmpeg",
+            "-y",
+            "-f",
+            "concat",
+            "-safe",
+            "0",
+            "-r",
+            str(fps),
+            "-i",
+            str(concat_path),
+        ]
+        if output_path.endswith(".gif"):
+            cmd += ["-vf", "split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse"]
+        else:
+            cmd += ["-c:v", "libx264", "-pix_fmt", "yuv420p"]
+        cmd.append(output_path)
+
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        if result.returncode != 0:
+            typer.echo(f"ffmpeg error: {result.stderr}", err=True)
+            raise typer.Exit(1)
+        typer.echo(f"Animation saved: {output_path}")
+    finally:
+        concat_path.unlink(missing_ok=True)
+
+
 def _render_plot(
     path: Path,
     step_val: int,
@@ -750,6 +939,9 @@ def _render_plot(
     colormap: str | None,
     scale: str,
     linthresh: float | None,
+    theme: str | None = None,
+    contour_field: str | None = None,
+    contour_levels: int = 5,
 ) -> None:
     """Render a single plot frame (called once per step)."""
     import matplotlib
@@ -762,7 +954,10 @@ def _render_plot(
 
     sim = _open(path)
     try:
-        ds = sim.read(step_val, fields=[field])
+        read_fields = [field]
+        if contour_field is not None:
+            read_fields.append(contour_field)
+        ds = sim.read(step_val, fields=read_fields)
 
         if frame is not None:
             ds = ds.transform_to(frame)
@@ -816,7 +1011,7 @@ def _render_plot(
 
         time = step_val * ds.grid.dt if ds.grid.dt else None
 
-        fig, _ = plot_field_slice(
+        fig, ax = plot_field_slice(
             ds,
             field,
             plane=plane_sel,
@@ -826,8 +1021,14 @@ def _render_plot(
             cmap=colormap,
             step=step_val,
             time=time,
+            theme=theme,
             **scale_kwargs,  # type: ignore[arg-type]
         )
+
+        if contour_field is not None:
+            from pypic.plotting.slices import add_contours
+
+            add_contours(ax, ds, contour_field, plane=plane_sel, levels=contour_levels)
     except KeyError as exc:
         typer.echo(f"Error: {exc}", err=True)
         raise typer.Exit(1) from None
@@ -907,6 +1108,26 @@ def plot(
         int,
         typer.Option("--jobs", help="Parallel workers for batch rendering."),
     ] = 1,
+    theme: Annotated[
+        str | None,
+        typer.Option("--theme", help="Plot theme name (e.g. dark, light, synthwave)."),
+    ] = None,
+    contour: Annotated[
+        str | None,
+        typer.Option("--contour", help="Overlay contour lines from this field."),
+    ] = None,
+    contour_levels: Annotated[
+        int,
+        typer.Option("--contour-levels", help="Number of contour levels."),
+    ] = 5,
+    animate: Annotated[
+        str | None,
+        typer.Option("--animate", help="Stitch frames into video (e.g. out.mp4)."),
+    ] = None,
+    fps: Annotated[
+        int,
+        typer.Option("--fps", help="Animation framerate."),
+    ] = 24,
 ) -> None:
     """Plot a 2D field slice."""
     if scale not in ("linear", "log", "symlog"):
@@ -962,6 +1183,9 @@ def plot(
             colormap,
             scale,
             linthresh,
+            theme=theme,
+            contour_field=contour,
+            contour_levels=contour_levels,
         )
 
     if len(step_list) > 1 and jobs > 1:
@@ -974,6 +1198,15 @@ def plot(
     else:
         for sv in step_list:
             _run_frame(sv)
+
+    if animate is not None:
+        if len(step_list) < 2:
+            msg = "--animate requires multiple steps (use --step all or a range)."
+            raise typer.BadParameter(msg)
+        if output is None:
+            msg = "--animate requires --output to know where frames are."
+            raise typer.BadParameter(msg)
+        _stitch_animation(output, step_list, animate, fps)
 
 
 @app.command(name="plot-compare")
@@ -1032,6 +1265,10 @@ def plot_compare(
         str,
         typer.Option("--method", help="Interpolation method for regridding."),
     ] = "linear",
+    theme: Annotated[
+        str | None,
+        typer.Option("--theme", help="Plot theme name (e.g. dark, light, synthwave)."),
+    ] = None,
 ) -> None:
     """Three-panel comparison plot: A | B | difference."""
     if comp_units not in ("si", "code"):
@@ -1097,6 +1334,7 @@ def plot_compare(
             time=time,
             labels=(path_a.name, path_b.name),
             show_error=True,
+            theme=theme,
         )
     except KeyError as exc:
         typer.echo(f"Error: {exc}", err=True)
