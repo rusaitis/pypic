@@ -40,6 +40,22 @@ def _default_encoding(ds: xr.Dataset) -> dict[str, dict[str, Any]]:
     return {str(name): {"compressors": compressor} for name in ds.data_vars}
 
 
+def _build_encoding(
+    ds: xr.Dataset,
+    dtype: str | None,
+    encoding: dict[str, dict[str, Any]] | None,
+) -> dict[str, dict[str, Any]]:
+    """Merge default compression, optional dtype downcast, and user overrides."""
+    enc = _default_encoding(ds)
+    if dtype is not None:
+        for var_name in ds.data_vars:
+            enc[str(var_name)]["dtype"] = dtype
+    if encoding is not None:
+        for name, overrides in encoding.items():
+            enc.setdefault(name, {}).update(overrides)
+    return enc
+
+
 def to_zarr(
     fds: FieldDataset,
     path: str | Path,
@@ -83,20 +99,12 @@ def to_zarr(
     ds = fds.xr.copy(deep=False)
     ds.attrs["pypic"] = encode_pypic_attrs(fds)
 
-    enc = _default_encoding(ds)
-    if dtype is not None:
-        for var_name in ds.data_vars:
-            enc[str(var_name)]["dtype"] = dtype
-    if encoding is not None:
-        for name, overrides in encoding.items():
-            enc.setdefault(name, {}).update(overrides)
-
     ds.to_zarr(
         str(path),
         zarr_format=3,
         consolidated=False,
         mode="w",
-        encoding=enc,
+        encoding=_build_encoding(ds, dtype, encoding),
     )
     _log.info("Wrote %d fields to %s", len(ds.data_vars), path)
 
@@ -199,7 +207,6 @@ def to_zarr_timeseries(
     >>> # to_zarr_timeseries(pairs, "/tmp/ts.zarr")
     """
     ensure_zarr()
-    # Normalize source to an iterable of (time_value, FieldDataset)
     pairs: Iterable[tuple[float | int, FieldDataset]]
     from pypic.readers._registry import Simulation as _Sim
 
@@ -222,25 +229,16 @@ def to_zarr_timeseries(
     first = True
     pypic_attrs: dict[str, Any] | None = None
     for time_val, fds in pairs:
-        ds = fds.xr.copy(deep=False)
-        ds = ds.expand_dims(time=[float(time_val)])
+        ds = fds.xr.expand_dims(time=[float(time_val)])
 
         if first:
             pypic_attrs = encode_pypic_attrs(fds)
-            enc = _default_encoding(ds)
-            if dtype is not None:
-                for var_name in ds.data_vars:
-                    enc[str(var_name)]["dtype"] = dtype
-            if encoding is not None:
-                for enc_name, overrides in encoding.items():
-                    enc.setdefault(enc_name, {}).update(overrides)
-
             ds.to_zarr(
                 path_str,
                 zarr_format=3,
                 consolidated=False,
                 mode="w",
-                encoding=enc,
+                encoding=_build_encoding(ds, dtype, encoding),
             )
             first = False
         else:
@@ -251,13 +249,15 @@ def to_zarr_timeseries(
                 append_dim="time",
             )
 
-    # Write pypic metadata after all appends — xarray's append mode
-    # clears dataset-level attrs, so we stamp them onto the zarr store
-    # directly at the end.
-    if pypic_attrs is not None:
-        import zarr
+    if first:
+        msg = "No timesteps to write — source yielded zero items."
+        raise ValueError(msg)
 
-        store = zarr.open_group(path_str, mode="r+")
-        store.attrs["pypic"] = pypic_attrs
+    # Stamp pypic metadata after all appends — xarray's append mode
+    # clears dataset-level attrs.
+    import zarr
+
+    store = zarr.open_group(path_str, mode="r+")
+    store.attrs["pypic"] = pypic_attrs
 
     _log.info("Wrote timeseries to %s", path)

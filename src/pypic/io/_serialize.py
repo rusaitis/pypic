@@ -11,6 +11,7 @@ from __future__ import annotations
 import math
 from typing import TYPE_CHECKING, Any
 
+from pypic import __version__
 from pypic.coordinates.geometry import GEOMETRY_BY_NAME
 from pypic.coordinates.transforms import FrameTransform
 from pypic.grid import GridInfo
@@ -229,7 +230,7 @@ def encode_pypic_attrs(fds: FieldDataset) -> dict[str, Any]:
     FieldDataset on read.
     """
     return {
-        "pypic_version": "0.1.0",
+        "pypic_version": __version__,
         "grid": grid_to_dict(fds.grid),
         "normalization": normalization_to_dict(fds.normalization),
         "species": species_to_list(fds.species),

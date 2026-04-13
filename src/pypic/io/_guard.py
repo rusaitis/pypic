@@ -10,6 +10,9 @@ def ensure_zarr() -> None:
     global _HAS_ZARR
     if _HAS_ZARR is True:
         return
+    if _HAS_ZARR is False:
+        msg = "Missing dependencies for pypic.io. Install with: pip install pypic[zarr]"
+        raise ImportError(msg) from None
     missing: list[str] = []
     try:
         import zarr  # noqa: F401
