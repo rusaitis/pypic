@@ -154,14 +154,51 @@ Each step produces something testable. No step starts until the previous step's 
 ## Phase 8: Modern I/O Formats
 
 - [ ] **Step 24: `pypic.io` — Zarr export/import for FieldDataset**
-  `to_zarr(fds, path)` leveraging `xr.Dataset.to_zarr()` + pypic metadata as group attrs (grid, normalization, species, physics). `from_zarr(path) -> FieldDataset` reconstructs everything. Round-trip guarantee. Default compression: zstd. Optional dep: `zarr>=3.0` under `zarr` extra.
-  **Field metadata:** Already self-describing via xarray DataArray attrs (`quantity_type`, `si_unit`, `long_name`, `latex`, `units`), set by `from_arrays()` and `with_field()`. `xr.Dataset.to_zarr()` serializes attrs automatically — no separate field registry module needed. `from_zarr()` reconstructs `FieldDataset` including per-field metadata. No CF vocabulary (CF has no plasma physics coverage).
+  Zarr v3 + xarray for chunked, self-describing field data storage. Two write modes:
+  - `to_zarr(fds, path)` — single timestep. Leverages `xr.Dataset.to_zarr()` with pypic metadata (grid, normalization, species, physics, frame) serialized to `xr.Dataset.attrs` as JSON-compatible dicts. Writes with `zarr_format=3, consolidated=False`.
+  - `to_zarr_timeseries(simulation, path, *, steps, fields)` — multi-timestep store with `time` as a dimension. Each field becomes `(nt, nx, ny, nz)`, chunked along `time` so reading one step is O(1). Enables time-series analysis without scanning separate files.
+  `from_zarr(path) -> FieldDataset` reconstructs everything including per-field metadata. Returns lazy-loading dataset by default (`xr.open_zarr` is lazy — reading one field doesn't touch others). For multi-variable stores, async concurrent metadata fetching via `zarr.config.set({'async.concurrency': 128})` delivers up to 14× speedup.
+  **Naming:** Canonical numbered names (`B1`, `B2`, `B3`) in the stored format, not geometry-specific (`Bx`, `Br`). Geometry is in metadata; aliases resolve on load. Consistent with HDF5 layout (schema.md § 4).
+  **Field metadata:** Already self-describing via xarray DataArray attrs (`quantity_type`, `si_unit`, `long_name`, `latex`, `units`), set by `from_arrays()` and `with_field()`. `xr.Dataset.to_zarr()` serializes attrs automatically. `from_zarr()` reconstructs `FieldDataset` including per-field metadata. No CF vocabulary (CF has no plasma physics coverage).
+  **FrameTransforms:** Serialize origin, rotation matrix, and scale as arrays in metadata. Skip callable-based transforms; reconstruct on load.
+  **Precision:** `dtype="float32"` kwarg on `to_zarr()` / `to_zarr_timeseries()` downcasts all field arrays to single precision on write (halves storage). Most PIC codes write single-precision dumps anyway; float64→float32 loses ~7 decimal digits, well below PIC numerical accuracy. Default: preserve source dtype. Implemented via xarray's `encoding` dict — user can also pass `encoding=` directly for per-field control.
+  **Compression:** Default `BloscCodec(cname='zstd', clevel=5, shuffle='bitshuffle')` — the standalone `ZstdCodec` lacks shuffle pre-filtering and compresses floats poorly. Blosc2 + zstd + bitshuffle achieves 10–300× on smooth electromagnetic field data due to high spatial correlation. The newer bytedelta filter (Blosc2 2.8+) is an emerging improvement over bitshuffle (37% better on pressure-type data) — expose as an option once stable. User-configurable via `encoding=` passthrough to xarray.
+  **Sharding (cloud):** For cloud-hosted stores (S3, GCS, R2), enable sharding to group chunks into single storage objects, avoiding the small-files problem. Shards are the minimum write unit — the entire shard must fit in memory. Dask chunks must align with shard boundaries. Expose via `shards=` kwarg.
+  **Version pinning:** `zarr>=3.1.0,<4` — versions 3.0.0–3.0.7 were yanked from PyPI due to a data-loss bug (append mode silently deleted data). v3.0.8 is the first safe release; v3.1+ is recommended. Requires `numcodecs>=0.16.0` (fixes BloscCodec defaulting to `typesize=1`, which produced 10–20× larger chunks). Optional deps under `zarr` extra.
+
+- [ ] **Step 24b: `pypic.io` — VirtualiZarr for legacy HDF5**
+  `open_virtual(path) -> FieldDataset` creates lightweight virtual Zarr views over existing HDF5 simulation outputs by extracting byte-range metadata, enabling `xr.open_zarr()` access that transparently reads from original files without conversion. Uses VirtualiZarr v2.4+ (`open_virtual_dataset()`, standard `xr.concat`/`merge`). Virtual references can be persisted to Icechunk (Step 24c) for repeated fast access. Limitations: inherits source file chunking (contiguous HDF5 datasets become single chunks), potential issues with non-standard HDF5 compression filters. Optional dep: `virtualizarr>=2.4` under `zarr` extra.
+  **Depends on:** Step 24 (Zarr foundations).
+
+- [ ] **Step 24c: `pypic.io` — Icechunk storage backend**
+  Optional Git-like versioning and ACID transactions over Zarr v3 stores via Icechunk. Rust-based I/O backend achieves 13–14 Gbps read/write throughput on cloud instances (2–10× faster than zarr + s3fs). Value for pypic: tag dataset versions for reproducibility (`repo.create_tag("v1.0-paper-submission", snapshot_id=...)`), time-travel to prior analysis states, and Rust-accelerated I/O even for non-versioned workflows. `to_zarr(..., backend="icechunk")` writes to an Icechunk-managed store; `from_zarr()` auto-detects Icechunk stores. Optional dep: `icechunk>=1.1` under `icechunk` extra.
+  **Depends on:** Step 24 (Zarr foundations).
 
 - [ ] **Step 25: `pypic.io` — Parquet/Arrow for ParticleData**
-  `particles_to_parquet(data, path)`, `particles_from_parquet(path) -> ParticleData`, `particles_to_arrow(data) -> pyarrow.Table` (zero-copy), `particles_from_arrow(table, ...) -> ParticleData`. Columnar storage: x/y/z/vx/vy/vz/charge/id columns. Species metadata in Parquet footer. Optional dep: `pyarrow>=17.0` under `arrow` extra.
+  Two-tier API for particle I/O, designed for billion-particle datasets with selective reads.
+  **Low-level (in-memory interchange):**
+  `particles_to_arrow(data) -> pyarrow.Table` (zero-copy NumPy→Arrow), `particles_from_arrow(table) -> ParticleData`. Columnar storage: `x/y/z/vx/vy/vz/charge/id` columns (letter names — particle positions are always in the simulation Cartesian frame). Species metadata in Arrow schema metadata. Used by the Starlette server (Step 37) for Arrow IPC over WebSocket streaming.
+  **High-level (partitioned dataset for large-scale I/O):**
+  `particles_to_parquet(data, path)` — single species/step file. `particles_to_dataset(simulation, path, *, steps, species)` — multi-step partitioned Parquet dataset with Hive-style layout:
+  ```
+  particles/step=000000/species=electrons/part-00000.parquet
+  ```
+  **Selection support** via `particles_from_dataset(path, *, step, species, spatial_box, ids, energy_min, columns)`:
+  - *Time*: partition pruning — reading step 100 opens only `step=000100/`.
+  - *Species*: partition pruning — reading electrons skips ion files.
+  - *Spatial region*: particles sorted by Morton (Z-order) curve within each partition. Morton confirmed over Hilbert — <5% locality difference at fine row-group granularity, 5–8× cheaper to compute (bit-interleaving via BMI2). Parquet row-group min/max statistics on x/y/z enable predicate pushdown; spatial box queries skip 95%+ of row groups.
+  - *Energy*: `|v|` stored as a derived column at write time. Parquet statistics enable energy-threshold pushdown.
+  - *Particle ID*: predicate pushdown on `id` column. Optional secondary index file (`id → step/row_group`) for trajectory reconstruction across timesteps.
+  - *Column pruning*: `columns=["x", "y", "z"]` reads only requested columns.
+  **Row groups:** 500K–1M rows per row group (balances metadata overhead vs skip granularity).
+  **Compression:** zstd with shuffle pre-filter. Expect 1.5–3× lossless on particle data (noisy positions/velocities lack the spatial correlation that gives field data 10–300×). Always apply shuffle before compression — without it, LZ4 achieves ~1× and zstd only 5–8× on raw floats. Use zstd level 1 for processing, level 3 for archival.
+  **Precision:** `position_dtype="float32"` and `velocity_dtype="float32"` kwargs downcast position/velocity columns to single precision on write. Charge stays float64 (full mantissa serves as unique particle identifier) and id stays int64. The `|v|` derived column follows the velocity dtype. Default: preserve source dtype.
+  **DuckDB query engine (optional):** `query_sql(path, sql) -> ParticleData | pa.Table` provides SQL access to partitioned particle datasets via DuckDB. Automatic predicate pushdown, partition pruning, and morsel-driven parallelism — 45ms filtered counts where Pandas takes 7.5s, ~1.3 GB memory on 140 GB datasets. Pattern: DuckDB for interactive exploration and ad-hoc spatial queries, PyArrow dataset API for programmatic pipelines. DuckDB queries Arrow tables with zero-copy; results export as Arrow or NumPy. Optional dep: `duckdb>=1.4` under `duckdb` extra.
+  `particles_from_parquet(path) -> ParticleData` for single-file full load. Optional dep: `pyarrow>=17.0` under `arrow` extra.
+  **Evaluated and rejected:** Lance (1.1× compression vs Parquet's 3×+, AI/ML-focused ecosystem, no browser reader), GeoParquet (WKB encoding overhead, 2D-biased tooling, ~3× larger files than plain Parquet with spatial sorting), TileDB (immature xarray integration, lower cloud I/O throughput than Zarr+Rust backends, minimal physics/earth-science adoption).
 
 - [ ] **Step 26: `pypic convert` CLI subcommand**
-  `pypic convert <path> --step N --output DIR [--format zarr|parquet] [--fields F1,F2] [--target-resolution DX]`. Batch mode: `--all-steps`.
+  `pypic convert <path> --step N --output DIR [--format zarr|parquet] [--fields F1,F2] [--target-resolution DX] [--dtype float32] [--compression zstd|blosc]`. Batch mode: `--all-steps`. Zarr output uses `to_zarr_timeseries` for multi-step; Parquet uses `particles_to_dataset` for partitioned layout. `--virtual` flag creates VirtualiZarr references instead of copying data (Step 24b).
 
 ---
 
@@ -203,11 +240,13 @@ Step 19 (regrid) ←── Step 20 (cross-grid diagnostics) ←── Step 21
               ←── Step 19b (spherical regrid) ←── Step 20b (volume-weighted norms)
 Step 15 (frame transforms) ←── Step 40 (time-dependent transforms)
 Step 5 (FieldDataset) ←── Steps 24, 25 (Zarr/Arrow)
+                      ←── Step 24b (VirtualiZarr) ←── Step 24 (Zarr)
+                      ←── Step 24c (Icechunk) ←── Step 24 (Zarr)
                       ←── Steps 23, 35, 36 (additional readers)
                       ←── Step 27 (interop adapters)
 ```
 
-Recommended implementation order: 19 → 20 → 21b → 21 → 22, with 24/25 parallelizable anytime, 26 after 21+24+25, 40 anytime after Step 15, 23/35/36 anytime after Step 12 (readers exist), 27–28 anytime after API stabilizes.
+Recommended implementation order: 19 → 20 → 21b → 21 → 22, with 24/25 parallelizable anytime, 24b/24c after 24, 26 after 21+24+25, 40 anytime after Step 15, 23/35/36 anytime after Step 12 (readers exist), 27–28 anytime after API stabilizes.
 
 ---
 
@@ -296,7 +335,8 @@ grow.
 ## Phase 13: Cross-Project Integration
 
 - [ ] **Step 37: `pypic.server` — Arrow IPC streaming via Starlette/FastAPI**
-  Zero-copy field data serving to webpic (Three.js viewer). Selections from the viewer UI map to pypic `Selection` objects server-side. Lazy I/O via xarray/dask serves only requested slices from disk. Arrow IPC replaces raw ArrayBuffers with structured metadata (field names, coordinates, units, normalization) in a single response. Uses `xr.Dataset` → Arrow conversion. Readable in JS (`apache-arrow`) and Rust (`arrow-rs`), aligning all three projects on one interchange format. Derived quantities computed server-side via `compute()`, unit conversion via `in_si()` / `in_units()`. Optional dep: `fastapi`, `uvicorn`, `pyarrow` under `server` extra. The server is a separate entry point, not part of the library import path.
+  Zero-copy field data serving to webpic (Three.js/WebGPU viewer). Arrow IPC over WebSocket — **not** Arrow Flight (no Flight JS client exists for browsers; gRPC-Web requires an Envoy proxy and eliminates Flight's advantages). Pipeline: `pyarrow RecordBatch → IPC stream bytes → WebSocket → tableFromIPC() → Float32Array → Three.js BufferAttribute → GPU`. WebSocket provides persistent bidirectional connections ideal for continuous simulation streaming and time-series animation.
+  Selections from the viewer UI map to pypic `Selection` objects server-side. Lazy I/O via xarray/dask serves only requested slices from disk. Arrow IPC carries structured metadata (field names, coordinates, units, normalization) in a single response. Readable in JS (`apache-arrow` npm package) and Rust (`arrow-rs`), aligning all three projects on one interchange format. Derived quantities computed server-side via `compute()`, unit conversion via `in_si()` / `in_units()`. Optional dep: `fastapi`, `uvicorn`, `pyarrow`, `websockets` under `server` extra. The server is a separate entry point, not part of the library import path.
   **Depends on:** Steps 24-25 (Zarr/Arrow foundations).
 
 - [ ] **Step 38: `pypic.readers.rustpic` — Rust PIC code reader**
@@ -340,8 +380,10 @@ grow.
 | 21b | readers | `sim.available_fields()` + `available_fields_mapping()` | ✅ |
 | 21 | cli | `info`, `fields`, `stats`, `compare`, `validate` subcommands (typer) | ✅ |
 | 22 | cli | `plot`, `plot-compare` subcommands + theme, contours, animate | ✅ |
-| 24 | io | Zarr export/import for FieldDataset | — |
-| 25 | io | Parquet/Arrow for ParticleData | — |
+| 24 | io | Zarr v3 export/import (single + timeseries, Blosc2+zstd+bitshuffle) | — |
+| 24b | io | VirtualiZarr for legacy HDF5 (virtual Zarr views without conversion) | — |
+| 24c | io | Icechunk storage backend (versioning + Rust I/O acceleration) | — |
+| 25 | io | Partitioned Parquet/Arrow + DuckDB (Morton-sorted, spatial/energy/ID selection) | — |
 | 26 | cli | `convert` subcommand | — |
 | 23 | readers | VLasiator VLSV reader (FSgrid + DCCRG regrid) | — |
 | 35 | readers | VPIC reader (Yee mesh destaggering) | — |
@@ -356,6 +398,6 @@ grow.
 | 34 | readers | `StaggerInfo` provenance metadata | ✅ |
 | 41 | probes | Virtual probe/spacecraft sampling + time-series | — |
 | 41b | probes | SPICE-driven probe trajectories | — |
-| 37 | server | Arrow IPC streaming via Starlette/FastAPI → webpic | — |
+| 37 | server | Arrow IPC over WebSocket via Starlette/FastAPI → webpic | — |
 | 38 | readers | rustpic reader + cross-project validation | — |
 | 39 | docs | webpic data pipeline end-to-end guide | — |
