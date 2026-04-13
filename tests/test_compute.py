@@ -647,15 +647,15 @@ class TestSpeciesAliases:
         np.testing.assert_allclose(ds["n_e"], 1.0)
         np.testing.assert_allclose(ds["n_i"], 2.0)
 
-    def test_s_gyro_i_uses_n_s1(self):
+    def test_s_gyro_i_uses_per_species_pressure(self):
         shape = (2, 2, 2)
         data = {
-            "P11": np.full(shape, 1.0),
-            "P22": np.full(shape, 1.0),
-            "P33": np.full(shape, 3.0),
-            "P12": np.zeros(shape),
-            "P13": np.zeros(shape),
-            "P23": np.zeros(shape),
+            "P11_s1": np.full(shape, 1.0),
+            "P22_s1": np.full(shape, 1.0),
+            "P33_s1": np.full(shape, 3.0),
+            "P12_s1": np.zeros(shape),
+            "P13_s1": np.zeros(shape),
+            "P23_s1": np.zeros(shape),
             "B1": np.zeros(shape),
             "B2": np.zeros(shape),
             "B3": np.ones(shape),
@@ -663,7 +663,7 @@ class TestSpeciesAliases:
         }
         ds = make_test_dataset(data, shape=shape)
         result = compute_field("s_gyro_i", ds)
-        # P_par=3 (B along z), P_perp=(1+1+3-3)/2=1
+        # P_par_i=3 (B along z), P_perp_i=(1+1+3-3)/2=1
         # s_gyro = ln(P_par * P_perp^2 / n^5) = ln(3 * 1 / 32) = ln(3/32)
         expected = np.log(3.0 * 1.0**2 / 2.0**5)
         np.testing.assert_allclose(result, expected, rtol=1e-14)
@@ -672,12 +672,12 @@ class TestSpeciesAliases:
         """Bare s_gyro is an error — must specify s_gyro_e or s_gyro_i."""
         shape = (2, 2, 2)
         data = {
-            "P11": np.full(shape, 1.0),
-            "P22": np.full(shape, 1.0),
-            "P33": np.full(shape, 3.0),
-            "P12": np.zeros(shape),
-            "P13": np.zeros(shape),
-            "P23": np.zeros(shape),
+            "P11_s0": np.full(shape, 1.0),
+            "P22_s0": np.full(shape, 1.0),
+            "P33_s0": np.full(shape, 3.0),
+            "P12_s0": np.zeros(shape),
+            "P13_s0": np.zeros(shape),
+            "P23_s0": np.zeros(shape),
             "B1": np.zeros(shape),
             "B2": np.zeros(shape),
             "B3": np.ones(shape),
@@ -720,6 +720,91 @@ class TestPressureTensor:
         np.testing.assert_allclose(compute_field("P_par", ds), 3.0, rtol=1e-15)
         # P_perp = (Tr(P) - P_par) / 2 = (6 - 3) / 2 = 1.5
         np.testing.assert_allclose(compute_field("P_perp", ds), 1.5, rtol=1e-15)
+
+
+class TestPerSpeciesPressureDecomposition:
+    """Per-species P_par, P_perp, agyrotropy via compute registry."""
+
+    def _make_species_tensor_dataset(self):
+        """Two species with different diagonal tensors, B along z."""
+        shape = (2, 2, 2)
+        data = {
+            # Species 0 (electrons): P_diag = (1, 1, 3)
+            "P11_s0": np.full(shape, 1.0),
+            "P22_s0": np.full(shape, 1.0),
+            "P33_s0": np.full(shape, 3.0),
+            "P12_s0": np.zeros(shape),
+            "P13_s0": np.zeros(shape),
+            "P23_s0": np.zeros(shape),
+            # Species 1 (ions): P_diag = (2, 4, 6)
+            "P11_s1": np.full(shape, 2.0),
+            "P22_s1": np.full(shape, 4.0),
+            "P33_s1": np.full(shape, 6.0),
+            "P12_s1": np.zeros(shape),
+            "P13_s1": np.zeros(shape),
+            "P23_s1": np.zeros(shape),
+            # Total tensor = sum of per-species
+            "P11": np.full(shape, 3.0),
+            "P22": np.full(shape, 5.0),
+            "P33": np.full(shape, 9.0),
+            "P12": np.zeros(shape),
+            "P13": np.zeros(shape),
+            "P23": np.zeros(shape),
+            "B1": np.zeros(shape),
+            "B2": np.zeros(shape),
+            "B3": np.ones(shape),
+        }
+        return make_test_dataset(data, shape=shape)
+
+    def test_per_species_parallel_pressure(self):
+        ds = self._make_species_tensor_dataset()
+        # B along z → P_par = P33
+        np.testing.assert_allclose(compute_field("P_par_e", ds), 3.0, rtol=1e-15)
+        np.testing.assert_allclose(compute_field("P_par_i", ds), 6.0, rtol=1e-15)
+
+    def test_per_species_perpendicular_pressure(self):
+        ds = self._make_species_tensor_dataset()
+        # P_perp = (Tr(P) - P_par) / 2
+        # s0: (1+1+3 - 3)/2 = 1.0
+        # s1: (2+4+6 - 6)/2 = 3.0
+        np.testing.assert_allclose(compute_field("P_perp_e", ds), 1.0, rtol=1e-15)
+        np.testing.assert_allclose(compute_field("P_perp_i", ds), 3.0, rtol=1e-15)
+
+    def test_per_species_agyrotropy_isotropic(self):
+        shape = (2, 2, 2)
+        p = np.full(shape, 2.0)
+        data = {
+            "P11_s0": p, "P22_s0": p, "P33_s0": p,
+            "P12_s0": np.zeros(shape),
+            "P13_s0": np.zeros(shape),
+            "P23_s0": np.zeros(shape),
+            "B1": np.zeros(shape),
+            "B2": np.zeros(shape),
+            "B3": np.ones(shape),
+        }
+        ds = make_test_dataset(data, shape=shape)
+        # Isotropic tensor → Q = 0
+        np.testing.assert_allclose(
+            compute_field("agyrotropy_e", ds), 0.0, atol=1e-15
+        )
+
+    def test_alias_resolution(self):
+        ds = self._make_species_tensor_dataset()
+        # P_par_s0 (alias) and P_par_e (static) give same result
+        result_alias = compute_field("P_par_s0", ds)
+        result_static = compute_field("P_par_e", ds)
+        np.testing.assert_array_equal(result_alias, result_static)
+
+    def test_total_equals_sum_of_per_species(self):
+        """P_par = P_par_s0 + P_par_s1 (linear in tensor components)."""
+        ds = self._make_species_tensor_dataset()
+        total = compute_field("P_par", ds)
+        per_species_sum = compute_field("P_par_e", ds) + compute_field("P_par_i", ds)
+        np.testing.assert_allclose(total, per_species_sum, rtol=1e-15)
+
+        total_perp = compute_field("P_perp", ds)
+        perp_sum = compute_field("P_perp_e", ds) + compute_field("P_perp_i", ds)
+        np.testing.assert_allclose(total_perp, perp_sum, rtol=1e-15)
 
 
 class TestGeometryGuard:

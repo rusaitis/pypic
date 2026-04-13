@@ -38,7 +38,7 @@ Each step produces something testable. No step starts until the previous step's 
 - [x] **Step 8: derived (part 2) — characteristic scales**
   Species-dependent: `thermal_speed`, `gyrofrequency`, `plasma_frequency`, `skin_depth`, `gyroradius`, `debye_length`, `sound_speed`, `ion_acoustic_speed`, `magnetosonic_speed`, `alfven_mach`, `magnetosonic_mach`, `parallel_pressure`, `perpendicular_pressure`, `agyrotropy`. Verify against NRL Formulary.
 
-- [ ] **Step 8b: per-species pressure decomposition in compute registry**
+- [x] **Step 8b: per-species pressure decomposition in compute registry**
   Wire `P_par_s0`, `P_perp_s0`, `P_par_s1`, `P_perp_s1`, `agyrotropy_s0`, `agyrotropy_s1` as compute recipes. The underlying functions (`parallel_pressure`, `perpendicular_pressure`, `agyrotropy`) already work on any tensor — the missing piece is registry plumbing: recipes that map per-species tensor components (`P11_s0`...`P33_s0`) + `B1/B2/B3` to the decomposition. Generalizes to N species via the existing `species_index` mechanism on `_Recipe`.
 
 - [x] **Step 9: diagnostics — comparison and validation**
@@ -320,7 +320,7 @@ grow.
 | 6 | readers | simulation.toml loader | ✅ |
 | 7 | derived | \|B\|, beta, v_A, Poynting flux, energies | ✅ |
 | 8 | derived | omega_pe, d_i, r_i, lambda_D, v_th, c_s | ✅ |
-| 8b | compute | Per-species P_par, P_perp, agyrotropy recipes | — |
+| 8b | compute | Per-species P_par, P_perp, agyrotropy recipes | ✅ |
 | 9 | diagnostics | L2 error, div B, field energy | ✅ |
 | 10 | coordinates | curl, div, grad (Cartesian) | ✅ |
 | 11 | selections | Plane, Box | ✅ |

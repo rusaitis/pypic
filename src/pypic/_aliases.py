@@ -69,6 +69,12 @@ _COMPUTE_ALIASES: dict[str, str] = {
     "T_s1": "Ti",
     "P_s0": "Pe",
     "P_s1": "Pi",
+    "P_par_s0": "P_par_e",
+    "P_par_s1": "P_par_i",
+    "P_perp_s0": "P_perp_e",
+    "P_perp_s1": "P_perp_i",
+    "agyrotropy_s0": "agyrotropy_e",
+    "agyrotropy_s1": "agyrotropy_i",
     # Structured v_th aliases
     "v_th_s0": "v_th_e",
     "v_th_s1": "v_th_i",

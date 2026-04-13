@@ -69,6 +69,16 @@ class _Recipe:
 
 _PRESSURE_TENSOR_FIELDS = ("P11", "P22", "P33", "P12", "P13", "P23")
 _PRESSURE_TENSOR_AND_B = (*_PRESSURE_TENSOR_FIELDS, "B1", "B2", "B3")
+_SPECIES_PRESSURE_TENSOR_AND_B = (
+    *(f"{f}_s{{N}}" for f in _PRESSURE_TENSOR_FIELDS),
+    "B1", "B2", "B3",
+)
+
+
+def _species_tensor_b(species: int) -> tuple[str, ...]:
+    """Build per-species pressure tensor + B field tuple for static recipes."""
+    s = str(species)
+    return (*(f"{f}_s{s}" for f in _PRESSURE_TENSOR_FIELDS), "B1", "B2", "B3")
 
 _REGISTRY: dict[str, _Recipe] = {
     # Magnitudes
@@ -133,8 +143,8 @@ _REGISTRY: dict[str, _Recipe] = {
     "s": _Recipe(derived.entropy, ("P", "rho_m"), needs_gamma=True),
     "s_e": _Recipe(derived.entropy, ("Pe", "n_s0"), needs_gamma=True),
     "s_i": _Recipe(derived.entropy, ("Pi", "n_s1"), needs_gamma=True),
-    "s_gyro_e": _Recipe(derived.gyrotropic_entropy, ("P_par", "P_perp", "n_s0")),
-    "s_gyro_i": _Recipe(derived.gyrotropic_entropy, ("P_par", "P_perp", "n_s1")),
+    "s_gyro_e": _Recipe(derived.gyrotropic_entropy, ("P_par_e", "P_perp_e", "n_s0")),
+    "s_gyro_i": _Recipe(derived.gyrotropic_entropy, ("P_par_i", "P_perp_i", "n_s1")),
     # Poynting flux (tuple return — component selects)
     "S1": _Recipe(
         derived.poynting_flux,
@@ -248,6 +258,13 @@ _REGISTRY: dict[str, _Recipe] = {
     "P_par": _Recipe(derived.parallel_pressure, _PRESSURE_TENSOR_AND_B),
     "P_perp": _Recipe(derived.perpendicular_pressure, _PRESSURE_TENSOR_AND_B),
     "agyrotropy": _Recipe(derived.agyrotropy, _PRESSURE_TENSOR_AND_B),
+    # Per-species pressure decomposition (electrons = s0, ions = s1)
+    "P_par_e": _Recipe(derived.parallel_pressure, _species_tensor_b(0)),
+    "P_par_i": _Recipe(derived.parallel_pressure, _species_tensor_b(1)),
+    "P_perp_e": _Recipe(derived.perpendicular_pressure, _species_tensor_b(0)),
+    "P_perp_i": _Recipe(derived.perpendicular_pressure, _species_tensor_b(1)),
+    "agyrotropy_e": _Recipe(derived.agyrotropy, _species_tensor_b(0)),
+    "agyrotropy_i": _Recipe(derived.agyrotropy, _species_tensor_b(1)),
     # Grid-dependent diagnostics
     "div_B": _Recipe(
         diagnostics.div_b,
@@ -410,7 +427,24 @@ _SPECIES_TEMPLATES: dict[str, _SpeciesTemplate] = {
         derived.entropy, ("P_s{N}", "n_s{N}"), _SpeciesArgs.NONE, needs_gamma=True
     ),
     "s_gyro": _SpeciesTemplate(
-        derived.gyrotropic_entropy, ("P_par", "P_perp", "n_s{N}"), _SpeciesArgs.NONE
+        derived.gyrotropic_entropy,
+        ("P_par_s{N}", "P_perp_s{N}", "n_s{N}"),
+        _SpeciesArgs.NONE,
+    ),
+    "P_par": _SpeciesTemplate(
+        derived.parallel_pressure,
+        _SPECIES_PRESSURE_TENSOR_AND_B,
+        _SpeciesArgs.NONE,
+    ),
+    "P_perp": _SpeciesTemplate(
+        derived.perpendicular_pressure,
+        _SPECIES_PRESSURE_TENSOR_AND_B,
+        _SpeciesArgs.NONE,
+    ),
+    "agyrotropy": _SpeciesTemplate(
+        derived.agyrotropy,
+        _SPECIES_PRESSURE_TENSOR_AND_B,
+        _SpeciesArgs.NONE,
     ),
     "T": _SpeciesTemplate(derived.temperature, ("P_s{N}", "n_s{N}"), _SpeciesArgs.NONE),
     "P": _SpeciesTemplate(

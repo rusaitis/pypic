@@ -202,6 +202,18 @@ _FIELD_INFO: dict[str, FieldInfo] = {
     "Pi": _FI("pressure", "Ion pressure", "Pa", r"$P_i$"),
     "P_par": _FI("pressure", "Parallel pressure", "Pa", r"$P_\parallel$"),
     "P_perp": _FI("pressure", "Perpendicular pressure", "Pa", r"$P_\perp$"),
+    "P_par_e": _FI(
+        "pressure", "Electron parallel pressure", "Pa", r"$P_{\parallel,e}$"
+    ),
+    "P_par_i": _FI(
+        "pressure", "Ion parallel pressure", "Pa", r"$P_{\parallel,i}$"
+    ),
+    "P_perp_e": _FI(
+        "pressure", "Electron perpendicular pressure", "Pa", r"$P_{\perp,e}$"
+    ),
+    "P_perp_i": _FI(
+        "pressure", "Ion perpendicular pressure", "Pa", r"$P_{\perp,i}$"
+    ),
     "P11": _FI("pressure", "Pressure tensor P11", "Pa", r"$P_{11}$"),
     "P22": _FI("pressure", "Pressure tensor P22", "Pa", r"$P_{22}$"),
     "P33": _FI("pressure", "Pressure tensor P33", "Pa", r"$P_{33}$"),
@@ -393,6 +405,8 @@ _FIELD_INFO: dict[str, FieldInfo] = {
         r"$s_{gyro,i}$",
     ),
     "agyrotropy": _FI("dimensionless", "Agyrotropy measure", "", r"$Q$"),
+    "agyrotropy_e": _FI("dimensionless", "Electron agyrotropy", "", r"$Q_e$"),
+    "agyrotropy_i": _FI("dimensionless", "Ion agyrotropy", "", r"$Q_i$"),
     "gamma_L": _FI("dimensionless", "Bulk Lorentz factor", "", r"$\gamma$"),
     "sigma": _FI("dimensionless", "Magnetization parameter", "", r"$\sigma$"),
     "gamma_eos": _FI("dimensionless", "Adiabatic index", "", r"$\gamma_{eos}$"),
@@ -698,6 +712,18 @@ _SPECIES_INFO_PATTERNS: list[tuple[re.Pattern[str], str, str, str]] = [
         "dimensionless",
         "Gyrotropic entropy (species {N})",
         r"$s_{{gyro,s{N}}}$",
+    ),
+    (
+        re.compile(r"^P_par_s(\d+)$"),
+        "pressure",
+        "Parallel pressure (species {N})",
+        r"$P_{{\parallel,s{N}}}$",
+    ),
+    (
+        re.compile(r"^P_perp_s(\d+)$"),
+        "pressure",
+        "Perpendicular pressure (species {N})",
+        r"$P_{{\perp,s{N}}}$",
     ),
     (
         re.compile(r"^agyrotropy_s(\d+)$"),

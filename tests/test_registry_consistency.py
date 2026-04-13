@@ -84,6 +84,12 @@ CANONICAL_NAMES: frozenset[str] = frozenset(
         "P23",
         "P33",
         "agyrotropy",
+        "P_par_e",
+        "P_par_i",
+        "P_perp_e",
+        "P_perp_i",
+        "agyrotropy_e",
+        "agyrotropy_i",
         # ── Temperature ──────────────────────────────────────────────────
         "Te",
         "Ti",
@@ -215,6 +221,9 @@ PER_SPECIES_PREFIXES: frozenset[str] = frozenset(
         "beta",
         "s",
         "s_gyro",
+        "P_par",
+        "P_perp",
+        "agyrotropy",
     }
 )
 
