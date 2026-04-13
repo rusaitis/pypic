@@ -61,6 +61,7 @@ Each step produces something testable. No step starts until the previous step's 
 
 - [ ] **Step 24c: `pypic.io` — Icechunk storage backend**
   Optional Git-like versioning and ACID transactions over Zarr v3 stores via Icechunk. Rust-based I/O backend achieves 13–14 Gbps read/write throughput on cloud instances (2–10× faster than zarr + s3fs). Value for pypic: tag dataset versions for reproducibility (`repo.create_tag("v1.0-paper-submission", snapshot_id=...)`), time-travel to prior analysis states, and Rust-accelerated I/O even for non-versioned workflows. `to_zarr(..., backend="icechunk")` writes to an Icechunk-managed store; `from_zarr()` auto-detects Icechunk stores. Optional dep: `icechunk>=1.1` under `icechunk` extra.
+  **Migrate `open_virtual` to Zarr v3:** Step 24b's `open_virtual` currently uses Kerchunk (Zarr v2 format) as the virtual-reference intermediary because VirtualiZarr's native Zarr v3 virtual backend is Icechunk. Once Icechunk is available, switch `open_virtual` to persist virtual refs via `vds.vz.to_icechunk()` instead of `vds.vz.to_kerchunk()`, eliminating the only Zarr v2 code path in pypic and fixing the fill-value edge case (datasets where all values equal the fill value read back incorrectly through Kerchunk).
   **Depends on:** Step 24 (Zarr foundations).
 
 - [ ] **Step 25: `pypic.io` — Parquet/Arrow for ParticleData**

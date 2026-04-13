@@ -1,8 +1,9 @@
-"""Optional-dependency guard for zarr and numcodecs."""
+"""Optional-dependency guards for zarr, numcodecs, and virtualizarr."""
 
 from __future__ import annotations
 
 _HAS_ZARR: bool | None = None
+_HAS_VIRTUALIZARR: bool | None = None
 
 
 def ensure_zarr() -> None:
@@ -30,3 +31,26 @@ def ensure_zarr() -> None:
         )
         raise ImportError(msg) from None
     _HAS_ZARR = True
+
+
+def ensure_virtualizarr() -> None:
+    """Raise ``ImportError`` with install hint if virtualizarr is missing."""
+    global _HAS_VIRTUALIZARR
+    if _HAS_VIRTUALIZARR is True:
+        return
+    if _HAS_VIRTUALIZARR is False:
+        msg = (
+            "Missing virtualizarr for pypic.io.open_virtual. "
+            "Install with: pip install pypic[zarr]"
+        )
+        raise ImportError(msg) from None
+    try:
+        import virtualizarr  # noqa: F401
+    except ImportError:
+        _HAS_VIRTUALIZARR = False
+        msg = (
+            "virtualizarr is required for pypic.io.open_virtual. "
+            "Install with: pip install pypic[zarr]"
+        )
+        raise ImportError(msg) from None
+    _HAS_VIRTUALIZARR = True

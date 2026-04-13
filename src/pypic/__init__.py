@@ -86,7 +86,7 @@ from pypic.fields import (
     unregister_field,
 )
 from pypic.grid import GridInfo
-from pypic.io import from_zarr, to_zarr, to_zarr_timeseries
+from pypic.io import from_zarr, open_virtual, to_zarr, to_zarr_timeseries
 from pypic.readers import (
     AuxiliaryDataReader,
     BATSRUSConfig,
@@ -227,6 +227,7 @@ __all__ = [
     "magnetosonic_speed",
     "max_div_b",
     "open_batsrus",
+    "open_virtual",
     "open_ipic3d",
     "open_openggcm",
     "open_simple",
