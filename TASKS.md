@@ -4,150 +4,39 @@ Each step produces something testable. No step starts until the previous step's 
 
 ---
 
-## Phase 1: Foundation
+## Completed
 
-- [x] **Step 1: skeleton — project setup**
-  pyproject.toml (uv, ruff, pytest `--doctest-modules`, mypy strict), CI, `py.typed`.
+- [x] **Step 1:** Project skeleton (pyproject.toml, uv, ruff, pytest, mypy, CI)
+- [x] **Step 2:** Normalization class (pic_standard, pic_electron, mhd_standard, identity)
+- [x] **Step 3:** PhysicsConstants, SpeciesInfo
+- [x] **Step 4:** CoordinateGeometry, GeometryType, metric_factors
+- [x] **Step 5:** FieldDataset, GridInfo, SimulationReader, SimulationConfig
+- [x] **Step 6:** simulation.toml loader
+- [x] **Step 7:** Derived part 1 — |B|, |E|, |J|, |V|, beta, v_A, Poynting, energies, entropy
+- [x] **Step 8:** Derived part 2 — characteristic scales (v_th, omega_p, d_i, r_i, lambda_D, c_s, M_A)
+- [x] **Step 8b:** Per-species pressure decomposition in compute registry
+- [x] **Step 9:** Diagnostics — L2/Linf error, div B/E, field energy
+- [x] **Step 10:** Differential operators — curl, div, grad (Cartesian)
+- [x] **Step 11:** PlaneSelection, BoxSelection
+- [x] **Step 12:** Readers — iPIC3D (parallel/serial/H5hut), BATSRUS (IDL/HDF5), OpenGGCM, SimpleReader + registry + auto-detection
+- [x] **Step 13:** compute(), in_si(), in_units(), QuantityType, field metadata registry
+- [x] **Step 14:** 2D plotting — plot_field_slice, plot_comparison, publication styles
+- [x] **Step 15:** Frame transforms — ReferenceFrame, FrameTransform, chaining, transform_to
+- [x] **Step 16:** SphereSelection (NaN masking) + FieldDataset.where()
+- [x] **Step 17:** MkDocs documentation site
+- [x] **Step 18:** Relativistic — lorentz_factor, magnetization, ~9 functions with rel. corrections
+- [x] **Step 19:** Regrid — regrid(), align_grids(), common_grid() (Cartesian)
+- [x] **Step 20:** Cross-grid comparison — compare_fields(), field_comparison_report(), field_difference_dataset()
+- [x] **Step 21b:** available_fields() + available_fields_mapping()
+- [x] **Step 21:** CLI — info, fields, stats, compare, validate (typer + rich)
+- [x] **Step 22:** CLI — plot, plot-compare (themes, contours, animate, batch)
+- [x] **Step 30:** Reduced geometry after slicing
+- [~] **Step 31:** Remove default geometry from operators — deferred (revisit when non-Cartesian operators land)
+- [x] **Step 32:** Separate four_velocity quantity type
+- [x] **Step 33:** specific_energy quantity type for enthalpy (fixed dimensional bug)
+- [x] **Step 34:** StaggerInfo provenance metadata
 
-- [x] **Step 2: units — Normalization class**
-  Frozen dataclass with reference values, `normalize(quantity, x)` / `to_si(quantity, x)` methods.
-  - `pic_standard(reference_density, reference_mass, reference_charge, c)` — derives from any reference species
-  - `pic_electron(n_e)` — electron-scale convenience wrapper
-  - `mhd_standard(l_0, rho_0, b_0)` — Alfven-speed-based refs
-  - `identity()` — all refs = 1.0
-
-- [x] **Step 3: units — PhysicsConstants and SpeciesInfo**
-  `PhysicsConstants` (PIC vs MHD normalized, `inv_c_squared()`). `SpeciesInfo` frozen dataclass with inference logic (charge + mass <-> charge_to_mass).
-
-- [x] **Step 4: coordinates/geometry — CoordinateGeometry**
-  `GeometryType` StrEnum, `CoordinateGeometry` frozen dataclass, `metric_factors()`. Pre-defined `CARTESIAN`, `SPHERICAL`, `CYLINDRICAL` instances.
-
-- [x] **Step 5: readers/base — FieldDataset, GridInfo, SimulationReader, SimulationConfig**
-  `GridInfo` (dimensions, spacing, origin, geometry, `coordinate_arrays()`). `FieldDataset` wrapping `xr.Dataset` with `__getitem__`, `has_field`, `field_names`, `sel`/`isel`, geometry-aware aliases. `SimulationReader` protocol. `SimulationConfig` frozen dataclass.
-
----
-
-## Phase 2: Physics
-
-- [x] **Step 6: readers/config — simulation.toml loader**
-  `load_config(path) -> SimulationConfig` via `tomllib`. Parses all schema.md sections: `[model]` -> name/type, `[grid]` -> `GridInfo`, `[units]` -> `Normalization`, `[coordinates]` -> `CoordinateGeometry` + frame, `[[species]]` -> `list[SpeciesInfo]`, `[physics]` -> dict. Optional: `[initial_conditions]`, `[output]` -> metadata.
-
-- [x] **Step 7: derived (part 1) — field-level quantities**
-  Pure NumPy functions: `magnetic_field_magnitude`, `electric_field_magnitude`, `current_density_magnitude`, `velocity_magnitude`, `plasma_beta`, `alfven_speed`, `poynting_flux`, `magnetic_energy_density`, `electric_energy_density`, `kinetic_energy_density`, `thermal_energy_density`, `internal_energy`, `enthalpy`, `relativistic_enthalpy`, `entropy`, `gyrotropic_entropy`.
-
-- [x] **Step 8: derived (part 2) — characteristic scales**
-  Species-dependent: `thermal_speed`, `gyrofrequency`, `plasma_frequency`, `skin_depth`, `gyroradius`, `debye_length`, `sound_speed`, `ion_acoustic_speed`, `magnetosonic_speed`, `alfven_mach`, `magnetosonic_mach`, `parallel_pressure`, `perpendicular_pressure`, `agyrotropy`. Verify against NRL Formulary.
-
-- [x] **Step 8b: per-species pressure decomposition in compute registry**
-  Wire `P_par_s0`, `P_perp_s0`, `P_par_s1`, `P_perp_s1`, `agyrotropy_s0`, `agyrotropy_s1` as compute recipes. The underlying functions (`parallel_pressure`, `perpendicular_pressure`, `agyrotropy`) already work on any tensor — the missing piece is registry plumbing: recipes that map per-species tensor components (`P11_s0`...`P33_s0`) + `B1/B2/B3` to the decomposition. Generalizes to N species via the existing `species_index` mechanism on `_Recipe`.
-
-- [x] **Step 9: diagnostics — comparison and validation**
-  `l2_relative_error`, `linf_error`, `field_difference`, `field_energy`, `div_b`, `max_div_b`, `div_e`. Cartesian central differences.
-
-- [x] **Step 10: coordinates/operators — discrete differential operators**
-  Geometry-aware `curl`, `div`, `grad`. Cartesian second-order central diffs; spherical/cylindrical raise `NotImplementedError`.
-
----
-
-## Phase 3: Integration
-
-- [x] **Step 11: selections — PlaneSelection and BoxSelection**
-  Frozen dataclasses with `apply(data) -> FieldDataset`. `PlaneSelection` (normal, index; `None` = midplane). `BoxSelection` (optional index ranges per axis).
-
-- [x] **Step 12: readers — multi-format reader system**
-  Four readers implementing `SimulationReader`:
-  - **iPIC3D:** `IPic3DParallelReader` (phdf5), `IPic3DSerialReader` (shdf5), `IPic3DH5hutReader` (H5hut). Parses `.inp` and `settings.hdf` configs, maps iPIC3D names to canonical, 4π Gaussian→SI-rationalized correction, node-centered grid origin, ZYX→XYZ transpose, pressure tensor sign correction, per-species fields. `ConservedQuantities` parser (Format A + B). `open_ipic3d()` auto-detects all three formats.
-  - **BATSRUS:** `BATSRUSReader` for IDL per-cell and HDF5 BATL formats. AMR regridding to uniform grid, `target_resolution` parameter, `parse_param_in()`, `parse_header()`. Handles normalized and SI-unit outputs, split-B, geometry propagation.
-  - **OpenGGCM:** `OpenGGCMReader` for Fortran binary 3df files with custom grid parsing.
-  - **SimpleReader:** HDF5 files following the canonical schema directly.
-
-  **Registry and auto-detection:** Confidence-based `open_simulation()` with `ProbeResult` diagnostics, factory fallback (tries next-best reader if top candidate crashes, `ExceptionGroup` if all fail), `Simulation` facade with `probe_results` introspection, `describe()`, `refresh_steps()`, `first_step`/`last_step`. Selective I/O via `fields=` parameter. `AuxiliaryDataReader` protocol for tabular data. BATSRUS `.h` probe tightened to BATSRUS timestamp pattern (avoids C header false positives). `FieldDataset._resolve_key` suggests close matches on `KeyError`.
-
-- [x] **Step 13: FieldDataset — compute() and in_units()**
-  `compute(name)` dispatches string to derived function ("|B|", "beta", "v_A", "M_A", "|vort|", "vort1"/"vort2"/"vort3", ...). `in_si(field)` for SI conversion. `in_units(field, unit_str)` for display units ("nT", "km/s"). `QuantityType` StrEnum, `_FIELD_INFO` registry with `FieldInfo` metadata (quantity_type, long_name, si_unit, latex). `register_field()` / `unregister_field()` for custom fields. `FieldDataset.with_field()` attaches fields with xarray attrs carrying metadata through slicing. Attrs-first lookup in `field_info()` / `in_si()` (xarray attrs override global registry). Geometry-aware label localization. Per-species regex patterns for auto-generated metadata.
-
-- [x] **Step 14: plotting/slices — basic 2D visualization**
-  `plot_field_slice` (plane selection, axis labels, colorbar). `plot_comparison` (three-panel: A | B | difference). Publication rcParams in `plotting/styles.py`.
-
-**Milestone: daily-use tool** — load iPIC3D data -> compute derived quantities -> compare runs -> select subregions -> convert units -> make paper figures.
-
----
-
-## Phase 4: Extensions
-
-- [x] **Step 15: coordinates/transforms — frame transforms**
-  `ReferenceFrame`, `FrameTransform` dataclasses. Load from `[coordinates.transforms]` in simulation.toml. Transform chaining (A->B + B->C = A->C). `FieldDataset.transform_to(frame_name)`.
-
-- [x] **Step 16: selections — SphereSelection**
-  Non-axis-aligned selection via `xr.where()`. Points outside sphere = NaN, grid shape preserved. NaN propagation in derived quantities and plotting. Also added `FieldDataset.where(cond)` as the general-purpose masking primitive.
-
-- [x] **Step 18: derived (relativistic) — relativistic derived quantities**
-  `lorentz_factor()` (from three-velocity or four-velocity).
-  `magnetization()` ($\sigma = B^2/\rho_m c^2$).
-  Extend ~9 functions with optional `lorentz_factor` parameter:
-  `kinetic_energy_density`, `alfven_speed`, `sound_speed`,
-  `magnetosonic_speed`, `gyrofrequency`, `plasma_frequency`,
-  `skin_depth`, `gyroradius`, `thermal_speed`.
-  Add `u1/u2/u3` aliases in `_build_aliases`.
-  Priority: bulk-flow corrections first, thermal second.
-  Tests: γ→1 recovers non-relativistic; σ→∞ gives v_A→c.
-
-- [ ] **Step 40: time-dependent frame transforms**
-  Extend `FrameTransform` to support rotation matrices that vary per timestep. Primary use case: GSE↔GSM depends on dipole tilt angle, which changes with time. Two approaches, both supported:
-  - **Parameter-driven:** `parameter = "dipole_tilt"` in `[coordinates.transforms]` names a time-varying quantity looked up per step from simulation metadata or auxiliary data. The rotation matrix is recomputed at each timestep.
-  - **SPICE kernels:** Optional integration with `spiceypy` for ephemeris-based transforms (GSE↔HEE↔RTN, planetary frames). `from_spice(frame_a, frame_b, epoch)` builds a `FrameTransform` from NAIF kernels. Optional dep: `spiceypy` under `spice` extra. Useful for comparing simulation output with spacecraft observations in the correct frame at the correct epoch.
-  `FieldDataset.transform_to(frame, *, epoch=None)` gains an optional epoch parameter. Static transforms (current behavior) are unchanged. Tests: round-trip GSE→GSM→GSE at known tilt angles against published rotation matrices.
-  **Depends on:** Step 15 (frame transforms).
-
----
-
-## Phase 5: Documentation
-
-- [x] **Step 17: MkDocs documentation site**
-  Material theme + mkdocstrings + mathjax. API reference (one page per module), getting-started guide, tutorial (load -> derive -> select -> compare -> plot). `mkdocs build --strict` passes.
-
----
-
-## Phase 6: Regridding & Cross-Model Comparison
-
-- [x] **Step 19: `pypic.regrid` — uniform-to-uniform interpolation**
-  `regrid(source, target_grid, *, method="linear", **kwargs) -> FieldDataset` using `scipy.interpolate.RegularGridInterpolator` (same pattern as `traces/_sampling.py`). `method` is `str` (not enum) so new interpolation strategies can be added without API changes; `**kwargs` forwarded to the interpolator for future options. `align_grids(a, b) -> (FieldDataset, FieldDataset)` regrids both to the finer grid's intersection domain. `common_grid(a, b) -> GridInfo` computes that target: intersection domain = `max(origin_a, origin_b)` to `min(extent_a, extent_b)`, spacing = `min(dx_a, dx_b)` per axis; raises if domains don't overlap. Cartesian only (raise `NotImplementedError` for spherical/cylindrical, matching `operators.py` pattern). NaN-fill outside source domain via `bounds_error=False, fill_value=np.nan`. Preserves normalization, species, physics metadata. Works for 1D, 2D, and 3D grids. No-op shortcut when source grid already matches target (avoids interpolation for same-resolution comparisons). Each field array is interpolated independently; derived fields on source are regridded as-is, not recomputed.
-  - *Not* a replacement for BATSRUS AMR regridding (block-avg/NN in `batsrus/_grid.py` operates on raw AMR cell data pre-FieldDataset; this module operates on assembled uniform grids via interpolation — different problems, different algorithms).
-  - *Not* responsible for destaggering. Readers destagger to co-located grids on load (see Step 34). This module operates on already-co-located `FieldDataset` grids.
-  - *Not* responsible for time alignment — Step 19 is purely spatial. Temporal interpolation (comparing different codes at matching physical time when dt differs) is a separate concern.
-  - *Not* conservative. `method="linear"` does not preserve volume integrals of the field (energy, mass). Conservative regridding (`method="conservative"`) is a potential future option once an energy/mass-budget validation study motivates it; non-uniform-to-uniform support (OpenGGCM's stretched grids via `scipy.interpn`) is similarly deferred until a concrete user emerges.
-
-- [ ] **Step 19b: spherical regridding for `pypic.regrid`**
-  Extend `regrid()` / `common_grid()` / `align_grids()` to handle `GeometryType.SPHERICAL`. Metric-factor-aware interpolation on $(r, \theta, \phi)$ grids (not just tensor-product linear in the raw indices — the $\sin\theta$ Jacobian matters near the poles). Pole handling: clamp $\theta \in [\epsilon, \pi - \epsilon]$ or switch to a local Cartesian chart near each pole. Intersection grid semantics: $r$ extends like Cartesian; $\theta$ intersected in $[0, \pi]$; $\phi$ intersected modulo $2\pi$ with wrap-around support.
-  Primary use case: comparing two ARMS runs at different angular resolutions (Step 36). Also unblocks Step 20b (volume-weighted comparison norms). Keeps the `NotImplementedError` branch in `_require_cartesian_grid` alive for cylindrical until that reader lands.
-  Tests: spherical harmonic round-trip ($Y_\ell^m$ sampled on a coarse grid, regridded to fine, residual bounded by the truncation order), pole fidelity (analytic $\cos\theta$ field, zero error at $\theta = 0, \pi$ within interpolation tolerance), $\phi$-wrap correctness (periodic field resampled across the $\phi = 2\pi$ seam).
-  **Depends on:** Step 19 (Cartesian regrid).
-
-- [x] **Step 20: cross-grid comparison diagnostics**
-  `compare_fields(a, b, field, *, metric="l2", units="si") -> float` — aligns grids then computes error. Converts to SI by default before comparing (cross-model normalizations are incomparable in code units; see schema.md). `units="code"` for same-normalization runs. Resolves field aliases before matching (e.g. "Bx" in A, "B1" in B → same canonical field). Logs a warning when grid resolutions differ by more than 10× (e.g. iPIC3D kinetic-scale vs BATSRUS MHD-scale — interpolation works but the comparison may be physically meaningless). Aligns *frames* before grids: *b* is auto-transformed into *a*'s frame via `FieldDataset.transform_to`, or pass `frame="..."` to transform both inputs to a third reference frame (raises `ValueError` if a required transform is missing). `field_comparison_report(a, b, *, fields=None, units="si") -> dict[str, dict[str, float]]` — L2 + Linf for all common fields, plus grid context (domain extent, resolution ratio) for interpretability. `field_difference_dataset(a, b, *, fields=None, units="si") -> FieldDataset` — returns a FieldDataset on the common grid with difference fields, directly plottable via `plot_comparison`. Delegates to existing pure diagnostics (`l2_relative_error`, `linf_error`, `field_difference` from `diagnostics.py`) after alignment — no reimplementation. These are the only diagnostics functions that touch FieldDataset (existing ones are pure-array); justified because cross-grid comparison inherently needs grid metadata.
-
-- [ ] **Step 20b: volume-weighted comparison norms**
-  Add metric-factor integration to `compare_fields()` / `field_comparison_report()` so L2 and L∞ correctly weight each cell by $\sqrt{|g|}\,d^n x$ instead of treating every sample uniformly. Current Step 20 is correct for uniform Cartesian grids (where $\Delta V$ cancels between numerator and denominator of the L2 norm), but wrong for spherical grids where cells near the poles or near $r = 0$ cover exponentially less volume. New API: `compare_fields(..., weighted: bool = False)` — defaults preserve current Cartesian behavior, `True` switches to the properly-weighted norm via `GridInfo.geometry.metric_factors()`. L∞ unaffected (max is a pointwise statistic). Tests: volume-weighted L2 of a radial shell equals the analytic shell volume; Cartesian result unchanged (regression test against current values).
-  **Depends on:** Step 19b (spherical regridding — without it there is no spherical dataset to compare and this step is vacuous).
-
----
-
-## Phase 7: CLI
-
-- [x] **Step 21b: `sim.available_fields()` — lightweight field probe**
-  `available_fields(step) -> list[str]` and `available_fields_mapping(step) -> dict[str, str | None]` list canonical field names without loading arrays. Implemented on iPIC3D, BATSRUS, SimpleReader; OpenGGCM falls back to full read.
-
-- [x] **Step 21: `pypic.cli` — core subcommands (typer)**
-  Entry point `pypic = "pypic.cli:app"`, optional deps `typer>=0.12` + `rich>=13.0` under `cli` extra. Global: `--version`, `--log-level`, `-q`, `--debug`. Shared `--step` syntax: `N`, `first`/`last`, `start:stop:stride` (inclusive stop), `all`.
-  - `pypic info <path> [--json]` — metadata (grid, units, species, physics, steps).
-  - `pypic fields <path> [--step N] [--mapping] [--derived] [--aux] [--all] [--json]` — available/computable fields, native→canonical mapping.
-  - `pypic stats <path> --field FIELD [--step last] [--units UNIT] [--json]` — min/max/mean/rms/NaN. `--field all` batch-reads every field at once. Multi-step table via `--step all`.
-  - `pypic compare <path_a> <path_b> [--field FIELD] [--metric l2|linf|both] [--units si|code] [--method METHOD] [--nan-policy omit|propagate|raise] [--frame FRAME] [--json]` — cross-grid error metrics, all common fields when `--field` omitted.
-  - `pypic validate <path> [--step last] [--json]` — NaN census, max |div B|, magnetic/electric field energy. Reports energy drift (total + last step) from auxiliary `conserved_quantities` time-series when available.
-
-- [x] **Step 22: `pypic plot` and `pypic plot-compare` CLI subcommands**
-  `pypic plot <path> --field FIELD` with smart defaults (last step, largest cross-section plane). Geometry-aware `--plane` accepts Cartesian shorthands (`xy`/`xz`/`yz`), axis-name pairs (`rθ`), or a single normal axis name (`z`, `φ`). `--index I` or `--coord V` for slice position. Display: `--output FILE`, `--format png|pdf|svg`, `--dpi`, `--res WxH` (downsample), `--colormap`, `--scale linear|log|symlog`, `--linthresh`, `--vmin/--vmax`, `--theme NAME`, `--contour FIELD [--contour-levels N]`. Auto color range: 3σ from median, 1-2-5 rounded (`round_nice`, `auto_clim` in `_colormaps.py`). Batch: `--step all --output "frames/{step:06d}.png" --jobs N` (ThreadPoolExecutor). Animation: `--animate out.mp4 --fps 24` (ffmpeg concat demuxer).
-  `pypic plot-compare <path_a> <path_b> --field FIELD` — three-panel (A | B | diff) via `align_grids` + `plot_comparison`. `--units si|code`, `--diff-vmin/--diff-vmax`, `--method`, `--theme`.
+**Milestone: daily-use tool** — load data → compute derived quantities → compare runs → select subregions → convert units → make paper figures. ✅
 
 ---
 
@@ -216,6 +105,27 @@ Each step produces something testable. No step starts until the previous step's 
 
 ---
 
+## Pending Extensions
+
+- [ ] **Step 19b: spherical regridding for `pypic.regrid`**
+  Extend `regrid()` / `common_grid()` / `align_grids()` to handle `GeometryType.SPHERICAL`. Metric-factor-aware interpolation on $(r, \theta, \phi)$ grids (not just tensor-product linear in the raw indices — the $\sin\theta$ Jacobian matters near the poles). Pole handling: clamp $\theta \in [\epsilon, \pi - \epsilon]$ or switch to a local Cartesian chart near each pole. Intersection grid semantics: $r$ extends like Cartesian; $\theta$ intersected in $[0, \pi]$; $\phi$ intersected modulo $2\pi$ with wrap-around support.
+  Primary use case: comparing two ARMS runs at different angular resolutions (Step 36). Also unblocks Step 20b (volume-weighted comparison norms). Keeps the `NotImplementedError` branch in `_require_cartesian_grid` alive for cylindrical until that reader lands.
+  Tests: spherical harmonic round-trip ($Y_\ell^m$ sampled on a coarse grid, regridded to fine, residual bounded by the truncation order), pole fidelity (analytic $\cos\theta$ field, zero error at $\theta = 0, \pi$ within interpolation tolerance), $\phi$-wrap correctness (periodic field resampled across the $\phi = 2\pi$ seam).
+  **Depends on:** Step 19 (Cartesian regrid).
+
+- [ ] **Step 20b: volume-weighted comparison norms**
+  Add metric-factor integration to `compare_fields()` / `field_comparison_report()` so L2 and L∞ correctly weight each cell by $\sqrt{|g|}\,d^n x$ instead of treating every sample uniformly. Current Step 20 is correct for uniform Cartesian grids (where $\Delta V$ cancels between numerator and denominator of the L2 norm), but wrong for spherical grids where cells near the poles or near $r = 0$ cover exponentially less volume. New API: `compare_fields(..., weighted: bool = False)` — defaults preserve current Cartesian behavior, `True` switches to the properly-weighted norm via `GridInfo.geometry.metric_factors()`. L∞ unaffected (max is a pointwise statistic). Tests: volume-weighted L2 of a radial shell equals the analytic shell volume; Cartesian result unchanged (regression test against current values).
+  **Depends on:** Step 19b (spherical regridding — without it there is no spherical dataset to compare and this step is vacuous).
+
+- [ ] **Step 40: time-dependent frame transforms**
+  Extend `FrameTransform` to support rotation matrices that vary per timestep. Primary use case: GSE↔GSM depends on dipole tilt angle, which changes with time. Two approaches, both supported:
+  - **Parameter-driven:** `parameter = "dipole_tilt"` in `[coordinates.transforms]` names a time-varying quantity looked up per step from simulation metadata or auxiliary data. The rotation matrix is recomputed at each timestep.
+  - **SPICE kernels:** Optional integration with `spiceypy` for ephemeris-based transforms (GSE↔HEE↔RTN, planetary frames). `from_spice(frame_a, frame_b, epoch)` builds a `FrameTransform` from NAIF kernels. Optional dep: `spiceypy` under `spice` extra. Useful for comparing simulation output with spacecraft observations in the correct frame at the correct epoch.
+  `FieldDataset.transform_to(frame, *, epoch=None)` gains an optional epoch parameter. Static transforms (current behavior) are unchanged. Tests: round-trip GSE→GSM→GSE at known tilt angles against published rotation matrices.
+  **Depends on:** Step 15 (frame transforms).
+
+---
+
 ## Phase 10: Ecosystem Integration
 
 - [ ] **Step 27: `pypic.interop` — yt, PlasmaPy, SpacePy adapters**
@@ -229,87 +139,6 @@ Each step produces something testable. No step starts until the previous step's 
 
 - [ ] **Step 29: `pypic.interop.spase` — SPASE XML metadata export**
   `to_spase_xml(fds, *, resource_id, contact, description) -> str` generates a SPASE `NumericalData` XML document from FieldDataset metadata. Maps `simulation.toml` sections to SPASE elements: `[model]` → `SimulationRun`, `[grid]` → `SpatialDescription`, `[units]` → `Units` on each Parameter, `[[species]]` → `Particle` parameters, canonical fields → `Parameter` elements with `ParameterKey`/`Name`/`Description`/`Units`. `to_spase_file(fds, path, **kwargs)` writes to disk. No external deps (stdlib `xml.etree.ElementTree`). Enables publishing pypic-processed data to CDAWEB/VHO/CCMC archives. All tests use synthetic FieldDatasets.
-
-**Dependency graph:**
-
-```
-Steps 13-14 (compute/plot) ←── Step 22 (plot CLI)
-                           ←── Step 20 (field_difference_dataset → plot_comparison)
-                           ←── Step 21b (available_fields) ←── Step 21 (CLI core) ←── Step 26 (convert CLI)
-Step 19 (regrid) ←── Step 20 (cross-grid diagnostics) ←── Step 21
-              ←── Step 19b (spherical regrid) ←── Step 20b (volume-weighted norms)
-Step 15 (frame transforms) ←── Step 40 (time-dependent transforms)
-Step 5 (FieldDataset) ←── Steps 24, 25 (Zarr/Arrow)
-                      ←── Step 24b (VirtualiZarr) ←── Step 24 (Zarr)
-                      ←── Step 24c (Icechunk) ←── Step 24 (Zarr)
-                      ←── Steps 23, 35, 36 (additional readers)
-                      ←── Step 27 (interop adapters)
-```
-
-Recommended implementation order: 19 → 20 → 21b → 21 → 22, with 24/25 parallelizable anytime, 24b/24c after 24, 26 after 21+24+25, 40 anytime after Step 15, 23/35/36 anytime after Step 12 (readers exist), 27–28 anytime after API stabilizes.
-
----
-
-## Phase 11: Geometry & Type System Hardening
-
-Design weaknesses identified during the unit/geometry audit. These are
-not bugs — current behavior is correct for Cartesian data — but will
-become problems as non-Cartesian geometries and relativistic workflows
-grow.
-
-- [x] **Step 30: Reduced geometry after slicing**
-  After `PlaneSelection.apply()` reduces 3D→2D, the `GridInfo` keeps the
-  original 3-axis `CoordinateGeometry`. Code uses `axis_names[:ndim]` to
-  get surviving names, which gives the **first N** names, not the
-  **surviving** names (e.g. slicing the r-axis from spherical gives
-  surviving (θ, φ) but `axis_names[:2]` returns (r, θ)). Needs a concept
-  of "reduced geometry" or storing surviving axis indices. Affects
-  `PlaneSelection.apply()`, `BoxSelection.apply()`, and
-  `_build_grid_from_dataset()` in `readers/base.py`. No impact on
-  shipped readers (all Cartesian), but blocks correct spherical/cylindrical
-  slicing.
-  **Depends on:** Step 15 (frame transforms) or Step 16 (sphere selection).
-
-- [~] **Step 31: Remove default geometry from operators (deferred)**
-  Operators default to `GeometryType.CARTESIAN`. Removing the default
-  adds verbosity to 23 Cartesian test sites with zero safety gain (non-
-  Cartesian already raises `NotImplementedError`). Instead, `compute.py`
-  threads geometry via `_Recipe.passes_geometry` — a no-op today but
-  pre-wired for when spherical/cylindrical operators land (Step 10 ext.).
-  **Revisit when:** non-Cartesian operators are implemented.
-
-- [x] **Step 32: Separate `four_velocity` quantity type**
-  `u1/u2/u3` (four-velocity, γv, unbounded) share `quantity_type="velocity"`
-  with `V1/V2/V3` (three-velocity, bounded by c). SI conversion is correct
-  (both have units of m/s), but the shared type prevents distinguishing them
-  in validation or display contexts. A separate `"four_velocity"` type with
-  the same SI factor would make the semantics explicit. Low priority — only
-  matters for relativistic workflows.
-  **Depends on:** Step 18 (relativistic derived quantities).
-
-- [x] **Step 33: `specific_energy` quantity type for enthalpy**
-  `h`, `h_rel`, `e_int` used `quantity_type="temperature"` with SI factor
-  `mass_ref * velocity_ref²` (J). The correct SI factor for specific energy
-  (energy per unit mass) is `velocity_ref²` (J/kg) — this was a dimensional
-  bug masked by `identity()` normalization in tests. Fixed by adding a
-  `"specific_energy"` quantity type with the correct factor.
-
-- [x] **Step 34: `StaggerInfo` provenance metadata**
-  Optional frozen dataclass recording original grid stagger convention
-  before destaggering: which fields lived on faces, edges, nodes, or
-  cell centers. Stored in `FieldDataset.metadata["stagger"]` by readers
-  that load from staggered-mesh codes (ARMS, Athena++, BATSRUS
-  face-centered). Purely informational — not used in computation or
-  operators. Enables provenance tracking and documentation of
-  interpolation order used during destaggering.
-  **Architecture note:** Readers are responsible for destaggering to
-  co-located grids. `FieldDataset` always represents a single co-located
-  grid. Diagnostics like `div_b` on destaggered data measure interpolation
-  error + actual divergence; for staggered codes, O(dx²) residual is
-  expected and does not indicate a simulation defect. Carrying stagger
-  through the pipeline (stagger-aware operators) is explicitly out of
-  scope — the complexity cost outweighs the benefit for analysis workflows.
-  **Depends on:** Step 12 (readers).
 
 ---
 
@@ -348,56 +177,16 @@ grow.
 
 ---
 
-## Summary
+## Dependency Graph
 
-| Step | Module | Delivers | Status |
-|------|--------|----------|--------|
-| 1 | skeleton | CI pipeline, project config | ✅ |
-| 2 | units | Normalization (PIC / MHD / SI) | ✅ |
-| 3 | units | PhysicsConstants, SpeciesInfo | ✅ |
-| 4 | coordinates | CoordinateGeometry, metric factors | ✅ |
-| 5 | readers | FieldDataset, GridInfo, SimulationReader, SimulationConfig | ✅ |
-| 6 | readers | simulation.toml loader | ✅ |
-| 7 | derived | \|B\|, beta, v_A, Poynting flux, energies | ✅ |
-| 8 | derived | omega_pe, d_i, r_i, lambda_D, v_th, c_s | ✅ |
-| 8b | compute | Per-species P_par, P_perp, agyrotropy recipes | ✅ |
-| 9 | diagnostics | L2 error, div B, field energy | ✅ |
-| 10 | coordinates | curl, div, grad (Cartesian) | ✅ |
-| 11 | selections | Plane, Box | ✅ |
-| 12 | readers | iPIC3D, BATSRUS, OpenGGCM, Simple readers + registry + auto-detection | ✅ |
-| 13 | fields | compute(), in_units(), QuantityType, field metadata registry | ✅ |
-| 14 | plotting | 2D slices, comparison | ✅ |
-| **—** | **—** | **Milestone: daily-use tool** | **—** |
-| 15 | coordinates | Frame transforms | ✅ |
-| 16 | selections | Sphere (NaN masking) | ✅ |
-| 17 | docs | MkDocs site | ✅ |
-| 18 | derived | lorentz_factor, magnetization, rel. corrections | ✅ |
-| 40 | coordinates | Time-dependent frame transforms (dipole tilt, SPICE) | — |
-| 19 | regrid | `regrid()`, `align_grids()`, `common_grid()` (Cartesian) | ✅ |
-| 19b | regrid | Spherical regridding (metric-aware, pole + $\phi$-wrap) | — |
-| 20 | comparison | `compare_fields()`, `field_comparison_report()`, `field_difference_dataset()` | ✅ |
-| 20b | comparison | Volume-weighted L2 norm via `weighted=True` | — |
-| 21b | readers | `sim.available_fields()` + `available_fields_mapping()` | ✅ |
-| 21 | cli | `info`, `fields`, `stats`, `compare`, `validate` subcommands (typer) | ✅ |
-| 22 | cli | `plot`, `plot-compare` subcommands + theme, contours, animate | ✅ |
-| 24 | io | Zarr v3 export/import (single + timeseries, Blosc2+zstd+bitshuffle) | — |
-| 24b | io | VirtualiZarr for legacy HDF5 (virtual Zarr views without conversion) | — |
-| 24c | io | Icechunk storage backend (versioning + Rust I/O acceleration) | — |
-| 25 | io | Partitioned Parquet/Arrow + DuckDB (Morton-sorted, spatial/energy/ID selection) | — |
-| 26 | cli | `convert` subcommand | — |
-| 23 | readers | VLasiator VLSV reader (FSgrid + DCCRG regrid) | — |
-| 35 | readers | VPIC reader (Yee mesh destaggering) | — |
-| 36 | readers | ARMS reader (block-AMR, spherical) | — |
-| 27 | interop | yt, PlasmaPy, SpacePy thin adapters | — |
-| 28 | docs | Ecosystem positioning page | — |
-| 29 | interop | SPASE XML metadata export | — |
-| 30 | readers/selections | Reduced geometry after slicing | ✅ |
-| 31 | coordinates | Remove default geometry from operators (deferred — see note) | ⏸ |
-| 32 | fields/units | Separate `four_velocity` quantity type | ✅ |
-| 33 | fields/units | `specific_energy` quantity type for enthalpy | ✅ |
-| 34 | readers | `StaggerInfo` provenance metadata | ✅ |
-| 41 | probes | Virtual probe/spacecraft sampling + time-series | — |
-| 41b | probes | SPICE-driven probe trajectories | — |
-| 37 | server | Arrow IPC over WebSocket via Starlette/FastAPI → webpic | — |
-| 38 | readers | rustpic reader + cross-project validation | — |
-| 39 | docs | webpic data pipeline end-to-end guide | — |
+```
+Step 19 (regrid) ←── Step 19b (spherical) ←── Step 20b (volume-weighted norms)
+Step 15 (transforms) ←── Step 40 (time-dependent transforms)
+Step 5 (FieldDataset) ←── Steps 24, 25 (Zarr/Arrow) ←── Step 26 (convert CLI)
+                      ←── Step 24b (VirtualiZarr) ←── Step 24
+                      ←── Step 24c (Icechunk) ←── Step 24
+                      ←── Steps 23, 35, 36 (additional readers)
+                      ←── Step 27 (interop adapters)
+```
+
+Recommended order: 24/25 parallelizable anytime, 24b/24c after 24, 26 after 24+25, 40 anytime, 23/35/36 anytime, 27–28 after API stabilizes.
