@@ -330,7 +330,9 @@ class IPic3DParallelReader:
             Zero-based species index.
         columns : Iterable[str] | None
             Subset of ``{"position", "velocity"}`` to load.
-            ``None`` loads all.  ``charge`` is always loaded.
+            ``None`` loads all.  Per-particle ``weight`` and the scalar
+            ``species_charge``/``species_mass`` are always populated
+            (canonical layout, ``docs/schema.md``).
 
         Returns
         -------

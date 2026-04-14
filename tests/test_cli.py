@@ -990,8 +990,15 @@ def test_convert_fields_subset(tmp_path: Path) -> None:
     result = runner.invoke(
         app,
         [
-            "convert", "fields", str(d),
-            "--output", str(out), "--step", "0", "--fields", "B1,B2",
+            "convert",
+            "fields",
+            str(d),
+            "--output",
+            str(out),
+            "--step",
+            "0",
+            "--fields",
+            "B1,B2",
         ],
     )
     assert result.exit_code == 0, result.output
@@ -1010,9 +1017,15 @@ def test_convert_fields_box_crop(tmp_path: Path) -> None:
     result = runner.invoke(
         app,
         [
-            "convert", "fields", str(d),
-            "--output", str(out), "--step", "0",
-            "--box", "x=0:2,y=0:2",
+            "convert",
+            "fields",
+            str(d),
+            "--output",
+            str(out),
+            "--step",
+            "0",
+            "--box",
+            "x=0:2,y=0:2",
         ],
     )
     assert result.exit_code == 0, result.output
@@ -1027,8 +1040,13 @@ def test_convert_fields_bad_backend(tmp_path: Path) -> None:
     result = runner.invoke(
         app,
         [
-            "convert", "fields", str(d),
-            "--output", str(out), "--backend", "lance",
+            "convert",
+            "fields",
+            str(d),
+            "--output",
+            str(out),
+            "--backend",
+            "lance",
         ],
     )
     assert result.exit_code != 0
@@ -1042,8 +1060,13 @@ def test_convert_fields_tag_requires_icechunk(tmp_path: Path) -> None:
     result = runner.invoke(
         app,
         [
-            "convert", "fields", str(d),
-            "--output", str(out), "--tag", "v1.0",
+            "convert",
+            "fields",
+            str(d),
+            "--output",
+            str(out),
+            "--tag",
+            "v1.0",
         ],
     )
     assert result.exit_code != 0
@@ -1068,8 +1091,12 @@ def test_convert_particles_dry_run(tmp_path: Path) -> None:
     result = runner.invoke(
         app,
         [
-            "convert", "particles", str(_IPIC3D_FIXTURE),
-            "--output", str(out), "--dry-run",
+            "convert",
+            "particles",
+            str(_IPIC3D_FIXTURE),
+            "--output",
+            str(out),
+            "--dry-run",
         ],
     )
     assert result.exit_code == 0, result.output
@@ -1085,8 +1112,13 @@ def test_convert_particles_round_trip(tmp_path: Path) -> None:
     result = runner.invoke(
         app,
         [
-            "convert", "particles", str(_IPIC3D_FIXTURE),
-            "--output", str(out), "--step", "0",
+            "convert",
+            "particles",
+            str(_IPIC3D_FIXTURE),
+            "--output",
+            str(out),
+            "--step",
+            "0",
         ],
     )
     assert result.exit_code == 0, result.output
@@ -1105,8 +1137,15 @@ def test_convert_particles_species_filter(tmp_path: Path) -> None:
     result = runner.invoke(
         app,
         [
-            "convert", "particles", str(_IPIC3D_FIXTURE),
-            "--output", str(out), "--step", "0", "--species", "species_1",
+            "convert",
+            "particles",
+            str(_IPIC3D_FIXTURE),
+            "--output",
+            str(out),
+            "--step",
+            "0",
+            "--species",
+            "species_1",
         ],
     )
     assert result.exit_code == 0, result.output
@@ -1120,8 +1159,13 @@ def test_convert_particles_bad_sort_by(tmp_path: Path) -> None:
     result = runner.invoke(
         app,
         [
-            "convert", "particles", str(_IPIC3D_FIXTURE),
-            "--output", str(out), "--sort-by", "charge",
+            "convert",
+            "particles",
+            str(_IPIC3D_FIXTURE),
+            "--output",
+            str(out),
+            "--sort-by",
+            "charge",
         ],
     )
     assert result.exit_code != 0
@@ -1151,8 +1195,15 @@ def test_convert_fields_plane_slice(tmp_path: Path) -> None:
     result = runner.invoke(
         app,
         [
-            "convert", "fields", str(d),
-            "--output", str(out), "--step", "0", "--plane", "xy",
+            "convert",
+            "fields",
+            str(d),
+            "--output",
+            str(out),
+            "--step",
+            "0",
+            "--plane",
+            "xy",
         ],
     )
     assert result.exit_code == 0, result.output
@@ -1170,9 +1221,15 @@ def test_convert_fields_compression_zstd(tmp_path: Path) -> None:
     result = runner.invoke(
         app,
         [
-            "convert", "fields", str(d),
-            "--output", str(out), "--step", "0",
-            "--compression", "zstd:3",
+            "convert",
+            "fields",
+            str(d),
+            "--output",
+            str(out),
+            "--step",
+            "0",
+            "--compression",
+            "zstd:3",
         ],
     )
     assert result.exit_code == 0, result.output
@@ -1187,8 +1244,13 @@ def test_convert_fields_compression_bad_spec(tmp_path: Path) -> None:
     result = runner.invoke(
         app,
         [
-            "convert", "fields", str(d),
-            "--output", str(out), "--compression", "lz4",
+            "convert",
+            "fields",
+            str(d),
+            "--output",
+            str(out),
+            "--compression",
+            "lz4",
         ],
     )
     assert result.exit_code != 0
@@ -1198,6 +1260,7 @@ def test_convert_fields_compression_bad_spec(tmp_path: Path) -> None:
 @zarr_required
 def test_convert_fields_virtual(tmp_path: Path) -> None:
     pytest.importorskip("virtualizarr")
+    pytest.importorskip("icechunk")
     from pypic.io import from_zarr
 
     # Create a canonical pypic-layout HDF5 file (grid + normalization + fields).
@@ -1218,8 +1281,12 @@ def test_convert_fields_virtual(tmp_path: Path) -> None:
     result = runner.invoke(
         app,
         [
-            "convert", "fields", str(h5_path),
-            "--output", str(out), "--virtual",
+            "convert",
+            "fields",
+            str(h5_path),
+            "--output",
+            str(out),
+            "--virtual",
         ],
     )
     assert result.exit_code == 0, result.output
@@ -1239,6 +1306,35 @@ def test_convert_fields_virtual_rejects_directory(tmp_path: Path) -> None:
     assert "hdf5 file" in result.output.lower()
 
 
+@zarr_required
+def test_convert_fields_virtual_rejects_fields_filter(tmp_path: Path) -> None:
+    h5_path = tmp_path / "canonical.h5"
+    with h5py.File(h5_path, "w") as f:
+        f.create_group("fields").create_dataset("B1", data=np.zeros((4, 4, 4)))
+        grid = f.create_group("grid")
+        grid.attrs["dimensions"] = [4, 4, 4]
+        grid.attrs["spacing"] = [1.0, 1.0, 1.0]
+        grid.attrs["origin"] = [0.0, 0.0, 0.0]
+        grid.attrs["geometry"] = "cartesian"
+
+    out = tmp_path / "nope.zarr"
+    result = runner.invoke(
+        app,
+        [
+            "convert",
+            "fields",
+            str(h5_path),
+            "--output",
+            str(out),
+            "--virtual",
+            "--fields",
+            "B1",
+        ],
+    )
+    assert result.exit_code != 0
+    assert "--fields" in result.output
+
+
 @arrow_required
 def test_convert_particles_box_crop(tmp_path: Path) -> None:
     from pypic.io._parquet import particles_from_dataset
@@ -1248,10 +1344,17 @@ def test_convert_particles_box_crop(tmp_path: Path) -> None:
     result = runner.invoke(
         app,
         [
-            "convert", "particles", str(_IPIC3D_FIXTURE),
-            "--output", str(out),
-            "--step", "0", "--species", "species_0",
-            "--box", "x=0.0:0.4",
+            "convert",
+            "particles",
+            str(_IPIC3D_FIXTURE),
+            "--output",
+            str(out),
+            "--step",
+            "0",
+            "--species",
+            "species_0",
+            "--box",
+            "x=0.0:0.4",
         ],
     )
     assert result.exit_code == 0, result.output
@@ -1283,8 +1386,12 @@ def test_convert_all_dry_run_particles(tmp_path: Path) -> None:
     result = runner.invoke(
         app,
         [
-            "convert", "all", str(_IPIC3D_FIXTURE),
-            "--output", str(out), "--dry-run",
+            "convert",
+            "all",
+            str(_IPIC3D_FIXTURE),
+            "--output",
+            str(out),
+            "--dry-run",
         ],
     )
     assert result.exit_code == 0, result.output

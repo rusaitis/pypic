@@ -1,12 +1,12 @@
 """Virtual Zarr views over existing HDF5 simulation outputs.
 
-Uses VirtualiZarr to extract byte-range metadata from HDF5 files,
-creating lightweight references that enable ``xr.open_zarr()``-style
-access without copying data.  The original HDF5 files are read
-transparently via their byte ranges.
+Uses VirtualiZarr to extract byte-range metadata from HDF5 files and
+persists the references through Icechunk's Zarr v3 backend (in-memory
+store) so that consumers see a standard ``xr.open_zarr``-style dataset
+that resolves chunks by reading byte ranges from the source HDF5 files.
 
-Requires optional dependency ``virtualizarr>=2.4``.
-Install with ``pip install pypic[zarr]``.
+Requires optional dependencies ``virtualizarr>=2.4`` and
+``icechunk>=1.1``; both are installed by ``pip install pypic[zarr]``.
 """
 
 from __future__ import annotations
@@ -20,7 +20,7 @@ import xarray as xr
 from pypic.coordinates.geometry import CARTESIAN, GEOMETRY_BY_NAME
 from pypic.dataset import FieldDataset
 from pypic.grid import GridInfo
-from pypic.io._guard import ensure_virtualizarr
+from pypic.io._guard import ensure_icechunk, ensure_virtualizarr
 from pypic.units import Normalization
 
 if TYPE_CHECKING:
@@ -95,54 +95,34 @@ def _read_metadata_from_h5(
     return grid, norm, extra
 
 
-def _virtual_to_readable(
-    vds: xr.Dataset,
-    *,
-    source_dir: str | None = None,
-) -> xr.Dataset:
-    """Convert a VirtualiZarr virtual dataset to a lazy-readable one.
+def _virtual_to_readable(vds: xr.Dataset, *, source_dir: str) -> xr.Dataset:
+    """Persist virtual references via Icechunk's Zarr v3 backend.
 
-    When icechunk is installed, persists virtual references via
-    Icechunk's native Zarr v3 backend (in-memory store).  Falls back
-    to in-memory Kerchunk (Zarr v2) otherwise.
-
-    Parameters
-    ----------
-    source_dir : str or None
-        Parent directory of the source HDF5 file.  Required for the
-        Icechunk path to set up the virtual chunk container.
+    Uses an in-memory Icechunk store as the v3-format home for the
+    virtual refs, then opens it as a lazy ``xr.Dataset`` that resolves
+    chunks by reading byte ranges from the source HDF5 files.
     """
-    from pypic.io._guard import has_icechunk
+    import icechunk
 
-    if has_icechunk() and source_dir is not None:
-        import icechunk
-
-        storage = icechunk.in_memory_storage()
-        config = icechunk.RepositoryConfig.default()
-        url_prefix = f"file://{source_dir}/"
-        container = icechunk.VirtualChunkContainer(
-            name="local",
-            url_prefix=url_prefix,
-            store=icechunk.local_filesystem_store(source_dir),
-        )
-        config.set_virtual_chunk_container(container)
-        repo = icechunk.Repository.create(
-            storage,
-            config=config,
-            authorize_virtual_chunk_access={url_prefix: None},
-        )
-        session = repo.writable_session("main")
-        vds.vz.to_icechunk(session.store)
-        session.commit("Virtual refs")
-        read_session = repo.readonly_session(branch="main")
-        return xr.open_zarr(read_session.store, consolidated=False)  # type: ignore[no-any-return]
-
-    import fsspec
-
-    refs = vds.vz.to_kerchunk(format="dict")
-    fs = fsspec.filesystem("reference", fo=refs)
-    mapper = fs.get_mapper("")
-    return xr.open_dataset(mapper, engine="zarr", consolidated=False)
+    storage = icechunk.in_memory_storage()
+    config = icechunk.RepositoryConfig.default()
+    url_prefix = f"file://{source_dir}/"
+    container = icechunk.VirtualChunkContainer(
+        name="local",
+        url_prefix=url_prefix,
+        store=icechunk.local_filesystem_store(source_dir),
+    )
+    config.set_virtual_chunk_container(container)
+    repo = icechunk.Repository.create(
+        storage,
+        config=config,
+        authorize_virtual_chunk_access={url_prefix: None},
+    )
+    session = repo.writable_session("main")
+    vds.vz.to_icechunk(session.store)
+    session.commit("Virtual refs")
+    read_session = repo.readonly_session(branch="main")
+    return xr.open_zarr(read_session.store, consolidated=False)  # type: ignore[no-any-return]
 
 
 def open_virtual(
@@ -186,17 +166,17 @@ def open_virtual(
     ------
     ValueError
         If grid metadata cannot be determined from the file or config.
+    ImportError
+        If ``virtualizarr`` or ``icechunk`` is not installed.
 
     Notes
     -----
-    When ``icechunk`` is installed, virtual references use Icechunk's
-    native Zarr v3 backend (in-memory store), eliminating the
-    fill-value edge case present in the Kerchunk fallback path.
-    Without ``icechunk``, falls back to in-memory Kerchunk dicts
-    (Zarr v2 format) where HDF5 datasets whose values all equal the
-    fill value (typically 0.0) may read back incorrectly.
+    Virtual references are persisted via Icechunk's native Zarr v3
+    backend (in-memory store).  Both ``virtualizarr`` and ``icechunk``
+    are installed by the ``zarr`` extra (``pip install pypic[zarr]``).
     """
     ensure_virtualizarr()
+    ensure_icechunk()
 
     from pathlib import Path as _Path
 

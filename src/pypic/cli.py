@@ -323,9 +323,7 @@ def _parse_box_ranges(
     return ranges or None
 
 
-def _resolve_species_list(
-    raw: str | None, sim: Simulation
-) -> list[int] | None:
+def _resolve_species_list(raw: str | None, sim: Simulation) -> list[int] | None:
     """Resolve ``--species names_or_indices`` into a list of species indices."""
     if raw is None:
         return None
@@ -338,9 +336,7 @@ def _resolve_species_list(
         try:
             idx = int(tok)
         except ValueError:
-            idx = next(
-                (i for i, sp in enumerate(all_species) if sp.name == tok), -1
-            )
+            idx = next((i for i, sp in enumerate(all_species) if sp.name == tok), -1)
             if idx < 0:
                 names = ", ".join(sp.name for sp in all_species)
                 msg = f"Species {tok!r} not found. Available: {names}"
@@ -573,7 +569,11 @@ def convert_fields(
         bool,
         typer.Option(
             "--virtual",
-            help="Treat PATH as an HDF5 file, write virtual refs (no data copy).",
+            help=(
+                "Treat PATH as an HDF5 file, write virtual refs (no data "
+                "copy). Mutually exclusive with --fields, --box, --plane, "
+                "--target-resolution, --to-si."
+            ),
         ),
     ] = False,
     backend: Annotated[
@@ -624,10 +624,11 @@ def convert_fields(
         if path.is_dir():
             msg = "--virtual requires PATH to be an HDF5 file, not a directory."
             raise typer.BadParameter(msg)
-        if target_resolution or box or plane or to_si:
+        if target_resolution or box or plane or to_si or fields is not None:
             msg = (
                 "--virtual is incompatible with --target-resolution, --box, "
-                "--plane, and --to-si (virtual mode preserves source data)."
+                "--plane, --to-si, and --fields (virtual refs cover the whole "
+                "source dataset; sub-selection would force materialization)."
             )
             raise typer.BadParameter(msg)
         from pypic.io import open_virtual
@@ -895,9 +896,7 @@ def convert_particles(
         return
 
     species_resolved = (
-        species_idx
-        if species_idx is not None
-        else list(range(len(sim.config.species)))
+        species_idx if species_idx is not None else list(range(len(sim.config.species)))
     )
 
     def _pairs() -> object:

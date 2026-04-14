@@ -34,7 +34,9 @@ class ParticleDataReader(Protocol):
     """Opt-in protocol for readers that provide particle data.
 
     Readers implement this alongside ``SimulationReader`` to advertise
-    and load per-species particle arrays (position, velocity, charge).
+    and load per-species particle arrays (position, velocity, weight)
+    plus scalar species charge/mass — see ``docs/schema.md`` § Per-particle
+    data columns.
     """
 
     def available_particle_steps(self, path: Path) -> list[int]:
@@ -61,7 +63,9 @@ class ParticleDataReader(Protocol):
             Zero-based species index.
         columns : Iterable[str] | None
             Subset of ``{"position", "velocity"}`` to load.
-            ``None`` loads all.  ``charge`` is always loaded.
+            ``None`` loads all.  Per-particle ``weight`` and the scalar
+            ``species_charge``/``species_mass`` are always populated
+            (canonical layout, ``docs/schema.md``).
         """
         ...
 

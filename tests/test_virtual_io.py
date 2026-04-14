@@ -6,6 +6,7 @@ import numpy as np
 import pytest
 
 virtualizarr = pytest.importorskip("virtualizarr")
+pytest.importorskip("icechunk")
 
 import h5py  # noqa: E402
 
@@ -171,6 +172,21 @@ class TestOpenVirtual:
         fds = open_virtual(h5path, fields_group=None)
 
         assert fds.has_field("B1")
+
+    def test_constant_field_round_trip(self, tmp_path):
+        # Regression: the old Kerchunk fallback returned the fill value
+        # (typically 0) when every cell of an HDF5 dataset equalled the
+        # fill value, since Kerchunk encoded the chunk as "all-fill" and
+        # zarr v2 read it back as the default. The Icechunk-backed path
+        # preserves the actual value.
+        grid = make_uniform_grid(4, 3, 2)
+        const = 0.0  # the fill-value-collision case
+        h5path = tmp_path / "const.h5"
+        _write_canonical_h5(h5path, {"B1": np.full((4, 3, 2), const)}, grid)
+
+        fds = open_virtual(h5path)
+
+        np.testing.assert_array_equal(np.asarray(fds["B1"]), const)
 
     def test_coordinate_arrays_match_grid(self, tmp_path):
         grid = GridInfo(
