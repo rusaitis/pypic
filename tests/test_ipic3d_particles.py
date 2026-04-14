@@ -375,9 +375,7 @@ class TestPhdf5ParticleReader:
 class TestNonUniformWeight:
     """Per-particle q dataset (particle splitting, non-uniform plasma)."""
 
-    def _write_fixture(
-        self, tmp_path: Path, q_values: np.ndarray, n: int
-    ) -> Path:
+    def _write_fixture(self, tmp_path: Path, q_values: np.ndarray, n: int) -> Path:
         import h5py as h5  # type: ignore[import-untyped]
 
         particles_dir = tmp_path / "Particles_00000"

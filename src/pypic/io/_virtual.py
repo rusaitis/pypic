@@ -373,6 +373,15 @@ def to_icechunk_virtual(
     )
     _ensure_branch(repo, branch)
     session = repo.writable_session(branch)
+    # Clear the session's working-tree root so virtualizarr's
+    # to_icechunk can create a fresh root group.  Required for (a)
+    # repeat commits to the same branch and (b) new branches forked
+    # from a non-empty main — both inherit the prior root group from
+    # the branch tip, and virtualizarr's ``Group.from_store`` raises
+    # ContainsGroupError on any pre-existing node.  Prior snapshots
+    # stay intact in repo history; only this commit's root is
+    # replaced.
+    session.store.sync_clear()
     vds.vz.to_icechunk(session.store)
 
     # Reuse open_virtual to assemble the canonical FieldDataset attrs.

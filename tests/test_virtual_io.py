@@ -12,7 +12,8 @@ import h5py  # noqa: E402
 
 from pypic.containers import SimulationConfig  # noqa: E402
 from pypic.grid import GridInfo  # noqa: E402
-from pypic.io import open_virtual  # noqa: E402
+from pypic.io import from_zarr, open_virtual, to_icechunk_virtual  # noqa: E402
+from pypic.io._icechunk import open_icechunk_repo  # noqa: E402
 from pypic.units import Normalization, SpeciesInfo  # noqa: E402
 from tests._helpers import make_uniform_grid  # noqa: E402
 
@@ -196,9 +197,7 @@ class TestOpenVirtual:
         grid = make_uniform_grid(4, 3, 2)
         h5path = tmp_path / "bytes_attrs.h5"
         with h5py.File(h5path, "w") as f:
-            f.create_group("fields").create_dataset(
-                "B1", data=np.ones((4, 3, 2))
-            )
+            f.create_group("fields").create_dataset("B1", data=np.ones((4, 3, 2)))
             g = f.create_group("grid")
             g.attrs["dimensions"] = list(grid.dimensions)
             g.attrs["spacing"] = list(grid.spacing)
@@ -230,3 +229,52 @@ class TestOpenVirtual:
         np.testing.assert_allclose(fds.xr.coords["x"].values, [0.25, 0.75, 1.25, 1.75])
         np.testing.assert_allclose(fds.xr.coords["y"].values, [0.5, 1.5, 2.5])
         np.testing.assert_allclose(fds.xr.coords["z"].values, [1.0, 3.0])
+
+
+class TestToIcechunkVirtualVersioning:
+    """Reviewer regression: to_icechunk_virtual must support more than
+    one commit per repo (re-commits to the same branch, and forks from
+    a populated main).  The first version wrote virtual refs at root
+    without overwriting, hitting ContainsGroupError on any write that
+    wasn't the very first.
+    """
+
+    def test_second_commit_to_same_branch(self, tmp_path):
+        grid = make_uniform_grid(4, 3, 2)
+        h5a = tmp_path / "a.h5"
+        h5b = tmp_path / "b.h5"
+        _write_canonical_h5(h5a, {"B1": np.ones((4, 3, 2))}, grid)
+        _write_canonical_h5(h5b, {"B1": np.full((4, 3, 2), 2.0)}, grid)
+
+        output = tmp_path / "repo"
+        snap_a = to_icechunk_virtual(h5a, output, message="first")
+        snap_b = to_icechunk_virtual(h5b, output, message="second")
+
+        assert snap_a != snap_b
+        repo = open_icechunk_repo(output)
+        ancestry = list(repo.ancestry(branch="main"))
+        # initial root snapshot plus two pypic commits
+        assert len(ancestry) >= 3
+
+        loaded = from_zarr(output)
+        np.testing.assert_allclose(loaded["B1"], 2.0)
+
+    def test_new_branch_fork_from_populated_main(self, tmp_path):
+        grid = make_uniform_grid(4, 3, 2)
+        h5a = tmp_path / "a.h5"
+        h5b = tmp_path / "b.h5"
+        _write_canonical_h5(h5a, {"B1": np.ones((4, 3, 2))}, grid)
+        _write_canonical_h5(h5b, {"B1": np.full((4, 3, 2), 3.0)}, grid)
+
+        output = tmp_path / "repo"
+        to_icechunk_virtual(h5a, output, branch="main", message="main write")
+        # Forking a new branch off a populated main previously failed
+        # because the fresh branch inherited main's root group.
+        snap_alt = to_icechunk_virtual(h5b, output, branch="alt", message="alt write")
+        assert isinstance(snap_alt, str)
+        assert snap_alt
+
+        loaded_main = from_zarr(output, branch="main")
+        loaded_alt = from_zarr(output, branch="alt")
+        np.testing.assert_allclose(loaded_main["B1"], 1.0)
+        np.testing.assert_allclose(loaded_alt["B1"], 3.0)

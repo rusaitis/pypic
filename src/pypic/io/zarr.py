@@ -369,34 +369,46 @@ def to_zarr_timeseries(
         raise ValueError(msg)
 
     ensure_zarr()
+    import shutil
+
     pairs = _resolve_timeseries_pairs(source, steps, fields)
     path_str = str(path)
     first = True
     pypic_attrs: dict[str, Any] | None = None
     expected_fields: frozenset[str] = frozenset()
-    for time_val, fds in pairs:
-        current_fields = frozenset(fds.field_names())
-        ds = fds.xr.expand_dims(time=[float(time_val)])
+    try:
+        for time_val, fds in pairs:
+            current_fields = frozenset(fds.field_names())
+            ds = fds.xr.expand_dims(time=[float(time_val)])
 
-        if first:
-            pypic_attrs = encode_pypic_attrs(fds)
-            expected_fields = current_fields
-            ds.to_zarr(
-                path_str,
-                zarr_format=3,
-                consolidated=False,
-                mode="w",
-                encoding=_build_encoding(ds, dtype, encoding),
-            )
-            first = False
-        else:
-            _check_timeseries_fields(expected_fields, current_fields, time_val)
-            ds.to_zarr(
-                path_str,
-                consolidated=False,
-                mode="a",
-                append_dim="time",
-            )
+            if first:
+                pypic_attrs = encode_pypic_attrs(fds)
+                expected_fields = current_fields
+                ds.to_zarr(
+                    path_str,
+                    zarr_format=3,
+                    consolidated=False,
+                    mode="w",
+                    encoding=_build_encoding(ds, dtype, encoding),
+                )
+                first = False
+            else:
+                _check_timeseries_fields(expected_fields, current_fields, time_val)
+                ds.to_zarr(
+                    path_str,
+                    consolidated=False,
+                    mode="a",
+                    append_dim="time",
+                )
+    except BaseException:
+        # Partial multi-step writes leave a store that looks like a
+        # valid single-step export — delete it so the filesystem state
+        # matches the error state.  BaseException covers KeyboardInterrupt
+        # as well: a Ctrl-C between appends would otherwise leave the
+        # same orphan store behind.
+        if not first:
+            shutil.rmtree(path_str, ignore_errors=True)
+        raise
 
     if first:
         msg = "No timesteps to write — source yielded zero items."

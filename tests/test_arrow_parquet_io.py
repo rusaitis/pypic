@@ -786,3 +786,34 @@ class TestDuckDBQuery:
         )
         assert isinstance(table, pa.Table)
         assert len(table) == 5
+
+    def test_scalar_only_projection_raises(self, tmp_path: Path):
+        # Reviewer regression: a projection with the `species` column
+        # but no full position or velocity triplet used to fall through
+        # to particles_from_arrow and raise the opaque "At least one of
+        # position or velocity must be provided".  Must fail early with
+        # an actionable pointer to return_type="arrow".
+        from pypic.io._duckdb import query_sql
+
+        root = self._write_dataset(tmp_path)
+        with pytest.raises(ValueError, match=r"position triplet.*velocity triplet"):
+            query_sql(
+                root,
+                "SELECT species, id FROM particles WHERE species='electrons' LIMIT 5",
+            )
+
+    def test_velocity_only_projection_succeeds(self, tmp_path: Path):
+        # ParticleData requires *one* of position or velocity, not both —
+        # velocity-only projections must still round-trip.
+        from pypic.io._duckdb import query_sql
+
+        root = self._write_dataset(tmp_path)
+        pcl = query_sql(
+            root,
+            "SELECT species, vx, vy, vz FROM particles "
+            "WHERE species='electrons' LIMIT 5",
+        )
+        assert pcl.n_particles == 5
+        assert pcl.velocity is not None
+        assert pcl.velocity.shape == (5, 3)
+        assert pcl.position is None

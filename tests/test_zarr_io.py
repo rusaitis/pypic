@@ -362,6 +362,30 @@ class TestToZarrTimeseries:
         store = tmp_path / "drift.zarr"
         with pytest.raises(ValueError, match=r"field set.*differs.*B2"):
             to_zarr_timeseries([(0.0, step0), (1.0, step1)], store)
+        # And the partial store from step 0 must not survive — otherwise
+        # it looks like a valid single-step export on retry.
+        assert not store.exists()
+
+    def test_timeseries_cleans_partial_store_on_append_failure(self, tmp_path):
+        # Reviewer regression: shape drift between steps raises only
+        # after step 0 has written to disk.  The partial store must
+        # be removed so the filesystem state matches the error state.
+        grid_small = make_uniform_grid(2, 2, 2)
+        grid_big = make_uniform_grid(3, 2, 2)
+        step0 = FieldDataset.from_arrays(
+            {"B1": np.ones((2, 2, 2))},
+            grid_small,
+            Normalization.identity(),
+        )
+        step1 = FieldDataset.from_arrays(
+            {"B1": np.ones((3, 2, 2))},
+            grid_big,
+            Normalization.identity(),
+        )
+        store = tmp_path / "partial.zarr"
+        with pytest.raises(ValueError, match=r"different dimension sizes"):
+            to_zarr_timeseries([(0.0, step0), (1.0, step1)], store)
+        assert not store.exists()
 
     def test_timeseries_preserves_metadata(self, tmp_path):
         grid = make_uniform_grid(4, 3, 2)

@@ -96,6 +96,18 @@ def query_sql(
         )
         raise ValueError(msg)
 
+    cols = set(arrow_table.column_names)
+    has_position = {"x", "y", "z"}.issubset(cols)
+    has_velocity = {"vx", "vy", "vz"}.issubset(cols)
+    if not (has_position or has_velocity):
+        msg = (
+            "query_sql(return_type='particledata') requires a full "
+            "position triplet (x, y, z) or velocity triplet (vx, vy, vz) "
+            f"in the projection.  Got columns: {sorted(cols)}.  "
+            "Use return_type='arrow' for scalar or aggregate queries."
+        )
+        raise ValueError(msg)
+
     species_values = {
         v for v in arrow_table.column("species").unique().to_pylist() if v is not None
     }
