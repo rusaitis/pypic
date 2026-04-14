@@ -130,10 +130,12 @@ Each step produces something testable. No step starts until the previous step's 
   - `--plane z=mid` — `PlaneSelection.apply()` for 2D slabs (reuses the
     plane-parsing helper already in `cli.py`).
   - `--target-resolution DX` — regrid to uniform spacing via `pypic.regrid`.
-  - `--units nT,km/s,...` — per-field display units applied via
-    `FieldDataset.in_units(field, unit)`; unspecified fields stay in code
-    units. Mirrors the convention in `stats` and `plot-compare`.
-  - `--to-si` — boolean; applies `in_si()` to every field before write.
+  - `--to-si` — boolean; applies `in_si()` to every field before write
+    and writes with `Normalization.identity()`.  Handoff path for non-
+    pypic consumers (IDL, MATLAB, plain xarray readers).  Default
+    (code units + full Normalization serialized) is lossless and the
+    right choice for pypic-to-pypic round-trips — consumers can call
+    `in_units()` at read time.
   - `--dtype float32` — forwarded to `to_zarr{,_timeseries}(dtype=...)`.
   - `--compression zstd|blosc[:level]` — built into the `encoding=` dict
     passed to `to_zarr{,_timeseries}`.
@@ -164,9 +166,11 @@ Each step produces something testable. No step starts until the previous step's 
   - `--row-group-size N` — forwards to `row_group_size=`.
   - `--progress / --no-progress` / `--dry-run` — as above.
 
-  **Default when no subcommand is given:** `pypic convert <path> --output
-  DIR` runs both pipelines with defaults, detecting particle output via
-  `sim.particle_steps`.
+  **Both-pipelines subcommand:** `pypic convert all <path> --output DIR`
+  writes fields to `{DIR}/fields.zarr` and particles (when present) to
+  `{DIR}/particles/`.  Detects particle output via `sim.particle_steps`.
+  Chosen over a subcommand-less default because typer's `Context` model
+  conflates callback args with subcommand args.
 
   **Not in scope (separate future steps):** frame transforms at convert
   time (Step 40 extension), DuckDB-query-based particle filtering
@@ -175,22 +179,25 @@ Each step produces something testable. No step starts until the previous step's 
   as a documented kwarg).
 
   **Shipped:** `convert fields` with `--step`, `--output`, `--fields`,
-  `--box`, `--target-resolution`, `--to-si`, `--dtype`, `--backend`,
-  `--message`, `--tag`, `--dry-run`. `convert particles` with `--step`,
-  `--output`, `--species`, `--columns`, `--sort-by`, `--position-dtype`,
+  `--box`, `--plane`/`--plane-index`/`--plane-coord`,
+  `--target-resolution`, `--to-si`, `--dtype`, `--compression
+  zstd|blosc[:level]`, `--virtual`, `--backend`, `--message`, `--tag`,
+  `--progress/--no-progress`, `--dry-run`. `convert particles` with
+  `--step`, `--output`, `--species`, `--columns`, `--box` (position
+  filter in code units), `--sort-by`, `--position-dtype`,
   `--velocity-dtype`, `--compression-level`, `--row-group-size`,
-  `--dry-run`. Single-step writes call `to_zarr`; multi-step writes call
-  `to_zarr_timeseries` (adds a leading time dim). Icechunk `--tag` uses
-  `icechunk_create_tag` after a successful write.
+  `--progress/--no-progress`, `--dry-run`. `convert all` runs both
+  with sensible defaults. Single-step writes call `to_zarr`; multi-step
+  writes call `to_zarr_timeseries` (adds a leading time dim). Icechunk
+  `--tag` uses `icechunk_create_tag` after a successful write. Virtual
+  mode (`--virtual`) treats PATH as a single HDF5 file and persists
+  byte-range refs via `open_virtual` → `to_zarr`.
 
-  **Deferred (follow-up steps):** `--plane` (trivial — reuse existing
-  `_resolve_plane` helper), per-field `--units nT,km/s` display strings
-  (needs a small parser to map field→unit), `--compression
-  zstd|blosc[:level]` explicit flag (the `encoding=` dict is already
-  wired; just needs a string→codec parser), `--virtual` mode
-  (`open_virtual` + `backend=icechunk` persistence path), `--progress`
-  bar, particle `--box` spatial crop, and the subcommand-less default
-  that runs both pipelines.
+  **Dropped from spec:** per-field `--units nT,km/s,...` display
+  strings.  Unit metadata is always serialized via the Normalization
+  object; consumers call `in_units()` at read time.  Baking display
+  units into the file would break the "one coherent normalization per
+  file" invariant without saving anyone a step.
 
   **Depends on:** Steps 24, 24b, 24c, 25, 25b — all shipped.
 

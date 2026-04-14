@@ -1137,3 +1137,156 @@ def test_convert_particles_no_particle_output(tmp_path: Path) -> None:
     )
     assert result.exit_code != 0
     assert "no particle output" in result.output.lower()
+
+
+# -- convert: --plane, --compression, --virtual, --all, particle --box ------
+
+
+@zarr_required
+def test_convert_fields_plane_slice(tmp_path: Path) -> None:
+    from pypic.io import from_zarr
+
+    d = _make_sim_dir(tmp_path)
+    out = tmp_path / "plane.zarr"
+    result = runner.invoke(
+        app,
+        [
+            "convert", "fields", str(d),
+            "--output", str(out), "--step", "0", "--plane", "xy",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    fds = from_zarr(out)
+    # xy plane → normal is z, so the z axis is sliced out
+    assert fds["B1"].shape == (4, 4)
+
+
+@zarr_required
+def test_convert_fields_compression_zstd(tmp_path: Path) -> None:
+    from pypic.io import from_zarr
+
+    d = _make_sim_dir(tmp_path)
+    out = tmp_path / "zstd.zarr"
+    result = runner.invoke(
+        app,
+        [
+            "convert", "fields", str(d),
+            "--output", str(out), "--step", "0",
+            "--compression", "zstd:3",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    fds = from_zarr(out)
+    assert "B1" in fds.field_names()
+
+
+@zarr_required
+def test_convert_fields_compression_bad_spec(tmp_path: Path) -> None:
+    d = _make_sim_dir(tmp_path)
+    out = tmp_path / "bad.zarr"
+    result = runner.invoke(
+        app,
+        [
+            "convert", "fields", str(d),
+            "--output", str(out), "--compression", "lz4",
+        ],
+    )
+    assert result.exit_code != 0
+    assert "compression" in result.output.lower()
+
+
+@zarr_required
+def test_convert_fields_virtual(tmp_path: Path) -> None:
+    pytest.importorskip("virtualizarr")
+    from pypic.io import from_zarr
+
+    # Create a canonical pypic-layout HDF5 file (grid + normalization + fields).
+    h5_path = tmp_path / "canonical.h5"
+    rng = np.random.default_rng(7)
+    with h5py.File(h5_path, "w") as f:
+        fields = f.create_group("fields")
+        fields.create_dataset("B1", data=rng.standard_normal((4, 4, 4)))
+        fields.create_dataset("B2", data=rng.standard_normal((4, 4, 4)))
+        fields.create_dataset("B3", data=rng.standard_normal((4, 4, 4)))
+        grid = f.create_group("grid")
+        grid.attrs["dimensions"] = [4, 4, 4]
+        grid.attrs["spacing"] = [1.0, 1.0, 1.0]
+        grid.attrs["origin"] = [0.0, 0.0, 0.0]
+        grid.attrs["geometry"] = "cartesian"
+
+    out = tmp_path / "virtual.zarr"
+    result = runner.invoke(
+        app,
+        [
+            "convert", "fields", str(h5_path),
+            "--output", str(out), "--virtual",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    fds = from_zarr(out)
+    assert set(fds.field_names()) >= {"B1", "B2", "B3"}
+
+
+@zarr_required
+def test_convert_fields_virtual_rejects_directory(tmp_path: Path) -> None:
+    d = _make_sim_dir(tmp_path)
+    out = tmp_path / "nope.zarr"
+    result = runner.invoke(
+        app,
+        ["convert", "fields", str(d), "--output", str(out), "--virtual"],
+    )
+    assert result.exit_code != 0
+    assert "hdf5 file" in result.output.lower()
+
+
+@arrow_required
+def test_convert_particles_box_crop(tmp_path: Path) -> None:
+    from pypic.io._parquet import particles_from_dataset
+
+    out = tmp_path / "cropped"
+    # Fixture positions are in [0, 1); crop to a slab in x.
+    result = runner.invoke(
+        app,
+        [
+            "convert", "particles", str(_IPIC3D_FIXTURE),
+            "--output", str(out),
+            "--step", "0", "--species", "species_0",
+            "--box", "x=0.0:0.4",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    pcl = particles_from_dataset(out, step=0, species="species_0")
+    assert pcl.n_particles > 0
+    assert pcl.n_particles < 18  # was cropped
+    assert pcl.x.max() <= 0.4
+
+
+@zarr_required
+@arrow_required
+def test_convert_all_fields_only(tmp_path: Path) -> None:
+    # Sim without particle output: `convert all` should write fields only.
+    d = _make_sim_dir(tmp_path)
+    out = tmp_path / "all_out"
+    result = runner.invoke(
+        app,
+        ["convert", "all", str(d), "--output", str(out)],
+    )
+    assert result.exit_code == 0, result.output
+    assert (out / "fields.zarr").is_dir()
+    assert not (out / "particles").exists()
+
+
+@zarr_required
+@arrow_required
+def test_convert_all_dry_run_particles(tmp_path: Path) -> None:
+    out = tmp_path / "plan"
+    result = runner.invoke(
+        app,
+        [
+            "convert", "all", str(_IPIC3D_FIXTURE),
+            "--output", str(out), "--dry-run",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    assert "fields.zarr" in result.output
+    assert "particles" in result.output
