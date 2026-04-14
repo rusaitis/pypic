@@ -18,6 +18,7 @@ Install with ``pip install pypic[arrow]``.
 from __future__ import annotations
 
 import logging
+import re
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
 
@@ -53,6 +54,7 @@ _DEFAULT_ROW_GROUP_SIZE: int = 750_000
 _PARTITION_COLS = ("step", "species")
 _DERIVED_COLS = ("speed",)
 _STRIP_COLS = _PARTITION_COLS + _DERIVED_COLS
+_PART_RE = re.compile(r"^part-(\d{5,})\.parquet$")
 
 
 def _add_speed_column(table: pa.Table) -> pa.Table:
@@ -378,7 +380,14 @@ def particles_to_dataset(
         part_dir.mkdir(parents=True, exist_ok=True)
         key = (step, sp_name)
         if key not in part_counters:
-            part_counters[key] = sum(1 for _ in part_dir.glob("part-*.parquet"))
+            indices = [
+                int(m.group(1))
+                for p in part_dir.iterdir()
+                if (m := _PART_RE.match(p.name))
+            ]
+            # Counting files would skip into the wrong slot when prior
+            # numbering is sparse (e.g. part-00001 without part-00000).
+            part_counters[key] = (max(indices) + 1) if indices else 0
         part_idx = part_counters[key]
         part_counters[key] = part_idx + 1
         part_path = part_dir / f"part-{part_idx:05d}.parquet"

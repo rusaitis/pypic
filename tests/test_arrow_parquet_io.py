@@ -526,6 +526,27 @@ class TestPartitionedDataset:
         assert idx1.species_name == "alpha"
         assert idx1.species_index == 1
 
+    def test_sparse_part_numbering_resumes_at_next_free_index(self, tmp_path: Path):
+        # If a partition already contains part-00001.parquet without
+        # part-00000.parquet (deletion, manual edit, partial prior
+        # write), the next chunk must land at part-00002.parquet, not
+        # overwrite the existing part-00001.parquet.  File-counting
+        # would have produced index=1 here.
+        chunk_a = _make_particles(10, seed=11, species_name="electrons")
+        chunk_b = _make_particles(20, seed=22, species_name="electrons")
+        root = tmp_path / "sparse"
+        particles_to_dataset([(0, "electrons", chunk_a)], root)
+        part_dir = root / "step=000000/species=electrons"
+        # Make the prior file sparse: drop 00000, leave only 00001.
+        (part_dir / "part-00000.parquet").rename(part_dir / "part-00001.parquet")
+        sentinel = (part_dir / "part-00001.parquet").read_bytes()
+
+        particles_to_dataset([(0, "electrons", chunk_b)], root)
+
+        assert (part_dir / "part-00002.parquet").exists()
+        # Existing sparse file is untouched.
+        assert (part_dir / "part-00001.parquet").read_bytes() == sentinel
+
     def test_iterable_chunked_writes_preserve_all_batches(self, tmp_path: Path):
         # Streaming pipelines naturally yield multiple ParticleData
         # chunks per (step, species).  Each chunk must land in its own

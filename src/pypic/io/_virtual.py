@@ -21,6 +21,7 @@ from pypic.coordinates.geometry import CARTESIAN, GEOMETRY_BY_NAME
 from pypic.dataset import FieldDataset
 from pypic.grid import GridInfo
 from pypic.io._guard import ensure_icechunk, ensure_virtualizarr
+from pypic.io._serialize import encode_pypic_attrs
 from pypic.units import Normalization
 
 if TYPE_CHECKING:
@@ -29,7 +30,7 @@ if TYPE_CHECKING:
     from pypic.containers import SimulationConfig
     from pypic.coordinates.transforms import FrameTransform
 
-__all__ = ["open_virtual"]
+__all__ = ["open_virtual", "to_icechunk_virtual"]
 
 
 def _read_metadata_from_h5(
@@ -95,6 +96,50 @@ def _read_metadata_from_h5(
     return grid, norm, extra
 
 
+def _virtual_repo_config(source_dir: str) -> tuple[Any, str]:
+    """Build the Icechunk RepositoryConfig + url_prefix for a source dir.
+
+    The returned config has a ``VirtualChunkContainer`` registered for
+    ``file://{source_dir}/`` so that Icechunk knows how to resolve
+    virtual chunk references back to the original HDF5 bytes.
+    """
+    import icechunk
+
+    config = icechunk.RepositoryConfig.default()
+    url_prefix = f"file://{source_dir}/"
+    container = icechunk.VirtualChunkContainer(
+        name="local",
+        url_prefix=url_prefix,
+        store=icechunk.local_filesystem_store(source_dir),
+    )
+    config.set_virtual_chunk_container(container)
+    return config, url_prefix
+
+
+def _build_vds(
+    source_str: str,
+    fields_group: str | None,
+    drop_variables: list[str] | None,
+) -> xr.Dataset:
+    """Extract a VirtualiZarr virtual dataset from an HDF5 file."""
+    from obspec_utils.registry import ObjectStoreRegistry
+    from obstore.store import LocalStore
+    from virtualizarr import open_virtual_dataset
+    from virtualizarr.parsers import HDFParser
+
+    url = f"file://{source_str}"
+    registry = ObjectStoreRegistry()  # type: ignore[var-annotated]
+    registry.register("file://", LocalStore())
+    parser = HDFParser(group=fields_group)
+    return open_virtual_dataset(
+        url,
+        registry=registry,
+        parser=parser,
+        drop_variables=drop_variables,
+        loadable_variables=[],
+    )
+
+
 def _virtual_to_readable(vds: xr.Dataset, *, source_dir: str) -> xr.Dataset:
     """Persist virtual references via Icechunk's Zarr v3 backend.
 
@@ -105,14 +150,7 @@ def _virtual_to_readable(vds: xr.Dataset, *, source_dir: str) -> xr.Dataset:
     import icechunk
 
     storage = icechunk.in_memory_storage()
-    config = icechunk.RepositoryConfig.default()
-    url_prefix = f"file://{source_dir}/"
-    container = icechunk.VirtualChunkContainer(
-        name="local",
-        url_prefix=url_prefix,
-        store=icechunk.local_filesystem_store(source_dir),
-    )
-    config.set_virtual_chunk_container(container)
+    config, url_prefix = _virtual_repo_config(source_dir)
     repo = icechunk.Repository.create(
         storage,
         config=config,
@@ -180,26 +218,8 @@ def open_virtual(
 
     from pathlib import Path as _Path
 
-    from obspec_utils.registry import ObjectStoreRegistry
-    from obstore.store import LocalStore
-    from virtualizarr import open_virtual_dataset
-    from virtualizarr.parsers import HDFParser
-
     path_str = str(_Path(path).resolve())
-    url = f"file://{path_str}"
-
-    registry = ObjectStoreRegistry()  # type: ignore[var-annotated]
-    registry.register("file://", LocalStore())
-
-    parser = HDFParser(group=fields_group)
-    vds = open_virtual_dataset(
-        url,
-        registry=registry,
-        parser=parser,
-        drop_variables=drop_variables,
-        loadable_variables=[],
-    )
-
+    vds = _build_vds(path_str, fields_group, drop_variables)
     ds = _virtual_to_readable(vds, source_dir=str(_Path(path_str).parent))
 
     if config is not None:
@@ -251,3 +271,104 @@ def open_virtual(
         frame=frame,
         transforms=transforms,
     )
+
+
+def to_icechunk_virtual(
+    source: str | Path,
+    output: str | Path,
+    *,
+    fields_group: str | None = "fields",
+    drop_variables: list[str] | None = None,
+    config: SimulationConfig | None = None,
+    message: str | None = None,
+    branch: str = "main",
+) -> str:
+    r"""Persist HDF5 byte-range references to an Icechunk repository.
+
+    Writes the virtual references for *source*'s field datasets to a
+    persistent on-disk Icechunk repo at *output* and attaches pypic
+    metadata as group attrs.  Subsequent reads via ``from_zarr(output)``
+    resolve chunks by reading byte ranges from *source* — no field
+    data is copied.
+
+    Parameters
+    ----------
+    source : str or Path
+        Path to the source HDF5 file.
+    output : str or Path
+        Destination directory for the Icechunk repository.
+    fields_group : str or None
+        HDF5 group containing field datasets (``"fields"`` for the
+        canonical layout; ``None`` reads from the root group).
+    drop_variables : list[str] or None
+        HDF5 dataset names to exclude from the virtual view.
+    config : SimulationConfig or None
+        Explicit metadata.  When provided, overrides any metadata
+        found in the HDF5 file.
+    message : str or None
+        Icechunk commit message.  Defaults to a generated string.
+    branch : str
+        Branch to commit to.  Defaults to ``"main"``.
+
+    Returns
+    -------
+    str
+        The Icechunk snapshot ID of the new commit.
+
+    Raises
+    ------
+    ImportError
+        If ``virtualizarr`` or ``icechunk`` is not installed.
+    ValueError
+        If grid metadata cannot be determined from *source* or *config*.
+
+    Notes
+    -----
+    Both ``virtualizarr`` and ``icechunk`` are installed by the
+    ``zarr`` extra (``pip install pypic[zarr]``).  Moving or deleting
+    *source* after the write breaks the virtual refs in *output* — the
+    on-disk repo is metadata only.
+    """
+    ensure_virtualizarr()
+    ensure_icechunk()
+
+    from pathlib import Path as _Path
+
+    import icechunk
+    import zarr
+
+    source_path = _Path(source).resolve()
+    source_str = str(source_path)
+    source_dir = str(source_path.parent)
+    output_path = _Path(output)
+    output_path.mkdir(parents=True, exist_ok=True)
+
+    vds = _build_vds(source_str, fields_group, drop_variables)
+
+    storage = icechunk.local_filesystem_storage(str(output_path))
+    repo_config, url_prefix = _virtual_repo_config(source_dir)
+    repo = icechunk.Repository.open_or_create(
+        storage,
+        config=repo_config,
+        authorize_virtual_chunk_access={url_prefix: None},
+    )
+    session = repo.writable_session(branch)
+    vds.vz.to_icechunk(session.store)
+
+    # Reuse open_virtual to assemble the canonical FieldDataset attrs.
+    # This re-extracts vds against an in-memory store (cheap — only
+    # HDF5 metadata is read) and gives encode_pypic_attrs the same
+    # FieldDataset shape from_zarr will reconstruct on read.
+    fds = open_virtual(
+        source,
+        fields_group=fields_group,
+        drop_variables=drop_variables,
+        config=config,
+    )
+    group = zarr.open_group(session.store, mode="r+")
+    group.attrs["pypic"] = encode_pypic_attrs(fds)
+
+    snapshot: str = session.commit(
+        message if message is not None else "pypic: virtual refs"
+    )
+    return snapshot

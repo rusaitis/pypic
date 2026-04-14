@@ -28,7 +28,7 @@ from pypic.io._parquet import (
     particles_to_dataset,
     particles_to_parquet,
 )
-from pypic.io._virtual import open_virtual
+from pypic.io._virtual import open_virtual, to_icechunk_virtual
 from pypic.io.zarr import from_zarr, to_zarr, to_zarr_timeseries
 
 __all__ = [
@@ -44,6 +44,7 @@ __all__ = [
     "particles_to_dataset",
     "particles_to_parquet",
     "query_sql",
+    "to_icechunk_virtual",
     "to_zarr",
     "to_zarr_timeseries",
 ]

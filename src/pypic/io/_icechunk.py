@@ -67,6 +67,7 @@ def open_icechunk_repo(
     path: str | Path,
     *,
     create: bool = False,
+    authorize_virtual_chunk_access: dict[str, Any] | None = None,
 ) -> Any:  # noqa: ANN401
     r"""Open (or create) a local Icechunk repository.
 
@@ -76,6 +77,15 @@ def open_icechunk_repo(
         Directory for the repository.
     create : bool
         When ``True``, create the repository if it does not exist.
+    authorize_virtual_chunk_access : dict or None
+        Mapping of URL prefix → credentials (``None`` for unauthenticated
+        local ``file://`` URLs).  When ``None`` (the default), the
+        function auto-detects every ``VirtualChunkContainer`` registered
+        with the repo and authorizes each prefix with ``None``
+        credentials — local virtual stores written by
+        ``to_icechunk_virtual`` round-trip without further wiring.  Pass
+        an empty dict to disable virtual chunk reads, or supply explicit
+        credentials for cloud (``s3://``, ``gs://``) containers.
 
     Returns
     -------
@@ -86,9 +96,29 @@ def open_icechunk_repo(
     import icechunk
 
     storage = icechunk.local_filesystem_storage(str(path))
+
+    if authorize_virtual_chunk_access is None:
+        # Two-pass open: peek at the persisted RepositoryConfig to
+        # discover registered containers, then re-open with auth that
+        # matches their url_prefixes.  Containers store their full
+        # prefix (e.g. file:///path/to/source/), which is what
+        # Icechunk requires — a generic "file://" auth does not match.
+        if create:
+            probe = icechunk.Repository.open_or_create(storage)
+        else:
+            probe = icechunk.Repository.open(storage)
+        containers = probe.config.virtual_chunk_containers or {}
+        authorize_virtual_chunk_access = {prefix: None for prefix in containers}
+
     if create:
-        return icechunk.Repository.open_or_create(storage)
-    return icechunk.Repository.open(storage)
+        return icechunk.Repository.open_or_create(
+            storage,
+            authorize_virtual_chunk_access=authorize_virtual_chunk_access,
+        )
+    return icechunk.Repository.open(
+        storage,
+        authorize_virtual_chunk_access=authorize_virtual_chunk_access,
+    )
 
 
 def to_zarr_icechunk(

@@ -13,7 +13,7 @@ import typer
 from pypic.dataset import FieldDataset
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Callable, Sequence
     from typing import Any
 
     from pypic.containers import ParticleData
@@ -74,22 +74,29 @@ def main(
     app.pretty_exceptions_enable = debug
 
 
-def parse_steps(raw: str, sim: Simulation) -> list[int]:
+def parse_steps(raw: str, available: Sequence[int]) -> list[int]:
     """Parse ``--step`` syntax into a list of timestep indices.
 
     Supports: ``N`` (single int), ``first``, ``last``, ``all``,
-    ``start:stop:stride`` (inclusive stop).
+    ``start:stop:stride`` (inclusive stop).  ``available`` is the
+    universe of valid steps — pass ``sim.steps`` for field commands
+    and ``sim.particle_steps`` for particle commands so aliases like
+    ``last`` resolve to the right cadence.
 
-    Raises :class:`typer.BadParameter` on invalid syntax or when the
-    resolved list is empty.
+    Raises :class:`typer.BadParameter` on invalid syntax, on an empty
+    ``available`` list, or when the resolved list is empty.
     """
     raw = raw.strip()
+    if not available:
+        msg = f"No steps available to resolve --step {raw!r}."
+        raise typer.BadParameter(msg)
+    available_list = list(available)
     if raw == "all":
-        return sim.steps
+        return available_list
     if raw == "first":
-        return [sim.first_step]
+        return [available_list[0]]
     if raw == "last":
-        return [sim.last_step]
+        return [available_list[-1]]
     if ":" in raw:
         parts = raw.split(":")
         if len(parts) not in (2, 3):
@@ -106,12 +113,14 @@ def parse_steps(raw: str, sim: Simulation) -> list[int]:
             msg = f"Stride must be positive, got {stride}."
             raise typer.BadParameter(msg)
         result = [
-            s for s in sim.steps if start <= s <= stop and (s - start) % stride == 0
+            s
+            for s in available_list
+            if start <= s <= stop and (s - start) % stride == 0
         ]
         if not result:
             msg = (
                 f"No available steps match range {raw!r}. "
-                f"Available: {sim.steps[0]}..{sim.steps[-1]}"
+                f"Available: {available_list[0]}..{available_list[-1]}"
             )
             raise typer.BadParameter(msg)
         return result
@@ -123,9 +132,10 @@ def parse_steps(raw: str, sim: Simulation) -> list[int]:
             "Use a number, first, last, all, or start:stop:stride."
         )
         raise typer.BadParameter(msg) from None
-    if step_val not in sim.steps:
+    if step_val not in available_list:
         msg = (
-            f"Step {step_val} not available. Available: {sim.steps[0]}..{sim.steps[-1]}"
+            f"Step {step_val} not available. "
+            f"Available: {available_list[0]}..{available_list[-1]}"
         )
         raise typer.BadParameter(msg)
     return [step_val]
@@ -570,9 +580,11 @@ def convert_fields(
         typer.Option(
             "--virtual",
             help=(
-                "Treat PATH as an HDF5 file, write virtual refs (no data "
-                "copy). Mutually exclusive with --fields, --box, --plane, "
-                "--target-resolution, --to-si."
+                "Treat PATH as an HDF5 file, persist byte-range refs to "
+                "an Icechunk repo (no data copy). Requires --backend "
+                "icechunk. Mutually exclusive with --fields, --box, "
+                "--plane, --target-resolution, --to-si, --dtype, "
+                "--compression."
             ),
         ),
     ] = False,
@@ -631,27 +643,30 @@ def convert_fields(
                 "source dataset; sub-selection would force materialization)."
             )
             raise typer.BadParameter(msg)
-        from pypic.io import open_virtual
+        if dtype is not None or compression is not None:
+            msg = (
+                "--virtual is incompatible with --dtype and --compression: "
+                "virtual refs persist the source bytes as-is, so chunk "
+                "encoding cannot be changed at write time."
+            )
+            raise typer.BadParameter(msg)
+        if backend != "icechunk":
+            msg = (
+                "--virtual requires --backend icechunk: virtual chunk "
+                "containers are an Icechunk-only feature."
+            )
+            raise typer.BadParameter(msg)
+        from pypic.io import to_icechunk_virtual
 
         if dry_run:
             typer.echo(f"Would write virtual refs for {path} to {output}")
             typer.echo(f"  backend: {backend}")
             return
-        fds = open_virtual(path)
-        compression_spec = _parse_compression(compression)
-        enc = _expand_encoding_for_vars(compression_spec, list(fds.field_names()))
-        snapshot = to_zarr(
-            fds,
-            output,
-            dtype=dtype,
-            encoding=enc,
-            backend=backend_arg,
-            message=message,
-        )
-        if tag is not None and snapshot is not None:
+        virtual_snapshot = to_icechunk_virtual(path, output, message=message)
+        if tag is not None:
             from pypic.io import icechunk_create_tag
 
-            icechunk_create_tag(output, tag, snapshot_id=snapshot)
+            icechunk_create_tag(output, tag, snapshot_id=virtual_snapshot)
             typer.echo(f"Wrote virtual refs to {output} (tag={tag})")
         else:
             typer.echo(f"Wrote virtual refs to {output}")
@@ -659,7 +674,7 @@ def convert_fields(
 
     # -- Standard mode: iterate simulation steps -----------------------------
     sim = _open(path)
-    step_list = parse_steps(step, sim)
+    step_list = parse_steps(step, sim.steps)
     field_list = _parse_comma_list(fields)
     box_ranges = _parse_box_ranges(box, convert=int)
     plane_sel = (
@@ -853,21 +868,9 @@ def convert_particles(
         typer.echo(f"Error: {path} has no particle output.", err=True)
         raise typer.Exit(1)
 
-    # Intersect --step spec with the reader's particle_steps since the
-    # field steps may be a superset of particle steps.
-    try:
-        requested = parse_steps(step, sim)
-    except typer.BadParameter:
-        raise
-    particle_steps = set(sim.particle_steps)
-    step_list = [s for s in requested if s in particle_steps]
-    if not step_list:
-        available = f"{sim.particle_steps[0]}..{sim.particle_steps[-1]}"
-        typer.echo(
-            f"Error: no particle output for --step {step!r}. Available: {available}",
-            err=True,
-        )
-        raise typer.Exit(1)
+    # Resolve aliases against particle_steps directly so first/last/all
+    # follow the particle cadence even when fields were dumped more often.
+    step_list = parse_steps(step, sim.particle_steps)
 
     species_idx = _resolve_species_list(species, sim)
     columns_list = _parse_comma_list(columns)
@@ -1122,7 +1125,7 @@ def fields(
 ) -> None:
     """List available fields at a timestep."""
     sim = _open(path)
-    step_val = _require_single_step(parse_steps(step, sim), step)
+    step_val = _require_single_step(parse_steps(step, sim.steps), step)
 
     show_mapping = mapping or all_sections
     show_derived = derived or all_sections
@@ -1215,7 +1218,7 @@ def stats(
     from pypic.diagnostics import field_extrema, spatial_mean, spatial_rms
 
     sim = _open(path)
-    step_list = parse_steps(step, sim)
+    step_list = parse_steps(step, sim.steps)
     unit_label = units if units is not None else "code"
 
     def _stats_from_array(arr: FloatArray) -> dict[str, object]:
@@ -1356,7 +1359,7 @@ def compare(
     sim_a = _open(path_a)
     sim_b = _open(path_b)
 
-    step_val = _require_single_step(parse_steps(step, sim_a), step)
+    step_val = _require_single_step(parse_steps(step, sim_a.steps), step)
 
     if step_val not in sim_b.steps:
         typer.echo(
@@ -1512,7 +1515,7 @@ def validate(
     from pypic.diagnostics import field_energy, max_div_b
 
     sim = _open(path)
-    step_val = _require_single_step(parse_steps(step, sim), step)
+    step_val = _require_single_step(parse_steps(step, sim.steps), step)
     ds = sim.read(step_val)
 
     field_names = sorted(ds.field_names())
@@ -1872,7 +1875,7 @@ def plot(
         raise typer.BadParameter(msg)
 
     sim = _open(path)
-    step_list = parse_steps(step, sim)
+    step_list = parse_steps(step, sim.steps)
 
     if animate is not None and len(step_list) < 2:
         msg = "--animate requires multiple steps (use --step all or a range)."
@@ -2056,7 +2059,7 @@ def plot_compare(
     sim_a = _open(path_a)
     sim_b = _open(path_b)
 
-    step_val = _require_single_step(parse_steps(step, sim_a), step)
+    step_val = _require_single_step(parse_steps(step, sim_a.steps), step)
     if step_val not in sim_b.steps:
         typer.echo(
             f"Error: step {step_val} not available in {path_b}. "

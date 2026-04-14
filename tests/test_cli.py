@@ -290,6 +290,21 @@ def test_empty_step_range(tmp_path):
     assert "No available steps" in result.output
 
 
+def test_parse_steps_resolves_against_provided_list():
+    # Aliases must consult the provided list, not field steps.  This is
+    # what lets `convert particles` resolve "last" to the last *particle*
+    # step even when fields were dumped on a finer cadence.
+    from pypic.cli import parse_steps
+
+    field_steps = [0, 50, 100, 150, 200]
+    particle_steps = [0, 100]
+    assert parse_steps("last", field_steps) == [200]
+    assert parse_steps("last", particle_steps) == [100]
+    assert parse_steps("first", particle_steps) == [0]
+    assert parse_steps("all", particle_steps) == [0, 100]
+    assert parse_steps("0:200:50", particle_steps) == [0, 100]
+
+
 def test_multi_step_rejected_by_fields(tmp_path):
     d = _make_sim_dir(tmp_path, n_steps=3)
     result = runner.invoke(app, ["fields", str(d), "--step", "all"])
@@ -1287,11 +1302,15 @@ def test_convert_fields_virtual(tmp_path: Path) -> None:
             "--output",
             str(out),
             "--virtual",
+            "--backend",
+            "icechunk",
         ],
     )
     assert result.exit_code == 0, result.output
     fds = from_zarr(out)
     assert set(fds.field_names()) >= {"B1", "B2", "B3"}
+    # Virtual refs only — no materialised chunk files in the destination.
+    assert not list(out.rglob("B1/c/*"))
 
 
 @zarr_required
@@ -1300,16 +1319,23 @@ def test_convert_fields_virtual_rejects_directory(tmp_path: Path) -> None:
     out = tmp_path / "nope.zarr"
     result = runner.invoke(
         app,
-        ["convert", "fields", str(d), "--output", str(out), "--virtual"],
+        [
+            "convert",
+            "fields",
+            str(d),
+            "--output",
+            str(out),
+            "--virtual",
+            "--backend",
+            "icechunk",
+        ],
     )
     assert result.exit_code != 0
     assert "hdf5 file" in result.output.lower()
 
 
-@zarr_required
-def test_convert_fields_virtual_rejects_fields_filter(tmp_path: Path) -> None:
-    h5_path = tmp_path / "canonical.h5"
-    with h5py.File(h5_path, "w") as f:
+def _write_min_h5(path: Path) -> None:
+    with h5py.File(path, "w") as f:
         f.create_group("fields").create_dataset("B1", data=np.zeros((4, 4, 4)))
         grid = f.create_group("grid")
         grid.attrs["dimensions"] = [4, 4, 4]
@@ -1317,6 +1343,21 @@ def test_convert_fields_virtual_rejects_fields_filter(tmp_path: Path) -> None:
         grid.attrs["origin"] = [0.0, 0.0, 0.0]
         grid.attrs["geometry"] = "cartesian"
 
+
+@zarr_required
+@pytest.mark.parametrize(
+    ("flag", "value", "expected"),
+    [
+        ("--fields", "B1", "--fields"),
+        ("--dtype", "float32", "--dtype"),
+        ("--compression", "zstd:3", "--compression"),
+    ],
+)
+def test_convert_fields_virtual_rejects_incompatible_flags(
+    tmp_path: Path, flag: str, value: str, expected: str
+) -> None:
+    h5_path = tmp_path / "canonical.h5"
+    _write_min_h5(h5_path)
     out = tmp_path / "nope.zarr"
     result = runner.invoke(
         app,
@@ -1327,6 +1368,97 @@ def test_convert_fields_virtual_rejects_fields_filter(tmp_path: Path) -> None:
             "--output",
             str(out),
             "--virtual",
+            "--backend",
+            "icechunk",
+            flag,
+            value,
+        ],
+    )
+    assert result.exit_code != 0
+    assert expected in result.output
+
+
+@zarr_required
+def test_convert_fields_virtual_rejects_zarr_backend(tmp_path: Path) -> None:
+    h5_path = tmp_path / "canonical.h5"
+    _write_min_h5(h5_path)
+    out = tmp_path / "nope.zarr"
+    result = runner.invoke(
+        app,
+        [
+            "convert",
+            "fields",
+            str(h5_path),
+            "--output",
+            str(out),
+            "--virtual",  # backend defaults to "zarr"
+        ],
+    )
+    assert result.exit_code != 0
+    assert "icechunk" in result.output.lower()
+
+
+@zarr_required
+def test_convert_fields_virtual_reflects_source_mutations(tmp_path: Path) -> None:
+    pytest.importorskip("virtualizarr")
+    pytest.importorskip("icechunk")
+    from pypic.io import from_zarr
+
+    # The reviewer's reproducer: write virtual refs, mutate the source,
+    # confirm the destination read sees the mutation (proving refs
+    # resolve at read time, not snapshots taken at write time).
+    h5_path = tmp_path / "src.h5"
+    with h5py.File(h5_path, "w") as f:
+        f.create_group("fields").create_dataset("B1", data=np.full((4, 4, 4), 7.0))
+        grid = f.create_group("grid")
+        grid.attrs["dimensions"] = [4, 4, 4]
+        grid.attrs["spacing"] = [1.0, 1.0, 1.0]
+        grid.attrs["origin"] = [0.0, 0.0, 0.0]
+        grid.attrs["geometry"] = "cartesian"
+
+    out = tmp_path / "virtual_store"
+    result = runner.invoke(
+        app,
+        [
+            "convert",
+            "fields",
+            str(h5_path),
+            "--output",
+            str(out),
+            "--virtual",
+            "--backend",
+            "icechunk",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+
+    # Pre-mutation read: original values.
+    np.testing.assert_array_equal(np.asarray(from_zarr(out)["B1"]), 7.0)
+
+    # Mutate source HDF5; the virtual store must see the new value.
+    with h5py.File(h5_path, "r+") as f:
+        f["fields"]["B1"][...] = 99.0
+    np.testing.assert_array_equal(np.asarray(from_zarr(out)["B1"]), 99.0)
+
+
+@zarr_required
+def test_convert_fields_virtual_rejects_fields_filter(tmp_path: Path) -> None:
+    # Kept for backwards-test-compat with the previous targeted test;
+    # now subsumed by the parametrised flag-rejection test above.
+    h5_path = tmp_path / "canonical.h5"
+    _write_min_h5(h5_path)
+    out = tmp_path / "nope.zarr"
+    result = runner.invoke(
+        app,
+        [
+            "convert",
+            "fields",
+            str(h5_path),
+            "--output",
+            str(out),
+            "--virtual",
+            "--backend",
+            "icechunk",
             "--fields",
             "B1",
         ],
