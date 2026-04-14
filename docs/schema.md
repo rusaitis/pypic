@@ -511,55 +511,71 @@ See CLAUDE.md for naming conventions (functions, parameters, class names).
 ### Per-particle data columns
 
 For PIC and hybrid codes that emit per-particle data, `ParticleData`
-exposes the following canonical fields (used by the Arrow/Parquet
-I/O layer in `pypic.io`).  All fields are **optional** — readers
-populate whatever the source format provides, and the
-:attr:`ParticleData.macro_charge` / :attr:`macro_mass` properties
-give per-macroparticle quantities regardless of which raw fields are
-populated.
+carries one canonical per-macroparticle representation regardless of
+the source code's native storage convention: per-particle `weight`
+(array) plus scalar `species_charge` and `species_mass`.  The
+per-macroparticle charge and mass that enter moments and the equations
+of motion are derived on demand via the :attr:`ParticleData.macro_charge`
+and :attr:`macro_mass` properties.
 
 | Field | Storage | Meaning |
 |-------|---------|---------|
 | `x`, `y`, `z` | per-particle (`(N,)` float) | Particle position components in the simulation Cartesian frame |
 | `vx`, `vy`, `vz` | per-particle | Particle velocity components |
-| `charge` | per-particle (`(N,)` float64) | Macroparticle charge `q_s × w`. Populated by combined-storage codes (iPIC3D, OSIRIS); `None` for separate-storage codes |
-| `weight` | per-particle (`(N,)` float64) | Number of physical particles per macroparticle. Populated directly by separate-storage codes; derived from `\|charge\|/\|species_charge\|` for combined-storage codes |
+| `weight` | per-particle (`(N,)` float64) | Number of physical particles per macroparticle $w$ |
 | `id` | per-particle (`(N,)` int64) | Integer tracking ID (when the code emits one) |
-| `species_charge` | scalar (metadata) | Per-species charge in code units (e.g. ±1 for electrons/ions in iPIC3D normalization) |
-| `species_mass` | scalar (metadata) | Per-species mass in code units |
+| `species_charge` | scalar (metadata) | Per-species charge $q_s$ in code units (e.g. ±1 for electrons/ions in iPIC3D normalization) |
+| `species_mass` | scalar (metadata) | Per-species mass $m_s$ in code units |
 
 The scalar `species_charge` and `species_mass` round-trip through the
 Arrow/Parquet schema metadata (no per-particle storage cost).
 
-#### Charge–weight conventions across PIC codes
+#### Native layouts (reader concern)
 
 PIC codes split into two camps for how they store macroparticle charge
-`q_macro = q_s × w`:
+$q_s w$ on disk, but this split is entirely handled by the readers —
+`ParticleData` and every downstream consumer see the same canonical
+form.
 
-- **Combined** (iPIC3D, OSIRIS): per-particle field is `q_macro`.  Weight
-  is implicit — pypic readers derive it as `\|charge\|/\|species_charge\|`.
-  Both `charge` and `weight` are populated.
+- **Combined** (iPIC3D, OSIRIS): per-particle field on disk is
+  $q_s w$.  Readers split it into `weight` (derived as
+  $|q_s w|/|q_s|$) plus scalar `species_charge`/`species_mass` from
+  the run config.
 - **Separate** (VPIC, WarpX, Smilei, EPOCH, PIConGPU, TRISTAN-MP):
-  per-particle field is `weight`; species charge is a scalar from the
-  run config.  `weight`, `species_charge`, and `species_mass` are
-  populated; per-particle `charge` is left `None` to avoid wasting
-  ~8 GB at billion-particle scale.
+  per-particle field on disk is `weight`; species charge/mass come
+  from the run config.  Readers pass these through unchanged.
 
 #### Computing per-particle quantities
 
-For code-agnostic analysis, use the derived properties:
-
-- `pcl.macro_charge` — returns per-particle `charge` if loaded, else
-  computes `species_charge × weight`.  Used for current density
-  `J = Σ q v` and charge density `ρ_c = Σ q`.
+- `pcl.macro_charge` — returns `species_charge × weight`.  Used for
+  current density $J = \sum q_s w\, v$ and charge density
+  $\rho_c = \sum q_s w$.
 - `pcl.macro_mass` — returns `species_mass × weight`.  Used for
-  kinetic energy `KE = ½ m v²`, mass density `ρ_m = Σ m`, and
-  physical particle counts `N_phys = Σ w`.
+  kinetic energy $KE = \tfrac{1}{2} m_s w\, v^2$, mass density
+  $\rho_m = \sum m_s w$, and physical particle counts
+  $N_{\mathrm{phys}} = \sum w$.
 
 In non-uniform-weight runs (particle splitting/merging, non-uniform
-initial densities), each macroparticle's `weight` is unique and can
-serve as a particle tracking ID — pass `id_column="weight"` to
-`particles_from_dataset` to filter by it.
+initial densities), each macroparticle's `weight` is unique at full
+float64 precision and can serve as a particle tracking ID — pass
+`id_column="weight"` to `particles_from_dataset` to filter by it.
+
+#### Single charge state per species
+
+One `[[species]]` entry carries a single scalar `species_charge`; all
+macroparticles of that species share it.  Mixed ionization states
+(e.g. both H⁺ and H²⁺ alongside neutral H) must be modeled as
+separate species in the simulation config.  Every mainstream PIC code
+follows this convention.
+
+#### Round-trip fidelity
+
+A pypic `read → write → read` cycle reconstructs $q_s w$ bit-exactly
+via float64 arithmetic ($q_s$ scalar × `weight` array), but does not
+preserve the original on-disk bytes of combined-storage native files
+(since the per-particle $q_s w$ column is not stored — only `weight`
+is).  pypic is an analysis toolkit, not a simulation engine: restart
+regeneration from pypic-written files is out of scope.
 
 ---
 

@@ -128,17 +128,17 @@ def particles_to_parquet(
     velocity_dtype: str | None = None,
     compression_level: int = 1,
     row_group_size: int = _DEFAULT_ROW_GROUP_SIZE,
-    sort_by: Literal["position", "charge", "weight"] = "position",
+    sort_by: Literal["position", "weight"] = "position",
 ) -> None:
     r"""Write a single ``ParticleData`` to a Parquet file.
 
     Particles are sorted before writing so that Parquet row-group
     min/max statistics enable predicate pushdown on read.  The default
     ``sort_by="position"`` uses a Morton Z-order curve, optimal for
-    spatial box queries.  Use ``sort_by="charge"`` to optimize for
-    particle tracking when charge serves as the per-particle ID
-    (iPIC3D non-uniform plasma); spatial queries become slower in
-    return.
+    spatial box queries.  Use ``sort_by="weight"`` when weight serves
+    as the per-particle tracking ID (iPIC3D non-uniform plasma, where
+    each macroparticle's float64 weight is unique); spatial queries
+    become slower in return.
 
     Parameters
     ----------
@@ -154,11 +154,10 @@ def particles_to_parquet(
         zstd compression level (1 for processing, 3 for archival).
     row_group_size : int
         Target rows per row group (500K--1M recommended).
-    sort_by : {"position", "charge", "weight"}
-        Pre-write sort order.  ``"position"`` (default) Morton-sorts
-        on x/y/z for spatial pushdown.  ``"charge"`` or ``"weight"``
-        ascending-sorts on that column, enabling row-group statistics
-        pushdown for particle tracking by charge or weight.
+    sort_by : {"position", "weight"}
+        Pre-write sort order.  ``"position"`` (default) Morton-sorts on
+        x/y/z for spatial pushdown.  ``"weight"`` ascending-sorts on the
+        weight column for particle-tracking pushdown.
 
     Examples
     --------
@@ -167,7 +166,8 @@ def particles_to_parquet(
     >>> pcl = ParticleData(
     ...     species_index=0, species_name="e",
     ...     position=np.zeros((5, 3)), velocity=np.ones((5, 3)),
-    ...     charge=np.full(5, -1.0), n_particles=5, metadata={},
+    ...     n_particles=5, metadata={},
+    ...     weight=np.ones(5), species_charge=-1.0, species_mass=1.0,
     ... )
     >>> # particles_to_parquet(pcl, "/tmp/pcl.parquet")
     """
@@ -180,10 +180,10 @@ def particles_to_parquet(
     table = _add_speed_column(table)
     if sort_by == "position":
         table = _morton_sort_table(table)
-    elif sort_by in ("charge", "weight"):
-        table = _column_sort_table(table, sort_by)
+    elif sort_by == "weight":
+        table = _column_sort_table(table, "weight")
     else:
-        msg = f"sort_by must be 'position', 'charge', or 'weight', got {sort_by!r}"
+        msg = f"sort_by must be 'position' or 'weight', got {sort_by!r}"
         raise ValueError(msg)
 
     pq.write_table(
@@ -293,7 +293,7 @@ def particles_to_dataset(
     velocity_dtype: str | None = None,
     compression_level: int = 1,
     row_group_size: int = _DEFAULT_ROW_GROUP_SIZE,
-    sort_by: Literal["position", "charge", "weight"] = "position",
+    sort_by: Literal["position", "weight"] = "position",
 ) -> None:
     r"""Write a partitioned Parquet dataset from a Simulation or iterable.
 
@@ -325,7 +325,7 @@ def particles_to_dataset(
         zstd level (1 for processing, 3 for archival).
     row_group_size : int
         Target rows per row group.
-    sort_by : {"position", "charge", "weight"}
+    sort_by : {"position", "weight"}
         Pre-write sort order; forwarded to ``particles_to_parquet``.
 
     Examples
@@ -392,19 +392,20 @@ def particles_from_dataset(
         spatial filtering via predicate pushdown.
     ids : array or Sequence or None
         Values to filter on against ``id_column``.  Default
-        ``id_column="id"`` matches the integer tracking column;
-        pass ``id_column="charge"`` with float64 values to track
-        iPIC3D particles by their (per-particle) charge/weight.
+        ``id_column="id"`` matches the integer tracking column; pass
+        ``id_column="weight"`` with float64 values to track iPIC3D
+        non-uniform-plasma particles by their unique per-particle
+        weight.
     id_column : str
         Column name to filter ``ids`` against.  Default ``"id"``.
         For best pushdown effectiveness when ``id_column != "id"``,
         write the dataset with matching ``sort_by`` (e.g.
-        ``sort_by="charge"`` for ``id_column="charge"``).
+        ``sort_by="weight"`` for ``id_column="weight"``).
     energy_min : float or None
         Minimum speed ``|v|`` threshold for energy filtering.
     columns : Sequence[str] or None
-        Column names to load (e.g. ``["x", "y", "z"]``).  ``charge``
-        and ``id_column`` are always included.
+        Column names to load (e.g. ``["x", "y", "z"]``).  ``id_column``
+        is force-included when ``ids`` filtering is active.
 
     Returns
     -------

@@ -96,8 +96,9 @@ def particles_to_arrow(
     r"""Convert a ``ParticleData`` to a PyArrow Table.
 
     Column layout: ``x``, ``y``, ``z``, ``vx``, ``vy``, ``vz``,
-    ``charge``, ``id``.  Columns for unloaded fields (e.g. velocity
-    when ``data.velocity is None``) are omitted.
+    ``weight``, ``id``.  Columns for unloaded fields (e.g. velocity
+    when ``data.velocity is None``) are omitted.  Scalar
+    ``species_charge``/``species_mass`` travel in schema metadata.
 
     Species metadata is stored in ``table.schema.metadata[b"pypic"]``
     as a JSON dict.
@@ -124,7 +125,8 @@ def particles_to_arrow(
     >>> pcl = ParticleData(
     ...     species_index=0, species_name="electrons",
     ...     position=np.zeros((5, 3)), velocity=np.ones((5, 3)),
-    ...     charge=np.full(5, -1.0), n_particles=5, metadata={},
+    ...     n_particles=5, metadata={},
+    ...     weight=np.ones(5), species_charge=-1.0, species_mass=1.0,
     ... )
     >>> # table = particles_to_arrow(pcl)
     """
@@ -146,9 +148,6 @@ def particles_to_arrow(
             if velocity_dtype is not None and col.dtype != np.dtype(velocity_dtype):
                 col = col.astype(velocity_dtype)
             arrays[col_name] = pa.array(col)
-
-    if data.charge is not None:
-        arrays["charge"] = pa.array(data.charge)
 
     if data.id is not None:
         arrays["id"] = pa.array(data.id)
@@ -199,21 +198,18 @@ def particles_from_arrow(table: pa.Table) -> ParticleData:
         ]
         velocity = np.column_stack(vel_arrays)
 
-    charge: np.ndarray | None = None
-    if "charge" in table.column_names:
-        charge = table.column("charge").to_numpy(zero_copy_only=False)
-        if charge.dtype != np.float64:
-            charge = charge.astype(np.float64)
-
     particle_id: np.ndarray | None = None
     if "id" in table.column_names:
         particle_id = table.column("id").to_numpy(zero_copy_only=False)
 
     weight: np.ndarray | None = None
     if "weight" in table.column_names:
-        weight = table.column("weight").to_numpy(zero_copy_only=False)
-        if weight.dtype != np.float64:
-            weight = weight.astype(np.float64)
+        weight_raw = table.column("weight").to_numpy(zero_copy_only=False)
+        weight = (
+            weight_raw
+            if weight_raw.dtype == np.float64
+            else weight_raw.astype(np.float64)
+        )
 
     n_particles = len(table)
 
@@ -225,7 +221,6 @@ def particles_from_arrow(table: pa.Table) -> ParticleData:
         species_name=meta["species_name"],
         position=position,
         velocity=velocity,
-        charge=charge,
         n_particles=n_particles,
         metadata=meta.get("metadata", {}),
         id=particle_id,

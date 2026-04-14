@@ -59,12 +59,12 @@ def read_phdf5_particles(
     species : int
         Zero-based species index.
     config : IPic3DConfig
-        Parsed iPIC3D configuration.  Provides per-species charge/mass
-        via ``qom``; weight is derived as ``|charge|`` (iPIC3D sets
-        ``|q_species| = 1``).  Species names follow ``species_{index}``.
+        Parsed iPIC3D configuration.  Provides per-species charge/mass via
+        ``qom``.  Emits canonical form: ``weight`` (derived from native
+        per-particle ``q`` as ``|q|`` since iPIC3D sets ``|q_species| = 1``)
+        plus scalar ``species_charge`` and ``species_mass``.
     columns : Iterable[str] | None
-        Subset of ``{"position", "velocity"}`` to load.
-        ``None`` loads all.  ``charge`` is always loaded.
+        Subset of ``{"position", "velocity"}`` to load.  ``None`` loads all.
 
     Returns
     -------
@@ -96,10 +96,13 @@ def read_phdf5_particles(
         if "velocity" in want:
             velocity = np.array(group["velocity"])
 
-        # charge: always loaded — scalar (1,1) in phdf5, broadcast to (N,)
+        # iPIC3D stores macroparticle charge q_macro = q_s * w as a
+        # scalar (uniform weighting); weight = |q_macro| since |q_s| = 1.
+        # NOTE: scalar broadcast collapses non-uniform-weight runs to
+        # uniform — revisit when non-uniform plasma support lands.
         q_raw = np.array(group["q"])
         q_scalar = float(q_raw.flat[0])
-        charge = np.full(n_particles, q_scalar, dtype=np.float64)
+        weight = np.full(n_particles, abs(q_scalar), dtype=np.float64)
 
         # ID: optional integer tracking ID
         particle_id = None
@@ -109,18 +112,16 @@ def read_phdf5_particles(
     species_name = f"species_{species}"
 
     # iPIC3D normalization: |q_species| = 1, sign(q_species) = sign(qom[s]),
-    # m_species = 1 / |qom[s]|. Since |q_species| = 1, weight = |charge|.
+    # m_species = 1 / |qom[s]|.
     qom_s = config.qom[species]
     species_charge = float(np.sign(qom_s))
     species_mass = 1.0 / abs(qom_s)
-    weight = np.abs(charge)
 
     return ParticleData(
         species_index=species,
         species_name=species_name,
         position=position,
         velocity=velocity,
-        charge=charge,
         n_particles=n_particles,
         metadata={"path": str(h5_path), "format": "phdf5"},
         id=particle_id,

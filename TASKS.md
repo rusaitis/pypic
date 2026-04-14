@@ -87,6 +87,34 @@ Each step produces something testable. No step starts until the previous step's 
   `particles_from_parquet(path) -> ParticleData` for single-file full load. Optional dep: `pyarrow>=17.0` under `arrow` extra.
   **Evaluated and rejected:** Lance (1.1× compression vs Parquet's 3×+, AI/ML-focused ecosystem, no browser reader), GeoParquet (WKB encoding overhead, 2D-biased tooling, ~3× larger files than plain Parquet with spatial sorting), TileDB (immature xarray integration, lower cloud I/O throughput than Zarr+Rust backends, minimal physics/earth-science adoption).
 
+- [ ] **Step 25b: canonicalize `ParticleData` — drop per-particle `charge`, standardize on `weight` + scalars**
+  Tighten the Step 25 schema before it hardens: **readers always translate native PIC layouts into one canonical form** — per-particle `weight` (array) plus scalar `species_charge` and `species_mass`. The optional per-particle `charge` field disappears entirely; storage-convention branching moves from `ParticleData` and every downstream caller into the single place where it belongs (the reader).
+  **Container changes (`containers.py`):**
+  - Remove `charge: FloatArray | None` from `ParticleData`.
+  - `weight`, `species_charge`, `species_mass` become required-ish (validation ensures they're present together for any per-particle mass/charge computation).
+  - `macro_charge` collapses to a one-liner: `species_charge × weight`. No two-branch fallback.
+  - `macro_mass` unchanged: `species_mass × weight`.
+  - Drop the `__post_init__` validation block for `charge`.
+  **Reader responsibility:** each `SimulationReader` produces the canonical form regardless of native layout.
+  - **Combined-storage codes** (iPIC3D, OSIRIS): read per-particle `q = q_s × w` from disk, split into `weight = |q| / |species_charge|` and populate `species_charge`/`species_mass` from the run config. iPIC3D already does this split today — just stop storing the redundant `charge` array.
+  - **Separate-storage codes** (VPIC, WarpX, Smilei, EPOCH, PIConGPU, TRISTAN-MP): read `weight` directly, populate scalars from config. No change.
+  **I/O layer (`pypic.io._arrow`, `pypic.io._parquet`):**
+  - Arrow/Parquet schema loses the optional `charge` column. Always has `weight` (`(N,)` float64) + scalar metadata.
+  - `particles_to_arrow` / `particles_from_arrow`: drop the `charge` branch.
+  - `particles_from_dataset`: `id_column="charge"` no longer valid; particle tracking uses `id_column="weight"` (already supported — the per-particle `weight` value carries the same unique-identifier property that iPIC3D's `charge` did, since `|q_species| = 1` makes them identical up to sign).
+  - `particles_to_parquet`: `sort_by="charge"` drops; `sort_by="weight"` remains and absorbs the particle-tracking use case.
+  **Schema (`docs/schema.md` § Per-particle data columns):**
+  - Remove `charge` from the canonical field table.
+  - Rewrite the "Charge–weight conventions across PIC codes" section: mention the combined/separate split as a *reader concern only*, note that the canonical container doesn't carry it.
+  - Document the single-charge-state-per-species assumption explicitly (mixed ionization states must be modeled as separate species).
+  - Note the round-trip fidelity caveat: `read → write → read` reconstructs `q = species_charge × weight` bit-exactly but doesn't preserve the original disk bytes of combined-storage codes. pypic is analysis, not simulation — not a concern for restart regeneration.
+  **Tests:**
+  - Remove tests that assert per-particle `charge` round-trip presence.
+  - Keep tests that assert `macro_charge` derives correctly and equals the pre-refactor value on iPIC3D fixtures.
+  - Add a reader-boundary test: iPIC3D reader input (per-particle `q` on disk) produces canonical form (no `charge`, populated `weight` + scalars).
+  **Migration:** breaking change to the Step 25 Parquet schema. Version window is open (Step 25 just shipped). Bump `__version__` minor; no deprecation shim — pypic hasn't hit 1.0.
+  **Depends on:** Step 25 (Parquet/Arrow foundation), commit `c272e33` (introduced `weight`/species scalars).
+
 - [ ] **Step 26: `pypic convert` CLI subcommand**
   `pypic convert <path> --step N --output DIR [--format zarr|parquet] [--fields F1,F2] [--target-resolution DX] [--dtype float32] [--compression zstd|blosc]`. Batch mode: `--all-steps`. Zarr output uses `to_zarr_timeseries` for multi-step; Parquet uses `particles_to_dataset` for partitioned layout. `--virtual` flag creates VirtualiZarr references instead of copying data (Step 24b).
 
@@ -186,8 +214,9 @@ Step 15 (transforms) ←── Step 40 (time-dependent transforms)
 Step 5 (FieldDataset) ←── Steps 24, 25 (Zarr/Arrow) ←── Step 26 (convert CLI)
                       ←── Step 24b (VirtualiZarr) ←── Step 24
                       ←── Step 24c (Icechunk) ←── Step 24
+                      ←── Step 25b (canonical ParticleData) ←── Step 25
                       ←── Steps 23, 35, 36 (additional readers)
                       ←── Step 27 (interop adapters)
 ```
 
-Recommended order: 24/25 parallelizable anytime, 24b/24c after 24, 26 after 24+25, 40 anytime, 23/35/36 anytime, 27–28 after API stabilizes.
+Recommended order: 24/25 parallelizable anytime, 24b/24c after 24, 25b right after 25 (before the Parquet schema hardens), 26 after 24+25+25b, 40 anytime, 23/35/36 anytime, 27–28 after API stabilizes.

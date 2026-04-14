@@ -31,6 +31,7 @@ def _make_particles(
     seed: int = 42,
     species_index: int = 0,
     species_name: str = "electrons",
+    weight: np.ndarray | None = None,
 ) -> ParticleData:
     """Create synthetic particle data for testing."""
     rng = np.random.default_rng(seed)
@@ -39,10 +40,12 @@ def _make_particles(
         species_name=species_name,
         position=rng.uniform(0, 10, (n, 3)),
         velocity=rng.standard_normal((n, 3)),
-        charge=np.full(n, -1.0),
         n_particles=n,
         id=np.arange(n, dtype=np.int64),
         metadata={"source": "test"},
+        weight=weight if weight is not None else np.ones(n),
+        species_charge=-1.0 if species_name == "electrons" else 1.0,
+        species_mass=1.0,
     )
 
 
@@ -141,8 +144,10 @@ class TestArrowInterchange:
         assert rebuilt.n_particles == pcl.n_particles
         np.testing.assert_array_equal(rebuilt.position, pcl.position)
         np.testing.assert_array_equal(rebuilt.velocity, pcl.velocity)
-        np.testing.assert_array_equal(rebuilt.charge, pcl.charge)
+        np.testing.assert_array_equal(rebuilt.weight, pcl.weight)
         np.testing.assert_array_equal(rebuilt.id, pcl.id)
+        assert rebuilt.species_charge == pcl.species_charge
+        assert rebuilt.species_mass == pcl.species_mass
 
     def test_round_trip_position_only(self):
         rng = np.random.default_rng(1)
@@ -151,9 +156,11 @@ class TestArrowInterchange:
             species_name="e",
             position=rng.uniform(0, 1, (50, 3)),
             velocity=None,
-            charge=np.full(50, -1.0),
             n_particles=50,
             metadata={},
+            weight=np.ones(50),
+            species_charge=-1.0,
+            species_mass=1.0,
         )
         table = particles_to_arrow(pcl)
         assert "vx" not in table.column_names
@@ -168,9 +175,11 @@ class TestArrowInterchange:
             species_name="ions",
             position=None,
             velocity=rng.standard_normal((30, 3)),
-            charge=np.full(30, 1.0),
             n_particles=30,
             metadata={},
+            weight=np.ones(30),
+            species_charge=1.0,
+            species_mass=1.0,
         )
         table = particles_to_arrow(pcl)
         assert "x" not in table.column_names
@@ -197,12 +206,11 @@ class TestArrowInterchange:
         table = particles_to_arrow(pcl, velocity_dtype="float32")
         assert table.column("vx").type == pa.float32()
 
-    def test_charge_stays_float64(self):
-        pcl = _make_particles(20)
-        table = particles_to_arrow(
-            pcl, position_dtype="float32", velocity_dtype="float32"
-        )
-        assert table.column("charge").type == pa.float64()
+    def test_no_charge_column(self):
+        # Step 25b: canonical form never carries a per-particle charge column.
+        pcl = _make_particles(10)
+        table = particles_to_arrow(pcl)
+        assert "charge" not in table.column_names
 
     def test_column_names_full(self):
         pcl = _make_particles(10)
@@ -214,50 +222,20 @@ class TestArrowInterchange:
             "vx",
             "vy",
             "vz",
-            "charge",
+            "weight",
             "id",
         }
 
-    def test_round_trip_no_charge_vpic_style(self):
-        # VPIC/WarpX style: weight + species_charge, no per-particle charge
-        rng = np.random.default_rng(23)
-        n = 40
-        pcl = ParticleData(
+    def test_species_metadata_round_trip(self):
+        # species_charge/species_mass travel in schema metadata
+        pcl_with_meta = ParticleData(
             species_index=0,
             species_name="electrons",
-            position=rng.uniform(0, 1, (n, 3)),
-            velocity=rng.standard_normal((n, 3)),
-            charge=None,
-            n_particles=n,
+            position=np.zeros((20, 3)),
+            velocity=np.ones((20, 3)),
+            n_particles=20,
             metadata={},
-            weight=rng.uniform(0.5, 2.0, n),
-            species_charge=-1.0,
-            species_mass=1.0,
-        )
-        table = particles_to_arrow(pcl)
-        assert "charge" not in table.column_names
-        assert "weight" in table.column_names
-        rebuilt = particles_from_arrow(table)
-        assert rebuilt.charge is None
-        assert rebuilt.species_charge == -1.0
-        assert rebuilt.species_mass == 1.0
-        assert rebuilt.weight is not None
-        np.testing.assert_array_equal(rebuilt.weight, pcl.weight)
-        # macro_charge should compute from species_charge × weight
-        np.testing.assert_array_equal(rebuilt.macro_charge, -1.0 * pcl.weight)
-
-    def test_species_metadata_round_trip(self):
-        pcl = _make_particles(20)
-        # Inject custom species fields
-        pcl_with_meta = ParticleData(
-            species_index=pcl.species_index,
-            species_name=pcl.species_name,
-            position=pcl.position,
-            velocity=pcl.velocity,
-            charge=pcl.charge,
-            n_particles=pcl.n_particles,
-            metadata={},
-            id=pcl.id,
+            weight=np.ones(20),
             species_charge=2.5,
             species_mass=4.0,
         )
@@ -266,7 +244,7 @@ class TestArrowInterchange:
         assert rebuilt.species_charge == 2.5
         assert rebuilt.species_mass == 4.0
 
-    def test_round_trip_with_weight(self):
+    def test_non_uniform_weight_round_trip(self):
         rng = np.random.default_rng(13)
         n = 30
         pcl = ParticleData(
@@ -274,20 +252,31 @@ class TestArrowInterchange:
             species_name="electrons",
             position=rng.uniform(0, 1, (n, 3)),
             velocity=rng.standard_normal((n, 3)),
-            charge=np.full(n, -1.0),
             n_particles=n,
             metadata={},
             weight=rng.uniform(0.5, 2.0, n),
+            species_charge=-1.0,
+            species_mass=1.0,
         )
         table = particles_to_arrow(pcl)
         assert "weight" in table.column_names
         rebuilt = particles_from_arrow(table)
         assert rebuilt.weight is not None
         np.testing.assert_array_equal(rebuilt.weight, pcl.weight)
+        # macro_charge reconstructs as species_charge × weight
+        np.testing.assert_array_equal(rebuilt.macro_charge, -1.0 * pcl.weight)
 
     def test_round_trip_without_weight(self):
-        pcl = _make_particles(20)
-        assert pcl.weight is None
+        # Particles without weight: no moment math available, but the
+        # container still round-trips (positions-only workflows).
+        pcl = ParticleData(
+            species_index=0,
+            species_name="e",
+            position=np.zeros((10, 3)),
+            velocity=None,
+            n_particles=10,
+            metadata={},
+        )
         table = particles_to_arrow(pcl)
         assert "weight" not in table.column_names
         rebuilt = particles_from_arrow(table)
@@ -300,9 +289,11 @@ class TestArrowInterchange:
             species_name="e",
             position=rng.uniform(0, 1, (25, 3)),
             velocity=rng.standard_normal((25, 3)),
-            charge=np.full(25, -1.0),
             n_particles=25,
             metadata={},
+            weight=np.ones(25),
+            species_charge=-1.0,
+            species_mass=1.0,
             id=None,
         )
         table = particles_to_arrow(pcl)
@@ -353,7 +344,7 @@ class TestSingleFileParquet:
         # Read raw to check dtypes
         table = pq.read_table(str(fpath))
         assert table.column("x").type == pa.float32()
-        assert table.column("charge").type == pa.float64()
+        assert table.column("weight").type == pa.float64()
 
     def test_speed_column_written(self, tmp_path: Path):
         import pyarrow.parquet as pq
@@ -372,32 +363,13 @@ class TestSingleFileParquet:
         # ParticleData should not have a speed attribute leak
         assert rebuilt.n_particles == 50
 
-    def test_sort_by_charge(self, tmp_path: Path):
-        # Use distinct per-particle charges so sorting is observable
-        rng = np.random.default_rng(7)
-        n = 200
-        pcl = ParticleData(
-            species_index=0,
-            species_name="electrons",
-            position=rng.uniform(0, 10, (n, 3)),
-            velocity=rng.standard_normal((n, 3)),
-            charge=rng.uniform(-2.0, -0.5, n),
-            n_particles=n,
-            id=np.arange(n, dtype=np.int64),
-            metadata={},
-        )
-        fpath = tmp_path / "charge_sorted.parquet"
-        particles_to_parquet(pcl, fpath, sort_by="charge")
-        rebuilt = particles_from_parquet(fpath)
-        assert np.all(np.diff(rebuilt.charge) >= 0)
-
     def test_sort_by_invalid_raises(self, tmp_path: Path):
         pcl = _make_particles(10)
         with pytest.raises(ValueError, match="sort_by"):
             particles_to_parquet(pcl, tmp_path / "bad.parquet", sort_by="velocity")  # type: ignore[arg-type]
 
-    def test_round_trip_no_charge_parquet(self, tmp_path: Path):
-        # VPIC-style: weight + species fields, no per-particle charge
+    def test_canonical_round_trip(self, tmp_path: Path):
+        # Canonical form: weight + species scalars round-trip
         rng = np.random.default_rng(31)
         n = 60
         pcl = ParticleData(
@@ -405,20 +377,19 @@ class TestSingleFileParquet:
             species_name="electrons",
             position=rng.uniform(0, 5, (n, 3)),
             velocity=rng.standard_normal((n, 3)),
-            charge=None,
             n_particles=n,
             metadata={},
             weight=rng.uniform(0.5, 2.0, n),
             species_charge=-1.0,
             species_mass=1.0,
         )
-        fpath = tmp_path / "vpic_style.parquet"
+        fpath = tmp_path / "canonical.parquet"
         particles_to_parquet(pcl, fpath)
         rebuilt = particles_from_parquet(fpath)
-        assert rebuilt.charge is None
         assert rebuilt.weight is not None
         assert rebuilt.species_charge == -1.0
         assert rebuilt.species_mass == 1.0
+        assert not hasattr(rebuilt, "charge")
 
     def test_sort_by_weight(self, tmp_path: Path):
         rng = np.random.default_rng(17)
@@ -428,10 +399,11 @@ class TestSingleFileParquet:
             species_name="electrons",
             position=rng.uniform(0, 10, (n, 3)),
             velocity=rng.standard_normal((n, 3)),
-            charge=np.full(n, -1.0),
             n_particles=n,
             id=np.arange(n, dtype=np.int64),
             weight=rng.uniform(0.5, 2.0, n),
+            species_charge=-1.0,
+            species_mass=1.0,
             metadata={},
         )
         fpath = tmp_path / "weight_sorted.parquet"
@@ -524,29 +496,33 @@ class TestPartitionedDataset:
         # 2 steps × 2 species × 100 particles = 400
         assert pcl.n_particles == 400
 
-    def test_id_column_charge_filter(self, tmp_path: Path):
-        # Build a custom dataset with distinct float64 charges per particle
+    def test_id_column_weight_filter(self, tmp_path: Path):
+        # Non-uniform weight doubles as a particle tracking ID —
+        # float64 precision makes each weight unique per macroparticle.
         rng = np.random.default_rng(11)
         n = 100
-        charges = rng.uniform(-2.0, -0.5, n)
+        weights = rng.uniform(0.5, 2.0, n)
         pcl = ParticleData(
             species_index=0,
             species_name="electrons",
             position=rng.uniform(0, 10, (n, 3)),
             velocity=rng.standard_normal((n, 3)),
-            charge=charges,
             n_particles=n,
             id=np.arange(n, dtype=np.int64),
             metadata={},
+            weight=weights,
+            species_charge=-1.0,
+            species_mass=1.0,
         )
-        root = tmp_path / "by_charge"
-        particles_to_dataset([(0, "electrons", pcl)], root, sort_by="charge")
-        target = [float(charges[3]), float(charges[42]), float(charges[77])]
+        root = tmp_path / "by_weight"
+        particles_to_dataset([(0, "electrons", pcl)], root, sort_by="weight")
+        target = [float(weights[3]), float(weights[42]), float(weights[77])]
         result = particles_from_dataset(
-            root, step=0, species="electrons", ids=target, id_column="charge"
+            root, step=0, species="electrons", ids=target, id_column="weight"
         )
         assert result.n_particles == 3
-        assert sorted(result.charge.tolist()) == sorted(target)
+        assert result.weight is not None
+        assert sorted(result.weight.tolist()) == sorted(target)
 
     def test_iterable_source(self, tmp_path: Path):
         pcl_e = _make_particles(40, seed=1, species_name="electrons")
@@ -563,9 +539,9 @@ class TestPartitionedDataset:
         rebuilt_e = particles_from_dataset(root, step=0, species="electrons")
         assert rebuilt_e.n_particles == 40
 
-    def test_partitioned_dataset_no_charge(self, tmp_path: Path):
-        # VPIC-style: write data with charge=None via iterable form,
-        # verify species_charge/mass round-trip through Parquet metadata
+    def test_partitioned_dataset_round_trip(self, tmp_path: Path):
+        # Canonical form round-trips through the partitioned dataset:
+        # weight + species_charge/species_mass all recovered.
         rng = np.random.default_rng(43)
         n = 50
         pcl = ParticleData(
@@ -573,25 +549,22 @@ class TestPartitionedDataset:
             species_name="electrons",
             position=rng.uniform(0, 5, (n, 3)),
             velocity=rng.standard_normal((n, 3)),
-            charge=None,
             n_particles=n,
             metadata={},
             weight=rng.uniform(0.5, 2.0, n),
             species_charge=-1.0,
             species_mass=1.0,
         )
-        root = tmp_path / "vpic_dataset"
+        root = tmp_path / "canonical_dataset"
         particles_to_dataset([(0, "electrons", pcl)], root)
         rebuilt = particles_from_dataset(root, step=0, species="electrons")
-        assert rebuilt.charge is None
         assert rebuilt.weight is not None
         assert rebuilt.species_charge == -1.0
         assert rebuilt.species_mass == 1.0
-        # macro_charge derives correctly
         np.testing.assert_array_equal(rebuilt.macro_charge, -1.0 * rebuilt.weight)
 
-    def test_columns_pruning_no_implicit_charge(self, tmp_path: Path):
-        # When user requests only x/y/z, charge should NOT be force-included
+    def test_columns_pruning(self, tmp_path: Path):
+        # When user requests only x/y/z, weight should not be loaded.
         rng = np.random.default_rng(47)
         n = 40
         pcl = ParticleData(
@@ -599,20 +572,18 @@ class TestPartitionedDataset:
             species_name="electrons",
             position=rng.uniform(0, 5, (n, 3)),
             velocity=rng.standard_normal((n, 3)),
-            charge=None,
             n_particles=n,
             metadata={},
             weight=rng.uniform(0.5, 2.0, n),
             species_charge=-1.0,
         )
-        root = tmp_path / "no_charge_columns"
+        root = tmp_path / "pruned_columns"
         particles_to_dataset([(0, "electrons", pcl)], root)
         rebuilt = particles_from_dataset(
             root, step=0, species="electrons", columns=["x", "y", "z"]
         )
         assert rebuilt.position is not None
         assert rebuilt.velocity is None
-        assert rebuilt.charge is None
         assert rebuilt.weight is None  # not requested
 
     def test_iterable_with_steps_kwarg_raises(self, tmp_path: Path):

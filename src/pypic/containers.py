@@ -247,18 +247,15 @@ class TabularData:
 class ParticleData:
     r"""Container for particle data from a single species at one timestep.
 
-    All field arrays are optional — codes split into two camps for how
-    they store macroparticle charge:
-
-    - **Combined** (iPIC3D, OSIRIS): per-particle ``charge`` field on
-      disk equals ``species_charge × weight``. ``charge`` is populated.
-    - **Separate** (VPIC, WarpX, Smilei, EPOCH, PIConGPU, TRISTAN-MP):
-      per-particle ``weight`` is stored, ``species_charge`` is a scalar
-      from the run config.  Per-particle ``charge`` is left ``None`` to
-      avoid wasting ~8 GB at billion-particle scale.
-
-    Use the :attr:`macro_charge` and :attr:`macro_mass` properties
-    for per-macroparticle quantities regardless of storage convention.
+    Canonical per-macroparticle representation: every macroparticle carries
+    a ``weight`` (number of physical particles it represents); the species
+    as a whole carries scalar ``species_charge`` and ``species_mass``. The
+    per-macroparticle charge and mass that enter moments and the equations
+    of motion are derived on demand via :attr:`macro_charge` and
+    :attr:`macro_mass`. This shape is code-agnostic — readers for combined-
+    storage codes (iPIC3D, OSIRIS) split the native ``q_s × w`` column into
+    ``weight`` + scalars on load; separate-storage codes (VPIC, WarpX,
+    Smilei, PIConGPU, TRISTAN-MP) populate the same fields directly.
 
     Parameters
     ----------
@@ -270,28 +267,20 @@ class ParticleData:
         Particle positions, shape ``(N, 3)``. ``None`` if not loaded.
     velocity : FloatArray | None
         Particle velocities, shape ``(N, 3)``. ``None`` if not loaded.
-    charge : FloatArray | None
-        Per-particle macroparticle charge, shape ``(N,)``, float64.
-        Equals ``species_charge × weight``.  Populated by combined-storage
-        codes; ``None`` for separate-storage codes — use
-        :attr:`macro_charge` to get a per-particle array regardless.
     n_particles : int
         Total particle count.
     id : np.ndarray | None
         Integer particle tracking IDs, shape ``(N,)``. ``None`` if not
         available or not requested.
     weight : FloatArray | None
-        Per-particle weight (number of physical particles per
-        macroparticle), shape ``(N,)``, float64. Required for any
-        mass-based calculation (kinetic energy ``½ mₛ w v²``, mass
-        density ``Σ mₛ w``, physical particle count ``Σ w``).
+        Per-macroparticle weight $w$ (number of physical particles per
+        macroparticle), shape ``(N,)``, float64. Required for
+        :attr:`macro_charge` and :attr:`macro_mass`.
     species_charge : float | None
-        Scalar species charge in code units (e.g. ``-1.0`` for electrons
-        in iPIC3D normalization). Combined with ``weight`` to compute
-        per-particle charge when ``charge`` is None.
+        Scalar species charge $q_s$ in code units (e.g. ``-1.0`` for
+        electrons in iPIC3D normalization).
     species_mass : float | None
-        Scalar species mass in code units. Combined with ``weight`` to
-        compute per-particle physical mass via :attr:`macro_mass`.
+        Scalar species mass $m_s$ in code units.
     metadata : dict[str, Any]
         Source info (file path, format, etc.).
 
@@ -302,8 +291,8 @@ class ParticleData:
     ...     species_index=0, species_name="electrons",
     ...     position=np.zeros((10, 3)),
     ...     velocity=np.ones((10, 3)),
-    ...     charge=np.full(10, -1.0),
     ...     n_particles=10, metadata={},
+    ...     weight=np.ones(10), species_charge=-1.0, species_mass=1.0,
     ... )
     >>> pcl.x.shape
     (10,)
@@ -315,7 +304,6 @@ class ParticleData:
     species_name: str
     position: FloatArray | None
     velocity: FloatArray | None
-    charge: FloatArray | None
     n_particles: int
     metadata: dict[str, Any]  # frozen at runtime via __post_init__
     id: np.ndarray | None = None
@@ -327,19 +315,6 @@ class ParticleData:
         if self.position is None and self.velocity is None:
             msg = "At least one of position or velocity must be provided"
             raise ValueError(msg)
-        if self.charge is not None:
-            if self.charge.dtype != np.float64:
-                msg = (
-                    f"charge must be float64 (particle ID precision), "
-                    f"got {self.charge.dtype}"
-                )
-                raise ValueError(msg)
-            if self.charge.shape != (self.n_particles,):
-                msg = (
-                    f"charge shape {self.charge.shape} does not match "
-                    f"n_particles ({self.n_particles},)"
-                )
-                raise ValueError(msg)
         if self.position is not None and self.position.shape != (self.n_particles, 3):
             msg = (
                 f"position shape {self.position.shape} does not match "
@@ -420,21 +395,11 @@ class ParticleData:
 
     @property
     def macro_charge(self) -> FloatArray:
-        r"""Per-macroparticle charge $q_s w$.
-
-        Returns per-particle ``charge`` if populated (combined-storage
-        codes: iPIC3D, OSIRIS), otherwise computes ``species_charge × weight``
-        (separate-storage codes: VPIC, WarpX, Smilei, PIConGPU, TRISTAN-MP).
-        """
-        if self.charge is not None:
-            return self.charge
-        if self.species_charge is not None and self.weight is not None:
-            return self.species_charge * self.weight
-        msg = (
-            "Cannot compute macro_charge: need either per-particle "
-            "'charge' or both 'species_charge' and 'weight'"
-        )
-        raise ValueError(msg)
+        r"""Per-macroparticle charge $q_s w$."""
+        if self.species_charge is None or self.weight is None:
+            msg = "Cannot compute macro_charge: need both 'species_charge' and 'weight'"
+            raise ValueError(msg)
+        return self.species_charge * self.weight
 
     @property
     def macro_mass(self) -> FloatArray:
@@ -453,8 +418,6 @@ class ParticleData:
             loaded.append("position")
         if self.velocity is not None:
             loaded.append("velocity")
-        if self.charge is not None:
-            loaded.append("charge")
         if self.id is not None:
             loaded.append("id")
         if self.weight is not None:
