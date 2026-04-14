@@ -6,13 +6,16 @@ import importlib.metadata
 import json
 import logging
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated
+from typing import TYPE_CHECKING, Annotated, Literal
 
 import typer
 
 from pypic.dataset import FieldDataset
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+    from typing import Any
+
     from pypic.containers import ParticleData
     from pypic.grid import GridInfo
     from pypic.readers._registry import Simulation
@@ -280,6 +283,9 @@ def _parse_resolution(res_str: str) -> tuple[int, int]:
     return (w, h)
 
 
+_ENCODING_BLANKET_KEY = "__all__"  # sentinel for "apply to every data_var"
+
+
 def _parse_comma_list(raw: str | None) -> list[str] | None:
     """Split a comma-separated string into a list, preserving None."""
     if raw is None:
@@ -287,24 +293,32 @@ def _parse_comma_list(raw: str | None) -> list[str] | None:
     return [s.strip() for s in raw.split(",") if s.strip()]
 
 
-def _parse_box(raw: str | None) -> dict[str, tuple[int, int]] | None:
-    """Parse ``x=0:64,y=0:64,z=32:64`` into ``BoxSelection.ranges``."""
+def _parse_box_ranges(
+    raw: str | None,
+    *,
+    convert: Callable[[str], Any],
+) -> dict[str, tuple[Any, Any]] | None:
+    """Parse ``axis=lo:hi,axis=lo:hi`` using *convert* for bounds.
+
+    Pass ``convert=int`` for cell-index crops (fields) or ``convert=float``
+    for physical-coordinate crops (particles).
+    """
     if raw is None:
         return None
-    ranges: dict[str, tuple[int, int]] = {}
+    ranges: dict[str, tuple[Any, Any]] = {}
     for part in raw.split(","):
         segment = part.strip()
         if not segment:
             continue
         if "=" not in segment or ":" not in segment:
-            msg = f"Invalid --box segment {segment!r}. Use axis=start:stop."
+            msg = f"Invalid --box segment {segment!r}. Use axis=lo:hi."
             raise typer.BadParameter(msg)
         axis, spec = segment.split("=", 1)
         lo_s, hi_s = spec.split(":", 1)
         try:
-            ranges[axis.strip()] = (int(lo_s), int(hi_s))
+            ranges[axis.strip()] = (convert(lo_s), convert(hi_s))
         except ValueError as exc:
-            msg = f"Non-integer bounds in --box segment {segment!r}."
+            msg = f"Invalid bounds in --box segment {segment!r}."
             raise typer.BadParameter(msg) from exc
     return ranges or None
 
@@ -343,9 +357,9 @@ def _parse_compression(
 ) -> dict[str, dict[str, object]] | None:
     """Parse ``zstd[:level]`` / ``blosc[:clevel]`` into a zarr encoding dict.
 
-    The returned dict has a single key ``"__all__"`` which the field-
-    writer iterates over all data_vars.  Caller is responsible for
-    fanning out to per-variable entries.
+    Returns ``{_ENCODING_BLANKET_KEY: {...}}`` — caller passes the result
+    through :func:`_expand_encoding_for_vars` to fan out to every
+    ``data_var`` before handing to ``to_zarr``.
     """
     if spec is None:
         return None
@@ -374,18 +388,18 @@ def _parse_compression(
     else:
         msg = f"--compression codec must be 'zstd' or 'blosc', got {codec_name!r}."
         raise typer.BadParameter(msg)
-    return {"__all__": {"compressors": compressor}}
+    return {_ENCODING_BLANKET_KEY: {"compressors": compressor}}
 
 
 def _expand_encoding_for_vars(
     spec: dict[str, dict[str, object]] | None,
     data_vars: list[str],
 ) -> dict[str, dict[str, object]] | None:
-    """Expand a ``{"__all__": {...}}`` encoding marker to all data_vars."""
+    """Expand a blanket-keyed encoding dict to per-variable entries."""
     if spec is None:
         return None
-    if "__all__" in spec:
-        blanket = spec["__all__"]
+    blanket = spec.get(_ENCODING_BLANKET_KEY)
+    if blanket is not None:
         return {name: dict(blanket) for name in data_vars}
     return spec
 
@@ -425,28 +439,6 @@ def _filter_particles_box(
         id=None if pcl.id is None else pcl.id[mask],
         n_particles=n_kept,
     )
-
-
-def _parse_box_float(raw: str | None) -> dict[str, tuple[float, float]] | None:
-    """Parse ``x=0.0:10.0,y=-5:5`` into float ranges (for particle crops)."""
-    if raw is None:
-        return None
-    ranges: dict[str, tuple[float, float]] = {}
-    for part in raw.split(","):
-        segment = part.strip()
-        if not segment:
-            continue
-        if "=" not in segment or ":" not in segment:
-            msg = f"Invalid --box segment {segment!r}. Use axis=lo:hi."
-            raise typer.BadParameter(msg)
-        axis, spec = segment.split("=", 1)
-        lo_s, hi_s = spec.split(":", 1)
-        try:
-            ranges[axis.strip()] = (float(lo_s), float(hi_s))
-        except ValueError as exc:
-            msg = f"Non-numeric bounds in --box segment {segment!r}."
-            raise typer.BadParameter(msg) from exc
-    return ranges or None
 
 
 def _make_progress_iter(
@@ -585,7 +577,7 @@ def convert_fields(
         ),
     ] = False,
     backend: Annotated[
-        str,
+        Literal["zarr", "icechunk"],
         typer.Option("--backend", help="Storage backend: zarr or icechunk."),
     ] = "zarr",
     message: Annotated[
@@ -619,9 +611,6 @@ def convert_fields(
     from pypic.io import to_zarr, to_zarr_timeseries
     from pypic.selections import BoxSelection
 
-    if backend not in ("zarr", "icechunk"):
-        msg = f"--backend must be 'zarr' or 'icechunk', got {backend!r}."
-        raise typer.BadParameter(msg)
     if tag is not None and backend != "icechunk":
         msg = "--tag requires --backend icechunk."
         raise typer.BadParameter(msg)
@@ -671,7 +660,7 @@ def convert_fields(
     sim = _open(path)
     step_list = parse_steps(step, sim)
     field_list = _parse_comma_list(fields)
-    box_ranges = _parse_box(box)
+    box_ranges = _parse_box_ranges(box, convert=int)
     plane_sel = (
         _resolve_plane(sim.grid, plane, plane_index, plane_coord)
         if (plane or plane_index is not None or plane_coord is not None)
@@ -743,8 +732,17 @@ def convert_fields(
     else:
         dt = sim.grid.dt
 
+        # Read step 0 once — reused for the encoding dict AND as the first
+        # yielded pair, avoiding a duplicate I/O on large datasets.
+        first = sim.read(step_list[0], fields=field_list)
+        if needs_transform:
+            first = _postprocess(first)
+        enc = _expand_encoding_for_vars(compression_spec, list(first.field_names()))
+
         def _base_pairs() -> object:
-            for s in step_list:
+            first_t = step_list[0] * dt if dt is not None else step_list[0]
+            yield first_t, first
+            for s in step_list[1:]:
                 fds = sim.read(s, fields=field_list)
                 if needs_transform:
                     fds = _postprocess(fds)
@@ -757,11 +755,6 @@ def convert_fields(
             description="Writing fields",
             enabled=progress,
         )
-        # Pre-expand encoding against the first read so codec is per-field.
-        sample = sim.read(step_list[0], fields=field_list)
-        if needs_transform:
-            sample = _postprocess(sample)
-        enc = _expand_encoding_for_vars(compression_spec, list(sample.field_names()))
         snapshot = to_zarr_timeseries(
             pairs,  # type: ignore[arg-type]
             output,
@@ -813,7 +806,7 @@ def convert_particles(
         ),
     ] = None,
     sort_by: Annotated[
-        str,
+        Literal["position", "weight"],
         typer.Option("--sort-by", help="Pre-write sort: position or weight."),
     ] = "position",
     position_dtype: Annotated[
@@ -854,10 +847,6 @@ def convert_particles(
     """
     from pypic.io._parquet import particles_to_dataset
 
-    if sort_by not in ("position", "weight"):
-        msg = f"--sort-by must be 'position' or 'weight', got {sort_by!r}."
-        raise typer.BadParameter(msg)
-
     sim = _open(path)
     if not sim.particle_steps:
         typer.echo(f"Error: {path} has no particle output.", err=True)
@@ -881,7 +870,7 @@ def convert_particles(
 
     species_idx = _resolve_species_list(species, sim)
     columns_list = _parse_comma_list(columns)
-    box_ranges = _parse_box_float(box)
+    box_ranges = _parse_box_ranges(box, convert=float)
 
     if dry_run:
         typer.echo(f"Would write {len(step_list)} step(s) to {output}")
@@ -911,70 +900,30 @@ def convert_particles(
         else list(range(len(sim.config.species)))
     )
 
-    needs_iterable = columns_list is not None or box_ranges is not None
-
-    if needs_iterable:
-        def _base_pairs() -> object:
-            for s in step_list:
-                for sp_idx in species_resolved:
-                    pcl = sim.particles(s, sp_idx, columns=columns_list)
-                    if box_ranges is not None:
-                        pcl = _filter_particles_box(pcl, box_ranges)
+    def _pairs() -> object:
+        for s in step_list:
+            for sp_idx in species_resolved:
+                pcl = sim.particles(s, sp_idx, columns=columns_list)
+                if box_ranges is not None:
+                    pcl = _filter_particles_box(pcl, box_ranges)
+                if pcl.n_particles > 0:
                     yield s, sim.config.species[sp_idx].name, pcl
 
-        pairs_iter = _make_progress_iter(
-            _base_pairs(),
-            total=len(step_list) * len(species_resolved),
-            description="Writing particles",
-            enabled=progress,
-        )
-        particles_to_dataset(
-            pairs_iter,  # type: ignore[arg-type]
-            output,
-            position_dtype=position_dtype,
-            velocity_dtype=velocity_dtype,
-            compression_level=compression_level,
-            row_group_size=row_group_size,
-            sort_by=sort_by,  # type: ignore[arg-type]
-        )
-    else:
-        # Still wrap the Simulation path with progress via an adapter iter
-        # so the user sees progress even for plain --all-steps batch.
-        if progress and len(step_list) * len(species_resolved) > 1:
-            def _sim_pairs() -> object:
-                for s in step_list:
-                    for sp_idx in species_resolved:
-                        pcl = sim.particles(s, sp_idx)
-                        if pcl.n_particles > 0:
-                            yield s, sim.config.species[sp_idx].name, pcl
-
-            pairs_iter = _make_progress_iter(
-                _sim_pairs(),
-                total=len(step_list) * len(species_resolved),
-                description="Writing particles",
-                enabled=progress,
-            )
-            particles_to_dataset(
-                pairs_iter,  # type: ignore[arg-type]
-                output,
-                position_dtype=position_dtype,
-                velocity_dtype=velocity_dtype,
-                compression_level=compression_level,
-                row_group_size=row_group_size,
-                sort_by=sort_by,  # type: ignore[arg-type]
-            )
-        else:
-            particles_to_dataset(
-                sim,
-                output,
-                steps=step_list,
-                species=species_idx,
-                position_dtype=position_dtype,
-                velocity_dtype=velocity_dtype,
-                compression_level=compression_level,
-                row_group_size=row_group_size,
-                sort_by=sort_by,  # type: ignore[arg-type]
-            )
+    pairs_iter = _make_progress_iter(
+        _pairs(),
+        total=len(step_list) * len(species_resolved),
+        description="Writing particles",
+        enabled=progress,
+    )
+    particles_to_dataset(
+        pairs_iter,  # type: ignore[arg-type]
+        output,
+        position_dtype=position_dtype,
+        velocity_dtype=velocity_dtype,
+        compression_level=compression_level,
+        row_group_size=row_group_size,
+        sort_by=sort_by,
+    )
     typer.echo(f"Wrote {len(step_list)} step(s) to {output}")
 
 
