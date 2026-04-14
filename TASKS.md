@@ -64,7 +64,7 @@ Each step produces something testable. No step starts until the previous step's 
   **Migrate `open_virtual` to Zarr v3:** Step 24b's `open_virtual` currently uses Kerchunk (Zarr v2 format) as the virtual-reference intermediary because VirtualiZarr's native Zarr v3 virtual backend is Icechunk. Once Icechunk is available, switch `open_virtual` to persist virtual refs via `vds.vz.to_icechunk()` instead of `vds.vz.to_kerchunk()`, eliminating the only Zarr v2 code path in pypic and fixing the fill-value edge case (datasets where all values equal the fill value read back incorrectly through Kerchunk).
   **Depends on:** Step 24 (Zarr foundations).
 
-- [ ] **Step 25: `pypic.io` — Parquet/Arrow for ParticleData**
+- [x] **Step 25: `pypic.io` — Parquet/Arrow for ParticleData**
   Two-tier API for particle I/O, designed for billion-particle datasets with selective reads.
   **Low-level (in-memory interchange):**
   `particles_to_arrow(data) -> pyarrow.Table` (zero-copy NumPy→Arrow), `particles_from_arrow(table) -> ParticleData`. Columnar storage: `x/y/z/vx/vy/vz/charge/id` columns (letter names — particle positions are always in the simulation Cartesian frame). Species metadata in Arrow schema metadata. Used by the Starlette server (Step 37) for Arrow IPC over WebSocket streaming.
@@ -87,7 +87,7 @@ Each step produces something testable. No step starts until the previous step's 
   `particles_from_parquet(path) -> ParticleData` for single-file full load. Optional dep: `pyarrow>=17.0` under `arrow` extra.
   **Evaluated and rejected:** Lance (1.1× compression vs Parquet's 3×+, AI/ML-focused ecosystem, no browser reader), GeoParquet (WKB encoding overhead, 2D-biased tooling, ~3× larger files than plain Parquet with spatial sorting), TileDB (immature xarray integration, lower cloud I/O throughput than Zarr+Rust backends, minimal physics/earth-science adoption).
 
-- [ ] **Step 25b: canonicalize `ParticleData` — drop per-particle `charge`, standardize on `weight` + scalars**
+- [x] **Step 25b: canonicalize `ParticleData` — drop per-particle `charge`, standardize on `weight` + scalars**
   Tighten the Step 25 schema before it hardens: **readers always translate native PIC layouts into one canonical form** — per-particle `weight` (array) plus scalar `species_charge` and `species_mass`. The optional per-particle `charge` field disappears entirely; storage-convention branching moves from `ParticleData` and every downstream caller into the single place where it belongs (the reader).
   **Container changes (`containers.py`):**
   - Remove `charge: FloatArray | None` from `ParticleData`.
