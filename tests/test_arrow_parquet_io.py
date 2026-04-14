@@ -489,12 +489,63 @@ class TestPartitionedDataset:
         assert pcl.n_particles <= len(target_ids)
         assert all(pid in target_ids for pid in pcl.id.tolist())
 
-    def test_read_all_partitions(self, tmp_path: Path):
+    def test_unfiltered_multispecies_read_raises(self, tmp_path: Path):
+        # The container is single-species; merging electrons + ions into
+        # one ParticleData would corrupt macro_charge/macro_mass since
+        # they use the scalar species_charge.  Force the caller to pick.
         root = self._write_dataset(tmp_path)
-        # No filters — reads everything
-        pcl = particles_from_dataset(root)
-        # 2 steps × 2 species × 100 particles = 400
-        assert pcl.n_particles == 400
+        with pytest.raises(ValueError, match=r"matched 2 species"):
+            particles_from_dataset(root)
+
+    def test_string_species_resolves_correct_index(self, tmp_path: Path):
+        # particles_from_dataset(species="ions") must surface the
+        # original species_index (1), not the default 0 — downstream
+        # consumers rely on ParticleData.species_index for routing.
+        root = self._write_dataset(tmp_path)
+        pcl_e = particles_from_dataset(root, step=0, species="electrons")
+        pcl_i = particles_from_dataset(root, step=0, species="ions")
+        assert pcl_e.species_index == 0
+        assert pcl_i.species_index == 1
+
+    def test_integer_species_uses_stored_index(self, tmp_path: Path):
+        # Hive partitioning erases config order, so an integer selector
+        # must consult per-fragment metadata rather than alphabetical
+        # directory order.  Names chosen so alphabetical order
+        # disagrees with the stored species_index ("alpha" < "zeta").
+        pcl_zeta = _make_particles(20, seed=1, species_index=0, species_name="zeta")
+        pcl_alpha = _make_particles(30, seed=2, species_index=1, species_name="alpha")
+        root = tmp_path / "non_alpha"
+        particles_to_dataset(
+            [(0, "zeta", pcl_zeta), (0, "alpha", pcl_alpha)],
+            root,
+        )
+        idx0 = particles_from_dataset(root, step=0, species=0)
+        idx1 = particles_from_dataset(root, step=0, species=1)
+        assert idx0.species_name == "zeta"
+        assert idx0.species_index == 0
+        assert idx1.species_name == "alpha"
+        assert idx1.species_index == 1
+
+    def test_iterable_chunked_writes_preserve_all_batches(self, tmp_path: Path):
+        # Streaming pipelines naturally yield multiple ParticleData
+        # chunks per (step, species).  Each chunk must land in its own
+        # part-NNNNN.parquet — the prior fixed "part-00000.parquet"
+        # filename silently dropped all but the last batch.
+        chunk_a = _make_particles(40, seed=1, species_name="electrons")
+        chunk_b = _make_particles(60, seed=2, species_name="electrons")
+        root = tmp_path / "chunked"
+        particles_to_dataset(
+            [(0, "electrons", chunk_a), (0, "electrons", chunk_b)],
+            root,
+        )
+        part_dir = root / "step=000000/species=electrons"
+        parts = sorted(part_dir.glob("part-*.parquet"))
+        assert [p.name for p in parts] == [
+            "part-00000.parquet",
+            "part-00001.parquet",
+        ]
+        rebuilt = particles_from_dataset(root, step=0, species="electrons")
+        assert rebuilt.n_particles == 40 + 60
 
     def test_id_column_weight_filter(self, tmp_path: Path):
         # Non-uniform weight doubles as a particle tracking ID —

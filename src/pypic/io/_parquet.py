@@ -102,22 +102,40 @@ def _strip_extra_columns(table: pa.Table) -> pa.Table:
     return table.drop(drop) if drop else table
 
 
-def _fragment_species_scalars(
+def _matched_species_metadata(
     dataset: pads.Dataset,
     combined_filter: pads.Expression | None,
-) -> tuple[float | None, float | None]:
-    """Read ``species_charge``/``species_mass`` from the first fragment's metadata.
+) -> dict[str, Any]:
+    """Resolve per-fragment ``pypic`` metadata for a filtered dataset read.
 
-    ``pyarrow.dataset``'s unified schema doesn't merge per-file metadata,
-    so these scalars are recovered directly from one matching Parquet
-    file's schema. Returns ``(None, None)`` when no fragments match.
+    ``pyarrow.dataset``'s unified schema does not merge per-file
+    metadata, so we recover the ``species_index``/``species_name``/
+    ``species_charge``/``species_mass`` payload by scanning the schemas
+    of matching fragments directly.  Raises when more than one species
+    matches — ``ParticleData`` is a single-species container, so a
+    silent merge would corrupt ``macro_charge``/``macro_mass``.
+
+    Returns the empty defaults when no fragments match (e.g. the caller
+    asked for a step that has no data); ``particles_from_arrow`` then
+    builds a zero-particle ``ParticleData`` from the empty table.
     """
-    try:
-        first_frag = next(iter(dataset.get_fragments(filter=combined_filter)))
-    except StopIteration:
-        return None, None
-    payload = _decode_species_meta(first_frag.physical_schema.metadata)
-    return payload.get("species_charge"), payload.get("species_mass")
+    fragments = list(dataset.get_fragments(filter=combined_filter))
+    if not fragments:
+        return {"species_index": 0, "species_name": "unknown"}
+
+    payloads = [
+        _decode_species_meta(frag.physical_schema.metadata) for frag in fragments
+    ]
+    distinct = {(p.get("species_index"), p.get("species_name")) for p in payloads}
+    if len(distinct) > 1:
+        names = sorted({str(p.get("species_name")) for p in payloads})
+        msg = (
+            f"particles_from_dataset matched {len(distinct)} species "
+            f"({', '.join(names)}); pass species= to select one. "
+            "ParticleData is a single-species container."
+        )
+        raise ValueError(msg)
+    return payloads[0]
 
 
 def particles_to_parquet(
@@ -304,6 +322,13 @@ def particles_to_dataset(
         {path}/step=000100/species=electrons/part-00000.parquet
         ...
 
+    When an iterable source yields multiple ``ParticleData`` chunks
+    for the same ``(step, species)`` (streaming pipelines), each chunk
+    is written to a fresh ``part-NNNNN.parquet`` within the partition
+    directory rather than overwriting the previous one.  Existing
+    ``part-*.parquet`` files in the destination are preserved and the
+    counter resumes from the next free index.
+
     Parameters
     ----------
     source : Simulation or Iterable[tuple[int, str, ParticleData]]
@@ -339,6 +364,11 @@ def particles_to_dataset(
     root = Path(path)
     pairs = _resolve_particle_pairs(source, steps, species)
 
+    # Enumerate within a single call so iterable sources may yield
+    # multiple chunks per (step, species) without overwriting; the
+    # initial counter is seeded from any existing part files in the
+    # destination so concurrent re-runs append rather than clobber.
+    part_counters: dict[tuple[int, str], int] = {}
     n_written = 0
     for step, sp_name, pcl in pairs:
         if pcl.n_particles == 0:
@@ -346,7 +376,12 @@ def particles_to_dataset(
             continue
         part_dir = root / f"step={step:06d}" / f"species={sp_name}"
         part_dir.mkdir(parents=True, exist_ok=True)
-        part_path = part_dir / "part-00000.parquet"
+        key = (step, sp_name)
+        if key not in part_counters:
+            part_counters[key] = sum(1 for _ in part_dir.glob("part-*.parquet"))
+        part_idx = part_counters[key]
+        part_counters[key] = part_idx + 1
+        part_path = part_dir / f"part-{part_idx:05d}.parquet"
         particles_to_parquet(
             pcl,
             part_path,
@@ -474,29 +509,20 @@ def particles_from_dataset(
         if ids is not None and id_column not in read_columns:
             read_columns.append(id_column)
 
+    # Resolve species metadata from per-fragment Parquet schemas — the
+    # only authoritative source for the original species_index after
+    # Hive partitioning has flattened it to a directory name.  Raises
+    # if the filter matched multiple species.
+    payload = _matched_species_metadata(dataset, combined_filter)
+
     table = dataset.to_table(filter=combined_filter, columns=read_columns)
-
-    # Extract species info from partition columns before stripping
-    species_name = "unknown"
-    species_index = 0
-    if "species" in table.column_names and len(table) > 0:
-        species_name = str(table.column("species")[0].as_py())
-    if isinstance(species, str):
-        species_name = species
-    elif isinstance(species, int):
-        species_index = species
-
-    species_charge_meta, species_mass_meta = _fragment_species_scalars(
-        dataset, combined_filter
-    )
-
     table = _strip_extra_columns(table)
     table = inject_species_meta(
         table,
-        species_index,
-        species_name,
-        species_charge=species_charge_meta,
-        species_mass=species_mass_meta,
+        int(payload.get("species_index", 0)),
+        str(payload.get("species_name", "unknown")),
+        species_charge=payload.get("species_charge"),
+        species_mass=payload.get("species_mass"),
     )
     return particles_from_arrow(table)
 
@@ -504,22 +530,33 @@ def particles_from_dataset(
 def _resolve_species_str(species: str | int, root: Path) -> str:
     """Convert a species argument to the string used in partition keys.
 
-    For string arguments, returns directly.  For integer indices,
-    discovers species names from the Hive directory structure
-    (stable across pyarrow versions, unlike expression repr parsing).
+    For string arguments, returns directly.  For integer indices, the
+    canonical mapping comes from per-fragment Parquet metadata (the
+    ``species_index`` field written by ``inject_species_meta``) — Hive
+    partitioning stores only the species *name*, so alphabetical
+    directory order does not match the simulation's species index.
     """
     if isinstance(species, str):
         return species
-    species_dirs: set[str] = set()
+    import pyarrow.parquet as pq
+
     prefix = "species="
-    for p in root.glob("step=*/species=*"):
-        if p.is_dir() and p.name.startswith(prefix):
-            species_dirs.add(p.name[len(prefix) :])
-    species_sorted = sorted(species_dirs)
-    if species >= len(species_sorted):
+    seen_dirs: set[str] = set()
+    index_to_name: dict[int, str] = {}
+    for p in root.glob("step=*/species=*/*.parquet"):
+        sp_dir = p.parent.name
+        if not sp_dir.startswith(prefix) or sp_dir in seen_dirs:
+            continue
+        seen_dirs.add(sp_dir)
+        sp_name = sp_dir[len(prefix) :]
+        payload = _decode_species_meta(pq.read_metadata(str(p)).metadata)
+        idx = payload.get("species_index")
+        if idx is not None:
+            index_to_name[int(idx)] = sp_name
+    if species not in index_to_name:
         msg = (
-            f"Species index {species} out of range"
-            f" (found {len(species_sorted)} species)"
+            f"Species index {species} not found in dataset "
+            f"(known indices: {sorted(index_to_name)})"
         )
         raise IndexError(msg)
-    return species_sorted[species]
+    return index_to_name[species]
