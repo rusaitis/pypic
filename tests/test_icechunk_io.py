@@ -234,6 +234,59 @@ class TestTimeseriesIcechunk:
         store = tmp_path / "drift.icechunk"
         with pytest.raises(ValueError, match=r"field set.*differs.*B2"):
             to_zarr_timeseries([(0.0, step0), (1.0, step1)], store, backend="icechunk")
+        # The fresh repo must not survive a pre-commit failure —
+        # ``open_icechunk_repo(create=True)`` persists an initial
+        # snapshot before we know the source is usable, and without
+        # cleanup ``is_icechunk_store`` would report True while
+        # ``from_zarr`` raises GroupNotFoundError.
+        assert not store.exists()
+
+    def test_timeseries_empty_source_cleans_up_fresh_repo(self, tmp_path):
+        # Reviewer regression: empty source now raises before any
+        # commit, and the half-initialized repo directory is removed.
+        store = tmp_path / "empty.icechunk"
+        with pytest.raises(ValueError, match=r"No timesteps to write"):
+            to_zarr_timeseries([], store, backend="icechunk")
+        assert not store.exists()
+
+    def test_timeseries_shape_drift_cleans_up_fresh_repo(self, tmp_path):
+        grid_small = make_uniform_grid(2, 2, 2)
+        grid_big = make_uniform_grid(3, 2, 2)
+        step0 = FieldDataset.from_arrays(
+            {"B1": np.ones((2, 2, 2))},
+            grid_small,
+            Normalization.identity(),
+        )
+        step1 = FieldDataset.from_arrays(
+            {"B1": np.ones((3, 2, 2))},
+            grid_big,
+            Normalization.identity(),
+        )
+        store = tmp_path / "partial.icechunk"
+        with pytest.raises(ValueError, match=r"different dimension sizes"):
+            to_zarr_timeseries([(0.0, step0), (1.0, step1)], store, backend="icechunk")
+        assert not store.exists()
+
+    def test_timeseries_preserves_existing_repo_on_failure(self, tmp_path):
+        # A failing write on a repo that already had successful
+        # commits must not destroy the pre-existing data — only
+        # freshly-created repos are cleaned up.
+        grid = make_uniform_grid(4, 3, 2)
+        good = FieldDataset.from_arrays(
+            {"B1": np.full((4, 3, 2), 5.0)},
+            grid,
+            Normalization.identity(),
+        )
+        store = tmp_path / "existing.icechunk"
+        to_zarr_timeseries(
+            [(0.0, good), (1.0, good)], store, backend="icechunk", branch="main"
+        )
+        # Attempt a failing write into the same repo on a fresh branch.
+        with pytest.raises(ValueError, match=r"No timesteps to write"):
+            to_zarr_timeseries([], store, backend="icechunk", branch="nightly")
+        # Pre-existing data on main must still be readable.
+        loaded = from_zarr(store, branch="main")
+        np.testing.assert_allclose(loaded["B1"], 5.0)
 
     def test_timeseries_branch_created(self, tmp_path):
         grid = make_uniform_grid(4, 3, 2)

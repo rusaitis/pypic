@@ -295,7 +295,19 @@ def to_zarr_timeseries_icechunk(
         The snapshot ID of the new commit.
     """
     ensure_icechunk()
+    import shutil
+
     import zarr
+
+    # Whether we created the repo directory on this call.  An existing
+    # repo's uncommitted session is transactional — nothing to clean —
+    # but ``open_icechunk_repo(create=True)`` on a fresh path persists
+    # an initial snapshot before we know whether the source is usable.
+    # If our pypic write then fails, ``is_icechunk_store`` returns True
+    # but ``from_zarr`` raises ``GroupNotFoundError``.  Remove the
+    # half-initialized directory so the filesystem state matches the
+    # error state.
+    created_new = not Path(path).exists()
 
     pairs = _resolve_timeseries_pairs(source, steps, fields)
     repo = open_icechunk_repo(path, create=True)
@@ -305,41 +317,46 @@ def to_zarr_timeseries_icechunk(
     first = True
     pypic_attrs: dict[str, Any] | None = None
     expected_fields: frozenset[str] = frozenset()
-    for time_val, fds in pairs:
-        current_fields = frozenset(fds.field_names())
-        ds = fds.xr.expand_dims(time=[float(time_val)])
+    try:
+        for time_val, fds in pairs:
+            current_fields = frozenset(fds.field_names())
+            ds = fds.xr.expand_dims(time=[float(time_val)])
+
+            if first:
+                pypic_attrs = encode_pypic_attrs(fds)
+                expected_fields = current_fields
+                ds.to_zarr(
+                    session.store,
+                    zarr_format=3,
+                    consolidated=False,
+                    mode="w",
+                    encoding=_build_encoding(ds, dtype, encoding),
+                )
+                first = False
+            else:
+                _check_timeseries_fields(expected_fields, current_fields, time_val)
+                ds.to_zarr(
+                    session.store,
+                    consolidated=False,
+                    mode="a",
+                    append_dim="time",
+                )
 
         if first:
-            pypic_attrs = encode_pypic_attrs(fds)
-            expected_fields = current_fields
-            ds.to_zarr(
-                session.store,
-                zarr_format=3,
-                consolidated=False,
-                mode="w",
-                encoding=_build_encoding(ds, dtype, encoding),
-            )
-            first = False
-        else:
-            _check_timeseries_fields(expected_fields, current_fields, time_val)
-            ds.to_zarr(
-                session.store,
-                consolidated=False,
-                mode="a",
-                append_dim="time",
-            )
+            msg = "No timesteps to write — source yielded zero items."
+            raise ValueError(msg)
 
-    if first:
-        msg = "No timesteps to write — source yielded zero items."
-        raise ValueError(msg)
+        store = zarr.open_group(session.store, mode="r+")
+        store.attrs["pypic"] = pypic_attrs
 
-    store = zarr.open_group(session.store, mode="r+")
-    store.attrs["pypic"] = pypic_attrs
+        if message is None:
+            message = "pypic: write timeseries"
 
-    if message is None:
-        message = "pypic: write timeseries"
-
-    snapshot_id: str = session.commit(message)
+        snapshot_id: str = session.commit(message)
+    except BaseException:
+        if created_new:
+            shutil.rmtree(path, ignore_errors=True)
+        raise
     _log.info("Wrote timeseries to %s (snapshot %s)", path, snapshot_id)
     return snapshot_id
 

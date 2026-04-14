@@ -305,3 +305,30 @@ class TestToIcechunkVirtualVersioning:
         np.testing.assert_allclose(from_zarr(output)["B1"], 2.0)
         np.testing.assert_allclose(from_zarr(output, snapshot_id=snap_a)["B1"], 1.0)
         np.testing.assert_allclose(from_zarr(output, snapshot_id=snap_b)["B1"], 2.0)
+
+    def test_numpy_scalar_root_attrs(self, tmp_path):
+        # Reviewer regression: h5py returns scalar HDF5 attrs as
+        # numpy types (float32, int64), which xarray's Zarr attr
+        # validator rejects as "Invalid attribute in Dataset.attrs".
+        # ``to_icechunk_virtual`` must normalize the metadata dict
+        # before writing.
+        grid = make_uniform_grid(4, 3, 2)
+        h5path = tmp_path / "numpy_attrs.h5"
+        with h5py.File(h5path, "w") as f:
+            f.create_group("fields").create_dataset("B1", data=np.ones((4, 3, 2)))
+            g = f.create_group("grid")
+            g.attrs["dimensions"] = list(grid.dimensions)
+            g.attrs["spacing"] = list(grid.spacing)
+            g.attrs["origin"] = list(grid.origin)
+            g.attrs["geometry"] = "cartesian"
+            # h5py stores these as numpy scalars on read-back
+            f.attrs["time"] = np.float32(1.25)
+            f.attrs["step"] = np.int64(42)
+
+        output = tmp_path / "repo"
+        snap = to_icechunk_virtual(h5path, output, message="numpy attrs")
+        assert snap
+
+        loaded = from_zarr(output)
+        assert loaded.metadata["time"] == pytest.approx(1.25)
+        assert loaded.metadata["step"] == 42

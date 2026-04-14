@@ -11,6 +11,8 @@ from __future__ import annotations
 import math
 from typing import TYPE_CHECKING, Any
 
+import numpy as np
+
 from pypic import __version__
 from pypic.coordinates.geometry import GEOMETRY_BY_NAME
 from pypic.coordinates.transforms import FrameTransform
@@ -222,6 +224,26 @@ def dict_to_transforms(
     return {key: _dict_to_transform(td) for key, td in d.items()}
 
 
+def _to_json_native(obj: Any) -> Any:  # noqa: ANN401
+    """Recursively coerce NumPy scalars/arrays to JSON-native equivalents.
+
+    HDF5 readers (h5py) and many other sources commonly return attrs
+    as ``numpy.float32`` / ``numpy.int64`` / ``numpy.ndarray``.  Zarr's
+    attr validator (via xarray) rejects these, so a user-supplied
+    ``metadata`` dict must be normalized before serialization.
+    Python-native types pass through unchanged.
+    """
+    if isinstance(obj, np.generic):
+        return obj.item()
+    if isinstance(obj, np.ndarray):
+        return obj.tolist()
+    if isinstance(obj, dict):
+        return {str(k): _to_json_native(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [_to_json_native(v) for v in obj]
+    return obj
+
+
 def encode_pypic_attrs(fds: FieldDataset) -> dict[str, Any]:
     """Assemble all FieldDataset metadata into a JSON-compatible dict.
 
@@ -235,7 +257,7 @@ def encode_pypic_attrs(fds: FieldDataset) -> dict[str, Any]:
         "normalization": normalization_to_dict(fds.normalization),
         "species": species_to_list(fds.species),
         "physics": physics_to_dict(fds.physics),
-        "metadata": dict(fds.metadata),
+        "metadata": _to_json_native(dict(fds.metadata)),
         "frame": fds.frame,
         "transforms": transforms_to_dict(dict(fds.transforms)),
     }

@@ -162,6 +162,37 @@ class TestSerializationHelpers:
         rebuilt = dict_to_transforms(d)
         assert rebuilt == {}
 
+    def test_metadata_numpy_scalars_round_trip(self, tmp_path):
+        # Reviewer regression: h5py returns attrs as numpy scalars
+        # (np.float32, np.int64) or arrays, and xarray's Zarr attr
+        # validator rejects those with
+        # "Invalid attribute in Dataset.attrs".  The serializer must
+        # recursively coerce to JSON-native types.
+        grid = make_uniform_grid(4, 3, 2)
+        metadata = {
+            "time": np.float32(1.25),
+            "step": np.int64(42),
+            "flag": np.bool_(True),
+            "seq": np.array([1.0, 2.0, 3.0]),
+            "nested": {"inner": np.int32(7)},
+        }
+        fds = FieldDataset.from_arrays(
+            {"B1": np.ones((4, 3, 2))},
+            grid,
+            Normalization.identity(),
+            metadata=metadata,
+        )
+        store = tmp_path / "meta.zarr"
+        to_zarr(fds, store)
+        loaded = from_zarr(store)
+        assert loaded.metadata["time"] == 1.25
+        assert isinstance(loaded.metadata["time"], float)
+        assert loaded.metadata["step"] == 42
+        assert isinstance(loaded.metadata["step"], int)
+        assert loaded.metadata["flag"] is True
+        assert loaded.metadata["seq"] == [1.0, 2.0, 3.0]
+        assert loaded.metadata["nested"] == {"inner": 7}
+
 
 class TestToZarrFromZarr:
     """Round-trip tests for to_zarr / from_zarr."""
