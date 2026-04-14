@@ -372,6 +372,47 @@ class TestPhdf5ParticleReader:
         assert pcl_i.species_mass > 0
 
 
+class TestNonUniformWeight:
+    """Per-particle q dataset (particle splitting, non-uniform plasma)."""
+
+    def _write_fixture(
+        self, tmp_path: Path, q_values: np.ndarray, n: int
+    ) -> Path:
+        import h5py as h5  # type: ignore[import-untyped]
+
+        particles_dir = tmp_path / "Particles_00000"
+        particles_dir.mkdir()
+        h5_path = particles_dir / "species_0_00000.h5"
+        with h5.File(h5_path, "w") as f:
+            g = f.create_group("Particles/species_0")
+            g.create_dataset("position", data=np.zeros((n, 3)))
+            g.create_dataset("velocity", data=np.ones((n, 3)))
+            g.create_dataset("q", data=q_values)
+        return h5_path
+
+    def test_per_particle_q_round_trip(self, tmp_path) -> None:
+        n = 7
+        q = -np.array([1.0, 0.5, 2.0, 0.25, 1.5, 0.75, 3.0])
+        self._write_fixture(tmp_path, q, n)
+
+        cfg = parse_inp(FIXTURE_DIR / "synthetic.inp")
+        pcl = read_phdf5_particles(tmp_path, 0, 0, cfg)
+
+        assert pcl.n_particles == n
+        assert pcl.weight is not None
+        np.testing.assert_array_equal(pcl.weight, np.abs(q))
+        np.testing.assert_array_equal(pcl.macro_charge, -np.abs(q))
+
+    def test_q_size_mismatch_raises(self, tmp_path) -> None:
+        n = 5
+        q = np.ones(3)  # neither 1 nor n
+        self._write_fixture(tmp_path, q, n)
+
+        cfg = parse_inp(FIXTURE_DIR / "synthetic.inp")
+        with pytest.raises(ValueError, match="'q' dataset size 3"):
+            read_phdf5_particles(tmp_path, 0, 0, cfg)
+
+
 class TestParticleIdSupport:
     """Test particle ID reading from phdf5 format."""
 

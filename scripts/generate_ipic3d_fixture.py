@@ -732,10 +732,11 @@ def main() -> None:
     assert pcl.n_particles == 18
     assert pcl.position is not None
     assert pcl.velocity is not None
-    assert pcl.charge.dtype == np.float64
-    assert pcl.charge[0] == -1.0  # electrons
+    assert pcl.weight is not None
+    assert pcl.weight.dtype == np.float64
+    assert pcl.species_charge == -1.0  # electrons
     pcl_i = read_phdf5_particles(phdf5_dir, 0, 1, cfg_p)
-    assert pcl_i.charge[0] == 1.0  # ions
+    assert pcl_i.species_charge == 1.0  # ions
     assert pcl.id is not None, "Particle IDs should be loaded"
     assert pcl.id.dtype == np.int64
     np.testing.assert_array_equal(pcl.id, np.arange(18, dtype=np.int64))

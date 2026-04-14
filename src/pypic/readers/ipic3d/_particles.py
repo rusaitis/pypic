@@ -96,13 +96,21 @@ def read_phdf5_particles(
         if "velocity" in want:
             velocity = np.array(group["velocity"])
 
-        # iPIC3D stores macroparticle charge q_macro = q_s * w as a
-        # scalar (uniform weighting); weight = |q_macro| since |q_s| = 1.
-        # NOTE: scalar broadcast collapses non-uniform-weight runs to
-        # uniform — revisit when non-uniform plasma support lands.
-        q_raw = np.array(group["q"])
-        q_scalar = float(q_raw.flat[0])
-        weight = np.full(n_particles, abs(q_scalar), dtype=np.float64)
+        # iPIC3D stores macroparticle charge q_macro = q_s * w. |q_s| = 1
+        # by convention, so weight = |q_macro|. Uniform-weight runs emit a
+        # scalar/singleton; particle-splitting or non-uniform-density runs
+        # emit a per-particle array.
+        q_raw = np.asarray(group["q"])
+        if q_raw.size == n_particles:
+            weight = np.abs(q_raw.reshape(n_particles).astype(np.float64))
+        elif q_raw.size == 1:
+            weight = np.full(n_particles, abs(float(q_raw.flat[0])), dtype=np.float64)
+        else:
+            msg = (
+                f"iPIC3D 'q' dataset size {q_raw.size} is neither 1 nor "
+                f"n_particles={n_particles} in {h5_path}:{group_name}"
+            )
+            raise ValueError(msg)
 
         # ID: optional integer tracking ID
         particle_id = None

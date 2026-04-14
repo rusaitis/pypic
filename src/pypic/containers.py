@@ -243,6 +243,21 @@ class TabularData:
         return np.arange(len(self), dtype=np.float64)
 
 
+def _check_particle_shape(
+    arr: np.ndarray | None, name: str, expected: tuple[int, ...]
+) -> None:
+    """Shape validator for per-particle arrays in ``ParticleData``."""
+    if arr is None or arr.shape == expected:
+        return
+    n = expected[0]
+    if len(expected) == 2:
+        pretty = f"(n_particles, {expected[1]}) = ({n}, {expected[1]})"
+    else:
+        pretty = f"n_particles ({n},)"
+    msg = f"{name} shape {arr.shape} does not match {pretty}"
+    raise ValueError(msg)
+
+
 @dataclass(frozen=True, slots=True)
 class ParticleData:
     r"""Container for particle data from a single species at one timestep.
@@ -315,34 +330,14 @@ class ParticleData:
         if self.position is None and self.velocity is None:
             msg = "At least one of position or velocity must be provided"
             raise ValueError(msg)
-        if self.position is not None and self.position.shape != (self.n_particles, 3):
-            msg = (
-                f"position shape {self.position.shape} does not match "
-                f"(n_particles, 3) = ({self.n_particles}, 3)"
-            )
+        n = self.n_particles
+        _check_particle_shape(self.position, "position", (n, 3))
+        _check_particle_shape(self.velocity, "velocity", (n, 3))
+        _check_particle_shape(self.id, "id", (n,))
+        _check_particle_shape(self.weight, "weight", (n,))
+        if self.weight is not None and self.weight.dtype != np.float64:
+            msg = f"weight must be float64, got {self.weight.dtype}"
             raise ValueError(msg)
-        if self.velocity is not None and self.velocity.shape != (self.n_particles, 3):
-            msg = (
-                f"velocity shape {self.velocity.shape} does not match "
-                f"(n_particles, 3) = ({self.n_particles}, 3)"
-            )
-            raise ValueError(msg)
-        if self.id is not None and self.id.shape != (self.n_particles,):
-            msg = (
-                f"id shape {self.id.shape} does not match "
-                f"n_particles ({self.n_particles},)"
-            )
-            raise ValueError(msg)
-        if self.weight is not None:
-            if self.weight.dtype != np.float64:
-                msg = f"weight must be float64, got {self.weight.dtype}"
-                raise ValueError(msg)
-            if self.weight.shape != (self.n_particles,):
-                msg = (
-                    f"weight shape {self.weight.shape} does not match "
-                    f"n_particles ({self.n_particles},)"
-                )
-                raise ValueError(msg)
         object.__setattr__(self, "metadata", MappingProxyType(dict(self.metadata)))
 
     @property

@@ -10,6 +10,8 @@ from typing import TYPE_CHECKING, Annotated
 
 import typer
 
+from pypic.dataset import FieldDataset
+
 if TYPE_CHECKING:
     from pypic.grid import GridInfo
     from pypic.readers._registry import Simulation
@@ -275,6 +277,400 @@ def _parse_resolution(res_str: str) -> tuple[int, int]:
         msg = f"--res dimensions must be positive, got {res_str!r}."
         raise typer.BadParameter(msg)
     return (w, h)
+
+
+def _parse_comma_list(raw: str | None) -> list[str] | None:
+    """Split a comma-separated string into a list, preserving None."""
+    if raw is None:
+        return None
+    return [s.strip() for s in raw.split(",") if s.strip()]
+
+
+def _parse_box(raw: str | None) -> dict[str, tuple[int, int]] | None:
+    """Parse ``x=0:64,y=0:64,z=32:64`` into ``BoxSelection.ranges``."""
+    if raw is None:
+        return None
+    ranges: dict[str, tuple[int, int]] = {}
+    for part in raw.split(","):
+        segment = part.strip()
+        if not segment:
+            continue
+        if "=" not in segment or ":" not in segment:
+            msg = f"Invalid --box segment {segment!r}. Use axis=start:stop."
+            raise typer.BadParameter(msg)
+        axis, spec = segment.split("=", 1)
+        lo_s, hi_s = spec.split(":", 1)
+        try:
+            ranges[axis.strip()] = (int(lo_s), int(hi_s))
+        except ValueError as exc:
+            msg = f"Non-integer bounds in --box segment {segment!r}."
+            raise typer.BadParameter(msg) from exc
+    return ranges or None
+
+
+def _resolve_species_list(
+    raw: str | None, sim: Simulation
+) -> list[int] | None:
+    """Resolve ``--species names_or_indices`` into a list of species indices."""
+    if raw is None:
+        return None
+    tokens = _parse_comma_list(raw) or []
+    if not tokens:
+        return None
+    all_species = sim.config.species
+    result: list[int] = []
+    for tok in tokens:
+        try:
+            idx = int(tok)
+        except ValueError:
+            idx = next(
+                (i for i, sp in enumerate(all_species) if sp.name == tok), -1
+            )
+            if idx < 0:
+                names = ", ".join(sp.name for sp in all_species)
+                msg = f"Species {tok!r} not found. Available: {names}"
+                raise typer.BadParameter(msg) from None
+        if idx < 0 or idx >= len(all_species):
+            msg = f"Species index {idx} out of range (0..{len(all_species) - 1})."
+            raise typer.BadParameter(msg)
+        result.append(idx)
+    return result
+
+
+def _to_si_dataset(fds: FieldDataset) -> FieldDataset:
+    """Return a copy of *fds* with every field converted to SI units.
+
+    The new dataset carries ``Normalization.identity()`` so re-reading
+    via the standard path returns SI values without further scaling.
+    """
+    from pypic.units import Normalization
+
+    si_fields = {name: fds.in_si(name) for name in fds.field_names()}
+    return FieldDataset.from_arrays(
+        si_fields,
+        fds.grid,
+        Normalization.identity(),
+        species=fds.species,
+        physics=fds.physics,
+        metadata=dict(fds.metadata),
+        frame=fds.frame,
+        transforms=dict(fds.transforms),
+    )
+
+
+convert_app = typer.Typer(
+    name="convert",
+    help="Convert simulation output to Zarr (fields) or Parquet (particles).",
+    no_args_is_help=True,
+)
+app.add_typer(convert_app, name="convert")
+
+
+@convert_app.command("fields")
+def convert_fields(
+    path: Annotated[Path, typer.Argument(help="Simulation directory.")],
+    output: Annotated[
+        Path,
+        typer.Option("--output", "-o", help="Destination Zarr store directory."),
+    ],
+    step: Annotated[
+        str,
+        typer.Option(
+            "--step",
+            help="Step spec: N, first, last, all, or start:stop[:stride].",
+        ),
+    ] = "all",
+    fields: Annotated[
+        str | None,
+        typer.Option("--fields", help="Comma-separated field names (e.g. B,E3,rho_c)."),
+    ] = None,
+    box: Annotated[
+        str | None,
+        typer.Option("--box", help="Spatial crop as axis=lo:hi,...,axis=lo:hi."),
+    ] = None,
+    target_resolution: Annotated[
+        float | None,
+        typer.Option("--target-resolution", help="Regrid to this uniform spacing."),
+    ] = None,
+    to_si: Annotated[
+        bool,
+        typer.Option("--to-si", help="Convert all fields to SI units before writing."),
+    ] = False,
+    dtype: Annotated[
+        str | None,
+        typer.Option("--dtype", help="Downcast (e.g. float32)."),
+    ] = None,
+    backend: Annotated[
+        str,
+        typer.Option("--backend", help="Storage backend: zarr or icechunk."),
+    ] = "zarr",
+    message: Annotated[
+        str | None,
+        typer.Option("--message", help="Icechunk commit message."),
+    ] = None,
+    tag: Annotated[
+        str | None,
+        typer.Option("--tag", help="Icechunk tag name (created on success)."),
+    ] = None,
+    dry_run: Annotated[
+        bool,
+        typer.Option("--dry-run", help="Print the plan without writing."),
+    ] = False,
+) -> None:
+    """Convert simulation fields to a Zarr v3 store.
+
+    Writes one timestep via ``to_zarr`` or a multi-step time-series via
+    ``to_zarr_timeseries``.  Optionally crops, regrids, and/or converts
+    to SI units.  Pass ``--backend icechunk`` for versioned storage.
+    """
+    from pypic.io import to_zarr, to_zarr_timeseries
+    from pypic.selections import BoxSelection
+
+    if backend not in ("zarr", "icechunk"):
+        msg = f"--backend must be 'zarr' or 'icechunk', got {backend!r}."
+        raise typer.BadParameter(msg)
+    if tag is not None and backend != "icechunk":
+        msg = "--tag requires --backend icechunk."
+        raise typer.BadParameter(msg)
+    if message is not None and backend != "icechunk":
+        msg = "--message requires --backend icechunk."
+        raise typer.BadParameter(msg)
+
+    sim = _open(path)
+    step_list = parse_steps(step, sim)
+    field_list = _parse_comma_list(fields)
+    box_ranges = _parse_box(box)
+    backend_arg = None if backend == "zarr" else backend
+
+    def _postprocess(fds: FieldDataset) -> FieldDataset:
+        if box_ranges:
+            fds = BoxSelection(ranges=box_ranges).apply(fds)
+        if target_resolution is not None:
+            from pypic.grid import GridInfo
+            from pypic.regrid import regrid
+
+            extents = tuple(
+                d * s
+                for d, s in zip(fds.grid.dimensions, fds.grid.spacing, strict=True)
+            )
+            new_dims = tuple(max(1, round(e / target_resolution)) for e in extents)
+            target = GridInfo(
+                dimensions=new_dims,
+                spacing=tuple(target_resolution for _ in extents),
+                origin=fds.grid.origin,
+                geometry=fds.grid.geometry,
+                dt=fds.grid.dt,
+            )
+            fds = regrid(fds, target)
+        if to_si:
+            fds = _to_si_dataset(fds)
+        return fds
+
+    if dry_run:
+        typer.echo(f"Would write {len(step_list)} step(s) to {output}")
+        typer.echo(f"  backend: {backend}")
+        typer.echo(f"  fields: {', '.join(field_list) if field_list else 'all'}")
+        if box_ranges:
+            typer.echo(f"  box: {box_ranges}")
+        if target_resolution is not None:
+            typer.echo(f"  target_resolution: {target_resolution}")
+        if to_si:
+            typer.echo("  units: converted to SI on write")
+        if dtype:
+            typer.echo(f"  dtype: {dtype}")
+        if tag:
+            typer.echo(f"  tag: {tag}")
+        return
+
+    needs_transform = bool(box_ranges or target_resolution or to_si)
+
+    if len(step_list) == 1:
+        fds = sim.read(step_list[0], fields=field_list)
+        if needs_transform:
+            fds = _postprocess(fds)
+        snapshot = to_zarr(
+            fds,
+            output,
+            dtype=dtype,
+            backend=backend_arg,
+            message=message,
+        )
+    elif needs_transform:
+        dt = sim.grid.dt
+        pairs = (
+            (s * dt if dt is not None else s,
+             _postprocess(sim.read(s, fields=field_list)))
+            for s in step_list
+        )
+        snapshot = to_zarr_timeseries(
+            pairs,
+            output,
+            dtype=dtype,
+            backend=backend_arg,
+            message=message,
+        )
+    else:
+        snapshot = to_zarr_timeseries(
+            sim,
+            output,
+            steps=step_list,
+            fields=field_list,
+            dtype=dtype,
+            backend=backend_arg,
+            message=message,
+        )
+
+    if tag is not None and snapshot is not None:
+        from pypic.io import icechunk_create_tag
+
+        icechunk_create_tag(output, tag, snapshot_id=snapshot)
+        typer.echo(f"Wrote {len(step_list)} step(s) to {output} (tag={tag})")
+    else:
+        typer.echo(f"Wrote {len(step_list)} step(s) to {output}")
+
+
+@convert_app.command("particles")
+def convert_particles(
+    path: Annotated[Path, typer.Argument(help="Simulation directory.")],
+    output: Annotated[
+        Path,
+        typer.Option("--output", "-o", help="Destination partitioned Parquet dir."),
+    ],
+    step: Annotated[
+        str,
+        typer.Option(
+            "--step",
+            help="Step spec: N, first, last, all, or start:stop[:stride].",
+        ),
+    ] = "all",
+    species: Annotated[
+        str | None,
+        typer.Option("--species", help="Comma-separated species names or indices."),
+    ] = None,
+    columns: Annotated[
+        str | None,
+        typer.Option(
+            "--columns",
+            help="Subset of position,velocity to load per-particle.",
+        ),
+    ] = None,
+    sort_by: Annotated[
+        str,
+        typer.Option("--sort-by", help="Pre-write sort: position or weight."),
+    ] = "position",
+    position_dtype: Annotated[
+        str | None,
+        typer.Option("--position-dtype", help="Downcast positions (e.g. float32)."),
+    ] = None,
+    velocity_dtype: Annotated[
+        str | None,
+        typer.Option("--velocity-dtype", help="Downcast velocities (e.g. float32)."),
+    ] = None,
+    compression_level: Annotated[
+        int,
+        typer.Option(
+            "--compression-level", help="zstd level: 1 (fast) ... 5 (archival)."
+        ),
+    ] = 1,
+    row_group_size: Annotated[
+        int,
+        typer.Option("--row-group-size", help="Rows per Parquet row group."),
+    ] = 750_000,
+    dry_run: Annotated[
+        bool,
+        typer.Option("--dry-run", help="Print the plan without writing."),
+    ] = False,
+) -> None:
+    """Convert particle output to a partitioned Parquet dataset.
+
+    Layout: ``{output}/step=000000/species=electrons/part-00000.parquet``.
+    Particles are Morton-sorted (or weight-sorted) for spatial predicate
+    pushdown on read.
+    """
+    from pypic.io._parquet import particles_to_dataset
+
+    if sort_by not in ("position", "weight"):
+        msg = f"--sort-by must be 'position' or 'weight', got {sort_by!r}."
+        raise typer.BadParameter(msg)
+
+    sim = _open(path)
+    if not sim.particle_steps:
+        typer.echo(f"Error: {path} has no particle output.", err=True)
+        raise typer.Exit(1)
+
+    # Intersect --step spec with the reader's particle_steps since the
+    # field steps may be a superset of particle steps.
+    try:
+        requested = parse_steps(step, sim)
+    except typer.BadParameter:
+        raise
+    particle_steps = set(sim.particle_steps)
+    step_list = [s for s in requested if s in particle_steps]
+    if not step_list:
+        available = f"{sim.particle_steps[0]}..{sim.particle_steps[-1]}"
+        typer.echo(
+            f"Error: no particle output for --step {step!r}. Available: {available}",
+            err=True,
+        )
+        raise typer.Exit(1)
+
+    species_idx = _resolve_species_list(species, sim)
+    columns_list = _parse_comma_list(columns)
+
+    if dry_run:
+        typer.echo(f"Would write {len(step_list)} step(s) to {output}")
+        typer.echo(f"  steps: {step_list}")
+        typer.echo(
+            "  species: "
+            + (
+                ", ".join(sim.config.species[i].name for i in species_idx)
+                if species_idx
+                else "all"
+            )
+        )
+        typer.echo(f"  sort_by: {sort_by}")
+        if columns_list:
+            typer.echo(f"  columns: {columns_list}")
+        if position_dtype:
+            typer.echo(f"  position_dtype: {position_dtype}")
+        if velocity_dtype:
+            typer.echo(f"  velocity_dtype: {velocity_dtype}")
+        return
+
+    if columns_list is not None:
+        species_resolved = (
+            species_idx
+            if species_idx is not None
+            else list(range(len(sim.config.species)))
+        )
+        pairs_iter = (
+            (s, sim.config.species[sp_idx].name,
+             sim.particles(s, sp_idx, columns=columns_list))
+            for s in step_list
+            for sp_idx in species_resolved
+        )
+        particles_to_dataset(
+            pairs_iter,
+            output,
+            position_dtype=position_dtype,
+            velocity_dtype=velocity_dtype,
+            compression_level=compression_level,
+            row_group_size=row_group_size,
+            sort_by=sort_by,  # type: ignore[arg-type]
+        )
+    else:
+        particles_to_dataset(
+            sim,
+            output,
+            steps=step_list,
+            species=species_idx,
+            position_dtype=position_dtype,
+            velocity_dtype=velocity_dtype,
+            compression_level=compression_level,
+            row_group_size=row_group_size,
+            sort_by=sort_by,  # type: ignore[arg-type]
+        )
+    typer.echo(f"Wrote {len(step_list)} step(s) to {output}")
 
 
 @app.command()

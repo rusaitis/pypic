@@ -115,8 +115,84 @@ Each step produces something testable. No step starts until the previous step's 
   **Migration:** breaking change to the Step 25 Parquet schema. Version window is open (Step 25 just shipped). Bump `__version__` minor; no deprecation shim — pypic hasn't hit 1.0.
   **Depends on:** Step 25 (Parquet/Arrow foundation), commit `c272e33` (introduced `weight`/species scalars).
 
-- [ ] **Step 26: `pypic convert` CLI subcommand**
-  `pypic convert <path> --step N --output DIR [--format zarr|parquet] [--fields F1,F2] [--target-resolution DX] [--dtype float32] [--compression zstd|blosc]`. Batch mode: `--all-steps`. Zarr output uses `to_zarr_timeseries` for multi-step; Parquet uses `particles_to_dataset` for partitioned layout. `--virtual` flag creates VirtualiZarr references instead of copying data (Step 24b).
+- [x] **Step 26: `pypic convert` CLI subcommand — fields & particles**
+  Two subcommands with pipeline-appropriate flags. Both reuse the existing
+  step-range parser (`parse_steps` in `cli.py`, which already handles `N`,
+  `first`, `last`, `all`, `start:stop:stride`) and the unified
+  `open_simulation()` path resolver.
+
+  **`pypic convert fields <path> --output DIR`**
+  - `--step SPEC` — forwarded to `parse_steps`. Default `all`.
+  - `--fields B,E3,rho_c` — forwarded to `Simulation.read(fields=...)`;
+    supports vector-group shorthand (`"B"` → `B1,B2,B3`) and aliases.
+  - `--box x=0:64,y=0:64,z=32:64` — `BoxSelection.apply()` at convert
+    time to crop spatial extent.
+  - `--plane z=mid` — `PlaneSelection.apply()` for 2D slabs (reuses the
+    plane-parsing helper already in `cli.py`).
+  - `--target-resolution DX` — regrid to uniform spacing via `pypic.regrid`.
+  - `--units nT,km/s,...` — per-field display units applied via
+    `FieldDataset.in_units(field, unit)`; unspecified fields stay in code
+    units. Mirrors the convention in `stats` and `plot-compare`.
+  - `--to-si` — boolean; applies `in_si()` to every field before write.
+  - `--dtype float32` — forwarded to `to_zarr{,_timeseries}(dtype=...)`.
+  - `--compression zstd|blosc[:level]` — built into the `encoding=` dict
+    passed to `to_zarr{,_timeseries}`.
+  - `--virtual` — use `open_virtual()` to build lazy HDF5-backed refs
+    instead of copying data; the resulting FieldDataset is written
+    through the same `to_zarr` path (persists refs, not data).
+  - `--backend zarr|icechunk` — forwards to `to_zarr{,_timeseries}
+    (backend=...)`. Icechunk enables Git-like versioning (Step 24c).
+  - `--tag NAME` / `--message TEXT` — icechunk-only; pass `message=` to
+    the writer and `repo.create_tag(NAME, snapshot_id=...)` on success.
+  - `--progress / --no-progress` — rich.progress bar for multi-step runs
+    (default: enabled when stderr is a TTY).
+  - `--dry-run` — print the planned write list without executing.
+
+  **`pypic convert particles <path> --output DIR`**
+  - `--step SPEC` — same parser; forwarded to
+    `particles_to_dataset(steps=...)`.
+  - `--species electrons,ions` — forwarded to
+    `particles_to_dataset(species=...)`; accepts names or indices.
+  - `--columns x,y,z` — forwarded to the reader's `columns=` kwarg.
+  - `--box x=0.0:10.0,y=...` — crop particles by position before write.
+  - `--sort-by position|weight` — forwards to
+    `particles_to_{parquet,dataset}(sort_by=...)`.
+  - `--position-dtype float32` / `--velocity-dtype float32` — forwards
+    to the two existing downcast kwargs.
+  - `--compression-level 1|3|5` — forwards to
+    `particles_to_{parquet,dataset}(compression_level=...)`.
+  - `--row-group-size N` — forwards to `row_group_size=`.
+  - `--progress / --no-progress` / `--dry-run` — as above.
+
+  **Default when no subcommand is given:** `pypic convert <path> --output
+  DIR` runs both pipelines with defaults, detecting particle output via
+  `sim.particle_steps`.
+
+  **Not in scope (separate future steps):** frame transforms at convert
+  time (Step 40 extension), DuckDB-query-based particle filtering
+  (belongs in `query_sql` in `pypic.io._parquet`, not the convert CLI),
+  cloud sharding (`shards=` passthrough — add once `to_zarr` exposes it
+  as a documented kwarg).
+
+  **Shipped:** `convert fields` with `--step`, `--output`, `--fields`,
+  `--box`, `--target-resolution`, `--to-si`, `--dtype`, `--backend`,
+  `--message`, `--tag`, `--dry-run`. `convert particles` with `--step`,
+  `--output`, `--species`, `--columns`, `--sort-by`, `--position-dtype`,
+  `--velocity-dtype`, `--compression-level`, `--row-group-size`,
+  `--dry-run`. Single-step writes call `to_zarr`; multi-step writes call
+  `to_zarr_timeseries` (adds a leading time dim). Icechunk `--tag` uses
+  `icechunk_create_tag` after a successful write.
+
+  **Deferred (follow-up steps):** `--plane` (trivial — reuse existing
+  `_resolve_plane` helper), per-field `--units nT,km/s` display strings
+  (needs a small parser to map field→unit), `--compression
+  zstd|blosc[:level]` explicit flag (the `encoding=` dict is already
+  wired; just needs a string→codec parser), `--virtual` mode
+  (`open_virtual` + `backend=icechunk` persistence path), `--progress`
+  bar, particle `--box` spatial crop, and the subcommand-less default
+  that runs both pipelines.
+
+  **Depends on:** Steps 24, 24b, 24c, 25, 25b — all shipped.
 
 ---
 
@@ -219,4 +295,4 @@ Step 5 (FieldDataset) ←── Steps 24, 25 (Zarr/Arrow) ←── Step 26 (con
                       ←── Step 27 (interop adapters)
 ```
 
-Recommended order: 24/25 parallelizable anytime, 24b/24c after 24, 25b right after 25 (before the Parquet schema hardens), 26 after 24+25+25b, 40 anytime, 23/35/36 anytime, 27–28 after API stabilizes.
+Recommended order: 24/25 parallelizable anytime, 24b/24c after 24, 25b right after 25 (before the Parquet schema hardens), 26 shipped, 40 anytime, 23/35/36 anytime, 27–28 after API stabilizes.

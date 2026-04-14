@@ -925,3 +925,215 @@ def test_plot_compare_bad_method(tmp_path: Path) -> None:
     )
     assert result.exit_code != 0
     assert "Error:" in result.output
+
+
+# -- convert fields ---------------------------------------------------------
+
+zarr_required = pytest.mark.skipif(
+    pytest.importorskip("zarr", reason="zarr required") is None, reason="zarr required"
+)
+
+
+@zarr_required
+def test_convert_fields_dry_run(tmp_path: Path) -> None:
+    d = _make_sim_dir(tmp_path)
+    out = tmp_path / "out.zarr"
+    result = runner.invoke(
+        app,
+        ["convert", "fields", str(d), "--output", str(out), "--dry-run"],
+    )
+    assert result.exit_code == 0, result.output
+    assert "Would write" in result.output
+    assert not out.exists()
+
+
+@zarr_required
+def test_convert_fields_single_step_round_trip(tmp_path: Path) -> None:
+    from pypic.io import from_zarr
+
+    d = _make_sim_dir(tmp_path)
+    out = tmp_path / "single.zarr"
+    result = runner.invoke(
+        app,
+        ["convert", "fields", str(d), "--output", str(out), "--step", "0"],
+    )
+    assert result.exit_code == 0, result.output
+    assert out.exists()
+
+    fds = from_zarr(out)
+    assert set(fds.field_names()) >= {"B1", "B2", "B3"}
+    assert fds["B1"].shape == (4, 4, 4)
+
+
+@zarr_required
+def test_convert_fields_multi_step_timeseries(tmp_path: Path) -> None:
+    from pypic.io import from_zarr
+
+    d = _make_sim_dir(tmp_path, n_steps=3)
+    out = tmp_path / "ts.zarr"
+    result = runner.invoke(
+        app,
+        ["convert", "fields", str(d), "--output", str(out), "--step", "all"],
+    )
+    assert result.exit_code == 0, result.output
+    fds = from_zarr(out)
+    # timeseries: arrays gain a leading time dim of length 3
+    assert fds["B1"].shape == (3, 4, 4, 4)
+
+
+@zarr_required
+def test_convert_fields_subset(tmp_path: Path) -> None:
+    from pypic.io import from_zarr
+
+    d = _make_sim_dir(tmp_path)
+    out = tmp_path / "subset.zarr"
+    result = runner.invoke(
+        app,
+        [
+            "convert", "fields", str(d),
+            "--output", str(out), "--step", "0", "--fields", "B1,B2",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    fds = from_zarr(out)
+    assert "B1" in fds.field_names()
+    assert "B2" in fds.field_names()
+    assert "B3" not in fds.field_names()
+
+
+@zarr_required
+def test_convert_fields_box_crop(tmp_path: Path) -> None:
+    from pypic.io import from_zarr
+
+    d = _make_sim_dir(tmp_path)
+    out = tmp_path / "cropped.zarr"
+    result = runner.invoke(
+        app,
+        [
+            "convert", "fields", str(d),
+            "--output", str(out), "--step", "0",
+            "--box", "x=0:2,y=0:2",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    fds = from_zarr(out)
+    assert fds["B1"].shape == (2, 2, 4)
+
+
+@zarr_required
+def test_convert_fields_bad_backend(tmp_path: Path) -> None:
+    d = _make_sim_dir(tmp_path)
+    out = tmp_path / "nope.zarr"
+    result = runner.invoke(
+        app,
+        [
+            "convert", "fields", str(d),
+            "--output", str(out), "--backend", "lance",
+        ],
+    )
+    assert result.exit_code != 0
+    assert "backend" in result.output.lower()
+
+
+@zarr_required
+def test_convert_fields_tag_requires_icechunk(tmp_path: Path) -> None:
+    d = _make_sim_dir(tmp_path)
+    out = tmp_path / "tagged.zarr"
+    result = runner.invoke(
+        app,
+        [
+            "convert", "fields", str(d),
+            "--output", str(out), "--tag", "v1.0",
+        ],
+    )
+    assert result.exit_code != 0
+    assert "icechunk" in result.output.lower()
+
+
+# -- convert particles ------------------------------------------------------
+
+arrow_required = pytest.mark.skipif(
+    pytest.importorskip("pyarrow", reason="pyarrow required") is None,
+    reason="pyarrow required",
+)
+
+from pathlib import Path as _RuntimePath  # noqa: E402
+
+_IPIC3D_FIXTURE = _RuntimePath("tests/data/ipic3d-synthetic/phdf5")
+
+
+@arrow_required
+def test_convert_particles_dry_run(tmp_path: Path) -> None:
+    out = tmp_path / "particles"
+    result = runner.invoke(
+        app,
+        [
+            "convert", "particles", str(_IPIC3D_FIXTURE),
+            "--output", str(out), "--dry-run",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    assert "Would write" in result.output
+    assert not out.exists()
+
+
+@arrow_required
+def test_convert_particles_round_trip(tmp_path: Path) -> None:
+    from pypic.io._parquet import particles_from_dataset
+
+    out = tmp_path / "particles"
+    result = runner.invoke(
+        app,
+        [
+            "convert", "particles", str(_IPIC3D_FIXTURE),
+            "--output", str(out), "--step", "0",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    # Both species should have a partition
+    assert (out / "step=000000" / "species=species_0").is_dir()
+    assert (out / "step=000000" / "species=species_1").is_dir()
+
+    pcl = particles_from_dataset(out, step=0, species="species_0")
+    assert pcl.n_particles == 18
+    assert pcl.species_charge == -1.0
+
+
+@arrow_required
+def test_convert_particles_species_filter(tmp_path: Path) -> None:
+    out = tmp_path / "particles_one"
+    result = runner.invoke(
+        app,
+        [
+            "convert", "particles", str(_IPIC3D_FIXTURE),
+            "--output", str(out), "--step", "0", "--species", "species_1",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    assert (out / "step=000000" / "species=species_1").is_dir()
+    assert not (out / "step=000000" / "species=species_0").exists()
+
+
+@arrow_required
+def test_convert_particles_bad_sort_by(tmp_path: Path) -> None:
+    out = tmp_path / "nope"
+    result = runner.invoke(
+        app,
+        [
+            "convert", "particles", str(_IPIC3D_FIXTURE),
+            "--output", str(out), "--sort-by", "charge",
+        ],
+    )
+    assert result.exit_code != 0
+    assert "sort-by" in result.output.lower()
+
+
+def test_convert_particles_no_particle_output(tmp_path: Path) -> None:
+    d = _make_sim_dir(tmp_path)
+    out = tmp_path / "empty"
+    result = runner.invoke(
+        app,
+        ["convert", "particles", str(d), "--output", str(out)],
+    )
+    assert result.exit_code != 0
+    assert "no particle output" in result.output.lower()
