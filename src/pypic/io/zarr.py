@@ -98,6 +98,33 @@ def _default_encoding(ds: xr.Dataset) -> dict[str, dict[str, Any]]:
     return {str(name): {"compressors": compressor} for name in ds.data_vars}
 
 
+def _check_timeseries_fields(
+    expected: frozenset[str],
+    current: frozenset[str],
+    time_val: float,
+) -> None:
+    """Reject timeseries steps whose field set differs from the first.
+
+    xarray's ``to_zarr(mode="a", append_dim="time")`` does not enforce
+    a consistent variable set across appends; a drift would silently
+    write a store unreadable by ``from_zarr`` (conflicting sizes on
+    ``time``).  Strict check matches the repo's "fail loud on
+    selection mismatches" convention.
+    """
+    if current == expected:
+        return
+    extra = sorted(current - expected)
+    missing = sorted(expected - current)
+    msg = (
+        f"Timeseries step at time={time_val}: field set {sorted(current)} "
+        f"differs from the first step's {sorted(expected)} "
+        f"(extra: {extra}, missing: {missing}).  All steps must share "
+        "one field set — xarray append would otherwise leave the store "
+        "unreadable."
+    )
+    raise ValueError(msg)
+
+
 def _build_encoding(
     ds: xr.Dataset,
     dtype: str | None,
@@ -346,11 +373,14 @@ def to_zarr_timeseries(
     path_str = str(path)
     first = True
     pypic_attrs: dict[str, Any] | None = None
+    expected_fields: frozenset[str] = frozenset()
     for time_val, fds in pairs:
+        current_fields = frozenset(fds.field_names())
         ds = fds.xr.expand_dims(time=[float(time_val)])
 
         if first:
             pypic_attrs = encode_pypic_attrs(fds)
+            expected_fields = current_fields
             ds.to_zarr(
                 path_str,
                 zarr_format=3,
@@ -360,6 +390,7 @@ def to_zarr_timeseries(
             )
             first = False
         else:
+            _check_timeseries_fields(expected_fields, current_fields, time_val)
             ds.to_zarr(
                 path_str,
                 consolidated=False,

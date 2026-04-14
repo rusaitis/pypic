@@ -19,6 +19,7 @@ from pypic.io._guard import ensure_icechunk
 from pypic.io._serialize import encode_pypic_attrs
 from pypic.io.zarr import (
     _build_encoding,
+    _check_timeseries_fields,
     _ds_to_field_dataset,
     _resolve_timeseries_pairs,
 )
@@ -121,6 +122,23 @@ def open_icechunk_repo(
     )
 
 
+def _ensure_branch(repo: Any, branch: str) -> None:  # noqa: ANN401
+    """Create ``branch`` forked from ``main`` if it does not exist yet.
+
+    ``Repository.writable_session`` requires the branch ref to exist;
+    Icechunk only auto-creates ``main`` when the repo itself is
+    created.  Idempotent.
+    """
+    if branch in repo.list_branches():
+        return
+    if branch == "main":
+        # main is the initial branch — if it is missing the repo is
+        # broken, not empty.  Let the downstream session call raise.
+        return
+    main_tip = repo.lookup_branch("main")
+    repo.create_branch(branch, main_tip)
+
+
 def to_zarr_icechunk(
     fds: FieldDataset,
     path: str | Path,
@@ -158,6 +176,7 @@ def to_zarr_icechunk(
     ensure_icechunk()
 
     repo = open_icechunk_repo(path, create=True)
+    _ensure_branch(repo, branch)
     session = repo.writable_session(branch)
 
     ds = fds.xr.copy(deep=False)
@@ -280,15 +299,19 @@ def to_zarr_timeseries_icechunk(
 
     pairs = _resolve_timeseries_pairs(source, steps, fields)
     repo = open_icechunk_repo(path, create=True)
+    _ensure_branch(repo, branch)
     session = repo.writable_session(branch)
 
     first = True
     pypic_attrs: dict[str, Any] | None = None
+    expected_fields: frozenset[str] = frozenset()
     for time_val, fds in pairs:
+        current_fields = frozenset(fds.field_names())
         ds = fds.xr.expand_dims(time=[float(time_val)])
 
         if first:
             pypic_attrs = encode_pypic_attrs(fds)
+            expected_fields = current_fields
             ds.to_zarr(
                 session.store,
                 zarr_format=3,
@@ -298,6 +321,7 @@ def to_zarr_timeseries_icechunk(
             )
             first = False
         else:
+            _check_timeseries_fields(expected_fields, current_fields, time_val)
             ds.to_zarr(
                 session.store,
                 consolidated=False,

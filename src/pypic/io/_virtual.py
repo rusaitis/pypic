@@ -21,6 +21,7 @@ from pypic.coordinates.geometry import CARTESIAN, GEOMETRY_BY_NAME
 from pypic.dataset import FieldDataset
 from pypic.grid import GridInfo
 from pypic.io._guard import ensure_icechunk, ensure_virtualizarr
+from pypic.io._icechunk import _ensure_branch
 from pypic.io._serialize import encode_pypic_attrs
 from pypic.units import Normalization
 
@@ -370,6 +371,7 @@ def to_icechunk_virtual(
         config=repo_config,
         authorize_virtual_chunk_access={url_prefix: None},
     )
+    _ensure_branch(repo, branch)
     session = repo.writable_session(branch)
     vds.vz.to_icechunk(session.store)
 

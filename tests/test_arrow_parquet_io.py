@@ -679,9 +679,7 @@ class TestPartitionedDataset:
         root = tmp_path / "scalar_only"
         particles_to_dataset([(0, "electrons", pcl)], root)
         with pytest.raises(ValueError, match=r"full position triplet"):
-            particles_from_dataset(
-                root, step=0, species="electrons", columns=["id"]
-            )
+            particles_from_dataset(root, step=0, species="electrons", columns=["id"])
 
     def test_iterable_with_steps_kwarg_raises(self, tmp_path: Path):
         pcl = _make_particles(10)
@@ -750,6 +748,20 @@ class TestDuckDBQuery:
         root = self._write_dataset(tmp_path)
         with pytest.raises(ValueError, match=r"matched 2 species"):
             query_sql(root, "SELECT * FROM particles")
+
+    def test_empty_single_species_result(self, tmp_path: Path):
+        # Well-formed single-species filter that happens to match zero
+        # rows should return an empty ParticleData, not raise.
+        from pypic.io._duckdb import query_sql
+
+        root = self._write_dataset(tmp_path)
+        pcl = query_sql(
+            root,
+            "SELECT * FROM particles WHERE species='electrons' AND 1=0",
+        )
+        assert pcl.n_particles == 0
+        assert pcl.position is not None
+        assert pcl.position.shape == (0, 3)
 
     def test_missing_species_column_raises(self, tmp_path: Path):
         from pypic.io._duckdb import query_sql

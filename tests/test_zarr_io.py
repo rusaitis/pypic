@@ -343,6 +343,26 @@ class TestToZarrTimeseries:
         np.testing.assert_allclose(ds["B1"].sel(time=0.0).values, 1.0)
         np.testing.assert_allclose(ds["B1"].sel(time=2.0).values, 3.0)
 
+    def test_timeseries_rejects_field_drift(self, tmp_path):
+        # xarray's to_zarr(mode="a", append_dim=...) doesn't enforce
+        # a consistent variable set across appends; a growing field
+        # set would silently write a store unreadable by from_zarr
+        # (conflicting sizes on `time`).  Fail loud at write time.
+        grid = make_uniform_grid(4, 3, 2)
+        step0 = FieldDataset.from_arrays(
+            {"B1": np.ones((4, 3, 2))},
+            grid,
+            Normalization.identity(),
+        )
+        step1 = FieldDataset.from_arrays(
+            {"B1": np.ones((4, 3, 2)), "B2": np.zeros((4, 3, 2))},
+            grid,
+            Normalization.identity(),
+        )
+        store = tmp_path / "drift.zarr"
+        with pytest.raises(ValueError, match=r"field set.*differs.*B2"):
+            to_zarr_timeseries([(0.0, step0), (1.0, step1)], store)
+
     def test_timeseries_preserves_metadata(self, tmp_path):
         grid = make_uniform_grid(4, 3, 2)
         fds = FieldDataset.from_arrays(

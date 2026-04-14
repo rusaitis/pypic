@@ -169,6 +169,17 @@ class TestFromZarrIcechunk:
         loaded = from_zarr(store, branch="main")
         np.testing.assert_allclose(loaded["B1"], 1.0)
 
+    def test_write_creates_non_main_branch(self, tmp_path):
+        # Fresh repos only have `main`; writable_session(other) would
+        # otherwise raise `ref not found`.  The writer must fork the
+        # branch off main's tip before opening the session.
+        fds = make_test_dataset({"B1": np.full((4, 3, 2), 7.0)})
+        store = tmp_path / "nonmain.icechunk"
+        snap = to_zarr(fds, store, backend="icechunk", branch="analysis")
+        assert snap is not None
+        loaded = from_zarr(store, branch="analysis")
+        np.testing.assert_allclose(loaded["B1"], 7.0)
+
     def test_multiple_refs_raises(self, tmp_path):
         fds = make_test_dataset({"B1": np.ones((4, 3, 2))})
         store = tmp_path / "multi.icechunk"
@@ -206,6 +217,40 @@ class TestTimeseriesIcechunk:
 
         loaded = from_zarr(store)
         assert "time" in loaded.xr.dims
+        assert loaded.xr.sizes["time"] == 2
+
+    def test_timeseries_rejects_field_drift(self, tmp_path):
+        grid = make_uniform_grid(4, 3, 2)
+        step0 = FieldDataset.from_arrays(
+            {"B1": np.ones((4, 3, 2))},
+            grid,
+            Normalization.identity(),
+        )
+        step1 = FieldDataset.from_arrays(
+            {"B1": np.ones((4, 3, 2)), "B2": np.zeros((4, 3, 2))},
+            grid,
+            Normalization.identity(),
+        )
+        store = tmp_path / "drift.icechunk"
+        with pytest.raises(ValueError, match=r"field set.*differs.*B2"):
+            to_zarr_timeseries([(0.0, step0), (1.0, step1)], store, backend="icechunk")
+
+    def test_timeseries_branch_created(self, tmp_path):
+        grid = make_uniform_grid(4, 3, 2)
+        fds = FieldDataset.from_arrays(
+            {"B1": np.ones((4, 3, 2))},
+            grid,
+            Normalization.identity(),
+        )
+        store = tmp_path / "ts_branch.icechunk"
+        snap = to_zarr_timeseries(
+            [(0.0, fds), (1.0, fds)],
+            store,
+            backend="icechunk",
+            branch="nightly",
+        )
+        assert snap is not None
+        loaded = from_zarr(store, branch="nightly")
         assert loaded.xr.sizes["time"] == 2
 
     def test_timeseries_metadata_preserved(self, tmp_path):

@@ -87,7 +87,7 @@ def query_sql(
     # one species.  The caller must keep the `species` partition column
     # in the projection (SELECT * does by default); cross-species and
     # aggregate queries should use return_type="arrow".
-    if "species" not in arrow_table.column_names or len(arrow_table) == 0:
+    if "species" not in arrow_table.column_names:
         msg = (
             "query_sql(return_type='particledata') requires the 'species' "
             "partition column in the result.  Keep `species` in the SELECT "
@@ -99,6 +99,13 @@ def query_sql(
     species_values = {
         v for v in arrow_table.column("species").unique().to_pylist() if v is not None
     }
+    if not species_values:
+        # Well-formed filter that matched zero rows.  Return an empty
+        # ParticleData with a placeholder species — callers can
+        # dispatch on `n_particles == 0` without a try/except.
+        arrow_table = _strip_extra_columns(arrow_table)
+        arrow_table = inject_species_meta(arrow_table, 0, "unknown")
+        return particles_from_arrow(arrow_table)
     if len(species_values) > 1:
         names = sorted(species_values)
         msg = (
