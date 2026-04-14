@@ -205,15 +205,11 @@ _FIELD_INFO: dict[str, FieldInfo] = {
     "P_par_e": _FI(
         "pressure", "Electron parallel pressure", "Pa", r"$P_{\parallel,e}$"
     ),
-    "P_par_i": _FI(
-        "pressure", "Ion parallel pressure", "Pa", r"$P_{\parallel,i}$"
-    ),
+    "P_par_i": _FI("pressure", "Ion parallel pressure", "Pa", r"$P_{\parallel,i}$"),
     "P_perp_e": _FI(
         "pressure", "Electron perpendicular pressure", "Pa", r"$P_{\perp,e}$"
     ),
-    "P_perp_i": _FI(
-        "pressure", "Ion perpendicular pressure", "Pa", r"$P_{\perp,i}$"
-    ),
+    "P_perp_i": _FI("pressure", "Ion perpendicular pressure", "Pa", r"$P_{\perp,i}$"),
     "P11": _FI("pressure", "Pressure tensor P11", "Pa", r"$P_{11}$"),
     "P22": _FI("pressure", "Pressure tensor P22", "Pa", r"$P_{22}$"),
     "P33": _FI("pressure", "Pressure tensor P33", "Pa", r"$P_{33}$"),

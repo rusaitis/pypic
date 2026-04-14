@@ -774,7 +774,9 @@ class TestPerSpeciesPressureDecomposition:
         shape = (2, 2, 2)
         p = np.full(shape, 2.0)
         data = {
-            "P11_s0": p, "P22_s0": p, "P33_s0": p,
+            "P11_s0": p,
+            "P22_s0": p,
+            "P33_s0": p,
             "P12_s0": np.zeros(shape),
             "P13_s0": np.zeros(shape),
             "P23_s0": np.zeros(shape),
@@ -784,9 +786,7 @@ class TestPerSpeciesPressureDecomposition:
         }
         ds = make_test_dataset(data, shape=shape)
         # Isotropic tensor → Q = 0
-        np.testing.assert_allclose(
-            compute_field("agyrotropy_e", ds), 0.0, atol=1e-15
-        )
+        np.testing.assert_allclose(compute_field("agyrotropy_e", ds), 0.0, atol=1e-15)
 
     def test_alias_resolution(self):
         ds = self._make_species_tensor_dataset()
@@ -822,9 +822,7 @@ class TestPerSpeciesPressureDecomposition:
         }
         ds = make_test_dataset(data, shape=shape)
         # B along z → P_par = P33 = 4
-        np.testing.assert_allclose(
-            compute_field("P_par_s2", ds), 4.0, rtol=1e-15
-        )
+        np.testing.assert_allclose(compute_field("P_par_s2", ds), 4.0, rtol=1e-15)
 
 
 class TestGeometryGuard:

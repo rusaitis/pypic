@@ -86,8 +86,8 @@ class TestParticleData:
             species_charge=-1.0,
         )
         assert pcl.charge is None
-        # effective_charge derives from species_charge × weight
-        np.testing.assert_array_equal(pcl.effective_charge, np.full(3, -1.0))
+        # macro_charge derives from species_charge × weight
+        np.testing.assert_array_equal(pcl.macro_charge, np.full(3, -1.0))
 
     def test_charge_dtype_float64(self) -> None:
         pos = np.zeros((3, 3))
@@ -240,10 +240,10 @@ class TestParticleData:
         assert len(pcl) == 7
 
 
-class TestEffectiveProperties:
-    """Tests for the code-agnostic effective_charge / effective_mass properties."""
+class TestMacroProperties:
+    """Tests for the code-agnostic macro_charge / macro_mass properties."""
 
-    def test_effective_charge_from_per_particle(self) -> None:
+    def test_macro_charge_from_per_particle(self) -> None:
         # Combined-storage style: charge populated, returns it directly
         pcl = ParticleData(
             species_index=0,
@@ -255,10 +255,10 @@ class TestEffectiveProperties:
             metadata={},
         )
         np.testing.assert_array_equal(
-            pcl.effective_charge, np.array([-1.0, -2.0, -1.5, -0.5])
+            pcl.macro_charge, np.array([-1.0, -2.0, -1.5, -0.5])
         )
 
-    def test_effective_charge_fallback(self) -> None:
+    def test_macro_charge_fallback(self) -> None:
         # Separate-storage style: charge None, derive from species_charge × weight
         pcl = ParticleData(
             species_index=0,
@@ -271,11 +271,9 @@ class TestEffectiveProperties:
             weight=np.array([1.0, 2.0, 3.0]),
             species_charge=-1.0,
         )
-        np.testing.assert_array_equal(
-            pcl.effective_charge, np.array([-1.0, -2.0, -3.0])
-        )
+        np.testing.assert_array_equal(pcl.macro_charge, np.array([-1.0, -2.0, -3.0]))
 
-    def test_effective_charge_neither_raises(self) -> None:
+    def test_macro_charge_neither_raises(self) -> None:
         pcl = ParticleData(
             species_index=0,
             species_name="e",
@@ -285,10 +283,10 @@ class TestEffectiveProperties:
             n_particles=3,
             metadata={},
         )
-        with pytest.raises(ValueError, match="effective_charge"):
-            _ = pcl.effective_charge
+        with pytest.raises(ValueError, match="macro_charge"):
+            _ = pcl.macro_charge
 
-    def test_effective_mass(self) -> None:
+    def test_macro_mass(self) -> None:
         pcl = ParticleData(
             species_index=0,
             species_name="i",
@@ -300,9 +298,9 @@ class TestEffectiveProperties:
             weight=np.array([1.0, 2.0, 4.0]),
             species_mass=2.5,
         )
-        np.testing.assert_array_equal(pcl.effective_mass, np.array([2.5, 5.0, 10.0]))
+        np.testing.assert_array_equal(pcl.macro_mass, np.array([2.5, 5.0, 10.0]))
 
-    def test_effective_mass_missing_raises(self) -> None:
+    def test_macro_mass_missing_raises(self) -> None:
         # No species_mass
         pcl = ParticleData(
             species_index=0,
@@ -314,8 +312,8 @@ class TestEffectiveProperties:
             metadata={},
             weight=np.full(3, 1.0),
         )
-        with pytest.raises(ValueError, match="effective_mass"):
-            _ = pcl.effective_mass
+        with pytest.raises(ValueError, match="macro_mass"):
+            _ = pcl.macro_mass
 
 
 @pytest.fixture

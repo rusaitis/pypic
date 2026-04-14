@@ -514,9 +514,9 @@ For PIC and hybrid codes that emit per-particle data, `ParticleData`
 exposes the following canonical fields (used by the Arrow/Parquet
 I/O layer in `pypic.io`).  All fields are **optional** — readers
 populate whatever the source format provides, and the
-:attr:`ParticleData.effective_charge` / :attr:`effective_mass`
-properties give code-agnostic per-particle quantities regardless of
-which fields are present.
+:attr:`ParticleData.macro_charge` / :attr:`macro_mass` properties
+give per-macroparticle quantities regardless of which raw fields are
+populated.
 
 | Field | Storage | Meaning |
 |-------|---------|---------|
@@ -549,10 +549,10 @@ PIC codes split into two camps for how they store macroparticle charge
 
 For code-agnostic analysis, use the derived properties:
 
-- `pcl.effective_charge` — returns per-particle `charge` if loaded,
-  else computes `species_charge × weight`.  Used for current density
+- `pcl.macro_charge` — returns per-particle `charge` if loaded, else
+  computes `species_charge × weight`.  Used for current density
   `J = Σ q v` and charge density `ρ_c = Σ q`.
-- `pcl.effective_mass` — returns `species_mass × weight`.  Used for
+- `pcl.macro_mass` — returns `species_mass × weight`.  Used for
   kinetic energy `KE = ½ m v²`, mass density `ρ_m = Σ m`, and
   physical particle counts `N_phys = Σ w`.
 

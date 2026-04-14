@@ -257,8 +257,8 @@ class ParticleData:
       from the run config.  Per-particle ``charge`` is left ``None`` to
       avoid wasting ~8 GB at billion-particle scale.
 
-    Use the :attr:`effective_charge` and :attr:`effective_mass`
-    properties for code-agnostic per-particle quantities.
+    Use the :attr:`macro_charge` and :attr:`macro_mass` properties
+    for per-macroparticle quantities regardless of storage convention.
 
     Parameters
     ----------
@@ -274,7 +274,7 @@ class ParticleData:
         Per-particle macroparticle charge, shape ``(N,)``, float64.
         Equals ``species_charge × weight``.  Populated by combined-storage
         codes; ``None`` for separate-storage codes — use
-        :attr:`effective_charge` to get a per-particle array regardless.
+        :attr:`macro_charge` to get a per-particle array regardless.
     n_particles : int
         Total particle count.
     id : np.ndarray | None
@@ -291,7 +291,7 @@ class ParticleData:
         per-particle charge when ``charge`` is None.
     species_mass : float | None
         Scalar species mass in code units. Combined with ``weight`` to
-        compute per-particle physical mass via :attr:`effective_mass`.
+        compute per-particle physical mass via :attr:`macro_mass`.
     metadata : dict[str, Any]
         Source info (file path, format, etc.).
 
@@ -419,29 +419,28 @@ class ParticleData:
         return self.velocity[:, 2]
 
     @property
-    def effective_charge(self) -> FloatArray:
-        """Per-particle macroparticle charge (loaded or derived).
+    def macro_charge(self) -> FloatArray:
+        r"""Per-macroparticle charge $q_s w$.
 
-        Returns the per-particle ``charge`` array if available; otherwise
-        computes ``species_charge × weight``.  Use this in any code that
-        needs to be agnostic to the underlying PIC code's storage
-        convention.
+        Returns per-particle ``charge`` if populated (combined-storage
+        codes: iPIC3D, OSIRIS), otherwise computes ``species_charge × weight``
+        (separate-storage codes: VPIC, WarpX, Smilei, PIConGPU, TRISTAN-MP).
         """
         if self.charge is not None:
             return self.charge
         if self.species_charge is not None and self.weight is not None:
             return self.species_charge * self.weight
         msg = (
-            "Cannot compute effective_charge: need either per-particle "
+            "Cannot compute macro_charge: need either per-particle "
             "'charge' or both 'species_charge' and 'weight'"
         )
         raise ValueError(msg)
 
     @property
-    def effective_mass(self) -> FloatArray:
-        """Per-particle physical mass = ``species_mass × weight``."""
+    def macro_mass(self) -> FloatArray:
+        r"""Per-macroparticle mass $m_s w$."""
         if self.species_mass is None or self.weight is None:
-            msg = "Cannot compute effective_mass: need both 'species_mass' and 'weight'"
+            msg = "Cannot compute macro_mass: need both 'species_mass' and 'weight'"
             raise ValueError(msg)
         return self.species_mass * self.weight
 

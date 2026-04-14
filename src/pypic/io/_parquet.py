@@ -22,6 +22,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
 
 from pypic.io._arrow import (
+    _decode_species_meta,
     inject_species_meta,
     particles_from_arrow,
     particles_to_arrow,
@@ -34,6 +35,7 @@ if TYPE_CHECKING:
 
     import numpy as np
     import pyarrow as pa
+    import pyarrow.dataset as pads
 
     from pypic.containers import ParticleData
     from pypic.readers._registry import Simulation
@@ -89,18 +91,33 @@ def _column_sort_table(table: pa.Table, column: str) -> pa.Table:
     same row groups, making row-group min/max statistics tight enough
     for predicate pushdown to skip non-matching groups.
     """
-    import pyarrow.compute as pc
-
     if column not in table.column_names:
         return table
-    idx = pc.sort_indices(table, sort_keys=[(column, "ascending")])
-    return table.take(idx)
+    return table.sort_by(column)
 
 
 def _strip_extra_columns(table: pa.Table) -> pa.Table:
     """Remove partition and derived columns before converting to ParticleData."""
     drop = [c for c in _STRIP_COLS if c in table.column_names]
     return table.drop(drop) if drop else table
+
+
+def _fragment_species_scalars(
+    dataset: pads.Dataset,
+    combined_filter: pads.Expression | None,
+) -> tuple[float | None, float | None]:
+    """Read ``species_charge``/``species_mass`` from the first fragment's metadata.
+
+    ``pyarrow.dataset``'s unified schema doesn't merge per-file metadata,
+    so these scalars are recovered directly from one matching Parquet
+    file's schema. Returns ``(None, None)`` when no fragments match.
+    """
+    try:
+        first_frag = next(iter(dataset.get_fragments(filter=combined_filter)))
+    except StopIteration:
+        return None, None
+    payload = _decode_species_meta(first_frag.physical_schema.metadata)
+    return payload.get("species_charge"), payload.get("species_mass")
 
 
 def particles_to_parquet(
@@ -308,7 +325,7 @@ def particles_to_dataset(
         zstd level (1 for processing, 3 for archival).
     row_group_size : int
         Target rows per row group.
-    sort_by : {"position", "charge"}
+    sort_by : {"position", "charge", "weight"}
         Pre-write sort order; forwarded to ``particles_to_parquet``.
 
     Examples
@@ -468,22 +485,9 @@ def particles_from_dataset(
     elif isinstance(species, int):
         species_index = species
 
-    # Recover scalar species_charge/species_mass from the per-file
-    # Parquet schema metadata (pyarrow.dataset's unified schema doesn't
-    # merge per-file metadata).  Read from the first matching fragment.
-    species_charge_meta = None
-    species_mass_meta = None
-    try:
-        first_frag = next(iter(dataset.get_fragments(filter=combined_filter)))
-        file_meta = first_frag.physical_schema.metadata
-        if file_meta and b"pypic" in file_meta:
-            import json as _json
-
-            payload = _json.loads(file_meta[b"pypic"])
-            species_charge_meta = payload.get("species_charge")
-            species_mass_meta = payload.get("species_mass")
-    except (StopIteration, KeyError, ValueError):
-        pass
+    species_charge_meta, species_mass_meta = _fragment_species_scalars(
+        dataset, combined_filter
+    )
 
     table = _strip_extra_columns(table)
     table = inject_species_meta(

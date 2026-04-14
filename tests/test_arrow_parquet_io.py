@@ -243,8 +243,8 @@ class TestArrowInterchange:
         assert rebuilt.species_mass == 1.0
         assert rebuilt.weight is not None
         np.testing.assert_array_equal(rebuilt.weight, pcl.weight)
-        # effective_charge should compute from species_charge × weight
-        np.testing.assert_array_equal(rebuilt.effective_charge, -1.0 * pcl.weight)
+        # macro_charge should compute from species_charge × weight
+        np.testing.assert_array_equal(rebuilt.macro_charge, -1.0 * pcl.weight)
 
     def test_species_metadata_round_trip(self):
         pcl = _make_particles(20)
@@ -587,8 +587,8 @@ class TestPartitionedDataset:
         assert rebuilt.weight is not None
         assert rebuilt.species_charge == -1.0
         assert rebuilt.species_mass == 1.0
-        # effective_charge derives correctly
-        np.testing.assert_array_equal(rebuilt.effective_charge, -1.0 * rebuilt.weight)
+        # macro_charge derives correctly
+        np.testing.assert_array_equal(rebuilt.macro_charge, -1.0 * rebuilt.weight)
 
     def test_columns_pruning_no_implicit_charge(self, tmp_path: Path):
         # When user requests only x/y/z, charge should NOT be force-included

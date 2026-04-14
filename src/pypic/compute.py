@@ -72,7 +72,9 @@ _PRESSURE_TENSOR_FIELDS = ("P11", "P22", "P33", "P12", "P13", "P23")
 _PRESSURE_TENSOR_AND_B = (*_PRESSURE_TENSOR_FIELDS, "B1", "B2", "B3")
 _SPECIES_PRESSURE_TENSOR_AND_B = (
     *(f"{f}_s{{N}}" for f in _PRESSURE_TENSOR_FIELDS),
-    "B1", "B2", "B3",
+    "B1",
+    "B2",
+    "B3",
 )
 
 
@@ -80,6 +82,7 @@ def _species_tensor_b(species: int) -> tuple[str, ...]:
     """Build per-species pressure tensor + B field tuple for static recipes."""
     s = str(species)
     return (*(f"{f}_s{s}" for f in _PRESSURE_TENSOR_FIELDS), "B1", "B2", "B3")
+
 
 _REGISTRY: dict[str, _Recipe] = {
     # Magnitudes
