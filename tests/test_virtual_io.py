@@ -188,6 +188,34 @@ class TestOpenVirtual:
 
         np.testing.assert_array_equal(np.asarray(fds["B1"]), const)
 
+    def test_byte_string_attrs_decoded(self, tmp_path):
+        # HDF5 writers commonly store string attrs as bytes (h5py's
+        # default for variable-length UTF-8).  str(b"cartesian") gives
+        # "b'cartesian'" — use an explicit decode so metadata reads
+        # stay faithful across writers.
+        grid = make_uniform_grid(4, 3, 2)
+        h5path = tmp_path / "bytes_attrs.h5"
+        with h5py.File(h5path, "w") as f:
+            f.create_group("fields").create_dataset(
+                "B1", data=np.ones((4, 3, 2))
+            )
+            g = f.create_group("grid")
+            g.attrs["dimensions"] = list(grid.dimensions)
+            g.attrs["spacing"] = list(grid.spacing)
+            g.attrs["origin"] = list(grid.origin)
+            g.attrs["geometry"] = b"cartesian"
+            g.attrs["boundary"] = np.array(
+                [b"periodic", b"periodic", b"periodic"], dtype="S8"
+            )
+            f.attrs["model"] = b"iPIC3D"
+
+        fds = open_virtual(h5path)
+
+        assert fds.grid.boundary == ("periodic", "periodic", "periodic")
+        # Geometry byte-decoded back to the canonical cartesian entry.
+        assert fds.grid.geometry.type.value == "cartesian"
+        assert fds.metadata["model"] == "iPIC3D"
+
     def test_coordinate_arrays_match_grid(self, tmp_path):
         grid = GridInfo(
             dimensions=(4, 3, 2),

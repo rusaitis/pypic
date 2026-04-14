@@ -658,6 +658,31 @@ class TestPartitionedDataset:
         assert rebuilt.velocity is None
         assert rebuilt.weight is None  # not requested
 
+    def test_scalar_only_columns_raises(self, tmp_path: Path):
+        # columns=['id'] omits both position and velocity triplets.
+        # Failing late inside ParticleData.__post_init__ produced an
+        # opaque message; fail early with a projection-aware one.
+        rng = np.random.default_rng(101)
+        n = 10
+        pcl = ParticleData(
+            species_index=0,
+            species_name="electrons",
+            position=rng.uniform(0, 1, (n, 3)),
+            velocity=rng.standard_normal((n, 3)),
+            n_particles=n,
+            id=np.arange(n, dtype=np.int64),
+            metadata={},
+            weight=np.ones(n),
+            species_charge=-1.0,
+            species_mass=1.0,
+        )
+        root = tmp_path / "scalar_only"
+        particles_to_dataset([(0, "electrons", pcl)], root)
+        with pytest.raises(ValueError, match=r"full position triplet"):
+            particles_from_dataset(
+                root, step=0, species="electrons", columns=["id"]
+            )
+
     def test_iterable_with_steps_kwarg_raises(self, tmp_path: Path):
         pcl = _make_particles(10)
         with pytest.raises(ValueError, match="only apply when source is a Simulation"):
@@ -690,7 +715,9 @@ class TestDuckDBQuery:
         from pypic.io._duckdb import query_sql
 
         root = self._write_dataset(tmp_path)
-        pcl = query_sql(root, "SELECT * FROM particles LIMIT 10")
+        pcl = query_sql(
+            root, "SELECT * FROM particles WHERE species='electrons' LIMIT 10"
+        )
         assert pcl.n_particles == 10
 
     def test_filtered_query(self, tmp_path: Path):
@@ -703,6 +730,38 @@ class TestDuckDBQuery:
         )
         assert pcl.n_particles == 50
         assert pcl.species_name == "electrons"
+        # Scalar metadata must survive the DuckDB strip + recover path.
+        assert pcl.species_index == 0
+        assert pcl.species_charge == -1.0
+        assert pcl.species_mass == 1.0
+
+    def test_string_species_resolves_correct_index(self, tmp_path: Path):
+        from pypic.io._duckdb import query_sql
+
+        root = self._write_dataset(tmp_path)
+        pcl = query_sql(root, "SELECT * FROM particles WHERE species='ions'")
+        assert pcl.species_name == "ions"
+        assert pcl.species_index == 1
+        assert pcl.species_charge == 1.0
+
+    def test_unfiltered_multispecies_query_raises(self, tmp_path: Path):
+        from pypic.io._duckdb import query_sql
+
+        root = self._write_dataset(tmp_path)
+        with pytest.raises(ValueError, match=r"matched 2 species"):
+            query_sql(root, "SELECT * FROM particles")
+
+    def test_missing_species_column_raises(self, tmp_path: Path):
+        from pypic.io._duckdb import query_sql
+
+        root = self._write_dataset(tmp_path)
+        # SELECT x, y — drops partition columns entirely; we can't
+        # reconstruct ParticleData without a species hint.
+        with pytest.raises(ValueError, match=r"species.*partition column"):
+            query_sql(
+                root,
+                "SELECT x, y FROM particles WHERE species='electrons' LIMIT 5",
+            )
 
     def test_return_type_arrow(self, tmp_path: Path):
         from pypic.io._duckdb import query_sql

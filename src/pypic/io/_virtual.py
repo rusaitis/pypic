@@ -33,6 +33,19 @@ if TYPE_CHECKING:
 __all__ = ["open_virtual", "to_icechunk_virtual"]
 
 
+def _as_text(val: object) -> str:
+    """Coerce an HDF5 attr value to ``str``, decoding bytes as UTF-8.
+
+    h5py may return string-valued attrs as ``bytes`` (or ``numpy.bytes_``)
+    depending on how the source file encoded them.  Plain ``str(b"x")``
+    produces ``"b'x'"`` rather than ``"x"``, which silently corrupts
+    geometry/boundary/model labels.
+    """
+    if isinstance(val, bytes):
+        return val.decode("utf-8")
+    return str(val)
+
+
 def _read_metadata_from_h5(
     path: str,
 ) -> tuple[GridInfo | None, Normalization | None, dict[str, Any]]:
@@ -54,13 +67,13 @@ def _read_metadata_from_h5(
             dims = tuple(int(x) for x in g.attrs["dimensions"])
             spacing = tuple(float(x) for x in g.attrs["spacing"])
             origin = tuple(float(x) for x in g.attrs.get("origin", np.zeros(len(dims))))
-            geom_str = str(g.attrs.get("geometry", "cartesian"))
+            geom_str = _as_text(g.attrs.get("geometry", "cartesian"))
             geometry = GEOMETRY_BY_NAME.get(geom_str, CARTESIAN)
             dt_val = g.attrs.get("dt")
             dt = float(dt_val) if dt_val is not None else None
             boundary_raw = g.attrs.get("boundary")
             boundary = (
-                tuple(str(b) for b in boundary_raw)
+                tuple(_as_text(b) for b in boundary_raw)
                 if boundary_raw is not None
                 else None
             )
@@ -91,7 +104,12 @@ def _read_metadata_from_h5(
         for key in ("time", "step", "model"):
             if key in f.attrs:
                 val = f.attrs[key]
-                extra[key] = int(val) if key == "step" else val
+                if key == "step":
+                    extra[key] = int(val)
+                elif key == "model":
+                    extra[key] = _as_text(val)
+                else:
+                    extra[key] = val
 
     return grid, norm, extra
 

@@ -23,6 +23,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
 
 from pypic.io._arrow import (
+    _POSITION_COLS,
+    _VELOCITY_COLS,
     _decode_species_meta,
     inject_species_meta,
     particles_from_arrow,
@@ -102,6 +104,26 @@ def _strip_extra_columns(table: pa.Table) -> pa.Table:
     """Remove partition and derived columns before converting to ParticleData."""
     drop = [c for c in _STRIP_COLS if c in table.column_names]
     return table.drop(drop) if drop else table
+
+
+def _require_vector_columns(columns: Sequence[str]) -> None:
+    """Reject projections that would produce a scalar-only ParticleData.
+
+    ``ParticleData.__post_init__`` requires at least one full vector
+    triplet.  Catching scalar-only projections here surfaces a
+    projection-aware error instead of the opaque container-level one.
+    """
+    has_position = all(c in columns for c in _POSITION_COLS)
+    has_velocity = all(c in columns for c in _VELOCITY_COLS)
+    if not (has_position or has_velocity):
+        msg = (
+            f"columns={list(columns)} selects neither a full position "
+            f"triplet {list(_POSITION_COLS)} nor a full velocity triplet "
+            f"{list(_VELOCITY_COLS)}.  ParticleData requires at least "
+            "one.  For scalar-only queries use query_sql(..., "
+            "return_type='arrow')."
+        )
+        raise ValueError(msg)
 
 
 def _matched_species_metadata(
@@ -515,6 +537,7 @@ def particles_from_dataset(
     read_columns: list[str] | None = None
     if columns is not None:
         read_columns = list(columns)
+        _require_vector_columns(read_columns)
         if ids is not None and id_column not in read_columns:
             read_columns.append(id_column)
 
