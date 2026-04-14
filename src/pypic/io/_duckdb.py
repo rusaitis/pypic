@@ -22,6 +22,28 @@ if TYPE_CHECKING:
 __all__ = ["query_sql"]
 
 
+def _lookup_species_meta(
+    path: str | Path, species_name: str
+) -> tuple[int, float | None, float | None]:
+    """Read species_index/charge/mass from any matching Parquet fragment.
+
+    Returns ``(0, None, None)`` when no fragment is found — callers then
+    produce an ``unknown``-tagged ParticleData.
+    """
+    import pyarrow.parquet as pq
+
+    from pypic.io._arrow import _decode_species_meta
+
+    for p in Path(path).glob(f"step=*/species={species_name}/*.parquet"):
+        payload = _decode_species_meta(pq.read_metadata(str(p)).metadata)
+        return (
+            int(payload.get("species_index", 0)),
+            payload.get("species_charge"),
+            payload.get("species_mass"),
+        )
+    return (0, None, None)
+
+
 def query_sql(
     path: str | Path,
     sql: str,
@@ -58,7 +80,6 @@ def query_sql(
     import duckdb
 
     from pypic.io._arrow import (
-        _decode_species_meta,
         inject_species_meta,
         particles_from_arrow,
     )
@@ -112,11 +133,31 @@ def query_sql(
         v for v in arrow_table.column("species").unique().to_pylist() if v is not None
     }
     if not species_values:
-        # Well-formed filter that matched zero rows.  Return an empty
-        # ParticleData with a placeholder species — callers can
-        # dispatch on `n_particles == 0` without a try/except.
+        # Well-formed filter that matched zero rows.  If the dataset
+        # has exactly one species on disk, adopt its metadata — empty
+        # reads then preserve species identity the same way
+        # ``particles_from_dataset(species=...)`` does.  Multi-species
+        # datasets remain genuinely ambiguous (we can't recover which
+        # species the WHERE clause asked for), so fall back to the
+        # placeholder so callers can still dispatch on ``n_particles``.
+        on_disk = sorted(
+            {p.name.split("=", 1)[1] for p in Path(path).glob("step=*/species=*")}
+        )
         arrow_table = _strip_extra_columns(arrow_table)
-        arrow_table = inject_species_meta(arrow_table, 0, "unknown")
+        if len(on_disk) == 1:
+            species_name = on_disk[0]
+            species_index, species_charge, species_mass = _lookup_species_meta(
+                path, species_name
+            )
+            arrow_table = inject_species_meta(
+                arrow_table,
+                species_index,
+                species_name,
+                species_charge=species_charge,
+                species_mass=species_mass,
+            )
+        else:
+            arrow_table = inject_species_meta(arrow_table, 0, "unknown")
         return particles_from_arrow(arrow_table)
     if len(species_values) > 1:
         names = sorted(species_values)
@@ -127,20 +168,9 @@ def query_sql(
         )
         raise ValueError(msg)
     species_name = next(iter(species_values))
-
-    # Read one Parquet fragment from the matching partition for the
-    # authoritative species_index/charge/mass payload.
-    import pyarrow.parquet as pq
-
-    species_index = 0
-    species_charge: float | None = None
-    species_mass: float | None = None
-    for p in Path(path).glob(f"step=*/species={species_name}/*.parquet"):
-        payload = _decode_species_meta(pq.read_metadata(str(p)).metadata)
-        species_index = int(payload.get("species_index", 0))
-        species_charge = payload.get("species_charge")
-        species_mass = payload.get("species_mass")
-        break
+    species_index, species_charge, species_mass = _lookup_species_meta(
+        path, species_name
+    )
 
     arrow_table = _strip_extra_columns(arrow_table)
     arrow_table = inject_species_meta(

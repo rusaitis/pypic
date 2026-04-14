@@ -802,6 +802,45 @@ class TestDuckDBQuery:
                 "SELECT species, id FROM particles WHERE species='electrons' LIMIT 5",
             )
 
+    def test_empty_result_adopts_single_species_from_disk(self, tmp_path: Path):
+        # Reviewer regression: a zero-row result on a single-species
+        # dataset must not lose the species identity — it should adopt
+        # the only on-disk species rather than fall back to
+        # "unknown"/index 0/no charge.
+        from pypic.io._duckdb import query_sql
+
+        root = tmp_path / "single_species"
+        sim = _make_mock_simulation(
+            steps=[0, 100],
+            species=[(0, "electrons")],
+            n_particles=50,
+        )
+        particles_to_dataset(sim, root)
+        pcl = query_sql(
+            root,
+            "SELECT * FROM particles WHERE species='electrons' AND 1=0",
+        )
+        assert pcl.n_particles == 0
+        assert pcl.species_name == "electrons"
+        assert pcl.species_index == 0
+        assert pcl.species_charge == -1.0
+        assert pcl.species_mass == 1.0
+
+    def test_empty_result_multispecies_stays_placeholder(self, tmp_path: Path):
+        # Multi-species datasets can't unambiguously recover which
+        # species the WHERE clause asked for on an empty read — keep
+        # the placeholder so callers still see a well-formed empty
+        # ParticleData.
+        from pypic.io._duckdb import query_sql
+
+        root = self._write_dataset(tmp_path)
+        pcl = query_sql(
+            root,
+            "SELECT * FROM particles WHERE species='electrons' AND 1=0",
+        )
+        assert pcl.n_particles == 0
+        assert pcl.species_name == "unknown"
+
     def test_velocity_only_projection_succeeds(self, tmp_path: Path):
         # ParticleData requires *one* of position or velocity, not both —
         # velocity-only projections must still round-trip.

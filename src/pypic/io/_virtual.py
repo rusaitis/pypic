@@ -115,6 +115,30 @@ def _read_metadata_from_h5(
     return grid, norm, extra
 
 
+def _container_name_for(url_prefix: str) -> str:
+    """Stable, per-prefix container name.
+
+    Icechunk requires globally unique container names within a repo;
+    multiple commits from different source directories must each get a
+    distinct name that derives deterministically from the prefix.
+    """
+    import hashlib
+
+    digest = hashlib.sha1(url_prefix.encode("utf-8"), usedforsecurity=False).hexdigest()
+    return f"local_{digest[:12]}"
+
+
+def _make_virtual_chunk_container(url_prefix: str, source_dir: str) -> Any:  # noqa: ANN401
+    """Build a VirtualChunkContainer for a local filesystem source dir."""
+    import icechunk
+
+    return icechunk.VirtualChunkContainer(
+        name=_container_name_for(url_prefix),
+        url_prefix=url_prefix,
+        store=icechunk.local_filesystem_store(source_dir),
+    )
+
+
 def _virtual_repo_config(source_dir: str) -> tuple[Any, str]:
     """Build the Icechunk RepositoryConfig + url_prefix for a source dir.
 
@@ -126,12 +150,9 @@ def _virtual_repo_config(source_dir: str) -> tuple[Any, str]:
 
     config = icechunk.RepositoryConfig.default()
     url_prefix = f"file://{source_dir}/"
-    container = icechunk.VirtualChunkContainer(
-        name="local",
-        url_prefix=url_prefix,
-        store=icechunk.local_filesystem_store(source_dir),
+    config.set_virtual_chunk_container(
+        _make_virtual_chunk_container(url_prefix, source_dir)
     )
-    config.set_virtual_chunk_container(container)
     return config, url_prefix
 
 
@@ -366,11 +387,40 @@ def to_icechunk_virtual(
 
     storage = icechunk.local_filesystem_storage(str(output_path))
     repo_config, url_prefix = _virtual_repo_config(source_dir)
+
+    # Merge the new virtual chunk container into any config already
+    # persisted for this repo.  ``open_or_create`` accepts ``config=``
+    # but does not union it with previously-saved containers — passing
+    # only the current source's container would silently displace every
+    # prefix from earlier commits, so later reads of those refs fail
+    # with "no virtual chunk container can handle the chunk location".
+    try:
+        persisted = icechunk.Repository.fetch_config(storage)
+    except Exception:
+        # Fresh repo: fetch_config raises before any commit exists.
+        persisted = None
+    if persisted is not None:
+        existing = persisted.virtual_chunk_containers or {}
+        if url_prefix not in existing:
+            persisted.set_virtual_chunk_container(
+                _make_virtual_chunk_container(url_prefix, source_dir)
+            )
+        repo_config = persisted
+
+    all_prefixes: dict[str, Any] = {
+        p: None for p in (repo_config.virtual_chunk_containers or {})
+    }
+    all_prefixes.setdefault(url_prefix, None)
+
     repo = icechunk.Repository.open_or_create(
         storage,
         config=repo_config,
-        authorize_virtual_chunk_access={url_prefix: None},
+        authorize_virtual_chunk_access=all_prefixes,
     )
+    # Persist the (possibly augmented) config so ``from_zarr`` — which
+    # opens the repo without knowing which containers to authorize —
+    # can auto-discover every prefix this repo has ever written against.
+    repo.save_config()
     _ensure_branch(repo, branch)
     session = repo.writable_session(branch)
     # Clear the session's working-tree root so virtualizarr's

@@ -278,3 +278,30 @@ class TestToIcechunkVirtualVersioning:
         loaded_alt = from_zarr(output, branch="alt")
         np.testing.assert_allclose(loaded_main["B1"], 1.0)
         np.testing.assert_allclose(loaded_alt["B1"], 3.0)
+
+    def test_sources_in_different_directories(self, tmp_path):
+        # Reviewer regression: commits from different parent dirs must
+        # both remain readable.  The first write registered a virtual
+        # chunk container for source A's parent; the second write must
+        # merge in source B's parent — otherwise refs to /b/b.h5 have
+        # no container and from_zarr fails with "no virtual chunk
+        # container can handle the chunk location".
+        dir_a = tmp_path / "a"
+        dir_b = tmp_path / "b"
+        dir_a.mkdir()
+        dir_b.mkdir()
+        grid = make_uniform_grid(4, 3, 2)
+        h5a = dir_a / "a.h5"
+        h5b = dir_b / "b.h5"
+        _write_canonical_h5(h5a, {"B1": np.ones((4, 3, 2))}, grid)
+        _write_canonical_h5(h5b, {"B1": np.full((4, 3, 2), 2.0)}, grid)
+
+        output = tmp_path / "repo"
+        snap_a = to_icechunk_virtual(h5a, output, message="a")
+        snap_b = to_icechunk_virtual(h5b, output, message="b")
+
+        # Tip reads current (b); snapshot A still resolves via the
+        # merged container set.
+        np.testing.assert_allclose(from_zarr(output)["B1"], 2.0)
+        np.testing.assert_allclose(from_zarr(output, snapshot_id=snap_a)["B1"], 1.0)
+        np.testing.assert_allclose(from_zarr(output, snapshot_id=snap_b)["B1"], 2.0)
