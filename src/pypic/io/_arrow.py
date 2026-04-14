@@ -34,6 +34,10 @@ def _encode_species_meta(data: ParticleData) -> bytes:
         "species_name": data.species_name,
         "n_particles": data.n_particles,
     }
+    if data.species_charge is not None:
+        meta["species_charge"] = data.species_charge
+    if data.species_mass is not None:
+        meta["species_mass"] = data.species_mass
     raw_metadata = dict(data.metadata)
     if raw_metadata:
         meta["metadata"] = raw_metadata
@@ -58,21 +62,28 @@ def inject_species_meta(
     table: pa.Table,
     species_index: int,
     species_name: str,
+    *,
+    species_charge: float | None = None,
+    species_mass: float | None = None,
 ) -> pa.Table:
     """Inject species metadata into an Arrow table's schema metadata.
 
     Used by ``particles_from_dataset`` and ``query_sql`` to attach
     species info extracted from partition columns before calling
-    ``particles_from_arrow``.
+    ``particles_from_arrow``.  Optional ``species_charge`` and
+    ``species_mass`` round-trip alongside the per-particle data.
     """
+    payload: dict[str, Any] = {
+        "species_index": species_index,
+        "species_name": species_name,
+        "n_particles": len(table),
+    }
+    if species_charge is not None:
+        payload["species_charge"] = species_charge
+    if species_mass is not None:
+        payload["species_mass"] = species_mass
     meta = table.schema.metadata or {}
-    meta[b"pypic"] = json.dumps(
-        {
-            "species_index": species_index,
-            "species_name": species_name,
-            "n_particles": len(table),
-        }
-    ).encode("utf-8")
+    meta[b"pypic"] = json.dumps(payload).encode("utf-8")
     return table.replace_schema_metadata(meta)
 
 
@@ -136,10 +147,14 @@ def particles_to_arrow(
                 col = col.astype(velocity_dtype)
             arrays[col_name] = pa.array(col)
 
-    arrays["charge"] = pa.array(data.charge)
+    if data.charge is not None:
+        arrays["charge"] = pa.array(data.charge)
 
     if data.id is not None:
         arrays["id"] = pa.array(data.id)
+
+    if data.weight is not None:
+        arrays["weight"] = pa.array(data.weight)
 
     table = pa.table(arrays)
     meta = table.schema.metadata or {}
@@ -184,15 +199,26 @@ def particles_from_arrow(table: pa.Table) -> ParticleData:
         ]
         velocity = np.column_stack(vel_arrays)
 
-    charge = table.column("charge").to_numpy(zero_copy_only=False)
-    if charge.dtype != np.float64:
-        charge = charge.astype(np.float64)
+    charge: np.ndarray | None = None
+    if "charge" in table.column_names:
+        charge = table.column("charge").to_numpy(zero_copy_only=False)
+        if charge.dtype != np.float64:
+            charge = charge.astype(np.float64)
 
     particle_id: np.ndarray | None = None
     if "id" in table.column_names:
         particle_id = table.column("id").to_numpy(zero_copy_only=False)
 
+    weight: np.ndarray | None = None
+    if "weight" in table.column_names:
+        weight = table.column("weight").to_numpy(zero_copy_only=False)
+        if weight.dtype != np.float64:
+            weight = weight.astype(np.float64)
+
     n_particles = len(table)
+
+    species_charge_val = meta.get("species_charge")
+    species_mass_val = meta.get("species_mass")
 
     return ParticleData(
         species_index=meta["species_index"],
@@ -203,4 +229,11 @@ def particles_from_arrow(table: pa.Table) -> ParticleData:
         n_particles=n_particles,
         metadata=meta.get("metadata", {}),
         id=particle_id,
+        weight=weight,
+        species_charge=(
+            float(species_charge_val) if species_charge_val is not None else None
+        ),
+        species_mass=(
+            float(species_mass_val) if species_mass_val is not None else None
+        ),
     )

@@ -508,6 +508,59 @@ name regardless of geometry.
 
 See CLAUDE.md for naming conventions (functions, parameters, class names).
 
+### Per-particle data columns
+
+For PIC and hybrid codes that emit per-particle data, `ParticleData`
+exposes the following canonical fields (used by the Arrow/Parquet
+I/O layer in `pypic.io`).  All fields are **optional** — readers
+populate whatever the source format provides, and the
+:attr:`ParticleData.effective_charge` / :attr:`effective_mass`
+properties give code-agnostic per-particle quantities regardless of
+which fields are present.
+
+| Field | Storage | Meaning |
+|-------|---------|---------|
+| `x`, `y`, `z` | per-particle (`(N,)` float) | Particle position components in the simulation Cartesian frame |
+| `vx`, `vy`, `vz` | per-particle | Particle velocity components |
+| `charge` | per-particle (`(N,)` float64) | Macroparticle charge `q_s × w`. Populated by combined-storage codes (iPIC3D, OSIRIS); `None` for separate-storage codes |
+| `weight` | per-particle (`(N,)` float64) | Number of physical particles per macroparticle. Populated directly by separate-storage codes; derived from `\|charge\|/\|species_charge\|` for combined-storage codes |
+| `id` | per-particle (`(N,)` int64) | Integer tracking ID (when the code emits one) |
+| `species_charge` | scalar (metadata) | Per-species charge in code units (e.g. ±1 for electrons/ions in iPIC3D normalization) |
+| `species_mass` | scalar (metadata) | Per-species mass in code units |
+
+The scalar `species_charge` and `species_mass` round-trip through the
+Arrow/Parquet schema metadata (no per-particle storage cost).
+
+#### Charge–weight conventions across PIC codes
+
+PIC codes split into two camps for how they store macroparticle charge
+`q_macro = q_s × w`:
+
+- **Combined** (iPIC3D, OSIRIS): per-particle field is `q_macro`.  Weight
+  is implicit — pypic readers derive it as `\|charge\|/\|species_charge\|`.
+  Both `charge` and `weight` are populated.
+- **Separate** (VPIC, WarpX, Smilei, EPOCH, PIConGPU, TRISTAN-MP):
+  per-particle field is `weight`; species charge is a scalar from the
+  run config.  `weight`, `species_charge`, and `species_mass` are
+  populated; per-particle `charge` is left `None` to avoid wasting
+  ~8 GB at billion-particle scale.
+
+#### Computing per-particle quantities
+
+For code-agnostic analysis, use the derived properties:
+
+- `pcl.effective_charge` — returns per-particle `charge` if loaded,
+  else computes `species_charge × weight`.  Used for current density
+  `J = Σ q v` and charge density `ρ_c = Σ q`.
+- `pcl.effective_mass` — returns `species_mass × weight`.  Used for
+  kinetic energy `KE = ½ m v²`, mass density `ρ_m = Σ m`, and
+  physical particle counts `N_phys = Σ w`.
+
+In non-uniform-weight runs (particle splitting/merging, non-uniform
+initial densities), each macroparticle's `weight` is unique and can
+serve as a particle tracking ID — pass `id_column="weight"` to
+`particles_from_dataset` to filter by it.
+
 ---
 
 ## 4. HDF5 Output Layout

@@ -247,11 +247,18 @@ class TabularData:
 class ParticleData:
     r"""Container for particle data from a single species at one timestep.
 
-    Stores position and velocity as ``(N, 3)`` arrays with selective
-    loading: either can be ``None`` if not requested.  The ``charge``
-    array is **always** loaded because per-particle $q$ doubles as a
-    unique particle identifier (each particle's weight is unique at
-    full float64 precision in restart files).
+    All field arrays are optional — codes split into two camps for how
+    they store macroparticle charge:
+
+    - **Combined** (iPIC3D, OSIRIS): per-particle ``charge`` field on
+      disk equals ``species_charge × weight``. ``charge`` is populated.
+    - **Separate** (VPIC, WarpX, Smilei, EPOCH, PIConGPU, TRISTAN-MP):
+      per-particle ``weight`` is stored, ``species_charge`` is a scalar
+      from the run config.  Per-particle ``charge`` is left ``None`` to
+      avoid wasting ~8 GB at billion-particle scale.
+
+    Use the :attr:`effective_charge` and :attr:`effective_mass`
+    properties for code-agnostic per-particle quantities.
 
     Parameters
     ----------
@@ -263,13 +270,28 @@ class ParticleData:
         Particle positions, shape ``(N, 3)``. ``None`` if not loaded.
     velocity : FloatArray | None
         Particle velocities, shape ``(N, 3)``. ``None`` if not loaded.
-    charge : FloatArray
-        Per-particle charge/weight, shape ``(N,)``. Always float64.
+    charge : FloatArray | None
+        Per-particle macroparticle charge, shape ``(N,)``, float64.
+        Equals ``species_charge × weight``.  Populated by combined-storage
+        codes; ``None`` for separate-storage codes — use
+        :attr:`effective_charge` to get a per-particle array regardless.
     n_particles : int
         Total particle count.
     id : np.ndarray | None
         Integer particle tracking IDs, shape ``(N,)``. ``None`` if not
         available or not requested.
+    weight : FloatArray | None
+        Per-particle weight (number of physical particles per
+        macroparticle), shape ``(N,)``, float64. Required for any
+        mass-based calculation (kinetic energy ``½ mₛ w v²``, mass
+        density ``Σ mₛ w``, physical particle count ``Σ w``).
+    species_charge : float | None
+        Scalar species charge in code units (e.g. ``-1.0`` for electrons
+        in iPIC3D normalization). Combined with ``weight`` to compute
+        per-particle charge when ``charge`` is None.
+    species_mass : float | None
+        Scalar species mass in code units. Combined with ``weight`` to
+        compute per-particle physical mass via :attr:`effective_mass`.
     metadata : dict[str, Any]
         Source info (file path, format, etc.).
 
@@ -293,27 +315,31 @@ class ParticleData:
     species_name: str
     position: FloatArray | None
     velocity: FloatArray | None
-    charge: FloatArray
+    charge: FloatArray | None
     n_particles: int
     metadata: dict[str, Any]  # frozen at runtime via __post_init__
     id: np.ndarray | None = None
+    weight: FloatArray | None = None
+    species_charge: float | None = None
+    species_mass: float | None = None
 
     def __post_init__(self) -> None:
         if self.position is None and self.velocity is None:
             msg = "At least one of position or velocity must be provided"
             raise ValueError(msg)
-        if self.charge.dtype != np.float64:
-            msg = (
-                f"charge must be float64 (particle ID precision), "
-                f"got {self.charge.dtype}"
-            )
-            raise ValueError(msg)
-        if self.charge.shape != (self.n_particles,):
-            msg = (
-                f"charge shape {self.charge.shape} does not match "
-                f"n_particles ({self.n_particles},)"
-            )
-            raise ValueError(msg)
+        if self.charge is not None:
+            if self.charge.dtype != np.float64:
+                msg = (
+                    f"charge must be float64 (particle ID precision), "
+                    f"got {self.charge.dtype}"
+                )
+                raise ValueError(msg)
+            if self.charge.shape != (self.n_particles,):
+                msg = (
+                    f"charge shape {self.charge.shape} does not match "
+                    f"n_particles ({self.n_particles},)"
+                )
+                raise ValueError(msg)
         if self.position is not None and self.position.shape != (self.n_particles, 3):
             msg = (
                 f"position shape {self.position.shape} does not match "
@@ -332,6 +358,16 @@ class ParticleData:
                 f"n_particles ({self.n_particles},)"
             )
             raise ValueError(msg)
+        if self.weight is not None:
+            if self.weight.dtype != np.float64:
+                msg = f"weight must be float64, got {self.weight.dtype}"
+                raise ValueError(msg)
+            if self.weight.shape != (self.n_particles,):
+                msg = (
+                    f"weight shape {self.weight.shape} does not match "
+                    f"n_particles ({self.n_particles},)"
+                )
+                raise ValueError(msg)
         object.__setattr__(self, "metadata", MappingProxyType(dict(self.metadata)))
 
     @property
@@ -382,6 +418,33 @@ class ParticleData:
             raise ValueError(msg)
         return self.velocity[:, 2]
 
+    @property
+    def effective_charge(self) -> FloatArray:
+        """Per-particle macroparticle charge (loaded or derived).
+
+        Returns the per-particle ``charge`` array if available; otherwise
+        computes ``species_charge × weight``.  Use this in any code that
+        needs to be agnostic to the underlying PIC code's storage
+        convention.
+        """
+        if self.charge is not None:
+            return self.charge
+        if self.species_charge is not None and self.weight is not None:
+            return self.species_charge * self.weight
+        msg = (
+            "Cannot compute effective_charge: need either per-particle "
+            "'charge' or both 'species_charge' and 'weight'"
+        )
+        raise ValueError(msg)
+
+    @property
+    def effective_mass(self) -> FloatArray:
+        """Per-particle physical mass = ``species_mass × weight``."""
+        if self.species_mass is None or self.weight is None:
+            msg = "Cannot compute effective_mass: need both 'species_mass' and 'weight'"
+            raise ValueError(msg)
+        return self.species_mass * self.weight
+
     def __len__(self) -> int:
         return self.n_particles
 
@@ -391,9 +454,16 @@ class ParticleData:
             loaded.append("position")
         if self.velocity is not None:
             loaded.append("velocity")
-        loaded.append("charge")
+        if self.charge is not None:
+            loaded.append("charge")
         if self.id is not None:
             loaded.append("id")
+        if self.weight is not None:
+            loaded.append("weight")
+        if self.species_charge is not None:
+            loaded.append(f"species_charge={self.species_charge:g}")
+        if self.species_mass is not None:
+            loaded.append(f"species_mass={self.species_mass:g}")
         return (
             f"ParticleData({self.species_name!r}, "
             f"n={self.n_particles:,}, "

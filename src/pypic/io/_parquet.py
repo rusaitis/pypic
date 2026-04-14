@@ -19,7 +19,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
 from pypic.io._arrow import (
     inject_species_meta,
@@ -30,7 +30,7 @@ from pypic.io._guard import ensure_arrow
 from pypic.io._morton import morton_sort_indices
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Iterable, Sequence
 
     import numpy as np
     import pyarrow as pa
@@ -81,6 +81,22 @@ def _morton_sort_table(table: pa.Table) -> pa.Table:
     return table.take(pa.array(idx))
 
 
+def _column_sort_table(table: pa.Table, column: str) -> pa.Table:
+    """Reorder an Arrow table by ascending values of *column*.
+
+    Use when the dataset will be queried by ``column`` as a particle
+    tracking ID — sorting clusters identical/nearby values into the
+    same row groups, making row-group min/max statistics tight enough
+    for predicate pushdown to skip non-matching groups.
+    """
+    import pyarrow.compute as pc
+
+    if column not in table.column_names:
+        return table
+    idx = pc.sort_indices(table, sort_keys=[(column, "ascending")])
+    return table.take(idx)
+
+
 def _strip_extra_columns(table: pa.Table) -> pa.Table:
     """Remove partition and derived columns before converting to ParticleData."""
     drop = [c for c in _STRIP_COLS if c in table.column_names]
@@ -95,12 +111,17 @@ def particles_to_parquet(
     velocity_dtype: str | None = None,
     compression_level: int = 1,
     row_group_size: int = _DEFAULT_ROW_GROUP_SIZE,
+    sort_by: Literal["position", "charge", "weight"] = "position",
 ) -> None:
     r"""Write a single ``ParticleData`` to a Parquet file.
 
-    Particles are sorted by Morton Z-order curve before writing so
-    that Parquet row-group min/max statistics on ``x``/``y``/``z``
-    enable spatial predicate pushdown on read.
+    Particles are sorted before writing so that Parquet row-group
+    min/max statistics enable predicate pushdown on read.  The default
+    ``sort_by="position"`` uses a Morton Z-order curve, optimal for
+    spatial box queries.  Use ``sort_by="charge"`` to optimize for
+    particle tracking when charge serves as the per-particle ID
+    (iPIC3D non-uniform plasma); spatial queries become slower in
+    return.
 
     Parameters
     ----------
@@ -116,6 +137,11 @@ def particles_to_parquet(
         zstd compression level (1 for processing, 3 for archival).
     row_group_size : int
         Target rows per row group (500K--1M recommended).
+    sort_by : {"position", "charge", "weight"}
+        Pre-write sort order.  ``"position"`` (default) Morton-sorts
+        on x/y/z for spatial pushdown.  ``"charge"`` or ``"weight"``
+        ascending-sorts on that column, enabling row-group statistics
+        pushdown for particle tracking by charge or weight.
 
     Examples
     --------
@@ -135,7 +161,13 @@ def particles_to_parquet(
         data, position_dtype=position_dtype, velocity_dtype=velocity_dtype
     )
     table = _add_speed_column(table)
-    table = _morton_sort_table(table)
+    if sort_by == "position":
+        table = _morton_sort_table(table)
+    elif sort_by in ("charge", "weight"):
+        table = _column_sort_table(table, sort_by)
+    else:
+        msg = f"sort_by must be 'position', 'charge', or 'weight', got {sort_by!r}"
+        raise ValueError(msg)
 
     pq.write_table(
         table,
@@ -203,8 +235,39 @@ def _resolve_species_list(
     return result
 
 
+def _resolve_particle_pairs(
+    source: Simulation | Iterable[tuple[int, str, ParticleData]],
+    steps: Sequence[int] | None,
+    species: Sequence[int | str] | None,
+) -> Iterable[tuple[int, str, ParticleData]]:
+    """Normalize a particle source into an iterable of (step, species_name, data).
+
+    Mirrors ``_resolve_timeseries_pairs`` in ``zarr.py`` for fields.
+    Uses duck typing on ``particle_steps`` to detect Simulation-like
+    sources so test mocks and other adapters work without subclassing.
+    """
+    if hasattr(source, "particle_steps") and hasattr(source, "particles"):
+        sim: Any = source
+        step_list = list(steps) if steps is not None else sim.particle_steps
+        species_list = _resolve_species_list(sim, species)
+
+        def _iter_sim() -> Iterable[tuple[int, str, ParticleData]]:
+            for step in step_list:
+                for sp_idx, sp_name in species_list:
+                    pcl = sim.particles(step, sp_idx)
+                    if pcl.n_particles > 0:
+                        yield step, sp_name, pcl
+
+        return _iter_sim()
+
+    if steps is not None or species is not None:
+        msg = "steps= and species= only apply when source is a Simulation"
+        raise ValueError(msg)
+    return source
+
+
 def particles_to_dataset(
-    source: Simulation,
+    source: Simulation | Iterable[tuple[int, str, ParticleData]],
     path: str | Path,
     *,
     steps: Sequence[int] | None = None,
@@ -213,8 +276,9 @@ def particles_to_dataset(
     velocity_dtype: str | None = None,
     compression_level: int = 1,
     row_group_size: int = _DEFAULT_ROW_GROUP_SIZE,
+    sort_by: Literal["position", "charge", "weight"] = "position",
 ) -> None:
-    r"""Write a partitioned Parquet dataset from a Simulation.
+    r"""Write a partitioned Parquet dataset from a Simulation or iterable.
 
     Layout::
 
@@ -225,53 +289,58 @@ def particles_to_dataset(
 
     Parameters
     ----------
-    source : Simulation
-        Simulation with particle data support.
+    source : Simulation or Iterable[tuple[int, str, ParticleData]]
+        Either a ``Simulation`` (reads via ``source.particles``) or an
+        iterable of ``(step, species_name, ParticleData)`` tuples for
+        custom HDF5→Parquet pipelines.  When passing an iterable,
+        ``steps`` and ``species`` must be ``None``.
     path : str or Path
         Root directory for the partitioned dataset.
     steps : Sequence[int] or None
-        Timestep indices to write.  Defaults to all particle steps.
+        Timestep indices to write (Simulation source only).  Defaults
+        to all particle steps.
     species : Sequence[int | str] or None
-        Species indices or names.  Defaults to all species.
+        Species indices or names (Simulation source only).  Defaults
+        to all species.
     position_dtype, velocity_dtype : str or None
         Downcast options.
     compression_level : int
         zstd level (1 for processing, 3 for archival).
     row_group_size : int
         Target rows per row group.
+    sort_by : {"position", "charge"}
+        Pre-write sort order; forwarded to ``particles_to_parquet``.
 
     Examples
     --------
     >>> # particles_to_dataset(sim, "/tmp/particles")
+    >>> # Or with an iterable for custom pipelines:
+    >>> # pairs = [(0, "electrons", pcl_e), (0, "ions", pcl_i)]
+    >>> # particles_to_dataset(pairs, "/tmp/particles")
     """
     ensure_arrow()
     root = Path(path)
-    step_list = list(steps) if steps is not None else source.particle_steps
-    species_list = _resolve_species_list(source, species)
+    pairs = _resolve_particle_pairs(source, steps, species)
 
-    for step in step_list:
-        for sp_idx, sp_name in species_list:
-            pcl = source.particles(step, sp_idx)
-            if pcl.n_particles == 0:
-                _log.debug("Skipping empty step=%d species=%s", step, sp_name)
-                continue
-            part_dir = root / f"step={step:06d}" / f"species={sp_name}"
-            part_dir.mkdir(parents=True, exist_ok=True)
-            part_path = part_dir / "part-00000.parquet"
-            particles_to_parquet(
-                pcl,
-                part_path,
-                position_dtype=position_dtype,
-                velocity_dtype=velocity_dtype,
-                compression_level=compression_level,
-                row_group_size=row_group_size,
-            )
-    _log.info(
-        "Wrote partitioned dataset (%d steps, %d species) to %s",
-        len(step_list),
-        len(species_list),
-        root,
-    )
+    n_written = 0
+    for step, sp_name, pcl in pairs:
+        if pcl.n_particles == 0:
+            _log.debug("Skipping empty step=%d species=%s", step, sp_name)
+            continue
+        part_dir = root / f"step={step:06d}" / f"species={sp_name}"
+        part_dir.mkdir(parents=True, exist_ok=True)
+        part_path = part_dir / "part-00000.parquet"
+        particles_to_parquet(
+            pcl,
+            part_path,
+            position_dtype=position_dtype,
+            velocity_dtype=velocity_dtype,
+            compression_level=compression_level,
+            row_group_size=row_group_size,
+            sort_by=sort_by,
+        )
+        n_written += 1
+    _log.info("Wrote partitioned dataset (%d files) to %s", n_written, root)
 
 
 def particles_from_dataset(
@@ -282,7 +351,8 @@ def particles_from_dataset(
     spatial_box: (
         tuple[tuple[float, float], tuple[float, float], tuple[float, float]] | None
     ) = None,
-    ids: np.ndarray | Sequence[int] | None = None,
+    ids: np.ndarray | Sequence[int] | Sequence[float] | None = None,
+    id_column: str = "id",
     energy_min: float | None = None,
     columns: Sequence[str] | None = None,
 ) -> ParticleData:
@@ -304,12 +374,20 @@ def particles_from_dataset(
         ``((x_min, x_max), (y_min, y_max), (z_min, z_max))`` for
         spatial filtering via predicate pushdown.
     ids : array or Sequence or None
-        Particle IDs to filter on.
+        Values to filter on against ``id_column``.  Default
+        ``id_column="id"`` matches the integer tracking column;
+        pass ``id_column="charge"`` with float64 values to track
+        iPIC3D particles by their (per-particle) charge/weight.
+    id_column : str
+        Column name to filter ``ids`` against.  Default ``"id"``.
+        For best pushdown effectiveness when ``id_column != "id"``,
+        write the dataset with matching ``sort_by`` (e.g.
+        ``sort_by="charge"`` for ``id_column="charge"``).
     energy_min : float or None
         Minimum speed ``|v|`` threshold for energy filtering.
     columns : Sequence[str] or None
         Column names to load (e.g. ``["x", "y", "z"]``).  ``charge``
-        is always included.
+        and ``id_column`` are always included.
 
     Returns
     -------
@@ -360,7 +438,7 @@ def particles_from_dataset(
         row_filter = speed_filter if row_filter is None else row_filter & speed_filter
     if ids is not None:
         id_list = list(ids) if not isinstance(ids, list) else ids
-        id_filter = pads.field("id").isin(id_list)
+        id_filter = pads.field(id_column).isin(id_list)
         row_filter = id_filter if row_filter is None else row_filter & id_filter
 
     combined_filter: Any = None
@@ -371,12 +449,12 @@ def particles_from_dataset(
     elif row_filter is not None:
         combined_filter = row_filter
 
-    # Column pruning — always include charge
+    # Column pruning — only force-include the active id_column when filtering
     read_columns: list[str] | None = None
     if columns is not None:
         read_columns = list(columns)
-        if "charge" not in read_columns:
-            read_columns.append("charge")
+        if ids is not None and id_column not in read_columns:
+            read_columns.append(id_column)
 
     table = dataset.to_table(filter=combined_filter, columns=read_columns)
 
@@ -390,8 +468,31 @@ def particles_from_dataset(
     elif isinstance(species, int):
         species_index = species
 
+    # Recover scalar species_charge/species_mass from the per-file
+    # Parquet schema metadata (pyarrow.dataset's unified schema doesn't
+    # merge per-file metadata).  Read from the first matching fragment.
+    species_charge_meta = None
+    species_mass_meta = None
+    try:
+        first_frag = next(iter(dataset.get_fragments(filter=combined_filter)))
+        file_meta = first_frag.physical_schema.metadata
+        if file_meta and b"pypic" in file_meta:
+            import json as _json
+
+            payload = _json.loads(file_meta[b"pypic"])
+            species_charge_meta = payload.get("species_charge")
+            species_mass_meta = payload.get("species_mass")
+    except (StopIteration, KeyError, ValueError):
+        pass
+
     table = _strip_extra_columns(table)
-    table = inject_species_meta(table, species_index, species_name)
+    table = inject_species_meta(
+        table,
+        species_index,
+        species_name,
+        species_charge=species_charge_meta,
+        species_mass=species_mass_meta,
+    )
     return particles_from_arrow(table)
 
 

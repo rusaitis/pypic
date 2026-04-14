@@ -70,20 +70,24 @@ class TestParticleData:
         assert pcl.position is None
         assert pcl.velocity is not None
 
-    def test_charge_always_present(self) -> None:
+    def test_charge_optional_when_omitted(self) -> None:
+        # ParticleData no longer requires per-particle charge; codes
+        # that store only weight + species_charge can omit it
         pos = np.zeros((3, 3))
-        q = np.full(3, -1.0)
         pcl = ParticleData(
             species_index=0,
             species_name="e",
             position=pos,
             velocity=None,
-            charge=q,
+            charge=None,
             n_particles=3,
             metadata={},
+            weight=np.full(3, 1.0),
+            species_charge=-1.0,
         )
-        assert pcl.charge is not None
-        np.testing.assert_array_equal(pcl.charge, np.full(3, -1.0))
+        assert pcl.charge is None
+        # effective_charge derives from species_charge × weight
+        np.testing.assert_array_equal(pcl.effective_charge, np.full(3, -1.0))
 
     def test_charge_dtype_float64(self) -> None:
         pos = np.zeros((3, 3))
@@ -236,6 +240,84 @@ class TestParticleData:
         assert len(pcl) == 7
 
 
+class TestEffectiveProperties:
+    """Tests for the code-agnostic effective_charge / effective_mass properties."""
+
+    def test_effective_charge_from_per_particle(self) -> None:
+        # Combined-storage style: charge populated, returns it directly
+        pcl = ParticleData(
+            species_index=0,
+            species_name="e",
+            position=np.zeros((4, 3)),
+            velocity=None,
+            charge=np.array([-1.0, -2.0, -1.5, -0.5]),
+            n_particles=4,
+            metadata={},
+        )
+        np.testing.assert_array_equal(
+            pcl.effective_charge, np.array([-1.0, -2.0, -1.5, -0.5])
+        )
+
+    def test_effective_charge_fallback(self) -> None:
+        # Separate-storage style: charge None, derive from species_charge × weight
+        pcl = ParticleData(
+            species_index=0,
+            species_name="e",
+            position=np.zeros((3, 3)),
+            velocity=None,
+            charge=None,
+            n_particles=3,
+            metadata={},
+            weight=np.array([1.0, 2.0, 3.0]),
+            species_charge=-1.0,
+        )
+        np.testing.assert_array_equal(
+            pcl.effective_charge, np.array([-1.0, -2.0, -3.0])
+        )
+
+    def test_effective_charge_neither_raises(self) -> None:
+        pcl = ParticleData(
+            species_index=0,
+            species_name="e",
+            position=np.zeros((3, 3)),
+            velocity=None,
+            charge=None,
+            n_particles=3,
+            metadata={},
+        )
+        with pytest.raises(ValueError, match="effective_charge"):
+            _ = pcl.effective_charge
+
+    def test_effective_mass(self) -> None:
+        pcl = ParticleData(
+            species_index=0,
+            species_name="i",
+            position=np.zeros((3, 3)),
+            velocity=None,
+            charge=None,
+            n_particles=3,
+            metadata={},
+            weight=np.array([1.0, 2.0, 4.0]),
+            species_mass=2.5,
+        )
+        np.testing.assert_array_equal(pcl.effective_mass, np.array([2.5, 5.0, 10.0]))
+
+    def test_effective_mass_missing_raises(self) -> None:
+        # No species_mass
+        pcl = ParticleData(
+            species_index=0,
+            species_name="i",
+            position=np.zeros((3, 3)),
+            velocity=None,
+            charge=np.full(3, 1.0),
+            n_particles=3,
+            metadata={},
+            weight=np.full(3, 1.0),
+        )
+        with pytest.raises(ValueError, match="effective_mass"):
+            _ = pcl.effective_mass
+
+
 @pytest.fixture
 def ipic3d_config():
     return parse_inp(FIXTURE_DIR / "synthetic.inp")
@@ -277,6 +359,7 @@ class TestPhdf5ParticleReader:
         assert len(pcl) == 18
         assert pcl.position is not None
         assert pcl.velocity is not None
+        assert pcl.charge is not None
         assert pcl.position.shape == (18, 3)
         assert pcl.velocity.shape == (18, 3)
         assert pcl.charge.shape == (18,)
@@ -303,6 +386,7 @@ class TestPhdf5ParticleReader:
 
     def test_charge_full_precision(self, ipic3d_config) -> None:
         pcl = read_phdf5_particles(FIXTURE_DIR, 0, 0, ipic3d_config)
+        assert pcl.charge is not None
         assert pcl.charge.dtype == np.float64
 
     def test_species_name(self, ipic3d_config) -> None:
@@ -310,6 +394,36 @@ class TestPhdf5ParticleReader:
         assert pcl.species_name == "species_0"
         pcl_i = read_phdf5_particles(FIXTURE_DIR, 0, 1, ipic3d_config)
         assert pcl_i.species_name == "species_1"
+
+    def test_weight_derived_from_charge(self, ipic3d_config) -> None:
+        # iPIC3D convention: |q_species|=1, so weight = |charge|.
+        # Both electrons and ions have unit weight in this fixture.
+        pcl_e = read_phdf5_particles(FIXTURE_DIR, 0, 0, ipic3d_config)
+        assert pcl_e.weight is not None
+        assert pcl_e.charge is not None
+        np.testing.assert_array_equal(pcl_e.weight, np.abs(pcl_e.charge))
+
+        pcl_i = read_phdf5_particles(FIXTURE_DIR, 0, 1, ipic3d_config)
+        assert pcl_i.weight is not None
+        assert pcl_i.charge is not None
+        np.testing.assert_array_equal(pcl_i.weight, np.abs(pcl_i.charge))
+
+    def test_species_charge_populated(self, ipic3d_config) -> None:
+        # iPIC3D convention: species_charge = sign(qom)
+        pcl_e = read_phdf5_particles(FIXTURE_DIR, 0, 0, ipic3d_config)
+        pcl_i = read_phdf5_particles(FIXTURE_DIR, 0, 1, ipic3d_config)
+        assert pcl_e.species_charge == -1.0  # electrons
+        assert pcl_i.species_charge == 1.0  # ions
+
+    def test_species_mass_populated(self, ipic3d_config) -> None:
+        # iPIC3D convention: species_mass = 1/|qom|
+        pcl_e = read_phdf5_particles(FIXTURE_DIR, 0, 0, ipic3d_config)
+        pcl_i = read_phdf5_particles(FIXTURE_DIR, 0, 1, ipic3d_config)
+        assert pcl_e.species_mass is not None
+        assert pcl_i.species_mass is not None
+        # Both species mass values should be positive
+        assert pcl_e.species_mass > 0
+        assert pcl_i.species_mass > 0
 
 
 class TestParticleIdSupport:

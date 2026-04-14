@@ -59,12 +59,12 @@ def read_phdf5_particles(
     species : int
         Zero-based species index.
     config : IPic3DConfig
-        Parsed iPIC3D configuration. Currently unused — species names
-        follow the ``species_{index}`` convention set by
-        :func:`_build_species` — but accepted on the signature for
-        symmetry with :meth:`SimulationReader.read_particles` and as a
-        hook for future metadata (e.g. real species names from the
-        ``.inp`` file).
+        Parsed iPIC3D configuration.  Used to derive per-particle
+        ``weight = |charge| / |species_charge|``.  iPIC3D normalization
+        sets ``|q_species| = 1`` so ``weight = |charge|``; in
+        uniform-weight runs this yields ``1.0`` everywhere, in
+        non-uniform plasma it carries the per-particle weight.
+        Species names still follow the ``species_{index}`` convention.
     columns : Iterable[str] | None
         Subset of ``{"position", "velocity"}`` to load.
         ``None`` loads all.  ``charge`` is always loaded.
@@ -111,6 +111,19 @@ def read_phdf5_particles(
 
     species_name = f"species_{species}"
 
+    # iPIC3D normalization convention: |q_species| = 1,
+    # sign(q_species) = sign(qom[s]), m_species = 1 / |qom[s]|.
+    # Populate scalar species fields and derive weight when species
+    # is in range of the config qom array.
+    weight: np.ndarray | None = None
+    species_charge: float | None = None
+    species_mass: float | None = None
+    if species < len(config.qom):
+        qom_s = config.qom[species]
+        species_charge = float(np.sign(qom_s))  # ±1.0
+        species_mass = 1.0 / abs(qom_s)
+        weight = np.abs(charge) / abs(species_charge)
+
     return ParticleData(
         species_index=species,
         species_name=species_name,
@@ -120,4 +133,7 @@ def read_phdf5_particles(
         n_particles=n_particles,
         metadata={"path": str(h5_path), "format": "phdf5"},
         id=particle_id,
+        weight=weight,
+        species_charge=species_charge,
+        species_mass=species_mass,
     )

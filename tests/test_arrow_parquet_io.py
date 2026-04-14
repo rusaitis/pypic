@@ -218,6 +218,81 @@ class TestArrowInterchange:
             "id",
         }
 
+    def test_round_trip_no_charge_vpic_style(self):
+        # VPIC/WarpX style: weight + species_charge, no per-particle charge
+        rng = np.random.default_rng(23)
+        n = 40
+        pcl = ParticleData(
+            species_index=0,
+            species_name="electrons",
+            position=rng.uniform(0, 1, (n, 3)),
+            velocity=rng.standard_normal((n, 3)),
+            charge=None,
+            n_particles=n,
+            metadata={},
+            weight=rng.uniform(0.5, 2.0, n),
+            species_charge=-1.0,
+            species_mass=1.0,
+        )
+        table = particles_to_arrow(pcl)
+        assert "charge" not in table.column_names
+        assert "weight" in table.column_names
+        rebuilt = particles_from_arrow(table)
+        assert rebuilt.charge is None
+        assert rebuilt.species_charge == -1.0
+        assert rebuilt.species_mass == 1.0
+        assert rebuilt.weight is not None
+        np.testing.assert_array_equal(rebuilt.weight, pcl.weight)
+        # effective_charge should compute from species_charge × weight
+        np.testing.assert_array_equal(rebuilt.effective_charge, -1.0 * pcl.weight)
+
+    def test_species_metadata_round_trip(self):
+        pcl = _make_particles(20)
+        # Inject custom species fields
+        pcl_with_meta = ParticleData(
+            species_index=pcl.species_index,
+            species_name=pcl.species_name,
+            position=pcl.position,
+            velocity=pcl.velocity,
+            charge=pcl.charge,
+            n_particles=pcl.n_particles,
+            metadata={},
+            id=pcl.id,
+            species_charge=2.5,
+            species_mass=4.0,
+        )
+        table = particles_to_arrow(pcl_with_meta)
+        rebuilt = particles_from_arrow(table)
+        assert rebuilt.species_charge == 2.5
+        assert rebuilt.species_mass == 4.0
+
+    def test_round_trip_with_weight(self):
+        rng = np.random.default_rng(13)
+        n = 30
+        pcl = ParticleData(
+            species_index=0,
+            species_name="electrons",
+            position=rng.uniform(0, 1, (n, 3)),
+            velocity=rng.standard_normal((n, 3)),
+            charge=np.full(n, -1.0),
+            n_particles=n,
+            metadata={},
+            weight=rng.uniform(0.5, 2.0, n),
+        )
+        table = particles_to_arrow(pcl)
+        assert "weight" in table.column_names
+        rebuilt = particles_from_arrow(table)
+        assert rebuilt.weight is not None
+        np.testing.assert_array_equal(rebuilt.weight, pcl.weight)
+
+    def test_round_trip_without_weight(self):
+        pcl = _make_particles(20)
+        assert pcl.weight is None
+        table = particles_to_arrow(pcl)
+        assert "weight" not in table.column_names
+        rebuilt = particles_from_arrow(table)
+        assert rebuilt.weight is None
+
     def test_round_trip_without_id(self):
         rng = np.random.default_rng(5)
         pcl = ParticleData(
@@ -296,6 +371,74 @@ class TestSingleFileParquet:
         rebuilt = particles_from_parquet(fpath)
         # ParticleData should not have a speed attribute leak
         assert rebuilt.n_particles == 50
+
+    def test_sort_by_charge(self, tmp_path: Path):
+        # Use distinct per-particle charges so sorting is observable
+        rng = np.random.default_rng(7)
+        n = 200
+        pcl = ParticleData(
+            species_index=0,
+            species_name="electrons",
+            position=rng.uniform(0, 10, (n, 3)),
+            velocity=rng.standard_normal((n, 3)),
+            charge=rng.uniform(-2.0, -0.5, n),
+            n_particles=n,
+            id=np.arange(n, dtype=np.int64),
+            metadata={},
+        )
+        fpath = tmp_path / "charge_sorted.parquet"
+        particles_to_parquet(pcl, fpath, sort_by="charge")
+        rebuilt = particles_from_parquet(fpath)
+        assert np.all(np.diff(rebuilt.charge) >= 0)
+
+    def test_sort_by_invalid_raises(self, tmp_path: Path):
+        pcl = _make_particles(10)
+        with pytest.raises(ValueError, match="sort_by"):
+            particles_to_parquet(pcl, tmp_path / "bad.parquet", sort_by="velocity")  # type: ignore[arg-type]
+
+    def test_round_trip_no_charge_parquet(self, tmp_path: Path):
+        # VPIC-style: weight + species fields, no per-particle charge
+        rng = np.random.default_rng(31)
+        n = 60
+        pcl = ParticleData(
+            species_index=0,
+            species_name="electrons",
+            position=rng.uniform(0, 5, (n, 3)),
+            velocity=rng.standard_normal((n, 3)),
+            charge=None,
+            n_particles=n,
+            metadata={},
+            weight=rng.uniform(0.5, 2.0, n),
+            species_charge=-1.0,
+            species_mass=1.0,
+        )
+        fpath = tmp_path / "vpic_style.parquet"
+        particles_to_parquet(pcl, fpath)
+        rebuilt = particles_from_parquet(fpath)
+        assert rebuilt.charge is None
+        assert rebuilt.weight is not None
+        assert rebuilt.species_charge == -1.0
+        assert rebuilt.species_mass == 1.0
+
+    def test_sort_by_weight(self, tmp_path: Path):
+        rng = np.random.default_rng(17)
+        n = 200
+        pcl = ParticleData(
+            species_index=0,
+            species_name="electrons",
+            position=rng.uniform(0, 10, (n, 3)),
+            velocity=rng.standard_normal((n, 3)),
+            charge=np.full(n, -1.0),
+            n_particles=n,
+            id=np.arange(n, dtype=np.int64),
+            weight=rng.uniform(0.5, 2.0, n),
+            metadata={},
+        )
+        fpath = tmp_path / "weight_sorted.parquet"
+        particles_to_parquet(pcl, fpath, sort_by="weight")
+        rebuilt = particles_from_parquet(fpath)
+        assert rebuilt.weight is not None
+        assert np.all(np.diff(rebuilt.weight) >= 0)
 
 
 # --- Partitioned dataset ---
@@ -380,6 +523,106 @@ class TestPartitionedDataset:
         pcl = particles_from_dataset(root)
         # 2 steps × 2 species × 100 particles = 400
         assert pcl.n_particles == 400
+
+    def test_id_column_charge_filter(self, tmp_path: Path):
+        # Build a custom dataset with distinct float64 charges per particle
+        rng = np.random.default_rng(11)
+        n = 100
+        charges = rng.uniform(-2.0, -0.5, n)
+        pcl = ParticleData(
+            species_index=0,
+            species_name="electrons",
+            position=rng.uniform(0, 10, (n, 3)),
+            velocity=rng.standard_normal((n, 3)),
+            charge=charges,
+            n_particles=n,
+            id=np.arange(n, dtype=np.int64),
+            metadata={},
+        )
+        root = tmp_path / "by_charge"
+        particles_to_dataset([(0, "electrons", pcl)], root, sort_by="charge")
+        target = [float(charges[3]), float(charges[42]), float(charges[77])]
+        result = particles_from_dataset(
+            root, step=0, species="electrons", ids=target, id_column="charge"
+        )
+        assert result.n_particles == 3
+        assert sorted(result.charge.tolist()) == sorted(target)
+
+    def test_iterable_source(self, tmp_path: Path):
+        pcl_e = _make_particles(40, seed=1, species_name="electrons")
+        pcl_i = _make_particles(60, seed=2, species_index=1, species_name="ions")
+        root = tmp_path / "iterable"
+        particles_to_dataset(
+            [(0, "electrons", pcl_e), (0, "ions", pcl_i)],
+            root,
+        )
+        e_path = root / "step=000000/species=electrons/part-00000.parquet"
+        i_path = root / "step=000000/species=ions/part-00000.parquet"
+        assert e_path.exists()
+        assert i_path.exists()
+        rebuilt_e = particles_from_dataset(root, step=0, species="electrons")
+        assert rebuilt_e.n_particles == 40
+
+    def test_partitioned_dataset_no_charge(self, tmp_path: Path):
+        # VPIC-style: write data with charge=None via iterable form,
+        # verify species_charge/mass round-trip through Parquet metadata
+        rng = np.random.default_rng(43)
+        n = 50
+        pcl = ParticleData(
+            species_index=0,
+            species_name="electrons",
+            position=rng.uniform(0, 5, (n, 3)),
+            velocity=rng.standard_normal((n, 3)),
+            charge=None,
+            n_particles=n,
+            metadata={},
+            weight=rng.uniform(0.5, 2.0, n),
+            species_charge=-1.0,
+            species_mass=1.0,
+        )
+        root = tmp_path / "vpic_dataset"
+        particles_to_dataset([(0, "electrons", pcl)], root)
+        rebuilt = particles_from_dataset(root, step=0, species="electrons")
+        assert rebuilt.charge is None
+        assert rebuilt.weight is not None
+        assert rebuilt.species_charge == -1.0
+        assert rebuilt.species_mass == 1.0
+        # effective_charge derives correctly
+        np.testing.assert_array_equal(rebuilt.effective_charge, -1.0 * rebuilt.weight)
+
+    def test_columns_pruning_no_implicit_charge(self, tmp_path: Path):
+        # When user requests only x/y/z, charge should NOT be force-included
+        rng = np.random.default_rng(47)
+        n = 40
+        pcl = ParticleData(
+            species_index=0,
+            species_name="electrons",
+            position=rng.uniform(0, 5, (n, 3)),
+            velocity=rng.standard_normal((n, 3)),
+            charge=None,
+            n_particles=n,
+            metadata={},
+            weight=rng.uniform(0.5, 2.0, n),
+            species_charge=-1.0,
+        )
+        root = tmp_path / "no_charge_columns"
+        particles_to_dataset([(0, "electrons", pcl)], root)
+        rebuilt = particles_from_dataset(
+            root, step=0, species="electrons", columns=["x", "y", "z"]
+        )
+        assert rebuilt.position is not None
+        assert rebuilt.velocity is None
+        assert rebuilt.charge is None
+        assert rebuilt.weight is None  # not requested
+
+    def test_iterable_with_steps_kwarg_raises(self, tmp_path: Path):
+        pcl = _make_particles(10)
+        with pytest.raises(ValueError, match="only apply when source is a Simulation"):
+            particles_to_dataset(
+                [(0, "electrons", pcl)],
+                tmp_path / "bad",
+                steps=[0],
+            )
 
 
 # --- DuckDB ---
