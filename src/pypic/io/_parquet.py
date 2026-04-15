@@ -126,6 +126,22 @@ def _require_vector_columns(columns: Sequence[str]) -> None:
         raise ValueError(msg)
 
 
+def _payload_from_species_dir(root: Path, species_name: str) -> dict[str, Any] | None:
+    """Read the ``pypic`` payload from any fragment under ``species={name}/``.
+
+    Fallback for the empty-filter case in :func:`particles_from_dataset`:
+    when no fragments match the caller's step/spatial/id filters but the
+    caller pinned a species, its schema metadata is still on disk and
+    should be adopted rather than degraded to the ``"unknown"``
+    placeholder.  Mirrors ``_duckdb._lookup_species_meta``.
+    """
+    import pyarrow.parquet as pq
+
+    for p in root.glob(f"step=*/species={species_name}/*.parquet"):
+        return _decode_species_meta(pq.read_metadata(str(p)).metadata)
+    return None
+
+
 def _matched_species_metadata(
     dataset: pads.Dataset,
     combined_filter: pads.Expression | None,
@@ -500,9 +516,10 @@ def particles_from_dataset(
     if step is not None:
         step_str = f"{step:06d}"
         part_filter = pads.field("step") == step_str
+    pinned_species_str: str | None = None
     if species is not None:
-        species_str = _resolve_species_str(species, Path(path))
-        sp_filter = pads.field("species") == species_str
+        pinned_species_str = _resolve_species_str(species, Path(path))
+        sp_filter = pads.field("species") == pinned_species_str
         part_filter = sp_filter if part_filter is None else part_filter & sp_filter
 
     # Row-level filter (predicate pushdown on Parquet statistics)
@@ -546,6 +563,14 @@ def particles_from_dataset(
     # Hive partitioning has flattened it to a directory name.  Raises
     # if the filter matched multiple species.
     payload = _matched_species_metadata(dataset, combined_filter)
+    # Empty-filter recovery: a pinned species still has its schema
+    # metadata on disk under ``species={name}/``, so adopt that
+    # payload rather than degrade identity to ``"unknown"``.  Mirrors
+    # the DuckDB empty-result recovery in ``_duckdb.query_sql``.
+    if payload.get("species_name") == "unknown" and pinned_species_str is not None:
+        pinned_payload = _payload_from_species_dir(Path(path), pinned_species_str)
+        if pinned_payload is not None:
+            payload = pinned_payload
 
     table = dataset.to_table(filter=combined_filter, columns=read_columns)
     table = _strip_extra_columns(table)

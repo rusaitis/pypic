@@ -766,6 +766,62 @@ class TestPartitionedDataset:
         rebuilt = particles_from_dataset(root, step=0, species="electrons")
         assert rebuilt.metadata == {"source": "test"}
 
+    def test_empty_filtered_read_preserves_pinned_species_string(self, tmp_path: Path):
+        # Reviewer regression: when the caller explicitly pins a
+        # species (by name) but the step/row filter matches zero
+        # fragments, the species' schema metadata is still on disk
+        # under ``species={name}/`` — adopt that payload rather than
+        # degrade to the ``"unknown"`` placeholder.
+        sim = _make_mock_simulation(
+            steps=[0, 100],
+            species=[(0, "electrons"), (1, "ions")],
+            n_particles=50,
+        )
+        root = tmp_path / "empty_pinned_str"
+        particles_to_dataset(sim, root)
+        pcl = particles_from_dataset(root, step=999, species="electrons")
+        assert pcl.n_particles == 0
+        assert pcl.species_name == "electrons"
+        assert pcl.species_index == 0
+        assert pcl.species_charge == -1.0
+        assert pcl.species_mass == 1.0
+        assert pcl.metadata == {"source": "test"}
+
+    def test_empty_filtered_read_preserves_pinned_species_index(self, tmp_path: Path):
+        # Same recovery path must fire when the caller pins a species
+        # by integer index — ``_resolve_species_str`` resolves to the
+        # same partition directory.
+        sim = _make_mock_simulation(
+            steps=[0, 100],
+            species=[(0, "electrons"), (1, "ions")],
+            n_particles=50,
+        )
+        root = tmp_path / "empty_pinned_idx"
+        particles_to_dataset(sim, root)
+        pcl = particles_from_dataset(root, step=999, species=1)
+        assert pcl.n_particles == 0
+        assert pcl.species_name == "ions"
+        assert pcl.species_index == 1
+        assert pcl.species_charge == 1.0
+
+    def test_empty_filtered_read_without_species_stays_placeholder(
+        self, tmp_path: Path
+    ):
+        # Genuinely ambiguous empty result — no species pin, multi-
+        # species dataset — must still return the ``"unknown"``
+        # placeholder (we have no basis for adopting a specific
+        # species).
+        sim = _make_mock_simulation(
+            steps=[0, 100],
+            species=[(0, "electrons"), (1, "ions")],
+            n_particles=50,
+        )
+        root = tmp_path / "empty_unpinned"
+        particles_to_dataset(sim, root)
+        pcl = particles_from_dataset(root, step=999)
+        assert pcl.n_particles == 0
+        assert pcl.species_name == "unknown"
+
 
 # --- DuckDB ---
 

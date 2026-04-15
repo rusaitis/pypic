@@ -474,6 +474,28 @@ class TestToZarrTimeseries:
             to_zarr_timeseries([(0.0, step0), (1.0, step1)], store)
         assert not store.exists()
 
+    def test_timeseries_cleans_stub_on_first_write_failure(self, tmp_path):
+        # Reviewer regression: the cleanup guard used to key off the
+        # ``first`` flag, which stays True when xarray's *first*
+        # ``ds.to_zarr(mode='w')`` call fails during materialization.
+        # A stub store containing only ``zarr.json`` was left behind
+        # and a later ``from_zarr`` surfaced the misleading "No 'pypic'
+        # metadata found" error instead of the real write failure.
+        grid = make_uniform_grid(4, 3, 2)
+        fds = FieldDataset.from_arrays(
+            {"B1": np.ones((4, 3, 2))},
+            grid,
+            Normalization.identity(),
+        )
+        store = tmp_path / "stub.zarr"
+        with pytest.raises((TypeError, ValueError)):
+            to_zarr_timeseries(
+                [(0.0, fds)],
+                store,
+                encoding={"B1": {"dtype": "not-a-real-dtype"}},
+            )
+        assert not store.exists()
+
     def test_timeseries_preserves_metadata(self, tmp_path):
         grid = make_uniform_grid(4, 3, 2)
         fds = FieldDataset.from_arrays(

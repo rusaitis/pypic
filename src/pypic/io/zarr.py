@@ -451,9 +451,20 @@ def to_zarr_timeseries(
 
     ensure_zarr()
     import shutil
+    from pathlib import Path as _Path
 
     pairs = _resolve_timeseries_pairs(source, steps, fields)
     path_str = str(path)
+    # Cleanup gating mirrors the single-step + icechunk writers: if the
+    # output path was fresh or empty when we started, any failure
+    # inside the try is ours to clean up — including when xarray's
+    # *first* ``ds.to_zarr(mode='w')`` call fails partway through and
+    # leaves a stub store with just ``zarr.json``.  A pre-existing
+    # non-empty directory is left alone (user data).
+    path_obj = _Path(path)
+    created_new = not path_obj.exists() or (
+        path_obj.is_dir() and not any(path_obj.iterdir())
+    )
     first = True
     pypic_attrs: dict[str, Any] | None = None
     first_fds: FieldDataset | None = None
@@ -491,12 +502,12 @@ def to_zarr_timeseries(
                     append_dim="time",
                 )
     except BaseException:
-        # Partial multi-step writes leave a store that looks like a
-        # valid single-step export — delete it so the filesystem state
-        # matches the error state.  BaseException covers KeyboardInterrupt
-        # as well: a Ctrl-C between appends would otherwise leave the
-        # same orphan store behind.
-        if not first:
+        # Any failure inside the loop — including a first-step
+        # materialization failure that leaves only ``zarr.json`` behind
+        # — reclaims the store when we owned the directory.
+        # BaseException covers KeyboardInterrupt as well: a Ctrl-C
+        # between appends would otherwise leave the same orphan store.
+        if created_new:
             shutil.rmtree(path_str, ignore_errors=True)
         raise
 
