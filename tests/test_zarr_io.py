@@ -364,6 +364,25 @@ class TestToZarrFromZarr:
         with pytest.raises(ValueError, match="No 'pypic' metadata"):
             from_zarr(store)
 
+    def test_failed_write_cleans_up_fresh_store(self, tmp_path):
+        # Reviewer regression: ``ds.to_zarr`` in mode='w' creates the
+        # destination directory (and writes ``zarr.json``) before
+        # xarray's attribute validator rejects a non-serializable
+        # value.  Without cleanup the half-written store survives and
+        # a later ``from_zarr`` surfaces "No 'pypic' metadata found"
+        # instead of the real write error.  A set is not JSON-native.
+        grid = make_uniform_grid(4, 3, 2)
+        fds = FieldDataset.from_arrays(
+            {"B1": np.ones((4, 3, 2))},
+            grid,
+            Normalization.identity(),
+            metadata={"bad": {1, 2, 3}},
+        )
+        store = tmp_path / "broken.zarr"
+        with pytest.raises(TypeError, match=r"Invalid attribute"):
+            to_zarr(fds, store)
+        assert not store.exists()
+
 
 class TestToZarrTimeseries:
     """Tests for to_zarr_timeseries with iterable source."""

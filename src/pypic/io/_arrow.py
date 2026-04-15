@@ -223,13 +223,15 @@ def particles_from_arrow(table: pa.Table) -> ParticleData:
     species_charge_val = meta.get("species_charge")
     species_mass_val = meta.get("species_mass")
 
+    from pypic.io._serialize import _from_json_native
+
     return ParticleData(
         species_index=meta["species_index"],
         species_name=meta["species_name"],
         position=position,
         velocity=velocity,
         n_particles=n_particles,
-        metadata=meta.get("metadata", {}),
+        metadata=_from_json_native(meta.get("metadata", {})),
         id=particle_id,
         weight=weight,
         species_charge=(

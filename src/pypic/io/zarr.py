@@ -214,16 +214,37 @@ def to_zarr(
         raise ValueError(msg)
 
     ensure_zarr()
+    import shutil
+    from pathlib import Path as _Path
+
+    # Same cleanup gating as the Icechunk writers: ``ds.to_zarr`` in
+    # ``mode='w'`` materializes a partial store (``zarr.json`` and any
+    # chunks written before the failure) into the destination before
+    # attribute serialization can reject, say, non-serializable
+    # metadata.  Without cleanup a later ``from_zarr`` on that path
+    # surfaces "No 'pypic' metadata found" instead of the actual
+    # underlying write error, misleading operators.  A pre-existing
+    # non-empty directory is left alone — that is the user's data.
+    path_obj = _Path(path)
+    created_new = not path_obj.exists() or (
+        path_obj.is_dir() and not any(path_obj.iterdir())
+    )
+
     ds = fds.xr.copy(deep=False)
     ds.attrs["pypic"] = encode_pypic_attrs(fds)
 
-    ds.to_zarr(
-        str(path),
-        zarr_format=3,
-        consolidated=False,
-        mode="w",
-        encoding=_build_encoding(ds, dtype, encoding),
-    )
+    try:
+        ds.to_zarr(
+            str(path),
+            zarr_format=3,
+            consolidated=False,
+            mode="w",
+            encoding=_build_encoding(ds, dtype, encoding),
+        )
+    except BaseException:
+        if created_new:
+            shutil.rmtree(path, ignore_errors=True)
+        raise
     _log.info("Wrote %d fields to %s", len(ds.data_vars), path)
     return None
 

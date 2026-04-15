@@ -222,6 +222,42 @@ class TestArrowInterchange:
         assert isinstance(rebuilt.metadata["step"], int)
         assert rebuilt.metadata["shape"] == [4, 3]
 
+    def test_stagger_info_metadata_round_trips(self):
+        # Reviewer regression: _encode_species_meta runs metadata
+        # through _to_json_native (so StaggerInfo becomes a tagged
+        # dict), but particles_from_arrow used to forward the dict
+        # straight into ParticleData — the particle path must also
+        # apply _from_json_native to reconstruct the dataclass, same
+        # as the FieldDataset path.
+        from pypic.containers import StaggerInfo
+
+        stagger = StaggerInfo(
+            convention="staggered",
+            field_locations={"B": "face"},
+            interpolation_order=1,
+            notes="Yee",
+        )
+        pcl = ParticleData(
+            species_index=0,
+            species_name="electrons",
+            position=np.zeros((4, 3)),
+            velocity=np.zeros((4, 3)),
+            n_particles=4,
+            metadata={"stagger": stagger, "run": "demo"},
+            weight=np.ones(4),
+            species_charge=-1.0,
+            species_mass=1.0,
+        )
+        table = particles_to_arrow(pcl)
+        rebuilt = particles_from_arrow(table)
+        rebuilt_stagger = rebuilt.metadata["stagger"]
+        assert isinstance(rebuilt_stagger, StaggerInfo)
+        assert rebuilt_stagger.convention == "staggered"
+        assert dict(rebuilt_stagger.field_locations) == {"B": "face"}
+        assert rebuilt_stagger.interpolation_order == 1
+        assert rebuilt_stagger.notes == "Yee"
+        assert rebuilt.metadata["run"] == "demo"
+
     def test_dtype_downcast_position_float32(self):
         pcl = _make_particles(20)
         table = particles_to_arrow(pcl, position_dtype="float32")
