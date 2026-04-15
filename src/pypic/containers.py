@@ -340,53 +340,43 @@ class ParticleData:
             raise ValueError(msg)
         object.__setattr__(self, "metadata", MappingProxyType(dict(self.metadata)))
 
+    def _component(self, attr: str, idx: int) -> FloatArray:
+        """Return one column of *attr*, raising if it was not loaded."""
+        arr: FloatArray | None = getattr(self, attr)
+        if arr is None:
+            msg = f"{attr} was not loaded"
+            raise ValueError(msg)
+        return arr[:, idx]
+
     @property
     def x(self) -> FloatArray:
         """X positions (view into ``position[:, 0]``)."""
-        if self.position is None:
-            msg = "position was not loaded"
-            raise ValueError(msg)
-        return self.position[:, 0]
+        return self._component("position", 0)
 
     @property
     def y(self) -> FloatArray:
         """Y positions (view into ``position[:, 1]``)."""
-        if self.position is None:
-            msg = "position was not loaded"
-            raise ValueError(msg)
-        return self.position[:, 1]
+        return self._component("position", 1)
 
     @property
     def z(self) -> FloatArray:
         """Z positions (view into ``position[:, 2]``)."""
-        if self.position is None:
-            msg = "position was not loaded"
-            raise ValueError(msg)
-        return self.position[:, 2]
+        return self._component("position", 2)
 
     @property
     def vx(self) -> FloatArray:
         """X velocities (view into ``velocity[:, 0]``)."""
-        if self.velocity is None:
-            msg = "velocity was not loaded"
-            raise ValueError(msg)
-        return self.velocity[:, 0]
+        return self._component("velocity", 0)
 
     @property
     def vy(self) -> FloatArray:
         """Y velocities (view into ``velocity[:, 1]``)."""
-        if self.velocity is None:
-            msg = "velocity was not loaded"
-            raise ValueError(msg)
-        return self.velocity[:, 1]
+        return self._component("velocity", 1)
 
     @property
     def vz(self) -> FloatArray:
         """Z velocities (view into ``velocity[:, 2]``)."""
-        if self.velocity is None:
-            msg = "velocity was not loaded"
-            raise ValueError(msg)
-        return self.velocity[:, 2]
+        return self._component("velocity", 2)
 
     @property
     def macro_charge(self) -> FloatArray:

@@ -201,6 +201,62 @@ def _build_encoding(
     return enc
 
 
+def _write_timeseries_steps(
+    pairs: Iterable[tuple[float | int, FieldDataset]],
+    store: Any,  # noqa: ANN401  # zarr accepts str/path/store object
+    *,
+    dtype: str | None,
+    encoding: dict[str, dict[str, Any]] | None,
+) -> dict[str, Any] | None:
+    """Append timeseries pairs into *store*; return the final pypic attrs.
+
+    Iterates *pairs*, writing each as one timestep along a new ``time``
+    dimension (``mode='w'`` for the first, ``mode='a'`` append for the
+    rest).  Validates each step's field set and structural identity
+    against the first; intersects per-step metadata to a cross-step
+    common ground.
+
+    Returns the pypic attrs dict (with ``metadata`` set to the
+    intersection) for callers to stamp onto ``store.attrs["pypic"]``,
+    or ``None`` if *pairs* yielded nothing.  Callers handle the empty
+    case (zarr raises after the try; icechunk inside it for cleanup).
+    """
+    first = True
+    pypic_attrs: dict[str, Any] | None = None
+    first_fds: FieldDataset | None = None
+    running_meta: dict[str, Any] = {}
+    expected_fields: frozenset[str] = frozenset()
+    for time_val, fds in pairs:
+        current_fields = frozenset(fds.field_names())
+        ds = fds.xr.expand_dims(time=[float(time_val)])
+        if first:
+            pypic_attrs = encode_pypic_attrs(fds)
+            first_fds = fds
+            running_meta = dict(pypic_attrs.get("metadata", {}))
+            expected_fields = current_fields
+            ds.to_zarr(
+                store,
+                zarr_format=3,
+                consolidated=False,
+                mode="w",
+                encoding=_build_encoding(ds, dtype, encoding),
+            )
+            first = False
+        else:
+            _check_timeseries_fields(expected_fields, current_fields, time_val)
+            assert first_fds is not None
+            _check_timeseries_identity(first_fds, fds, time_val)
+            running_meta = _intersect_encoded_metadata(
+                running_meta, _to_json_native(dict(fds.metadata))
+            )
+            ds.to_zarr(store, consolidated=False, mode="a", append_dim="time")
+    if first:
+        return None
+    assert pypic_attrs is not None
+    pypic_attrs["metadata"] = running_meta
+    return pypic_attrs
+
+
 def to_zarr(
     fds: FieldDataset,
     path: str | Path,
@@ -465,42 +521,10 @@ def to_zarr_timeseries(
     created_new = not path_obj.exists() or (
         path_obj.is_dir() and not any(path_obj.iterdir())
     )
-    first = True
-    pypic_attrs: dict[str, Any] | None = None
-    first_fds: FieldDataset | None = None
-    running_meta: dict[str, Any] = {}
-    expected_fields: frozenset[str] = frozenset()
     try:
-        for time_val, fds in pairs:
-            current_fields = frozenset(fds.field_names())
-            ds = fds.xr.expand_dims(time=[float(time_val)])
-
-            if first:
-                pypic_attrs = encode_pypic_attrs(fds)
-                first_fds = fds
-                running_meta = dict(pypic_attrs.get("metadata", {}))
-                expected_fields = current_fields
-                ds.to_zarr(
-                    path_str,
-                    zarr_format=3,
-                    consolidated=False,
-                    mode="w",
-                    encoding=_build_encoding(ds, dtype, encoding),
-                )
-                first = False
-            else:
-                _check_timeseries_fields(expected_fields, current_fields, time_val)
-                assert first_fds is not None
-                _check_timeseries_identity(first_fds, fds, time_val)
-                running_meta = _intersect_encoded_metadata(
-                    running_meta, _to_json_native(dict(fds.metadata))
-                )
-                ds.to_zarr(
-                    path_str,
-                    consolidated=False,
-                    mode="a",
-                    append_dim="time",
-                )
+        pypic_attrs = _write_timeseries_steps(
+            pairs, path_str, dtype=dtype, encoding=encoding
+        )
     except BaseException:
         # Any failure inside the loop — including a first-step
         # materialization failure that leaves only ``zarr.json`` behind
@@ -511,18 +535,16 @@ def to_zarr_timeseries(
             shutil.rmtree(path_str, ignore_errors=True)
         raise
 
-    if first:
+    if pypic_attrs is None:
         msg = "No timesteps to write — source yielded zero items."
         raise ValueError(msg)
 
     # Stamp pypic metadata after all appends — xarray's append mode
-    # clears dataset-level attrs.  Replace the per-step-0 metadata
-    # snapshot with the cross-step intersection so the stored attrs
-    # describe what is actually true for every timestep.
+    # clears dataset-level attrs.  The pypic attrs already carry the
+    # cross-step metadata intersection so the stored attrs describe
+    # what is actually true for every timestep.
     import zarr
 
-    assert pypic_attrs is not None
-    pypic_attrs["metadata"] = running_meta
     store = zarr.open_group(path_str, mode="r+")
     store.attrs["pypic"] = pypic_attrs
 

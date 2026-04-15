@@ -38,27 +38,18 @@ def _vector_magnitude(
 
 
 def magnetic_field_magnitude(
-    b1: FloatArray,
-    b2: FloatArray,
-    b3: FloatArray,
+    b1: FloatArray, b2: FloatArray, b3: FloatArray
 ) -> FloatArray:
-    r"""Compute the magnetic field magnitude.
-
-    $$|\mathbf{B}| = \sqrt{B_1^2 + B_2^2 + B_3^2}$$
+    r"""Magnetic field magnitude $|\mathbf{B}| = \sqrt{B_1^2 + B_2^2 + B_3^2}$.
 
     Parameters
     ----------
-    b1 : NDArray
-        First component of the magnetic field.
-    b2 : NDArray
-        Second component of the magnetic field.
-    b3 : NDArray
-        Third component of the magnetic field.
+    b1, b2, b3 : NDArray
+        Magnetic field components in normalized units.
 
     Returns
     -------
     NDArray
-        Magnetic field magnitude.
 
     Examples
     --------
@@ -70,27 +61,18 @@ def magnetic_field_magnitude(
 
 
 def electric_field_magnitude(
-    e1: FloatArray,
-    e2: FloatArray,
-    e3: FloatArray,
+    e1: FloatArray, e2: FloatArray, e3: FloatArray
 ) -> FloatArray:
-    r"""Compute the electric field magnitude.
-
-    $$|\mathbf{E}| = \sqrt{E_1^2 + E_2^2 + E_3^2}$$
+    r"""Electric field magnitude $|\mathbf{E}| = \sqrt{E_1^2 + E_2^2 + E_3^2}$.
 
     Parameters
     ----------
-    e1 : NDArray
-        First component of the electric field.
-    e2 : NDArray
-        Second component of the electric field.
-    e3 : NDArray
-        Third component of the electric field.
+    e1, e2, e3 : NDArray
+        Electric field components in normalized units.
 
     Returns
     -------
     NDArray
-        Electric field magnitude.
 
     Examples
     --------
@@ -102,27 +84,18 @@ def electric_field_magnitude(
 
 
 def current_density_magnitude(
-    j1: FloatArray,
-    j2: FloatArray,
-    j3: FloatArray,
+    j1: FloatArray, j2: FloatArray, j3: FloatArray
 ) -> FloatArray:
-    r"""Compute the current density magnitude.
-
-    $$|\mathbf{J}| = \sqrt{J_1^2 + J_2^2 + J_3^2}$$
+    r"""Magnitude $|\mathbf{J}| = \sqrt{J_1^2 + J_2^2 + J_3^2}$ of the current density.
 
     Parameters
     ----------
-    j1 : NDArray
-        First component of the current density.
-    j2 : NDArray
-        Second component of the current density.
-    j3 : NDArray
-        Third component of the current density.
+    j1, j2, j3 : NDArray
+        Current density components in normalized units.
 
     Returns
     -------
     NDArray
-        Current density magnitude.
 
     Examples
     --------
@@ -133,28 +106,17 @@ def current_density_magnitude(
     return _vector_magnitude(j1, j2, j3)
 
 
-def velocity_magnitude(
-    v1: FloatArray,
-    v2: FloatArray,
-    v3: FloatArray,
-) -> FloatArray:
-    r"""Compute the bulk velocity magnitude.
-
-    $$|\mathbf{V}| = \sqrt{V_1^2 + V_2^2 + V_3^2}$$
+def velocity_magnitude(v1: FloatArray, v2: FloatArray, v3: FloatArray) -> FloatArray:
+    r"""Bulk velocity magnitude $|\mathbf{V}| = \sqrt{V_1^2 + V_2^2 + V_3^2}$.
 
     Parameters
     ----------
-    v1 : NDArray
-        First component of the velocity.
-    v2 : NDArray
-        Second component of the velocity.
-    v3 : NDArray
-        Third component of the velocity.
+    v1, v2, v3 : NDArray
+        Velocity components in normalized units.
 
     Returns
     -------
     NDArray
-        Velocity magnitude.
 
     Examples
     --------
@@ -165,13 +127,8 @@ def velocity_magnitude(
     return _vector_magnitude(v1, v2, v3)
 
 
-def plasma_beta(
-    pressure: FloatArray,
-    b: FloatArray,
-) -> FloatArray:
-    r"""Compute the plasma beta.
-
-    $$\beta = \frac{2P}{B^2}$$
+def plasma_beta(pressure: FloatArray, b: FloatArray) -> FloatArray:
+    r"""Plasma beta $\beta = 2P/B^2$ (dimensionless).
 
     Parameters
     ----------
@@ -183,7 +140,6 @@ def plasma_beta(
     Returns
     -------
     NDArray
-        Plasma beta (dimensionless).
 
     Examples
     --------
@@ -460,13 +416,9 @@ def poynting_flux(
 
 
 def internal_energy(
-    pressure: FloatArray,
-    rho_m: FloatArray,
-    gamma: float = 5.0 / 3.0,
+    pressure: FloatArray, rho_m: FloatArray, gamma: float = 5.0 / 3.0
 ) -> FloatArray:
-    r"""Compute the specific internal energy.
-
-    $$e_{int} = \frac{P}{(\gamma - 1) \rho_m}$$
+    r"""Specific internal energy $e_{int} = P / ((\gamma - 1) \rho_m)$.
 
     Parameters
     ----------
@@ -480,7 +432,6 @@ def internal_energy(
     Returns
     -------
     NDArray
-        Specific internal energy in normalized units.
 
     Examples
     --------
@@ -660,16 +611,8 @@ def _unit_vector(
     return _safe_divide(b1, mag), _safe_divide(b2, mag), _safe_divide(b3, mag)
 
 
-def temperature(
-    pressure: FloatArray,
-    density: FloatArray,
-) -> FloatArray:
-    r"""Compute temperature from pressure and number density.
-
-    $$T = P / n$$
-
-    Temperature is in energy units (not Kelvin). Divide by $k_B$ to
-    convert to Kelvin.
+def temperature(pressure: FloatArray, density: FloatArray) -> FloatArray:
+    r"""Temperature $T = P / n$ (energy units; divide by $k_B$ for Kelvin).
 
     Parameters
     ----------
@@ -681,7 +624,6 @@ def temperature(
     Returns
     -------
     NDArray
-        Temperature in energy units (normalized).
 
     Examples
     --------
@@ -1077,13 +1019,8 @@ def magnetosonic_speed(
     return np.sqrt(v_a**2 + c_s**2)
 
 
-def alfven_mach(
-    v: FloatArray,
-    v_a: FloatArray,
-) -> FloatArray:
-    r"""Compute the Alfvén Mach number.
-
-    $$M_A = \frac{V}{v_A}$$
+def alfven_mach(v: FloatArray, v_a: FloatArray) -> FloatArray:
+    r"""Alfvén Mach number $M_A = V/v_A$ (dimensionless).
 
     Parameters
     ----------
@@ -1095,7 +1032,6 @@ def alfven_mach(
     Returns
     -------
     NDArray
-        Alfvén Mach number (dimensionless).
 
     Examples
     --------
@@ -1106,13 +1042,8 @@ def alfven_mach(
     return _safe_divide(v, v_a)
 
 
-def magnetosonic_mach(
-    v: FloatArray,
-    v_ms: FloatArray,
-) -> FloatArray:
-    r"""Compute the magnetosonic Mach number.
-
-    $$M_{ms} = \frac{V}{v_{ms}}$$
+def magnetosonic_mach(v: FloatArray, v_ms: FloatArray) -> FloatArray:
+    r"""Magnetosonic Mach number $M_{ms} = V/v_{ms}$ (dimensionless).
 
     Parameters
     ----------
@@ -1124,7 +1055,6 @@ def magnetosonic_mach(
     Returns
     -------
     NDArray
-        Magnetosonic Mach number (dimensionless).
 
     Examples
     --------
@@ -1135,28 +1065,22 @@ def magnetosonic_mach(
     return _safe_divide(v, v_ms)
 
 
-def bulk_velocity(
-    j: FloatArray,
-    rho_c: FloatArray,
-) -> FloatArray:
-    r"""Compute bulk velocity from current and charge density.
+def bulk_velocity(j: FloatArray, rho_c: FloatArray) -> FloatArray:
+    r"""Bulk velocity $V_s = J_s / \rho_{c,s}$ (per-component, per-species).
 
-    $$V_s = \frac{J_s}{\rho_{c,s}}$$
-
-    Uses charge density directly (consistent with current density moments)
-    rather than ``n \cdot q`` which may have different normalization.
+    Uses charge density directly (consistent with the current-density moment)
+    rather than $n \cdot q$, which may have a different normalization.
 
     Parameters
     ----------
     j : NDArray
-        Current density component (one of $J_1, J_2, J_3$) for a species.
+        Current density component ($J_1$, $J_2$, or $J_3$) for a species.
     rho_c : NDArray
         Charge density of the species.
 
     Returns
     -------
     NDArray
-        Bulk velocity component in normalized units.
 
     Examples
     --------

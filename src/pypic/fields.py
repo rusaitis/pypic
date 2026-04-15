@@ -117,68 +117,84 @@ assert set(QuantityType) == set(_QUANTITY_UNITS), (
 # Helper to keep long FieldInfo constructors within 88 columns
 _FI = FieldInfo
 
+
+def _vec_three(
+    name_tmpl: str,
+    qtype: str,
+    long_tmpl: str,
+    si_unit: str,
+    latex_tmpl: str,
+    mag: tuple[str, str, str] | None = None,
+) -> dict[str, FieldInfo]:
+    """Expand a vector-field spec into three component entries (+ optional magnitude).
+
+    Templates use ``{c}`` for the component digit.  LaTeX templates must
+    double any literal braces (``{{``, ``}}``).  When *mag* is provided,
+    it is ``(name, long_name, latex)`` for the magnitude entry.
+    """
+    out: dict[str, FieldInfo] = {
+        name_tmpl.format(c=c): FieldInfo(
+            qtype, long_tmpl.format(c=c), si_unit, latex_tmpl.format(c=c)
+        )
+        for c in (1, 2, 3)
+    }
+    if mag is not None:
+        name, long_name, latex = mag
+        out[name] = FieldInfo(qtype, long_name, si_unit, latex)
+    return out
+
+
 _FIELD_INFO: dict[str, FieldInfo] = {
     # Electromagnetic fields
-    "B1": _FI("b_field", "Magnetic field component 1", "T", r"$B_1$"),
-    "B2": _FI("b_field", "Magnetic field component 2", "T", r"$B_2$"),
-    "B3": _FI("b_field", "Magnetic field component 3", "T", r"$B_3$"),
-    "|B|": _FI("b_field", "Magnetic field magnitude", "T", r"$|B|$"),
-    "B0_1": _FI("b_field", "Background B component 1", "T", r"$B_{0,1}$"),
-    "B0_2": _FI("b_field", "Background B component 2", "T", r"$B_{0,2}$"),
-    "B0_3": _FI("b_field", "Background B component 3", "T", r"$B_{0,3}$"),
-    "E1": _FI("e_field", "Electric field component 1", "V/m", r"$E_1$"),
-    "E2": _FI("e_field", "Electric field component 2", "V/m", r"$E_2$"),
-    "E3": _FI("e_field", "Electric field component 3", "V/m", r"$E_3$"),
-    "|E|": _FI("e_field", "Electric field magnitude", "V/m", r"$|E|$"),
+    **_vec_three(
+        "B{c}",
+        "b_field",
+        "Magnetic field component {c}",
+        "T",
+        r"$B_{c}$",
+        mag=("|B|", "Magnetic field magnitude", r"$|B|$"),
+    ),
+    **_vec_three(
+        "B0_{c}",
+        "b_field",
+        "Background B component {c}",
+        "T",
+        r"$B_{{0,{c}}}$",
+    ),
+    **_vec_three(
+        "E{c}",
+        "e_field",
+        "Electric field component {c}",
+        "V/m",
+        r"$E_{c}$",
+        mag=("|E|", "Electric field magnitude", r"$|E|$"),
+    ),
     # Current density
-    "J1": _FI(
+    **_vec_three(
+        "J{c}",
         "current_density",
-        "Current density component 1",
+        "Current density component {c}",
         "A/m^2",
-        r"$J_1$",
-    ),
-    "J2": _FI(
-        "current_density",
-        "Current density component 2",
-        "A/m^2",
-        r"$J_2$",
-    ),
-    "J3": _FI(
-        "current_density",
-        "Current density component 3",
-        "A/m^2",
-        r"$J_3$",
-    ),
-    "|J|": _FI(
-        "current_density",
-        "Current density magnitude",
-        "A/m^2",
-        r"$|J|$",
+        r"$J_{c}$",
+        mag=("|J|", "Current density magnitude", r"$|J|$"),
     ),
     # Velocities
-    "V1": _FI("velocity", "Bulk velocity component 1", "m/s", r"$V_1$"),
-    "V2": _FI("velocity", "Bulk velocity component 2", "m/s", r"$V_2$"),
-    "V3": _FI("velocity", "Bulk velocity component 3", "m/s", r"$V_3$"),
-    "|V|": _FI("velocity", "Bulk velocity magnitude", "m/s", r"$|V|$"),
-    "Ve1": _FI(
+    **_vec_three(
+        "V{c}",
         "velocity",
-        "Electron velocity component 1",
+        "Bulk velocity component {c}",
         "m/s",
-        r"$V_{e,1}$",
+        r"$V_{c}$",
+        mag=("|V|", "Bulk velocity magnitude", r"$|V|$"),
     ),
-    "Ve2": _FI(
+    **_vec_three(
+        "Ve{c}",
         "velocity",
-        "Electron velocity component 2",
+        "Electron velocity component {c}",
         "m/s",
-        r"$V_{e,2}$",
+        r"$V_{{e,{c}}}$",
+        mag=("|Ve|", "Electron velocity magnitude", r"$|V_e|$"),
     ),
-    "Ve3": _FI(
-        "velocity",
-        "Electron velocity component 3",
-        "m/s",
-        r"$V_{e,3}$",
-    ),
-    "|Ve|": _FI("velocity", "Electron velocity magnitude", "m/s", r"$|V_e|$"),
     "v_A": _FI("velocity", "Alfvén speed", "m/s", r"$v_A$"),
     "c_s": _FI("velocity", "Sound speed", "m/s", r"$c_s$"),
     "c_ia": _FI("velocity", "Ion acoustic speed", "m/s", r"$c_{ia}$"),
@@ -186,9 +202,13 @@ _FIELD_INFO: dict[str, FieldInfo] = {
     "v_th_e": _FI("velocity", "Electron thermal speed", "m/s", r"$v_{th,e}$"),
     "v_th_i": _FI("velocity", "Ion thermal speed", "m/s", r"$v_{th,i}$"),
     # Four-velocity
-    "u1": _FI("four_velocity", "Four-velocity component 1", "m/s", r"$u_1$"),
-    "u2": _FI("four_velocity", "Four-velocity component 2", "m/s", r"$u_2$"),
-    "u3": _FI("four_velocity", "Four-velocity component 3", "m/s", r"$u_3$"),
+    **_vec_three(
+        "u{c}",
+        "four_velocity",
+        "Four-velocity component {c}",
+        "m/s",
+        r"$u_{c}$",
+    ),
     # Densities
     "rho_m": _FI("mass_density", "Mass density", "kg/m^3", r"$\rho_m$"),
     "rho_c": _FI("charge_density", "Charge density", "C/m^3", r"$\rho_c$"),
@@ -276,45 +296,27 @@ _FIELD_INFO: dict[str, FieldInfo] = {
     "r_i": _FI("length", "Ion thermal gyroradius", "m", r"$r_i$"),
     "lambda_D": _FI("length", "Electron Debye length", "m", r"$\lambda_D$"),
     # Poynting flux / energy flux
-    "S1": _FI(
+    **_vec_three(
+        "S{c}",
         "poynting_flux",
-        "Poynting flux component 1",
+        "Poynting flux component {c}",
         "W/m^2",
-        r"$S_1$",
+        r"$S_{c}$",
     ),
-    "S2": _FI(
-        "poynting_flux",
-        "Poynting flux component 2",
-        "W/m^2",
-        r"$S_2$",
-    ),
-    "S3": _FI(
-        "poynting_flux",
-        "Poynting flux component 3",
-        "W/m^2",
-        r"$S_3$",
-    ),
-    "EF1": _FI(
+    **_vec_three(
+        "EF{c}",
         "energy_flux",
-        "Energy flux component 1",
+        "Energy flux component {c}",
         "W/m^2",
-        r"$EF_1$",
+        r"$EF_{c}$",
     ),
-    "EF2": _FI(
+    **_vec_three(
+        "EHF{c}",
         "energy_flux",
-        "Energy flux component 2",
+        "Enthalpy flux component {c}",
         "W/m^2",
-        r"$EF_2$",
+        r"$EHF_{c}$",
     ),
-    "EF3": _FI(
-        "energy_flux",
-        "Energy flux component 3",
-        "W/m^2",
-        r"$EF_3$",
-    ),
-    "EHF1": _FI("energy_flux", "Enthalpy flux component 1", "W/m^2", r"$EHF_1$"),
-    "EHF2": _FI("energy_flux", "Enthalpy flux component 2", "W/m^2", r"$EHF_2$"),
-    "EHF3": _FI("energy_flux", "Enthalpy flux component 3", "W/m^2", r"$EHF_3$"),
     # Thermodynamic (specific quantities — energy per unit mass)
     "h": _FI("specific_energy", "Specific enthalpy", "J/kg", r"$h$"),
     "h_rel": _FI(
@@ -337,47 +339,20 @@ _FIELD_INFO: dict[str, FieldInfo] = {
         "V/m^2",
         r"$\nabla \cdot E$",
     ),
-    "curl_B1": _FI(
+    **_vec_three(
+        "curl_B{c}",
         "b_field_per_length",
-        "Curl of B component 1",
+        "Curl of B component {c}",
         "T/m",
-        r"$(\nabla \times B)_1$",
+        r"$(\nabla \times B)_{c}$",
     ),
-    "curl_B2": _FI(
-        "b_field_per_length",
-        "Curl of B component 2",
-        "T/m",
-        r"$(\nabla \times B)_2$",
-    ),
-    "curl_B3": _FI(
-        "b_field_per_length",
-        "Curl of B component 3",
-        "T/m",
-        r"$(\nabla \times B)_3$",
-    ),
-    "vort1": _FI(
+    **_vec_three(
+        "vort{c}",
         "velocity_per_length",
-        "Vorticity component 1",
+        "Vorticity component {c}",
         "1/s",
-        r"$\omega_1$",
-    ),
-    "vort2": _FI(
-        "velocity_per_length",
-        "Vorticity component 2",
-        "1/s",
-        r"$\omega_2$",
-    ),
-    "vort3": _FI(
-        "velocity_per_length",
-        "Vorticity component 3",
-        "1/s",
-        r"$\omega_3$",
-    ),
-    "|vort|": _FI(
-        "velocity_per_length",
-        "Vorticity magnitude",
-        "1/s",
-        r"$|\omega|$",
+        r"$\omega_{c}$",
+        mag=("|vort|", "Vorticity magnitude", r"$|\omega|$"),
     ),
     # Dimensionless
     "beta": _FI("dimensionless", "Plasma beta", "", r"$\beta$"),
@@ -413,59 +388,26 @@ _FIELD_INFO: dict[str, FieldInfo] = {
         "W/m^3",
         r"$\mathbf{J} \cdot \mathbf{E}$",
     ),
-    "E_prime_1": _FI(
+    **_vec_three(
+        "E_prime_{c}",
         "e_field",
-        "Non-ideal electric field, component 1",
+        "Non-ideal electric field, component {c}",
         "V/m",
-        r"$E'_1$",
+        r"$E'_{c}$",
     ),
-    "E_prime_2": _FI(
+    **_vec_three(
+        "E_ideal_{c}",
         "e_field",
-        "Non-ideal electric field, component 2",
+        "Ideal electric field, component {c}",
         "V/m",
-        r"$E'_2$",
+        r"$E_{{ideal,{c}}}$",
     ),
-    "E_prime_3": _FI(
+    **_vec_three(
+        "E_Hall_{c}",
         "e_field",
-        "Non-ideal electric field, component 3",
+        "Hall electric field, component {c}",
         "V/m",
-        r"$E'_3$",
-    ),
-    "E_ideal_1": _FI(
-        "e_field",
-        "Ideal electric field, component 1",
-        "V/m",
-        r"$E_{ideal,1}$",
-    ),
-    "E_ideal_2": _FI(
-        "e_field",
-        "Ideal electric field, component 2",
-        "V/m",
-        r"$E_{ideal,2}$",
-    ),
-    "E_ideal_3": _FI(
-        "e_field",
-        "Ideal electric field, component 3",
-        "V/m",
-        r"$E_{ideal,3}$",
-    ),
-    "E_Hall_1": _FI(
-        "e_field",
-        "Hall electric field, component 1",
-        "V/m",
-        r"$E_{Hall,1}$",
-    ),
-    "E_Hall_2": _FI(
-        "e_field",
-        "Hall electric field, component 2",
-        "V/m",
-        r"$E_{Hall,2}$",
-    ),
-    "E_Hall_3": _FI(
-        "e_field",
-        "Hall electric field, component 3",
-        "V/m",
-        r"$E_{Hall,3}$",
+        r"$E_{{Hall,{c}}}$",
     ),
     "firehose": _FI("dimensionless", "Firehose parameter", "", r"$\mathcal{F}$"),
     "mirror": _FI("dimensionless", "Mirror parameter", "", r"$\mathcal{M}$"),
@@ -537,196 +479,127 @@ def unregister_field(name: str) -> None:
             raise KeyError(msg) from None
 
 
-# Per-species field metadata via regex matching. Each entry is
-# (pattern, quantity_type, long_name_template, latex_template) where
-# {N} = species index and {C} = component index (see schema.md §3).
-_SPECIES_INFO_PATTERNS: list[tuple[re.Pattern[str], str, str, str]] = [
+# Per-species field metadata built from a compact (prefix, qtype, long, latex)
+# table.  The *prefix* is the part of the regex before the trailing ``_s(\d+)``
+# — when it contains a capture group (e.g. ``J([123])``), the templates use
+# ``{C}`` for the component index and ``{N}`` for the species index.  LaTeX
+# templates must double any literal braces.  ``P(\d{0,2})`` is the one entry
+# that also matches the scalar form (``P_s0``) alongside tensor components
+# (``P11_s0``); the empty capture triggers the scalar branch in
+# :func:`_try_species_info`.
+_SPECIES_PATTERN_SPECS: list[tuple[str, str, str, str]] = [
+    ("n", "density", "Number density (species {N})", r"$n_{{s{N}}}$"),
+    ("rho_c", "charge_density", "Charge density (species {N})", r"$\rho_{{c,s{N}}}$"),
     (
-        re.compile(r"^n_s(\d+)$"),
-        "density",
-        "Number density (species {N})",
-        r"$n_{{s{N}}}$",
-    ),
-    (
-        re.compile(r"^rho_c_s(\d+)$"),
-        "charge_density",
-        "Charge density (species {N})",
-        r"$\rho_{{c,s{N}}}$",
-    ),
-    (
-        re.compile(r"^J([123])_s(\d+)$"),
+        "J([123])",
         "current_density",
         "Current density component {C} (species {N})",
         r"$J_{{{C},s{N}}}$",
     ),
     (
-        re.compile(r"^V([123])_s(\d+)$"),
+        "V([123])",
         "velocity",
         "Velocity component {C} (species {N})",
         r"$V_{{{C},s{N}}}$",
     ),
     (
-        re.compile(r"^Ve([123])_s(\d+)$"),
+        "Ve([123])",
         "velocity",
         "Electron velocity component {C} (species {N})",
         r"$V_{{e,{C},s{N}}}$",
     ),
     (
-        re.compile(r"^EF([123])_s(\d+)$"),
+        "EF([123])",
         "energy_flux",
         "Energy flux component {C} (species {N})",
         r"$EF_{{{C},s{N}}}$",
     ),
     (
-        re.compile(r"^KEF([123])_s(\d+)$"),
+        "KEF([123])",
         "energy_flux",
         "Kinetic energy flux component {C} (species {N})",
         r"$KEF_{{{C},s{N}}}$",
     ),
     (
-        re.compile(r"^HF([123])_s(\d+)$"),
+        "HF([123])",
         "energy_flux",
         "Heat flux component {C} (species {N})",
         r"$HF_{{{C},s{N}}}$",
     ),
     (
-        re.compile(r"^EHF([123])_s(\d+)$"),
+        "EHF([123])",
         "energy_flux",
         "Enthalpy flux component {C} (species {N})",
         r"$EHF_{{{C},s{N}}}$",
     ),
     (
-        re.compile(r"^q([123])_s(\d+)$"),
+        "q([123])",
         "energy_flux",
         "Conductive heat flux component {C} (species {N})",
         r"$q_{{{C},s{N}}}$",
     ),
+    # \d{0,2} matches both P11_s0 (tensor) and P_s0 (scalar)
+    (r"P(\d{0,2})", "pressure", "Pressure {C} (species {N})", r"$P_{{{C},s{N}}}$"),
+    ("rho_m", "mass_density", "Mass density (species {N})", r"$\rho_{{m,s{N}}}$"),
+    (r"\|V\|", "velocity", "Velocity magnitude (species {N})", r"$|V_{{s{N}}}|$"),
     (
-        re.compile(r"^P(\d{0,2})_s(\d+)$"),
-        "pressure",
-        "Pressure {C} (species {N})",
-        r"$P_{{{C},s{N}}}$",
-    ),  # \d{0,2} matches both P11_s0 (tensor) and P_s0 (scalar)
-    (
-        re.compile(r"^rho_m_s(\d+)$"),
-        "mass_density",
-        "Mass density (species {N})",
-        r"$\rho_{{m,s{N}}}$",
-    ),
-    (
-        re.compile(r"^\|V\|_s(\d+)$"),
-        "velocity",
-        "Velocity magnitude (species {N})",
-        r"$|V_{{s{N}}}|$",
-    ),
-    (
-        re.compile(r"^e_k_s(\d+)$"),
+        "e_k",
         "energy_density",
         "Kinetic energy density (species {N})",
         r"$e_{{k,s{N}}}$",
     ),
     (
-        re.compile(r"^e_th_trace_s(\d+)$"),
+        "e_th_trace",
         "energy_density",
         "Thermal energy density tensor trace (species {N})",
         r"$e_{{th,\mathrm{{tr}},s{N}}}$",
     ),
     (
-        re.compile(r"^e_th_s(\d+)$"),
+        "e_th",
         "energy_density",
         "Thermal energy density (species {N})",
         r"$e_{{th,s{N}}}$",
     ),
     (
-        re.compile(r"^e_int_s(\d+)$"),
+        "e_int",
         "specific_energy",
         "Specific internal energy (species {N})",
         r"$e_{{int,s{N}}}$",
     ),
+    ("h", "specific_energy", "Specific enthalpy (species {N})", r"$h_{{s{N}}}$"),
+    ("T", "temperature", "Temperature (species {N})", r"$T_{{s{N}}}$"),
+    ("omega_p", "frequency", "Plasma frequency (species {N})", r"$\omega_{{p,s{N}}}$"),
     (
-        re.compile(r"^h_s(\d+)$"),
-        "specific_energy",
-        "Specific enthalpy (species {N})",
-        r"$h_{{s{N}}}$",
-    ),
-    (
-        re.compile(r"^T_s(\d+)$"),
-        "temperature",
-        "Temperature (species {N})",
-        r"$T_{{s{N}}}$",
-    ),
-    (
-        re.compile(r"^omega_p_s(\d+)$"),
-        "frequency",
-        "Plasma frequency (species {N})",
-        r"$\omega_{{p,s{N}}}$",
-    ),
-    (
-        re.compile(r"^omega_c_s(\d+)$"),
+        "omega_c",
         "frequency",
         "Cyclotron frequency (species {N})",
         r"$\omega_{{c,s{N}}}$",
     ),
+    ("d", "length", "Skin depth (species {N})", r"$d_{{s{N}}}$"),
+    ("r", "length", "Thermal gyroradius (species {N})", r"$r_{{s{N}}}$"),
+    ("lambda_D", "length", "Debye length (species {N})", r"$\lambda_{{D,s{N}}}$"),
+    ("v_th", "velocity", "Thermal speed (species {N})", r"$v_{{th,s{N}}}$"),
+    ("beta", "dimensionless", "Plasma beta (species {N})", r"$\beta_{{s{N}}}$"),
+    ("s", "dimensionless", "Entropy (species {N})", r"$s_{{s{N}}}$"),
     (
-        re.compile(r"^d_s(\d+)$"),
-        "length",
-        "Skin depth (species {N})",
-        r"$d_{{s{N}}}$",
-    ),
-    (
-        re.compile(r"^r_s(\d+)$"),
-        "length",
-        "Thermal gyroradius (species {N})",
-        r"$r_{{s{N}}}$",
-    ),
-    (
-        re.compile(r"^lambda_D_s(\d+)$"),
-        "length",
-        "Debye length (species {N})",
-        r"$\lambda_{{D,s{N}}}$",
-    ),
-    (
-        re.compile(r"^v_th_s(\d+)$"),
-        "velocity",
-        "Thermal speed (species {N})",
-        r"$v_{{th,s{N}}}$",
-    ),
-    (
-        re.compile(r"^beta_s(\d+)$"),
-        "dimensionless",
-        "Plasma beta (species {N})",
-        r"$\beta_{{s{N}}}$",
-    ),
-    (
-        re.compile(r"^s_s(\d+)$"),
-        "dimensionless",
-        "Entropy (species {N})",
-        r"$s_{{s{N}}}$",
-    ),
-    (
-        re.compile(r"^s_gyro_s(\d+)$"),
+        "s_gyro",
         "dimensionless",
         "Gyrotropic entropy (species {N})",
         r"$s_{{gyro,s{N}}}$",
     ),
+    ("P_par", "pressure", "Parallel pressure (species {N})", r"$P_{{\parallel,s{N}}}$"),
     (
-        re.compile(r"^P_par_s(\d+)$"),
-        "pressure",
-        "Parallel pressure (species {N})",
-        r"$P_{{\parallel,s{N}}}$",
-    ),
-    (
-        re.compile(r"^P_perp_s(\d+)$"),
+        "P_perp",
         "pressure",
         "Perpendicular pressure (species {N})",
         r"$P_{{\perp,s{N}}}$",
     ),
-    (
-        re.compile(r"^agyrotropy_s(\d+)$"),
-        "dimensionless",
-        "Agyrotropy (species {N})",
-        r"$Q_{{s{N}}}$",
-    ),
+    ("agyrotropy", "dimensionless", "Agyrotropy (species {N})", r"$Q_{{s{N}}}$"),
+]
+
+_SPECIES_INFO_PATTERNS: list[tuple[re.Pattern[str], str, str, str]] = [
+    (re.compile(rf"^{prefix}_s(\d+)$"), qtype, long_tmpl, latex_tmpl)
+    for prefix, qtype, long_tmpl, latex_tmpl in _SPECIES_PATTERN_SPECS
 ]
 
 

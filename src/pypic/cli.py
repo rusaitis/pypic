@@ -152,6 +152,17 @@ def _require_single_step(step_list: list[int], raw: str) -> int:
     return step_list[0]
 
 
+def _check_choice(option: str, value: str | None, choices: tuple[str, ...]) -> None:
+    """Raise BadParameter when *value* isn't one of *choices*.
+
+    ``None`` passes through so callers can use the helper for both
+    required and optional options.
+    """
+    if value is not None and value not in choices:
+        msg = f"Invalid {option} {value!r}. Use {', '.join(choices)}."
+        raise typer.BadParameter(msg)
+
+
 def _open(path: Path) -> Simulation:
     """Open a simulation, translating errors to CLI messages."""
     from pypic.readers._registry import open_simulation
@@ -1343,15 +1354,9 @@ def compare(
     ] = False,
 ) -> None:
     """Compare fields between two simulations."""
-    if metric not in ("l2", "linf", "both"):
-        msg = f"Invalid --metric {metric!r}. Use l2, linf, or both."
-        raise typer.BadParameter(msg)
-    if comp_units not in ("si", "code"):
-        msg = f"Invalid --units {comp_units!r}. Use si or code."
-        raise typer.BadParameter(msg)
-    if nan_policy not in ("omit", "propagate", "raise"):
-        msg = f"Invalid --nan-policy {nan_policy!r}. Use omit, propagate, or raise."
-        raise typer.BadParameter(msg)
+    _check_choice("--metric", metric, ("l2", "linf", "both"))
+    _check_choice("--units", comp_units, ("si", "code"))
+    _check_choice("--nan-policy", nan_policy, ("omit", "propagate", "raise"))
 
     from pypic.comparison import compare_fields as cmp_fields
     from pypic.comparison import field_comparison_report
@@ -1863,12 +1868,8 @@ def plot(
     ] = 24,
 ) -> None:
     """Plot a 2D field slice."""
-    if scale not in ("linear", "log", "symlog"):
-        msg = f"Invalid --scale {scale!r}. Use linear, log, or symlog."
-        raise typer.BadParameter(msg)
-    if fmt is not None and fmt not in ("png", "pdf", "svg"):
-        msg = f"Invalid --format {fmt!r}. Use png, pdf, or svg."
-        raise typer.BadParameter(msg)
+    _check_choice("--scale", scale, ("linear", "log", "symlog"))
+    _check_choice("--format", fmt, ("png", "pdf", "svg"))
 
     if animate is not None and output is None:
         msg = "--animate requires --output to know where frames are."
@@ -2041,12 +2042,8 @@ def plot_compare(
     ] = None,
 ) -> None:
     """Three-panel comparison plot: A | B | difference."""
-    if comp_units not in ("si", "code"):
-        msg = f"Invalid --units {comp_units!r}. Use si or code."
-        raise typer.BadParameter(msg)
-    if fmt is not None and fmt not in ("png", "pdf", "svg"):
-        msg = f"Invalid --format {fmt!r}. Use png, pdf, or svg."
-        raise typer.BadParameter(msg)
+    _check_choice("--units", comp_units, ("si", "code"))
+    _check_choice("--format", fmt, ("png", "pdf", "svg"))
 
     import matplotlib
 

@@ -84,6 +84,46 @@ def _species_tensor_b(species: int) -> tuple[str, ...]:
     return (*(f"{f}_s{s}" for f in _PRESSURE_TENSOR_FIELDS), "B1", "B2", "B3")
 
 
+def _vector_recipes(
+    name_tmpl: str,
+    func: Callable[..., Any],
+    fields: tuple[str, ...],
+    **kwargs: Any,  # noqa: ANN401  # forwarded verbatim to _Recipe
+) -> dict[str, _Recipe]:
+    """Three component recipes for a tuple-returning func (curl, Poynting, ...).
+
+    The same ``(func, fields)`` is shared across the three; only
+    ``component`` varies.  ``name_tmpl`` uses ``{c}`` for the component
+    digit (e.g. ``"S{c}"``, ``"curl_B{c}"``).
+    """
+    return {
+        name_tmpl.format(c=c + 1): _Recipe(func, fields, component=c, **kwargs)
+        for c in range(3)
+    }
+
+
+def _scalar_component_recipes(
+    name_tmpl: str,
+    func: Callable[..., Any],
+    fields_tmpl: tuple[str, ...],
+    **kwargs: Any,  # noqa: ANN401  # forwarded verbatim to _Recipe
+) -> dict[str, _Recipe]:
+    """Three per-component scalar recipes (``EHF{c}`` style).
+
+    ``fields_tmpl`` entries containing ``{c}`` are expanded per component;
+    the rest pass through unchanged.  Unlike :func:`_vector_recipes`, the
+    function returns a scalar so ``component`` is not set.
+    """
+    return {
+        name_tmpl.format(c=c): _Recipe(
+            func,
+            tuple(f.format(c=c) if "{c}" in f else f for f in fields_tmpl),
+            **kwargs,
+        )
+        for c in (1, 2, 3)
+    }
+
+
 _REGISTRY: dict[str, _Recipe] = {
     # Magnitudes
     "|B|": _Recipe(derived.magnetic_field_magnitude, ("B1", "B2", "B3")),
@@ -150,35 +190,16 @@ _REGISTRY: dict[str, _Recipe] = {
     "s_gyro_e": _Recipe(derived.gyrotropic_entropy, ("P_par_e", "P_perp_e", "n_s0")),
     "s_gyro_i": _Recipe(derived.gyrotropic_entropy, ("P_par_i", "P_perp_i", "n_s1")),
     # Poynting flux (tuple return — component selects)
-    "S1": _Recipe(
+    **_vector_recipes(
+        "S{c}",
         derived.poynting_flux,
         ("E1", "E2", "E3", "B1", "B2", "B3"),
-        component=0,
-    ),
-    "S2": _Recipe(
-        derived.poynting_flux,
-        ("E1", "E2", "E3", "B1", "B2", "B3"),
-        component=1,
-    ),
-    "S3": _Recipe(
-        derived.poynting_flux,
-        ("E1", "E2", "E3", "B1", "B2", "B3"),
-        component=2,
     ),
     # Enthalpy flux (total, MHD): EHF_i = (gamma/(gamma-1)) P V_i
-    "EHF1": _Recipe(
+    **_scalar_component_recipes(
+        "EHF{c}",
         derived.enthalpy_flux_component,
-        ("P", "V1"),
-        needs_gamma=True,
-    ),
-    "EHF2": _Recipe(
-        derived.enthalpy_flux_component,
-        ("P", "V2"),
-        needs_gamma=True,
-    ),
-    "EHF3": _Recipe(
-        derived.enthalpy_flux_component,
-        ("P", "V3"),
+        ("P", "V{c}"),
         needs_gamma=True,
     ),
     # Species-dependent: electrons (species 0)
@@ -283,47 +304,19 @@ _REGISTRY: dict[str, _Recipe] = {
         passes_geometry=True,
     ),
     # Curl of B (tuple return — component selects)
-    "curl_B1": _Recipe(
+    **_vector_recipes(
+        "curl_B{c}",
         operators.curl,
         ("B1", "B2", "B3"),
         needs_grid=True,
-        component=0,
-        passes_geometry=True,
-    ),
-    "curl_B2": _Recipe(
-        operators.curl,
-        ("B1", "B2", "B3"),
-        needs_grid=True,
-        component=1,
-        passes_geometry=True,
-    ),
-    "curl_B3": _Recipe(
-        operators.curl,
-        ("B1", "B2", "B3"),
-        needs_grid=True,
-        component=2,
         passes_geometry=True,
     ),
     # Vorticity (tuple return — component selects)
-    "vort1": _Recipe(
+    **_vector_recipes(
+        "vort{c}",
         operators.curl,
         ("V1", "V2", "V3"),
         needs_grid=True,
-        component=0,
-        passes_geometry=True,
-    ),
-    "vort2": _Recipe(
-        operators.curl,
-        ("V1", "V2", "V3"),
-        needs_grid=True,
-        component=1,
-        passes_geometry=True,
-    ),
-    "vort3": _Recipe(
-        operators.curl,
-        ("V1", "V2", "V3"),
-        needs_grid=True,
-        component=2,
         passes_geometry=True,
     ),
     # Vorticity magnitude — depends on vort1/2/3
@@ -331,58 +324,24 @@ _REGISTRY: dict[str, _Recipe] = {
     # Reconnection diagnostics
     "J_dot_E": _Recipe(derived.j_dot_e, ("J1", "J2", "J3", "E1", "E2", "E3")),
     # Non-ideal electric field E' = E + VxB (component selects)
-    "E_prime_1": _Recipe(
+    **_vector_recipes(
+        "E_prime_{c}",
         derived.non_ideal_electric_field,
         ("E1", "E2", "E3", "V1", "V2", "V3", "B1", "B2", "B3"),
-        component=0,
-    ),
-    "E_prime_2": _Recipe(
-        derived.non_ideal_electric_field,
-        ("E1", "E2", "E3", "V1", "V2", "V3", "B1", "B2", "B3"),
-        component=1,
-    ),
-    "E_prime_3": _Recipe(
-        derived.non_ideal_electric_field,
-        ("E1", "E2", "E3", "V1", "V2", "V3", "B1", "B2", "B3"),
-        component=2,
     ),
     # Ideal electric field E_ideal = -VxB (component selects)
-    "E_ideal_1": _Recipe(
+    **_vector_recipes(
+        "E_ideal_{c}",
         derived.ideal_electric_field,
         ("V1", "V2", "V3", "B1", "B2", "B3"),
-        component=0,
-    ),
-    "E_ideal_2": _Recipe(
-        derived.ideal_electric_field,
-        ("V1", "V2", "V3", "B1", "B2", "B3"),
-        component=1,
-    ),
-    "E_ideal_3": _Recipe(
-        derived.ideal_electric_field,
-        ("V1", "V2", "V3", "B1", "B2", "B3"),
-        component=2,
     ),
     # Hall electric field E_Hall = JxB/(nq) (component selects)
-    "E_Hall_1": _Recipe(
+    **_vector_recipes(
+        "E_Hall_{c}",
         derived.hall_electric_field,
         ("J1", "J2", "J3", "B1", "B2", "B3", "n_s0"),
         species_index=0,
         species_args=_SpeciesArgs.CHARGE_ONLY,
-        component=0,
-    ),
-    "E_Hall_2": _Recipe(
-        derived.hall_electric_field,
-        ("J1", "J2", "J3", "B1", "B2", "B3", "n_s0"),
-        species_index=0,
-        species_args=_SpeciesArgs.CHARGE_ONLY,
-        component=1,
-    ),
-    "E_Hall_3": _Recipe(
-        derived.hall_electric_field,
-        ("J1", "J2", "J3", "B1", "B2", "B3", "n_s0"),
-        species_index=0,
-        species_args=_SpeciesArgs.CHARGE_ONLY,
-        component=2,
     ),
     # Anisotropy instability parameters
     "firehose": _Recipe(derived.firehose_parameter, ("P_par", "P_perp", "|B|")),
