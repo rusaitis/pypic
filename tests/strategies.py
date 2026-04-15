@@ -8,8 +8,10 @@ in a comment; see ``autoresearcher-pypic.md`` for the loop rules.
 
 from __future__ import annotations
 
+import numpy as np
 from hypothesis import strategies as st
 
+from pypic.coordinates.transforms import FrameTransform
 from pypic.units import Normalization
 
 BASE_QUANTITIES: tuple[str, ...] = (
@@ -117,4 +119,83 @@ def normalizations() -> st.SearchStrategy[Normalization]:
         pic_electron_norms(),
         mhd_standard_norms(),
         identity_norms(),
+    )
+
+
+def _rodrigues(
+    axis: tuple[float, float, float], angle: float
+) -> tuple[
+    tuple[float, float, float],
+    tuple[float, float, float],
+    tuple[float, float, float],
+]:
+    """Rotation matrix from axis-angle via Rodrigues' formula.
+
+    Returns a tuple-of-tuples suitable for ``FrameTransform(rotation=...)``.
+    The axis is normalized; a zero-magnitude axis falls back to ``x̂``.
+    """
+    ax = np.asarray(axis, dtype=np.float64)
+    norm = float(np.linalg.norm(ax))
+    ax = np.array([1.0, 0.0, 0.0]) if norm == 0.0 else ax / norm
+    k = np.array(
+        [[0.0, -ax[2], ax[1]], [ax[2], 0.0, -ax[0]], [-ax[1], ax[0], 0.0]]
+    )
+    r = np.eye(3) + np.sin(angle) * k + (1.0 - np.cos(angle)) * (k @ k)
+    return (
+        (float(r[0, 0]), float(r[0, 1]), float(r[0, 2])),
+        (float(r[1, 0]), float(r[1, 1]), float(r[1, 2])),
+        (float(r[2, 0]), float(r[2, 1]), float(r[2, 2])),
+    )
+
+
+def rotations() -> st.SearchStrategy[
+    tuple[
+        tuple[float, float, float],
+        tuple[float, float, float],
+        tuple[float, float, float],
+    ]
+]:
+    """SO(3) rotation matrices as tuple-of-tuples (Rodrigues, axis-angle).
+
+    Source: ``FrameTransform`` accepts any 3×3 orthogonal matrix
+    (``src/pypic/coordinates/transforms.py:110``). Rodrigues guarantees
+    orthogonality analytically; roundoff sits at ~1e-16 which is well
+    under the post-init tolerance of 1e-6.
+    """
+    axis = st.tuples(
+        st.floats(-1.0, 1.0, allow_nan=False, allow_infinity=False),
+        st.floats(-1.0, 1.0, allow_nan=False, allow_infinity=False),
+        st.floats(-1.0, 1.0, allow_nan=False, allow_infinity=False),
+    )
+    angle = st.floats(
+        min_value=-np.pi, max_value=np.pi, allow_nan=False, allow_infinity=False
+    )
+    return st.builds(_rodrigues, axis, angle)
+
+
+def frame_transforms(
+    source: str, target: str, *, scale_range: tuple[float, float] = (0.1, 10.0)
+) -> st.SearchStrategy[FrameTransform]:
+    """Random ``FrameTransform`` between the named frames.
+
+    Combines an arbitrary SO(3) rotation, a bounded origin, and a positive
+    scale. Origin magnitudes are kept moderate (|o| ≤ 100) so downstream
+    compositions stay comfortably within float64's precision envelope —
+    associativity tests need headroom, not extreme inputs.
+    """
+    origin_component = st.floats(
+        -100.0, 100.0, allow_nan=False, allow_infinity=False
+    )
+    return st.builds(
+        FrameTransform,
+        source_frame=st.just(source),
+        target_frame=st.just(target),
+        origin=st.tuples(origin_component, origin_component, origin_component),
+        rotation=rotations(),
+        scale=st.floats(
+            min_value=scale_range[0],
+            max_value=scale_range[1],
+            allow_nan=False,
+            allow_infinity=False,
+        ),
     )
