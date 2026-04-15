@@ -244,17 +244,23 @@ def _stagger_to_dict(stagger: Any) -> dict[str, Any]:  # noqa: ANN401
 
 
 def _to_json_native(obj: Any) -> Any:  # noqa: ANN401
-    """Recursively coerce NumPy scalars/arrays to JSON-native equivalents.
+    """Recursively coerce arbitrary Python values to JSON-native equivalents.
 
-    HDF5 readers (h5py) and many other sources commonly return attrs
-    as ``numpy.float32`` / ``numpy.int64`` / ``numpy.ndarray``.  Zarr's
-    attr validator (via xarray) rejects these, so a user-supplied
-    ``metadata`` dict must be normalized before serialization.
-    Python-native types pass through unchanged.
+    HDF5 readers (h5py) commonly hand back attrs as ``numpy.float32`` /
+    ``numpy.int64`` / ``numpy.ndarray`` which Zarr's attr validator
+    rejects, so user-supplied metadata must be normalized before
+    serialization.  Python-native JSON values pass through unchanged.
 
-    Recognized typed values (``StaggerInfo``) are tagged so the decode
-    side can rebuild them — without the tag they'd come back as plain
-    dicts, breaking the serializer's round-trip-fidelity contract.
+    Round-trip-preserving tags (``__pypic_class__``) wrap values that
+    JSON cannot represent natively without information loss:
+
+    * ``StaggerInfo`` — the typed dataclass readers stamp into metadata.
+    * ``tuple`` — distinct from ``list`` in Python; a plain
+      ``[a, b]`` round-trip would lose the tuple identity.
+    * Dicts with non-string keys — JSON has only string keys, so plain
+      stringification silently collides ``{1: ..., "1": ...}``.
+
+    Decode is the inverse via ``_from_json_native``.
     """
     from pypic.containers import StaggerInfo
 
@@ -264,9 +270,21 @@ def _to_json_native(obj: Any) -> Any:  # noqa: ANN401
         return obj.item()
     if isinstance(obj, np.ndarray):
         return obj.tolist()
+    if isinstance(obj, tuple):
+        return {
+            "__pypic_class__": "tuple",
+            "items": [_to_json_native(v) for v in obj],
+        }
     if isinstance(obj, dict):
-        return {str(k): _to_json_native(v) for k, v in obj.items()}
-    if isinstance(obj, (list, tuple)):
+        if any(not isinstance(k, str) for k in obj):
+            return {
+                "__pypic_class__": "keyed_dict",
+                "items": [
+                    [_to_json_native(k), _to_json_native(v)] for k, v in obj.items()
+                ],
+            }
+        return {k: _to_json_native(v) for k, v in obj.items()}
+    if isinstance(obj, list):
         return [_to_json_native(v) for v in obj]
     return obj
 
@@ -294,6 +312,13 @@ def _from_json_native(obj: Any) -> Any:  # noqa: ANN401
         cls = obj.get("__pypic_class__")
         if cls == "StaggerInfo":
             return _dict_to_stagger(obj)
+        if cls == "tuple":
+            return tuple(_from_json_native(v) for v in obj.get("items", []))
+        if cls == "keyed_dict":
+            return {
+                _from_json_native(k): _from_json_native(v)
+                for k, v in obj.get("items", [])
+            }
         return {k: _from_json_native(v) for k, v in obj.items()}
     if isinstance(obj, list):
         return [_from_json_native(v) for v in obj]

@@ -466,7 +466,11 @@ class TestToZarrTimeseries:
             Normalization.identity(),
         )
         store = tmp_path / "partial.zarr"
-        with pytest.raises(ValueError, match=r"different dimension sizes"):
+        # Different shapes imply different grids — the identity check
+        # rejects this with a clearer message before xarray's
+        # dimension-size check would have fired.  Cleanup behavior
+        # (the actual point of this test) is unchanged.
+        with pytest.raises(ValueError, match=r"grid differ from the first step"):
             to_zarr_timeseries([(0.0, step0), (1.0, step1)], store)
         assert not store.exists()
 
@@ -486,3 +490,101 @@ class TestToZarrTimeseries:
         assert loaded_ds.frame == "sim"
         assert len(loaded_ds.species) == 1
         assert loaded_ds.species[0].name == "electrons"
+
+    def test_timeseries_rejects_grid_drift(self, tmp_path):
+        # Reviewer regression: timeseries writers used to silently
+        # flatten every later step's identity (grid, frame, etc.) to
+        # step 0 — succeeded but stored a misleading description of
+        # the simulation.  The identity check now fails loud.
+        step0 = FieldDataset.from_arrays(
+            {"B1": np.ones((4, 3, 2))},
+            make_uniform_grid(4, 3, 2, spacing=1.0, origin=0.0),
+            Normalization.identity(),
+        )
+        step1 = FieldDataset.from_arrays(
+            {"B1": np.ones((4, 3, 2))},
+            make_uniform_grid(4, 3, 2, spacing=5.0, origin=10.0),
+            Normalization.identity(),
+        )
+        store = tmp_path / "drift_grid.zarr"
+        with pytest.raises(ValueError, match=r"grid differ from the first step"):
+            to_zarr_timeseries([(0.0, step0), (1.0, step1)], store)
+        assert not store.exists()
+
+    def test_timeseries_rejects_frame_drift(self, tmp_path):
+        grid = make_uniform_grid(4, 3, 2)
+        step0 = FieldDataset.from_arrays(
+            {"B1": np.ones((4, 3, 2))},
+            grid,
+            Normalization.identity(),
+            frame="simulation",
+        )
+        step1 = FieldDataset.from_arrays(
+            {"B1": np.ones((4, 3, 2))},
+            grid,
+            Normalization.identity(),
+            frame="gsm",
+        )
+        store = tmp_path / "drift_frame.zarr"
+        with pytest.raises(ValueError, match=r"frame differ from the first step"):
+            to_zarr_timeseries([(0.0, step0), (1.0, step1)], store)
+        assert not store.exists()
+
+    def test_timeseries_intersects_per_step_metadata(self, tmp_path):
+        # Per-step metadata divergence (e.g. iPIC3D's per-file ``time``
+        # / ``step`` scalars) is normal — the writer now intersects so
+        # the stored attrs reflect what is actually true everywhere
+        # rather than silently keeping step 0's snapshot.
+        grid = make_uniform_grid(4, 3, 2)
+        step0 = FieldDataset.from_arrays(
+            {"B1": np.ones((4, 3, 2))},
+            grid,
+            Normalization.identity(),
+            metadata={"shared": "ok", "step_meta": "a"},
+        )
+        step1 = FieldDataset.from_arrays(
+            {"B1": np.ones((4, 3, 2))},
+            grid,
+            Normalization.identity(),
+            metadata={"shared": "ok", "step_meta": "b"},
+        )
+        store = tmp_path / "ts_meta_intersect.zarr"
+        to_zarr_timeseries([(0.0, step0), (1.0, step1)], store)
+        loaded = from_zarr(store)
+        assert loaded.metadata == {"shared": "ok"}
+
+    def test_metadata_tuple_round_trip(self, tmp_path):
+        # Reviewer regression: tuples used to be coerced to lists and
+        # come back as lists, losing the type identity.  Tagging
+        # preserves the round-trip.
+        grid = make_uniform_grid(4, 3, 2)
+        fds = FieldDataset.from_arrays(
+            {"B1": np.ones((4, 3, 2))},
+            grid,
+            Normalization.identity(),
+            metadata={"tuple_val": (1, 2, 3), "list_val": [4, 5]},
+        )
+        store = tmp_path / "tup.zarr"
+        to_zarr(fds, store)
+        loaded = from_zarr(store)
+        assert loaded.metadata["tuple_val"] == (1, 2, 3)
+        assert isinstance(loaded.metadata["tuple_val"], tuple)
+        assert loaded.metadata["list_val"] == [4, 5]
+        assert isinstance(loaded.metadata["list_val"], list)
+
+    def test_metadata_non_string_keys_round_trip(self, tmp_path):
+        # Reviewer regression: stringifying integer keys silently
+        # collides ``{1: a, '1': b}`` and loses int-vs-str identity.
+        # Tagged ``keyed_dict`` preserves both key type and uniqueness.
+        grid = make_uniform_grid(4, 3, 2)
+        fds = FieldDataset.from_arrays(
+            {"B1": np.ones((4, 3, 2))},
+            grid,
+            Normalization.identity(),
+            metadata={"num_key_map": {1: "one", 2: "two"}},
+        )
+        store = tmp_path / "intkey.zarr"
+        to_zarr(fds, store)
+        loaded = from_zarr(store)
+        assert loaded.metadata["num_key_map"] == {1: "one", 2: "two"}
+        assert all(isinstance(k, int) for k in loaded.metadata["num_key_map"])

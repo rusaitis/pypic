@@ -19,7 +19,11 @@ import xarray as xr
 
 from pypic.dataset import FieldDataset
 from pypic.io._guard import ensure_zarr
-from pypic.io._serialize import decode_pypic_attrs, encode_pypic_attrs
+from pypic.io._serialize import (
+    _to_json_native,
+    decode_pypic_attrs,
+    encode_pypic_attrs,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence
@@ -123,6 +127,62 @@ def _check_timeseries_fields(
         "unreadable."
     )
     raise ValueError(msg)
+
+
+def _check_timeseries_identity(
+    first_fds: FieldDataset,
+    current_fds: FieldDataset,
+    time_val: float,
+) -> None:
+    """Reject timeseries steps whose structural attrs differ from the first.
+
+    A timeseries describes one simulation's evolution: grid,
+    normalization, species, physics, frame, and frame transforms must
+    stay constant.  Without this check, the writer used to silently
+    flatten every later step's identity to the first step's — the data
+    landed but the reconstructed FieldDataset described a different
+    simulation than the one that produced it.  Per-step *metadata*
+    differences are tolerated (intersected by the caller); this guard
+    only fires for the identity-defining attrs.
+    """
+    diffs: list[str] = []
+    if first_fds.grid != current_fds.grid:
+        diffs.append("grid")
+    if first_fds.normalization != current_fds.normalization:
+        diffs.append("normalization")
+    if first_fds.species != current_fds.species:
+        diffs.append("species")
+    if first_fds.physics != current_fds.physics:
+        diffs.append("physics")
+    if first_fds.frame != current_fds.frame:
+        diffs.append("frame")
+    if dict(first_fds.transforms) != dict(current_fds.transforms):
+        diffs.append("transforms")
+    if not diffs:
+        return
+    msg = (
+        f"Timeseries step at time={time_val}: "
+        f"{', '.join(diffs)} differ from the first step.  These attrs "
+        "define the simulation's identity and must be constant across "
+        "a timeseries write — pre-flatten the source or split into "
+        "separate stores."
+    )
+    raise ValueError(msg)
+
+
+def _intersect_encoded_metadata(
+    running: dict[str, Any], current: dict[str, Any]
+) -> dict[str, Any]:
+    """Keep only metadata keys whose encoded values match across steps.
+
+    Per-step metadata divergence (e.g. iPIC3D's per-file ``time`` /
+    ``step`` scalars) is normal and not an error, but the final stored
+    attrs must reflect what is actually true everywhere — silently
+    keeping step-0's values would mislead readers.  This intersection
+    runs on the already JSON-encoded dicts, so equality respects the
+    serializer's coercions (numpy scalars → python natives, etc.).
+    """
+    return {k: v for k, v in running.items() if k in current and current[k] == v}
 
 
 def _build_encoding(
@@ -396,6 +456,8 @@ def to_zarr_timeseries(
     path_str = str(path)
     first = True
     pypic_attrs: dict[str, Any] | None = None
+    first_fds: FieldDataset | None = None
+    running_meta: dict[str, Any] = {}
     expected_fields: frozenset[str] = frozenset()
     try:
         for time_val, fds in pairs:
@@ -404,6 +466,8 @@ def to_zarr_timeseries(
 
             if first:
                 pypic_attrs = encode_pypic_attrs(fds)
+                first_fds = fds
+                running_meta = dict(pypic_attrs.get("metadata", {}))
                 expected_fields = current_fields
                 ds.to_zarr(
                     path_str,
@@ -415,6 +479,11 @@ def to_zarr_timeseries(
                 first = False
             else:
                 _check_timeseries_fields(expected_fields, current_fields, time_val)
+                assert first_fds is not None
+                _check_timeseries_identity(first_fds, fds, time_val)
+                running_meta = _intersect_encoded_metadata(
+                    running_meta, _to_json_native(dict(fds.metadata))
+                )
                 ds.to_zarr(
                     path_str,
                     consolidated=False,
@@ -436,9 +505,13 @@ def to_zarr_timeseries(
         raise ValueError(msg)
 
     # Stamp pypic metadata after all appends — xarray's append mode
-    # clears dataset-level attrs.
+    # clears dataset-level attrs.  Replace the per-step-0 metadata
+    # snapshot with the cross-step intersection so the stored attrs
+    # describe what is actually true for every timestep.
     import zarr
 
+    assert pypic_attrs is not None
+    pypic_attrs["metadata"] = running_meta
     store = zarr.open_group(path_str, mode="r+")
     store.attrs["pypic"] = pypic_attrs
 

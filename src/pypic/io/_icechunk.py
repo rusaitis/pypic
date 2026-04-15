@@ -16,11 +16,13 @@ from typing import TYPE_CHECKING, Any
 import xarray as xr
 
 from pypic.io._guard import ensure_icechunk
-from pypic.io._serialize import encode_pypic_attrs
+from pypic.io._serialize import _to_json_native, encode_pypic_attrs
 from pypic.io.zarr import (
     _build_encoding,
     _check_timeseries_fields,
+    _check_timeseries_identity,
     _ds_to_field_dataset,
+    _intersect_encoded_metadata,
     _resolve_timeseries_pairs,
 )
 
@@ -338,6 +340,8 @@ def to_zarr_timeseries_icechunk(
 
     first = True
     pypic_attrs: dict[str, Any] | None = None
+    first_fds: FieldDataset | None = None
+    running_meta: dict[str, Any] = {}
     expected_fields: frozenset[str] = frozenset()
     try:
         for time_val, fds in pairs:
@@ -346,6 +350,8 @@ def to_zarr_timeseries_icechunk(
 
             if first:
                 pypic_attrs = encode_pypic_attrs(fds)
+                first_fds = fds
+                running_meta = dict(pypic_attrs.get("metadata", {}))
                 expected_fields = current_fields
                 ds.to_zarr(
                     session.store,
@@ -357,6 +363,11 @@ def to_zarr_timeseries_icechunk(
                 first = False
             else:
                 _check_timeseries_fields(expected_fields, current_fields, time_val)
+                assert first_fds is not None
+                _check_timeseries_identity(first_fds, fds, time_val)
+                running_meta = _intersect_encoded_metadata(
+                    running_meta, _to_json_native(dict(fds.metadata))
+                )
                 ds.to_zarr(
                     session.store,
                     consolidated=False,
@@ -368,6 +379,11 @@ def to_zarr_timeseries_icechunk(
             msg = "No timesteps to write — source yielded zero items."
             raise ValueError(msg)
 
+        # Replace the per-step-0 metadata snapshot with the cross-step
+        # intersection so the committed attrs reflect what is actually
+        # true for every timestep.
+        assert pypic_attrs is not None
+        pypic_attrs["metadata"] = running_meta
         store = zarr.open_group(session.store, mode="r+")
         store.attrs["pypic"] = pypic_attrs
 

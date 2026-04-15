@@ -318,7 +318,11 @@ class TestTimeseriesIcechunk:
             Normalization.identity(),
         )
         store = tmp_path / "partial.icechunk"
-        with pytest.raises(ValueError, match=r"different dimension sizes"):
+        # Different shapes imply different grids — the identity check
+        # rejects this with a clearer message before xarray's
+        # dimension-size check would have fired.  Cleanup behavior
+        # (the actual point of this test) is unchanged.
+        with pytest.raises(ValueError, match=r"grid differ from the first step"):
             to_zarr_timeseries([(0.0, step0), (1.0, step1)], store, backend="icechunk")
         assert not store.exists()
 
