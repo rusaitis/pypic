@@ -249,6 +249,21 @@ class TestTimeseriesIcechunk:
             to_zarr_timeseries([], store, backend="icechunk")
         assert not store.exists()
 
+    def test_timeseries_empty_source_cleans_up_preexisting_empty_dir(self, tmp_path):
+        # Reviewer regression: a caller-supplied empty directory must
+        # be treated like a missing one — ``open_icechunk_repo(create=
+        # True)`` will seed a half-initialized repo into it, and an
+        # empty source then aborts before commit.  Leaving the repo
+        # subtree behind would leave ``is_icechunk_store`` returning
+        # True while ``from_zarr`` raised ``GroupNotFoundError``.
+        store = tmp_path / "preexisting_empty"
+        store.mkdir()
+        assert not any(store.iterdir())
+        with pytest.raises(ValueError, match=r"No timesteps to write"):
+            to_zarr_timeseries([], store, backend="icechunk")
+        assert not store.exists() or not any(store.iterdir())
+        assert not is_icechunk_store(store)
+
     def test_timeseries_shape_drift_cleans_up_fresh_repo(self, tmp_path):
         grid_small = make_uniform_grid(2, 2, 2)
         grid_big = make_uniform_grid(3, 2, 2)

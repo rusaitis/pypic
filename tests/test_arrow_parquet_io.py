@@ -194,6 +194,34 @@ class TestArrowInterchange:
         assert rebuilt.species_index == 3
         assert rebuilt.species_name == "alpha"
 
+    def test_numpy_scalar_metadata_round_trips(self):
+        # h5py-style readers commonly hand back attrs as numpy scalars
+        # (np.float32, np.int32, ...).  json.dumps rejects those, so the
+        # encoder must coerce them to Python natives — same path used
+        # for FieldDataset attrs.
+        pcl = ParticleData(
+            species_index=0,
+            species_name="electrons",
+            position=np.zeros((4, 3)),
+            velocity=np.zeros((4, 3)),
+            n_particles=4,
+            metadata={
+                "time": np.float32(1.25),
+                "step": np.int32(7),
+                "shape": np.array([4, 3]),
+            },
+            weight=np.ones(4),
+            species_charge=-1.0,
+            species_mass=1.0,
+        )
+        table = particles_to_arrow(pcl)
+        rebuilt = particles_from_arrow(table)
+        assert rebuilt.metadata["time"] == 1.25
+        assert isinstance(rebuilt.metadata["time"], float)
+        assert rebuilt.metadata["step"] == 7
+        assert isinstance(rebuilt.metadata["step"], int)
+        assert rebuilt.metadata["shape"] == [4, 3]
+
     def test_dtype_downcast_position_float32(self):
         pcl = _make_particles(20)
         table = particles_to_arrow(pcl, position_dtype="float32")
@@ -826,17 +854,36 @@ class TestDuckDBQuery:
         assert pcl.species_charge == -1.0
         assert pcl.species_mass == 1.0
 
-    def test_empty_result_multispecies_stays_placeholder(self, tmp_path: Path):
-        # Multi-species datasets can't unambiguously recover which
-        # species the WHERE clause asked for on an empty read — keep
-        # the placeholder so callers still see a well-formed empty
-        # ParticleData.
+    def test_empty_result_multispecies_recovers_pinned_species(self, tmp_path: Path):
+        # When the SQL pins exactly one on-disk species via a literal
+        # ``species='NAME'``, an empty multi-species result must still
+        # recover the intended identity (name, index, charge, mass)
+        # rather than degrade to the ``unknown`` placeholder.
         from pypic.io._duckdb import query_sql
 
         root = self._write_dataset(tmp_path)
         pcl = query_sql(
             root,
             "SELECT * FROM particles WHERE species='electrons' AND 1=0",
+        )
+        assert pcl.n_particles == 0
+        assert pcl.species_name == "electrons"
+        assert pcl.species_index == 0
+        assert pcl.species_charge == -1.0
+        assert pcl.species_mass == 1.0
+
+    def test_empty_result_multispecies_no_literal_stays_placeholder(
+        self, tmp_path: Path
+    ):
+        # Without a ``species='NAME'`` literal in the SQL, an empty
+        # multi-species result is genuinely ambiguous and must keep
+        # the ``unknown`` placeholder.
+        from pypic.io._duckdb import query_sql
+
+        root = self._write_dataset(tmp_path)
+        pcl = query_sql(
+            root,
+            "SELECT * FROM particles WHERE x > 1e20 AND 1=0",
         )
         assert pcl.n_particles == 0
         assert pcl.species_name == "unknown"

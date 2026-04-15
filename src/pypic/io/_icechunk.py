@@ -301,13 +301,17 @@ def to_zarr_timeseries_icechunk(
 
     # Whether we created the repo directory on this call.  An existing
     # repo's uncommitted session is transactional — nothing to clean —
-    # but ``open_icechunk_repo(create=True)`` on a fresh path persists
-    # an initial snapshot before we know whether the source is usable.
-    # If our pypic write then fails, ``is_icechunk_store`` returns True
-    # but ``from_zarr`` raises ``GroupNotFoundError``.  Remove the
-    # half-initialized directory so the filesystem state matches the
-    # error state.
-    created_new = not Path(path).exists()
+    # but ``open_icechunk_repo(create=True)`` on a fresh (or empty) path
+    # persists an initial snapshot before we know whether the source is
+    # usable.  If our pypic write then fails, ``is_icechunk_store``
+    # returns True but ``from_zarr`` raises ``GroupNotFoundError``.
+    # Remove the half-initialized directory so the filesystem state
+    # matches the error state.  An empty directory pre-existing on disk
+    # is treated the same as a missing one — we own its contents.
+    path_obj = Path(path)
+    created_new = not path_obj.exists() or (
+        path_obj.is_dir() and not any(path_obj.iterdir())
+    )
 
     pairs = _resolve_timeseries_pairs(source, steps, fields)
     repo = open_icechunk_repo(path, create=True)

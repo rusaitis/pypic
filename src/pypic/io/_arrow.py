@@ -29,6 +29,8 @@ _VELOCITY_COLS = ("vx", "vy", "vz")
 
 def _encode_species_meta(data: ParticleData) -> bytes:
     """Serialize species metadata to JSON bytes for Arrow schema."""
+    from pypic.io._serialize import _to_json_native
+
     meta: dict[str, Any] = {
         "species_index": data.species_index,
         "species_name": data.species_name,
@@ -38,7 +40,7 @@ def _encode_species_meta(data: ParticleData) -> bytes:
         meta["species_charge"] = data.species_charge
     if data.species_mass is not None:
         meta["species_mass"] = data.species_mass
-    raw_metadata = dict(data.metadata)
+    raw_metadata = _to_json_native(dict(data.metadata))
     if raw_metadata:
         meta["metadata"] = raw_metadata
     return json.dumps(meta).encode("utf-8")

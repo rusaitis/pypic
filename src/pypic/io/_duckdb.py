@@ -9,10 +9,13 @@ Install with ``pip install pypic[duckdb]``.
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 from pypic.io._guard import ensure_arrow, ensure_duckdb
+
+_SPECIES_LITERAL = re.compile(r"species\s*=\s*'([^']+)'", re.IGNORECASE)
 
 if TYPE_CHECKING:
     import pyarrow as pa
@@ -133,26 +136,33 @@ def query_sql(
         v for v in arrow_table.column("species").unique().to_pylist() if v is not None
     }
     if not species_values:
-        # Well-formed filter that matched zero rows.  If the dataset
-        # has exactly one species on disk, adopt its metadata — empty
-        # reads then preserve species identity the same way
-        # ``particles_from_dataset(species=...)`` does.  Multi-species
-        # datasets remain genuinely ambiguous (we can't recover which
-        # species the WHERE clause asked for), so fall back to the
-        # placeholder so callers can still dispatch on ``n_particles``.
+        # Well-formed filter that matched zero rows.  Recover the
+        # intended species when possible: (a) only one species on disk
+        # → adopt it; (b) the SQL pins exactly one on-disk species via
+        # a literal ``species='NAME'`` clause → adopt that.  Anything
+        # else is genuinely ambiguous (no literal, multiple literals,
+        # subqueries) and falls through to the ``unknown`` placeholder
+        # so callers can still dispatch on ``n_particles``.
         on_disk = sorted(
             {p.name.split("=", 1)[1] for p in Path(path).glob("step=*/species=*")}
         )
         arrow_table = _strip_extra_columns(arrow_table)
+        recovered_species: str | None = None
         if len(on_disk) == 1:
-            species_name = on_disk[0]
+            recovered_species = on_disk[0]
+        else:
+            pinned = {m.group(1) for m in _SPECIES_LITERAL.finditer(sql)}
+            on_disk_pinned = pinned & set(on_disk)
+            if len(on_disk_pinned) == 1:
+                recovered_species = next(iter(on_disk_pinned))
+        if recovered_species is not None:
             species_index, species_charge, species_mass = _lookup_species_meta(
-                path, species_name
+                path, recovered_species
             )
             arrow_table = inject_species_meta(
                 arrow_table,
                 species_index,
-                species_name,
+                recovered_species,
                 species_charge=species_charge,
                 species_mass=species_mass,
             )
