@@ -555,6 +555,7 @@ def particles_from_dataset(
         str(payload.get("species_name", "unknown")),
         species_charge=payload.get("species_charge"),
         species_mass=payload.get("species_mass"),
+        metadata=payload.get("metadata"),
     )
     return particles_from_arrow(table)
 

@@ -1529,3 +1529,7 @@ def test_convert_all_dry_run_particles(tmp_path: Path) -> None:
     assert result.exit_code == 0, result.output
     assert "fields.zarr" in result.output
     assert "particles" in result.output
+    # Reviewer regression: a dry run must not create the output
+    # directory — the expected contract is that --dry-run has no
+    # filesystem side effects.
+    assert not out.exists()

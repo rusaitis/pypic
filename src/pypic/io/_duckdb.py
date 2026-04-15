@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from pypic.io._guard import ensure_arrow, ensure_duckdb
 
@@ -25,12 +25,13 @@ if TYPE_CHECKING:
 __all__ = ["query_sql"]
 
 
-def _lookup_species_meta(
-    path: str | Path, species_name: str
-) -> tuple[int, float | None, float | None]:
-    """Read species_index/charge/mass from any matching Parquet fragment.
+def _lookup_species_meta(path: str | Path, species_name: str) -> dict[str, Any]:
+    """Read the full ``pypic`` species payload from any matching fragment.
 
-    Returns ``(0, None, None)`` when no fragment is found — callers then
+    Returns the payload dict (``species_index``, optional
+    ``species_charge``/``species_mass``/``metadata``) recovered from
+    the first matching Parquet fragment's schema metadata.  Returns
+    ``{"species_index": 0}`` when no fragment is found — callers then
     produce an ``unknown``-tagged ParticleData.
     """
     import pyarrow.parquet as pq
@@ -38,13 +39,8 @@ def _lookup_species_meta(
     from pypic.io._arrow import _decode_species_meta
 
     for p in Path(path).glob(f"step=*/species={species_name}/*.parquet"):
-        payload = _decode_species_meta(pq.read_metadata(str(p)).metadata)
-        return (
-            int(payload.get("species_index", 0)),
-            payload.get("species_charge"),
-            payload.get("species_mass"),
-        )
-    return (0, None, None)
+        return _decode_species_meta(pq.read_metadata(str(p)).metadata)
+    return {"species_index": 0}
 
 
 def query_sql(
@@ -156,15 +152,14 @@ def query_sql(
             if len(on_disk_pinned) == 1:
                 recovered_species = next(iter(on_disk_pinned))
         if recovered_species is not None:
-            species_index, species_charge, species_mass = _lookup_species_meta(
-                path, recovered_species
-            )
+            payload = _lookup_species_meta(path, recovered_species)
             arrow_table = inject_species_meta(
                 arrow_table,
-                species_index,
+                int(payload.get("species_index", 0)),
                 recovered_species,
-                species_charge=species_charge,
-                species_mass=species_mass,
+                species_charge=payload.get("species_charge"),
+                species_mass=payload.get("species_mass"),
+                metadata=payload.get("metadata"),
             )
         else:
             arrow_table = inject_species_meta(arrow_table, 0, "unknown")
@@ -178,16 +173,15 @@ def query_sql(
         )
         raise ValueError(msg)
     species_name = next(iter(species_values))
-    species_index, species_charge, species_mass = _lookup_species_meta(
-        path, species_name
-    )
+    payload = _lookup_species_meta(path, species_name)
 
     arrow_table = _strip_extra_columns(arrow_table)
     arrow_table = inject_species_meta(
         arrow_table,
-        species_index,
+        int(payload.get("species_index", 0)),
         species_name,
-        species_charge=species_charge,
-        species_mass=species_mass,
+        species_charge=payload.get("species_charge"),
+        species_mass=payload.get("species_mass"),
+        metadata=payload.get("metadata"),
     )
     return particles_from_arrow(arrow_table)

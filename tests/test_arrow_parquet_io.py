@@ -718,6 +718,18 @@ class TestPartitionedDataset:
                 steps=[0],
             )
 
+    def test_particle_metadata_round_trip(self, tmp_path: Path):
+        # Reviewer regression: ``_matched_species_metadata`` already
+        # recovers the full per-fragment ``pypic`` payload, but the
+        # final ``inject_species_meta`` call used to drop the nested
+        # ``metadata`` dict — dataset round-trips silently lost any
+        # non-empty ``ParticleData.metadata``.
+        pcl = _make_particles(20)  # metadata={"source": "test"}
+        root = tmp_path / "with_metadata"
+        particles_to_dataset([(0, "electrons", pcl)], root)
+        rebuilt = particles_from_dataset(root, step=0, species="electrons")
+        assert rebuilt.metadata == {"source": "test"}
+
 
 # --- DuckDB ---
 
@@ -760,6 +772,9 @@ class TestDuckDBQuery:
         assert pcl.species_index == 0
         assert pcl.species_charge == -1.0
         assert pcl.species_mass == 1.0
+        # ``_make_particles`` stamps metadata={'source': 'test'}; the
+        # recovery path must carry it back through the SQL entrypoint.
+        assert pcl.metadata == {"source": "test"}
 
     def test_string_species_resolves_correct_index(self, tmp_path: Path):
         from pypic.io._duckdb import query_sql

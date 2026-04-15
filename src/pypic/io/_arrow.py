@@ -67,13 +67,16 @@ def inject_species_meta(
     *,
     species_charge: float | None = None,
     species_mass: float | None = None,
+    metadata: dict[str, Any] | None = None,
 ) -> pa.Table:
     """Inject species metadata into an Arrow table's schema metadata.
 
     Used by ``particles_from_dataset`` and ``query_sql`` to attach
     species info extracted from partition columns before calling
-    ``particles_from_arrow``.  Optional ``species_charge`` and
-    ``species_mass`` round-trip alongside the per-particle data.
+    ``particles_from_arrow``.  Optional ``species_charge``,
+    ``species_mass``, and ``metadata`` round-trip alongside the
+    per-particle data — ``metadata`` preserves the original
+    ``ParticleData.metadata`` that was written by the writer.
     """
     payload: dict[str, Any] = {
         "species_index": species_index,
@@ -84,6 +87,8 @@ def inject_species_meta(
         payload["species_charge"] = species_charge
     if species_mass is not None:
         payload["species_mass"] = species_mass
+    if metadata:
+        payload["metadata"] = metadata
     meta = table.schema.metadata or {}
     meta[b"pypic"] = json.dumps(payload).encode("utf-8")
     return table.replace_schema_metadata(meta)

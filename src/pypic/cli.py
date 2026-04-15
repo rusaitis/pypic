@@ -957,7 +957,6 @@ def convert_all(
     ``fields`` or ``particles`` subcommand directly for full control
     over flags.
     """
-    output.mkdir(parents=True, exist_ok=True)
     fields_out = output / "fields.zarr"
     particles_out = output / "particles"
 
@@ -972,6 +971,7 @@ def convert_all(
             typer.echo("No particle output detected; skipping particles pipeline.")
         return
 
+    output.mkdir(parents=True, exist_ok=True)
     ctx.invoke(
         convert_fields,
         path=path,
