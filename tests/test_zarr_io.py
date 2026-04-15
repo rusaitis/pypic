@@ -193,6 +193,39 @@ class TestSerializationHelpers:
         assert loaded.metadata["seq"] == [1.0, 2.0, 3.0]
         assert loaded.metadata["nested"] == {"inner": 7}
 
+    def test_metadata_stagger_info_round_trip(self, tmp_path):
+        # Reviewer regression: every reader (openggcm, batsrus, the
+        # config loader) populates metadata["stagger"] as a typed
+        # StaggerInfo dataclass.  Without an explicit (de)serializer
+        # the value would either crash json.dumps or come back as a
+        # plain dict — the FieldDataset round-trip-fidelity contract
+        # requires the original type.
+        from pypic.containers import StaggerInfo
+
+        grid = make_uniform_grid(4, 3, 2)
+        stagger = StaggerInfo(
+            convention="staggered",
+            field_locations={"B": "face", "E": "edge"},
+            interpolation_order=1,
+            notes="Yee mesh",
+        )
+        fds = FieldDataset.from_arrays(
+            {"B1": np.ones((4, 3, 2))},
+            grid,
+            Normalization.identity(),
+            metadata={"stagger": stagger, "run": "demo"},
+        )
+        store = tmp_path / "stagger.zarr"
+        to_zarr(fds, store)
+        loaded = from_zarr(store)
+        loaded_stagger = loaded.metadata["stagger"]
+        assert isinstance(loaded_stagger, StaggerInfo)
+        assert loaded_stagger.convention == "staggered"
+        assert dict(loaded_stagger.field_locations) == {"B": "face", "E": "edge"}
+        assert loaded_stagger.interpolation_order == 1
+        assert loaded_stagger.notes == "Yee mesh"
+        assert loaded.metadata["run"] == "demo"
+
 
 class TestToZarrFromZarr:
     """Round-trip tests for to_zarr / from_zarr."""

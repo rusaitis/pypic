@@ -224,6 +224,25 @@ def dict_to_transforms(
     return {key: _dict_to_transform(td) for key, td in d.items()}
 
 
+def _stagger_to_dict(stagger: Any) -> dict[str, Any]:  # noqa: ANN401
+    """Serialize a StaggerInfo to a tagged JSON dict.
+
+    Tagged with ``__pypic_class__`` so ``_from_json_native`` can spot
+    it during decode and rebuild the dataclass instead of leaving a
+    plain dict in ``metadata``.
+    """
+    field_locations = stagger.field_locations
+    return {
+        "__pypic_class__": "StaggerInfo",
+        "convention": stagger.convention,
+        "field_locations": (
+            dict(field_locations) if field_locations is not None else None
+        ),
+        "interpolation_order": stagger.interpolation_order,
+        "notes": stagger.notes,
+    }
+
+
 def _to_json_native(obj: Any) -> Any:  # noqa: ANN401
     """Recursively coerce NumPy scalars/arrays to JSON-native equivalents.
 
@@ -232,7 +251,15 @@ def _to_json_native(obj: Any) -> Any:  # noqa: ANN401
     attr validator (via xarray) rejects these, so a user-supplied
     ``metadata`` dict must be normalized before serialization.
     Python-native types pass through unchanged.
+
+    Recognized typed values (``StaggerInfo``) are tagged so the decode
+    side can rebuild them — without the tag they'd come back as plain
+    dicts, breaking the serializer's round-trip-fidelity contract.
     """
+    from pypic.containers import StaggerInfo
+
+    if isinstance(obj, StaggerInfo):
+        return _stagger_to_dict(obj)
     if isinstance(obj, np.generic):
         return obj.item()
     if isinstance(obj, np.ndarray):
@@ -241,6 +268,35 @@ def _to_json_native(obj: Any) -> Any:  # noqa: ANN401
         return {str(k): _to_json_native(v) for k, v in obj.items()}
     if isinstance(obj, (list, tuple)):
         return [_to_json_native(v) for v in obj]
+    return obj
+
+
+def _dict_to_stagger(d: dict[str, Any]) -> Any:  # noqa: ANN401
+    """Reconstruct a StaggerInfo from a tagged dict written by ``_to_json_native``."""
+    from pypic.containers import StaggerInfo
+
+    return StaggerInfo(
+        convention=d["convention"],
+        field_locations=d.get("field_locations"),
+        interpolation_order=d.get("interpolation_order"),
+        notes=d.get("notes"),
+    )
+
+
+def _from_json_native(obj: Any) -> Any:  # noqa: ANN401
+    """Inverse of ``_to_json_native``: rebuild tagged typed values.
+
+    Walks dicts/lists recursively.  Plain JSON values pass through
+    unchanged.  Only the ``__pypic_class__`` marker triggers
+    reconstruction.
+    """
+    if isinstance(obj, dict):
+        cls = obj.get("__pypic_class__")
+        if cls == "StaggerInfo":
+            return _dict_to_stagger(obj)
+        return {k: _from_json_native(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_from_json_native(v) for v in obj]
     return obj
 
 
@@ -285,7 +341,7 @@ def decode_pypic_attrs(
     normalization = dict_to_normalization(d["normalization"])
     species = list_to_species(d.get("species", []))
     physics = dict_to_physics(d["physics"])
-    metadata = d.get("metadata", {})
+    metadata = _from_json_native(d.get("metadata", {}))
     frame = d.get("frame", "simulation")
     transforms = dict_to_transforms(d.get("transforms", {}))
     return grid, normalization, species, physics, metadata, frame, transforms

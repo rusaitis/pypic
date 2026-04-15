@@ -174,27 +174,45 @@ def to_zarr_icechunk(
         The snapshot ID of the new commit.
     """
     ensure_icechunk()
+    import shutil
 
-    repo = open_icechunk_repo(path, create=True)
-    _ensure_branch(repo, branch)
-    session = repo.writable_session(branch)
-
-    ds = fds.xr.copy(deep=False)
-    ds.attrs["pypic"] = encode_pypic_attrs(fds)
-
-    ds.to_zarr(
-        session.store,
-        zarr_format=3,
-        consolidated=False,
-        mode="w",
-        encoding=_build_encoding(ds, dtype, encoding),
+    # Same cleanup gating as ``to_zarr_timeseries``: a fresh-or-empty
+    # output directory means the half-initialized repo is ours to remove
+    # if anything between ``open_icechunk_repo(create=True)`` and
+    # ``session.commit`` raises.  Without this, callers see
+    # ``is_icechunk_store`` return True while ``from_zarr`` raises
+    # ``GroupNotFoundError`` — non-serializable metadata or an
+    # ``encode_pypic_attrs`` failure are the realistic triggers.
+    path_obj = Path(path)
+    created_new = not path_obj.exists() or (
+        path_obj.is_dir() and not any(path_obj.iterdir())
     )
 
-    n_fields = len(ds.data_vars)
-    if message is None:
-        message = f"pypic: write {n_fields} fields"
+    repo = open_icechunk_repo(path, create=True)
+    try:
+        _ensure_branch(repo, branch)
+        session = repo.writable_session(branch)
 
-    snapshot_id: str = session.commit(message)
+        ds = fds.xr.copy(deep=False)
+        ds.attrs["pypic"] = encode_pypic_attrs(fds)
+
+        ds.to_zarr(
+            session.store,
+            zarr_format=3,
+            consolidated=False,
+            mode="w",
+            encoding=_build_encoding(ds, dtype, encoding),
+        )
+
+        n_fields = len(ds.data_vars)
+        if message is None:
+            message = f"pypic: write {n_fields} fields"
+
+        snapshot_id: str = session.commit(message)
+    except BaseException:
+        if created_new:
+            shutil.rmtree(path, ignore_errors=True)
+        raise
     _log.info("Wrote %d fields to %s (snapshot %s)", n_fields, path, snapshot_id)
     return snapshot_id
 

@@ -332,3 +332,24 @@ class TestToIcechunkVirtualVersioning:
         loaded = from_zarr(output)
         assert loaded.metadata["time"] == pytest.approx(1.25)
         assert loaded.metadata["step"] == 42
+
+    def test_failed_validation_cleans_up_fresh_repo(self, tmp_path):
+        # Reviewer regression: the virtual writer creates and seeds
+        # the Icechunk repo before ``open_virtual`` runs the canonical
+        # metadata validation.  An HDF5 file with ``fields/`` but no
+        # ``grid/`` raises a ``ValueError`` from
+        # ``open_virtual``/``_extract_grid``, and without cleanup the
+        # repo subtree was left behind — ``is_icechunk_store`` would
+        # report True while ``from_zarr`` raised ``GroupNotFoundError``.
+        h5path = tmp_path / "no_grid.h5"
+        with h5py.File(h5path, "w") as f:
+            f.create_group("fields").create_dataset("B1", data=np.ones((4, 3, 2)))
+            # Intentionally omit the ``grid/`` group.
+
+        output = tmp_path / "broken_virtual"
+        with pytest.raises((ValueError, KeyError)):
+            to_icechunk_virtual(h5path, output)
+        from pypic.io._icechunk import is_icechunk_store
+
+        assert not output.exists() or not any(output.iterdir())
+        assert not is_icechunk_store(output)

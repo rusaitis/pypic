@@ -132,6 +132,46 @@ class TestToZarrIcechunk:
         with pytest.raises(ValueError, match="Unknown backend"):
             to_zarr(fds, store, backend="nosql")
 
+    def test_failed_write_cleans_up_fresh_repo(self, tmp_path):
+        # Reviewer regression: any error between
+        # ``open_icechunk_repo(create=True)`` and ``session.commit``
+        # used to leave a half-initialized repo behind — same stale-
+        # store problem already fixed for the timeseries writer.  A
+        # set is not JSON-serializable, so xarray's attr validator
+        # raises during ``ds.to_zarr`` and the cleanup branch fires.
+        grid = make_uniform_grid(4, 3, 2)
+        fds = FieldDataset.from_arrays(
+            {"B1": np.ones((4, 3, 2))},
+            grid,
+            Normalization.identity(),
+            metadata={"bad": {1, 2, 3}},
+        )
+        store = tmp_path / "broken.icechunk"
+        with pytest.raises(TypeError, match=r"Invalid attribute"):
+            to_zarr(fds, store, backend="icechunk")
+        assert not store.exists()
+        assert not is_icechunk_store(store)
+
+    def test_failed_write_preserves_existing_repo(self, tmp_path):
+        # The cleanup must only fire on freshly-created repos: a repo
+        # with prior successful commits stays intact even if a later
+        # write attempt aborts before commit.
+        good = make_test_dataset({"B1": np.full((4, 3, 2), 7.0)})
+        store = tmp_path / "existing.icechunk"
+        to_zarr(good, store, backend="icechunk")
+        grid = make_uniform_grid(4, 3, 2)
+        bad = FieldDataset.from_arrays(
+            {"B1": np.ones((4, 3, 2))},
+            grid,
+            Normalization.identity(),
+            metadata={"bad": {1, 2, 3}},
+        )
+        with pytest.raises(TypeError, match=r"Invalid attribute"):
+            to_zarr(bad, store, backend="icechunk", branch="nightly")
+        assert is_icechunk_store(store)
+        loaded = from_zarr(store, branch="main")
+        np.testing.assert_allclose(loaded["B1"], 7.0)
+
 
 class TestFromZarrIcechunk:
     """Tests for from_zarr with Icechunk auto-detection and ref parameters."""

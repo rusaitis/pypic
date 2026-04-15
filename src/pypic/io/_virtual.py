@@ -372,6 +372,7 @@ def to_icechunk_virtual(
     ensure_virtualizarr()
     ensure_icechunk()
 
+    import shutil
     from pathlib import Path as _Path
 
     import icechunk
@@ -381,73 +382,91 @@ def to_icechunk_virtual(
     source_str = str(source_path)
     source_dir = str(source_path.parent)
     output_path = _Path(output)
+    # Detect whether the output directory is ours to clean up *before*
+    # we mkdir it.  Same gating as ``to_zarr_icechunk`` /
+    # ``to_zarr_timeseries`` — anything that fails between the repo
+    # init and ``session.commit`` (notably ``open_virtual`` raising
+    # because the source HDF5 lacks ``grid/``) leaves a half-
+    # initialized repo where ``is_icechunk_store`` returns True while
+    # ``from_zarr`` raises ``GroupNotFoundError``.
+    created_new = not output_path.exists() or (
+        output_path.is_dir() and not any(output_path.iterdir())
+    )
     output_path.mkdir(parents=True, exist_ok=True)
 
-    vds = _build_vds(source_str, fields_group, drop_variables)
-
-    storage = icechunk.local_filesystem_storage(str(output_path))
-    repo_config, url_prefix = _virtual_repo_config(source_dir)
-
-    # Merge the new virtual chunk container into any config already
-    # persisted for this repo.  ``open_or_create`` accepts ``config=``
-    # but does not union it with previously-saved containers — passing
-    # only the current source's container would silently displace every
-    # prefix from earlier commits, so later reads of those refs fail
-    # with "no virtual chunk container can handle the chunk location".
     try:
-        persisted = icechunk.Repository.fetch_config(storage)
-    except Exception:
-        # Fresh repo: fetch_config raises before any commit exists.
-        persisted = None
-    if persisted is not None:
-        existing = persisted.virtual_chunk_containers or {}
-        if url_prefix not in existing:
-            persisted.set_virtual_chunk_container(
-                _make_virtual_chunk_container(url_prefix, source_dir)
-            )
-        repo_config = persisted
+        vds = _build_vds(source_str, fields_group, drop_variables)
 
-    all_prefixes: dict[str, Any] = {
-        p: None for p in (repo_config.virtual_chunk_containers or {})
-    }
-    all_prefixes.setdefault(url_prefix, None)
+        storage = icechunk.local_filesystem_storage(str(output_path))
+        repo_config, url_prefix = _virtual_repo_config(source_dir)
 
-    repo = icechunk.Repository.open_or_create(
-        storage,
-        config=repo_config,
-        authorize_virtual_chunk_access=all_prefixes,
-    )
-    # Persist the (possibly augmented) config so ``from_zarr`` — which
-    # opens the repo without knowing which containers to authorize —
-    # can auto-discover every prefix this repo has ever written against.
-    repo.save_config()
-    _ensure_branch(repo, branch)
-    session = repo.writable_session(branch)
-    # Clear the session's working-tree root so virtualizarr's
-    # to_icechunk can create a fresh root group.  Required for (a)
-    # repeat commits to the same branch and (b) new branches forked
-    # from a non-empty main — both inherit the prior root group from
-    # the branch tip, and virtualizarr's ``Group.from_store`` raises
-    # ContainsGroupError on any pre-existing node.  Prior snapshots
-    # stay intact in repo history; only this commit's root is
-    # replaced.
-    session.store.sync_clear()
-    vds.vz.to_icechunk(session.store)
+        # Merge the new virtual chunk container into any config already
+        # persisted for this repo.  ``open_or_create`` accepts
+        # ``config=`` but does not union it with previously-saved
+        # containers — passing only the current source's container
+        # would silently displace every prefix from earlier commits, so
+        # later reads of those refs fail with "no virtual chunk
+        # container can handle the chunk location".
+        try:
+            persisted = icechunk.Repository.fetch_config(storage)
+        except Exception:
+            # Fresh repo: fetch_config raises before any commit exists.
+            persisted = None
+        if persisted is not None:
+            existing = persisted.virtual_chunk_containers or {}
+            if url_prefix not in existing:
+                persisted.set_virtual_chunk_container(
+                    _make_virtual_chunk_container(url_prefix, source_dir)
+                )
+            repo_config = persisted
 
-    # Reuse open_virtual to assemble the canonical FieldDataset attrs.
-    # This re-extracts vds against an in-memory store (cheap — only
-    # HDF5 metadata is read) and gives encode_pypic_attrs the same
-    # FieldDataset shape from_zarr will reconstruct on read.
-    fds = open_virtual(
-        source,
-        fields_group=fields_group,
-        drop_variables=drop_variables,
-        config=config,
-    )
-    group = zarr.open_group(session.store, mode="r+")
-    group.attrs["pypic"] = encode_pypic_attrs(fds)
+        all_prefixes: dict[str, Any] = {
+            p: None for p in (repo_config.virtual_chunk_containers or {})
+        }
+        all_prefixes.setdefault(url_prefix, None)
 
-    snapshot: str = session.commit(
-        message if message is not None else "pypic: virtual refs"
-    )
+        repo = icechunk.Repository.open_or_create(
+            storage,
+            config=repo_config,
+            authorize_virtual_chunk_access=all_prefixes,
+        )
+        # Persist the (possibly augmented) config so ``from_zarr`` —
+        # which opens the repo without knowing which containers to
+        # authorize — can auto-discover every prefix this repo has
+        # ever written against.
+        repo.save_config()
+        _ensure_branch(repo, branch)
+        session = repo.writable_session(branch)
+        # Clear the session's working-tree root so virtualizarr's
+        # to_icechunk can create a fresh root group.  Required for (a)
+        # repeat commits to the same branch and (b) new branches
+        # forked from a non-empty main — both inherit the prior root
+        # group from the branch tip, and virtualizarr's
+        # ``Group.from_store`` raises ContainsGroupError on any
+        # pre-existing node.  Prior snapshots stay intact in repo
+        # history; only this commit's root is replaced.
+        session.store.sync_clear()
+        vds.vz.to_icechunk(session.store)
+
+        # Reuse open_virtual to assemble the canonical FieldDataset
+        # attrs.  This re-extracts vds against an in-memory store
+        # (cheap — only HDF5 metadata is read) and gives
+        # encode_pypic_attrs the same FieldDataset shape from_zarr
+        # will reconstruct on read.
+        fds = open_virtual(
+            source,
+            fields_group=fields_group,
+            drop_variables=drop_variables,
+            config=config,
+        )
+        group = zarr.open_group(session.store, mode="r+")
+        group.attrs["pypic"] = encode_pypic_attrs(fds)
+
+        snapshot: str = session.commit(
+            message if message is not None else "pypic: virtual refs"
+        )
+    except BaseException:
+        if created_new:
+            shutil.rmtree(output_path, ignore_errors=True)
+        raise
     return snapshot
