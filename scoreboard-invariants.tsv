@@ -2,3 +2,4 @@ timestamp	iteration	invariant_name	outcome	commit_hash	notes
 2026-04-15	0	norm_roundtrip_all_systems	test-added	0574071	smoke-test; extends test_units.py:65 from 2 systems to 4 + adds compound-factor round-trip
 2026-04-15	1	compute_dispatch_magnitudes	test-added	3136f9b	backlog #2a; algebraic identity compute("|X|")² == sum(Xi²) for all 6 magnitude recipes; registry-drift guard caught missing |vort|
 2026-04-15	2	compute_dispatch_plasma_params	test-added	83fb925	backlog #2b; β = 2P/B², v_A = |B|/√ρ_m, M_A = |V|/v_A — closed-form identities from equations.md § 5
+2026-04-16	3	div_curl_identity	test-added	pending	backlog #3; ∇·(∇×F) = 0 bit-exactly (not just truncation) — np.gradient linear ops on distinct axes commute everywhere, not only interior
