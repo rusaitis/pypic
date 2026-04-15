@@ -564,13 +564,17 @@ def particles_from_dataset(
     # if the filter matched multiple species.
     payload = _matched_species_metadata(dataset, combined_filter)
     # Empty-filter recovery: a pinned species still has its schema
-    # metadata on disk under ``species={name}/``, so adopt that
-    # payload rather than degrade identity to ``"unknown"``.  Mirrors
-    # the DuckDB empty-result recovery in ``_duckdb.query_sql``.
+    # metadata on disk under ``species={name}/``, so adopt species
+    # identity rather than degrade to ``"unknown"``.  Per-step
+    # ``metadata`` (time, tag, ...) is *not* recoverable on an empty
+    # read — forwarding an arbitrary fragment's payload would stamp
+    # stale step-specific attrs onto a zero-row result.  Keep only
+    # species-level fields (index, name, charge, mass).  Mirrors the
+    # DuckDB empty-result recovery in ``_duckdb.query_sql``.
     if payload.get("species_name") == "unknown" and pinned_species_str is not None:
         pinned_payload = _payload_from_species_dir(Path(path), pinned_species_str)
         if pinned_payload is not None:
-            payload = pinned_payload
+            payload = {k: v for k, v in pinned_payload.items() if k != "metadata"}
 
     table = dataset.to_table(filter=combined_filter, columns=read_columns)
     table = _strip_extra_columns(table)

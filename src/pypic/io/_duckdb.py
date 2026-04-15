@@ -153,13 +153,18 @@ def query_sql(
                 recovered_species = next(iter(on_disk_pinned))
         if recovered_species is not None:
             payload = _lookup_species_meta(path, recovered_species)
+            # Empty-result recovery keeps species identity (index /
+            # charge / mass) but drops per-step ``metadata``: the
+            # fragment we scanned is *some* step's schema, not the
+            # (zero-row) step the query asked about, so stamping its
+            # ``time``/``tag``/... scalars onto the empty result would
+            # be silent corruption.  Species-level scalars stay.
             arrow_table = inject_species_meta(
                 arrow_table,
                 int(payload.get("species_index", 0)),
                 recovered_species,
                 species_charge=payload.get("species_charge"),
                 species_mass=payload.get("species_mass"),
-                metadata=payload.get("metadata"),
             )
         else:
             arrow_table = inject_species_meta(arrow_table, 0, "unknown")

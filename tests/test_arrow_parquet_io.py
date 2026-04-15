@@ -770,8 +770,10 @@ class TestPartitionedDataset:
         # Reviewer regression: when the caller explicitly pins a
         # species (by name) but the step/row filter matches zero
         # fragments, the species' schema metadata is still on disk
-        # under ``species={name}/`` — adopt that payload rather than
-        # degrade to the ``"unknown"`` placeholder.
+        # under ``species={name}/`` — adopt species identity rather
+        # than degrade to the ``"unknown"`` placeholder.  Per-step
+        # ``metadata`` is NOT recoverable on a zero-row read and must
+        # come back empty (not stamped from an arbitrary fragment).
         sim = _make_mock_simulation(
             steps=[0, 100],
             species=[(0, "electrons"), (1, "ions")],
@@ -785,7 +787,10 @@ class TestPartitionedDataset:
         assert pcl.species_index == 0
         assert pcl.species_charge == -1.0
         assert pcl.species_mass == 1.0
-        assert pcl.metadata == {"source": "test"}
+        # Empty reads must not leak a fragment's payload, even though
+        # ``_make_particles`` happens to stamp identical metadata
+        # across every step here.
+        assert pcl.metadata == {}
 
     def test_empty_filtered_read_preserves_pinned_species_index(self, tmp_path: Path):
         # Same recovery path must fire when the caller pins a species
@@ -803,6 +808,49 @@ class TestPartitionedDataset:
         assert pcl.species_name == "ions"
         assert pcl.species_index == 1
         assert pcl.species_charge == 1.0
+        assert pcl.metadata == {}
+
+    def test_empty_filtered_read_drops_stale_per_step_metadata(self, tmp_path: Path):
+        # Reviewer regression: ``_payload_from_species_dir`` returns
+        # whichever fragment it finds first under ``species={name}/``.
+        # When steps stamp different metadata (e.g. ``time``, ``tag``),
+        # forwarding an arbitrary fragment's payload on a zero-row
+        # read would silently attach wrong-step values.  Species
+        # identity is preserved; per-step metadata is not.
+        pcl_base = _make_particles(10, species_index=0, species_name="electrons")
+        pcl0 = ParticleData(
+            species_index=pcl_base.species_index,
+            species_name=pcl_base.species_name,
+            position=pcl_base.position,
+            velocity=pcl_base.velocity,
+            n_particles=pcl_base.n_particles,
+            id=pcl_base.id,
+            metadata={"time": 0.0, "tag": "step0"},
+            weight=pcl_base.weight,
+            species_charge=pcl_base.species_charge,
+            species_mass=pcl_base.species_mass,
+        )
+        pcl100 = ParticleData(
+            species_index=pcl_base.species_index,
+            species_name=pcl_base.species_name,
+            position=pcl_base.position,
+            velocity=pcl_base.velocity,
+            n_particles=pcl_base.n_particles,
+            id=pcl_base.id,
+            metadata={"time": 1.0, "tag": "step100"},
+            weight=pcl_base.weight,
+            species_charge=pcl_base.species_charge,
+            species_mass=pcl_base.species_mass,
+        )
+        root = tmp_path / "per_step_meta"
+        particles_to_dataset([(0, "electrons", pcl0), (100, "electrons", pcl100)], root)
+        rebuilt = particles_from_dataset(root, step=999, species="electrons")
+        assert rebuilt.n_particles == 0
+        assert rebuilt.species_name == "electrons"
+        assert rebuilt.species_charge == -1.0
+        # Critical: must not be {"time": 0.0, "tag": "step0"} or the
+        # step-100 equivalent — neither is the step-999 truth.
+        assert rebuilt.metadata == {}
 
     def test_empty_filtered_read_without_species_stays_placeholder(
         self, tmp_path: Path
@@ -941,7 +989,9 @@ class TestDuckDBQuery:
         # Reviewer regression: a zero-row result on a single-species
         # dataset must not lose the species identity — it should adopt
         # the only on-disk species rather than fall back to
-        # "unknown"/index 0/no charge.
+        # "unknown"/index 0/no charge.  Per-step ``metadata`` however
+        # must NOT come along: an arbitrary fragment's step-specific
+        # attrs don't describe the (zero-row) step we queried.
         from pypic.io._duckdb import query_sql
 
         root = tmp_path / "single_species"
@@ -960,6 +1010,7 @@ class TestDuckDBQuery:
         assert pcl.species_index == 0
         assert pcl.species_charge == -1.0
         assert pcl.species_mass == 1.0
+        assert pcl.metadata == {}
 
     def test_empty_result_multispecies_recovers_pinned_species(self, tmp_path: Path):
         # When the SQL pins exactly one on-disk species via a literal
@@ -978,6 +1029,52 @@ class TestDuckDBQuery:
         assert pcl.species_index == 0
         assert pcl.species_charge == -1.0
         assert pcl.species_mass == 1.0
+        assert pcl.metadata == {}
+
+    def test_empty_result_drops_stale_per_step_metadata(self, tmp_path: Path):
+        # Reviewer regression: ``_lookup_species_meta`` returns the
+        # first fragment's full payload under ``species={name}/``;
+        # stamping that payload's step-specific metadata onto a zero-
+        # row SQL result would silently attach wrong-step attrs.
+        # Species identity is preserved; per-step metadata is not.
+        from pypic.io._duckdb import query_sql
+
+        pcl_base = _make_particles(10, species_index=0, species_name="electrons")
+        pcl0 = ParticleData(
+            species_index=pcl_base.species_index,
+            species_name=pcl_base.species_name,
+            position=pcl_base.position,
+            velocity=pcl_base.velocity,
+            n_particles=pcl_base.n_particles,
+            id=pcl_base.id,
+            metadata={"time": 0.0, "tag": "step0"},
+            weight=pcl_base.weight,
+            species_charge=pcl_base.species_charge,
+            species_mass=pcl_base.species_mass,
+        )
+        pcl100 = ParticleData(
+            species_index=pcl_base.species_index,
+            species_name=pcl_base.species_name,
+            position=pcl_base.position,
+            velocity=pcl_base.velocity,
+            n_particles=pcl_base.n_particles,
+            id=pcl_base.id,
+            metadata={"time": 1.0, "tag": "step100"},
+            weight=pcl_base.weight,
+            species_charge=pcl_base.species_charge,
+            species_mass=pcl_base.species_mass,
+        )
+        root = tmp_path / "duckdb_per_step_meta"
+        particles_to_dataset([(0, "electrons", pcl0), (100, "electrons", pcl100)], root)
+        pcl = query_sql(
+            root,
+            "SELECT * FROM particles WHERE species='electrons' AND step='000999'",
+        )
+        assert pcl.n_particles == 0
+        assert pcl.species_name == "electrons"
+        assert pcl.species_charge == -1.0
+        # Critical: neither step 0 nor step 100 attrs should leak in.
+        assert pcl.metadata == {}
 
     def test_empty_result_multispecies_no_literal_stays_placeholder(
         self, tmp_path: Path
