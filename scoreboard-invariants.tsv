@@ -4,3 +4,4 @@ timestamp	iteration	invariant_name	outcome	commit_hash	notes
 2026-04-15	2	compute_dispatch_plasma_params	test-added	83fb925	backlog #2b; β = 2P/B², v_A = |B|/√ρ_m, M_A = |V|/v_A — closed-form identities from equations.md § 5
 2026-04-16	3	div_curl_identity	test-added	218d9d1	backlog #3; ∇·(∇×F) = 0 bit-exactly (not just truncation) — np.gradient linear ops on distinct axes commute everywhere, not only interior
 2026-04-16	4	transform_associativity	test-added	038371d	backlog #4; compose((T1,T2),T3) == compose(T1,(T2,T3)) to float64 roundoff + point-application parity
+2026-04-16	5	macro_charge_identity	test-added	7b64121	backlog #5; macro_charge == species_charge × weight bit-exact + fail-loud when either is missing (Step 25b contract)
