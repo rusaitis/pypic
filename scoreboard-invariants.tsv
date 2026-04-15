@@ -1,0 +1,2 @@
+timestamp	iteration	invariant_name	outcome	commit_hash	notes
+2026-04-15	0	norm_roundtrip_all_systems	test-added	pending-commit	smoke-test; extends test_units.py:65 from 2 systems to 4 + adds compound-factor round-trip
