@@ -1,2 +1,3 @@
 timestamp	iteration	invariant_name	outcome	commit_hash	notes
-2026-04-15	0	norm_roundtrip_all_systems	test-added	pending-commit	smoke-test; extends test_units.py:65 from 2 systems to 4 + adds compound-factor round-trip
+2026-04-15	0	norm_roundtrip_all_systems	test-added	0574071	smoke-test; extends test_units.py:65 from 2 systems to 4 + adds compound-factor round-trip
+2026-04-15	1	compute_dispatch_magnitudes	test-added	3136f9b	backlog #2a; algebraic identity compute("|X|")² == sum(Xi²) for all 6 magnitude recipes; registry-drift guard caught missing |vort|
