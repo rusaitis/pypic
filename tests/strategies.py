@@ -136,7 +136,14 @@ def _rodrigues(
     """
     ax = np.asarray(axis, dtype=np.float64)
     norm = float(np.linalg.norm(ax))
-    ax = np.array([1.0, 0.0, 0.0]) if norm == 0.0 else ax / norm
+    # Underflow guard: ``np.linalg.norm`` computes ``sqrt(Σxᵢ²)``; when any
+    # ``xᵢ²`` is subnormal (|xᵢ| ≲ 1.5e-154), the sqrt loses several digits
+    # of precision, and the subsequent ``ax / norm`` produces a near-unit
+    # vector with an O(1e-9) error — enough to make the resulting
+    # "rotation" fail orthogonality at float64 roundoff even though it
+    # passes the ``FrameTransform`` post-init tolerance of 1e-6. Fall back
+    # to the identity rotation in that regime.
+    ax = np.array([1.0, 0.0, 0.0]) if norm < 1e-100 else ax / norm
     k = np.array(
         [[0.0, -ax[2], ax[1]], [ax[2], 0.0, -ax[0]], [-ax[1], ax[0], 0.0]]
     )

@@ -293,7 +293,16 @@ def kinetic_energy_density(
     if c is not None:
         if lorentz_factor is None:
             lorentz_factor = 1.0 / np.sqrt(1.0 - v**2 / c**2)
-        return (lorentz_factor - 1.0) * rho_m * c**2
+        # Algebraically equivalent to (γ - 1) ρ c², but avoids the
+        # catastrophic cancellation when v ≪ c: γ rounds to 1 at v/c <
+        # √eps ≈ 1.5e-8, so the subtraction silently returns 0 instead
+        # of the non-relativistic limit ½ρv². Identity: γ - 1 =
+        # (γ² - 1)/(γ + 1) = (v²/c²) γ²/(γ + 1), hence (γ - 1) c² =
+        # γ² v²/(γ + 1). Recovers ½ρv² as γ → 1.
+        result: FloatArray = (
+            rho_m * v**2 * lorentz_factor**2 / (lorentz_factor + 1.0)
+        )
+        return result
     return 0.5 * rho_m * v**2
 
 
