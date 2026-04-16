@@ -159,56 +159,56 @@ tests/test_cli.py::test_bad_metric	3	kept	Pins 'Invalid --metric' error — catc
 tests/test_cli.py::test_bad_units	3	kept	Pins 'Invalid --units' error for 'cgs' (an unsupported unit system) — catches a silent-fallback-to-code-units bug.	5cf5583
 tests/test_cli.py::test_bad_nan_policy	3	kept	Pins 'Invalid --nan-policy' error for 'ignore' (valid values are omit/propagate/raise) — catches a typo-tolerance bug where the CLI accepts unknown policy strings.	5cf5583
 tests/test_cli.py::test_log_level_not_sticky	3	kept	Pins logging.basicConfig(force=True) — catches a regression where a prior debug-level invocation leaks level state to subsequent -q invocations (documented bug class in the docstring).	5cf5583
-tests/test_cli.py::test_missing_field_stats	4	kept	Pins the user-facing 'Error:' prefix in stats' missing-field path; catches a regression where a KeyError would bubble up raw instead of through _die().	<pending>
-tests/test_cli.py::test_missing_field_compare	4	kept	Pins the user-facing 'Error:' prefix in compare's missing-field path on both datasets; mirrors stats test but covers the compare dispatch branch.	<pending>
-tests/test_cli.py::test_quiet_flag	4	kept	Pins that `-q` runs cleanly end-to-end (no secondary errors from the logging-level reset) on the shortest CLI invocation.	<pending>
-tests/test_cli.py::test_quiet_suppresses_warnings	4	kept	Pins the warnings.warn→logging redirection under `-q`: NaN-cell warnings from diagnostics must not leak to the terminal — mutating the showwarning override would silently regress this.	<pending>
-tests/test_cli.py::TestPlot::test_minimal	4	kept	Happy-path smoke test with file-existence check — catches plot subcommand ImportError / wiring break before any option path is exercised.	<pending>
-tests/test_cli.py::TestPlot::test_plane_xy	4	hardened	Added (tmp_path / 'xy.png').exists() after exit_code==0 — catches 'exit 0 but no file' regressions.	<pending>
-tests/test_cli.py::TestPlot::test_plane_xz	4	hardened	Added .exists() guard (same pattern as test_plane_xy).	<pending>
-tests/test_cli.py::TestPlot::test_plane_normal_axis_name	4	hardened	Added .exists() guard — pins that single-axis plane names (e.g. 'z') still route through _parse_plane correctly.	<pending>
-tests/test_cli.py::TestPlot::test_with_index	4	hardened	Added .exists() guard — catches a path where --index is parsed but never consumed by _resolve_index_from_plane.	<pending>
-tests/test_cli.py::TestPlot::test_with_coord	4	hardened	Added .exists() guard — catches a path where --coord is parsed but never consumed by _resolve_index_from_plane.	<pending>
-tests/test_cli.py::TestPlot::test_index_and_coord_conflict	4	hardened	Tightened from 'exit_code != 0' to requiring both '--index' and '--coord' appear in the error message — pins the conflict-guard's message, not merely the exit status.	<pending>
-tests/test_cli.py::TestPlot::test_derived_field	4	hardened	Added .exists() guard — pins that |B| (registry dispatch) reaches the plot output path, not just an early error.	<pending>
-tests/test_cli.py::TestPlot::test_log_scale	4	hardened	Added .exists() guard — catches regressions where LogNorm construction raises post exit-code-0 but silently drops the image.	<pending>
-tests/test_cli.py::TestPlot::test_symlog_scale	4	hardened	Added .exists() guard — mirrors log_scale; pins SymLogNorm default-linthresh path.	<pending>
-tests/test_cli.py::TestPlot::test_symlog_with_linthresh	4	hardened	Added .exists() guard — pins --linthresh is threaded through to SymLogNorm (not silently dropped).	<pending>
-tests/test_cli.py::TestPlot::test_custom_clim	4	hardened	Added .exists() guard — pins --vmin/--vmax are threaded to imshow and don't break rendering.	<pending>
-tests/test_cli.py::TestPlot::test_colormap	4	hardened	Added .exists() guard — pins --colormap lookup does not raise post exit-code-0.	<pending>
-tests/test_cli.py::TestPlot::test_dpi	4	kept	Already checks .exists(); pins that --dpi integer is accepted by savefig path (matplotlib raises on bad dpi types).	<pending>
-tests/test_cli.py::TestPlot::test_format_override	4	hardened	Added .exists() + PDF magic-bytes check — catches a silent regression where --format pdf is parsed but ignored (PNG written to .pdf).	<pending>
-tests/test_cli.py::TestPlot::test_res_downsample	4	hardened	Added .exists() guard — pins --res '2x2' is threaded through to the preview-downsample path and doesn't silently skip output.	<pending>
-tests/test_cli.py::TestPlot::test_batch_steps	4	kept	Pins per-step file emission for multi-step plots (3 frames); catches regressions where the {step} placeholder stops expanding.	<pending>
-tests/test_cli.py::TestPlot::test_batch_no_output_error	4	hardened	Tightened from bare 'exit_code != 0' to also require '--output' appears in the error — pins the BadParameter message names the missing flag.	<pending>
-tests/test_cli.py::TestPlot::test_bad_scale	4	kept	Pins the 'Invalid --scale' _check_choice error text; catches regressions where _check_choice is removed from plot() signature validation.	<pending>
-tests/test_cli.py::TestPlot::test_bad_plane	4	kept	Pins the 'Invalid --plane' error text from _parse_plane; catches regressions where 'ab' (nonsense axis pair) is accepted as a two-letter plane.	<pending>
-tests/test_cli.py::TestPlot::test_missing_field	4	kept	Pins the plot-path missing-field error routes through _die with 'Error:' prefix — different code path than stats/compare.	<pending>
-tests/test_cli.py::TestPlotCompare::test_minimal	4	kept	Already checks .exists() — pins that plot-compare's full three-panel render (a | b | diff) produces a file at baseline.	<pending>
-tests/test_cli.py::TestPlotCompare::test_with_plane	4	hardened	Added .exists() guard — pins --plane xz threads through the plot-compare dispatch (distinct from plot's plane path).	<pending>
-tests/test_cli.py::TestPlotCompare::test_diff_limits	4	hardened	Added .exists() guard — pins --diff-vmin/--diff-vmax reach the difference-panel's imshow call.	<pending>
-tests/test_cli.py::TestPlotCompare::test_bad_units	4	kept	Pins 'Invalid --units' _check_choice error text on plot-compare — catches regression where units='cgs' silently falls back to SI.	<pending>
-tests/test_cli.py::TestPlotCompare::test_missing_field	4	kept	Pins plot-compare missing-field path through _die with 'Error:' prefix — distinct branch from plot's version.	<pending>
-tests/test_cli.py::test_stats_field_all	4	kept	Pins '--field all' iterates the loaded field set; catches regressions where only the first field is reported (B2, B3 missing).	<pending>
-tests/test_cli.py::test_stats_field_all_json	4	kept	Pins JSON schema for '--field all': {'fields': [...]} shape with 'field' key per entry; locks the machine-readable contract for downstream scripts.	<pending>
-tests/test_cli.py::test_validate_text	4	kept	Pins the validate subcommand's expected section headers ('Validation:', 'NaN census:', 'max |div B|:', 'B energy:') — catches section reorderings or renamings that break grep-based parsers.	<pending>
-tests/test_cli.py::test_validate_json	4	kept	Pins the validate --json schema: nan_total, max_div_b, b_energy, fields list, energy_drift_* keys; ensures energy drift is null for non-aux sims (not accidentally zero).	<pending>
-tests/test_cli.py::TestPlotTheme::test_theme_dark	4	hardened	Added .exists() guard — pins --theme dark mplstyle is applied and doesn't abort the render silently.	<pending>
-tests/test_cli.py::TestPlotContour::test_contour_overlay	4	kept	Already checks .exists() — pins that --contour <field> + --contour-levels overlays succeed without loading the contour field twice or crashing on missing data.	<pending>
-tests/test_cli.py::TestPlotCompareTheme::test_theme	4	hardened	Added .exists() guard — mirrors TestPlotTheme fix on plot-compare's theme plumbing.	<pending>
-tests/test_cli.py::TestPlotAnimate::test_animate_requires_multistep	4	kept	Pins the 'multiple steps' BadParameter when --animate is given without multi-step input; catches regressions where the single-step check is dropped and the stitcher runs on one frame.	<pending>
-tests/test_cli.py::test_plot_2d_dataset	4	kept	Pins that already-2D data plots without --plane — catches a regression where plot() always demands a plane and breaks on 2D simulations.	<pending>
-tests/test_cli.py::test_stats_2d_dataset	4	kept	Pins stats works on 2D data — catches dimension-assumption bugs in stats' summary code.	<pending>
-tests/test_cli.py::test_compare_bad_method	4	kept	Pins compare's method validation path through _die with 'Error:' — catches regression where a typo ('banana') silently falls through to default linear interpolation.	<pending>
-tests/test_cli.py::test_compare_bad_frame	4	kept	Pins compare's frame validation path through _die with 'Error:' — catches regression where an unregistered frame is silently accepted.	<pending>
-tests/test_cli.py::test_plot_compare_bad_method	4	kept	Pins plot-compare's method validation path through _die with 'Error:' — parallel to test_compare_bad_method on the plot-compare branch.	<pending>
-tests/test_cli.py::test_convert_fields_dry_run	4	kept	Pins 'Would write' dry-run output + 'not out.exists()' side-effect-free contract; catches regressions where --dry-run starts creating directories.	<pending>
-tests/test_cli.py::test_convert_fields_single_step_round_trip	4	kept	Pins round-trip: CLI write → from_zarr read reconstructs {B1,B2,B3} with shape (4,4,4). Catches regressions where only some fields survive or shapes are transposed.	<pending>
-tests/test_cli.py::test_convert_fields_multi_step_timeseries	4	kept	Pins multi-step writes add a leading time dim of length 3 (shape (3,4,4,4)) — distinguishes the to_zarr_timeseries path from the single-step to_zarr path.	<pending>
-tests/test_cli.py::test_convert_fields_subset	4	kept	Pins --fields B1,B2 includes only the requested fields and excludes B3 — catches regression where field filter is parsed but ignored.	<pending>
-tests/test_cli.py::test_convert_fields_box_crop	4	kept	Pins --box 'x=0:2,y=0:2' crops to shape (2,2,4) — catches regression in BoxSelection.apply dispatch at convert time (wrong axis, off-by-one slice, etc.).	<pending>
-tests/test_cli.py::test_convert_fields_bad_backend	4	kept	Pins --backend lance is rejected with 'backend' in the error — catches regression where unknown backends fall through to the default zarr path.	<pending>
-tests/test_cli.py::test_convert_fields_tag_requires_icechunk	4	kept	Pins --tag without --backend icechunk raises with 'icechunk' in error — catches a silent acceptance that would drop the tag on the zarr backend.	<pending>
+tests/test_cli.py::test_missing_field_stats	4	kept	Pins the user-facing 'Error:' prefix in stats' missing-field path; catches a regression where a KeyError would bubble up raw instead of through _die().	3d4a0c4
+tests/test_cli.py::test_missing_field_compare	4	kept	Pins the user-facing 'Error:' prefix in compare's missing-field path on both datasets; mirrors stats test but covers the compare dispatch branch.	3d4a0c4
+tests/test_cli.py::test_quiet_flag	4	kept	Pins that `-q` runs cleanly end-to-end (no secondary errors from the logging-level reset) on the shortest CLI invocation.	3d4a0c4
+tests/test_cli.py::test_quiet_suppresses_warnings	4	kept	Pins the warnings.warn→logging redirection under `-q`: NaN-cell warnings from diagnostics must not leak to the terminal — mutating the showwarning override would silently regress this.	3d4a0c4
+tests/test_cli.py::TestPlot::test_minimal	4	kept	Happy-path smoke test with file-existence check — catches plot subcommand ImportError / wiring break before any option path is exercised.	3d4a0c4
+tests/test_cli.py::TestPlot::test_plane_xy	4	hardened	Added (tmp_path / 'xy.png').exists() after exit_code==0 — catches 'exit 0 but no file' regressions.	3d4a0c4
+tests/test_cli.py::TestPlot::test_plane_xz	4	hardened	Added .exists() guard (same pattern as test_plane_xy).	3d4a0c4
+tests/test_cli.py::TestPlot::test_plane_normal_axis_name	4	hardened	Added .exists() guard — pins that single-axis plane names (e.g. 'z') still route through _parse_plane correctly.	3d4a0c4
+tests/test_cli.py::TestPlot::test_with_index	4	hardened	Added .exists() guard — catches a path where --index is parsed but never consumed by _resolve_index_from_plane.	3d4a0c4
+tests/test_cli.py::TestPlot::test_with_coord	4	hardened	Added .exists() guard — catches a path where --coord is parsed but never consumed by _resolve_index_from_plane.	3d4a0c4
+tests/test_cli.py::TestPlot::test_index_and_coord_conflict	4	hardened	Tightened from 'exit_code != 0' to requiring both '--index' and '--coord' appear in the error message — pins the conflict-guard's message, not merely the exit status.	3d4a0c4
+tests/test_cli.py::TestPlot::test_derived_field	4	hardened	Added .exists() guard — pins that |B| (registry dispatch) reaches the plot output path, not just an early error.	3d4a0c4
+tests/test_cli.py::TestPlot::test_log_scale	4	hardened	Added .exists() guard — catches regressions where LogNorm construction raises post exit-code-0 but silently drops the image.	3d4a0c4
+tests/test_cli.py::TestPlot::test_symlog_scale	4	hardened	Added .exists() guard — mirrors log_scale; pins SymLogNorm default-linthresh path.	3d4a0c4
+tests/test_cli.py::TestPlot::test_symlog_with_linthresh	4	hardened	Added .exists() guard — pins --linthresh is threaded through to SymLogNorm (not silently dropped).	3d4a0c4
+tests/test_cli.py::TestPlot::test_custom_clim	4	hardened	Added .exists() guard — pins --vmin/--vmax are threaded to imshow and don't break rendering.	3d4a0c4
+tests/test_cli.py::TestPlot::test_colormap	4	hardened	Added .exists() guard — pins --colormap lookup does not raise post exit-code-0.	3d4a0c4
+tests/test_cli.py::TestPlot::test_dpi	4	kept	Already checks .exists(); pins that --dpi integer is accepted by savefig path (matplotlib raises on bad dpi types).	3d4a0c4
+tests/test_cli.py::TestPlot::test_format_override	4	hardened	Added .exists() + PDF magic-bytes check — catches a silent regression where --format pdf is parsed but ignored (PNG written to .pdf).	3d4a0c4
+tests/test_cli.py::TestPlot::test_res_downsample	4	hardened	Added .exists() guard — pins --res '2x2' is threaded through to the preview-downsample path and doesn't silently skip output.	3d4a0c4
+tests/test_cli.py::TestPlot::test_batch_steps	4	kept	Pins per-step file emission for multi-step plots (3 frames); catches regressions where the {step} placeholder stops expanding.	3d4a0c4
+tests/test_cli.py::TestPlot::test_batch_no_output_error	4	hardened	Tightened from bare 'exit_code != 0' to also require '--output' appears in the error — pins the BadParameter message names the missing flag.	3d4a0c4
+tests/test_cli.py::TestPlot::test_bad_scale	4	kept	Pins the 'Invalid --scale' _check_choice error text; catches regressions where _check_choice is removed from plot() signature validation.	3d4a0c4
+tests/test_cli.py::TestPlot::test_bad_plane	4	kept	Pins the 'Invalid --plane' error text from _parse_plane; catches regressions where 'ab' (nonsense axis pair) is accepted as a two-letter plane.	3d4a0c4
+tests/test_cli.py::TestPlot::test_missing_field	4	kept	Pins the plot-path missing-field error routes through _die with 'Error:' prefix — different code path than stats/compare.	3d4a0c4
+tests/test_cli.py::TestPlotCompare::test_minimal	4	kept	Already checks .exists() — pins that plot-compare's full three-panel render (a | b | diff) produces a file at baseline.	3d4a0c4
+tests/test_cli.py::TestPlotCompare::test_with_plane	4	hardened	Added .exists() guard — pins --plane xz threads through the plot-compare dispatch (distinct from plot's plane path).	3d4a0c4
+tests/test_cli.py::TestPlotCompare::test_diff_limits	4	hardened	Added .exists() guard — pins --diff-vmin/--diff-vmax reach the difference-panel's imshow call.	3d4a0c4
+tests/test_cli.py::TestPlotCompare::test_bad_units	4	kept	Pins 'Invalid --units' _check_choice error text on plot-compare — catches regression where units='cgs' silently falls back to SI.	3d4a0c4
+tests/test_cli.py::TestPlotCompare::test_missing_field	4	kept	Pins plot-compare missing-field path through _die with 'Error:' prefix — distinct branch from plot's version.	3d4a0c4
+tests/test_cli.py::test_stats_field_all	4	kept	Pins '--field all' iterates the loaded field set; catches regressions where only the first field is reported (B2, B3 missing).	3d4a0c4
+tests/test_cli.py::test_stats_field_all_json	4	kept	Pins JSON schema for '--field all': {'fields': [...]} shape with 'field' key per entry; locks the machine-readable contract for downstream scripts.	3d4a0c4
+tests/test_cli.py::test_validate_text	4	kept	Pins the validate subcommand's expected section headers ('Validation:', 'NaN census:', 'max |div B|:', 'B energy:') — catches section reorderings or renamings that break grep-based parsers.	3d4a0c4
+tests/test_cli.py::test_validate_json	4	kept	Pins the validate --json schema: nan_total, max_div_b, b_energy, fields list, energy_drift_* keys; ensures energy drift is null for non-aux sims (not accidentally zero).	3d4a0c4
+tests/test_cli.py::TestPlotTheme::test_theme_dark	4	hardened	Added .exists() guard — pins --theme dark mplstyle is applied and doesn't abort the render silently.	3d4a0c4
+tests/test_cli.py::TestPlotContour::test_contour_overlay	4	kept	Already checks .exists() — pins that --contour <field> + --contour-levels overlays succeed without loading the contour field twice or crashing on missing data.	3d4a0c4
+tests/test_cli.py::TestPlotCompareTheme::test_theme	4	hardened	Added .exists() guard — mirrors TestPlotTheme fix on plot-compare's theme plumbing.	3d4a0c4
+tests/test_cli.py::TestPlotAnimate::test_animate_requires_multistep	4	kept	Pins the 'multiple steps' BadParameter when --animate is given without multi-step input; catches regressions where the single-step check is dropped and the stitcher runs on one frame.	3d4a0c4
+tests/test_cli.py::test_plot_2d_dataset	4	kept	Pins that already-2D data plots without --plane — catches a regression where plot() always demands a plane and breaks on 2D simulations.	3d4a0c4
+tests/test_cli.py::test_stats_2d_dataset	4	kept	Pins stats works on 2D data — catches dimension-assumption bugs in stats' summary code.	3d4a0c4
+tests/test_cli.py::test_compare_bad_method	4	kept	Pins compare's method validation path through _die with 'Error:' — catches regression where a typo ('banana') silently falls through to default linear interpolation.	3d4a0c4
+tests/test_cli.py::test_compare_bad_frame	4	kept	Pins compare's frame validation path through _die with 'Error:' — catches regression where an unregistered frame is silently accepted.	3d4a0c4
+tests/test_cli.py::test_plot_compare_bad_method	4	kept	Pins plot-compare's method validation path through _die with 'Error:' — parallel to test_compare_bad_method on the plot-compare branch.	3d4a0c4
+tests/test_cli.py::test_convert_fields_dry_run	4	kept	Pins 'Would write' dry-run output + 'not out.exists()' side-effect-free contract; catches regressions where --dry-run starts creating directories.	3d4a0c4
+tests/test_cli.py::test_convert_fields_single_step_round_trip	4	kept	Pins round-trip: CLI write → from_zarr read reconstructs {B1,B2,B3} with shape (4,4,4). Catches regressions where only some fields survive or shapes are transposed.	3d4a0c4
+tests/test_cli.py::test_convert_fields_multi_step_timeseries	4	kept	Pins multi-step writes add a leading time dim of length 3 (shape (3,4,4,4)) — distinguishes the to_zarr_timeseries path from the single-step to_zarr path.	3d4a0c4
+tests/test_cli.py::test_convert_fields_subset	4	kept	Pins --fields B1,B2 includes only the requested fields and excludes B3 — catches regression where field filter is parsed but ignored.	3d4a0c4
+tests/test_cli.py::test_convert_fields_box_crop	4	kept	Pins --box 'x=0:2,y=0:2' crops to shape (2,2,4) — catches regression in BoxSelection.apply dispatch at convert time (wrong axis, off-by-one slice, etc.).	3d4a0c4
+tests/test_cli.py::test_convert_fields_bad_backend	4	kept	Pins --backend lance is rejected with 'backend' in the error — catches regression where unknown backends fall through to the default zarr path.	3d4a0c4
+tests/test_cli.py::test_convert_fields_tag_requires_icechunk	4	kept	Pins --tag without --backend icechunk raises with 'icechunk' in error — catches a silent acceptance that would drop the tag on the zarr backend.	3d4a0c4
 tests/test_cli.py::test_convert_particles_dry_run	0	not-yet-reviewed		
 tests/test_cli.py::test_convert_particles_round_trip	0	not-yet-reviewed		
 tests/test_cli.py::test_convert_particles_species_filter	0	not-yet-reviewed		
