@@ -335,7 +335,11 @@ frame = "sim"
 """,
             )
         )
-        assert cfg.normalization.length_ref == 1.0
+        # ``system = "SI"`` must produce the identity normalization: every
+        # reference = 1.0, not just length.  Catching regressions that
+        # initialise one ref but leave others at zero/unit mismatch requires
+        # checking the aggregate invariant, not a single field.
+        assert cfg.normalization.is_identity
 
     def test_custom(self, tmp_path):
         cfg = load_config(

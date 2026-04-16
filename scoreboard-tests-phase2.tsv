@@ -289,11 +289,11 @@ tests/test_comparison.py::TestMethodPassthrough::test_method_validation_unknown_
 tests/test_comparison.py::test_compare_fields_equivalent_to_align_plus_pure[grid_a_params0-grid_b_params0]	6	kept	Structural invariant: compare_fields = align_grids + pure diagnostic (same-size grids). Regression if implementations diverge.	a3d763c
 tests/test_comparison.py::test_compare_fields_equivalent_to_align_plus_pure[grid_a_params1-grid_b_params1]	6	kept	Structural invariant case: compare_fields = align_grids + pure diagnostic (coarse vs fine, 2x ratio).	a3d763c
 tests/test_comparison.py::test_compare_fields_equivalent_to_align_plus_pure[grid_a_params2-grid_b_params2]	6	kept	Structural invariant case: compare_fields = align_grids + pure diagnostic (8x8 vs 5x5, upsampling direction).	a3d763c
-tests/test_compute.py::TestRegistryIntegrity::test_no_duplicate_names	0	not-yet-reviewed		
-tests/test_compute.py::TestRegistryIntegrity::test_all_aliases_resolve	0	not-yet-reviewed		
-tests/test_compute.py::TestRegistryIntegrity::test_available_quantities_nonempty	0	not-yet-reviewed		
-tests/test_compute.py::TestRegistryIntegrity::test_available_quantities_sorted	0	not-yet-reviewed		
-tests/test_compute.py::TestRegistryIntegrity::test_species_recipes_have_species_args	0	not-yet-reviewed		
+tests/test_compute.py::TestRegistryIntegrity::test_no_duplicate_names	7	kept	Guards against name collisions between _REGISTRY and _COMPUTE_ALIASES — a duplicate would silently shadow one path and make compute_field dispatch order-dependent.	<pending>
+tests/test_compute.py::TestRegistryIntegrity::test_all_aliases_resolve	7	kept	Catches dead aliases that resolve to nothing (registry rename without updating _COMPUTE_ALIASES) — would become runtime KeyError for users.	<pending>
+tests/test_compute.py::TestRegistryIntegrity::test_available_quantities_nonempty	7	hardened	Was 'len > 30' only; hardened to also pin |B|, beta, v_A, div_B so an accidental registry wipe that leaves a handful of entries still fails.	<pending>
+tests/test_compute.py::TestRegistryIntegrity::test_available_quantities_sorted	7	kept	Sort invariant is a public API guarantee for CLI help output and tab completion; an unsorted regression would show up cosmetically first.	<pending>
+tests/test_compute.py::TestRegistryIntegrity::test_species_recipes_have_species_args	7	kept	Structural invariant: a recipe with species_index but no species_args descriptor would crash when compute_field tries to resolve per-species fields — this test is the sole check.	<pending>
 tests/test_compute.py::TestMagnitudes::test_345_triangle[|B|-fields0]	6	kept	Pins |B|=5 for (3,4,0) — 3-4-5 Pythagorean sanity. Guards against component-index swap or missing sqrt.	a3d763c
 tests/test_compute.py::TestMagnitudes::test_345_triangle[|E|-fields1]	6	kept	Pins |E| magnitude uses E1/E2/E3 components correctly via 3-4-5 triangle. Different recipe from |B|, independent regression.	a3d763c
 tests/test_compute.py::TestMagnitudes::test_345_triangle[|J|-fields2]	6	kept	Pins |J| recipe with J1/J2/J3 inputs; independent of |B|/|E|. 3-4-5 sanity.	a3d763c
@@ -307,17 +307,17 @@ tests/test_compute.py::TestDependencyChains::test_Pi_from_species_tensor	6	kept	
 tests/test_compute.py::TestDependencyChains::test_alfven_mach_chain	6	kept	Pins M_A = |V|/v_A chain works end-to-end with |V|, |B|, rho_m intermediates. Regression if any link in the chain breaks.	a3d763c
 tests/test_compute.py::TestDependencyChains::test_vorticity_magnitude_chain	6	kept	Pins |vort| auto-chains through vort1/2/3 via curl; uniform V → zero result (exact). Guards the scalar-from-vector chain.	a3d763c
 tests/test_compute.py::TestDependencyChains::test_existing_field_returned_directly	6	kept	Pins direct passthrough for raw fields — B1 present in dataset must not invoke any recipe. Regression against inadvertent recomputation.	a3d763c
-tests/test_compute.py::TestSpeciesDependent::test_omega_pe	0	not-yet-reviewed		
-tests/test_compute.py::TestSpeciesDependent::test_omega_ci	0	not-yet-reviewed		
-tests/test_compute.py::TestSpeciesDependent::test_skin_depth	0	not-yet-reviewed		
-tests/test_compute.py::TestSpeciesDependent::test_thermal_speed	0	not-yet-reviewed		
-tests/test_compute.py::TestSpeciesDependent::test_gyroradius	0	not-yet-reviewed		
-tests/test_compute.py::TestSpeciesDependent::test_debye_length	0	not-yet-reviewed		
-tests/test_compute.py::TestSpeciesDependent::test_missing_species_raises	0	not-yet-reviewed		
+tests/test_compute.py::TestSpeciesDependent::test_omega_pe	7	kept	Exercises the full species-lookup path for omega_pe with reduced mass ratio m_e=1/256 against a hand-computed value; guards wrong-species selection / mass-reference regressions.	<pending>
+tests/test_compute.py::TestSpeciesDependent::test_omega_ci	7	kept	Guards the sibling ion branch of the species selector; a bug that hardcoded electrons would pass omega_pe but fail omega_ci.	<pending>
+tests/test_compute.py::TestSpeciesDependent::test_skin_depth	7	kept	Checks c/omega_pe chaining with non-default c=2; catches a regression that forgets to inject PhysicsParams.c into the recipe.	<pending>
+tests/test_compute.py::TestSpeciesDependent::test_thermal_speed	7	kept	NRL v_th = sqrt(T/m) convention is split in the community (see conventions.md) — test pins the chosen convention against the sqrt(2T/m) regression.	<pending>
+tests/test_compute.py::TestSpeciesDependent::test_gyroradius	7	kept	Guards r_i = v_th_i / omega_ci dependency chain — a dropped cyclotron sign or species index would fail here.	<pending>
+tests/test_compute.py::TestSpeciesDependent::test_debye_length	7	kept	lambda_D uses Te (electron) and n_s0 specifically; catches an ion-Debye regression (see Debye Length note in conventions.md).	<pending>
+tests/test_compute.py::TestSpeciesDependent::test_missing_species_raises	7	kept	Without [[species]] the recipe must raise ValueError, not silently return NaN / use a default; guards the selection-fails-loud invariant.	<pending>
 tests/test_compute.py::TestGridDependent::test_div_b_uniform	6	kept	Pins div_B of uniform B = 0 (div-B cleaning sanity). Regression if divergence stencil is broken on uniform input.	a3d763c
 tests/test_compute.py::TestGridDependent::test_curl_component	6	kept	Pins curl_B1 of uniform B = 0 to machine precision. Regression if curl stencil has spurious offset or dx normalization error.	a3d763c
-tests/test_compute.py::TestPhysicsConfig::test_sound_speed_custom_gamma	0	not-yet-reviewed		
-tests/test_compute.py::TestPhysicsConfig::test_sound_speed_default_gamma	0	not-yet-reviewed		
+tests/test_compute.py::TestPhysicsConfig::test_sound_speed_custom_gamma	7	kept	Verifies c_s recipe actually reads PhysicsParams.gamma rather than a module-level default — key regression when needs_gamma is forgotten on a new recipe.	<pending>
+tests/test_compute.py::TestPhysicsConfig::test_sound_speed_default_gamma	7	kept	Pins the default gamma=5/3 with explicit numeric expectation; catches a drift to gamma=7/5 or similar.	<pending>
 tests/test_compute.py::TestMultiComponent::test_poynting_components	6	kept	Pins S3 = E1*B2 - E2*B1 (z-component of ExB) via cross-product. Guards against component-index/sign bugs in Poynting recipe.	a3d763c
 tests/test_compute.py::TestMultiComponent::test_vorticity_component	6	kept	Pins vort2 (single component via curl) = 0 for uniform V; complements |vort| test.	a3d763c
 tests/test_compute.py::TestFieldDatasetMethods::test_compute_method	6	kept	Pins FieldDataset.compute() as public API shim to compute_field; guards against method-removal/signature drift.	a3d763c
@@ -328,89 +328,89 @@ tests/test_compute.py::TestFieldDatasetMethods::test_in_units_nt	6	kept	Pins in_
 tests/test_compute.py::TestFieldDatasetMethods::test_in_units_unknown_raises	6	kept	Pins ValueError('Unknown unit') when user passes unsupported unit via in_units; guards silent fallback.	a3d763c
 tests/test_compute.py::TestFieldDatasetMethods::test_cartesian_compute_aliases	6	kept	Pins Cartesian alias resolution for derived quantities: curl_Bx == curl_B1. Guards against alias table omission for derived fields.	a3d763c
 tests/test_compute.py::TestFieldDatasetMethods::test_identity_normalization_passthrough	6	dropped	Copy-paste variant: duplicates TestFieldDatasetMethods::test_in_si_with_identity (same setup, same identity normalization, same in_si('B1') passthrough assertion, only the sentinel value differs 5.0 vs 7.0). Merged coverage is preserved by the sibling test.	a3d763c
-tests/test_compute.py::TestSIFactors::test_si_factor[pressure]	0	not-yet-reviewed		
-tests/test_compute.py::TestSIFactors::test_si_factor[frequency]	0	not-yet-reviewed		
-tests/test_compute.py::TestSIFactors::test_si_factor[B0]	0	not-yet-reviewed		
-tests/test_compute.py::TestSIFactors::test_si_factor[n_s2]	0	not-yet-reviewed		
-tests/test_compute.py::TestSIFactors::test_si_factor[P11]	0	not-yet-reviewed		
-tests/test_compute.py::TestSIFactors::test_si_factor[gamma_L]	0	not-yet-reviewed		
-tests/test_compute.py::TestSIFactors::test_si_factor[sigma]	0	not-yet-reviewed		
-tests/test_compute.py::TestSIFactors::test_si_factor[vort1]	0	not-yet-reviewed		
-tests/test_compute.py::TestSIFactors::test_si_factor[enthalpy]	0	not-yet-reviewed		
-tests/test_compute.py::TestSIFactors::test_div_b_factor	0	not-yet-reviewed		
-tests/test_compute.py::TestSIFactors::test_div_e_factor	0	not-yet-reviewed		
+tests/test_compute.py::TestSIFactors::test_si_factor[pressure]	7	kept	Pins the compound factor density_ref*mass_ref*velocity_ref^2 for pressure — a quantity_type mis-registration would yield a scalar mismatch.	<pending>
+tests/test_compute.py::TestSIFactors::test_si_factor[frequency]	7	kept	Frequency uses 1/time_ref (inverse) — catches a sign/inversion regression that would swap time_ref for 1/time_ref.	<pending>
+tests/test_compute.py::TestSIFactors::test_si_factor[B0]	7	kept	Background field B0_1 must share b_field quantity_type with B1; a split registry entry that forgot B0* would break SI conversion for MHD split-B runs.	<pending>
+tests/test_compute.py::TestSIFactors::test_si_factor[n_s2]	7	kept	Species-indexed density pattern n_s{N}; regression in the species regex would break non-two-species PIC runs (hybrid, multi-ion).	<pending>
+tests/test_compute.py::TestSIFactors::test_si_factor[P11]	7	kept	Pressure-tensor components must share SI factor with scalar pressure; a 6-component tensor bug where P12 differs from P11 would show here.	<pending>
+tests/test_compute.py::TestSIFactors::test_si_factor[gamma_L]	7	kept	Lorentz factor must be dimensionless (factor 1.0 regardless of normalization); regression that assigned it velocity_ref or similar would fail.	<pending>
+tests/test_compute.py::TestSIFactors::test_si_factor[sigma]	7	kept	Magnetization sigma is dimensionless (B^2 / rho_m c^2 cancels); catches a wrong-qtype registration.	<pending>
+tests/test_compute.py::TestSIFactors::test_si_factor[vort1]	7	kept	Vorticity is velocity/length — tests the compound 'inverse-length-velocity' builder; a missing metric factor would yield velocity_ref alone.	<pending>
+tests/test_compute.py::TestSIFactors::test_si_factor[enthalpy]	7	kept	Specific enthalpy is velocity_ref^2 (not mass*velocity^2); guards against confusing specific_energy and energy_density quantity types (see equations.md table).	<pending>
+tests/test_compute.py::TestSIFactors::test_div_b_factor	7	kept	div_B factor = b_field_ref / length_ref — non-identity inputs would miss a dropped-metric bug that happened to cancel for identity.	<pending>
+tests/test_compute.py::TestSIFactors::test_div_e_factor	7	kept	Sibling to div_b_factor for the E side; together they pin the geometry-aware operator SI path.	<pending>
 tests/test_compute.py::TestDisplayUnits::test_known_unit	6	kept	Pins display_unit_factor values: nT=1e-9, km/s=1e3, R_E=6.371e6, eV=scipy.constants.eV, normalized=1.0. Guards against typos in unit table.	a3d763c
 tests/test_compute.py::TestDisplayUnits::test_unknown_unit_raises	6	kept	Pins ValueError with 'Unknown unit' for unknown units; guards silent fallback.	a3d763c
 tests/test_compute.py::TestErrorMessages::test_unknown_name_suggests	6	kept	Pins typo-suggestion 'Did you mean' in KeyError for misspelled names — guards against removal of difflib.get_close_matches.	a3d763c
 tests/test_compute.py::TestErrorMessages::test_missing_dependency_lists_available	6	kept	Pins 'requires' word + available fields in error message — guards against generic error hiding what's actually missing.	a3d763c
 tests/test_compute.py::TestErrorMessages::test_recursion_depth	6	kept	Pins bounded depth termination: compute_field must raise (not hang or infinite-recurse) when dependency chain is missing all inputs.	a3d763c
-tests/test_compute.py::TestThermodynamicCompute::test_enthalpy	0	not-yet-reviewed		
-tests/test_compute.py::TestThermodynamicCompute::test_entropy_unit_values	0	not-yet-reviewed		
-tests/test_compute.py::TestThermodynamicCompute::test_species_entropy	0	not-yet-reviewed		
-tests/test_compute.py::TestThermodynamicCompute::test_ion_acoustic_speed	0	not-yet-reviewed		
-tests/test_compute.py::TestSpeciesAliases::test_n_e_alias_resolves_through_compute	0	not-yet-reviewed		
-tests/test_compute.py::TestSpeciesAliases::test_n_e_n_i_accessible_as_fields	0	not-yet-reviewed		
-tests/test_compute.py::TestSpeciesAliases::test_s_gyro_i_uses_per_species_pressure	0	not-yet-reviewed		
-tests/test_compute.py::TestSpeciesAliases::test_bare_s_gyro_raises	0	not-yet-reviewed		
-tests/test_compute.py::TestSpeciesAliases::test_four_velocity_aliases_resolve	0	not-yet-reviewed		
-tests/test_compute.py::TestPressureTensor::test_parallel_and_perpendicular_pressure	0	not-yet-reviewed		
-tests/test_compute.py::TestPerSpeciesPressureDecomposition::test_per_species_parallel_pressure	0	not-yet-reviewed		
-tests/test_compute.py::TestPerSpeciesPressureDecomposition::test_per_species_perpendicular_pressure	0	not-yet-reviewed		
+tests/test_compute.py::TestThermodynamicCompute::test_enthalpy	7	kept	Numeric check of h = gamma*P/((gamma-1)*rho_m) with the default gamma — guards a drift from gamma to gamma-1 in the denominator.	<pending>
+tests/test_compute.py::TestThermodynamicCompute::test_entropy_unit_values	7	kept	ln(1/1) = 0 sanity — catches a wrong-log-base or sign regression in entropy formula.	<pending>
+tests/test_compute.py::TestThermodynamicCompute::test_species_entropy	7	kept	Per-species entropy path (Pe, n_s0) distinct from fluid entropy (P, rho_m); a dispatch regression mixing the two would fail.	<pending>
+tests/test_compute.py::TestThermodynamicCompute::test_ion_acoustic_speed	7	kept	c_ia uses a mixed-gamma formula (gamma_e*Te + gamma_i*Ti)/m_i; catches the MHD sound-speed vs ion-acoustic conflation flagged in conventions.md.	<pending>
+tests/test_compute.py::TestSpeciesAliases::test_n_e_alias_resolves_through_compute	7	kept	Alias n_e -> n_s0 must resolve through compute_field dependency graph, not just FieldDataset __getitem__; guards a partial alias registration.	<pending>
+tests/test_compute.py::TestSpeciesAliases::test_n_e_n_i_accessible_as_fields	7	kept	Direct FieldDataset __getitem__ alias path, distinct from the compute alias; together with previous test this covers both code paths.	<pending>
+tests/test_compute.py::TestSpeciesAliases::test_s_gyro_i_uses_per_species_pressure	7	kept	Gyrotropic entropy uses P_par*P_perp^2/n^5 with species-specific tensors; guards a regression where s_gyro_i falls back to fluid P_par/P_perp.	<pending>
+tests/test_compute.py::TestSpeciesAliases::test_bare_s_gyro_raises	7	kept	Schema forbids a bare s_gyro — must be s_gyro_e or s_gyro_i; catches a regression that silently uses ion tensor.	<pending>
+tests/test_compute.py::TestSpeciesAliases::test_four_velocity_aliases_resolve	7	kept	ux/uy/uz -> u1/u2/u3 alias for relativistic PIC (see conventions.md § 8.1); guards the letter-alias registration for four-velocity components.	<pending>
+tests/test_compute.py::TestPressureTensor::test_parallel_and_perpendicular_pressure	7	kept	Projects full tensor onto B direction; P_par=P33 when B || z and P_perp=(Tr-P_par)/2 — catches eigenvector-projection regressions.	<pending>
+tests/test_compute.py::TestPerSpeciesPressureDecomposition::test_per_species_parallel_pressure	7	kept	Exercises per-species projection (P_par_e vs P_par_i) using the fixture's distinct species tensors; catches dispatch-to-wrong-species regression.	<pending>
+tests/test_compute.py::TestPerSpeciesPressureDecomposition::test_per_species_perpendicular_pressure	7	kept	Sibling perpendicular-projection case; a missing /2 factor or Tr(P) subtraction error would fail here.	<pending>
 tests/test_compute.py::TestPerSpeciesPressureDecomposition::test_per_species_agyrotropy_isotropic	6	kept	Pins agyrotropy_e = 0 for isotropic tensor. Regression if Q metric has spurious offset or uses wrong tensor reduction.	a3d763c
 tests/test_compute.py::TestPerSpeciesPressureDecomposition::test_alias_resolution	6	kept	Pins P_par_s0 (dynamic alias) produces identical result to P_par_e (static) — guards the species-index alias table consistency.	a3d763c
-tests/test_compute.py::TestPerSpeciesPressureDecomposition::test_total_equals_sum_of_per_species	0	not-yet-reviewed		
+tests/test_compute.py::TestPerSpeciesPressureDecomposition::test_total_equals_sum_of_per_species	7	kept	Linearity invariant P_par = sum_s P_par_s — guards a regression where total-pressure P_par recomputes from P11+P22+P33 differently than per-species path.	<pending>
 tests/test_compute.py::TestPerSpeciesPressureDecomposition::test_dynamic_species_without_species_metadata	6	kept	Pins dynamic species recipe synthesis: P_par_s2 works purely from tensor fields even without species[2] in metadata. Guards against unnecessary metadata requirement.	a3d763c
 tests/test_compute.py::TestGeometryGuard::test_compute_rejects_spherical[div_B-components0]	6	kept	Pins NotImplementedError with 'Cartesian' for div_B on spherical grids. Guards against silent wrong-metric result.	a3d763c
 tests/test_compute.py::TestGeometryGuard::test_compute_rejects_spherical[vort1-components1]	6	kept	Pins NotImplementedError for vort1 on spherical grids. Same guard, different operator.	a3d763c
-tests/test_compute.py::TestRegisterRecipe::test_register_and_compute	0	not-yet-reviewed		
-tests/test_compute.py::TestRegisterRecipe::test_unregister_removes_recipe_and_metadata	0	not-yet-reviewed		
-tests/test_compute.py::TestRegisterRecipe::test_duplicate_name_raises	0	not-yet-reviewed		
-tests/test_compute.py::TestRegisterRecipe::test_unregister_nonexistent_raises	0	not-yet-reviewed		
-tests/test_compute.py::TestRegisterRecipe::test_si_conversion_works	0	not-yet-reviewed		
-tests/test_config.py::TestIPIC3DDoubleHarris::test_model_and_metadata	0	not-yet-reviewed		
-tests/test_config.py::TestIPIC3DDoubleHarris::test_grid	0	not-yet-reviewed		
-tests/test_config.py::TestIPIC3DDoubleHarris::test_species	0	not-yet-reviewed		
-tests/test_config.py::TestIPIC3DDoubleHarris::test_normalization	0	not-yet-reviewed		
-tests/test_config.py::TestParseModel::test_minimal	0	not-yet-reviewed		
-tests/test_config.py::TestParseModel::test_missing_name	0	not-yet-reviewed		
-tests/test_config.py::TestParseModel::test_missing_type	0	not-yet-reviewed		
-tests/test_config.py::TestParseGrid::test_full	0	not-yet-reviewed		
-tests/test_config.py::TestParseGrid::test_default_origin	0	not-yet-reviewed		
-tests/test_config.py::TestParseGrid::test_missing_grid_key[dimensions]	0	not-yet-reviewed		
-tests/test_config.py::TestParseGrid::test_missing_grid_key[spacing]	0	not-yet-reviewed		
-tests/test_config.py::TestParseUnits::test_pic_electron_default	0	not-yet-reviewed		
-tests/test_config.py::TestParseUnits::test_pic_ion_reference	0	not-yet-reviewed		
-tests/test_config.py::TestParseUnits::test_pic_custom_species_requires_mass_charge	0	not-yet-reviewed		
-tests/test_config.py::TestParseUnits::test_pic_custom_species_with_explicit	0	not-yet-reviewed		
-tests/test_config.py::TestParseUnits::test_mhd	0	not-yet-reviewed		
-tests/test_config.py::TestParseUnits::test_si_identity	0	not-yet-reviewed		
-tests/test_config.py::TestParseUnits::test_custom	0	not-yet-reviewed		
-tests/test_config.py::TestParseUnits::test_custom_missing_ref	0	not-yet-reviewed		
-tests/test_config.py::TestParseUnits::test_unknown_system	0	not-yet-reviewed		
-tests/test_config.py::TestParseUnits::test_scaling_metadata	0	not-yet-reviewed		
-tests/test_config.py::TestParseCoordinates::test_geometry_lookup[cartesian-expected_names0]	0	not-yet-reviewed		
-tests/test_config.py::TestParseCoordinates::test_geometry_lookup[spherical-expected_names1]	0	not-yet-reviewed		
-tests/test_config.py::TestParseCoordinates::test_geometry_lookup[cylindrical-expected_names2]	0	not-yet-reviewed		
-tests/test_config.py::TestParseCoordinates::test_custom_labels_and_unknown_geometry	0	not-yet-reviewed		
-tests/test_config.py::TestParseCoordinates::test_missing_geometry	0	not-yet-reviewed		
-tests/test_config.py::TestParseSpecies::test_single_species	0	not-yet-reviewed		
-tests/test_config.py::TestParseSpecies::test_charge_to_mass_only	0	not-yet-reviewed		
-tests/test_config.py::TestParseSpecies::test_optional_vector_field[thermal_velocity-[0.06, 0.02, 0.02]-thermal_velocity-expected0]	0	not-yet-reviewed		
-tests/test_config.py::TestParseSpecies::test_optional_vector_field[drift_velocity-[0.0, 0.0, 0.01]-drift_velocity-expected1]	0	not-yet-reviewed		
-tests/test_config.py::TestParseSpecies::test_optional_vector_field[particles_per_cell-[5, 5, 1]-particles_per_cell-expected2]	0	not-yet-reviewed		
-tests/test_config.py::TestExceptionGroup::test_multiple_errors	0	not-yet-reviewed		
-tests/test_config.py::TestPhysicalExtent::test_auto_scale_from_toml	0	not-yet-reviewed		
-tests/test_config.py::TestPhysicalExtent::test_shrink_factor_computed	0	not-yet-reviewed		
-tests/test_config.py::TestPhysicalExtent::test_physical_extent_in_metadata	0	not-yet-reviewed		
-tests/test_config.py::TestPhysicalExtent::test_explicit_scale_validated	0	not-yet-reviewed		
-tests/test_config.py::TestPhysicalExtent::test_explicit_scale_mismatch_warns	0	not-yet-reviewed		
-tests/test_config.py::TestPhysicalExtent::test_unknown_unit_raises	0	not-yet-reviewed		
-tests/test_config.py::TestPhysicalExtent::test_non_uniform_scale_raises	0	not-yet-reviewed		
-tests/test_config.py::TestPhysicalExtent::test_length_units_table	0	not-yet-reviewed		
-tests/test_config.py::TestMergeSimulationToml::test_no_sim_dir_returns_base_unchanged	0	not-yet-reviewed		
-tests/test_config.py::TestMergeSimulationToml::test_missing_toml_returns_base_unchanged	0	not-yet-reviewed		
-tests/test_config.py::TestMergeSimulationToml::test_toml_overrides_normalization_frame_metadata	0	not-yet-reviewed		
-tests/test_config.py::TestMergeSimulationToml::test_toml_metadata_wins_on_key_conflict	0	not-yet-reviewed		
+tests/test_compute.py::TestRegisterRecipe::test_register_and_compute	7	kept	Public API round-trip: register -> compute_field -> available_quantities lists it; guards a half-wired register_recipe that forgets _register_field.	<pending>
+tests/test_compute.py::TestRegisterRecipe::test_unregister_removes_recipe_and_metadata	7	hardened	Test name promised 'and metadata' but only checked _REGISTRY. Added pre-assertion on field_info while registered and KeyError assertion on field_info after unregister.	<pending>
+tests/test_compute.py::TestRegisterRecipe::test_duplicate_name_raises	7	kept	Duplicate registration must ValueError — guards a regression where register_recipe silently overwrites (would corrupt in-flight compute pipelines in notebooks).	<pending>
+tests/test_compute.py::TestRegisterRecipe::test_unregister_nonexistent_raises	7	kept	Symmetric to duplicate-registration: unregister of unknown must KeyError; guards a silent no-op regression.	<pending>
+tests/test_compute.py::TestRegisterRecipe::test_si_conversion_works	7	hardened	Was checking factor==1.0 under identity norm, which is 1.0 for every quantity_type. Swapped to non-identity norm where b_field_ref=7.0 so the assertion actually verifies quantity_type='b_field' was honoured.	<pending>
+tests/test_config.py::TestIPIC3DDoubleHarris::test_model_and_metadata	7	kept	Pins model name/type and physics.c/gamma from the canonical iPIC3D example TOML; guards a parser regression that silently drops physics extras.	<pending>
+tests/test_config.py::TestIPIC3DDoubleHarris::test_grid	7	kept	Pins grid dims, spacing, and dt from the reference iPIC3D TOML; catches a parser regression that confuses spacing for origin or drops dt.	<pending>
+tests/test_config.py::TestIPIC3DDoubleHarris::test_species	7	kept	Checks 4 species are parsed with correct charge/mass — guards a regression that deduplicates species entries or swaps the electron mass with ion mass.	<pending>
+tests/test_config.py::TestIPIC3DDoubleHarris::test_normalization	7	kept	velocity_ref must equal c for PIC normalization; catches a regression that swaps speed_of_light for a reference velocity.	<pending>
+tests/test_config.py::TestParseModel::test_minimal	7	kept	Minimal valid TOML smoke — distinct from the iPIC3D fixture; guards a regression that requires optional sections.	<pending>
+tests/test_config.py::TestParseModel::test_missing_name	7	kept	[model].name is required; catches a regression where ExceptionGroup no longer contains this error (would let malformed TOML through).	<pending>
+tests/test_config.py::TestParseModel::test_missing_type	7	kept	Sibling to missing_name — type must raise; together they pin the two required [model] keys.	<pending>
+tests/test_config.py::TestParseGrid::test_full	7	kept	Exercises all [grid] fields (origin, boundary); guards a regression that silently drops origin or defaults it away.	<pending>
+tests/test_config.py::TestParseGrid::test_default_origin	7	kept	Default origin = (0,0,0) when omitted; catches a regression that rejects omitted origin instead of defaulting.	<pending>
+tests/test_config.py::TestParseGrid::test_missing_grid_key[dimensions]	7	kept	Missing dimensions must raise; tests the ExceptionGroup aggregation for [grid] (distinct from [model] path).	<pending>
+tests/test_config.py::TestParseGrid::test_missing_grid_key[spacing]	7	kept	Missing spacing must raise — the other required [grid] key; both are needed since a regression could drop either validator.	<pending>
+tests/test_config.py::TestParseUnits::test_pic_electron_default	7	kept	Default PIC = electron-referenced; catches a regression that defaults to ion reference (would silently scale every SI conversion by m_p/m_e).	<pending>
+tests/test_config.py::TestParseUnits::test_pic_ion_reference	7	kept	reference_species='ions' must use m_p; guards the branch distinct from electron default.	<pending>
+tests/test_config.py::TestParseUnits::test_pic_custom_species_requires_mass_charge	7	kept	Unknown reference_species (alpha) without explicit reference_mass must raise; guards a silent-zero-mass regression.	<pending>
+tests/test_config.py::TestParseUnits::test_pic_custom_species_with_explicit	7	kept	Explicit reference_mass for alpha must override default lookup; guards the custom-species escape hatch.	<pending>
+tests/test_config.py::TestParseUnits::test_mhd	7	kept	MHD normalization uses explicit reference_length/density/b_field — distinct code path from PIC derivation.	<pending>
+tests/test_config.py::TestParseUnits::test_si_identity	7	hardened	Was asserting length_ref==1.0 only, which any constructor that happened to set length=1 would pass. Replaced with is_identity property check so all eight references are verified.	<pending>
+tests/test_config.py::TestParseUnits::test_custom	7	kept	Exercises [units.reference] Approach B; guards a regression where the reference subtable is ignored.	<pending>
+tests/test_config.py::TestParseUnits::test_custom_missing_ref	7	kept	system='custom' without [units.reference] must raise; catches a regression that silently falls back to identity.	<pending>
+tests/test_config.py::TestParseUnits::test_unknown_system	7	kept	system='CGS' is not supported (schema.md only lists PIC/MHD/SI/custom); must raise rather than silently behave like SI.	<pending>
+tests/test_config.py::TestParseUnits::test_scaling_metadata	7	kept	scaling_factor/description must survive to metadata['scaling'] (separate from physical_extent shrink_factor); guards a drop-on-parse regression.	<pending>
+tests/test_config.py::TestParseCoordinates::test_geometry_lookup[cartesian-expected_names0]	7	kept	Cartesian axis_names = (x,y,z); catches a regression where GEOMETRY_BY_NAME lookup returns a wrong geometry object.	<pending>
+tests/test_config.py::TestParseCoordinates::test_geometry_lookup[spherical-expected_names1]	7	kept	Spherical uses (r, theta, phi) with unicode greek — catches an axis-name ordering drift between code and schema.	<pending>
+tests/test_config.py::TestParseCoordinates::test_geometry_lookup[cylindrical-expected_names2]	7	kept	Cylindrical (r, phi, z) — distinct from spherical ordering; both variants are needed to pin the lookup.	<pending>
+tests/test_config.py::TestParseCoordinates::test_custom_labels_and_unknown_geometry	7	kept	axis_labels override + unknown geometry 'toroidal' must raise; two-in-one test covering custom labels path and validation path.	<pending>
+tests/test_config.py::TestParseCoordinates::test_missing_geometry	7	kept	Missing [coordinates].geometry must raise; guards a regression that defaults silently to Cartesian.	<pending>
+tests/test_config.py::TestParseSpecies::test_single_species	7	kept	Single species with explicit charge/mass — baseline parsing; catches a regression that requires ≥2 species.	<pending>
+tests/test_config.py::TestParseSpecies::test_charge_to_mass_only	7	kept	charge_to_mass=-256 must decompose into charge=-1, mass=1/256; guards the derivation branch distinct from explicit charge+mass.	<pending>
+tests/test_config.py::TestParseSpecies::test_optional_vector_field[thermal_velocity-[0.06, 0.02, 0.02]-thermal_velocity-expected0]	7	kept	Parametrized on thermal_velocity vector field — guards against regressions that parse scalar vs tuple inconsistently.	<pending>
+tests/test_config.py::TestParseSpecies::test_optional_vector_field[drift_velocity-[0.0, 0.0, 0.01]-drift_velocity-expected1]	7	kept	Sibling parametrization for drift_velocity; schema lists both as optional vectors — both must round-trip.	<pending>
+tests/test_config.py::TestParseSpecies::test_optional_vector_field[particles_per_cell-[5, 5, 1]-particles_per_cell-expected2]	7	kept	particles_per_cell is int-valued (PIC per-cell counts) — distinct from float thermal/drift; a type-coercion regression would fail here.	<pending>
+tests/test_config.py::TestExceptionGroup::test_multiple_errors	7	kept	Multiple validation errors must surface together via ExceptionGroup (not short-circuit); critical UX contract so users see all TOML bugs at once.	<pending>
+tests/test_config.py::TestPhysicalExtent::test_auto_scale_from_toml	7	kept	Auto-scale from physical_extent = 46 R_E for 460-cell grid -> scale 0.25; core of the physical_extent feature (see schema.md § 2).	<pending>
+tests/test_config.py::TestPhysicalExtent::test_shrink_factor_computed	7	kept	shrink_factor~3.5x for reduced mass ratio PIC — see schema.md 'Scale vs shrink factor'; catches a regression where shrink_factor is absent from metadata.	<pending>
+tests/test_config.py::TestPhysicalExtent::test_physical_extent_in_metadata	7	kept	physical_extent + unit must be preserved in metadata; guards a regression that consumes but drops them after scale derivation.	<pending>
+tests/test_config.py::TestPhysicalExtent::test_explicit_scale_validated	7	kept	Explicit scale matching auto-computed scale (0.25) must not warn; guards the 5% tolerance window from accidentally tightening.	<pending>
+tests/test_config.py::TestPhysicalExtent::test_explicit_scale_mismatch_warns	7	kept	Explicit scale=0.30 vs implied 0.25 must log 'Scale mismatch' warning; guards silent discard of user's explicit scale.	<pending>
+tests/test_config.py::TestPhysicalExtent::test_unknown_unit_raises	7	kept	parsec outside LENGTH_UNITS must raise ValueError with 'Unknown physical_extent_unit' — guards silent fallback to 1.0.	<pending>
+tests/test_config.py::TestPhysicalExtent::test_non_uniform_scale_raises	7	kept	Non-uniform per-axis ratios (50/100, 30/100, 50/100) must raise with 'non-uniform'; guards averaging hiding a bug in physical_extent.	<pending>
+tests/test_config.py::TestPhysicalExtent::test_length_units_table	7	kept	Pins m/km/R_E constants and ≥5 entries; catches a regression that loses R_E or changes its value (which would silently rescale every spacecraft comparison).	<pending>
+tests/test_config.py::TestMergeSimulationToml::test_no_sim_dir_returns_base_unchanged	7	kept	sim_dir=None must return the base config unchanged (identity semantics); guards a regression that mutates base when no TOML to merge.	<pending>
+tests/test_config.py::TestMergeSimulationToml::test_missing_toml_returns_base_unchanged	7	kept	tmp_path without simulation.toml must return base identity-equal; sibling case to no_sim_dir — both branches of the early-return guard.	<pending>
+tests/test_config.py::TestMergeSimulationToml::test_toml_overrides_normalization_frame_metadata	7	kept	Reader-supplied config + simulation.toml merge: toml wins on normalization/frame, reader keeps grid/model_name/metadata — the central merge contract.	<pending>
+tests/test_config.py::TestMergeSimulationToml::test_toml_metadata_wins_on_key_conflict	7	kept	Explicit metadata key-conflict policy: toml overrides, reader-only keys preserved; catches a dict-union direction regression.	<pending>
 tests/test_derived.py::TestMagnitudes::test_345_triangle[magnetic_field_magnitude]	0	not-yet-reviewed		
 tests/test_derived.py::TestMagnitudes::test_345_triangle[electric_field_magnitude]	0	not-yet-reviewed		
 tests/test_derived.py::TestMagnitudes::test_345_triangle[current_density_magnitude]	0	not-yet-reviewed		

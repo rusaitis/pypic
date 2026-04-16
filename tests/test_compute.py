@@ -64,7 +64,12 @@ class TestRegistryIntegrity:
 
     def test_available_quantities_nonempty(self):
         names = available_quantities()
+        # ``> 30`` alone would keep passing after an accidental registry wipe
+        # that leaves a handful of entries.  Pin a small set of core
+        # quantities whose absence would be a real regression.
         assert len(names) > 30
+        for required in ("|B|", "beta", "v_A", "div_B"):
+            assert required in names, f"core quantity {required!r} missing"
 
     def test_available_quantities_sorted(self):
         names = available_quantities()
@@ -865,6 +870,8 @@ class TestRegisterRecipe:
             unregister_recipe("e_mag_ratio")
 
     def test_unregister_removes_recipe_and_metadata(self):
+        from pypic.fields import field_info
+
         register_recipe(
             "_test_tmp",
             func=lambda b: b * 2,
@@ -872,8 +879,14 @@ class TestRegisterRecipe:
             quantity_type="b_field",
         )
         assert "_test_tmp" in _REGISTRY
+        # Metadata is present while registered.
+        assert field_info("_test_tmp").quantity_type == "b_field"
         unregister_recipe("_test_tmp")
         assert "_test_tmp" not in _REGISTRY
+        # Test name promises "and metadata" — verify the metadata side too,
+        # so a regression that forgets to unregister the field info is caught.
+        with pytest.raises(KeyError):
+            field_info("_test_tmp")
 
     def test_duplicate_name_raises(self):
         register_recipe(
@@ -906,7 +919,20 @@ class TestRegisterRecipe:
             quantity_type="b_field",
         )
         try:
-            factor = field_si_factor("_test_si", Normalization.identity())
-            assert factor == 1.0
+            # Under identity normalization every quantity_type gives 1.0, so
+            # that alone cannot show the registered type was honoured.  Use a
+            # normalization where b_field differs from density to prove the
+            # factor actually came from quantity_type="b_field".
+            norm = Normalization(
+                length_ref=1.0,
+                time_ref=1.0,
+                velocity_ref=1.0,
+                b_field_ref=7.0,
+                e_field_ref=1.0,
+                density_ref=3.0,
+                mass_ref=1.0,
+                charge_ref=1.0,
+            )
+            assert field_si_factor("_test_si", norm) == pytest.approx(7.0)
         finally:
             unregister_recipe("_test_si")
