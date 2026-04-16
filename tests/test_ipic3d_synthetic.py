@@ -376,8 +376,14 @@ class TestH5hutReader:
         assert ds["B1"].shape == (NX, NY, NZ)
 
     def test_float64_promotion(self, ds):
-        """H5hut stores float32; reader must promote to float64."""
-        assert ds["B1"].dtype == np.float64
+        """H5hut stores float32; reader must promote to float64.
+
+        Previously B1-only — a reader that promoted B1 but left B2/B3 (or E*,
+        rho_c_*) as float32 still passed.  Check every loaded field: a dtype
+        regression in a single branch of the promotion path is now visible.
+        """
+        for name in ds.field_names():
+            assert ds[name].dtype == np.float64, f"{name} not promoted to float64"
 
     def test_b_field_after_transpose(self, ds):
         """ZYX→XYZ transpose + float32→float64 must recover correct values."""
@@ -480,8 +486,14 @@ class TestConservedQuantitiesSyntheticFormatA:
         return load_conserved_quantities(DATA / "phdf5" / "ConservedQuantities.txt")
 
     def test_cycle_properties(self, cq):
+        # Previously only pinned cycle[0]==0 and sorted(); a parser that
+        # returned [0, 0, 0] satisfies both (sorted allows duplicates) and
+        # paired test_energies still passes because energies are indexed
+        # positionally.  Pin each cycle explicitly against the fixture.
         assert len(cq.cycle) == 3
         assert cq.cycle[0] == 0
+        assert cq.cycle[1] == 5
+        assert cq.cycle[2] == 10
         assert list(cq.cycle) == sorted(cq.cycle)
         assert len(cq.species_npart) == 0
 

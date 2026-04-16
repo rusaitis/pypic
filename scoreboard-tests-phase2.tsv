@@ -783,58 +783,58 @@ tests/test_ipic3d_synthetic.py::TestPhdf5Reader::test_available_fields_matches_r
 tests/test_ipic3d_synthetic.py::TestPhdf5Reader::test_field_shapes	14	kept	Pins ds['B1'].shape == (NX,NY,NZ) with the node-centered +1 convention. Catches a reader bug that returns cell-centered shape (NXC,NYC,NZC) or transposes x/z.	e7364e2
 tests/test_ipic3d_synthetic.py::TestPhdf5Reader::test_b_field_exact	14	kept	Pins B1(y) = B0x * tanh((y-Ly/2)/delta) against an analytical field at atol=1e-14. Catches any axis-swap, 4π/μ0 factor, or destagger offset — the tanh profile gives distinct values per y-slice so a flipped axis would fail catastrophically.	e7364e2
 tests/test_ipic3d_synthetic.py::TestPhdf5Reader::test_e_field_zero	14	kept	Pins E1=E2=E3=0 at atol=1e-14 from the zero-initialization fixture — catches a reader bug that reads garbage memory (producing small non-zero noise) or swaps E with B in the layout.	e7364e2
-tests/test_ipic3d_synthetic.py::TestPhdf5Reader::test_electron_density_exact	0	not-yet-reviewed		
-tests/test_ipic3d_synthetic.py::TestPhdf5Reader::test_ion_density_exact	0	not-yet-reviewed		
-tests/test_ipic3d_synthetic.py::TestPhdf5Reader::test_total_charge_is_sum	0	not-yet-reviewed		
-tests/test_ipic3d_synthetic.py::TestPhdf5Reader::test_total_current_is_sum	0	not-yet-reviewed		
-tests/test_ipic3d_synthetic.py::TestPhdf5Reader::test_diagonal_pressure_positive[0]	0	not-yet-reviewed		
-tests/test_ipic3d_synthetic.py::TestPhdf5Reader::test_diagonal_pressure_positive[1]	0	not-yet-reviewed		
-tests/test_ipic3d_synthetic.py::TestPhdf5Reader::test_pressure_values	0	not-yet-reviewed		
-tests/test_ipic3d_synthetic.py::TestPhdf5Reader::test_off_diagonal_pressure_zero	0	not-yet-reviewed		
+tests/test_ipic3d_synthetic.py::TestPhdf5Reader::test_electron_density_exact	15	kept	Exact per-cell pins against analytical fixture values (tanh B1, ±RHO_INIT densities, rho·vth²/|qom| pressure, zero off-diagonals, trace sum identities). A reader axis-swap or 4π-correction regression fails these at 1e-12/1e-14 atol.	<pending>
+tests/test_ipic3d_synthetic.py::TestPhdf5Reader::test_ion_density_exact	15	kept	Exact per-cell pins against analytical fixture values (tanh B1, ±RHO_INIT densities, rho·vth²/|qom| pressure, zero off-diagonals, trace sum identities). A reader axis-swap or 4π-correction regression fails these at 1e-12/1e-14 atol.	<pending>
+tests/test_ipic3d_synthetic.py::TestPhdf5Reader::test_total_charge_is_sum	15	kept	Exact per-cell pins against analytical fixture values (tanh B1, ±RHO_INIT densities, rho·vth²/|qom| pressure, zero off-diagonals, trace sum identities). A reader axis-swap or 4π-correction regression fails these at 1e-12/1e-14 atol.	<pending>
+tests/test_ipic3d_synthetic.py::TestPhdf5Reader::test_total_current_is_sum	15	kept	Exact per-cell pins against analytical fixture values (tanh B1, ±RHO_INIT densities, rho·vth²/|qom| pressure, zero off-diagonals, trace sum identities). A reader axis-swap or 4π-correction regression fails these at 1e-12/1e-14 atol.	<pending>
+tests/test_ipic3d_synthetic.py::TestPhdf5Reader::test_diagonal_pressure_positive[0]	15	kept	Exact per-cell pins against analytical fixture values (tanh B1, ±RHO_INIT densities, rho·vth²/|qom| pressure, zero off-diagonals, trace sum identities). A reader axis-swap or 4π-correction regression fails these at 1e-12/1e-14 atol.	<pending>
+tests/test_ipic3d_synthetic.py::TestPhdf5Reader::test_diagonal_pressure_positive[1]	15	kept	Exact per-cell pins against analytical fixture values (tanh B1, ±RHO_INIT densities, rho·vth²/|qom| pressure, zero off-diagonals, trace sum identities). A reader axis-swap or 4π-correction regression fails these at 1e-12/1e-14 atol.	<pending>
+tests/test_ipic3d_synthetic.py::TestPhdf5Reader::test_pressure_values	15	kept	Exact per-cell pins against analytical fixture values (tanh B1, ±RHO_INIT densities, rho·vth²/|qom| pressure, zero off-diagonals, trace sum identities). A reader axis-swap or 4π-correction regression fails these at 1e-12/1e-14 atol.	<pending>
+tests/test_ipic3d_synthetic.py::TestPhdf5Reader::test_off_diagonal_pressure_zero	15	kept	Exact per-cell pins against analytical fixture values (tanh B1, ±RHO_INIT densities, rho·vth²/|qom| pressure, zero off-diagonals, trace sum identities). A reader axis-swap or 4π-correction regression fails these at 1e-12/1e-14 atol.	<pending>
 tests/test_ipic3d_synthetic.py::TestPhdf5Reader::test_species_metadata	14	hardened	Was len(ds.species)==2 only — a reader producing garbage SpeciesInfo (wrong charge sign, swapped mass) still passed. Now pins canonical charge=±1 and mass=1/|qom| per species, matching the iPIC3D convention documented in docs/schema.md.	e7364e2
-tests/test_ipic3d_synthetic.py::TestPhdf5Reader::test_grid_info	0	not-yet-reviewed		
-tests/test_ipic3d_synthetic.py::TestShdf5Reader::test_available_timesteps	0	not-yet-reviewed		
-tests/test_ipic3d_synthetic.py::TestShdf5Reader::test_available_fields_matches_read	0	not-yet-reviewed		
-tests/test_ipic3d_synthetic.py::TestShdf5Reader::test_field_shapes	0	not-yet-reviewed		
-tests/test_ipic3d_synthetic.py::TestShdf5Reader::test_b_field_exact	0	not-yet-reviewed		
-tests/test_ipic3d_synthetic.py::TestShdf5Reader::test_electron_density_exact	0	not-yet-reviewed		
-tests/test_ipic3d_synthetic.py::TestShdf5Reader::test_ion_density_exact	0	not-yet-reviewed		
-tests/test_ipic3d_synthetic.py::TestShdf5Reader::test_total_charge_is_sum	0	not-yet-reviewed		
-tests/test_ipic3d_synthetic.py::TestShdf5Reader::test_per_species_present	0	not-yet-reviewed		
-tests/test_ipic3d_synthetic.py::TestShdf5MatchesPhdf5::test_b_field_matches	0	not-yet-reviewed		
-tests/test_ipic3d_synthetic.py::TestShdf5MatchesPhdf5::test_e_field_matches	0	not-yet-reviewed		
-tests/test_ipic3d_synthetic.py::TestShdf5MatchesPhdf5::test_density_matches	0	not-yet-reviewed		
-tests/test_ipic3d_synthetic.py::TestShdf5MatchesPhdf5::test_current_matches	0	not-yet-reviewed		
-tests/test_ipic3d_synthetic.py::TestH5hutMatchesPhdf5::test_b_field_matches	0	not-yet-reviewed		
-tests/test_ipic3d_synthetic.py::TestH5hutMatchesPhdf5::test_e_field_matches	0	not-yet-reviewed		
-tests/test_ipic3d_synthetic.py::TestH5hutMatchesPhdf5::test_density_matches	0	not-yet-reviewed		
-tests/test_ipic3d_synthetic.py::TestH5hutMatchesPhdf5::test_current_matches	0	not-yet-reviewed		
-tests/test_ipic3d_synthetic.py::TestH5hutReader::test_available_timesteps	0	not-yet-reviewed		
-tests/test_ipic3d_synthetic.py::TestH5hutReader::test_available_fields_matches_read	0	not-yet-reviewed		
-tests/test_ipic3d_synthetic.py::TestH5hutReader::test_field_shapes	0	not-yet-reviewed		
-tests/test_ipic3d_synthetic.py::TestH5hutReader::test_float64_promotion	0	not-yet-reviewed		
-tests/test_ipic3d_synthetic.py::TestH5hutReader::test_b_field_after_transpose	0	not-yet-reviewed		
-tests/test_ipic3d_synthetic.py::TestH5hutReader::test_e_field_zero	0	not-yet-reviewed		
-tests/test_ipic3d_synthetic.py::TestH5hutReader::test_electron_density_4pi_corrected	0	not-yet-reviewed		
-tests/test_ipic3d_synthetic.py::TestH5hutReader::test_ion_density_4pi_corrected	0	not-yet-reviewed		
-tests/test_ipic3d_synthetic.py::TestH5hutReader::test_total_charge_is_sum	0	not-yet-reviewed		
-tests/test_ipic3d_synthetic.py::TestH5hutReader::test_total_current_is_sum	0	not-yet-reviewed		
+tests/test_ipic3d_synthetic.py::TestPhdf5Reader::test_grid_info	15	kept	Exact per-cell pins against analytical fixture values (tanh B1, ±RHO_INIT densities, rho·vth²/|qom| pressure, zero off-diagonals, trace sum identities). A reader axis-swap or 4π-correction regression fails these at 1e-12/1e-14 atol.	<pending>
+tests/test_ipic3d_synthetic.py::TestShdf5Reader::test_available_timesteps	15	kept	Pins reader.available_timesteps(SHDF5_DIR) == [0]; a reader silently returning [] would load nothing downstream — this is the single probe vs contract anchor for the serial reader.	<pending>
+tests/test_ipic3d_synthetic.py::TestShdf5Reader::test_available_fields_matches_read	15	kept	Pins probe() output equal to sorted(full-read field_names()); catches probe/read divergence which would lie to the compute() field-selection path.	<pending>
+tests/test_ipic3d_synthetic.py::TestShdf5Reader::test_field_shapes	15	kept	Pins B1 shape == (NX, NY, NZ); an MxN dimension swap in the serial reader's grid-reshape would fail immediately. B2/B3 shapes covered implicitly by assert_allclose in TestShdf5MatchesPhdf5.	<pending>
+tests/test_ipic3d_synthetic.py::TestShdf5Reader::test_b_field_exact	15	kept	Per-cell tanh profile pinned at 1e-14. y-varying B1 catches any axis swap (yy, not xx, drives the profile).	<pending>
+tests/test_ipic3d_synthetic.py::TestShdf5Reader::test_electron_density_exact	15	kept	Per-cell ±1.0 density pin at 1e-12 — covers both the sign convention (species 0 charge = -1) and the 4π factor for shdf5.	<pending>
+tests/test_ipic3d_synthetic.py::TestShdf5Reader::test_ion_density_exact	15	kept	Per-cell +1.0 ion density pin; exercises the independent ion branch of the shdf5 moment assembly.	<pending>
+tests/test_ipic3d_synthetic.py::TestShdf5Reader::test_total_charge_is_sum	15	kept	Sum identity rho_c == rho_c_s0 + rho_c_s1; a reader that emits only species arrays without assembling the total would fail.	<pending>
+tests/test_ipic3d_synthetic.py::TestShdf5Reader::test_per_species_present	15	kept	has_field-only, but complements the value-pinning electron/ion/total tests — this one guarantees every component/species name is emitted, not just that some subset has correct values.	<pending>
+tests/test_ipic3d_synthetic.py::TestShdf5MatchesPhdf5::test_b_field_matches	15	kept	Cross-reader per-cell pin for all 3 B components at 1e-14 atol. Catches any serial-vs-parallel divergence in grid assembly or destagger.	<pending>
+tests/test_ipic3d_synthetic.py::TestShdf5MatchesPhdf5::test_e_field_matches	15	kept	All 3 E components cross-pinned at 1e-14; the E=0 fixture would otherwise hide axis-swap bugs so cross-pinning against phdf5 (which has its own exact pin) is load-bearing here.	<pending>
+tests/test_ipic3d_synthetic.py::TestShdf5MatchesPhdf5::test_density_matches	15	kept	Per-species cross-reader density pin; rules out divergent 4π or sign conventions between the two PIC readers.	<pending>
+tests/test_ipic3d_synthetic.py::TestShdf5MatchesPhdf5::test_current_matches	15	kept	All 3 J components across both species cross-pinned at 1e-12; widest contract between the pair of readers.	<pending>
+tests/test_ipic3d_synthetic.py::TestH5hutMatchesPhdf5::test_b_field_matches	15	kept	Cross-reader per-cell pin for all 3 B components at 1e-6 (float32→float64 floor). Catches H5hut's ZYX→XYZ transpose bugs that would leave B1 correct but B2/B3 permuted.	<pending>
+tests/test_ipic3d_synthetic.py::TestH5hutMatchesPhdf5::test_e_field_matches	15	kept	All 3 E components cross-pinned against phdf5 — essential because the all-zero E fixture makes axis-swaps invisible in H5hut-only tests.	<pending>
+tests/test_ipic3d_synthetic.py::TestH5hutMatchesPhdf5::test_density_matches	15	kept	Per-species cross-check at 1e-5 atol; validates that H5hut's 4π correction path lands on the same value as phdf5's native convention.	<pending>
+tests/test_ipic3d_synthetic.py::TestH5hutMatchesPhdf5::test_current_matches	15	kept	All J components per species, 1e-5 atol; covers the 4π correction on current moments in H5hut.	<pending>
+tests/test_ipic3d_synthetic.py::TestH5hutReader::test_available_timesteps	15	kept	Probe returns [0] for H5hut fixture — the only anchor that the H5hut-specific '-Fields_000000.h5' discovery glob produces the expected step list.	<pending>
+tests/test_ipic3d_synthetic.py::TestH5hutReader::test_available_fields_matches_read	15	kept	Probe vs full-read equivalence for H5hut; catches H5hut-specific probe drift (e.g. if probe enumerates HDF5 groups but read uses a different mapping).	<pending>
+tests/test_ipic3d_synthetic.py::TestH5hutReader::test_field_shapes	15	kept	B1 shape after ZYX→XYZ transpose; a transpose bug would usually swap NX and NZ giving shape (NZ, NY, NX) which fails this assert.	<pending>
+tests/test_ipic3d_synthetic.py::TestH5hutReader::test_float64_promotion	15	hardened	Was B1-only — a reader that promoted B1 but left B2/B3/E*/rho_c_* as float32 slipped through. Now iterates over every field in ds.field_names() asserting float64 dtype, exercising the H5hut read path's promotion branch on every loaded moment/field.	<pending>
+tests/test_ipic3d_synthetic.py::TestH5hutReader::test_b_field_after_transpose	15	kept	Per-cell tanh(y) profile pinned at 1e-6 after transpose + float32→float64 — the strongest H5hut-specific correctness anchor.	<pending>
+tests/test_ipic3d_synthetic.py::TestH5hutReader::test_e_field_zero	15	kept	All 3 E components zero-pinned at 1e-6; confirms E moments survive the H5hut read path unchanged.	<pending>
+tests/test_ipic3d_synthetic.py::TestH5hutReader::test_electron_density_4pi_corrected	15	kept	Per-cell -1.0 pin for electron charge density at 1e-5; directly verifies the 4π correction path specific to H5hut output.	<pending>
+tests/test_ipic3d_synthetic.py::TestH5hutReader::test_ion_density_4pi_corrected	15	kept	Per-cell +1.0 pin for ion density; independent branch of the 4π correction.	<pending>
+tests/test_ipic3d_synthetic.py::TestH5hutReader::test_total_charge_is_sum	15	kept	Sum identity for H5hut; catches aggregation bugs in the H5hut total-moment assembly that wouldn't show in individual species pins.	<pending>
+tests/test_ipic3d_synthetic.py::TestH5hutReader::test_total_current_is_sum	15	kept	Sum identity across 3 components for H5hut; triple-checks total J assembly per axis.	<pending>
 tests/test_ipic3d_synthetic.py::TestH5hutReader::test_diagonal_pressure_positive	14	hardened	Renamed from test_electron_pressure_positive; was species-0-only. H5hut has no pressure-match-phdf5 test (unlike shdf5) and test_pressure_p_over_rho_consistency divides P by rho (cancels common sign flips). Positivity is the residual discriminator. Now covers both species, catching a sign bug isolated to the ion-specific 4π correction path.	e7364e2
-tests/test_ipic3d_synthetic.py::TestH5hutReader::test_pressure_p_over_rho_consistency	0	not-yet-reviewed		
-tests/test_ipic3d_synthetic.py::TestH5hutUnknownFieldPassthrough::test_extra_field_included	0	not-yet-reviewed		
-tests/test_ipic3d_synthetic.py::TestOpenIpic3dSynthetic::test_detects_parallel	0	not-yet-reviewed		
-tests/test_ipic3d_synthetic.py::TestOpenIpic3dSynthetic::test_detects_serial	0	not-yet-reviewed		
-tests/test_ipic3d_synthetic.py::TestOpenIpic3dSynthetic::test_detects_h5hut	0	not-yet-reviewed		
-tests/test_ipic3d_synthetic.py::TestOpenIpic3dSynthetic::test_missing_dir_raises	0	not-yet-reviewed		
-tests/test_ipic3d_synthetic.py::TestConservedQuantitiesSyntheticFormatA::test_cycle_properties	0	not-yet-reviewed		
-tests/test_ipic3d_synthetic.py::TestConservedQuantitiesSyntheticFormatA::test_energies	0	not-yet-reviewed		
-tests/test_ipic3d_synthetic.py::TestConservedQuantitiesSyntheticFormatB::test_cycle_count	0	not-yet-reviewed		
-tests/test_ipic3d_synthetic.py::TestConservedQuantitiesSyntheticFormatB::test_cycles_sorted	0	not-yet-reviewed		
-tests/test_ipic3d_synthetic.py::TestConservedQuantitiesSyntheticFormatB::test_cycles_deduplicated	0	not-yet-reviewed		
-tests/test_ipic3d_synthetic.py::TestConservedQuantitiesSyntheticFormatB::test_dedup_keeps_later_file	0	not-yet-reviewed		
-tests/test_ipic3d_synthetic.py::TestConservedQuantitiesSyntheticFormatB::test_species_count	0	not-yet-reviewed		
+tests/test_ipic3d_synthetic.py::TestH5hutReader::test_pressure_p_over_rho_consistency	15	kept	Per-species mean(P11)/mean(|rho_c|) == vth²/|qom|. Paired with the per-axis-positive hardened diagonal test, ensures both the magnitude (this) and the axis structure (that) are correct.	<pending>
+tests/test_ipic3d_synthetic.py::TestH5hutUnknownFieldPassthrough::test_extra_field_included	15	kept	Injects a synthetic 'CustomField' dataset into a copy of the H5hut fixture and asserts the reader passes it through with native name and value (99.0 at 1e-5). Pins the unknown-field passthrough contract, which is the sole mechanism by which code-specific diagnostic moments remain visible downstream.	<pending>
+tests/test_ipic3d_synthetic.py::TestOpenIpic3dSynthetic::test_detects_parallel	15	kept	open_ipic3d on the phdf5 fixture returns an IPic3DParallelReader instance and model_name=='iPIC3D'. Anchors the auto-detection dispatch that every downstream caller relies on.	<pending>
+tests/test_ipic3d_synthetic.py::TestOpenIpic3dSynthetic::test_detects_serial	15	kept	Same contract as parallel but for serial fixture — guarantees the shdf5 vs phdf5 discriminator in open_ipic3d.	<pending>
+tests/test_ipic3d_synthetic.py::TestOpenIpic3dSynthetic::test_detects_h5hut	15	kept	H5hut detection branch; without this a dispatch fallthrough would silently load H5hut output with the parallel reader.	<pending>
+tests/test_ipic3d_synthetic.py::TestOpenIpic3dSynthetic::test_missing_dir_raises	15	kept	FileNotFoundError contract on a nonexistent directory; the standard pypic 'fail-loud at the boundary' invariant for readers.	<pending>
+tests/test_ipic3d_synthetic.py::TestConservedQuantitiesSyntheticFormatA::test_cycle_properties	15	hardened	Was cycle[0]==0 + sorted() — both satisfied by a parser returning [0, 0, 0] (sorted allows duplicates) and the paired test_energies passes positionally. Now pins cycle[1]==5 and cycle[2]==10 so per-row cycle parsing is exercised.	<pending>
+tests/test_ipic3d_synthetic.py::TestConservedQuantitiesSyntheticFormatA::test_energies	15	kept	Pins total_energy[0..2] at 5.5/5.6/5.7 against the 13-column Format-A fixture. Paired with hardened test_cycle_properties this locks per-row alignment of the Roman-numeral-header parser.	<pending>
+tests/test_ipic3d_synthetic.py::TestConservedQuantitiesSyntheticFormatB::test_cycle_count	15	kept	len(cq.cycle) == 5 after multi-file dedup (0, 5, 10-deduped, 15, 20). Anchors the cross-file concatenation path.	<pending>
+tests/test_ipic3d_synthetic.py::TestConservedQuantitiesSyntheticFormatB::test_cycles_sorted	15	kept	np.diff(cq.cycle) > 0 — strict monotonicity after dedup. Rules out both unsorted and duplicate-producing parser bugs.	<pending>
+tests/test_ipic3d_synthetic.py::TestConservedQuantitiesSyntheticFormatB::test_cycles_deduplicated	15	kept	len(unique) == len(cycle); the explicit uniqueness claim that complements the strict-monotonic test.	<pending>
+tests/test_ipic3d_synthetic.py::TestConservedQuantitiesSyntheticFormatB::test_dedup_keeps_later_file	15	kept	Pins total_energy at the dedup-shared cycle 10 to the later-file value 5.71 — the specific tie-breaker contract that distinguishes Format B's merge from naive concatenation.	<pending>
+tests/test_ipic3d_synthetic.py::TestConservedQuantitiesSyntheticFormatB::test_species_count	15	kept	Pins len(species_npart) == len(species_charge) == len(species_kinetic_energy) == 2; guards against only one of the three species-array families being populated.	<pending>
 tests/test_ipic3d_synthetic.py::TestConservedQuantitiesSyntheticFormatB::test_species_arrays_length	14	hardened	Was species_npart-only — species_charge and species_kinetic_energy could be truncated (e.g. parser skips the last line for one column) and pass. Extended to iterate all three families, catching per-column row-count drift.	e7364e2
-tests/test_ipic3d_synthetic.py::TestConservedQuantitiesSyntheticFormatB::test_particle_counts	0	not-yet-reviewed		
+tests/test_ipic3d_synthetic.py::TestConservedQuantitiesSyntheticFormatB::test_particle_counts	15	kept	Pins per-cycle particle counts at 1000 for both species arrays; concrete numeric anchor on species_npart independent of the structural test_species_count.	<pending>
 tests/test_ipic3d_synthetic.py::TestConservedToTabular::test_structure	0	not-yet-reviewed		
 tests/test_ipic3d_synthetic.py::TestConservedToTabular::test_columns_present	0	not-yet-reviewed		
 tests/test_ipic3d_synthetic.py::TestConservedToTabular::test_values_match	0	not-yet-reviewed		
