@@ -461,68 +461,68 @@ tests/test_derived.py::TestIonAcousticSpeed::test_cold_ions	8	kept	Cold-ion limi
 tests/test_derived.py::TestIonAcousticSpeed::test_defaults	8	kept	gamma_e=1, gamma_i=3 defaults pin; conventions.md §Sound Speed vs Ion Acoustic (isothermal-electron + 1D-adiabatic-ion).	1bf448bb86e445e6e89b0194a09e3b8bdbc4011d
 tests/test_derived.py::TestIonAcousticSpeed::test_known_value	8	kept	Hand value exercising both Te and Ti branches plus mass scaling; catches mis-weighting of either.	1bf448bb86e445e6e89b0194a09e3b8bdbc4011d
 tests/test_derived.py::TestMagnetosonicSpeed::test_pythagorean	8	kept	Hand value v_ms(v_A=3, c_s=4) = 5; Pythagorean composition per equations.md §5.	1bf448bb86e445e6e89b0194a09e3b8bdbc4011d
-tests/test_derived.py::TestMagnetosonicSpeed::test_limiting_cases	0	not-yet-reviewed		
-tests/test_derived.py::TestMachNumbers::test_known_values	0	not-yet-reviewed		
-tests/test_derived.py::TestMachNumbers::test_zero_denominator_gives_nan	0	not-yet-reviewed		
-tests/test_derived.py::TestIsotropicPressure::test_trace_divided_by_three	0	not-yet-reviewed		
-tests/test_derived.py::TestIsotropicPressure::test_isotropic_tensor_returns_diagonal	0	not-yet-reviewed		
-tests/test_derived.py::TestIsotropicPressure::test_consistent_with_par_perp	0	not-yet-reviewed		
-tests/test_derived.py::TestIsotropicPressure::test_nan_propagation	0	not-yet-reviewed		
-tests/test_derived.py::TestParallelPressure::test_isotropic_any_b_direction	0	not-yet-reviewed		
-tests/test_derived.py::TestParallelPressure::test_b_along_z_diagonal	0	not-yet-reviewed		
-tests/test_derived.py::TestParallelPressure::test_b_along_111	0	not-yet-reviewed		
-tests/test_derived.py::TestPerpendicularPressure::test_isotropic_any_b_direction	0	not-yet-reviewed		
-tests/test_derived.py::TestPerpendicularPressure::test_b_along_z_diagonal	0	not-yet-reviewed		
-tests/test_derived.py::TestPerpendicularPressure::test_identity_trace	0	not-yet-reviewed		
-tests/test_derived.py::TestAgyrotropy::test_isotropic_is_zero	0	not-yet-reviewed		
-tests/test_derived.py::TestAgyrotropy::test_gyrotropic_diagonal_is_zero	0	not-yet-reviewed		
-tests/test_derived.py::TestAgyrotropy::test_agyrotropic_example	0	not-yet-reviewed		
-tests/test_derived.py::TestAgyrotropy::test_bounded_zero_one	0	not-yet-reviewed		
-tests/test_derived.py::TestCharacteristicScalesEdgeCases::test_empty_array_1arg[<lambda>0]	0	not-yet-reviewed		
-tests/test_derived.py::TestCharacteristicScalesEdgeCases::test_empty_array_1arg[<lambda>1]	0	not-yet-reviewed		
-tests/test_derived.py::TestCharacteristicScalesEdgeCases::test_empty_array_1arg[<lambda>2]	0	not-yet-reviewed		
-tests/test_derived.py::TestCharacteristicScalesEdgeCases::test_empty_array_2arg[<lambda>0]	0	not-yet-reviewed		
-tests/test_derived.py::TestCharacteristicScalesEdgeCases::test_empty_array_2arg[<lambda>1]	0	not-yet-reviewed		
-tests/test_derived.py::TestCharacteristicScalesEdgeCases::test_empty_array_2arg[<lambda>2]	0	not-yet-reviewed		
-tests/test_derived.py::TestCharacteristicScalesEdgeCases::test_empty_array_2arg[<lambda>3]	0	not-yet-reviewed		
-tests/test_derived.py::TestCharacteristicScalesEdgeCases::test_empty_array_2arg[<lambda>4]	0	not-yet-reviewed		
-tests/test_derived.py::TestCharacteristicScalesEdgeCases::test_empty_array_2arg[<lambda>5]	0	not-yet-reviewed		
-tests/test_derived.py::TestCharacteristicScalesEdgeCases::test_empty_array_2arg[<lambda>6]	0	not-yet-reviewed		
-tests/test_derived.py::TestCharacteristicScalesEdgeCases::test_nan_propagation_1arg[<lambda>0]	0	not-yet-reviewed		
-tests/test_derived.py::TestCharacteristicScalesEdgeCases::test_nan_propagation_1arg[<lambda>1]	0	not-yet-reviewed		
-tests/test_derived.py::TestCharacteristicScalesEdgeCases::test_nan_propagation_1arg[<lambda>2]	0	not-yet-reviewed		
-tests/test_derived.py::TestCharacteristicScalesEdgeCases::test_nan_propagation_2arg[<lambda>0]	0	not-yet-reviewed		
-tests/test_derived.py::TestCharacteristicScalesEdgeCases::test_nan_propagation_2arg[<lambda>1]	0	not-yet-reviewed		
-tests/test_derived.py::TestCharacteristicScalesEdgeCases::test_nan_propagation_2arg[<lambda>2]	0	not-yet-reviewed		
-tests/test_derived.py::TestCharacteristicScalesEdgeCases::test_nan_propagation_2arg[<lambda>3]	0	not-yet-reviewed		
-tests/test_derived.py::TestCharacteristicScalesEdgeCases::test_nan_propagation_2arg[<lambda>4]	0	not-yet-reviewed		
-tests/test_derived.py::TestCharacteristicScalesEdgeCases::test_nan_propagation_2arg[<lambda>5]	0	not-yet-reviewed		
-tests/test_derived.py::TestCharacteristicScalesEdgeCases::test_nan_propagation_2arg[<lambda>6]	0	not-yet-reviewed		
-tests/test_derived.py::TestCharacteristicScalesEdgeCases::test_pressure_tensor_nan_propagation	0	not-yet-reviewed		
-tests/test_derived.py::TestCharacteristicScalesEdgeCases::test_pressure_tensor_empty_arrays	0	not-yet-reviewed		
-tests/test_derived.py::TestCharacteristicScalesEdgeCases::test_agyrotropy_nan_propagation	0	not-yet-reviewed		
-tests/test_derived.py::TestJDotE::test_hand_calculation	0	not-yet-reviewed		
-tests/test_derived.py::TestJDotE::test_orthogonal_gives_zero	0	not-yet-reviewed		
-tests/test_derived.py::TestJDotE::test_negative_means_fields_gain_energy	0	not-yet-reviewed		
-tests/test_derived.py::TestJDotE::test_nan_propagation	0	not-yet-reviewed		
-tests/test_derived.py::TestIdealElectricField::test_hand_calculation	0	not-yet-reviewed		
-tests/test_derived.py::TestIdealElectricField::test_zero_velocity_gives_zero	0	not-yet-reviewed		
-tests/test_derived.py::TestNonIdealElectricField::test_ideal_case_gives_zero	0	not-yet-reviewed		
-tests/test_derived.py::TestNonIdealElectricField::test_hand_calculation	0	not-yet-reviewed		
-tests/test_derived.py::TestNonIdealElectricField::test_consistency_with_ideal	0	not-yet-reviewed		
-tests/test_derived.py::TestHallElectricField::test_hand_calculation	0	not-yet-reviewed		
-tests/test_derived.py::TestHallElectricField::test_charge_sign_independence	0	not-yet-reviewed		
-tests/test_derived.py::TestHallElectricField::test_zero_density_gives_nan	0	not-yet-reviewed		
-tests/test_derived.py::TestFirehoseParameter::test_isotropic_is_stable	0	not-yet-reviewed		
-tests/test_derived.py::TestFirehoseParameter::test_marginal_stability	0	not-yet-reviewed		
-tests/test_derived.py::TestFirehoseParameter::test_unstable	0	not-yet-reviewed		
-tests/test_derived.py::TestFirehoseParameter::test_zero_b_gives_nan	0	not-yet-reviewed		
-tests/test_derived.py::TestMirrorParameter::test_isotropic_is_stable	0	not-yet-reviewed		
-tests/test_derived.py::TestMirrorParameter::test_zero_b_gives_nan	0	not-yet-reviewed		
-tests/test_derived.py::TestMirrorParameter::test_large_beta_limit	0	not-yet-reviewed		
-tests/test_derived.py::TestMagneticShearAngle::test_parallel	0	not-yet-reviewed		
-tests/test_derived.py::TestMagneticShearAngle::test_antiparallel	0	not-yet-reviewed		
-tests/test_derived.py::TestMagneticShearAngle::test_perpendicular	0	not-yet-reviewed		
+tests/test_derived.py::TestMagnetosonicSpeed::test_limiting_cases	9	kept	Degenerate-case values (v_ms=v_A when c_s=0, v_ms=c_s when v_A=0) with rtol=1e-15 catch drops of either speed term.	<pending>
+tests/test_derived.py::TestMachNumbers::test_known_values	9	kept	Hand-calc values M_A=2 and M_ms=2 at rtol=1e-15 pin both Mach number formulas.	<pending>
+tests/test_derived.py::TestMachNumbers::test_zero_denominator_gives_nan	9	kept	Division-by-zero guard for both Mach numbers; prevents silent 0/0 drift.	<pending>
+tests/test_derived.py::TestIsotropicPressure::test_trace_divided_by_three	9	kept	Hand-calc (3+6+9)/3=6 at rtol=1e-15 pins the trace formula.	<pending>
+tests/test_derived.py::TestIsotropicPressure::test_isotropic_tensor_returns_diagonal	9	kept	Invariant: pure diagonal P=pI -> isotropic_pressure=p. Catches normalization bugs.	<pending>
+tests/test_derived.py::TestIsotropicPressure::test_consistent_with_par_perp	9	kept	Cross-formula identity P_iso=(P_par+2P_perp)/3 at rtol=1e-14; exercises off-diagonal terms and B-projection.	<pending>
+tests/test_derived.py::TestIsotropicPressure::test_nan_propagation	9	kept	NaN input propagates; sole guard against ufunc-masking drift in the trace formula.	<pending>
+tests/test_derived.py::TestParallelPressure::test_isotropic_any_b_direction	9	kept	Invariant: isotropic tensor gives P_par=P for any b-hat. Exercises unit-vector normalization in 3 directions.	<pending>
+tests/test_derived.py::TestParallelPressure::test_b_along_z_diagonal	9	kept	Diagonal case P_par=P33 at rtol=1e-15 pins component-index ordering.	<pending>
+tests/test_derived.py::TestParallelPressure::test_b_along_111	9	kept	Off-axis B=(1,1,1)/sqrt(3) on diag(1,2,3): P_par=(1+2+3)/3=2 catches 2*off-diagonal term sign drift.	<pending>
+tests/test_derived.py::TestPerpendicularPressure::test_isotropic_any_b_direction	9	kept	Invariant isotropic -> P_perp=P; catches trace/2 vs (Tr-P_par)/2 confusion.	<pending>
+tests/test_derived.py::TestPerpendicularPressure::test_b_along_z_diagonal	9	kept	Concrete value (P11+P22)/2=1.5 at rtol=1e-15 pins perp projection.	<pending>
+tests/test_derived.py::TestPerpendicularPressure::test_identity_trace	9	kept	Cross-check Tr(P)=P_par+2P_perp at rtol=1e-14; binds par/perp decomposition.	<pending>
+tests/test_derived.py::TestAgyrotropy::test_isotropic_is_zero	9	kept	Isotropic -> Q=0 invariant; sole guard against sign/ratio bugs in Swisdak formula.	<pending>
+tests/test_derived.py::TestAgyrotropy::test_gyrotropic_diagonal_is_zero	9	kept	Gyrotropic anisotropy diag(2,2,5) with B||z -> Q=0. Catches perp-perp symmetry bugs.	<pending>
+tests/test_derived.py::TestAgyrotropy::test_agyrotropic_example	9	kept	Hand-computed Q=0.25 for diag(3,1,1), B||z at rtol=1e-14 binds the full invariant computation.	<pending>
+tests/test_derived.py::TestAgyrotropy::test_bounded_zero_one	9	kept	Property check: Q in [0,1] over 100 random SPD tensors. atol=1e-10 is loose relative to FP noise (6e-16 observed on isotropic case) but the test isn't boundary-proximate (actual Q range [6e-3,0.92]), so tightening is cosmetic; kept as bounds-sanity guard.	<pending>
+tests/test_derived.py::TestCharacteristicScalesEdgeCases::test_empty_array_1arg[<lambda>0]	9	kept	thermal_speed empty-array shape preservation; iter-8 flagged for possible overlap with TestEdgeCaseInvariants, but EdgeCaseInvariants _FAMILY_1ARG covers only magnitudes/energies -- thermal_speed is disjoint, so this is sole guard.	<pending>
+tests/test_derived.py::TestCharacteristicScalesEdgeCases::test_empty_array_1arg[<lambda>1]	9	kept	plasma_frequency empty-array; not covered by _FAMILY_1ARG aggregated test (which tracks only magnitudes/energy densities).	<pending>
+tests/test_derived.py::TestCharacteristicScalesEdgeCases::test_empty_array_1arg[<lambda>2]	9	kept	skin_depth empty-array; not covered by _FAMILY_1ARG aggregated test.	<pending>
+tests/test_derived.py::TestCharacteristicScalesEdgeCases::test_empty_array_2arg[<lambda>0]	9	kept	gyrofrequency empty-array; not covered by _FAMILY_2ARG aggregated test (plasma_beta/alfven_speed/KE).	<pending>
+tests/test_derived.py::TestCharacteristicScalesEdgeCases::test_empty_array_2arg[<lambda>1]	9	kept	gyroradius empty-array; not covered by _FAMILY_2ARG aggregated test.	<pending>
+tests/test_derived.py::TestCharacteristicScalesEdgeCases::test_empty_array_2arg[<lambda>2]	9	kept	debye_length empty-array; not covered by _FAMILY_2ARG aggregated test.	<pending>
+tests/test_derived.py::TestCharacteristicScalesEdgeCases::test_empty_array_2arg[<lambda>3]	9	kept	sound_speed empty-array; not covered by _FAMILY_2ARG aggregated test.	<pending>
+tests/test_derived.py::TestCharacteristicScalesEdgeCases::test_empty_array_2arg[<lambda>4]	9	kept	magnetosonic_speed empty-array; not covered by _FAMILY_2ARG aggregated test.	<pending>
+tests/test_derived.py::TestCharacteristicScalesEdgeCases::test_empty_array_2arg[<lambda>5]	9	kept	alfven_mach empty-array; not covered by _FAMILY_2ARG aggregated test.	<pending>
+tests/test_derived.py::TestCharacteristicScalesEdgeCases::test_empty_array_2arg[<lambda>6]	9	kept	magnetosonic_mach empty-array; not covered by _FAMILY_2ARG aggregated test.	<pending>
+tests/test_derived.py::TestCharacteristicScalesEdgeCases::test_nan_propagation_1arg[<lambda>0]	9	kept	thermal_speed NaN propagation; not covered by _FAMILY_* aggregated tests.	<pending>
+tests/test_derived.py::TestCharacteristicScalesEdgeCases::test_nan_propagation_1arg[<lambda>1]	9	kept	plasma_frequency NaN propagation; not covered by _FAMILY_* aggregated tests.	<pending>
+tests/test_derived.py::TestCharacteristicScalesEdgeCases::test_nan_propagation_1arg[<lambda>2]	9	kept	skin_depth NaN propagation; not covered by _FAMILY_* aggregated tests.	<pending>
+tests/test_derived.py::TestCharacteristicScalesEdgeCases::test_nan_propagation_2arg[<lambda>0]	9	kept	gyrofrequency NaN propagation; not covered by _FAMILY_* aggregated tests.	<pending>
+tests/test_derived.py::TestCharacteristicScalesEdgeCases::test_nan_propagation_2arg[<lambda>1]	9	kept	gyroradius NaN propagation; not covered by _FAMILY_* aggregated tests.	<pending>
+tests/test_derived.py::TestCharacteristicScalesEdgeCases::test_nan_propagation_2arg[<lambda>2]	9	kept	debye_length NaN propagation; not covered by _FAMILY_* aggregated tests.	<pending>
+tests/test_derived.py::TestCharacteristicScalesEdgeCases::test_nan_propagation_2arg[<lambda>3]	9	kept	sound_speed NaN propagation; not covered by _FAMILY_* aggregated tests.	<pending>
+tests/test_derived.py::TestCharacteristicScalesEdgeCases::test_nan_propagation_2arg[<lambda>4]	9	kept	magnetosonic_speed NaN propagation; not covered by _FAMILY_* aggregated tests.	<pending>
+tests/test_derived.py::TestCharacteristicScalesEdgeCases::test_nan_propagation_2arg[<lambda>5]	9	kept	alfven_mach NaN propagation; not covered by _FAMILY_* aggregated tests.	<pending>
+tests/test_derived.py::TestCharacteristicScalesEdgeCases::test_nan_propagation_2arg[<lambda>6]	9	kept	magnetosonic_mach NaN propagation; not covered by _FAMILY_* aggregated tests.	<pending>
+tests/test_derived.py::TestCharacteristicScalesEdgeCases::test_pressure_tensor_nan_propagation	9	kept	parallel_pressure NaN propagation; sole guard for the 9-arg pressure tensor family.	<pending>
+tests/test_derived.py::TestCharacteristicScalesEdgeCases::test_pressure_tensor_empty_arrays	9	kept	parallel_pressure empty-input shape preservation; sole guard for the 9-arg family.	<pending>
+tests/test_derived.py::TestCharacteristicScalesEdgeCases::test_agyrotropy_nan_propagation	9	kept	agyrotropy NaN propagation; sole guard for its 9-arg interface.	<pending>
+tests/test_derived.py::TestJDotE::test_hand_calculation	9	kept	J=(1,2,0), E=(3,0,1) -> J.E=3 at rtol=1e-15 pins the dot product with asymmetric components.	<pending>
+tests/test_derived.py::TestJDotE::test_orthogonal_gives_zero	9	kept	Orthogonal J perp E -> J.E=0 invariant; catches sign/component-swap bugs.	<pending>
+tests/test_derived.py::TestJDotE::test_negative_means_fields_gain_energy	9	kept	Sign-convention invariant: anti-parallel J,E gives negative J.E (fields gain energy). Physics-semantic guard.	<pending>
+tests/test_derived.py::TestJDotE::test_nan_propagation	9	kept	NaN propagation for 6-arg j_dot_e; dedicated guard.	<pending>
+tests/test_derived.py::TestIdealElectricField::test_hand_calculation	9	kept	Hand-calc E_ideal=-VxB component-wise at rtol=1e-15 pins all three components.	<pending>
+tests/test_derived.py::TestIdealElectricField::test_zero_velocity_gives_zero	9	kept	V=0 invariant: E_ideal=0. Catches missing V factor in the cross product.	<pending>
+tests/test_derived.py::TestNonIdealElectricField::test_ideal_case_gives_zero	9	kept	Frozen-in limit E=-VxB -> E'=0 invariant; physics-semantic guard.	<pending>
+tests/test_derived.py::TestNonIdealElectricField::test_hand_calculation	9	kept	Specific value E'_3=1.5 at rtol=1e-15 pins the E + VxB formula.	<pending>
+tests/test_derived.py::TestNonIdealElectricField::test_consistency_with_ideal	9	kept	Cross-formula identity E'=E-E_ideal at rtol=1e-14; binds ideal/non-ideal pair.	<pending>
+tests/test_derived.py::TestHallElectricField::test_hand_calculation	9	kept	Hand-calc E_Hall_2=-0.5 at rtol=1e-15 pins JxB/(n|q|) with all three components non-trivial.	<pending>
+tests/test_derived.py::TestHallElectricField::test_charge_sign_independence	9	kept	|q| invariance: result identical for q=+1 and q=-1. Catches missing abs().	<pending>
+tests/test_derived.py::TestHallElectricField::test_zero_density_gives_nan	9	kept	n=0 -> NaN guard prevents division-by-zero drift to inf.	<pending>
+tests/test_derived.py::TestFirehoseParameter::test_isotropic_is_stable	9	kept	P_par=P_perp -> F=-1 at rtol=1e-15. Pins the -1 constant in the formula.	<pending>
+tests/test_derived.py::TestFirehoseParameter::test_marginal_stability	9	kept	Marginal case P_par-P_perp=B^2/2 -> F=0 at atol=1e-15. Pins the denominator factor 1/2.	<pending>
+tests/test_derived.py::TestFirehoseParameter::test_unstable	9	hardened	Replaced weak '> 0' with exact value 17.0 via hand-calc F=(10-1)/(1^2/2)-1=17; rtol=1e-15 catches any sign/factor drift.	<pending>
+tests/test_derived.py::TestFirehoseParameter::test_zero_b_gives_nan	9	kept	B=0 -> NaN guard; without _safe_divide this would give inf.	<pending>
+tests/test_derived.py::TestMirrorParameter::test_isotropic_is_stable	9	kept	P_par=P_perp=1, B=1 -> M=-0.5 (exact hand-calc) at rtol=1e-14. Pins all three terms.	<pending>
+tests/test_derived.py::TestMirrorParameter::test_zero_b_gives_nan	9	kept	B=0 -> NaN via _safe_divide guard.	<pending>
+tests/test_derived.py::TestMirrorParameter::test_large_beta_limit	9	kept	beta -> infinity limit: M -> P_perp/P_par - 1 = 2 at atol=0.01 (asymptotic: 1/beta_perp residual of ~5e-7 at B=1e-6).	<pending>
+tests/test_derived.py::TestMagneticShearAngle::test_parallel	9	kept	B_a parallel B_b -> theta=0 at atol=1e-15. arccos(1) precision guard.	<pending>
+tests/test_derived.py::TestMagneticShearAngle::test_antiparallel	9	kept	Anti-parallel B_a,B_b -> theta=pi at rtol=1e-14. arccos(-1) pin.	<pending>
+tests/test_derived.py::TestMagneticShearAngle::test_perpendicular	9	kept	B_a perp B_b -> theta=pi/2 at rtol=1e-14. arccos(0) pin.	<pending>
 tests/test_derived.py::TestMagneticShearAngle::test_45_degrees	0	not-yet-reviewed		
 tests/test_derived.py::TestMagneticFluxFunction::test_uniform_field	0	not-yet-reviewed		
 tests/test_derived.py::TestMagneticFluxFunction::test_sign_convention	0	not-yet-reviewed		
@@ -547,16 +547,16 @@ tests/test_derived.py::TestLorentzFactor::test_three_and_four_velocity_agree	0	n
 tests/test_derived.py::TestMagnetization::test_zero_field	0	not-yet-reviewed		
 tests/test_derived.py::TestMagnetization::test_unit_sigma	0	not-yet-reviewed		
 tests/test_derived.py::TestMagnetization::test_nonunit_c	0	not-yet-reviewed		
-tests/test_derived.py::TestRelativisticLimits::test_kinetic_energy_density_nonrel_limit	0	not-yet-reviewed		
-tests/test_derived.py::TestRelativisticLimits::test_alfven_speed_nonrel_limit	0	not-yet-reviewed		
+tests/test_derived.py::TestRelativisticLimits::test_kinetic_energy_density_nonrel_limit	9	hardened	Tightened rtol 1e-5 -> 1e-6. Taylor residual 3v^2/(8c^2) ~ 7.5e-7 at v=1e-3; 1.3x margin. Catches leading-order cancellation drift.	<pending>
+tests/test_derived.py::TestRelativisticLimits::test_alfven_speed_nonrel_limit	9	hardened	Tightened rtol 1e-3 -> 1e-4. sigma=1e-4 -> residual sigma/2=5e-5; 2x margin. Catches swap of sqrt(sigma/(1+sigma)) for sigma.	<pending>
 tests/test_derived.py::TestRelativisticLimits::test_alfven_speed_approaches_c	0	not-yet-reviewed		
 tests/test_derived.py::TestRelativisticLimits::test_magnetosonic_less_than_c	0	not-yet-reviewed		
-tests/test_derived.py::TestRelativisticLimits::test_magnetosonic_nonrel_limit	0	not-yet-reviewed		
-tests/test_derived.py::TestRelativisticLimits::test_sound_speed_nonrel_limit	0	not-yet-reviewed		
+tests/test_derived.py::TestRelativisticLimits::test_magnetosonic_nonrel_limit	9	hardened	Tightened rtol 1e-5 -> 1e-6. Coupling v_A^2 c_s^2/c^2 = 1e-12 in 2e-6 sum -> residual 2.5e-7; 4x margin.	<pending>
+tests/test_derived.py::TestRelativisticLimits::test_sound_speed_nonrel_limit	9	hardened	Tightened rtol 1e-3 -> 1e-5. Leading correction gamma*P/((gamma-1)*rho*c^2) ~ 1.25e-6 at P=1e-6; 8x margin.	<pending>
 tests/test_derived.py::TestRelativisticLimits::test_gyrofrequency_with_lorentz_factor	0	not-yet-reviewed		
 tests/test_derived.py::TestRelativisticLimits::test_plasma_frequency_with_lorentz_factor	0	not-yet-reviewed		
 tests/test_derived.py::TestRelativisticLimits::test_thermal_speed_capped_at_c	0	not-yet-reviewed		
-tests/test_derived.py::TestRelativisticLimits::test_thermal_speed_nonrel_limit	0	not-yet-reviewed		
+tests/test_derived.py::TestRelativisticLimits::test_thermal_speed_nonrel_limit	9	hardened	Tightened rtol 1e-5 -> 1e-6. Residual v_th^2/(2c^2)=5e-7 at T=1e-6, m=1, c=1; 2x margin.	<pending>
 tests/test_derived.py::TestRelativisticLimits::test_gyroradius_with_lorentz_factor	0	not-yet-reviewed		
 tests/test_derived.py::TestRelativisticLimits::test_skin_depth_with_lorentz_factor	0	not-yet-reviewed		
 tests/test_diagnostics.py::TestL2RelativeError::test_hand_calculation	0	not-yet-reviewed		

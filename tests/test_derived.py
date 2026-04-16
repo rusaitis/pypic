@@ -872,13 +872,13 @@ class TestFirehoseParameter:
         np.testing.assert_allclose(result, 0.0, atol=1e-15)
 
     def test_unstable(self):
-        """Large parallel excess → F > 0."""
+        """Large parallel excess: F = (10-1)/(1²/2) - 1 = 18 - 1 = 17."""
         result = firehose_parameter(
             np.array([10.0]),
             np.array([1.0]),
             np.array([1.0]),
         )
-        assert result[0] > 0
+        np.testing.assert_allclose(result, 17.0, rtol=1e-15)
 
     def test_zero_b_gives_nan(self):
         result = firehose_parameter(
@@ -1273,22 +1273,25 @@ class TestRelativisticLimits:
     """Non-relativistic limit (v ≪ c) recovers classical formulas."""
 
     def test_kinetic_energy_density_nonrel_limit(self):
-        # For v ≪ c: (γ-1)ρc² ≈ ½ρv² (Taylor: γ ≈ 1 + v²/(2c²))
+        # For v ≪ c: (γ-1)ρc² = ½ρv² + O(v⁴/c²). Leading correction is
+        # 3ρv⁴/(8c²); at v=1e-3, c=1 → rel err ≈ 7.5e-7. rtol=1e-6 gives
+        # ~1.3× margin over the Taylor residual.
         rho = np.array([2.0])
         v = np.array([0.001])  # v ≪ c
         c = 1.0
         gamma = lorentz_factor(v, c)
         rel = kinetic_energy_density(rho, v, lorentz_factor=gamma, c=c)
         nonrel = kinetic_energy_density(rho, v)
-        np.testing.assert_allclose(rel, nonrel, rtol=1e-5)
+        np.testing.assert_allclose(rel, nonrel, rtol=1e-6)
 
     def test_alfven_speed_nonrel_limit(self):
-        # σ ≪ 1: rel v_A ≈ B/√ρ
+        # σ = B²/(ρc²) ≪ 1: v_A_rel/v_A_nonrel = √(1/(1+σ)) ≈ 1 - σ/2.
+        # With σ = 1e-4, residual ≈ 5e-5. rtol=1e-4 gives 2× margin.
         b = np.array([0.01])
         rho = np.array([1.0])
         rel = alfven_speed(b, rho, c=1.0)
         nonrel = alfven_speed(b, rho)
-        np.testing.assert_allclose(rel, nonrel, rtol=1e-3)
+        np.testing.assert_allclose(rel, nonrel, rtol=1e-4)
 
     def test_alfven_speed_approaches_c(self):
         # σ → ∞: v_A → c
@@ -1307,20 +1310,24 @@ class TestRelativisticLimits:
         assert float(v_ms[0]) < c
 
     def test_magnetosonic_nonrel_limit(self):
-        # v_A, c_s ≪ c: correction term is negligible
+        # Relativistic v_ms² = v_A² + c_s² - v_A²c_s²/c². With
+        # v_A = c_s = 1e-3, c=1, the coupling term is 1e-12 vs 2e-6 sum →
+        # rel err ≈ 2.5e-7. rtol=1e-6 gives 4× margin.
         v_a = np.array([0.001])
         c_s = np.array([0.001])
         rel = magnetosonic_speed(v_a, c_s, c=1.0)
         nonrel = magnetosonic_speed(v_a, c_s)
-        np.testing.assert_allclose(rel, nonrel, rtol=1e-5)
+        np.testing.assert_allclose(rel, nonrel, rtol=1e-6)
 
     def test_sound_speed_nonrel_limit(self):
-        # P ≪ ρc²: h_rel ≈ c², so rel c_s ≈ √(γP/ρ)
+        # Rel. c_s = √(γP/(ρ h_rel/c²)). With h_rel ≈ c² + γP/((γ-1)ρ),
+        # the correction is γP/((γ-1)ρc²) at leading order. At P=1e-6,
+        # ρ=1, c=1, γ=5/3 → residual ≈ 1.25e-6. rtol=1e-5 gives 8× margin.
         p = np.array([1e-6])
         rho = np.array([1.0])
         rel = sound_speed(p, rho, c=1.0)
         nonrel = sound_speed(p, rho)
-        np.testing.assert_allclose(rel, nonrel, rtol=1e-3)
+        np.testing.assert_allclose(rel, nonrel, rtol=1e-5)
 
     def test_gyrofrequency_with_lorentz_factor(self):
         b = np.array([2.0])
@@ -1344,10 +1351,13 @@ class TestRelativisticLimits:
         assert float(v_rel[0]) < 1.0
 
     def test_thermal_speed_nonrel_limit(self):
+        # v_th_rel = v_th / √(1 + v_th²/c²). With T=1e-6, m=1, c=1 →
+        # v_th = 1e-3, residual ≈ v_th²/(2c²) = 5e-7. rtol=1e-6 gives
+        # 2× margin over the Taylor truncation.
         t_cold = np.array([1e-6])
         rel = thermal_speed(t_cold, mass=1.0, c=1.0)
         nonrel = thermal_speed(t_cold, mass=1.0)
-        np.testing.assert_allclose(rel, nonrel, rtol=1e-5)
+        np.testing.assert_allclose(rel, nonrel, rtol=1e-6)
 
     def test_gyroradius_with_lorentz_factor(self):
         t = np.array([1.0])
