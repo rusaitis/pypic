@@ -265,6 +265,11 @@ class TestFieldComparisonReport:
         assert "common_dimensions" in grid
         assert "resolution_ratio" in grid
         assert len(grid["resolution_ratio"]) == 2
+        # Same grid on both sides → ratio is exactly 1.0 on every axis.
+        # Pins against a swap of max/min in _resolution_ratio (which
+        # would return 1.0 only trivially) or an off-by-one ndim bug.
+        assert grid["resolution_ratio"] == (1.0, 1.0)
+        assert grid["common_dimensions"] == (6, 6)
 
     def test_no_common_fields_raises(self) -> None:
         grid = make_uniform_grid(4, spacing=1.0)

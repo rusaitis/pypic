@@ -1278,6 +1278,7 @@ def test_convert_fields_plane_slice(tmp_path: Path) -> None:
 @zarr_required
 def test_convert_fields_compression_zstd(tmp_path: Path) -> None:
     from pypic.io import from_zarr
+    from pypic.readers import open_simulation
 
     d = _make_sim_dir(tmp_path)
     out = tmp_path / "zstd.zarr"
@@ -1298,6 +1299,12 @@ def test_convert_fields_compression_zstd(tmp_path: Path) -> None:
     assert result.exit_code == 0, result.output
     fds = from_zarr(out)
     assert "B1" in fds.field_names()
+    # Lossless round-trip: zstd is lossless, so the compressed roundtrip
+    # must reproduce the source bit-exactly. Pins against a codec-level
+    # regression that silently lossy-compresses floats (a real hazard
+    # with codec-config typos like missing bit-shuffle).
+    src = open_simulation(d).read(step=0, fields=["B1"])
+    np.testing.assert_array_equal(np.asarray(fds["B1"]), np.asarray(src["B1"]))
 
 
 @zarr_required
@@ -1359,6 +1366,10 @@ def test_convert_fields_virtual(tmp_path: Path) -> None:
     assert set(fds.field_names()) >= {"B1", "B2", "B3"}
     # Virtual refs only — no materialised chunk files in the destination.
     assert not list(out.rglob("B1/c/*"))
+    # Virtual refs must resolve to the source data bit-exactly (no
+    # silent zero-fill regression, no axis transpose).
+    with h5py.File(h5_path, "r") as f:
+        np.testing.assert_array_equal(np.asarray(fds["B1"]), f["fields/B1"][...])
 
 
 @zarr_required
@@ -1548,6 +1559,8 @@ def test_convert_particles_box_crop(tmp_path: Path) -> None:
 @arrow_required
 def test_convert_all_fields_only(tmp_path: Path) -> None:
     # Sim without particle output: `convert all` should write fields only.
+    from pypic.io import from_zarr
+
     d = _make_sim_dir(tmp_path)
     out = tmp_path / "all_out"
     result = runner.invoke(
@@ -1557,6 +1570,11 @@ def test_convert_all_fields_only(tmp_path: Path) -> None:
     assert result.exit_code == 0, result.output
     assert (out / "fields.zarr").is_dir()
     assert not (out / "particles").exists()
+    # The fields directory must be a readable zarr store, not just an
+    # empty directory — guards against a `convert all` regression that
+    # mkdir()s the target but never writes into it.
+    fds = from_zarr(out / "fields.zarr")
+    assert "B1" in fds.field_names()
 
 
 @zarr_required
