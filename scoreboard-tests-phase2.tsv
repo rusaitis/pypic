@@ -973,116 +973,116 @@ tests/test_plotting.py::TestPlotComparison::test_options[semi-extremes]	17	harde
 tests/test_plotting.py::TestPlotComparison::test_options[darken-extremes]	17	hardened	Pre-hardening body was isinstance(fig,Figure). Added per-option assertions: colorbar=False → 3 axes (panels only); colorbar='inset' → 3 axes + 3 child axes; vmin/vmax pin norm limits on panels a & b. Parametrize ids now distinguishable via assertions.	a2d9274
 tests/test_plotting.py::TestPlotComparison::test_options[none-extremes]	17	hardened	Pre-hardening body was isinstance(fig,Figure). Added per-option assertions: colorbar=False → 3 axes (panels only); colorbar='inset' → 3 axes + 3 child axes; vmin/vmax pin norm limits on panels a & b. Parametrize ids now distinguishable via assertions.	a2d9274
 tests/test_plotting.py::TestPlotComparison::test_options[custom-clim]	17	hardened	Pre-hardening body was isinstance(fig,Figure). Added per-option assertions: colorbar=False → 3 axes (panels only); colorbar='inset' → 3 axes + 3 child axes; vmin/vmax pin norm limits on panels a & b. Parametrize ids now distinguishable via assertions.	a2d9274
-tests/test_plotting.py::TestColormapDetection::test_detection[magnitude]	0	not-yet-reviewed		
-tests/test_plotting.py::TestColormapDetection::test_detection[component]	0	not-yet-reviewed		
-tests/test_plotting.py::TestColormapDetection::test_detection[density]	0	not-yet-reviewed		
-tests/test_plotting.py::TestColormapDetection::test_detection[charge-density]	0	not-yet-reviewed		
-tests/test_plotting.py::TestColormapDetection::test_detection[beta]	0	not-yet-reviewed		
-tests/test_plotting.py::TestColormapDetection::test_detection[all-positive-fallback]	0	not-yet-reviewed		
-tests/test_plotting.py::TestColormapDetection::test_detection[mixed-sign-fallback]	0	not-yet-reviewed		
-tests/test_plotting.py::TestSymmetricClim::test_symmetric	0	not-yet-reviewed		
-tests/test_plotting.py::TestSymmetricClim::test_all_nan	0	not-yet-reviewed		
-tests/test_plotting.py::TestResolveFieldColormap::test_canonical_field_dispatch[B1]	0	not-yet-reviewed		
-tests/test_plotting.py::TestResolveFieldColormap::test_canonical_field_dispatch[rho_c]	0	not-yet-reviewed		
-tests/test_plotting.py::TestResolveFieldColormap::test_canonical_field_dispatch[J_dot_E]	0	not-yet-reviewed		
-tests/test_plotting.py::TestResolveFieldColormap::test_canonical_field_dispatch[psi]	0	not-yet-reviewed		
-tests/test_plotting.py::TestResolveFieldColormap::test_canonical_field_dispatch[div_B]	0	not-yet-reviewed		
-tests/test_plotting.py::TestResolveFieldColormap::test_canonical_field_dispatch[abs_B]	0	not-yet-reviewed		
-tests/test_plotting.py::TestResolveFieldColormap::test_canonical_field_dispatch[n_s0]	0	not-yet-reviewed		
-tests/test_plotting.py::TestResolveFieldColormap::test_string_override_passes_through	0	not-yet-reviewed		
-tests/test_plotting.py::TestResolveFieldColormap::test_colormap_object_passes_through	0	not-yet-reviewed		
-tests/test_plotting.py::TestResolveFieldColormap::test_matches_resolve_colormap_string_path	0	not-yet-reviewed		
-tests/test_plotting.py::TestResolveFieldColormap::test_uniform_field	0	not-yet-reviewed		
-tests/test_plotting.py::TestResolveFieldValues::test_stored_field	0	not-yet-reviewed		
-tests/test_plotting.py::TestResolveFieldValues::test_derived_field	0	not-yet-reviewed		
-tests/test_plotting.py::TestResolveFieldValues::test_with_units	0	not-yet-reviewed		
-tests/test_plotting.py::TestThemes::test_rcparams_valid[light]	0	not-yet-reviewed		
-tests/test_plotting.py::TestThemes::test_rcparams_valid[dark]	0	not-yet-reviewed		
-tests/test_plotting.py::TestThemes::test_default_is_light	0	not-yet-reviewed		
-tests/test_plotting.py::TestThemes::test_customize_rcparam	0	not-yet-reviewed		
-tests/test_plotting.py::TestThemes::test_customize_field	0	not-yet-reviewed		
-tests/test_plotting.py::TestThemes::test_customize_preserves_original	0	not-yet-reviewed		
-tests/test_plotting.py::TestPlotLine::test_1d	0	not-yet-reviewed		
-tests/test_plotting.py::TestPlotLine::test_2d_with_axis	0	not-yet-reviewed		
-tests/test_plotting.py::TestPlotLine::test_custom_axes_overlay	0	not-yet-reviewed		
-tests/test_plotting.py::TestPlotLine::test_missing_axis_raises	0	not-yet-reviewed		
-tests/test_plotting.py::TestPlotLine::test_label_and_legend	0	not-yet-reviewed		
-tests/test_plotting.py::TestPlotTimeSeries::test_single_column	0	not-yet-reviewed		
-tests/test_plotting.py::TestPlotTimeSeries::test_multiple_columns	0	not-yet-reviewed		
-tests/test_plotting.py::TestPlotTimeSeries::test_custom_x_column	0	not-yet-reviewed		
-tests/test_plotting.py::TestPlotTimeSeries::test_no_legend	0	not-yet-reviewed		
-tests/test_plotting.py::TestVectorPlots::test_returns_figure_and_axes[streamlines]	0	not-yet-reviewed		
-tests/test_plotting.py::TestVectorPlots::test_returns_figure_and_axes[quiver]	0	not-yet-reviewed		
-tests/test_plotting.py::TestVectorPlots::test_custom_axes[streamlines]	0	not-yet-reviewed		
-tests/test_plotting.py::TestVectorPlots::test_custom_axes[quiver]	0	not-yet-reviewed		
-tests/test_plotting.py::TestVectorPlots::test_uniform_color[streamlines]	0	not-yet-reviewed		
-tests/test_plotting.py::TestVectorPlots::test_uniform_color[quiver]	0	not-yet-reviewed		
-tests/test_plotting.py::TestVectorPlots::test_auto_legend[streamlines]	0	not-yet-reviewed		
-tests/test_plotting.py::TestVectorPlots::test_auto_legend[quiver]	0	not-yet-reviewed		
-tests/test_plotting.py::TestVectorPlots::test_legend_false_disables	0	not-yet-reviewed		
-tests/test_plotting.py::TestVectorPlots::test_options[stream-color_field]	0	not-yet-reviewed		
-tests/test_plotting.py::TestVectorPlots::test_options[stream-dark]	0	not-yet-reviewed		
-tests/test_plotting.py::TestVectorPlots::test_options[stream-no-cb]	0	not-yet-reviewed		
-tests/test_plotting.py::TestVectorPlots::test_options[stream-alpha]	0	not-yet-reviewed		
-tests/test_plotting.py::TestVectorPlots::test_options[stream-transparent]	0	not-yet-reviewed		
-tests/test_plotting.py::TestVectorPlots::test_options[stream-semi]	0	not-yet-reviewed		
-tests/test_plotting.py::TestVectorPlots::test_options[stream-none]	0	not-yet-reviewed		
-tests/test_plotting.py::TestVectorPlots::test_options[quiver-stride]	0	not-yet-reviewed		
-tests/test_plotting.py::TestVectorPlots::test_options[quiver-stride-tuple]	0	not-yet-reviewed		
-tests/test_plotting.py::TestVectorPlots::test_options[quiver-dark]	0	not-yet-reviewed		
-tests/test_plotting.py::TestVectorPlots::test_options[quiver-no-cb]	0	not-yet-reviewed		
-tests/test_plotting.py::TestVectorPlots::test_options[quiver-transparent]	0	not-yet-reviewed		
-tests/test_plotting.py::TestVectorPlots::test_options[quiver-semi]	0	not-yet-reviewed		
-tests/test_plotting.py::TestVectorPlots::test_options[quiver-none]	0	not-yet-reviewed		
-tests/test_plotting.py::TestStatusBadge::test_format_status_text[step]	0	not-yet-reviewed		
-tests/test_plotting.py::TestStatusBadge::test_format_status_text[time]	0	not-yet-reviewed		
-tests/test_plotting.py::TestStatusBadge::test_format_status_text[both]	0	not-yet-reviewed		
-tests/test_plotting.py::TestStatusBadge::test_format_status_text[custom-label]	0	not-yet-reviewed		
-tests/test_plotting.py::TestStatusBadge::test_format_status_text[empty-label]	0	not-yet-reviewed		
-tests/test_plotting.py::TestStatusBadge::test_format_status_text[with-max]	0	not-yet-reviewed		
-tests/test_plotting.py::TestStatusBadge::test_format_status_text[no-max]	0	not-yet-reviewed		
-tests/test_plotting.py::TestStatusBadge::test_format_status_text[time-units]	0	not-yet-reviewed		
-tests/test_plotting.py::TestStatusBadge::test_no_content_raises	0	not-yet-reviewed		
-tests/test_plotting.py::TestStatusBadge::test_custom_text	0	not-yet-reviewed		
-tests/test_plotting.py::TestStatusBadge::test_time_as_string	0	not-yet-reviewed		
-tests/test_plotting.py::TestStatusBadge::test_custom_text_with_progress	0	not-yet-reviewed		
-tests/test_plotting.py::TestStatusBadge::test_cycle_label	0	not-yet-reviewed		
-tests/test_plotting.py::TestStatusBadge::test_custom_bg_color	0	not-yet-reviewed		
-tests/test_plotting.py::TestStatusBadge::test_badge_renders_on_axes	0	not-yet-reviewed		
-tests/test_plotting.py::TestOverlayVariant::test_default_uses_theme_color	0	not-yet-reviewed		
-tests/test_plotting.py::TestOverlayVariant::test_alt_variant_returns_alt_colors	0	not-yet-reviewed		
-tests/test_plotting.py::TestOverlayVariant::test_returns_three_values	0	not-yet-reviewed		
-tests/test_plotting.py::TestInsetColorbar::test_returns_colorbar	0	not-yet-reviewed		
-tests/test_plotting.py::TestInsetColorbar::test_all_locs[upper left]	0	not-yet-reviewed		
-tests/test_plotting.py::TestInsetColorbar::test_all_locs[upper right]	0	not-yet-reviewed		
-tests/test_plotting.py::TestInsetColorbar::test_all_locs[lower left]	0	not-yet-reviewed		
-tests/test_plotting.py::TestInsetColorbar::test_all_locs[lower right]	0	not-yet-reviewed		
-tests/test_plotting.py::TestInsetColorbar::test_all_locs[upper center]	0	not-yet-reviewed		
-tests/test_plotting.py::TestInsetColorbar::test_via_plot_functions[slice]	0	not-yet-reviewed		
-tests/test_plotting.py::TestInsetColorbar::test_via_plot_functions[streamlines]	0	not-yet-reviewed		
-tests/test_plotting.py::TestInsetColorbar::test_via_plot_functions[quiver]	0	not-yet-reviewed		
-tests/test_plotting.py::TestVectorLegend::test_single_entry	0	not-yet-reviewed		
-tests/test_plotting.py::TestVectorLegend::test_multiple_entries	0	not-yet-reviewed		
-tests/test_plotting.py::TestPanelLabel::test_returns_anchored_offsetbox	0	not-yet-reviewed		
-tests/test_plotting.py::TestPanelLabel::test_all_locs[upper left]	0	not-yet-reviewed		
-tests/test_plotting.py::TestPanelLabel::test_all_locs[upper right]	0	not-yet-reviewed		
-tests/test_plotting.py::TestPanelLabel::test_all_locs[lower left]	0	not-yet-reviewed		
-tests/test_plotting.py::TestPanelLabel::test_all_locs[lower right]	0	not-yet-reviewed		
-tests/test_plotting.py::TestPanelLabel::test_all_locs[upper center]	0	not-yet-reviewed		
-tests/test_plotting.py::TestAddContours::test_basic_contour	0	not-yet-reviewed		
-tests/test_plotting.py::TestAddContours::test_contour_with_labels	0	not-yet-reviewed		
-tests/test_plotting.py::TestLogScale::test_log_scale_positive_field	0	not-yet-reviewed		
-tests/test_plotting.py::TestComposedFieldAndVectors::test_slice_then_streamlines	0	not-yet-reviewed		
-tests/test_plotting.py::TestComposedFieldAndVectors::test_slice_then_quiver	0	not-yet-reviewed		
-tests/test_plotting.py::TestComposedFieldAndVectors::test_shared_axes	0	not-yet-reviewed		
-tests/test_plotting.py::TestPlotFieldGrid::test_basic_grid	0	not-yet-reviewed		
-tests/test_plotting.py::TestPlotFieldGrid::test_single_field	0	not-yet-reviewed		
-tests/test_plotting.py::TestPlotFieldGrid::test_panel_labels_disabled	0	not-yet-reviewed		
-tests/test_plotting.py::TestPlotCrossSection::test_basic	0	not-yet-reviewed		
-tests/test_plotting.py::TestPlotCrossSection::test_custom_cut_index	0	not-yet-reviewed		
-tests/test_plotting.py::TestPlotCrossSection::test_invalid_cut_axis_rejects	0	not-yet-reviewed		
-tests/test_plotting.py::TestComparisonShowError::test_show_error	0	not-yet-reviewed		
-tests/test_plotting.py::TestPlotLines::test_basic	0	not-yet-reviewed		
+tests/test_plotting.py::TestColormapDetection::test_detection[magnitude]	18	kept	Parametrized equality check on is_positive_definite — pins magnitude→positive cmap dispatch.	<pending>
+tests/test_plotting.py::TestColormapDetection::test_detection[component]	18	kept	Parametrized equality check — pins vector component B1 defaulting to diverging cmap.	<pending>
+tests/test_plotting.py::TestColormapDetection::test_detection[density]	18	kept	Pins mass-density→positive-definite cmap family via quantity_type dispatch.	<pending>
+tests/test_plotting.py::TestColormapDetection::test_detection[charge-density]	18	kept	Pins charge-density→diverging cmap (distinct from mass density which is positive).	<pending>
+tests/test_plotting.py::TestColormapDetection::test_detection[beta]	18	kept	Pins beta (plasma beta) as positive-definite; regression would force diverging cmap.	<pending>
+tests/test_plotting.py::TestColormapDetection::test_detection[all-positive-fallback]	18	kept	No FieldInfo + all-positive data falls back to positive-definite. Pins data-inspection heuristic.	<pending>
+tests/test_plotting.py::TestColormapDetection::test_detection[mixed-sign-fallback]	18	kept	Mixed-sign unknown field falls back to diverging — complements all-positive-fallback.	<pending>
+tests/test_plotting.py::TestSymmetricClim::test_symmetric	18	kept	Equality: symmetric_clim([-3,1,2])==(-3,3). Pins max(|data|) symmetry convention.	<pending>
+tests/test_plotting.py::TestSymmetricClim::test_all_nan	18	kept	All-NaN yields epsilon-expanded (not degenerate 0,0) — pins safeguard against colorbar collapse.	<pending>
+tests/test_plotting.py::TestResolveFieldColormap::test_canonical_field_dispatch[B1]	18	kept	Parametrized: B1 → theme.diverging_cmap. Pins mag-field canonical name dispatch.	<pending>
+tests/test_plotting.py::TestResolveFieldColormap::test_canonical_field_dispatch[rho_c]	18	kept	Parametrized: rho_c (charge density) → diverging. Pins charge-density dispatch.	<pending>
+tests/test_plotting.py::TestResolveFieldColormap::test_canonical_field_dispatch[J_dot_E]	18	kept	Parametrized: J.E (power density) → diverging. Pins energy-conversion sign preservation.	<pending>
+tests/test_plotting.py::TestResolveFieldColormap::test_canonical_field_dispatch[psi]	18	kept	Parametrized: flux function ψ → diverging. Pins scalar-without-FieldInfo diverging default on mixed-sign data.	<pending>
+tests/test_plotting.py::TestResolveFieldColormap::test_canonical_field_dispatch[div_B]	18	kept	Parametrized: div_B (should be ~0, signed) → diverging. Pins diagnostic sign preservation.	<pending>
+tests/test_plotting.py::TestResolveFieldColormap::test_canonical_field_dispatch[abs_B]	18	kept	Parametrized: |B| magnitude → sequential. Pins magnitude→positive-definite dispatch.	<pending>
+tests/test_plotting.py::TestResolveFieldColormap::test_canonical_field_dispatch[n_s0]	18	kept	Parametrized: n_s0 (species density) → sequential. Pins density-is-positive convention.	<pending>
+tests/test_plotting.py::TestResolveFieldColormap::test_string_override_passes_through	18	kept	User-supplied cmap string bypasses auto-dispatch. Pins override priority contract.	<pending>
+tests/test_plotting.py::TestResolveFieldColormap::test_colormap_object_passes_through	18	kept	Colormap object identity preserved through resolve_field_colormap. Pins object-pass-through.	<pending>
+tests/test_plotting.py::TestResolveFieldColormap::test_matches_resolve_colormap_string_path	18	kept	Pins tuple-returning resolver agreement with legacy string-only path for 3 canonical cases.	<pending>
+tests/test_plotting.py::TestResolveFieldColormap::test_uniform_field	18	kept	Uniform-zero field still yields non-degenerate clim (epsilon expansion). Guards against divide-by-zero.	<pending>
+tests/test_plotting.py::TestResolveFieldValues::test_stored_field	18	kept	resolve_field_values on stored field equals raw array. Pins zero-copy contract.	<pending>
+tests/test_plotting.py::TestResolveFieldValues::test_derived_field	18	kept	|B| derived value equals sqrt(B1²+B2²+B3²). Pins derived dispatch + physics formula.	<pending>
+tests/test_plotting.py::TestResolveFieldValues::test_with_units	18	hardened	Hardened: added scale-equality check (1 T → 1e9 nT); shape-only check admitted silent identity conversion.	<pending>
+tests/test_plotting.py::TestThemes::test_rcparams_valid[light]	18	kept	Every rcparam key in the light theme must be a valid matplotlib rcParam name. Guards typos.	<pending>
+tests/test_plotting.py::TestThemes::test_rcparams_valid[dark]	18	kept	Same guard as light theme — every dark theme rcparam key is valid.	<pending>
+tests/test_plotting.py::TestThemes::test_default_is_light	18	kept	Default theme name equality. Pins get_theme()→light on module import.	<pending>
+tests/test_plotting.py::TestThemes::test_customize_rcparam	18	kept	customize(font_size=14) updates font.size; sequential_cmap unchanged. Pins partial-update immutability.	<pending>
+tests/test_plotting.py::TestThemes::test_customize_field	18	kept	customize(sequential_cmaps=..., grid_color=...) updates named fields only. Pins field-level immutability.	<pending>
+tests/test_plotting.py::TestThemes::test_customize_preserves_original	18	kept	customize() returns a new theme; original unchanged. Pins frozen-dataclass copy semantics.	<pending>
+tests/test_plotting.py::TestPlotLine::test_1d	18	hardened	Hardened: pinned line ydata == ds_1d['B1'] and xdata == coordinate array; prior isinstance-only passed for no-op plots.	<pending>
+tests/test_plotting.py::TestPlotLine::test_2d_with_axis	18	hardened	Hardened: pinned ydata == midplane row B1[:, ny//2]; prior line-count check admitted wrong-axis slices.	<pending>
+tests/test_plotting.py::TestPlotLine::test_custom_axes_overlay	18	hardened	Hardened: pinned both lines' ydata to B1 and B2 midplane slices; prior line-count check admitted second call overwriting first.	<pending>
+tests/test_plotting.py::TestPlotLine::test_missing_axis_raises	18	kept	2D data without axis kwarg raises ValueError. Pins explicit-axis contract.	<pending>
+tests/test_plotting.py::TestPlotLine::test_label_and_legend	18	hardened	Hardened: pinned legend text content to 'test'; prior legend-not-None admitted wrong label.	<pending>
+tests/test_plotting.py::TestPlotTimeSeries::test_single_column	18	hardened	Hardened: pinned ydata==tabular['total_energy'] and xdata==tabular.index; prior count-only admitted wrong column.	<pending>
+tests/test_plotting.py::TestPlotTimeSeries::test_multiple_columns	18	hardened	Hardened: pinned each line's ydata and legend texts in order; prior count+legend-present admitted label mis-ordering.	<pending>
+tests/test_plotting.py::TestPlotTimeSeries::test_custom_x_column	18	hardened	Hardened: added xdata==tabular['cycle'] check alongside xlabel assertion; prior admitted wrong x-axis values with correct label.	<pending>
+tests/test_plotting.py::TestPlotTimeSeries::test_no_legend	18	kept	legend=False → ax.get_legend() is None. Pins kwarg-to-legend suppression.	<pending>
+tests/test_plotting.py::TestVectorPlots::test_returns_figure_and_axes[streamlines]	18	hardened	Hardened: pinned len(ax.collections) >= 1 — isinstance-only passed for empty axes.	<pending>
+tests/test_plotting.py::TestVectorPlots::test_returns_figure_and_axes[quiver]	18	hardened	Hardened: same — a Quiver collection must be present.	<pending>
+tests/test_plotting.py::TestVectorPlots::test_custom_axes[streamlines]	18	hardened	Hardened: pre/post collection count verified on ax_ext; prior identity-only admitted return-without-draw.	<pending>
+tests/test_plotting.py::TestVectorPlots::test_custom_axes[quiver]	18	hardened	Hardened: same — pre=0, post>=1 collection count on supplied axes.	<pending>
+tests/test_plotting.py::TestVectorPlots::test_uniform_color[streamlines]	18	hardened	Hardened: pinned no colorbar axes in uniform-color mode (len(fig.axes)==1); prior isinstance-only admitted silent colormap fallback.	<pending>
+tests/test_plotting.py::TestVectorPlots::test_uniform_color[quiver]	18	hardened	Hardened: same — uniform-color path must skip colorbar axes.	<pending>
+tests/test_plotting.py::TestVectorPlots::test_auto_legend[streamlines]	18	kept	color='black' adds a vector legend overlay (AnchoredOffsetbox). Pins uniform-color legend contract.	<pending>
+tests/test_plotting.py::TestVectorPlots::test_auto_legend[quiver]	18	kept	Same contract as streamlines: uniform color auto-emits overlay.	<pending>
+tests/test_plotting.py::TestVectorPlots::test_legend_false_disables	18	kept	legend=False suppresses the overlay legend. Pins disabled-legend state.	<pending>
+tests/test_plotting.py::TestVectorPlots::test_options[stream-color_field]	18	hardened	Hardened: options test now pins collection count and alpha kwarg; isinstance-only admitted silent kwarg drops.	<pending>
+tests/test_plotting.py::TestVectorPlots::test_options[stream-dark]	18	hardened	Hardened: same per-option assertion pattern applies across parametrize cases.	<pending>
+tests/test_plotting.py::TestVectorPlots::test_options[stream-no-cb]	18	hardened	Hardened: colorbar=False pins len(fig.axes)==1; prior isinstance-only admitted colorbar-added-anyway regression.	<pending>
+tests/test_plotting.py::TestVectorPlots::test_options[stream-alpha]	18	hardened	Hardened: alpha kwarg pins ax.collections[0].get_alpha(); prior isinstance-only admitted alpha=1 regression.	<pending>
+tests/test_plotting.py::TestVectorPlots::test_options[stream-transparent]	18	hardened	Hardened: shared options-block collection count and alpha check; parametrized over extremes mode.	<pending>
+tests/test_plotting.py::TestVectorPlots::test_options[stream-semi]	18	hardened	Hardened: same as stream-transparent parametrize case.	<pending>
+tests/test_plotting.py::TestVectorPlots::test_options[stream-none]	18	hardened	Hardened: same as stream-transparent parametrize case.	<pending>
+tests/test_plotting.py::TestVectorPlots::test_options[quiver-stride]	18	hardened	Hardened: same — collection presence and per-option assertion block.	<pending>
+tests/test_plotting.py::TestVectorPlots::test_options[quiver-stride-tuple]	18	hardened	Hardened: same — collection presence and per-option assertion block.	<pending>
+tests/test_plotting.py::TestVectorPlots::test_options[quiver-dark]	18	hardened	Hardened: same — dark theme produces a Quiver collection.	<pending>
+tests/test_plotting.py::TestVectorPlots::test_options[quiver-no-cb]	18	hardened	Hardened: colorbar=False pins len(fig.axes)==1 for quiver.	<pending>
+tests/test_plotting.py::TestVectorPlots::test_options[quiver-transparent]	18	hardened	Hardened: shared options-block collection count check.	<pending>
+tests/test_plotting.py::TestVectorPlots::test_options[quiver-semi]	18	hardened	Hardened: same as quiver-transparent parametrize case.	<pending>
+tests/test_plotting.py::TestVectorPlots::test_options[quiver-none]	18	hardened	Hardened: same as quiver-transparent parametrize case.	<pending>
+tests/test_plotting.py::TestStatusBadge::test_format_status_text[step]	18	kept	Format 'step 42' exact match. Pins default step formatting.	<pending>
+tests/test_plotting.py::TestStatusBadge::test_format_status_text[time]	18	kept	Format 't = 3.14' exact match. Pins default time formatting.	<pending>
+tests/test_plotting.py::TestStatusBadge::test_format_status_text[both]	18	kept	step+time combined formatting 'step 42, t = 3.14'. Pins comma-separated composition.	<pending>
+tests/test_plotting.py::TestStatusBadge::test_format_status_text[custom-label]	18	kept	label='cycle' overrides 'step'. Pins label-prefix customization.	<pending>
+tests/test_plotting.py::TestStatusBadge::test_format_status_text[empty-label]	18	kept	label='' suppresses prefix entirely. Pins empty-string sentinel.	<pending>
+tests/test_plotting.py::TestStatusBadge::test_format_status_text[with-max]	18	kept	step_range=(0,500) yields 'step 100 / 500' progress format. Pins range-aware rendering.	<pending>
+tests/test_plotting.py::TestStatusBadge::test_format_status_text[no-max]	18	kept	show_max=False suppresses '/ 500' suffix. Pins explicit-disable path.	<pending>
+tests/test_plotting.py::TestStatusBadge::test_format_status_text[time-units]	18	kept	time=0.005 with time_units='ns' → 't = 5.00e-03 ns'. Pins scientific formatting + unit appending.	<pending>
+tests/test_plotting.py::TestStatusBadge::test_no_content_raises	18	kept	No step/time/text raises ValueError. Pins the 'provide at least one thing' invariant.	<pending>
+tests/test_plotting.py::TestStatusBadge::test_custom_text	18	kept	Custom text 'Harris sheet' appears as a badge artist. Pins free-form text path.	<pending>
+tests/test_plotting.py::TestStatusBadge::test_time_as_string	18	kept	time='13:34' (string, not float) renders verbatim. Pins clock-string pass-through.	<pending>
+tests/test_plotting.py::TestStatusBadge::test_custom_text_with_progress	18	kept	Custom text + progress=0.7 combine. Pins progress bar on free-form-text badges.	<pending>
+tests/test_plotting.py::TestStatusBadge::test_cycle_label	18	kept	label='Cycle' yields 'Cycle 102312' exactly. Pins capitalized-prefix formatting.	<pending>
+tests/test_plotting.py::TestStatusBadge::test_custom_bg_color	18	kept	Badge bg RGBA pinned to requested 'red' + 0.5 alpha. Pins color override contract.	<pending>
+tests/test_plotting.py::TestStatusBadge::test_badge_renders_on_axes	18	kept	Badge artist appears in ax.artists after plot_field_slice. Pins add_badge registers artist.	<pending>
+tests/test_plotting.py::TestOverlayVariant::test_default_uses_theme_color	18	hardened	Hardened: tightened alpha bound to strict < 1 and added RGB ∈ [0,1] range assertion; prior 0<alpha<=1 admitted unclamped colors.	<pending>
+tests/test_plotting.py::TestOverlayVariant::test_alt_variant_returns_alt_colors	18	hardened	Hardened: required any of (bg, fg, alpha) differ from default; prior OR on two fields admitted full-attribute degeneracy.	<pending>
+tests/test_plotting.py::TestOverlayVariant::test_returns_three_values	18	kept	_detect_overlay_defaults returns (RGB, RGB, float). Pins the tuple shape contract.	<pending>
+tests/test_plotting.py::TestInsetColorbar::test_returns_colorbar	18	kept	add_inset_colorbar returns a matplotlib.colorbar.Colorbar instance. Pins return type.	<pending>
+tests/test_plotting.py::TestInsetColorbar::test_all_locs[upper left]	18	hardened	Hardened: pinned ax.child_axes grows by 1; prior cb-not-None was a function-signature tautology. Parametrized across locs.	<pending>
+tests/test_plotting.py::TestInsetColorbar::test_all_locs[upper right]	18	hardened	Hardened: same child_axes growth check.	<pending>
+tests/test_plotting.py::TestInsetColorbar::test_all_locs[lower left]	18	hardened	Hardened: same child_axes growth check.	<pending>
+tests/test_plotting.py::TestInsetColorbar::test_all_locs[lower right]	18	hardened	Hardened: same child_axes growth check.	<pending>
+tests/test_plotting.py::TestInsetColorbar::test_all_locs[upper center]	18	hardened	Hardened: same child_axes growth check.	<pending>
+tests/test_plotting.py::TestInsetColorbar::test_via_plot_functions[slice]	18	hardened	Hardened: pinned len(fig.axes)==1 and len(ax.child_axes)==1; isinstance-only admitted silent sibling-colorbar fallback.	<pending>
+tests/test_plotting.py::TestInsetColorbar::test_via_plot_functions[streamlines]	18	hardened	Hardened: same inset-invariant check for streamline path.	<pending>
+tests/test_plotting.py::TestInsetColorbar::test_via_plot_functions[quiver]	18	hardened	Hardened: same inset-invariant check for quiver path.	<pending>
+tests/test_plotting.py::TestVectorLegend::test_single_entry	18	kept	Single LegendEntry appended as ax.artists member. Pins single-entry render path.	<pending>
+tests/test_plotting.py::TestVectorLegend::test_multiple_entries	18	kept	Two entries render in same AnchoredOffsetbox. Pins multi-entry composition.	<pending>
+tests/test_plotting.py::TestPanelLabel::test_returns_anchored_offsetbox	18	kept	add_label returns AnchoredOffsetbox and registers it on ax. Pins return type and side effect.	<pending>
+tests/test_plotting.py::TestPanelLabel::test_all_locs[upper left]	18	kept	Each loc string places an AnchoredOffsetbox on ax. Parametrized coverage of all valid loc values.	<pending>
+tests/test_plotting.py::TestPanelLabel::test_all_locs[upper right]	18	kept	Same as upper left — parametrized loc coverage.	<pending>
+tests/test_plotting.py::TestPanelLabel::test_all_locs[lower left]	18	kept	Same as upper left — parametrized loc coverage.	<pending>
+tests/test_plotting.py::TestPanelLabel::test_all_locs[lower right]	18	kept	Same as upper left — parametrized loc coverage.	<pending>
+tests/test_plotting.py::TestPanelLabel::test_all_locs[upper center]	18	kept	Same as upper left — parametrized loc coverage.	<pending>
+tests/test_plotting.py::TestAddContours::test_basic_contour	18	hardened	Hardened: pinned ax.collections grew after add_contours and cs.levels has >=3 entries; prior cs-not-None was tautological.	<pending>
+tests/test_plotting.py::TestAddContours::test_contour_with_labels	18	hardened	Hardened: added cs.labelTexts > 0 assertion; prior body had no assertion at all.	<pending>
+tests/test_plotting.py::TestLogScale::test_log_scale_positive_field	18	hardened	Hardened: pinned ax.collections[0].norm is LogNorm; isinstance-only admitted silently-linear regression.	<pending>
+tests/test_plotting.py::TestComposedFieldAndVectors::test_slice_then_streamlines	18	hardened	Hardened: pinned QuadMesh + LineCollection collection types in order; isinstance-only admitted silent replacements.	<pending>
+tests/test_plotting.py::TestComposedFieldAndVectors::test_slice_then_quiver	18	hardened	Hardened: pinned QuadMesh + Quiver collection types.	<pending>
+tests/test_plotting.py::TestComposedFieldAndVectors::test_shared_axes	18	hardened	Hardened: pinned exactly 2 collections on the externally supplied axes alongside identity check.	<pending>
+tests/test_plotting.py::TestPlotFieldGrid::test_basic_grid	18	hardened	Hardened: every panel pinned to have a drawn collection; prior count-only admitted N empty axes.	<pending>
+tests/test_plotting.py::TestPlotFieldGrid::test_single_field	18	hardened	Hardened: added len(collections)==1 invariant.	<pending>
+tests/test_plotting.py::TestPlotFieldGrid::test_panel_labels_disabled	18	hardened	Hardened: scanned every panel for AnchoredOffsetbox absence; prior body had no assertion.	<pending>
+tests/test_plotting.py::TestPlotCrossSection::test_basic	18	hardened	Hardened: pinned 2D panel has exactly one collection and 1D panel has >=1 line.	<pending>
+tests/test_plotting.py::TestPlotCrossSection::test_custom_cut_index	18	hardened	Hardened: pinned 1D line ydata == B1[2, :] at cut_axis='y', cut_index=2; prior body had no assertion.	<pending>
+tests/test_plotting.py::TestPlotCrossSection::test_invalid_cut_axis_rejects	18	kept	Invalid cut_axis raises ValueError. Pins axis-name validation contract.	<pending>
+tests/test_plotting.py::TestComparisonShowError::test_show_error	18	hardened	Hardened: pinned diff panel has a text artist containing 'L_2'; isinstance-only admitted show_error=True silently dropped.	<pending>
+tests/test_plotting.py::TestPlotLines::test_basic	18	kept	plot_lines draws 3 lines and emits a legend. Pins multi-field contract (count + legend existence).	<pending>
 tests/test_plotting.py::TestPlotLines::test_custom_labels	0	not-yet-reviewed		
 tests/test_plotting.py::TestSetDefaultTheme::test_set_and_get	0	not-yet-reviewed		
 tests/test_plotting.py::TestSetDefaultTheme::test_badge_on_slice	0	not-yet-reviewed		

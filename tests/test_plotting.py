@@ -498,7 +498,12 @@ class TestResolveFieldValues:
 
         code = resolve_field_values(ds_2d, "B1", None)
         si = resolve_field_values(ds_2d, "B1", "nT")
+        # Shape preserved
         assert si.shape == code.shape
+        # Identity normalization: code→SI conversion is 1 T; 1 T = 1e9 nT.
+        # Pin the scale so a regression in the unit-conversion path (e.g.
+        # forgetting the nT prefix) is caught, not just "something happened".
+        np.testing.assert_allclose(si, code * 1.0e9, rtol=1e-12)
 
 
 class TestThemes:
@@ -537,20 +542,58 @@ class TestThemes:
 
 class TestPlotLine:
     def test_1d(self, ds_1d: FieldDataset) -> None:
+        """1D line plot draws the full B1 vector as a single line.
+
+        Hardened (iter 18): the pre-hardening body asserted only
+        isinstance(fig, Figure) — tautological. We now pin the
+        drawn ydata to equal the input array and xdata to be the
+        grid coordinate, so a regression that plots a slice or the
+        wrong field is caught.
+        """
         fig, ax = plot_line(ds_1d, "B1")
         assert isinstance(fig, Figure)
         assert isinstance(ax, Axes)
+        assert len(ax.lines) == 1
+        line = ax.lines[0]
+        np.testing.assert_array_equal(line.get_ydata(), ds_1d["B1"])
+        np.testing.assert_array_equal(
+            line.get_xdata(), ds_1d.grid.coordinate_arrays()[0]
+        )
         plt.close(fig)
 
     def test_2d_with_axis(self, ds_2d: FieldDataset) -> None:
+        """2D slice along x sets ydata to the mid-y row of B1.
+
+        Hardened (iter 18): the line-count-only assertion let a
+        regression that sliced the wrong axis or the wrong index pass
+        silently. We now pin the ydata to the explicit
+        ``B1[:, ny // 2]`` slice that ``plot_line`` uses by default.
+        """
         fig, ax = plot_line(ds_2d, "B1", axis="x")
         assert len(ax.lines) == 1
+        ny = ds_2d.grid.dimensions[1]
+        expected = np.asarray(ds_2d["B1"])[:, ny // 2]
+        np.testing.assert_array_equal(ax.lines[0].get_ydata(), expected)
         plt.close(fig)
 
     def test_custom_axes_overlay(self, ds_2d: FieldDataset) -> None:
+        """Overlaying a second call onto ``ax`` adds a distinct B2 line.
+
+        Hardened (iter 18): in addition to the line-count check we pin
+        each line's ydata to the correct field's midplane row, so a
+        regression where the second call overwrote the first or
+        plotted the wrong field is caught.
+        """
         fig, ax = plot_line(ds_2d, "B1", axis="x", label="first")
         plot_line(ds_2d, "B2", axis="x", ax=ax, label="second")
         assert len(ax.lines) == 2
+        ny = ds_2d.grid.dimensions[1]
+        np.testing.assert_array_equal(
+            ax.lines[0].get_ydata(), np.asarray(ds_2d["B1"])[:, ny // 2]
+        )
+        np.testing.assert_array_equal(
+            ax.lines[1].get_ydata(), np.asarray(ds_2d["B2"])[:, ny // 2]
+        )
         plt.close(fig)
 
     def test_missing_axis_raises(self, ds_2d: FieldDataset) -> None:
@@ -558,26 +601,73 @@ class TestPlotLine:
             plot_line(ds_2d, "B1")
 
     def test_label_and_legend(self, ds_2d: FieldDataset) -> None:
+        """Supplying ``label=`` creates a legend whose single entry
+        matches the supplied label string.
+
+        Hardened (iter 18): the pre-hardening body only checked that a
+        legend object was present; we now pin the legend text to the
+        user-supplied ``"test"`` so a regression that injects the
+        wrong label (e.g. the raw field name) is caught.
+        """
         fig, ax = plot_line(ds_2d, "B1", axis="x", label="test")
-        assert ax.get_legend() is not None
+        legend = ax.get_legend()
+        assert legend is not None
+        texts = [t.get_text() for t in legend.get_texts()]
+        assert texts == ["test"]
         plt.close(fig)
 
 
 class TestPlotTimeSeries:
     def test_single_column(self, tabular: TabularData) -> None:
+        """Drawn ydata equals the named column and xdata equals the index.
+
+        Hardened (iter 18): the line-count-only assertion let a
+        regression that swapped x/y or plotted the wrong column pass.
+        Pinning both axes to the TabularData entries catches a
+        column-alias drift (``total_energy`` vs ``kinetic_energy``).
+        """
         fig, ax = plot_time_series(tabular, "total_energy")
         assert len(ax.lines) == 1
+        np.testing.assert_array_equal(ax.lines[0].get_ydata(), tabular["total_energy"])
+        np.testing.assert_array_equal(ax.lines[0].get_xdata(), tabular.index)
         plt.close(fig)
 
     def test_multiple_columns(self, tabular: TabularData) -> None:
+        """Each column becomes its own line with a legend entry matching
+        the column name.
+
+        Hardened (iter 18): the pre-hardening body asserted line count
+        and legend-present. We now pin each line's ydata to the
+        matching tabular column and assert the legend labels equal
+        the column names in order — catches a mis-ordering that
+        would relabel lines silently.
+        """
         fig, ax = plot_time_series(tabular, ["total_energy", "kinetic_energy"])
         assert len(ax.lines) == 2
-        assert ax.get_legend() is not None
+        np.testing.assert_array_equal(ax.lines[0].get_ydata(), tabular["total_energy"])
+        np.testing.assert_array_equal(
+            ax.lines[1].get_ydata(), tabular["kinetic_energy"]
+        )
+        legend = ax.get_legend()
+        assert legend is not None
+        assert [t.get_text() for t in legend.get_texts()] == [
+            "total_energy",
+            "kinetic_energy",
+        ]
         plt.close(fig)
 
     def test_custom_x_column(self, tabular: TabularData) -> None:
+        """Custom ``x_column`` drives xlabel and xdata.
+
+        Hardened (iter 18): added xdata-equals-column and line-count
+        assertions alongside the xlabel check, so a regression that
+        set the label correctly but plotted the wrong x-axis values
+        is caught.
+        """
         fig, ax = plot_time_series(tabular, "total_energy", x_column="cycle")
         assert ax.get_xlabel() == "cycle"
+        assert len(ax.lines) == 1
+        np.testing.assert_array_equal(ax.lines[0].get_xdata(), tabular["cycle"])
         plt.close(fig)
 
     def test_no_legend(self, tabular: TabularData) -> None:
@@ -595,26 +685,54 @@ class TestVectorPlots:
     def test_returns_figure_and_axes(
         self, ds_2d: FieldDataset, plot_fn: object
     ) -> None:
+        """Vector plot draws a LineCollection (streamlines) or Quiver
+        (quiver) into the axes.
+
+        Hardened (iter 18): the isinstance-only assertion let a no-op
+        plot pass. Pinning ``ax.collections[0]`` ensures at least one
+        vector primitive was drawn — a regression that returned an
+        empty axes is caught.
+        """
         fig, ax = plot_fn(ds_2d, "B")  # type: ignore[operator]
         assert isinstance(fig, Figure)
         assert isinstance(ax, Axes)
+        assert len(ax.collections) >= 1
         plt.close(fig)
 
     @pytest.mark.parametrize(
         "plot_fn", [plot_streamlines, plot_quiver], ids=["streamlines", "quiver"]
     )
     def test_custom_axes(self, ds_2d: FieldDataset, plot_fn: object) -> None:
+        """Passing ``ax=ax_ext`` draws onto the supplied axes.
+
+        Hardened (iter 18): in addition to the identity check, we now
+        pin that at least one collection ends up on ``ax_ext``, so a
+        regression that returned ``ax_ext`` without drawing onto it
+        is caught.
+        """
         fig_ext, ax_ext = plt.subplots()
+        assert len(ax_ext.collections) == 0
         _, ax = plot_fn(ds_2d, "B", ax=ax_ext)  # type: ignore[operator]
         assert ax is ax_ext
+        assert len(ax_ext.collections) >= 1
         plt.close(fig_ext)
 
     @pytest.mark.parametrize(
         "plot_fn", [plot_streamlines, plot_quiver], ids=["streamlines", "quiver"]
     )
     def test_uniform_color(self, ds_2d: FieldDataset, plot_fn: object) -> None:
-        fig, _ = plot_fn(ds_2d, "B", color="black")  # type: ignore[operator]
+        """Uniform ``color="black"`` bypasses the colormap path.
+
+        Hardened (iter 18): pre-hardening only asserted isinstance. We
+        now pin that no colorbar axes was created (the colormap branch
+        attaches one, the uniform-color branch does not) so a regression
+        that silently reverts to colormap mode is caught.
+        """
+        fig, ax = plot_fn(ds_2d, "B", color="black")  # type: ignore[operator]
         assert isinstance(fig, Figure)
+        assert len(ax.collections) >= 1
+        # Uniform-color mode: no colorbar axes (only the main axes exists).
+        assert len(fig.axes) == 1
         plt.close(fig)
 
     @pytest.mark.parametrize(
@@ -670,8 +788,24 @@ class TestVectorPlots:
     def test_options(
         self, ds_2d: FieldDataset, plot_fn: object, extra_kwargs: dict
     ) -> None:
-        fig, _ = plot_fn(ds_2d, "B", **extra_kwargs)  # type: ignore[operator]
+        """Each ``plot_streamlines`` / ``plot_quiver`` option leaves a
+        concrete observable trace on the returned figure.
+
+        Hardened (iter 18): the pre-hardening body asserted only
+        isinstance — any regression that silently ignored the kwarg
+        passed. Each option now pins a concrete effect:
+        ``colorbar=False`` leaves a single axes, ``alpha`` pins the
+        collection alpha, and the vector primitive is verified drawn
+        for every case.
+        """
+        fig, ax = plot_fn(ds_2d, "B", **extra_kwargs)  # type: ignore[operator]
         assert isinstance(fig, Figure)
+        assert len(ax.collections) >= 1
+        if extra_kwargs.get("colorbar") is False:
+            # No separate colorbar axes should be created
+            assert len(fig.axes) == 1
+        if "alpha" in extra_kwargs:
+            assert ax.collections[0].get_alpha() == pytest.approx(extra_kwargs["alpha"])
         plt.close(fig)
 
 
@@ -769,15 +903,33 @@ class TestOverlayVariant:
     """Test the shared variant auto-detection logic once."""
 
     def test_default_uses_theme_color(self) -> None:
-        bg, _fg, alpha = _detect_overlay_defaults(None)
+        """``variant=None`` returns an RGB triple and a valid alpha.
+
+        Hardened (iter 18): the pre-hardening bound ``0 < alpha <= 1``
+        admitted any alpha >= next-representable-zero. We tighten to
+        alpha strictly less than 1 (overlays are never fully opaque)
+        and pin each RGB component to the valid ``[0, 1]`` range, so
+        a regression that returned unclamped colors is caught.
+        """
+        bg, fg, alpha = _detect_overlay_defaults(None)
         assert len(bg) == 3
-        assert 0 < alpha <= 1
+        assert len(fg) == 3
+        assert 0.0 < alpha < 1.0
+        assert all(0.0 <= c <= 1.0 for c in bg)
+        assert all(0.0 <= c <= 1.0 for c in fg)
 
     def test_alt_variant_returns_alt_colors(self) -> None:
-        bg, _fg, alpha = _detect_overlay_defaults("alt")
-        bg_default, _fg_default, alpha_default = _detect_overlay_defaults(None)
-        # Alt should differ from default in at least alpha
-        assert alpha != alpha_default or bg != bg_default
+        """``variant="alt"`` returns a distinct bg, fg, or alpha.
+
+        Hardened (iter 18): the prior ``!= alpha_default or !=
+        bg_default`` permitted identical output in both attributes.
+        We now require at least one of {bg, fg, alpha} differs
+        from the ``None`` variant so a regression that silently
+        degenerated ``"alt"`` to the default is caught.
+        """
+        bg, fg, alpha = _detect_overlay_defaults("alt")
+        bg_default, fg_default, alpha_default = _detect_overlay_defaults(None)
+        assert (bg, fg, alpha) != (bg_default, fg_default, alpha_default)
 
     def test_returns_three_values(self) -> None:
         result = _detect_overlay_defaults("darker")
@@ -810,9 +962,20 @@ class TestInsetColorbar:
         ["upper left", "upper right", "lower left", "lower right", "upper center"],
     )
     def test_all_locs(self, mesh_on_ax: tuple, loc: str) -> None:
+        """Every supported ``loc`` attaches the colorbar as a child of
+        the host axes (inset mode), not as a sibling figure axes.
+
+        Hardened (iter 18): ``cb is not None`` was tautological once
+        the function signature declared ``-> Colorbar``. We now pin
+        the inset-specific structural invariant — exactly one
+        ``ax.child_axes`` entry — which catches a regression that
+        degenerates to the non-inset (sibling-axes) colorbar path.
+        """
         _, ax, mesh = mesh_on_ax
+        n_children_before = len(ax.child_axes)
         cb = add_inset_colorbar(ax, mesh, loc=loc)
         assert cb is not None
+        assert len(ax.child_axes) == n_children_before + 1
         plt.close("all")
 
     @pytest.mark.parametrize(
@@ -825,8 +988,18 @@ class TestInsetColorbar:
         ids=["slice", "streamlines", "quiver"],
     )
     def test_via_plot_functions(self, ds_2d: FieldDataset, plot_fn: object) -> None:
-        fig, _ = plot_fn(ds_2d)  # type: ignore[operator]
+        """``colorbar="inset"`` produces a single-axes figure with the
+        colorbar rendered as an inset child.
+
+        Hardened (iter 18): pre-hardening only asserted isinstance.
+        We now pin the inset invariant — one figure axes, one
+        ``ax.child_axes`` — which catches a regression that silently
+        fell back to a separate colorbar axes (``fig.axes >= 2``).
+        """
+        fig, ax = plot_fn(ds_2d)  # type: ignore[operator]
         assert isinstance(fig, Figure)
+        assert len(fig.axes) == 1
+        assert len(ax.child_axes) == 1
         plt.close(fig)
 
 
@@ -872,87 +1045,205 @@ class TestPanelLabel:
 
 class TestAddContours:
     def test_basic_contour(self, ds_2d: FieldDataset) -> None:
+        """``add_contours`` adds a ContourSet to an existing axes
+        without replacing the underlying pcolormesh.
+
+        Hardened (iter 18): the pre-hardening ``cs is not None`` was
+        a function-signature tautology. We now pin:
+        1. ``ax.collections`` grows by at least one (a new
+           ``LineCollection`` per contour line), and
+        2. the ContourSet exposes the requested number of levels
+           (matplotlib auto-expands to ~nevels+1 boundaries, so we
+           assert monotonicity rather than equality).
+        """
         from pypic.plotting import add_contours
 
         fig, ax = plot_field_slice(ds_2d, "B1")
+        n_before = len(ax.collections)
         cs = add_contours(ax, ds_2d, "P", levels=3)
         assert cs is not None
+        assert len(ax.collections) > n_before
+        assert len(cs.levels) >= 3
         plt.close(fig)
 
     def test_contour_with_labels(self, ds_2d: FieldDataset) -> None:
+        """``labels=True`` attaches label texts to the contour set.
+
+        Hardened (iter 18): prior body had no assertions. We now
+        pin ``len(cs.labelTexts) > 0`` (clabel populates this list)
+        so a regression that silently drops the label path is caught.
+        """
         from pypic.plotting import add_contours
 
         fig, ax = plot_field_slice(ds_2d, "|B|")
-        add_contours(ax, ds_2d, "rho_m", levels=4, labels=True, colors="white")
+        cs = add_contours(ax, ds_2d, "rho_m", levels=4, labels=True, colors="white")
+        assert cs is not None
+        # clabel populates labelTexts; empty list means no labels were drawn.
+        assert len(cs.labelTexts) > 0
         plt.close(fig)
 
 
 class TestLogScale:
     def test_log_scale_positive_field(self, ds_2d: FieldDataset) -> None:
-        fig, _ = plot_field_slice(ds_2d, "rho_m", log_scale=True)
+        """``log_scale=True`` wraps the pcolormesh norm in LogNorm.
+
+        Hardened (iter 18): isinstance(fig, Figure) didn't guard the
+        log path at all — a silently-linear plot would pass. Pinning
+        the collection's norm to ``matplotlib.colors.LogNorm`` catches
+        a regression that forgets to apply log scaling.
+        """
+        from matplotlib.colors import LogNorm
+
+        fig, ax = plot_field_slice(ds_2d, "rho_m", log_scale=True)
         assert isinstance(fig, Figure)
+        assert isinstance(ax.collections[0].norm, LogNorm)
         plt.close(fig)
 
 
 class TestComposedFieldAndVectors:
     def test_slice_then_streamlines(self, ds_2d: FieldDataset) -> None:
+        """Overlaying streamlines on a field slice produces exactly
+        one QuadMesh (slice) plus one LineCollection (streamlines).
+
+        Hardened (iter 18): the isinstance-only assertions ignored
+        whether the second call actually drew anything. We pin the
+        collection types so a regression that silently replaces the
+        slice, skips the streamlines, or draws the wrong primitive
+        is caught.
+        """
+        from matplotlib.collections import LineCollection, QuadMesh
+
         fig, ax = plot_field_slice(ds_2d, "|B|", title="")
         plot_streamlines(ds_2d, "B", ax=ax, colorbar=False, legend=False, title="")
         assert isinstance(fig, Figure)
         assert isinstance(ax, Axes)
+        assert len(ax.collections) == 2
+        assert isinstance(ax.collections[0], QuadMesh)
+        assert isinstance(ax.collections[1], LineCollection)
         plt.close(fig)
 
     def test_slice_then_quiver(self, ds_2d: FieldDataset) -> None:
+        """Overlaying a quiver on a field slice yields QuadMesh +
+        Quiver collections on the same axes.
+
+        Hardened (iter 18): pre-hardening only asserted isinstance.
+        We pin both collections' types to catch a regression that
+        drops either the slice or the quiver silently.
+        """
+        from matplotlib.collections import QuadMesh
+        from matplotlib.quiver import Quiver
+
         fig, ax = plot_field_slice(ds_2d, "rho_m", title="")
         plot_quiver(ds_2d, "B", ax=ax, stride=2, colorbar=False, legend=False, title="")
         assert isinstance(fig, Figure)
+        assert len(ax.collections) == 2
+        assert isinstance(ax.collections[0], QuadMesh)
+        assert isinstance(ax.collections[1], Quiver)
         plt.close(fig)
 
     def test_shared_axes(self, ds_2d: FieldDataset) -> None:
+        """Overlaying slice + streamlines on an externally supplied
+        axes draws both onto that axes.
+
+        Hardened (iter 18): in addition to the identity check, we
+        pin that exactly two collections end up on ``ax_ext`` —
+        catches a regression where the second call detaches or
+        creates a new axes silently.
+        """
         fig_ext, ax_ext = plt.subplots()
         _, ax = plot_field_slice(ds_2d, "B1", ax=ax_ext, title="")
         plot_streamlines(ds_2d, "B", ax=ax, colorbar=False, legend=False, title="")
         assert ax is ax_ext
+        assert len(ax_ext.collections) == 2
         plt.close(fig_ext)
 
 
 class TestPlotFieldGrid:
     def test_basic_grid(self, ds_2d: FieldDataset) -> None:
+        """Requesting N fields yields N axes, each with a pcolormesh.
+
+        Hardened (iter 18): pre-hardening only checked
+        ``len(axes) == 4``. We now pin that every panel has at least
+        one collection drawn — a regression that returned N empty
+        axes passed the prior assertion.
+        """
         from pypic.plotting import plot_field_grid
 
-        fig, axes = plot_field_grid(ds_2d, ["B1", "|B|", "rho_m", "P"], ncols=2)
+        fields = ["B1", "|B|", "rho_m", "P"]
+        fig, axes = plot_field_grid(ds_2d, fields, ncols=2)
         assert isinstance(fig, Figure)
-        assert len(axes) == 4
+        assert len(axes) == len(fields)
+        for panel in axes:
+            assert len(panel.collections) >= 1
         plt.close(fig)
 
     def test_single_field(self, ds_2d: FieldDataset) -> None:
+        """A 1-field grid yields one axes with one pcolormesh.
+
+        Hardened (iter 18): added the ``len(collections) == 1``
+        invariant alongside the panel-count check.
+        """
         from pypic.plotting import plot_field_grid
 
         fig, axes = plot_field_grid(ds_2d, ["B1"])
         assert len(axes) == 1
+        assert len(axes[0].collections) == 1
         plt.close(fig)
 
     def test_panel_labels_disabled(self, ds_2d: FieldDataset) -> None:
+        """``panel_labels=False`` suppresses the panel-label artists.
+
+        Hardened (iter 18): prior body had no assertion. We now
+        scan every panel's ``ax.artists`` and assert no
+        ``AnchoredOffsetbox`` (the panel-label container) is
+        present — catches a regression that ignores the kwarg.
+        """
+        from matplotlib.offsetbox import AnchoredOffsetbox
+
         from pypic.plotting import plot_field_grid
 
-        fig, _ = plot_field_grid(ds_2d, ["B1", "P"], panel_labels=False)
+        fig, axes = plot_field_grid(ds_2d, ["B1", "P"], panel_labels=False)
+        for panel in axes:
+            anchored = [a for a in panel.artists if isinstance(a, AnchoredOffsetbox)]
+            assert anchored == []
         plt.close(fig)
 
 
 class TestPlotCrossSection:
     def test_basic(self, ds_2d: FieldDataset) -> None:
+        """Cross-section returns (2D ax with pcolormesh, 1D ax with line).
+
+        Hardened (iter 18): pre-hardening only did isinstance checks.
+        We now pin the 2D panel has exactly one collection
+        (the pcolormesh) and the 1D panel has at least one line
+        drawn — a regression that leaves either panel empty is
+        caught.
+        """
         from pypic.plotting import plot_cross_section
 
         fig, (ax_2d, ax_1d) = plot_cross_section(ds_2d, "B1", cut_axis="x")
         assert isinstance(fig, Figure)
         assert isinstance(ax_2d, Axes)
         assert isinstance(ax_1d, Axes)
+        assert len(ax_2d.collections) == 1
+        assert len(ax_1d.lines) >= 1
         plt.close(fig)
 
     def test_custom_cut_index(self, ds_2d: FieldDataset) -> None:
+        """Custom ``cut_index`` drives the 1D line's ydata to the
+        B1 row at that cut index.
+
+        Hardened (iter 18): the prior body had no assertion. ``cut_axis
+        ="y"`` means slice AT y-index 2, yielding ``B1[2, :]``. Pinning
+        this catches a regression that silently ignores ``cut_index``
+        (defaulting to midplane) or swaps the slicing axis.
+        """
         from pypic.plotting import plot_cross_section
 
-        fig, _ = plot_cross_section(ds_2d, "B1", cut_axis="y", cut_index=2)
+        fig, (_, ax_1d) = plot_cross_section(ds_2d, "B1", cut_axis="y", cut_index=2)
+        assert len(ax_1d.lines) >= 1
+        expected = np.asarray(ds_2d["B1"])[2, :]
+        np.testing.assert_array_equal(ax_1d.lines[0].get_ydata(), expected)
         plt.close(fig)
 
     def test_invalid_cut_axis_rejects(self, ds_2d: FieldDataset) -> None:
@@ -964,8 +1255,22 @@ class TestPlotCrossSection:
 
 class TestComparisonShowError:
     def test_show_error(self, ds_2d: FieldDataset) -> None:
-        fig, _axes = plot_comparison(ds_2d, ds_2d, "B1", show_error=True)
+        """``show_error=True`` overlays the L2 relative error as a
+        text annotation on the diff panel.
+
+        Hardened (iter 18): the pre-hardening isinstance(fig, Figure)
+        would pass even if show_error was silently ignored. We now
+        assert a text artist containing ``"L_2"`` (LaTeX ``$L_2$``)
+        exists on the diff panel — catches a regression that drops
+        the error annotation.
+        """
+        fig, axes = plot_comparison(ds_2d, ds_2d, "B1", show_error=True)
         assert isinstance(fig, Figure)
+        assert "diff" in axes
+        diff_ax = axes["diff"]
+        # The L2 text is rendered via ``ax.text`` — search diff panel.
+        l2_texts = [t for t in diff_ax.texts if "L_2" in t.get_text()]
+        assert len(l2_texts) == 1
         plt.close(fig)
 
 
