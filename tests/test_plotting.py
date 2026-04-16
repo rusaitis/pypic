@@ -123,18 +123,34 @@ def tabular() -> TabularData:
 
 class TestPlotFieldSlice:
     def test_returns_figure_and_axes(self, ds_2d: FieldDataset) -> None:
+        """Plotted ``B1`` data equals the input field (transposed).
+
+        Hardened (iter 17): the pcolormesh-backed image is in
+        ``ax.collections[0]``; its ``get_array()`` carries the plotted
+        values with axes swapped relative to the input. Pinning the
+        array prevents silent regressions where the colorbar renders
+        but the wrong field (or wrong slice) is drawn.
+        """
         fig, ax = plot_field_slice(ds_2d, "B1")
         assert isinstance(fig, Figure)
         assert isinstance(ax, Axes)
+        # pcolormesh transposes (nx, ny) → (ny, nx) for display
+        plotted = np.asarray(ax.collections[0].get_array())
+        np.testing.assert_array_equal(plotted, ds_2d["B1"].T)
         plt.close(fig)
 
     def test_custom_axes(self, ds_2d: FieldDataset) -> None:
+        """``ax=`` reuses the caller's axes; no new figure is created."""
         fig_ext, ax_ext = plt.subplots()
-        _, ax = plot_field_slice(ds_2d, "B1", ax=ax_ext)
+        fig_ret, ax = plot_field_slice(ds_2d, "B1", ax=ax_ext)
         assert ax is ax_ext
+        assert fig_ret is fig_ext
+        # Drawing happened on the provided axes
+        assert len(ax_ext.collections) == 1
         plt.close(fig_ext)
 
     def test_custom_title_and_step(self, ds_2d: FieldDataset) -> None:
+        """Explicit ``title`` overrides the default; ``step`` is accepted."""
         fig, ax = plot_field_slice(ds_2d, "B1", title="Custom", step=42)
         assert ax.get_title() == "Custom"
         plt.close(fig)
@@ -156,36 +172,122 @@ class TestPlotFieldSlice:
         ],
     )
     def test_options(self, ds_2d: FieldDataset, kwargs: dict) -> None:
+        """Option kwargs leave observable traces on the resulting figure.
+
+        Hardened (iter 17): the pre-hardening assertion was
+        ``isinstance(fig, Figure)`` — a tautology that passes if
+        matplotlib doesn't crash. Each option now pins a concrete
+        visible effect: ``colorbar=False`` leaves a single axes,
+        ``colorbar='inset'`` adds a child axes, ``alpha`` pins the
+        collection alpha, ``units='nT'`` ends the colorbar label in
+        ``nT``, ``field='|B|'`` guarantees nonnegative plotted values,
+        and ``symmetric=False`` pins asymmetric vmin/vmax against
+        the default symmetric-about-zero diverging norm.
+        """
         field = kwargs.pop("field", "B1")
-        fig, _ = plot_field_slice(ds_2d, field, **kwargs)
+        option_id = next(
+            (
+                k
+                for k in (
+                    "colorbar",
+                    "units",
+                    "theme",
+                    "symmetric",
+                    "extremes",
+                    "alpha",
+                )
+                if k in kwargs
+            ),
+            "field",
+        )
+        fig, ax = plot_field_slice(ds_2d, field, **kwargs)
         assert isinstance(fig, Figure)
+        coll = ax.collections[0]
+
+        if field == "|B|":
+            plotted = np.asarray(coll.get_array())
+            assert plotted.min() >= 0.0, "magnitude field must be non-negative"
+        if option_id == "colorbar":
+            cb = kwargs["colorbar"]
+            if cb is False:
+                assert len(fig.axes) == 1  # no separate colorbar axes
+            elif cb == "inset":
+                # inset colorbar is attached as a child of ax, not a new axes
+                assert len(fig.axes) == 1
+                assert len(ax.child_axes) == 1
+        if option_id == "alpha":
+            assert coll.get_alpha() == pytest.approx(kwargs["alpha"])
+        if option_id == "units":
+            cax = [a for a in fig.axes if a is not ax]
+            # Colorbar label contains the supplied units token (e.g. '[nT]')
+            assert cax, "units-labeled plot must have a colorbar axes"
+            assert kwargs["units"] in cax[0].get_ylabel()
+        if option_id == "symmetric" and kwargs.get("symmetric") is False:
+            # Asymmetric data should NOT be forced to vmin = -vmax
+            norm = coll.norm
+            assert norm.vmin != pytest.approx(-norm.vmax)
         plt.close(fig)
 
     def test_3d_auto_and_explicit(self, ds_3d: FieldDataset) -> None:
-        fig1, _ = plot_field_slice(ds_3d, "B1")
-        fig2, _ = plot_field_slice(
+        """Explicit ``plane=`` selects the requested slice from a 3D dataset.
+
+        Hardened (iter 17): the pre-hardening body created two figures
+        and closed them with no assertions. The explicit slice at
+        ``x=3`` is pinned to the corresponding ``B2[3, :, :]`` plane
+        (transposed for pcolormesh). Prevents silent regressions where
+        plane-selection picks the wrong axis or the wrong index.
+        """
+        fig1, ax1 = plot_field_slice(ds_3d, "B1")
+        assert isinstance(fig1, Figure)
+        assert len(ax1.collections) == 1
+        fig2, ax2 = plot_field_slice(
             ds_3d, "B2", plane=PlaneSelection(normal="x", index=3)
         )
+        plotted = np.asarray(ax2.collections[0].get_array())
+        np.testing.assert_array_equal(plotted, ds_3d["B2"][3, :, :].T)
         plt.close(fig1)
         plt.close(fig2)
 
 
 class TestPlotComparison:
     def test_returns_figure_and_axes_dict(self, ds_2d: FieldDataset) -> None:
+        """Three-panel layout; diff panel vanishes for identical inputs.
+
+        Hardened (iter 17): when both inputs are the same dataset the
+        elementwise difference must be zero everywhere. The panel keys
+        were already pinned; we now also pin the numerical content of
+        the ``diff`` panel (guards against a regression where the diff
+        panel silently plots one of the inputs instead of ``a - b``).
+        """
         fig, axes = plot_comparison(ds_2d, ds_2d, "B1")
         assert isinstance(fig, Figure)
         assert set(axes) == {"a", "b", "diff"}
+        diff = np.asarray(axes["diff"].collections[0].get_array())
+        np.testing.assert_array_equal(diff, np.zeros_like(diff))
         plt.close(fig)
 
     def test_custom_labels(self, ds_2d: FieldDataset) -> None:
+        """``labels=`` sets the titles of the ``a`` and ``b`` panels."""
         fig, axes = plot_comparison(ds_2d, ds_2d, "B1", labels=("Run1", "Run2"))
         assert axes["a"].get_title() == "Run1"
         assert axes["b"].get_title() == "Run2"
         plt.close(fig)
 
     def test_3d_and_derived(self, ds_3d: FieldDataset) -> None:
-        fig, _ = plot_comparison(ds_3d, ds_3d, "|B|")
+        """3D + derived field (``|B|``) renders with non-negative panels.
+
+        Hardened (iter 17): was ``isinstance(fig, Figure)``. Now also
+        asserts the ``a`` and ``b`` panels carry non-negative data (as
+        required for a magnitude) and the diff panel has zero content.
+        """
+        fig, axes = plot_comparison(ds_3d, ds_3d, "|B|")
         assert isinstance(fig, Figure)
+        a_arr = np.asarray(axes["a"].collections[0].get_array())
+        b_arr = np.asarray(axes["b"].collections[0].get_array())
+        diff = np.asarray(axes["diff"].collections[0].get_array())
+        assert a_arr.min() >= 0.0
+        assert b_arr.min() >= 0.0
+        np.testing.assert_array_equal(diff, np.zeros_like(diff))
         plt.close(fig)
 
     @pytest.mark.parametrize(
@@ -201,8 +303,32 @@ class TestPlotComparison:
         ],
     )
     def test_options(self, ds_2d: FieldDataset, kwargs: dict) -> None:
-        fig, _ = plot_comparison(ds_2d, ds_2d, "B1", **kwargs)
+        """Option kwargs leave observable traces on the comparison figure.
+
+        Hardened (iter 17): pre-hardening body only asserted
+        ``isinstance(fig, Figure)``. Each option now pins a concrete
+        visible effect: ``colorbar=False`` yields 3 total axes (one
+        per panel, no colorbar); ``colorbar='inset'`` yields 3 total
+        axes plus 3 inset child axes; ``vmin/vmax`` pin the norm
+        limits on all three panels.
+        """
+        fig, axes = plot_comparison(ds_2d, ds_2d, "B1", **kwargs)
         assert isinstance(fig, Figure)
+        if "colorbar" in kwargs:
+            cb = kwargs["colorbar"]
+            if cb is False:
+                assert len(fig.axes) == 3  # panels only, no colorbars
+            elif cb == "inset":
+                assert len(fig.axes) == 3
+                assert sum(len(a.child_axes) for a in axes.values()) == 3
+        if "vmin" in kwargs:
+            for panel in ("a", "b"):
+                assert axes[panel].collections[0].norm.vmin == pytest.approx(
+                    kwargs["vmin"]
+                )
+                assert axes[panel].collections[0].norm.vmax == pytest.approx(
+                    kwargs["vmax"]
+                )
         plt.close(fig)
 
 

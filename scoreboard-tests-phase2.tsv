@@ -920,59 +920,59 @@ tests/test_openggcm_wrn2.py::TestDecompressFieldVectorized::test_single_chunk_ma
 tests/test_openggcm_wrn2.py::TestDecompressFieldVectorized::test_negative_values	16	kept	Vectorized decoder preserves sign-bit semantics (array_equal parity).	cba381f
 tests/test_openggcm_wrn2.py::TestDecompressFieldVectorized::test_multiple_chunks	16	kept	Multi-chunk parity with mixed literal-and-RLE chunks.	cba381f
 tests/test_openggcm_wrn2.py::TestDecompressFieldVectorized::test_mixed_literal_and_rle	16	kept	Mixed-encoding parity: 4-value line with all-literal checksum math.	cba381f
-tests/test_openggcm_wrn2.py::TestDecompressFieldVectorized::test_offset_into_buffer	0	not-yet-reviewed		
-tests/test_openggcm_wrn2.py::TestConvertFieldsPassthrough::test_unknown_fields_pass_through	0	not-yet-reviewed		
-tests/test_openggcm_wrn2.py::TestRealData::test_first_wrn2_block	0	not-yet-reviewed		
-tests/test_openggcm_wrn2.py::TestRealData::test_vectorized_matches_original_on_real_data	0	not-yet-reviewed		
-tests/test_operators.py::TestDivergenceCartesian::test_uniform_field_zero_divergence	0	not-yet-reviewed		
-tests/test_operators.py::TestDivergenceCartesian::test_linear_field_exact	0	not-yet-reviewed		
-tests/test_operators.py::TestDivergenceCartesian::test_div_curl_is_zero	0	not-yet-reviewed		
-tests/test_operators.py::TestDivergenceCartesian::test_nan_propagation	0	not-yet-reviewed		
-tests/test_operators.py::TestCurlCartesian::test_uniform_field_zero_curl	0	not-yet-reviewed		
-tests/test_operators.py::TestCurlCartesian::test_rigid_rotation	0	not-yet-reviewed		
-tests/test_operators.py::TestCurlCartesian::test_curl_grad_is_zero	0	not-yet-reviewed		
-tests/test_operators.py::TestCurlCartesian::test_nan_propagation	0	not-yet-reviewed		
-tests/test_operators.py::TestGradientCartesian::test_constant_field_zero_gradient	0	not-yet-reviewed		
-tests/test_operators.py::TestGradientCartesian::test_linear_field_exact	0	not-yet-reviewed		
-tests/test_operators.py::TestGradientCartesian::test_quadratic_field_interior	0	not-yet-reviewed		
-tests/test_operators.py::TestGradientCartesian::test_nan_propagation	0	not-yet-reviewed		
-tests/test_operators.py::TestConvergence::test_divergence_second_order	0	not-yet-reviewed		
-tests/test_operators.py::TestConvergence::test_curl_second_order	0	not-yet-reviewed		
-tests/test_operators.py::TestConvergence::test_gradient_second_order	0	not-yet-reviewed		
-tests/test_operators.py::TestAnisotropicSpacing::test_divergence_anisotropic	0	not-yet-reviewed		
-tests/test_operators.py::TestAnisotropicSpacing::test_gradient_anisotropic	0	not-yet-reviewed		
-tests/test_operators.py::TestAnisotropicSpacing::test_curl_anisotropic	0	not-yet-reviewed		
-tests/test_operators.py::TestNonCartesianNotImplemented::test_divergence_raises[spherical]	0	not-yet-reviewed		
-tests/test_operators.py::TestNonCartesianNotImplemented::test_divergence_raises[cylindrical]	0	not-yet-reviewed		
-tests/test_operators.py::TestNonCartesianNotImplemented::test_curl_raises[spherical]	0	not-yet-reviewed		
-tests/test_operators.py::TestNonCartesianNotImplemented::test_curl_raises[cylindrical]	0	not-yet-reviewed		
-tests/test_operators.py::TestNonCartesianNotImplemented::test_gradient_raises[spherical]	0	not-yet-reviewed		
-tests/test_operators.py::TestNonCartesianNotImplemented::test_gradient_raises[cylindrical]	0	not-yet-reviewed		
-tests/test_plotting.py::TestPlotFieldSlice::test_returns_figure_and_axes	0	not-yet-reviewed		
-tests/test_plotting.py::TestPlotFieldSlice::test_custom_axes	0	not-yet-reviewed		
-tests/test_plotting.py::TestPlotFieldSlice::test_custom_title_and_step	0	not-yet-reviewed		
-tests/test_plotting.py::TestPlotFieldSlice::test_options[derived]	0	not-yet-reviewed		
-tests/test_plotting.py::TestPlotFieldSlice::test_options[no-colorbar]	0	not-yet-reviewed		
-tests/test_plotting.py::TestPlotFieldSlice::test_options[inset-colorbar]	0	not-yet-reviewed		
-tests/test_plotting.py::TestPlotFieldSlice::test_options[units]	0	not-yet-reviewed		
-tests/test_plotting.py::TestPlotFieldSlice::test_options[dark-theme]	0	not-yet-reviewed		
-tests/test_plotting.py::TestPlotFieldSlice::test_options[symmetric-override]	0	not-yet-reviewed		
-tests/test_plotting.py::TestPlotFieldSlice::test_options[transparent-extremes]	0	not-yet-reviewed		
-tests/test_plotting.py::TestPlotFieldSlice::test_options[semi-extremes]	0	not-yet-reviewed		
-tests/test_plotting.py::TestPlotFieldSlice::test_options[darken-extremes]	0	not-yet-reviewed		
-tests/test_plotting.py::TestPlotFieldSlice::test_options[none-extremes]	0	not-yet-reviewed		
-tests/test_plotting.py::TestPlotFieldSlice::test_options[alpha]	0	not-yet-reviewed		
-tests/test_plotting.py::TestPlotFieldSlice::test_3d_auto_and_explicit	0	not-yet-reviewed		
-tests/test_plotting.py::TestPlotComparison::test_returns_figure_and_axes_dict	0	not-yet-reviewed		
-tests/test_plotting.py::TestPlotComparison::test_custom_labels	0	not-yet-reviewed		
-tests/test_plotting.py::TestPlotComparison::test_3d_and_derived	0	not-yet-reviewed		
-tests/test_plotting.py::TestPlotComparison::test_options[inset-colorbar]	0	not-yet-reviewed		
-tests/test_plotting.py::TestPlotComparison::test_options[no-colorbar]	0	not-yet-reviewed		
-tests/test_plotting.py::TestPlotComparison::test_options[transparent-extremes]	0	not-yet-reviewed		
-tests/test_plotting.py::TestPlotComparison::test_options[semi-extremes]	0	not-yet-reviewed		
-tests/test_plotting.py::TestPlotComparison::test_options[darken-extremes]	0	not-yet-reviewed		
-tests/test_plotting.py::TestPlotComparison::test_options[none-extremes]	0	not-yet-reviewed		
-tests/test_plotting.py::TestPlotComparison::test_options[custom-clim]	0	not-yet-reviewed		
+tests/test_openggcm_wrn2.py::TestDecompressFieldVectorized::test_offset_into_buffer	17	kept	Pins that decompress_field_vectorized honors buffer offsets — decoding (prefix + payload + trailer, offset=len(prefix)) equals decoding the payload alone; catches any reintroduction of a whole-buffer scan.	<pending>
+tests/test_openggcm_wrn2.py::TestConvertFieldsPassthrough::test_unknown_fields_pass_through	17	kept	Pins the field-map passthrough contract: known names (vx) rename to canonical (V1) while unknown names survive verbatim — catches over-filtering regressions that would silently drop custom fields.	<pending>
+tests/test_openggcm_wrn2.py::TestRealData::test_first_wrn2_block	17	kept	Integration guard against the real gc012.3df.006300 fixture; the vx range bounds (|min|<5000, max<2000 km/s) pin that the exponential+sign decode produces physical solar-wind/magnetotail values rather than arbitrary garbage.	<pending>
+tests/test_openggcm_wrn2.py::TestRealData::test_vectorized_matches_original_on_real_data	17	kept	Bit-exact cross-validation between the vectorized and line-by-line decoders on real data — the strongest guard against silent divergence in the fast path.	<pending>
+tests/test_operators.py::TestDivergenceCartesian::test_uniform_field_zero_divergence	17	kept	atol=1e-14 pins that constant-field divergence is exactly zero — catches a sign/stride bug where the stencil would leak non-zero machine values.	<pending>
+tests/test_operators.py::TestDivergenceCartesian::test_linear_field_exact	17	kept	F=(x,y,z) has div=3 exactly for central differences on any grid; rtol=1e-14 catches spacing-factor (1/dx wrong side) regressions.	<pending>
+tests/test_operators.py::TestDivergenceCartesian::test_div_curl_is_zero	17	kept	Vector identity div(curl A) = 0 (doc equations.md § 6) at atol=1e-10 on sinusoidal A; guards against any mismatched stencil between curl and divergence (e.g. forward vs central).	<pending>
+tests/test_operators.py::TestDivergenceCartesian::test_nan_propagation	17	kept	Pins NaN-propagation contract for np.gradient (conventions.md § NaN handling): any NaN in the input must contaminate the output — catches a regression to nan-aware internal reductions.	<pending>
+tests/test_operators.py::TestCurlCartesian::test_uniform_field_zero_curl	17	kept	atol=1e-14 pins exact-zero curl of a constant field — the cheapest canonical sanity point for any stencil rewrite.	<pending>
+tests/test_operators.py::TestCurlCartesian::test_rigid_rotation	17	kept	F=(-y, x, 0) has curl=(0,0,2) exactly for linear fields at rtol=1e-14; catches a component-swap bug in curl's (∂V2/∂x − ∂V1/∂y) term.	<pending>
+tests/test_operators.py::TestCurlCartesian::test_curl_grad_is_zero	17	kept	Vector identity curl(grad f) = 0 (equations.md § 6) on a non-trivial sin·cos·exp field at atol=1e-10 — catches mis-ordered partial derivatives.	<pending>
+tests/test_operators.py::TestCurlCartesian::test_nan_propagation	17	kept	NaN-propagation guard for curl (mirrors divergence NaN test).	<pending>
+tests/test_operators.py::TestGradientCartesian::test_constant_field_zero_gradient	17	kept	atol=1e-14 pins exact-zero gradient of a constant scalar field — canonical stencil sanity point.	<pending>
+tests/test_operators.py::TestGradientCartesian::test_linear_field_exact	17	kept	Gradient of 2x+3y+5z is (2,3,5) exactly at rtol=1e-14; catches per-axis spacing misapplication.	<pending>
+tests/test_operators.py::TestGradientCartesian::test_quadratic_field_interior	17	kept	Central differences are exact for quadratics in the interior (equations.md § 6 + conventions.md § Boundary treatment); interior-only slice with rtol=1e-14 guards against a regression to one-sided stencils everywhere.	<pending>
+tests/test_operators.py::TestGradientCartesian::test_nan_propagation	17	kept	NaN-propagation guard for gradient (mirrors divergence/curl NaN tests).	<pending>
+tests/test_operators.py::TestConvergence::test_divergence_second_order	17	hardened	Tightened Richardson ratio threshold from 3.5 to 3.9 (observed 3.98/3.99 at n=16,32,64). A first-order regression (ratio 2) still fails; the new bar rules out quieter degradations like partial one-sided-stencil contamination.	<pending>
+tests/test_operators.py::TestConvergence::test_curl_second_order	17	hardened	Tightened Richardson ratio threshold from 3.5 to 3.9 (observed ~3.98/3.99). Same rationale as divergence.	<pending>
+tests/test_operators.py::TestConvergence::test_gradient_second_order	17	hardened	Tightened Richardson ratio threshold from 3.5 to 3.9 (observed ~3.98/3.99). Same rationale as divergence.	<pending>
+tests/test_operators.py::TestAnisotropicSpacing::test_divergence_anisotropic	17	kept	F=(2x,3y,5z) with (dx,dy,dz)=(0.5,0.3,0.7) → div=10 exactly at rtol=1e-14 — pins that per-axis 1/dx normalization is correct, catching a regression that uses a single dx for all axes.	<pending>
+tests/test_operators.py::TestAnisotropicSpacing::test_gradient_anisotropic	17	kept	Mirrors the anisotropic divergence test for gradient; catches the same per-axis-spacing bug class.	<pending>
+tests/test_operators.py::TestAnisotropicSpacing::test_curl_anisotropic	17	kept	Mirrors the anisotropic divergence test for curl — rigid rotation at anisotropic spacing — catching per-axis spacing bugs in the cross-derivative terms.	<pending>
+tests/test_operators.py::TestNonCartesianNotImplemented::test_divergence_raises[spherical]	17	kept	Pins the NotImplementedError contract for non-Cartesian divergence (TASKS.md Step 31 deferred); match=geom.value guards against an accidental silent-pass in the geometry branch.	<pending>
+tests/test_operators.py::TestNonCartesianNotImplemented::test_divergence_raises[cylindrical]	17	kept	Same as [spherical] for cylindrical — the parametrize set is the documented coverage of non-Cartesian geometries that await implementation.	<pending>
+tests/test_operators.py::TestNonCartesianNotImplemented::test_curl_raises[spherical]	17	kept	NotImplementedError contract for spherical curl.	<pending>
+tests/test_operators.py::TestNonCartesianNotImplemented::test_curl_raises[cylindrical]	17	kept	NotImplementedError contract for cylindrical curl.	<pending>
+tests/test_operators.py::TestNonCartesianNotImplemented::test_gradient_raises[spherical]	17	kept	NotImplementedError contract for spherical gradient.	<pending>
+tests/test_operators.py::TestNonCartesianNotImplemented::test_gradient_raises[cylindrical]	17	kept	NotImplementedError contract for cylindrical gradient.	<pending>
+tests/test_plotting.py::TestPlotFieldSlice::test_returns_figure_and_axes	17	hardened	Added array-equality check: the pcolormesh QuadMesh's get_array() must equal ds_2d['B1'].T. Pre-hardening body was isinstance(fig,Figure) — a tautology — so a silent field-wrong regression would have passed.	<pending>
+tests/test_plotting.py::TestPlotFieldSlice::test_custom_axes	17	hardened	Added assertions that the returned fig is the caller's fig and that the caller's axes received exactly one QuadMesh collection; previously only checked ax identity — wouldn't catch a bug that silently created a new figure when both fig and ax were supplied.	<pending>
+tests/test_plotting.py::TestPlotFieldSlice::test_custom_title_and_step	17	kept	Pins that an explicit title= kwarg overrides the default title pipeline (otherwise quantity metadata + step would win); protects against a regression that would silently append the step to user titles.	<pending>
+tests/test_plotting.py::TestPlotFieldSlice::test_options[derived]	17	hardened	Pre-hardening body was isinstance(fig,Figure). Added per-option assertions: colorbar=False → 1 axes, colorbar='inset' → 1 ax + 1 child; alpha pins coll alpha; units token appears in cbar label; |B| pins non-negative plotted data; symmetric=False pins asymmetric vmin≠-vmax. Different parametrize ids now actually test different behaviors.	<pending>
+tests/test_plotting.py::TestPlotFieldSlice::test_options[no-colorbar]	17	hardened	Pre-hardening body was isinstance(fig,Figure). Added per-option assertions: colorbar=False → 1 axes, colorbar='inset' → 1 ax + 1 child; alpha pins coll alpha; units token appears in cbar label; |B| pins non-negative plotted data; symmetric=False pins asymmetric vmin≠-vmax. Different parametrize ids now actually test different behaviors.	<pending>
+tests/test_plotting.py::TestPlotFieldSlice::test_options[inset-colorbar]	17	hardened	Pre-hardening body was isinstance(fig,Figure). Added per-option assertions: colorbar=False → 1 axes, colorbar='inset' → 1 ax + 1 child; alpha pins coll alpha; units token appears in cbar label; |B| pins non-negative plotted data; symmetric=False pins asymmetric vmin≠-vmax. Different parametrize ids now actually test different behaviors.	<pending>
+tests/test_plotting.py::TestPlotFieldSlice::test_options[units]	17	hardened	Pre-hardening body was isinstance(fig,Figure). Added per-option assertions: colorbar=False → 1 axes, colorbar='inset' → 1 ax + 1 child; alpha pins coll alpha; units token appears in cbar label; |B| pins non-negative plotted data; symmetric=False pins asymmetric vmin≠-vmax. Different parametrize ids now actually test different behaviors.	<pending>
+tests/test_plotting.py::TestPlotFieldSlice::test_options[dark-theme]	17	hardened	Pre-hardening body was isinstance(fig,Figure). Added per-option assertions: colorbar=False → 1 axes, colorbar='inset' → 1 ax + 1 child; alpha pins coll alpha; units token appears in cbar label; |B| pins non-negative plotted data; symmetric=False pins asymmetric vmin≠-vmax. Different parametrize ids now actually test different behaviors.	<pending>
+tests/test_plotting.py::TestPlotFieldSlice::test_options[symmetric-override]	17	hardened	Pre-hardening body was isinstance(fig,Figure). Added per-option assertions: colorbar=False → 1 axes, colorbar='inset' → 1 ax + 1 child; alpha pins coll alpha; units token appears in cbar label; |B| pins non-negative plotted data; symmetric=False pins asymmetric vmin≠-vmax. Different parametrize ids now actually test different behaviors.	<pending>
+tests/test_plotting.py::TestPlotFieldSlice::test_options[transparent-extremes]	17	hardened	Pre-hardening body was isinstance(fig,Figure). Added per-option assertions: colorbar=False → 1 axes, colorbar='inset' → 1 ax + 1 child; alpha pins coll alpha; units token appears in cbar label; |B| pins non-negative plotted data; symmetric=False pins asymmetric vmin≠-vmax. Different parametrize ids now actually test different behaviors.	<pending>
+tests/test_plotting.py::TestPlotFieldSlice::test_options[semi-extremes]	17	hardened	Pre-hardening body was isinstance(fig,Figure). Added per-option assertions: colorbar=False → 1 axes, colorbar='inset' → 1 ax + 1 child; alpha pins coll alpha; units token appears in cbar label; |B| pins non-negative plotted data; symmetric=False pins asymmetric vmin≠-vmax. Different parametrize ids now actually test different behaviors.	<pending>
+tests/test_plotting.py::TestPlotFieldSlice::test_options[darken-extremes]	17	hardened	Pre-hardening body was isinstance(fig,Figure). Added per-option assertions: colorbar=False → 1 axes, colorbar='inset' → 1 ax + 1 child; alpha pins coll alpha; units token appears in cbar label; |B| pins non-negative plotted data; symmetric=False pins asymmetric vmin≠-vmax. Different parametrize ids now actually test different behaviors.	<pending>
+tests/test_plotting.py::TestPlotFieldSlice::test_options[none-extremes]	17	hardened	Pre-hardening body was isinstance(fig,Figure). Added per-option assertions: colorbar=False → 1 axes, colorbar='inset' → 1 ax + 1 child; alpha pins coll alpha; units token appears in cbar label; |B| pins non-negative plotted data; symmetric=False pins asymmetric vmin≠-vmax. Different parametrize ids now actually test different behaviors.	<pending>
+tests/test_plotting.py::TestPlotFieldSlice::test_options[alpha]	17	hardened	Pre-hardening body was isinstance(fig,Figure). Added per-option assertions: colorbar=False → 1 axes, colorbar='inset' → 1 ax + 1 child; alpha pins coll alpha; units token appears in cbar label; |B| pins non-negative plotted data; symmetric=False pins asymmetric vmin≠-vmax. Different parametrize ids now actually test different behaviors.	<pending>
+tests/test_plotting.py::TestPlotFieldSlice::test_3d_auto_and_explicit	17	hardened	Pre-hardening body created two figures and closed them with zero assertions. Now pins that PlaneSelection(normal='x', index=3) plots ds_3d['B2'][3,:,:].T — catches plane/axis misinterpretation regressions.	<pending>
+tests/test_plotting.py::TestPlotComparison::test_returns_figure_and_axes_dict	17	hardened	Added zero-diff pin: plot_comparison(ds, ds, 'B1') must show a diff panel of pure zeros — catches a regression where the diff panel silently plots one of the inputs instead of a−b.	<pending>
+tests/test_plotting.py::TestPlotComparison::test_custom_labels	17	kept	Pins labels=('Run1','Run2') → panel-a/b titles — protects against a regression that would show the default 'A'/'B' labels or default filename labels.	<pending>
+tests/test_plotting.py::TestPlotComparison::test_3d_and_derived	17	hardened	Pre-hardening body was isinstance(fig,Figure). Added non-negativity pins on a/b panels (|B| must be ≥0) and zero-diff pin. Catches both magnitude-sign regressions and diff-pipeline regressions in one shot.	<pending>
+tests/test_plotting.py::TestPlotComparison::test_options[inset-colorbar]	17	hardened	Pre-hardening body was isinstance(fig,Figure). Added per-option assertions: colorbar=False → 3 axes (panels only); colorbar='inset' → 3 axes + 3 child axes; vmin/vmax pin norm limits on panels a & b. Parametrize ids now distinguishable via assertions.	<pending>
+tests/test_plotting.py::TestPlotComparison::test_options[no-colorbar]	17	hardened	Pre-hardening body was isinstance(fig,Figure). Added per-option assertions: colorbar=False → 3 axes (panels only); colorbar='inset' → 3 axes + 3 child axes; vmin/vmax pin norm limits on panels a & b. Parametrize ids now distinguishable via assertions.	<pending>
+tests/test_plotting.py::TestPlotComparison::test_options[transparent-extremes]	17	hardened	Pre-hardening body was isinstance(fig,Figure). Added per-option assertions: colorbar=False → 3 axes (panels only); colorbar='inset' → 3 axes + 3 child axes; vmin/vmax pin norm limits on panels a & b. Parametrize ids now distinguishable via assertions.	<pending>
+tests/test_plotting.py::TestPlotComparison::test_options[semi-extremes]	17	hardened	Pre-hardening body was isinstance(fig,Figure). Added per-option assertions: colorbar=False → 3 axes (panels only); colorbar='inset' → 3 axes + 3 child axes; vmin/vmax pin norm limits on panels a & b. Parametrize ids now distinguishable via assertions.	<pending>
+tests/test_plotting.py::TestPlotComparison::test_options[darken-extremes]	17	hardened	Pre-hardening body was isinstance(fig,Figure). Added per-option assertions: colorbar=False → 3 axes (panels only); colorbar='inset' → 3 axes + 3 child axes; vmin/vmax pin norm limits on panels a & b. Parametrize ids now distinguishable via assertions.	<pending>
+tests/test_plotting.py::TestPlotComparison::test_options[none-extremes]	17	hardened	Pre-hardening body was isinstance(fig,Figure). Added per-option assertions: colorbar=False → 3 axes (panels only); colorbar='inset' → 3 axes + 3 child axes; vmin/vmax pin norm limits on panels a & b. Parametrize ids now distinguishable via assertions.	<pending>
+tests/test_plotting.py::TestPlotComparison::test_options[custom-clim]	17	hardened	Pre-hardening body was isinstance(fig,Figure). Added per-option assertions: colorbar=False → 3 axes (panels only); colorbar='inset' → 3 axes + 3 child axes; vmin/vmax pin norm limits on panels a & b. Parametrize ids now distinguishable via assertions.	<pending>
 tests/test_plotting.py::TestColormapDetection::test_detection[magnitude]	0	not-yet-reviewed		
 tests/test_plotting.py::TestColormapDetection::test_detection[component]	0	not-yet-reviewed		
 tests/test_plotting.py::TestColormapDetection::test_detection[density]	0	not-yet-reviewed		
