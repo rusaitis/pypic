@@ -1083,93 +1083,93 @@ tests/test_plotting.py::TestPlotCrossSection::test_custom_cut_index	18	hardened	
 tests/test_plotting.py::TestPlotCrossSection::test_invalid_cut_axis_rejects	18	kept	Invalid cut_axis raises ValueError. Pins axis-name validation contract.	47f39bfd3e1fc73fed6889080a5595ba99c4e912
 tests/test_plotting.py::TestComparisonShowError::test_show_error	18	hardened	Hardened: pinned diff panel has a text artist containing 'L_2'; isinstance-only admitted show_error=True silently dropped.	47f39bfd3e1fc73fed6889080a5595ba99c4e912
 tests/test_plotting.py::TestPlotLines::test_basic	18	kept	plot_lines draws 3 lines and emits a legend. Pins multi-field contract (count + legend existence).	47f39bfd3e1fc73fed6889080a5595ba99c4e912
-tests/test_plotting.py::TestPlotLines::test_custom_labels	19	hardened	Pin legend text to verbatim [$B_x$, $B_y$] — not just count.	<pending>
-tests/test_plotting.py::TestSetDefaultTheme::test_set_and_get	19	kept	Pins theme.name round-trip under save/restore.	<pending>
-tests/test_plotting.py::TestSetDefaultTheme::test_badge_on_slice	19	hardened	Pin step=42 appearing in badge text (ax.texts + patch children), not just any patch.	<pending>
-tests/test_plotting.py::TestSetDefaultTheme::test_save_creates_file	19	hardened	Verify PNG magic bytes and min file size, not just .exists().	<pending>
-tests/test_plotting.py::TestExtremesMode::test_semi_sets_reduced_alpha	19	kept	Pins cmap _rgba_under/over alpha ≈ 0.3.	<pending>
-tests/test_plotting.py::TestExtremesMode::test_transparent_matches_background	19	kept	Pins rgba matches axes.facecolor via assert_allclose.	<pending>
-tests/test_plotting.py::TestExtremesMode::test_darken_preserves_full_alpha	19	kept	Pins alpha ≈ 1.0.	<pending>
-tests/test_plotting.py::TestExtremesMode::test_none_is_noop	19	kept	Pins cmap.name unchanged when mode=None.	<pending>
-tests/test_plotting.py::TestFileThemes::test_export_creates_files	19	kept	Pins filenames exported == bundled set.	<pending>
-tests/test_plotting.py::TestFileThemes::test_export_no_overwrite	19	kept	Pins that modified contents survive overwrite=False.	<pending>
-tests/test_plotting.py::TestFileThemes::test_export_overwrite	19	kept	Pins overwrite=True wipes modifications.	<pending>
-tests/test_plotting.py::TestFileThemes::test_available_themes	19	kept	Pins dark/light present + count floor of 5.	<pending>
-tests/test_plotting.py::TestFileThemes::test_available_themes_skips_malformed	19	kept	Pins malformed toml ('bad') is skipped by discovery.	<pending>
-tests/test_plotting.py::TestFileThemes::test_user_theme_overrides_bundled	19	kept	Pins exact accent_color override propagates through resolve.	<pending>
-tests/test_plotting.py::TestFileThemes::test_resolve_by_file_path	19	kept	Pins theme.name from absolute-path resolve.	<pending>
-tests/test_plotting.py::TestFileThemes::test_custom_theme_from_user_dir	19	kept	Pins custom accent_color resolves by name from user dir.	<pending>
-tests/test_plotting.py::TestFileThemes::test_use_theme_with_string	19	kept	Pins rcParams flip inside/outside context manager.	<pending>
-tests/test_plotting.py::TestLegendEntryNoneColor::test_none_color_creates	19	kept	Pins LegendEntry stores color=None and label verbatim.	<pending>
-tests/test_plotting.py::TestLegendEntryNoneColor::test_none_color_renders	19	hardened	Assert AnchoredOffsetbox type and ax.artists membership — not just len(children)>0.	<pending>
-tests/test_plotting.py::TestOverlayAutoPlacement::test_default_corners	19	kept	Pins all four occupied-corner keys set on axes.	<pending>
-tests/test_plotting.py::TestOverlayAutoPlacement::test_bumps_to_free_corner	19	kept	Pins second label bumps to next free corner.	<pending>
-tests/test_plotting.py::TestOverlayAutoPlacement::test_explicit_loc_overrides	19	kept	Pins explicit loc takes precedence over auto-placement.	<pending>
-tests/test_plotting.py::TestFieldGridNewParams::test_shared_vmin_vmax	19	hardened	Pin norm.vmin=-2, vmax=2 on every panel's mesh.	<pending>
-tests/test_plotting.py::TestFieldGridNewParams::test_cmap_dict	19	hardened	Pin cmap.name == 'RdBu_r' and 'inferno' on respective panels.	<pending>
-tests/test_plotting.py::TestFieldGridNewParams::test_cmap_string	19	hardened	Pin cmap.name == 'viridis' on every panel.	<pending>
-tests/test_plotting.py::TestFieldGridNewParams::test_log_scale	19	hardened	Assert isinstance(norm, LogNorm) on each panel.	<pending>
-tests/test_plotting.py::TestComparisonNewParams::test_symmetric_false	19	hardened	Assert norm is non-symmetric around zero (vmin+vmax != 0).	<pending>
-tests/test_plotting.py::TestComparisonNewParams::test_alpha	19	hardened	Pin alpha=0.5 on all three panels via get_alpha().	<pending>
-tests/test_plotting.py::TestComparisonNewParams::test_log_scale	19	hardened	Assert LogNorm on both A and B panels.	<pending>
-tests/test_plotting.py::TestComparisonNewParams::test_log_scale_with_symmetric_warns	19	hardened	After warn, assert symmetric wins: norm.vmin == -norm.vmax.	<pending>
-tests/test_plotting.py::TestPlotKymograph::test_basic	19	hardened	Pin mesh.get_array() to input values — not just isinstance check.	<pending>
-tests/test_plotting.py::TestPlotKymograph::test_symmetric	19	hardened	Pin norm.vmin == -norm.vmax.	<pending>
-tests/test_plotting.py::TestPlotKymograph::test_log_scale	19	hardened	Assert isinstance(norm, LogNorm).	<pending>
-tests/test_plotting.py::TestPlotKymograph::test_custom_axes	19	hardened	Pin +1 collection added to ax.collections (actually painted).	<pending>
-tests/test_plotting.py::TestPlotKymograph::test_colorbar_inset	19	hardened	Pin len(ax.child_axes)>=1 (inset cbar exists).	<pending>
-tests/test_plotting.py::TestPlotKymograph::test_invalid_shape	19	kept	Already pins ValueError with '2D' regex.	<pending>
-tests/test_plotting.py::TestPlotKymograph::test_labels_and_title	19	hardened	Add ylabel assertion; was only checking xlabel+title.	<pending>
-tests/test_plotting.py::TestPlotScatter::test_basic	19	hardened	Pin offsets.shape == (N_cells, 2).	<pending>
-tests/test_plotting.py::TestPlotScatter::test_color_field	19	hardened	Pin color array size equals rho_m.size.	<pending>
-tests/test_plotting.py::TestPlotScatter::test_density_mode	19	hardened	Pin array is non-empty and density >= 0.	<pending>
-tests/test_plotting.py::TestPlotScatter::test_log_axes	19	kept	Already pins xscale/yscale == 'log'.	<pending>
-tests/test_plotting.py::TestPlotScatter::test_3d_auto_slice	19	hardened	Pin offsets count is a proper fraction of full 3D (confirms 2D slice).	<pending>
-tests/test_plotting.py::TestPlotScatter::test_custom_axes	19	hardened	Pin +1 collection on ax_ext (actually painted).	<pending>
-tests/test_plotting.py::TestPlotScatter::test_derived_fields	19	hardened	Pin finite, non-empty offsets — not just smoke.	<pending>
-tests/test_plotting.py::TestPlotScatter::test_density_with_color	19	hardened	Pin color array non-negative (density/color coexist).	<pending>
-tests/test_plotting.py::TestPlotPowerSpectrum::test_basic	19	hardened	Pin xscale/yscale=='log' and get_data() equals input (k, power).	<pending>
-tests/test_plotting.py::TestPlotPowerSpectrum::test_compensated	19	hardened	Kolmogorov k^(-5/3)*k^(5/3)=1 exact — pin ydata ≈ 1 to FP.	<pending>
-tests/test_plotting.py::TestPlotPowerSpectrum::test_reference_slopes	19	hardened	Pin len(ax.lines)==3 (data + 2 references).	<pending>
-tests/test_plotting.py::TestPlotPowerSpectrum::test_custom_axes	19	hardened	Pin +1 line on ax_ext (actually painted).	<pending>
-tests/test_plotting.py::TestPlotPowerSpectrum::test_with_label_and_legend	19	hardened	Pin legend text contains '$B_z$' verbatim.	<pending>
-tests/test_plotting.py::TestAnnotations::test_add_planet_returns_two_wedges	19	kept	Already pins both Wedge types and ax.patches membership.	<pending>
-tests/test_plotting.py::TestAnnotations::test_add_planet_all_directions[left]	19	hardened	Pin theta1/theta2 angles match sun_angle ± 90° (was just count==2).	<pending>
-tests/test_plotting.py::TestAnnotations::test_add_planet_all_directions[right]	19	hardened	Pin theta1/theta2 angles match sun_angle ± 90° (was just count==2).	<pending>
-tests/test_plotting.py::TestAnnotations::test_add_planet_all_directions[up]	19	hardened	Pin theta1/theta2 angles match sun_angle ± 90° (was just count==2).	<pending>
-tests/test_plotting.py::TestAnnotations::test_add_planet_all_directions[down]	19	hardened	Pin theta1/theta2 angles match sun_angle ± 90° (was just count==2).	<pending>
-tests/test_plotting.py::TestAnnotations::test_add_circle_returns_circle_patch	19	kept	Already pins Circle type and patches membership.	<pending>
-tests/test_plotting.py::TestAnnotations::test_add_circle_with_label_uses_theme_fontsize	19	kept	Already pins label text and theme fontsize.	<pending>
-tests/test_plotting.py::TestAnnotations::test_add_circle_explicit_fontsize_wins	19	kept	Already pins explicit fontsize wins over theme.	<pending>
-tests/test_plotting.py::TestPlotLineComparison::test_basic	19	hardened	Pin y-data equality for identical inputs.	<pending>
-tests/test_plotting.py::TestPlotLineComparison::test_labels	19	hardened	Pin custom labels verbatim in legend texts.	<pending>
-tests/test_plotting.py::TestPlotLineComparison::test_custom_axes	19	hardened	Pin +2 lines added to ax_ext.	<pending>
-tests/test_plotting.py::TestPlotLineComparison::test_derived_field	19	hardened	Pin |B| y-data is finite and non-negative.	<pending>
-tests/test_plotting.py::TestRoundNice::test_round_nice_values[0.7-0.5]	19	kept	Parametrized exact 1-2-5 rounding value.	<pending>
-tests/test_plotting.py::TestRoundNice::test_round_nice_values[1.3-1.0]	19	kept	Parametrized exact 1-2-5 rounding value.	<pending>
-tests/test_plotting.py::TestRoundNice::test_round_nice_values[3.5-5.0]	19	kept	Parametrized exact 1-2-5 rounding value.	<pending>
-tests/test_plotting.py::TestRoundNice::test_round_nice_values[150.0-200.0]	19	kept	Parametrized exact 1-2-5 rounding value.	<pending>
-tests/test_plotting.py::TestRoundNice::test_round_nice_values[0.003-0.002]	19	kept	Parametrized exact 1-2-5 rounding value (sub-unit scale).	<pending>
-tests/test_plotting.py::TestRoundNice::test_round_nice_values[7.0-5.0]	19	kept	Parametrized exact 1-2-5 rounding value.	<pending>
-tests/test_plotting.py::TestRoundNice::test_round_nice_values[15.0-20.0]	19	kept	Parametrized exact 1-2-5 rounding value.	<pending>
-tests/test_plotting.py::TestRoundNice::test_round_nice_values[0.11-0.1]	19	kept	Parametrized exact 1-2-5 rounding value.	<pending>
-tests/test_plotting.py::TestRoundNice::test_zero	19	kept	Edge case: round_nice(0) == 0.	<pending>
-tests/test_plotting.py::TestAutoClim::test_signed_symmetric	19	kept	Pins vmin == -vmax and vmin < 0 for signed data.	<pending>
-tests/test_plotting.py::TestAutoClim::test_positive_definite	19	kept	Pins vmin == 0 and vmax > 0 for positive data.	<pending>
-tests/test_plotting.py::TestAutoClim::test_constant_field	19	kept	Pins sensible clim on zero-variance field.	<pending>
-tests/test_plotting.py::TestAutoClim::test_all_nan	19	kept	Pins NaN-only signed data returns finite nonzero range.	<pending>
-tests/test_plotting.py::TestAutoClim::test_all_nan_positive	19	kept	Pins NaN-only positive data returns vmin=0, vmax>0.	<pending>
-tests/test_plotting.py::TestAutoLinthresh::test_typical_data	19	kept	Pins linthresh > 0 for typical signed data.	<pending>
-tests/test_plotting.py::TestAutoLinthresh::test_all_zero	19	kept	Pins linthresh == 1e-8 sentinel for zero data.	<pending>
-tests/test_plotting.py::TestSymlogSlice::test_symlog_renders	19	hardened	Pin isinstance(norm, SymLogNorm).	<pending>
-tests/test_plotting.py::TestSymlogSlice::test_symlog_with_linthresh	19	hardened	Pin norm.linthresh == 0.1 (and SymLogNorm type).	<pending>
-tests/test_plotting_parity.py::test_paired_function_parity[add_badge\u2194add_badge]	19	kept	Structural invariant: symmetric-diff of params == curated gap allowlist.	<pending>
-tests/test_plotting_parity.py::test_paired_function_parity[add_label\u2194add_label]	19	kept	Structural invariant: symmetric-diff of params == curated gap allowlist.	<pending>
-tests/test_plotting_parity.py::test_paired_function_parity[add_inset_colorbar\u2194add_colorbar]	19	kept	Structural invariant: symmetric-diff of params == curated gap allowlist.	<pending>
-tests/test_plotting_parity.py::test_paired_function_parity[add_planet\u2194add_planet]	19	kept	Structural invariant: symmetric-diff of params == curated gap allowlist.	<pending>
-tests/test_plotting_parity.py::test_paired_function_parity[add_circle\u2194add_reference_circles]	19	kept	Structural invariant: symmetric-diff of params == curated gap allowlist.	<pending>
-tests/test_plotting_parity.py::test_pyvista_colorbar_accepts_lifted_params	19	kept	Pins 'extremes' and 'ticks' kwargs lifted into pyvista signature.	<pending>
-tests/test_plotting_parity.py::test_pyvista_equatorial_surface_accepts_lifted_params	19	kept	Pins 'extremes' and 'colorbar_ticks' lifted into equatorial_surface.	<pending>
+tests/test_plotting.py::TestPlotLines::test_custom_labels	19	hardened	Pin legend text to verbatim [$B_x$, $B_y$] — not just count.	b150b7c
+tests/test_plotting.py::TestSetDefaultTheme::test_set_and_get	19	kept	Pins theme.name round-trip under save/restore.	b150b7c
+tests/test_plotting.py::TestSetDefaultTheme::test_badge_on_slice	19	hardened	Pin step=42 appearing in badge text (ax.texts + patch children), not just any patch.	b150b7c
+tests/test_plotting.py::TestSetDefaultTheme::test_save_creates_file	19	hardened	Verify PNG magic bytes and min file size, not just .exists().	b150b7c
+tests/test_plotting.py::TestExtremesMode::test_semi_sets_reduced_alpha	19	kept	Pins cmap _rgba_under/over alpha ≈ 0.3.	b150b7c
+tests/test_plotting.py::TestExtremesMode::test_transparent_matches_background	19	kept	Pins rgba matches axes.facecolor via assert_allclose.	b150b7c
+tests/test_plotting.py::TestExtremesMode::test_darken_preserves_full_alpha	19	kept	Pins alpha ≈ 1.0.	b150b7c
+tests/test_plotting.py::TestExtremesMode::test_none_is_noop	19	kept	Pins cmap.name unchanged when mode=None.	b150b7c
+tests/test_plotting.py::TestFileThemes::test_export_creates_files	19	kept	Pins filenames exported == bundled set.	b150b7c
+tests/test_plotting.py::TestFileThemes::test_export_no_overwrite	19	kept	Pins that modified contents survive overwrite=False.	b150b7c
+tests/test_plotting.py::TestFileThemes::test_export_overwrite	19	kept	Pins overwrite=True wipes modifications.	b150b7c
+tests/test_plotting.py::TestFileThemes::test_available_themes	19	kept	Pins dark/light present + count floor of 5.	b150b7c
+tests/test_plotting.py::TestFileThemes::test_available_themes_skips_malformed	19	kept	Pins malformed toml ('bad') is skipped by discovery.	b150b7c
+tests/test_plotting.py::TestFileThemes::test_user_theme_overrides_bundled	19	kept	Pins exact accent_color override propagates through resolve.	b150b7c
+tests/test_plotting.py::TestFileThemes::test_resolve_by_file_path	19	kept	Pins theme.name from absolute-path resolve.	b150b7c
+tests/test_plotting.py::TestFileThemes::test_custom_theme_from_user_dir	19	kept	Pins custom accent_color resolves by name from user dir.	b150b7c
+tests/test_plotting.py::TestFileThemes::test_use_theme_with_string	19	kept	Pins rcParams flip inside/outside context manager.	b150b7c
+tests/test_plotting.py::TestLegendEntryNoneColor::test_none_color_creates	19	kept	Pins LegendEntry stores color=None and label verbatim.	b150b7c
+tests/test_plotting.py::TestLegendEntryNoneColor::test_none_color_renders	19	hardened	Assert AnchoredOffsetbox type and ax.artists membership — not just len(children)>0.	b150b7c
+tests/test_plotting.py::TestOverlayAutoPlacement::test_default_corners	19	kept	Pins all four occupied-corner keys set on axes.	b150b7c
+tests/test_plotting.py::TestOverlayAutoPlacement::test_bumps_to_free_corner	19	kept	Pins second label bumps to next free corner.	b150b7c
+tests/test_plotting.py::TestOverlayAutoPlacement::test_explicit_loc_overrides	19	kept	Pins explicit loc takes precedence over auto-placement.	b150b7c
+tests/test_plotting.py::TestFieldGridNewParams::test_shared_vmin_vmax	19	hardened	Pin norm.vmin=-2, vmax=2 on every panel's mesh.	b150b7c
+tests/test_plotting.py::TestFieldGridNewParams::test_cmap_dict	19	hardened	Pin cmap.name == 'RdBu_r' and 'inferno' on respective panels.	b150b7c
+tests/test_plotting.py::TestFieldGridNewParams::test_cmap_string	19	hardened	Pin cmap.name == 'viridis' on every panel.	b150b7c
+tests/test_plotting.py::TestFieldGridNewParams::test_log_scale	19	hardened	Assert isinstance(norm, LogNorm) on each panel.	b150b7c
+tests/test_plotting.py::TestComparisonNewParams::test_symmetric_false	19	hardened	Assert norm is non-symmetric around zero (vmin+vmax != 0).	b150b7c
+tests/test_plotting.py::TestComparisonNewParams::test_alpha	19	hardened	Pin alpha=0.5 on all three panels via get_alpha().	b150b7c
+tests/test_plotting.py::TestComparisonNewParams::test_log_scale	19	hardened	Assert LogNorm on both A and B panels.	b150b7c
+tests/test_plotting.py::TestComparisonNewParams::test_log_scale_with_symmetric_warns	19	hardened	After warn, assert symmetric wins: norm.vmin == -norm.vmax.	b150b7c
+tests/test_plotting.py::TestPlotKymograph::test_basic	19	hardened	Pin mesh.get_array() to input values — not just isinstance check.	b150b7c
+tests/test_plotting.py::TestPlotKymograph::test_symmetric	19	hardened	Pin norm.vmin == -norm.vmax.	b150b7c
+tests/test_plotting.py::TestPlotKymograph::test_log_scale	19	hardened	Assert isinstance(norm, LogNorm).	b150b7c
+tests/test_plotting.py::TestPlotKymograph::test_custom_axes	19	hardened	Pin +1 collection added to ax.collections (actually painted).	b150b7c
+tests/test_plotting.py::TestPlotKymograph::test_colorbar_inset	19	hardened	Pin len(ax.child_axes)>=1 (inset cbar exists).	b150b7c
+tests/test_plotting.py::TestPlotKymograph::test_invalid_shape	19	kept	Already pins ValueError with '2D' regex.	b150b7c
+tests/test_plotting.py::TestPlotKymograph::test_labels_and_title	19	hardened	Add ylabel assertion; was only checking xlabel+title.	b150b7c
+tests/test_plotting.py::TestPlotScatter::test_basic	19	hardened	Pin offsets.shape == (N_cells, 2).	b150b7c
+tests/test_plotting.py::TestPlotScatter::test_color_field	19	hardened	Pin color array size equals rho_m.size.	b150b7c
+tests/test_plotting.py::TestPlotScatter::test_density_mode	19	hardened	Pin array is non-empty and density >= 0.	b150b7c
+tests/test_plotting.py::TestPlotScatter::test_log_axes	19	kept	Already pins xscale/yscale == 'log'.	b150b7c
+tests/test_plotting.py::TestPlotScatter::test_3d_auto_slice	19	hardened	Pin offsets count is a proper fraction of full 3D (confirms 2D slice).	b150b7c
+tests/test_plotting.py::TestPlotScatter::test_custom_axes	19	hardened	Pin +1 collection on ax_ext (actually painted).	b150b7c
+tests/test_plotting.py::TestPlotScatter::test_derived_fields	19	hardened	Pin finite, non-empty offsets — not just smoke.	b150b7c
+tests/test_plotting.py::TestPlotScatter::test_density_with_color	19	hardened	Pin color array non-negative (density/color coexist).	b150b7c
+tests/test_plotting.py::TestPlotPowerSpectrum::test_basic	19	hardened	Pin xscale/yscale=='log' and get_data() equals input (k, power).	b150b7c
+tests/test_plotting.py::TestPlotPowerSpectrum::test_compensated	19	hardened	Kolmogorov k^(-5/3)*k^(5/3)=1 exact — pin ydata ≈ 1 to FP.	b150b7c
+tests/test_plotting.py::TestPlotPowerSpectrum::test_reference_slopes	19	hardened	Pin len(ax.lines)==3 (data + 2 references).	b150b7c
+tests/test_plotting.py::TestPlotPowerSpectrum::test_custom_axes	19	hardened	Pin +1 line on ax_ext (actually painted).	b150b7c
+tests/test_plotting.py::TestPlotPowerSpectrum::test_with_label_and_legend	19	hardened	Pin legend text contains '$B_z$' verbatim.	b150b7c
+tests/test_plotting.py::TestAnnotations::test_add_planet_returns_two_wedges	19	kept	Already pins both Wedge types and ax.patches membership.	b150b7c
+tests/test_plotting.py::TestAnnotations::test_add_planet_all_directions[left]	19	hardened	Pin theta1/theta2 angles match sun_angle ± 90° (was just count==2).	b150b7c
+tests/test_plotting.py::TestAnnotations::test_add_planet_all_directions[right]	19	hardened	Pin theta1/theta2 angles match sun_angle ± 90° (was just count==2).	b150b7c
+tests/test_plotting.py::TestAnnotations::test_add_planet_all_directions[up]	19	hardened	Pin theta1/theta2 angles match sun_angle ± 90° (was just count==2).	b150b7c
+tests/test_plotting.py::TestAnnotations::test_add_planet_all_directions[down]	19	hardened	Pin theta1/theta2 angles match sun_angle ± 90° (was just count==2).	b150b7c
+tests/test_plotting.py::TestAnnotations::test_add_circle_returns_circle_patch	19	kept	Already pins Circle type and patches membership.	b150b7c
+tests/test_plotting.py::TestAnnotations::test_add_circle_with_label_uses_theme_fontsize	19	kept	Already pins label text and theme fontsize.	b150b7c
+tests/test_plotting.py::TestAnnotations::test_add_circle_explicit_fontsize_wins	19	kept	Already pins explicit fontsize wins over theme.	b150b7c
+tests/test_plotting.py::TestPlotLineComparison::test_basic	19	hardened	Pin y-data equality for identical inputs.	b150b7c
+tests/test_plotting.py::TestPlotLineComparison::test_labels	19	hardened	Pin custom labels verbatim in legend texts.	b150b7c
+tests/test_plotting.py::TestPlotLineComparison::test_custom_axes	19	hardened	Pin +2 lines added to ax_ext.	b150b7c
+tests/test_plotting.py::TestPlotLineComparison::test_derived_field	19	hardened	Pin |B| y-data is finite and non-negative.	b150b7c
+tests/test_plotting.py::TestRoundNice::test_round_nice_values[0.7-0.5]	19	kept	Parametrized exact 1-2-5 rounding value.	b150b7c
+tests/test_plotting.py::TestRoundNice::test_round_nice_values[1.3-1.0]	19	kept	Parametrized exact 1-2-5 rounding value.	b150b7c
+tests/test_plotting.py::TestRoundNice::test_round_nice_values[3.5-5.0]	19	kept	Parametrized exact 1-2-5 rounding value.	b150b7c
+tests/test_plotting.py::TestRoundNice::test_round_nice_values[150.0-200.0]	19	kept	Parametrized exact 1-2-5 rounding value.	b150b7c
+tests/test_plotting.py::TestRoundNice::test_round_nice_values[0.003-0.002]	19	kept	Parametrized exact 1-2-5 rounding value (sub-unit scale).	b150b7c
+tests/test_plotting.py::TestRoundNice::test_round_nice_values[7.0-5.0]	19	kept	Parametrized exact 1-2-5 rounding value.	b150b7c
+tests/test_plotting.py::TestRoundNice::test_round_nice_values[15.0-20.0]	19	kept	Parametrized exact 1-2-5 rounding value.	b150b7c
+tests/test_plotting.py::TestRoundNice::test_round_nice_values[0.11-0.1]	19	kept	Parametrized exact 1-2-5 rounding value.	b150b7c
+tests/test_plotting.py::TestRoundNice::test_zero	19	kept	Edge case: round_nice(0) == 0.	b150b7c
+tests/test_plotting.py::TestAutoClim::test_signed_symmetric	19	kept	Pins vmin == -vmax and vmin < 0 for signed data.	b150b7c
+tests/test_plotting.py::TestAutoClim::test_positive_definite	19	kept	Pins vmin == 0 and vmax > 0 for positive data.	b150b7c
+tests/test_plotting.py::TestAutoClim::test_constant_field	19	kept	Pins sensible clim on zero-variance field.	b150b7c
+tests/test_plotting.py::TestAutoClim::test_all_nan	19	kept	Pins NaN-only signed data returns finite nonzero range.	b150b7c
+tests/test_plotting.py::TestAutoClim::test_all_nan_positive	19	kept	Pins NaN-only positive data returns vmin=0, vmax>0.	b150b7c
+tests/test_plotting.py::TestAutoLinthresh::test_typical_data	19	kept	Pins linthresh > 0 for typical signed data.	b150b7c
+tests/test_plotting.py::TestAutoLinthresh::test_all_zero	19	kept	Pins linthresh == 1e-8 sentinel for zero data.	b150b7c
+tests/test_plotting.py::TestSymlogSlice::test_symlog_renders	19	hardened	Pin isinstance(norm, SymLogNorm).	b150b7c
+tests/test_plotting.py::TestSymlogSlice::test_symlog_with_linthresh	19	hardened	Pin norm.linthresh == 0.1 (and SymLogNorm type).	b150b7c
+tests/test_plotting_parity.py::test_paired_function_parity[add_badge\u2194add_badge]	19	kept	Structural invariant: symmetric-diff of params == curated gap allowlist.	b150b7c
+tests/test_plotting_parity.py::test_paired_function_parity[add_label\u2194add_label]	19	kept	Structural invariant: symmetric-diff of params == curated gap allowlist.	b150b7c
+tests/test_plotting_parity.py::test_paired_function_parity[add_inset_colorbar\u2194add_colorbar]	19	kept	Structural invariant: symmetric-diff of params == curated gap allowlist.	b150b7c
+tests/test_plotting_parity.py::test_paired_function_parity[add_planet\u2194add_planet]	19	kept	Structural invariant: symmetric-diff of params == curated gap allowlist.	b150b7c
+tests/test_plotting_parity.py::test_paired_function_parity[add_circle\u2194add_reference_circles]	19	kept	Structural invariant: symmetric-diff of params == curated gap allowlist.	b150b7c
+tests/test_plotting_parity.py::test_pyvista_colorbar_accepts_lifted_params	19	kept	Pins 'extremes' and 'ticks' kwargs lifted into pyvista signature.	b150b7c
+tests/test_plotting_parity.py::test_pyvista_equatorial_surface_accepts_lifted_params	19	kept	Pins 'extremes' and 'colorbar_ticks' lifted into equatorial_surface.	b150b7c
 tests/test_readers_base.py::TestGridInfo::test_coordinate_arrays_cell_centered	0	not-yet-reviewed		
 tests/test_readers_base.py::TestGridInfo::test_coordinate_arrays_with_offset_origin	0	not-yet-reviewed		
 tests/test_readers_base.py::TestGridInfo::test_lower_dimensional_grid[2d]	0	not-yet-reviewed		
