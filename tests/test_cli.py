@@ -449,6 +449,9 @@ class TestPlot:
             app, ["plot", str(d), "--field", "B1", "--plane", "xy", "--output", out]
         )
         assert result.exit_code == 0, result.output
+        # Guards against "exit 0 but no file written" regressions
+        # (e.g. if --plane xy silently swallowed input).
+        assert (tmp_path / "xy.png").exists()
 
     def test_plane_xz(self, tmp_path: Path) -> None:
         d = _make_sim_dir(tmp_path)
@@ -457,6 +460,7 @@ class TestPlot:
             app, ["plot", str(d), "--field", "B1", "--plane", "xz", "--output", out]
         )
         assert result.exit_code == 0, result.output
+        assert (tmp_path / "xz.png").exists()
 
     def test_plane_normal_axis_name(self, tmp_path: Path) -> None:
         """--plane accepts a single axis name as the normal (e.g. 'z')."""
@@ -466,6 +470,7 @@ class TestPlot:
             app, ["plot", str(d), "--field", "B1", "--plane", "z", "--output", out]
         )
         assert result.exit_code == 0, result.output
+        assert (tmp_path / "norm.png").exists()
 
     def test_with_index(self, tmp_path: Path) -> None:
         d = _make_sim_dir(tmp_path)
@@ -474,6 +479,7 @@ class TestPlot:
             app, ["plot", str(d), "--field", "B1", "--index", "2", "--output", out]
         )
         assert result.exit_code == 0, result.output
+        assert (tmp_path / "idx.png").exists()
 
     def test_with_coord(self, tmp_path: Path) -> None:
         d = _make_sim_dir(tmp_path)
@@ -482,6 +488,7 @@ class TestPlot:
             app, ["plot", str(d), "--field", "B1", "--coord", "1.5", "--output", out]
         )
         assert result.exit_code == 0, result.output
+        assert (tmp_path / "coord.png").exists()
 
     def test_index_and_coord_conflict(self, tmp_path: Path) -> None:
         d = _make_sim_dir(tmp_path)
@@ -502,12 +509,17 @@ class TestPlot:
             ],
         )
         assert result.exit_code != 0
+        # Error should name both conflicting flags, not a generic failure —
+        # pins the _resolve_index_from_plane guard against silent precedence bugs.
+        assert "--index" in result.output
+        assert "--coord" in result.output
 
     def test_derived_field(self, tmp_path: Path) -> None:
         d = _make_sim_dir(tmp_path)
         out = str(tmp_path / "mag.png")
         result = runner.invoke(app, ["plot", str(d), "--field", "|B|", "--output", out])
         assert result.exit_code == 0, result.output
+        assert (tmp_path / "mag.png").exists()
 
     def test_log_scale(self, tmp_path: Path) -> None:
         d = _make_sim_dir(tmp_path)
@@ -516,6 +528,7 @@ class TestPlot:
             app, ["plot", str(d), "--field", "|B|", "--scale", "log", "--output", out]
         )
         assert result.exit_code == 0, result.output
+        assert (tmp_path / "log.png").exists()
 
     def test_symlog_scale(self, tmp_path: Path) -> None:
         d = _make_sim_dir(tmp_path)
@@ -524,6 +537,7 @@ class TestPlot:
             app, ["plot", str(d), "--field", "B1", "--scale", "symlog", "--output", out]
         )
         assert result.exit_code == 0, result.output
+        assert (tmp_path / "sym.png").exists()
 
     def test_symlog_with_linthresh(self, tmp_path: Path) -> None:
         d = _make_sim_dir(tmp_path)
@@ -544,6 +558,7 @@ class TestPlot:
             ],
         )
         assert result.exit_code == 0, result.output
+        assert (tmp_path / "sym_lt.png").exists()
 
     def test_custom_clim(self, tmp_path: Path) -> None:
         d = _make_sim_dir(tmp_path)
@@ -564,6 +579,7 @@ class TestPlot:
             ],
         )
         assert result.exit_code == 0, result.output
+        assert (tmp_path / "clim.png").exists()
 
     def test_colormap(self, tmp_path: Path) -> None:
         d = _make_sim_dir(tmp_path)
@@ -573,6 +589,7 @@ class TestPlot:
             ["plot", str(d), "--field", "B1", "--colormap", "viridis", "--output", out],
         )
         assert result.exit_code == 0, result.output
+        assert (tmp_path / "cmap.png").exists()
 
     def test_dpi(self, tmp_path: Path) -> None:
         d = _make_sim_dir(tmp_path)
@@ -592,6 +609,10 @@ class TestPlot:
             ["plot", str(d), "--field", "B1", "--format", "pdf", "--output", out],
         )
         assert result.exit_code == 0, result.output
+        # Pins that --format pdf actually writes the pdf (catches a bug where
+        # the format flag is parsed but ignored, silently emitting PNG).
+        assert (tmp_path / "out.pdf").exists()
+        assert (tmp_path / "out.pdf").read_bytes().startswith(b"%PDF")
 
     def test_res_downsample(self, tmp_path: Path) -> None:
         d = _make_sim_dir(tmp_path)
@@ -601,6 +622,7 @@ class TestPlot:
             ["plot", str(d), "--field", "B1", "--res", "2x2", "--output", out],
         )
         assert result.exit_code == 0, result.output
+        assert (tmp_path / "lo.png").exists()
 
     def test_batch_steps(self, tmp_path: Path) -> None:
         d = _make_sim_dir(tmp_path, n_steps=3)
@@ -616,6 +638,9 @@ class TestPlot:
         d = _make_sim_dir(tmp_path, n_steps=3)
         result = runner.invoke(app, ["plot", str(d), "--field", "B1", "--step", "all"])
         assert result.exit_code != 0
+        # Error must name --output so users know which flag to add —
+        # guards against a generic "invalid input" that tells users nothing.
+        assert "--output" in result.output
 
     def test_bad_scale(self, tmp_path: Path) -> None:
         d = _make_sim_dir(tmp_path)
@@ -678,6 +703,7 @@ class TestPlotCompare:
             ],
         )
         assert result.exit_code == 0, result.output
+        assert (tmp_path / "cmp_xz.png").exists()
 
     def test_diff_limits(self, tmp_path: Path) -> None:
         d = _make_sim_dir(tmp_path)
@@ -699,6 +725,7 @@ class TestPlotCompare:
             ],
         )
         assert result.exit_code == 0, result.output
+        assert (tmp_path / "cmp_dl.png").exists()
 
     def test_bad_units(self, tmp_path: Path) -> None:
         d = _make_sim_dir(tmp_path)
@@ -793,6 +820,7 @@ class TestPlotTheme:
             ["plot", str(d), "--field", "B1", "--theme", "dark", "--output", out],
         )
         assert result.exit_code == 0, result.output
+        assert (tmp_path / "dark.png").exists()
 
 
 # -- plot --contour ----------------------------------------------------------
@@ -845,6 +873,7 @@ class TestPlotCompareTheme:
             ],
         )
         assert result.exit_code == 0, result.output
+        assert (tmp_path / "cmp_dark.png").exists()
 
 
 # -- plot --animate ----------------------------------------------------------
