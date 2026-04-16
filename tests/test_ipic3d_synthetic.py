@@ -796,9 +796,24 @@ class TestEnergyFluxPhdf5:
         assert ds["EF1_s0"].shape == (NX, NY, NZ)
 
     def test_eflux_4pi_corrected(self, ds):
-        """Energy flux should be 4π-corrected like other moments."""
-        expected = RHO_INIT[0] * U0[0] * UTH[0] ** 2
-        assert_allclose(ds["EF1_s0"], expected, atol=1e-12)
+        """Energy flux should be 4π-corrected like other moments.
+
+        Fixture convention: per-species EF_i is a drifting Maxwellian's
+        i-th energy-flux component, which for this fixture reduces to
+        ``rho * u_i * th_i**2`` (with u_i the bulk drift and th_i the
+        thermal speed along axis i).  The pair (EF1, EF3) pins both
+        the vacuous-when-drift-zero branch (U0=0) *and* the 4π factor:
+        without the 4π correction, EF3 would differ by ~12.57×.
+        """
+        # EF1 vacuously zero (U0 = 0)
+        expected_ef1 = RHO_INIT[0] * U0[0] * UTH[0] ** 2
+        assert_allclose(ds["EF1_s0"], expected_ef1, atol=1e-12)
+        # EF3 non-trivial: W0=0.001, WTH=0.02 → 4e-7 (species 0)
+        expected_ef3_s0 = RHO_INIT[0] * W0[0] * WTH[0] ** 2
+        assert_allclose(ds["EF3_s0"], expected_ef3_s0, atol=1e-12)
+        # EF3_s1 negative drift (W0=-0.064) pins sign preservation
+        expected_ef3_s1 = RHO_INIT[1] * W0[1] * WTH[1] ** 2
+        assert_allclose(ds["EF3_s1"], expected_ef3_s1, atol=1e-12)
 
 
 class TestEnergyFluxShdf5:
@@ -863,8 +878,10 @@ class TestFieldOutputTag:
     def test_field_output_tag_in_metadata(self):
         cfg = parse_inp(PHDF5_DIR / "synthetic.inp")
         sim_cfg = to_simulation_config(cfg)
-        assert "field_output_tag" in sim_cfg.metadata
-        assert "particles_output_cycle" in sim_cfg.metadata
+        # Presence + value: catches both dropped-key and wrong-value bugs.
+        assert "pressure" in sim_cfg.metadata["field_output_tag"]
+        assert "E_flux" in sim_cfg.metadata["field_output_tag"]
+        assert sim_cfg.metadata["particles_output_cycle"] == 10
 
     def test_settings_hdf_defaults(self):
         cfg = parse_settings_hdf(SHDF5_DIR / "settings.hdf")
@@ -920,19 +937,24 @@ class TestProbeImprovements:
     def test_phdf5_with_moments_higher_confidence(self):
         from pypic.readers.ipic3d import can_read_confidence
 
-        # phdf5 dir has .inp (0.5), Fields_* (+0.2 when score is 0 check bypassed
-        # due to .inp), Moments_* (+0.15), Particles_* (+0.1)
+        # phdf5 dir has .inp (0.5) + Moments_* (+0.15) + Particles_* (+0.1).
+        # The Fields_* fallback is suppressed because core score is already
+        # non-zero.  Pin the exact sum — a loose >= bound wouldn't catch a
+        # dropped reinforcement signal.
         score = can_read_confidence(PHDF5_DIR)
-        assert score >= 0.5  # at minimum .inp
+        assert score == pytest.approx(0.75)
 
     def test_moments_detected_in_phdf5(self, tmp_path):
         from pypic.readers.ipic3d import can_read_confidence
 
-        # Directory with only Fields_* and Moments_* (no .inp)
+        # Directory with only Fields_* and Moments_* (no .inp).  The
+        # Fields_ fallback (0.2) plus Moments_ reinforcement (0.15)
+        # must sum to exactly 0.35 — loose bounds would accept either
+        # signal alone and miss the other.
         (tmp_path / "Fields_00000").mkdir()
         (tmp_path / "Moments_00000").mkdir()
         score = can_read_confidence(tmp_path)
-        assert score >= 0.35  # Fields (0.2) + Moments (0.15)
+        assert score == pytest.approx(0.35)
 
     def test_particles_detected_in_phdf5(self, tmp_path):
         from pypic.readers.ipic3d import can_read_confidence
@@ -940,4 +962,5 @@ class TestProbeImprovements:
         (tmp_path / "Fields_00000").mkdir()
         (tmp_path / "Particles_00000").mkdir()
         score = can_read_confidence(tmp_path)
-        assert score >= 0.3  # Fields (0.2) + Particles (0.1)
+        # Fields_ fallback (0.2) + Particles_ reinforcement (0.1) = 0.30.
+        assert score == pytest.approx(0.30)

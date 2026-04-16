@@ -128,8 +128,10 @@ class TestGridParser:
             assert len(gz) == grid.nz
 
     def test_metadata(self, grid: OpenGGCMGrid) -> None:
-        assert "DIPOLETIME" in grid.metadata
-        assert "BASETIME" in grid.metadata
+        # Presence + value: a dropped or mis-parsed header would fail
+        # the equality check.  Fixture is gc012 with known DIPOLETIME.
+        assert grid.metadata["DIPOLETIME"] == "1967:01:01:00:00:00"
+        assert grid.metadata["BASETIME"].strip().startswith("1967:01:01")
 
 
 @pytest.mark.skipif(not _HAS_DATA, reason="Fixture data not available")
@@ -149,9 +151,23 @@ class TestFieldIO:
 
     def test_field_sanity_checks(self, all_fields) -> None:
         fields, *_ = all_fields
-        assert fields["rr"].min() >= 0.0
+        # Density strictly positive (magnetohydrodynamic fixture)
+        assert fields["rr"].min() > 0.0
+        # Pin fixture-specific ranges.  These bracket the actual values
+        # tight enough to catch endian/sign bugs that would silently
+        # produce garbage values outside the physical MHD regime.
+        # rr in cm⁻³: magnetotail densities 0.1–25
+        assert 0.1 < fields["rr"].min() < 1.0
+        assert 10.0 < fields["rr"].max() < 30.0
+        # vx in km/s: solar wind ~300 km/s, jets < 1500 km/s
+        assert -1000.0 < fields["vx"].min() < -500.0
+        assert 800.0 < fields["vx"].max() < 1500.0
+        # pp in pPa: solar wind ~1 pPa, ramp-up inside magnetosphere
+        assert 0.1 < fields["pp"].min() < 1.0
+        # |B| in nT: mostly < 100 nT, dipole-near values can be large
         b_mag = np.sqrt(fields["bx1"] ** 2 + fields["by1"] ** 2 + fields["bz1"] ** 2)
-        assert b_mag.max() < 1e6
+        assert 1.0 < b_mag.min() < 5.0
+        assert 5e4 < b_mag.max() < 1e5
 
 
 @pytest.mark.skipif(not _HAS_DATA, reason="Fixture data not available")
