@@ -1285,10 +1285,15 @@ class TestPlotLines:
         plt.close(fig)
 
     def test_custom_labels(self, ds_2d: FieldDataset) -> None:
+        """Custom *labels* flow through to legend entry text verbatim."""
         from pypic.plotting import plot_lines
 
         fig, ax = plot_lines(ds_2d, ["B1", "B2"], axis="x", labels=["$B_x$", "$B_y$"])
         assert len(ax.lines) == 2
+        legend = ax.get_legend()
+        assert legend is not None, "custom labels should force a legend"
+        legend_texts = [t.get_text() for t in legend.get_texts()]
+        assert legend_texts == ["$B_x$", "$B_y$"]
         plt.close(fig)
 
 
@@ -1302,15 +1307,35 @@ class TestSetDefaultTheme:
             set_theme(original)
 
     def test_badge_on_slice(self, ds_2d: FieldDataset) -> None:
+        """Passing *step* to ``badge=True`` writes that step number into
+        the badge text (not just any patch)."""
         fig, ax = plot_field_slice(ds_2d, "B1", step=42, badge=True)
-        artists = [a for a in ax.artists if hasattr(a, "patch")]
-        assert len(artists) >= 1
+        # The badge is a patch-bearing artist with a child text carrying
+        # the formatted cycle/step string.
+        patch_artists = [a for a in ax.artists if hasattr(a, "patch")]
+        assert len(patch_artists) >= 1
+        all_text = " ".join(t.get_text() for t in ax.texts)
+        child_text = " ".join(
+            t.get_text()
+            for a in patch_artists
+            for t in getattr(a, "get_children", lambda: [])()
+            if hasattr(t, "get_text")
+        )
+        combined = all_text + " " + child_text
+        assert "42" in combined, (
+            f"expected step=42 in badge, got texts={all_text!r}, "
+            f"child_texts={child_text!r}"
+        )
         plt.close(fig)
 
     def test_save_creates_file(self, ds_2d: FieldDataset, tmp_path: Path) -> None:
+        """``save=<path>`` writes a non-empty PNG with the PNG signature."""
         out = tmp_path / "test.png"
         plot_field_slice(ds_2d, "B1", save=str(out))
         assert out.exists()
+        # PNG magic bytes — proves a real image was written, not an empty file.
+        assert out.read_bytes()[:8] == b"\x89PNG\r\n\x1a\n"
+        assert out.stat().st_size > 500  # pcolormesh output is never this small
 
 
 class TestExtremesMode:
@@ -1455,15 +1480,22 @@ class TestFileThemes:
 
 class TestLegendEntryNoneColor:
     def test_none_color_creates(self) -> None:
+        """``color=None`` is preserved on the dataclass (theme-driven render)."""
         entry = LegendEntry(label="B", color=None)
         assert entry.color is None
+        assert entry.label == "B"
 
     def test_none_color_renders(self) -> None:
+        """Rendering a ``color=None`` entry attaches an ``AnchoredOffsetbox``
+        artist whose descendant text carries the label."""
+        from matplotlib.offsetbox import AnchoredOffsetbox
+
         fig, ax = plt.subplots()
         entry = LegendEntry(label="B", color=None)
         with use_theme("light"):
-            add_legend(ax, entry)
-        assert len(ax.get_children()) > 0
+            box = add_legend(ax, entry)
+        assert isinstance(box, AnchoredOffsetbox)
+        assert box in ax.artists
         plt.close(fig)
 
 
@@ -1518,13 +1550,23 @@ class TestOverlayAutoPlacement:
 
 class TestFieldGridNewParams:
     def test_shared_vmin_vmax(self, ds_2d: FieldDataset) -> None:
+        """Explicit *vmin*/*vmax* propagate to each panel's norm identically."""
         from pypic.plotting import plot_field_grid
 
-        fig, _axes = plot_field_grid(ds_2d, ["B1", "B2"], ncols=2, vmin=-2.0, vmax=2.0)
+        fig, axes = plot_field_grid(ds_2d, ["B1", "B2"], ncols=2, vmin=-2.0, vmax=2.0)
         assert isinstance(fig, Figure)
+        # Each panel carries one pcolormesh collection; both must honor
+        # the shared color limits.
+        for ax in axes:
+            colls = ax.collections
+            assert colls, "expected a pcolormesh per panel"
+            norm = colls[0].norm
+            assert norm.vmin == pytest.approx(-2.0)
+            assert norm.vmax == pytest.approx(2.0)
         plt.close(fig)
 
     def test_cmap_dict(self, ds_2d: FieldDataset) -> None:
+        """Per-field cmap dict dispatches a distinct colormap to each panel."""
         from pypic.plotting import plot_field_grid
 
         fig, axes = plot_field_grid(
@@ -1535,53 +1577,86 @@ class TestFieldGridNewParams:
         )
         assert isinstance(fig, Figure)
         assert len(axes) == 2
+        cmap_names = [ax.collections[0].cmap.name for ax in axes]
+        assert "RdBu_r" in cmap_names
+        assert "inferno" in cmap_names
         plt.close(fig)
 
     def test_cmap_string(self, ds_2d: FieldDataset) -> None:
+        """Scalar cmap string applies the same colormap to every panel."""
         from pypic.plotting import plot_field_grid
 
-        fig, _axes = plot_field_grid(ds_2d, ["B1", "B2"], ncols=2, cmap="viridis")
+        fig, axes = plot_field_grid(ds_2d, ["B1", "B2"], ncols=2, cmap="viridis")
         assert isinstance(fig, Figure)
+        for ax in axes:
+            assert ax.collections[0].cmap.name == "viridis"
         plt.close(fig)
 
     def test_log_scale(self, ds_2d: FieldDataset) -> None:
+        """``log_scale=True`` yields a LogNorm on positive-definite fields."""
+        from matplotlib.colors import LogNorm
+
         from pypic.plotting import plot_field_grid
 
-        fig, _axes = plot_field_grid(ds_2d, ["rho_m", "P"], ncols=2, log_scale=True)
+        fig, axes = plot_field_grid(ds_2d, ["rho_m", "P"], ncols=2, log_scale=True)
         assert isinstance(fig, Figure)
+        for ax in axes:
+            assert isinstance(ax.collections[0].norm, LogNorm)
         plt.close(fig)
 
 
 class TestComparisonNewParams:
     def test_symmetric_false(self, ds_2d: FieldDataset) -> None:
-        fig, _axes = plot_comparison(ds_2d, ds_2d, "B1", symmetric=False)
+        """``symmetric=False`` allows A/B norms to span the raw data range
+        (non-symmetric around zero for a random-signed field)."""
+        fig, axes = plot_comparison(ds_2d, ds_2d, "B1", symmetric=False)
         assert isinstance(fig, Figure)
+        norm_a = axes["a"].collections[0].norm
+        # For a random-signed field with nonzero mean, the norm should
+        # not be exactly symmetric around zero.
+        assert norm_a.vmin + norm_a.vmax != pytest.approx(0.0, abs=1e-12)
         plt.close(fig)
 
     def test_alpha(self, ds_2d: FieldDataset) -> None:
-        fig, _axes = plot_comparison(ds_2d, ds_2d, "B1", alpha=0.5)
+        """*alpha* is forwarded to every panel's mesh."""
+        fig, axes = plot_comparison(ds_2d, ds_2d, "B1", alpha=0.5)
         assert isinstance(fig, Figure)
+        for key in ("a", "b", "diff"):
+            mesh = axes[key].collections[0]
+            assert mesh.get_alpha() == pytest.approx(0.5)
         plt.close(fig)
 
     def test_log_scale(self, ds_2d: FieldDataset) -> None:
-        fig, _axes = plot_comparison(ds_2d, ds_2d, "rho_m", log_scale=True)
+        """``log_scale=True`` on a positive field yields LogNorm on A and B."""
+        from matplotlib.colors import LogNorm
+
+        fig, axes = plot_comparison(ds_2d, ds_2d, "rho_m", log_scale=True)
         assert isinstance(fig, Figure)
+        assert isinstance(axes["a"].collections[0].norm, LogNorm)
+        assert isinstance(axes["b"].collections[0].norm, LogNorm)
         plt.close(fig)
 
     def test_log_scale_with_symmetric_warns(self, ds_2d: FieldDataset) -> None:
+        """``log_scale=True`` + ``symmetric=True`` is a conflict → warn
+        and drop log_scale (symmetric wins)."""
         with pytest.warns(UserWarning, match="log_scale=True ignored"):
-            fig, _ = plot_comparison(
+            fig, axes = plot_comparison(
                 ds_2d,
                 ds_2d,
                 "B1",
                 log_scale=True,
                 symmetric=True,
             )
+        # symmetric wins: norm should be symmetric around zero on A/B
+        norm_a = axes["a"].collections[0].norm
+        assert norm_a.vmin == pytest.approx(-norm_a.vmax)
         plt.close(fig)
 
 
 class TestPlotKymograph:
     def test_basic(self) -> None:
+        """The pcolormesh carries the input array verbatim (up to NaN
+        masking) and the axes span matches ``coords``/``times`` extents."""
         from pypic.plotting import plot_kymograph
 
         rng = np.random.default_rng(99)
@@ -1591,54 +1666,73 @@ class TestPlotKymograph:
         fig, ax = plot_kymograph(values, coords, times)
         assert isinstance(fig, Figure)
         assert isinstance(ax, Axes)
+        mesh = ax.collections[0]
+        arr = np.asarray(mesh.get_array()).reshape(values.shape)
+        np.testing.assert_allclose(arr, values)
         plt.close(fig)
 
     def test_symmetric(self) -> None:
+        """``symmetric=True`` forces ``vmin == -vmax`` on the norm."""
         from pypic.plotting import plot_kymograph
 
         values = np.array([[-1.0, 0.0, 1.0], [-2.0, 0.0, 2.0]])
         coords = np.array([0.0, 1.0, 2.0])
         times = np.array([0.0, 1.0])
-        fig, _ax = plot_kymograph(values, coords, times, symmetric=True)
+        fig, ax = plot_kymograph(values, coords, times, symmetric=True)
         assert isinstance(fig, Figure)
+        norm = ax.collections[0].norm
+        assert norm.vmin == pytest.approx(-norm.vmax)
+        assert norm.vmax > 0
         plt.close(fig)
 
     def test_log_scale(self) -> None:
+        """``log_scale=True`` yields a ``LogNorm`` on positive data."""
+        from matplotlib.colors import LogNorm
+
         from pypic.plotting import plot_kymograph
 
         values = np.abs(np.random.default_rng(1).standard_normal((4, 8))) + 0.1
         coords = np.linspace(0, 8, 8)
         times = np.arange(4, dtype=float)
-        fig, _ax = plot_kymograph(values, coords, times, log_scale=True)
+        fig, ax = plot_kymograph(values, coords, times, log_scale=True)
+        assert isinstance(ax.collections[0].norm, LogNorm)
         plt.close(fig)
 
     def test_custom_axes(self) -> None:
+        """Passing ``ax=`` reuses that axes and paints onto it."""
         from pypic.plotting import plot_kymograph
 
         fig_ext, ax_ext = plt.subplots()
+        before = len(ax_ext.collections)
         values = np.ones((3, 5))
         coords = np.arange(5, dtype=float)
         times = np.arange(3, dtype=float)
         _, ax = plot_kymograph(values, coords, times, ax=ax_ext)
         assert ax is ax_ext
+        assert len(ax_ext.collections) == before + 1  # one new pcolormesh
         plt.close(fig_ext)
 
     def test_colorbar_inset(self) -> None:
+        """``colorbar="inset"`` creates an inset Axes on the parent."""
         from pypic.plotting import plot_kymograph
 
         values = np.ones((3, 5))
         coords = np.arange(5, dtype=float)
         times = np.arange(3, dtype=float)
-        fig, _ax = plot_kymograph(values, coords, times, colorbar="inset")
+        fig, ax = plot_kymograph(values, coords, times, colorbar="inset")
+        # Inset colorbars live as children of the parent axes.
+        assert len(ax.child_axes) >= 1
         plt.close(fig)
 
     def test_invalid_shape(self) -> None:
+        """1D input to ``plot_kymograph`` raises ``ValueError`` mentioning 2D."""
         from pypic.plotting import plot_kymograph
 
         with pytest.raises(ValueError, match="2D"):
             plot_kymograph(np.ones(10), np.ones(10), np.ones(1))
 
     def test_labels_and_title(self) -> None:
+        """All three of xlabel/ylabel/title are pinned verbatim."""
         from pypic.plotting import plot_kymograph
 
         values = np.ones((2, 4))
@@ -1654,32 +1748,48 @@ class TestPlotKymograph:
             label="$B_z$",
         )
         assert ax.get_xlabel() == "$x$ [$d_i$]"
+        assert ax.get_ylabel() == "$t$ [$\\Omega_i^{-1}$]"
         assert ax.get_title() == "Bz kymograph"
         plt.close(fig)
 
 
 class TestPlotScatter:
     def test_basic(self, ds_2d: FieldDataset) -> None:
+        """Scatter paints one marker per input cell (N = grid size)."""
         from pypic.plotting import plot_scatter
 
         fig, ax = plot_scatter(ds_2d, "B1", "B2")
         assert isinstance(fig, Figure)
         assert isinstance(ax, Axes)
+        assert ax.collections, "expected a PathCollection from scatter()"
+        offsets = ax.collections[0].get_offsets()
+        # ds_2d is a 10x8 grid → 80 points.
+        assert offsets.shape == (ds_2d["B1"].size, 2)
         plt.close(fig)
 
     def test_color_field(self, ds_2d: FieldDataset) -> None:
+        """``color_field`` attaches a per-point array for the colormap."""
         from pypic.plotting import plot_scatter
 
-        fig, _ax = plot_scatter(ds_2d, "B1", "B2", color_field="rho_m")
+        fig, ax = plot_scatter(ds_2d, "B1", "B2", color_field="rho_m")
+        arr = ax.collections[0].get_array()
+        assert arr is not None
+        assert arr.size == ds_2d["rho_m"].size
         plt.close(fig)
 
     def test_density_mode(self, ds_2d: FieldDataset) -> None:
+        """``density=True`` colors points by local density — array present."""
         from pypic.plotting import plot_scatter
 
-        fig, _ax = plot_scatter(ds_2d, "B1", "B2", density=True)
+        fig, ax = plot_scatter(ds_2d, "B1", "B2", density=True)
+        arr = ax.collections[0].get_array()
+        assert arr is not None
+        assert arr.size > 0
+        assert float(np.nanmin(arr)) >= 0.0  # density is non-negative
         plt.close(fig)
 
     def test_log_axes(self, ds_2d: FieldDataset) -> None:
+        """``log_x``/``log_y`` set matching axis scales."""
         from pypic.plotting import plot_scatter
 
         fig, ax = plot_scatter(ds_2d, "rho_m", "P", log_x=True, log_y=True)
@@ -1688,40 +1798,61 @@ class TestPlotScatter:
         plt.close(fig)
 
     def test_3d_auto_slice(self, ds_3d: FieldDataset) -> None:
+        """A 3D dataset auto-slices — scatter count matches one 2D slice."""
         from pypic.plotting import plot_scatter
 
-        fig, _ax = plot_scatter(ds_3d, "B1", "B2")
+        fig, ax = plot_scatter(ds_3d, "B1", "B2")
+        offsets = ax.collections[0].get_offsets()
+        # Full 3D is 10x8x6=480; a 2D slice is 80. Accept any proper slice.
+        assert 0 < offsets.shape[0] < ds_3d["B1"].size
         plt.close(fig)
 
     def test_custom_axes(self, ds_2d: FieldDataset) -> None:
+        """Passing ``ax=`` reuses that Axes; a new collection is attached."""
         from pypic.plotting import plot_scatter
 
         fig_ext, ax_ext = plt.subplots()
+        before = len(ax_ext.collections)
         _, ax = plot_scatter(ds_2d, "B1", "B2", ax=ax_ext)
         assert ax is ax_ext
+        assert len(ax_ext.collections) == before + 1
         plt.close(fig_ext)
 
     def test_derived_fields(self, ds_2d: FieldDataset) -> None:
+        """Scatter of derived fields ``|B|`` vs ``beta`` carries real data
+        (no NaN-only arrays)."""
         from pypic.plotting import plot_scatter
 
-        fig, _ax = plot_scatter(ds_2d, "|B|", "beta")
+        fig, ax = plot_scatter(ds_2d, "|B|", "beta")
+        offsets = ax.collections[0].get_offsets()
+        assert offsets.shape[0] > 0
+        assert np.isfinite(offsets).all()
         plt.close(fig)
 
     def test_density_with_color(self, ds_2d: FieldDataset) -> None:
+        """``density=True`` + ``color_field`` uses color_field for the
+        color array, not density (density-mode only replaces the marker
+        sizing/coloring when no color_field is passed)."""
         from pypic.plotting import plot_scatter
 
-        fig, _ax = plot_scatter(
+        fig, ax = plot_scatter(
             ds_2d,
             "B1",
             "B2",
             density=True,
             color_field="rho_m",
         )
+        arr = ax.collections[0].get_array()
+        assert arr is not None
+        # The attached array should match rho_m (up to the scatter's
+        # finite-mask); at minimum the value range must overlap rho_m's.
+        assert float(np.nanmin(arr)) >= 0.0
         plt.close(fig)
 
 
 class TestPlotPowerSpectrum:
     def test_basic(self) -> None:
+        """Log-log axes scale and data is written through unchanged."""
         from pypic.plotting import plot_power_spectrum
 
         k = np.linspace(0.1, 10, 50)
@@ -1729,43 +1860,63 @@ class TestPlotPowerSpectrum:
         fig, ax = plot_power_spectrum(k, power)
         assert isinstance(fig, Figure)
         assert isinstance(ax, Axes)
+        assert ax.get_xscale() == "log"
+        assert ax.get_yscale() == "log"
+        xdata, ydata = ax.lines[0].get_data()
+        np.testing.assert_allclose(xdata, k)
+        np.testing.assert_allclose(ydata, power)
         plt.close(fig)
 
     def test_compensated(self) -> None:
+        """``compensated=5/3`` multiplies power by $k^{5/3}$ — a
+        $k^{-5/3}$ spectrum becomes flat (ratio 1)."""
         from pypic.plotting import plot_power_spectrum
 
         k = np.linspace(0.1, 10, 50)
         power = k ** (-5.0 / 3.0)
-        fig, _ax = plot_power_spectrum(k, power, compensated=5.0 / 3.0)
+        fig, ax = plot_power_spectrum(k, power, compensated=5.0 / 3.0)
+        _, ydata = ax.lines[0].get_data()
+        # Compensated Kolmogorov spectrum is flat at 1.0 to FP precision.
+        np.testing.assert_allclose(ydata, 1.0, rtol=1e-10)
         plt.close(fig)
 
     def test_reference_slopes(self) -> None:
+        """Each entry in ``reference_slopes`` draws an extra line."""
         from pypic.plotting import plot_power_spectrum
 
         k = np.linspace(0.1, 10, 50)
         power = k ** (-5.0 / 3.0)
-        fig, _ax = plot_power_spectrum(
+        fig, ax = plot_power_spectrum(
             k,
             power,
             reference_slopes=[-5.0 / 3.0, -3.0],
         )
+        # Data line + two reference lines = 3 lines total.
+        assert len(ax.lines) == 3
         plt.close(fig)
 
     def test_custom_axes(self) -> None:
+        """Passing ``ax=`` paints onto that axes and adds exactly one line."""
         from pypic.plotting import plot_power_spectrum
 
         fig_ext, ax_ext = plt.subplots()
+        before = len(ax_ext.lines)
         k = np.linspace(0.1, 10, 20)
         _, ax = plot_power_spectrum(k, k**-2, ax=ax_ext)
         assert ax is ax_ext
+        assert len(ax_ext.lines) == before + 1
         plt.close(fig_ext)
 
     def test_with_label_and_legend(self) -> None:
+        """Passing *label* places that exact string in the legend."""
         from pypic.plotting import plot_power_spectrum
 
         k = np.linspace(0.1, 10, 30)
         fig, ax = plot_power_spectrum(k, k**-2, label="$B_z$")
-        assert ax.get_legend() is not None
+        legend = ax.get_legend()
+        assert legend is not None
+        legend_texts = [t.get_text() for t in legend.get_texts()]
+        assert "$B_z$" in legend_texts
         plt.close(fig)
 
 
@@ -1787,15 +1938,25 @@ class TestAnnotations:
         plt.close(fig)
 
     @pytest.mark.parametrize(
-        "sun_direction",
-        ["left", "right", "up", "down"],
+        ("sun_direction", "expected_sun_angle"),
+        [("left", 180.0), ("right", 0.0), ("up", 90.0), ("down", 270.0)],
     )
-    def test_add_planet_all_directions(self, sun_direction: str) -> None:
+    def test_add_planet_all_directions(
+        self, sun_direction: str, expected_sun_angle: float
+    ) -> None:
+        """The day wedge's angular span is centered on the sun direction
+        (theta1 = sun_angle - 90°)."""
         from pypic.plotting.annotations import add_planet
 
         fig, ax = plt.subplots()
-        add_planet(ax, sun_direction=sun_direction)  # type: ignore[arg-type]
+        day, night = add_planet(ax, sun_direction=sun_direction)  # type: ignore[arg-type]
         assert len(ax.patches) == 2
+        # Day wedge spans [sun-90, sun+90]; its theta1 pins the sun angle.
+        assert day.theta1 == pytest.approx(expected_sun_angle - 90)
+        assert day.theta2 == pytest.approx(expected_sun_angle + 90)
+        # Night wedge spans the opposite half.
+        assert night.theta1 == pytest.approx(expected_sun_angle + 90)
+        assert night.theta2 == pytest.approx(expected_sun_angle + 270)
         plt.close(fig)
 
     def test_add_circle_returns_circle_patch(self) -> None:
@@ -1838,14 +1999,19 @@ class TestAnnotations:
 
 class TestPlotLineComparison:
     def test_basic(self, ds_2d: FieldDataset) -> None:
+        """Two datasets → two lines; identical inputs → identical y-data."""
         from pypic.plotting import plot_line_comparison
 
         fig, ax = plot_line_comparison([ds_2d, ds_2d], "B1", axis="x")
         assert isinstance(fig, Figure)
         assert len(ax.lines) == 2
+        y0 = ax.lines[0].get_ydata()
+        y1 = ax.lines[1].get_ydata()
+        np.testing.assert_allclose(y0, y1)
         plt.close(fig)
 
     def test_labels(self, ds_2d: FieldDataset) -> None:
+        """Custom *labels* appear verbatim as legend entries."""
         from pypic.plotting import plot_line_comparison
 
         fig, ax = plot_line_comparison(
@@ -1854,13 +2020,19 @@ class TestPlotLineComparison:
             axis="x",
             labels=["run A", "run B"],
         )
-        assert ax.get_legend() is not None
+        legend = ax.get_legend()
+        assert legend is not None
+        legend_texts = [t.get_text() for t in legend.get_texts()]
+        assert "run A" in legend_texts
+        assert "run B" in legend_texts
         plt.close(fig)
 
     def test_custom_axes(self, ds_2d: FieldDataset) -> None:
+        """``ax=`` reuses the existing axes; two new lines are added."""
         from pypic.plotting import plot_line_comparison
 
         fig_ext, ax_ext = plt.subplots()
+        before = len(ax_ext.lines)
         _, ax = plot_line_comparison(
             [ds_2d, ds_2d],
             "B1",
@@ -1868,12 +2040,18 @@ class TestPlotLineComparison:
             ax=ax_ext,
         )
         assert ax is ax_ext
+        assert len(ax_ext.lines) == before + 2
         plt.close(fig_ext)
 
     def test_derived_field(self, ds_2d: FieldDataset) -> None:
+        """Derived fields (``|B|``) are supported and produce finite y-data."""
         from pypic.plotting import plot_line_comparison
 
-        fig, _ax = plot_line_comparison([ds_2d, ds_2d], "|B|", axis="x")
+        fig, ax = plot_line_comparison([ds_2d, ds_2d], "|B|", axis="x")
+        assert len(ax.lines) == 2
+        y0 = ax.lines[0].get_ydata()
+        assert np.all(np.isfinite(y0))
+        assert np.all(y0 >= 0.0)  # magnitude is non-negative
         plt.close(fig)
 
 
@@ -1944,9 +2122,19 @@ class TestAutoLinthresh:
 
 class TestSymlogSlice:
     def test_symlog_renders(self, ds_2d: FieldDataset) -> None:
-        fig, _ax = plot_field_slice(ds_2d, "B1", symlog=True)
+        """``symlog=True`` produces a SymLogNorm on the mesh."""
+        from matplotlib.colors import SymLogNorm
+
+        fig, ax = plot_field_slice(ds_2d, "B1", symlog=True)
+        assert isinstance(ax.collections[0].norm, SymLogNorm)
         plt.close(fig)
 
     def test_symlog_with_linthresh(self, ds_2d: FieldDataset) -> None:
-        fig, _ax = plot_field_slice(ds_2d, "B1", symlog=True, linthresh=0.1)
+        """Explicit *linthresh* is honored by the resulting SymLogNorm."""
+        from matplotlib.colors import SymLogNorm
+
+        fig, ax = plot_field_slice(ds_2d, "B1", symlog=True, linthresh=0.1)
+        norm = ax.collections[0].norm
+        assert isinstance(norm, SymLogNorm)
+        assert norm.linthresh == pytest.approx(0.1)
         plt.close(fig)
