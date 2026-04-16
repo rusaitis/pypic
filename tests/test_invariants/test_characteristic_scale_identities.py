@@ -122,24 +122,3 @@ def test_debye_length_is_thermal_speed_over_plasma_frequency(
     assert_allclose(lam, v_th / omega_p, rtol=1e-13, atol=1e-13)
 
 
-@given(
-    temperature=_positive_array(),
-    n=_positive_array(),
-    q=_species_scalar(),
-)
-@settings(max_examples=40, deadline=None)
-def test_debye_length_times_plasma_frequency_is_thermal_speed(
-    temperature: np.ndarray, n: np.ndarray, q: float
-) -> None:
-    r"""$\lambda_D \cdot \omega_p = v_{th}$ — equivalent to the identity
-    above but tested via multiplication to guard against reciprocal bugs.
-
-    Note: this identity does not involve ``mass`` at all — it cancels
-    between $v_{th}$ and $\omega_p$. Any recipe that accidentally
-    depends on mass in the wrong direction would be caught.
-    """
-    m = 1.0  # mass cancels; use 1.0 for clean readability
-    lam = debye_length(temperature, n, q)
-    omega_p = plasma_frequency(n, q, m)
-    v_th = thermal_speed(temperature, m)
-    assert_allclose(lam * omega_p, v_th, rtol=1e-13, atol=1e-13)
