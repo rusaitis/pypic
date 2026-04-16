@@ -39,27 +39,61 @@ class TestFindSaddlePoints:
         saddles = find_saddle_points(psi, dx, dx, min_separation=10)
         assert len(saddles) >= 2
 
-    def test_invalid_shape(self) -> None:
+    @pytest.mark.parametrize(
+        "bad_shape",
+        [(10,), (4, 4, 4), (2, 3, 4, 5)],
+        ids=["1d", "3d", "4d"],
+    )
+    def test_invalid_shape(self, bad_shape: tuple[int, ...]) -> None:
+        """Any non-2D input must raise — guards against a truthy ndim check."""
         with pytest.raises(ValueError, match="2D"):
-            find_saddle_points(np.ones(10), 1.0, 1.0)
+            find_saddle_points(np.ones(bad_shape), 1.0, 1.0)
 
-    def test_grid_too_small(self) -> None:
+    @pytest.mark.parametrize(
+        "shape",
+        [(3, 3), (4, 5), (5, 4), (2, 10), (10, 2)],
+        ids=["square_3", "nx_lt_5", "ny_lt_5", "nx_tiny", "ny_tiny"],
+    )
+    def test_grid_too_small(self, shape: tuple[int, int]) -> None:
+        """Both axes must satisfy nx>=5 AND ny>=5; one-sided failure is enough.
+
+        The 2-cell margin guard inside find_saddle_points requires
+        ``nx>=5`` and ``ny>=5`` independently. A regression to
+        ``nx<5 and ny<5`` (AND instead of OR) would let 4x10 slip
+        through and emit garbage from the one-sided stencil.
+        """
         with pytest.raises(ValueError, match="too small"):
-            find_saddle_points(np.ones((3, 3)), 1.0, 1.0)
+            find_saddle_points(np.ones(shape), 1.0, 1.0)
 
 
 class TestReconnectionRate:
-    def test_basic(self) -> None:
-        psi = np.zeros((10, 10))
-        psi_prev = np.ones((10, 10))
-        rate = reconnection_rate(psi, psi_prev, dt=0.5, x_point=(5, 5))
-        np.testing.assert_allclose(rate, -2.0)
-
-    def test_positive_rate(self) -> None:
-        psi = np.full((10, 10), 3.0)
-        psi_prev = np.full((10, 10), 1.0)
-        rate = reconnection_rate(psi, psi_prev, dt=1.0, x_point=(3, 3))
-        np.testing.assert_allclose(rate, 2.0)
+    @pytest.mark.parametrize(
+        ("psi_val", "psi_prev_val", "dt", "x_point", "expected"),
+        [
+            # Negative rate: psi decreasing
+            (0.0, 1.0, 0.5, (5, 5), -2.0),
+            # Positive rate: psi increasing
+            (3.0, 1.0, 1.0, (3, 3), 2.0),
+            # dt scales the rate linearly (guards against missing division)
+            (2.0, 0.0, 4.0, (5, 5), 0.5),
+            # X-point not at the grid centre — uses correct indices
+            (7.0, 3.0, 2.0, (0, 9), 2.0),
+        ],
+        ids=["negative", "positive", "dt_scaling", "off_center_xpoint"],
+    )
+    def test_finite_difference(
+        self,
+        psi_val: float,
+        psi_prev_val: float,
+        dt: float,
+        x_point: tuple[int, int],
+        expected: float,
+    ) -> None:
+        """Pins sign, magnitude, dt division, and x_point indexing."""
+        psi = np.full((10, 10), psi_val)
+        psi_prev = np.full((10, 10), psi_prev_val)
+        rate = reconnection_rate(psi, psi_prev, dt=dt, x_point=x_point)
+        np.testing.assert_allclose(rate, expected)
 
 
 class TestReconnectionEdgeCases:

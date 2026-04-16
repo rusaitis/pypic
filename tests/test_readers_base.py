@@ -89,11 +89,18 @@ class TestGridInfo:
                 geometry=CARTESIAN,
             )
 
-    def test_validation_negative_spacing(self):
+    @pytest.mark.parametrize("bad_spacing", [-0.5, 0.0], ids=["negative", "zero"])
+    def test_validation_negative_spacing(self, bad_spacing):
+        """Zero spacing is a degenerate grid and must fail like negative does.
+
+        Guards the ``spacing[i] > 0`` check from silently degrading to
+        ``>= 0`` — a zero dx silently breaks every finite-difference
+        diagnostic (divide-by-zero, NaNs far downstream).
+        """
         with pytest.raises(ValueError, match="must be > 0"):
             GridInfo(
                 dimensions=(8,),
-                spacing=(-0.5,),
+                spacing=(bad_spacing,),
                 origin=(0.0,),
                 geometry=CARTESIAN,
             )

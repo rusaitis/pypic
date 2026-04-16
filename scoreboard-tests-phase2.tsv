@@ -1170,66 +1170,66 @@ tests/test_plotting_parity.py::test_paired_function_parity[add_planet\u2194add_p
 tests/test_plotting_parity.py::test_paired_function_parity[add_circle\u2194add_reference_circles]	19	kept	Structural invariant: symmetric-diff of params == curated gap allowlist.	b150b7c
 tests/test_plotting_parity.py::test_pyvista_colorbar_accepts_lifted_params	19	kept	Pins 'extremes' and 'ticks' kwargs lifted into pyvista signature.	b150b7c
 tests/test_plotting_parity.py::test_pyvista_equatorial_surface_accepts_lifted_params	19	kept	Pins 'extremes' and 'colorbar_ticks' lifted into equatorial_surface.	b150b7c
-tests/test_readers_base.py::TestGridInfo::test_coordinate_arrays_cell_centered	0	not-yet-reviewed		
-tests/test_readers_base.py::TestGridInfo::test_coordinate_arrays_with_offset_origin	0	not-yet-reviewed		
-tests/test_readers_base.py::TestGridInfo::test_lower_dimensional_grid[2d]	0	not-yet-reviewed		
-tests/test_readers_base.py::TestGridInfo::test_lower_dimensional_grid[1d]	0	not-yet-reviewed		
-tests/test_readers_base.py::TestGridInfo::test_validation_length_mismatch	0	not-yet-reviewed		
-tests/test_readers_base.py::TestGridInfo::test_validation_zero_dimension	0	not-yet-reviewed		
-tests/test_readers_base.py::TestGridInfo::test_validation_negative_spacing	0	not-yet-reviewed		
-tests/test_readers_base.py::TestGridInfo::test_validation_boundary_length_mismatch	0	not-yet-reviewed		
-tests/test_readers_base.py::TestGridInfo::test_boundary_valid	0	not-yet-reviewed		
-tests/test_readers_base.py::TestFieldDatasetAccess::test_getitem_returns_ndarray	0	not-yet-reviewed		
-tests/test_readers_base.py::TestFieldDatasetAccess::test_zero_copy	0	not-yet-reviewed		
-tests/test_readers_base.py::TestFieldDatasetAccess::test_alias_access_cartesian	0	not-yet-reviewed		
-tests/test_readers_base.py::TestFieldDatasetAccess::test_has_field	0	not-yet-reviewed		
-tests/test_readers_base.py::TestFieldDatasetAccess::test_field_names_canonical_only	0	not-yet-reviewed		
-tests/test_readers_base.py::TestFieldDatasetAccess::test_xr_returns_dataset	0	not-yet-reviewed		
-tests/test_readers_base.py::TestFieldDatasetAccess::test_missing_key_raises_with_message	0	not-yet-reviewed		
-tests/test_readers_base.py::TestFieldDatasetAccess::test_did_you_mean_close_match	0	not-yet-reviewed		
-tests/test_readers_base.py::TestFieldDatasetAccess::test_did_you_mean_alias_suggestion	0	not-yet-reviewed		
-tests/test_readers_base.py::TestFieldDatasetAccess::test_no_suggestion_for_unrelated_key	0	not-yet-reviewed		
-tests/test_readers_base.py::TestFieldDatasetSlicing::test_isel_scalar_reduces_dim	0	not-yet-reviewed		
-tests/test_readers_base.py::TestFieldDatasetSlicing::test_isel_slice_keeps_dim	0	not-yet-reviewed		
-tests/test_readers_base.py::TestFieldDatasetSlicing::test_sel_scalar_drops_dim	0	not-yet-reviewed		
-tests/test_readers_base.py::TestFieldDatasetSlicing::test_sel_method_nearest	0	not-yet-reviewed		
-tests/test_readers_base.py::TestFieldDatasetSlicing::test_metadata_preserved	0	not-yet-reviewed		
-tests/test_readers_base.py::TestFieldDatasetSlicing::test_dict_indexers_for_unicode_dims	0	not-yet-reviewed		
-tests/test_readers_base.py::TestFieldDatasetSlicing::test_grid_origin_updated_after_slice	0	not-yet-reviewed		
-tests/test_readers_base.py::TestAliases::test_geometry_aliases[cartesian]	0	not-yet-reviewed		
-tests/test_readers_base.py::TestAliases::test_geometry_aliases[spherical]	0	not-yet-reviewed		
-tests/test_readers_base.py::TestAliases::test_geometry_aliases[cylindrical]	0	not-yet-reviewed		
-tests/test_readers_base.py::TestAliases::test_custom_aliases_override	0	not-yet-reviewed		
-tests/test_readers_base.py::TestAliases::test_aliases_only_for_existing_fields	0	not-yet-reviewed		
-tests/test_readers_base.py::TestAliases::test_n_e_n_i_aliases	0	not-yet-reviewed		
-tests/test_readers_base.py::TestAliases::test_n_e_alias_inactive_without_n_s0	0	not-yet-reviewed		
-tests/test_readers_base.py::TestAliases::test_four_velocity_aliases	0	not-yet-reviewed		
-tests/test_readers_base.py::TestSimulationReader::test_protocol_satisfied	0	not-yet-reviewed		
-tests/test_readers_base.py::TestSimulationReader::test_supports_selective_read	0	not-yet-reviewed		
-tests/test_readers_base.py::TestSimulationConfigImmutability::test_physics_not_mutable	0	not-yet-reviewed		
-tests/test_readers_base.py::TestSimulationConfigImmutability::test_physics_extra_not_mutable	0	not-yet-reviewed		
-tests/test_readers_base.py::TestWithDerived::test_single_field	0	not-yet-reviewed		
-tests/test_readers_base.py::TestWithDerived::test_multiple_fields	0	not-yet-reviewed		
-tests/test_readers_base.py::TestWithDerived::test_idempotent_for_existing_fields	0	not-yet-reviewed		
-tests/test_readers_base.py::TestWithDerived::test_survives_isel	0	not-yet-reviewed		
-tests/test_readers_base.py::TestWithDerived::test_survives_plane_selection	0	not-yet-reviewed		
-tests/test_readers_base.py::TestWithDerived::test_unit_conversion	0	not-yet-reviewed		
-tests/test_readers_base.py::TestWithDerived::test_field_info_populated	0	not-yet-reviewed		
-tests/test_readers_base.py::TestWithDerived::test_chaining_avoids_recomputation	0	not-yet-reviewed		
-tests/test_readers_base.py::TestWithDerived::test_vector_siblings	0	not-yet-reviewed		
-tests/test_readers_base.py::TestWithFieldAutoFill::test_known_field_auto_fills	0	not-yet-reviewed		
-tests/test_readers_base.py::TestWithFieldAutoFill::test_unknown_field_without_qt_raises	0	not-yet-reviewed		
-tests/test_readers_base.py::TestWithFieldAutoFill::test_explicit_override	0	not-yet-reviewed		
-tests/test_reconnection.py::TestFindSaddlePoints::test_hyperbolic_saddle	0	not-yet-reviewed		
-tests/test_reconnection.py::TestFindSaddlePoints::test_no_saddle_in_parabola	0	not-yet-reviewed		
-tests/test_reconnection.py::TestFindSaddlePoints::test_multiple_saddles	0	not-yet-reviewed		
-tests/test_reconnection.py::TestFindSaddlePoints::test_invalid_shape	0	not-yet-reviewed		
-tests/test_reconnection.py::TestFindSaddlePoints::test_grid_too_small	0	not-yet-reviewed		
-tests/test_reconnection.py::TestReconnectionRate::test_basic	0	not-yet-reviewed		
-tests/test_reconnection.py::TestReconnectionRate::test_positive_rate	0	not-yet-reviewed		
-tests/test_reconnection.py::TestReconnectionEdgeCases::test_nan_in_psi_no_crash	0	not-yet-reviewed		
-tests/test_reconnection.py::TestReconnectionEdgeCases::test_xpoint_just_inside_margin	0	not-yet-reviewed		
-tests/test_reconnection.py::TestReconnectionEdgeCases::test_reconnection_rate_preserves_nan	0	not-yet-reviewed		
+tests/test_readers_base.py::TestGridInfo::test_coordinate_arrays_cell_centered	20	kept	Pins exact cell-center formula origin + (i+0.5)*dx on all three axes; a regression to node-centered would move every coordinate by dx/2.	<pending>
+tests/test_readers_base.py::TestGridInfo::test_coordinate_arrays_with_offset_origin	20	kept	Pins [11,13,15] for origin=10, dx=2 — guards the origin-shift term in coordinate_arrays against being dropped or applied before the half-cell offset.	<pending>
+tests/test_readers_base.py::TestGridInfo::test_lower_dimensional_grid[2d]	20	kept	Confirms GridInfo accepts 1D/2D domains without hardcoding 3D in length checks.	<pending>
+tests/test_readers_base.py::TestGridInfo::test_lower_dimensional_grid[1d]	20	kept	1D case verifies coord[0] = origin + 0.5*dx; guards against the 3-axis zip cratering 1D grids.	<pending>
+tests/test_readers_base.py::TestGridInfo::test_validation_length_mismatch	20	kept	Pins the dimensions/spacing/origin length-mismatch error — the single guard that prevents shape-inconsistent grids from being constructed silently.	<pending>
+tests/test_readers_base.py::TestGridInfo::test_validation_zero_dimension	20	kept	Zero dim must raise; guards the ``d <= 0`` check from regressing to ``d < 0`` (zero creates empty arrays that pass most downstream shape checks).	<pending>
+tests/test_readers_base.py::TestGridInfo::test_validation_negative_spacing	20	hardened	Parametrized to cover both negative and zero spacing — previously only negative was tested, leaving zero (divide-by-zero in FD stencils) as a silent regression path.	<pending>
+tests/test_readers_base.py::TestGridInfo::test_validation_boundary_length_mismatch	20	kept	Pins boundary-tuple length check; without it a 2D grid could be built with one boundary label and later mis-index during slicing.	<pending>
+tests/test_readers_base.py::TestGridInfo::test_boundary_valid	20	kept	Round-trip test that boundary tuple is stored verbatim on a frozen dataclass — guards a regression where __post_init__ discards or normalizes boundary.	<pending>
+tests/test_readers_base.py::TestFieldDatasetAccess::test_getitem_returns_ndarray	20	kept	Guards the architecture rule ``xarray as container, NumPy for computation`` — __getitem__ must not leak xr.DataArray into the computation path.	<pending>
+tests/test_readers_base.py::TestFieldDatasetAccess::test_zero_copy	20	kept	Pins the zero-copy invariant for FieldDataset.from_arrays (np.shares_memory); a regression to .copy() would silently double memory for billion-cell fields.	<pending>
+tests/test_readers_base.py::TestFieldDatasetAccess::test_alias_access_cartesian	20	kept	Pins Bx→B1, By→B2, Bz→B3 Cartesian alias dispatch — the user-visible geometry-aware naming contract documented in schema.md §3.	<pending>
+tests/test_readers_base.py::TestFieldDatasetAccess::test_has_field	20	kept	has_field must recognize both canonical and alias names; regression to canonical-only would break every ``if ds.has_field('Bx')`` guard in downstream code.	<pending>
+tests/test_readers_base.py::TestFieldDatasetAccess::test_field_names_canonical_only	20	kept	field_names() returns canonical names only; pins the contract that iteration yields Nx unique names, not Nx+aliases (prevents double-iteration bugs).	<pending>
+tests/test_readers_base.py::TestFieldDatasetAccess::test_xr_returns_dataset	20	kept	Pins .xr accessor exposes underlying xr.Dataset; users need this for xarray-native operations (plot, to_netcdf).	<pending>
+tests/test_readers_base.py::TestFieldDatasetAccess::test_missing_key_raises_with_message	20	kept	KeyError with 'not found' message; pins the fail-loud contract from CLAUDE.md — silent lookup failures are forbidden.	<pending>
+tests/test_readers_base.py::TestFieldDatasetAccess::test_did_you_mean_close_match	20	kept	Pins 'Did you mean' fuzzy-suggestion output for typo 'rho'→'rho_c'; guards the UX enhancement from silently degrading.	<pending>
+tests/test_readers_base.py::TestFieldDatasetAccess::test_did_you_mean_alias_suggestion	20	kept	Suggestion set must include aliases (Bx) and canonicals (B1); guards a regression that considers only canonical names.	<pending>
+tests/test_readers_base.py::TestFieldDatasetAccess::test_no_suggestion_for_unrelated_key	20	kept	Pins threshold in fuzzy match — unrelated keys must NOT emit bogus suggestions.	<pending>
+tests/test_readers_base.py::TestFieldDatasetSlicing::test_isel_scalar_reduces_dim	20	kept	Pins that scalar isel collapses the dim on both array and GridInfo.dimensions — guards the grid-and-data-stay-in-sync invariant.	<pending>
+tests/test_readers_base.py::TestFieldDatasetSlicing::test_isel_slice_keeps_dim	20	kept	Pins slice isel preserves the axis and shrinks dimensions to the slice length; regression to ``collapse-on-any-isel`` would break 3D→3D subdomain extraction.	<pending>
+tests/test_readers_base.py::TestFieldDatasetSlicing::test_sel_scalar_drops_dim	20	kept	sel (coord-based) mirrors isel behavior on scalar drop — prevents divergence between the two accessors.	<pending>
+tests/test_readers_base.py::TestFieldDatasetSlicing::test_sel_method_nearest	20	kept	Pins method='nearest' is forwarded to xarray; without it, sel with off-grid coords would KeyError on user code.	<pending>
+tests/test_readers_base.py::TestFieldDatasetSlicing::test_metadata_preserved	20	kept	Pins species/physics/metadata survive isel — a regression to shallow-copy would drop units info and break unit conversion after slicing.	<pending>
+tests/test_readers_base.py::TestFieldDatasetSlicing::test_dict_indexers_for_unicode_dims	20	kept	Spherical θ/φ dims can only be accessed via dict indexer (not kwargs) — pins the non-ASCII workaround for spherical grids.	<pending>
+tests/test_readers_base.py::TestFieldDatasetSlicing::test_grid_origin_updated_after_slice	20	kept	After isel(x=2:6), origin must shift by 2*dx; guards the grid/coord consistency after spatial cropping — breakage silently mislocalizes every downstream feature.	<pending>
+tests/test_readers_base.py::TestAliases::test_geometry_aliases[cartesian]	20	kept	Pins the Cartesian alias map Bx/By/Bz→B1/B2/B3 as a registry contract for readers.	<pending>
+tests/test_readers_base.py::TestAliases::test_geometry_aliases[spherical]	20	kept	Pins the spherical alias map Br/Btheta/Bphi→B1/B2/B3 — schema.md §3 contract, not covered anywhere else.	<pending>
+tests/test_readers_base.py::TestAliases::test_geometry_aliases[cylindrical]	20	kept	Pins cylindrical Br/Bphi/Bz→B1/B2/B3 — different from spherical (axis 3 is z not phi) and the sole guard.	<pending>
+tests/test_readers_base.py::TestAliases::test_custom_aliases_override	20	kept	User-supplied aliases override geometry defaults; without this pin, collision resolution could silently favor one side.	<pending>
+tests/test_readers_base.py::TestAliases::test_aliases_only_for_existing_fields	20	kept	Aliases for absent fields silently drop — prevents ``has_field('By')`` returning True when B2 is missing (misleading diagnostic state).	<pending>
+tests/test_readers_base.py::TestAliases::test_n_e_n_i_aliases	20	kept	Pins n_e/n_i convenience aliases resolve to n_s0/n_s1 per schema.md electron/ion convention.	<pending>
+tests/test_readers_base.py::TestAliases::test_n_e_alias_inactive_without_n_s0	20	kept	n_e alias must NOT activate if n_s0 is absent; guards silent false-positive from alias resolution.	<pending>
+tests/test_readers_base.py::TestAliases::test_four_velocity_aliases	20	kept	Pins ux/uy/uz→u1/u2/u3 for relativistic PIC output — schema.md §3 relativistic variable.	<pending>
+tests/test_readers_base.py::TestSimulationReader::test_protocol_satisfied	20	kept	Runtime-checkable protocol must accept a duck-typed reader; guards against the @runtime_checkable decoration being lost in a refactor.	<pending>
+tests/test_readers_base.py::TestSimulationReader::test_supports_selective_read	20	kept	supports_selective_read must inspect ``fields=`` kwarg by signature introspection; pins the two cases — kwarg-present vs kwarg-absent — and the detection function itself.	<pending>
+tests/test_readers_base.py::TestSimulationConfigImmutability::test_physics_not_mutable	20	kept	Pins frozen dataclass + MappingProxyType on metadata per CLAUDE.md thread-safety rule — prevents shared mutable state across threads.	<pending>
+tests/test_readers_base.py::TestSimulationConfigImmutability::test_physics_extra_not_mutable	20	kept	PhysicsParams.extra must be immutable; pins MappingProxyType wrap for runtime-open physics keys that must not be mutated after load.	<pending>
+tests/test_readers_base.py::TestWithDerived::test_single_field	20	kept	Pins with_derived('|B|') computes sqrt(B1²+B2²+B3²); sole guard for the compute()→with_derived() round-trip.	<pending>
+tests/test_readers_base.py::TestWithDerived::test_multiple_fields	20	kept	with_derived accepts multiple names; guards against it silently keeping only the first argument.	<pending>
+tests/test_readers_base.py::TestWithDerived::test_idempotent_for_existing_fields	20	kept	with_derived('B1') when B1 exists must not recompute or corrupt the field; guards the idempotence contract.	<pending>
+tests/test_readers_base.py::TestWithDerived::test_survives_isel	20	kept	Derived fields must survive isel — without this, slicing drops compute() results and forces recomputation after every slice.	<pending>
+tests/test_readers_base.py::TestWithDerived::test_survives_plane_selection	20	kept	Derived fields must survive PlaneSelection.apply — companion to isel case, different code path.	<pending>
+tests/test_readers_base.py::TestWithDerived::test_unit_conversion	20	kept	with_derived fields carry quantity_type metadata so in_si() works; pins the metadata-propagation contract.	<pending>
+tests/test_readers_base.py::TestWithDerived::test_field_info_populated	20	kept	field_info('|B|') must return b_field quantity_type — pins metadata registry lookup on derived results.	<pending>
+tests/test_readers_base.py::TestWithDerived::test_chaining_avoids_recomputation	20	kept	Pins the e_B = |B|²/2 = 0.5 result when |B|=1; guards compute-registry dependency ordering (|B| is dep of e_B).	<pending>
+tests/test_readers_base.py::TestWithDerived::test_vector_siblings	20	kept	Requesting S1 must populate S2 and S3 too — vector-component quantities are computed together; pins the sibling-storage rule in the registry.	<pending>
+tests/test_readers_base.py::TestWithFieldAutoFill::test_known_field_auto_fills	20	kept	Pins auto-fill of metadata (quantity_type, long_name) when user supplies only the array — the core ergonomic contract of with_field for registered names.	<pending>
+tests/test_readers_base.py::TestWithFieldAutoFill::test_unknown_field_without_qt_raises	20	kept	Unknown field + no explicit qt must fail loud (ValueError) — guards the fail-loud selection rule from CLAUDE.md.	<pending>
+tests/test_readers_base.py::TestWithFieldAutoFill::test_explicit_override	20	kept	Explicit quantity_type overrides the registry default; guards the user-override rule from silently being ignored.	<pending>
+tests/test_reconnection.py::TestFindSaddlePoints::test_hyperbolic_saddle	20	kept	Pins saddle at origin for psi=x²-y²; the analytic flux-function test — any regression in Hessian sign or index convention is caught here.	<pending>
+tests/test_reconnection.py::TestFindSaddlePoints::test_no_saddle_in_parabola	20	kept	Elliptic topology (psi=x²+y²) must return zero saddles; guards against false-positive X-point detections at extrema.	<pending>
+tests/test_reconnection.py::TestFindSaddlePoints::test_multiple_saddles	20	kept	sin(x)sin(y) has multiple interior saddles; pins min_separation suppression behavior and multi-saddle discovery.	<pending>
+tests/test_reconnection.py::TestFindSaddlePoints::test_invalid_shape	20	hardened	Parametrized 1D/3D/4D — was only 1D — guards against a truthy ``ndim != 2`` check regressing to ``ndim == 1`` only.	<pending>
+tests/test_reconnection.py::TestFindSaddlePoints::test_grid_too_small	20	hardened	Parametrized axis-asymmetric shapes (4×10, 10×2) — guards ``nx<5 or ny<5`` from regressing to AND which would let one-axis-tiny grids slip through.	<pending>
+tests/test_reconnection.py::TestReconnectionRate::test_basic	20	merged	Merged with test_positive_rate into a single parametrized test_finite_difference covering sign, magnitude, dt scaling, and off-center x_point indexing.	<pending>
+tests/test_reconnection.py::TestReconnectionRate::test_positive_rate	20	merged	Merged with test_basic — see test_finite_difference. Net assertion count increased (was 2 allclose calls, now 4).	<pending>
+tests/test_reconnection.py::TestReconnectionEdgeCases::test_nan_in_psi_no_crash	20	kept	NaN in psi (from SphereSelection or regrid) must not crash saddle detection — pins graceful NaN handling for masked datasets.	<pending>
+tests/test_reconnection.py::TestReconnectionEdgeCases::test_xpoint_just_inside_margin	20	kept	Pins that saddles 6 cells from the upper edge are still reported (inside the 2-cell margin guard); guards against off-by-one shrinkage of the interior window.	<pending>
+tests/test_reconnection.py::TestReconnectionEdgeCases::test_reconnection_rate_preserves_nan	20	kept	NaN at X-point must propagate to rate=NaN (not silently 0); guards against a NaN-to-zero coercion anywhere in the subtraction path.	<pending>
 tests/test_registry.py::TestRegisterUnregister::test_register_and_lookup	0	not-yet-reviewed		
 tests/test_registry.py::TestRegisterUnregister::test_unregister_removes_entry	0	not-yet-reviewed		
 tests/test_registry.py::TestRegisterUnregister::test_unregister_nonexistent_raises	0	not-yet-reviewed		
