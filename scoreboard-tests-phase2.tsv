@@ -523,66 +523,66 @@ tests/test_derived.py::TestMirrorParameter::test_large_beta_limit	9	kept	beta ->
 tests/test_derived.py::TestMagneticShearAngle::test_parallel	9	kept	B_a parallel B_b -> theta=0 at atol=1e-15. arccos(1) precision guard.	210cf688cc2eb31212ec6f457d5c271c14159b66
 tests/test_derived.py::TestMagneticShearAngle::test_antiparallel	9	kept	Anti-parallel B_a,B_b -> theta=pi at rtol=1e-14. arccos(-1) pin.	210cf688cc2eb31212ec6f457d5c271c14159b66
 tests/test_derived.py::TestMagneticShearAngle::test_perpendicular	9	kept	B_a perp B_b -> theta=pi/2 at rtol=1e-14. arccos(0) pin.	210cf688cc2eb31212ec6f457d5c271c14159b66
-tests/test_derived.py::TestMagneticShearAngle::test_45_degrees	10	kept	Exact cos(45 deg) = sqrt(2)/2 hand-check at rtol=1e-14 guards against refactors swapping acos/asin or dropping normalization in shear-angle dot product.	<pending>
-tests/test_derived.py::TestMagneticFluxFunction::test_uniform_field	10	kept	psi = -int B2 dx hand-check on uniform field guards the sign convention and monotone decrease along x; catches cumsum axis/sign regressions.	<pending>
-tests/test_derived.py::TestMagneticFluxFunction::test_sign_convention	10	kept	Round-trip -d(psi)/dx ~ B2 verifies the Biskamp 2000 sign convention; guards against future sign flip in psi definition.	<pending>
-tests/test_derived.py::TestMagneticFluxFunction::test_3d_raises	10	kept	Shape validation: ValueError on 3D input. Prevents silent 3D-broadcasting that would swallow wrong-axis cumsum regressions.	<pending>
-tests/test_derived.py::TestEdgeCaseInvariants::test_empty_arrays_propagate	10	kept	Aggregated empty-input shape invariant across 10 derived funcs. One failure listing all regressions beats N parametrized copies per CLAUDE.md guidance.	<pending>
-tests/test_derived.py::TestEdgeCaseInvariants::test_single_element_preserves_shape	10	kept	Aggregated single-element shape sweep. Catches accidental .item() or np.asscalar in any derived func that would collapse (1,) to 0-d.	<pending>
-tests/test_derived.py::TestEdgeCaseInvariants::test_negative_density_returns_nan	10	kept	Aggregated NaN-propagation contract: sqrt/recip of negative density must produce NaN not raise. Guards against add of ValueError checks that would break pipeline callers.	<pending>
-tests/test_derived.py::TestEdgeCaseInvariants::test_charge_sign_invariance	10	kept	Aggregated |q|/q^2 invariance across 5 charge-dependent funcs. Catches accidental drop of abs() or swap of q**2 -> q in refactor.	<pending>
-tests/test_derived.py::TestDebyeLengthScaling::test_temperature_scaling[1.0-1.0]	10	kept	lambda_D ~ sqrt(T) scaling law check at rtol=1e-15. Complements single known-value test; scaling laws survive single-point refactor bugs.	<pending>
-tests/test_derived.py::TestDebyeLengthScaling::test_temperature_scaling[2.0-1.4142135623730951]	10	kept	lambda_D ~ sqrt(T) scaling law check at T=2.	<pending>
-tests/test_derived.py::TestDebyeLengthScaling::test_temperature_scaling[4.0-2.0]	10	kept	lambda_D ~ sqrt(T) scaling law check at T=4.	<pending>
-tests/test_derived.py::TestDebyeLengthScaling::test_temperature_scaling[0.25-0.5]	10	kept	lambda_D ~ sqrt(T) scaling law check at T=0.25 (below unity).	<pending>
-tests/test_derived.py::TestDebyeLengthScaling::test_density_scaling[1.0-1.0]	10	kept	lambda_D ~ 1/sqrt(n) scaling law baseline.	<pending>
-tests/test_derived.py::TestDebyeLengthScaling::test_density_scaling[4.0-0.5]	10	kept	lambda_D ~ 1/sqrt(n) scaling law check at n=4.	<pending>
-tests/test_derived.py::TestDebyeLengthScaling::test_density_scaling[0.25-2.0]	10	kept	lambda_D ~ 1/sqrt(n) scaling law check below unity.	<pending>
-tests/test_derived.py::TestDebyeLengthScaling::test_density_scaling[16.0-0.25]	10	kept	lambda_D ~ 1/sqrt(n) scaling law check at high density.	<pending>
-tests/test_derived.py::TestLorentzFactor::test_stationary	10	kept	Gamma(v=0) = 1 boundary sanity. Catches off-by-sign in 1 - v^2/c^2 denominator.	<pending>
-tests/test_derived.py::TestLorentzFactor::test_known_value	10	kept	v=0.6c -> gamma=1.25 hand-check with rtol=1e-15. Anchors the formula to a single tabulated value.	<pending>
-tests/test_derived.py::TestLorentzFactor::test_nonunit_c	10	kept	Verifies c!=1 (SI-like) path: v=6, c=10 -> gamma=1.25. Catches hardcoded c=1 in normalization.	<pending>
-tests/test_derived.py::TestLorentzFactor::test_four_velocity_stationary	10	kept	Gamma(u=0) = 1 from four-velocity branch. Guards numerically-stable sqrt(1+u^2/c^2) path.	<pending>
-tests/test_derived.py::TestLorentzFactor::test_three_and_four_velocity_agree	10	kept	Cross-consistency between 3v and 4v forms at multiple speeds up to 0.99c. Catches divergence as v->c where cancellation bites.	<pending>
-tests/test_derived.py::TestMagnetization::test_zero_field	10	kept	sigma(B=0) = 0 boundary check. Guards divide-by-zero handling in B^2/(rho c^2).	<pending>
-tests/test_derived.py::TestMagnetization::test_unit_sigma	10	kept	B^2 = rho c^2 -> sigma=1 hand-check. Anchors the MigBo 2013 definition.	<pending>
-tests/test_derived.py::TestMagnetization::test_nonunit_c	10	kept	B=2, rho=1, c=2 -> sigma=1. Catches hardcoded c=1 in magnetization formula.	<pending>
+tests/test_derived.py::TestMagneticShearAngle::test_45_degrees	10	kept	Exact cos(45 deg) = sqrt(2)/2 hand-check at rtol=1e-14 guards against refactors swapping acos/asin or dropping normalization in shear-angle dot product.	e869858
+tests/test_derived.py::TestMagneticFluxFunction::test_uniform_field	10	kept	psi = -int B2 dx hand-check on uniform field guards the sign convention and monotone decrease along x; catches cumsum axis/sign regressions.	e869858
+tests/test_derived.py::TestMagneticFluxFunction::test_sign_convention	10	kept	Round-trip -d(psi)/dx ~ B2 verifies the Biskamp 2000 sign convention; guards against future sign flip in psi definition.	e869858
+tests/test_derived.py::TestMagneticFluxFunction::test_3d_raises	10	kept	Shape validation: ValueError on 3D input. Prevents silent 3D-broadcasting that would swallow wrong-axis cumsum regressions.	e869858
+tests/test_derived.py::TestEdgeCaseInvariants::test_empty_arrays_propagate	10	kept	Aggregated empty-input shape invariant across 10 derived funcs. One failure listing all regressions beats N parametrized copies per CLAUDE.md guidance.	e869858
+tests/test_derived.py::TestEdgeCaseInvariants::test_single_element_preserves_shape	10	kept	Aggregated single-element shape sweep. Catches accidental .item() or np.asscalar in any derived func that would collapse (1,) to 0-d.	e869858
+tests/test_derived.py::TestEdgeCaseInvariants::test_negative_density_returns_nan	10	kept	Aggregated NaN-propagation contract: sqrt/recip of negative density must produce NaN not raise. Guards against add of ValueError checks that would break pipeline callers.	e869858
+tests/test_derived.py::TestEdgeCaseInvariants::test_charge_sign_invariance	10	kept	Aggregated |q|/q^2 invariance across 5 charge-dependent funcs. Catches accidental drop of abs() or swap of q**2 -> q in refactor.	e869858
+tests/test_derived.py::TestDebyeLengthScaling::test_temperature_scaling[1.0-1.0]	10	kept	lambda_D ~ sqrt(T) scaling law check at rtol=1e-15. Complements single known-value test; scaling laws survive single-point refactor bugs.	e869858
+tests/test_derived.py::TestDebyeLengthScaling::test_temperature_scaling[2.0-1.4142135623730951]	10	kept	lambda_D ~ sqrt(T) scaling law check at T=2.	e869858
+tests/test_derived.py::TestDebyeLengthScaling::test_temperature_scaling[4.0-2.0]	10	kept	lambda_D ~ sqrt(T) scaling law check at T=4.	e869858
+tests/test_derived.py::TestDebyeLengthScaling::test_temperature_scaling[0.25-0.5]	10	kept	lambda_D ~ sqrt(T) scaling law check at T=0.25 (below unity).	e869858
+tests/test_derived.py::TestDebyeLengthScaling::test_density_scaling[1.0-1.0]	10	kept	lambda_D ~ 1/sqrt(n) scaling law baseline.	e869858
+tests/test_derived.py::TestDebyeLengthScaling::test_density_scaling[4.0-0.5]	10	kept	lambda_D ~ 1/sqrt(n) scaling law check at n=4.	e869858
+tests/test_derived.py::TestDebyeLengthScaling::test_density_scaling[0.25-2.0]	10	kept	lambda_D ~ 1/sqrt(n) scaling law check below unity.	e869858
+tests/test_derived.py::TestDebyeLengthScaling::test_density_scaling[16.0-0.25]	10	kept	lambda_D ~ 1/sqrt(n) scaling law check at high density.	e869858
+tests/test_derived.py::TestLorentzFactor::test_stationary	10	kept	Gamma(v=0) = 1 boundary sanity. Catches off-by-sign in 1 - v^2/c^2 denominator.	e869858
+tests/test_derived.py::TestLorentzFactor::test_known_value	10	kept	v=0.6c -> gamma=1.25 hand-check with rtol=1e-15. Anchors the formula to a single tabulated value.	e869858
+tests/test_derived.py::TestLorentzFactor::test_nonunit_c	10	kept	Verifies c!=1 (SI-like) path: v=6, c=10 -> gamma=1.25. Catches hardcoded c=1 in normalization.	e869858
+tests/test_derived.py::TestLorentzFactor::test_four_velocity_stationary	10	kept	Gamma(u=0) = 1 from four-velocity branch. Guards numerically-stable sqrt(1+u^2/c^2) path.	e869858
+tests/test_derived.py::TestLorentzFactor::test_three_and_four_velocity_agree	10	kept	Cross-consistency between 3v and 4v forms at multiple speeds up to 0.99c. Catches divergence as v->c where cancellation bites.	e869858
+tests/test_derived.py::TestMagnetization::test_zero_field	10	kept	sigma(B=0) = 0 boundary check. Guards divide-by-zero handling in B^2/(rho c^2).	e869858
+tests/test_derived.py::TestMagnetization::test_unit_sigma	10	kept	B^2 = rho c^2 -> sigma=1 hand-check. Anchors the MigBo 2013 definition.	e869858
+tests/test_derived.py::TestMagnetization::test_nonunit_c	10	kept	B=2, rho=1, c=2 -> sigma=1. Catches hardcoded c=1 in magnetization formula.	e869858
 tests/test_derived.py::TestRelativisticLimits::test_kinetic_energy_density_nonrel_limit	9	hardened	Tightened rtol 1e-5 -> 1e-6. Taylor residual 3v^2/(8c^2) ~ 7.5e-7 at v=1e-3; 1.3x margin. Catches leading-order cancellation drift.	210cf688cc2eb31212ec6f457d5c271c14159b66
 tests/test_derived.py::TestRelativisticLimits::test_alfven_speed_nonrel_limit	9	hardened	Tightened rtol 1e-3 -> 1e-4. sigma=1e-4 -> residual sigma/2=5e-5; 2x margin. Catches swap of sqrt(sigma/(1+sigma)) for sigma.	210cf688cc2eb31212ec6f457d5c271c14159b66
-tests/test_derived.py::TestRelativisticLimits::test_alfven_speed_approaches_c	10	kept	Ultrarelativistic sigma -> inf -> v_A -> c limit check. Guards Lyubarsky 2005 formula asymptote.	<pending>
-tests/test_derived.py::TestRelativisticLimits::test_magnetosonic_less_than_c	10	kept	Relativistic v_ms < c invariant per Einstein velocity composition. Catches removal of the -v_A^2 c_s^2/c^2 coupling term.	<pending>
+tests/test_derived.py::TestRelativisticLimits::test_alfven_speed_approaches_c	10	kept	Ultrarelativistic sigma -> inf -> v_A -> c limit check. Guards Lyubarsky 2005 formula asymptote.	e869858
+tests/test_derived.py::TestRelativisticLimits::test_magnetosonic_less_than_c	10	kept	Relativistic v_ms < c invariant per Einstein velocity composition. Catches removal of the -v_A^2 c_s^2/c^2 coupling term.	e869858
 tests/test_derived.py::TestRelativisticLimits::test_magnetosonic_nonrel_limit	9	hardened	Tightened rtol 1e-5 -> 1e-6. Coupling v_A^2 c_s^2/c^2 = 1e-12 in 2e-6 sum -> residual 2.5e-7; 4x margin.	210cf688cc2eb31212ec6f457d5c271c14159b66
 tests/test_derived.py::TestRelativisticLimits::test_sound_speed_nonrel_limit	9	hardened	Tightened rtol 1e-3 -> 1e-5. Leading correction gamma*P/((gamma-1)*rho*c^2) ~ 1.25e-6 at P=1e-6; 8x margin.	210cf688cc2eb31212ec6f457d5c271c14159b66
-tests/test_derived.py::TestRelativisticLimits::test_gyrofrequency_with_lorentz_factor	10	kept	omega_c_rel = omega_c/gamma scaling. Catches drop of lorentz_factor argument in cyclotron frequency.	<pending>
-tests/test_derived.py::TestRelativisticLimits::test_plasma_frequency_with_lorentz_factor	10	kept	omega_p_rel = omega_p/sqrt(gamma) scaling. Catches wrong exponent (1 vs 1/2) in rel plasma frequency correction.	<pending>
-tests/test_derived.py::TestRelativisticLimits::test_thermal_speed_capped_at_c	10	kept	Hot-plasma cap: v_th(T=1e10, c=1) < c. Catches removal of sqrt(1 + v_th^2/c^2) denominator.	<pending>
+tests/test_derived.py::TestRelativisticLimits::test_gyrofrequency_with_lorentz_factor	10	kept	omega_c_rel = omega_c/gamma scaling. Catches drop of lorentz_factor argument in cyclotron frequency.	e869858
+tests/test_derived.py::TestRelativisticLimits::test_plasma_frequency_with_lorentz_factor	10	kept	omega_p_rel = omega_p/sqrt(gamma) scaling. Catches wrong exponent (1 vs 1/2) in rel plasma frequency correction.	e869858
+tests/test_derived.py::TestRelativisticLimits::test_thermal_speed_capped_at_c	10	kept	Hot-plasma cap: v_th(T=1e10, c=1) < c. Catches removal of sqrt(1 + v_th^2/c^2) denominator.	e869858
 tests/test_derived.py::TestRelativisticLimits::test_thermal_speed_nonrel_limit	9	hardened	Tightened rtol 1e-5 -> 1e-6. Residual v_th^2/(2c^2)=5e-7 at T=1e-6, m=1, c=1; 2x margin.	210cf688cc2eb31212ec6f457d5c271c14159b66
-tests/test_derived.py::TestRelativisticLimits::test_gyroradius_with_lorentz_factor	10	kept	r_rel = gamma * r scaling (from omega_c/gamma in denominator). Catches wrong-side lorentz_factor scaling.	<pending>
-tests/test_derived.py::TestRelativisticLimits::test_skin_depth_with_lorentz_factor	10	kept	d_rel = sqrt(gamma) * d scaling. Catches wrong-side lorentz_factor correction on skin depth.	<pending>
-tests/test_diagnostics.py::TestL2RelativeError::test_hand_calculation	10	kept	sqrt(8)/sqrt(5) hand-check at rtol=1e-15. Anchors the discrete unweighted L2 formula.	<pending>
-tests/test_diagnostics.py::TestL2RelativeError::test_zero_reference_gives_inf	10	kept	Zero reference -> inf boundary per conventions.md. Guards against silent divide-by-zero returning 0 or NaN.	<pending>
-tests/test_diagnostics.py::TestL2RelativeError::test_both_zero_gives_nan	10	kept	0/0 -> NaN boundary case. Distinguishes from zero-reference + nonzero-computed path.	<pending>
-tests/test_diagnostics.py::TestL2RelativeError::test_multidimensional	10	kept	Multi-d array support; a==a -> 0, a vs zeros -> inf. Catches dimension-squashing regressions.	<pending>
-tests/test_diagnostics.py::TestL2RelativeError::test_nan_omit_default_skips_and_warns	10	kept	Default nan_policy='omit' masks and warns per conventions.md. Protects the documented default against silent-drop regression.	<pending>
-tests/test_diagnostics.py::TestL2RelativeError::test_nan_propagate_policy_keeps_nan	10	kept	nan_policy='propagate' strict branch for convergence studies. Catches accidental default-flip.	<pending>
-tests/test_diagnostics.py::TestL2RelativeError::test_nan_raise_policy_raises	10	kept	nan_policy='raise' pipeline-contract branch. Verifies ValueError with cell count in message.	<pending>
-tests/test_diagnostics.py::TestL2RelativeError::test_nan_all_masked_returns_nan	10	kept	All-NaN input -> NaN with higher-severity warning. Guards edge case where joint mask empties both arrays.	<pending>
-tests/test_diagnostics.py::TestL2RelativeError::test_nan_denominator_uses_same_valid_set	10	kept	Critical invariant: numerator/denominator must use same valid-cell mask. Catches single-side masking that would artificially shrink relative error.	<pending>
-tests/test_diagnostics.py::TestLinfError::test_hand_calculation	10	kept	Max abs diff = 3.0 hand-check at rtol=1e-15. Anchors the absolute (not relative) L-inf convention.	<pending>
-tests/test_diagnostics.py::TestLinfError::test_nan_omit_default_skips_and_warns	10	kept	Default omit masks NaN with warning; symmetric to L2 case.	<pending>
-tests/test_diagnostics.py::TestLinfError::test_nan_propagate_policy_keeps_nan	10	kept	propagate branch for L-inf.	<pending>
-tests/test_diagnostics.py::TestLinfError::test_nan_raise_policy_raises	10	kept	raise branch for L-inf.	<pending>
-tests/test_diagnostics.py::TestLinfError::test_nan_all_masked_returns_nan	10	kept	All-NaN -> NaN for L-inf.	<pending>
-tests/test_diagnostics.py::TestFieldDifference::test_shape_mismatch_raises	10	kept	ValueError on shape mismatch. Prevents silent broadcasting of (2,) vs (1,).	<pending>
-tests/test_diagnostics.py::TestFieldDifference::test_preserves_shape	10	kept	Output preserves (2,3,4) input shape. Catches accidental flatten/squeeze.	<pending>
-tests/test_diagnostics.py::TestFieldDifference::test_nan_propagation	10	kept	NaN in input -> NaN in output. Guards against NaN-swallowing in difference.	<pending>
-tests/test_diagnostics.py::TestFieldEnergy::test_uniform_field_3d	10	kept	64 cells * 0.125 dV = 8.0 hand-check. Anchors the volume-integral formula.	<pending>
-tests/test_diagnostics.py::TestFieldEnergy::test_uniform_field_value	10	kept	sum(3.0)*dV = 24.0 with f!=1. Catches constant-folding of field value.	<pending>
-tests/test_diagnostics.py::TestFieldEnergy::test_1d	10	kept	1D integration: sum([1,2,3,4]) * 0.5 = 5.0. Verifies 1D dV handling.	<pending>
-tests/test_diagnostics.py::TestFieldEnergy::test_2d	10	kept	2D integration: 9 * (2*2) = 36. Verifies 2D dA handling.	<pending>
-tests/test_diagnostics.py::TestFieldEnergy::test_spacing_dimension_mismatch_raises	10	kept	ValueError when len(spacing) != ndim. Prevents silent missing-axis integration.	<pending>
-tests/test_diagnostics.py::TestFieldEnergy::test_nan_propagation	10	kept	NaN in field -> NaN in integral (no nanable sum). Default is strict.	<pending>
-tests/test_diagnostics.py::TestDivB::test_div_curl_is_zero	10	kept	Vector identity div(curl(A)) = 0 to atol=1e-10 using the same FD stencil. Guards stencil consistency between curl and div.	<pending>
+tests/test_derived.py::TestRelativisticLimits::test_gyroradius_with_lorentz_factor	10	kept	r_rel = gamma * r scaling (from omega_c/gamma in denominator). Catches wrong-side lorentz_factor scaling.	e869858
+tests/test_derived.py::TestRelativisticLimits::test_skin_depth_with_lorentz_factor	10	kept	d_rel = sqrt(gamma) * d scaling. Catches wrong-side lorentz_factor correction on skin depth.	e869858
+tests/test_diagnostics.py::TestL2RelativeError::test_hand_calculation	10	kept	sqrt(8)/sqrt(5) hand-check at rtol=1e-15. Anchors the discrete unweighted L2 formula.	e869858
+tests/test_diagnostics.py::TestL2RelativeError::test_zero_reference_gives_inf	10	kept	Zero reference -> inf boundary per conventions.md. Guards against silent divide-by-zero returning 0 or NaN.	e869858
+tests/test_diagnostics.py::TestL2RelativeError::test_both_zero_gives_nan	10	kept	0/0 -> NaN boundary case. Distinguishes from zero-reference + nonzero-computed path.	e869858
+tests/test_diagnostics.py::TestL2RelativeError::test_multidimensional	10	kept	Multi-d array support; a==a -> 0, a vs zeros -> inf. Catches dimension-squashing regressions.	e869858
+tests/test_diagnostics.py::TestL2RelativeError::test_nan_omit_default_skips_and_warns	10	kept	Default nan_policy='omit' masks and warns per conventions.md. Protects the documented default against silent-drop regression.	e869858
+tests/test_diagnostics.py::TestL2RelativeError::test_nan_propagate_policy_keeps_nan	10	kept	nan_policy='propagate' strict branch for convergence studies. Catches accidental default-flip.	e869858
+tests/test_diagnostics.py::TestL2RelativeError::test_nan_raise_policy_raises	10	kept	nan_policy='raise' pipeline-contract branch. Verifies ValueError with cell count in message.	e869858
+tests/test_diagnostics.py::TestL2RelativeError::test_nan_all_masked_returns_nan	10	kept	All-NaN input -> NaN with higher-severity warning. Guards edge case where joint mask empties both arrays.	e869858
+tests/test_diagnostics.py::TestL2RelativeError::test_nan_denominator_uses_same_valid_set	10	kept	Critical invariant: numerator/denominator must use same valid-cell mask. Catches single-side masking that would artificially shrink relative error.	e869858
+tests/test_diagnostics.py::TestLinfError::test_hand_calculation	10	kept	Max abs diff = 3.0 hand-check at rtol=1e-15. Anchors the absolute (not relative) L-inf convention.	e869858
+tests/test_diagnostics.py::TestLinfError::test_nan_omit_default_skips_and_warns	10	kept	Default omit masks NaN with warning; symmetric to L2 case.	e869858
+tests/test_diagnostics.py::TestLinfError::test_nan_propagate_policy_keeps_nan	10	kept	propagate branch for L-inf.	e869858
+tests/test_diagnostics.py::TestLinfError::test_nan_raise_policy_raises	10	kept	raise branch for L-inf.	e869858
+tests/test_diagnostics.py::TestLinfError::test_nan_all_masked_returns_nan	10	kept	All-NaN -> NaN for L-inf.	e869858
+tests/test_diagnostics.py::TestFieldDifference::test_shape_mismatch_raises	10	kept	ValueError on shape mismatch. Prevents silent broadcasting of (2,) vs (1,).	e869858
+tests/test_diagnostics.py::TestFieldDifference::test_preserves_shape	10	kept	Output preserves (2,3,4) input shape. Catches accidental flatten/squeeze.	e869858
+tests/test_diagnostics.py::TestFieldDifference::test_nan_propagation	10	kept	NaN in input -> NaN in output. Guards against NaN-swallowing in difference.	e869858
+tests/test_diagnostics.py::TestFieldEnergy::test_uniform_field_3d	10	kept	64 cells * 0.125 dV = 8.0 hand-check. Anchors the volume-integral formula.	e869858
+tests/test_diagnostics.py::TestFieldEnergy::test_uniform_field_value	10	kept	sum(3.0)*dV = 24.0 with f!=1. Catches constant-folding of field value.	e869858
+tests/test_diagnostics.py::TestFieldEnergy::test_1d	10	kept	1D integration: sum([1,2,3,4]) * 0.5 = 5.0. Verifies 1D dV handling.	e869858
+tests/test_diagnostics.py::TestFieldEnergy::test_2d	10	kept	2D integration: 9 * (2*2) = 36. Verifies 2D dA handling.	e869858
+tests/test_diagnostics.py::TestFieldEnergy::test_spacing_dimension_mismatch_raises	10	kept	ValueError when len(spacing) != ndim. Prevents silent missing-axis integration.	e869858
+tests/test_diagnostics.py::TestFieldEnergy::test_nan_propagation	10	kept	NaN in field -> NaN in integral (no nanable sum). Default is strict.	e869858
+tests/test_diagnostics.py::TestDivB::test_div_curl_is_zero	10	kept	Vector identity div(curl(A)) = 0 to atol=1e-10 using the same FD stencil. Guards stencil consistency between curl and div.	e869858
 tests/test_diagnostics.py::TestDivB::test_known_divergence	0	not-yet-reviewed		
 tests/test_diagnostics.py::TestDivB::test_nan_propagation	0	not-yet-reviewed		
 tests/test_diagnostics.py::TestMaxDivB::test_wraps_div_b	0	not-yet-reviewed		
