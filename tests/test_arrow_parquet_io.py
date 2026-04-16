@@ -99,13 +99,29 @@ class TestMortonEncoding:
         assert codes[1] == 63
 
     def test_sort_preserves_locality(self):
+        # Morton sort is only useful if spatially nearby points end up
+        # adjacent after sorting.  A regression that returned
+        # ``np.arange(N)`` would pass a bare "not identity" check on
+        # randomly generated data; pin the actual locality property by
+        # comparing successive-neighbour distance against random order.
         rng = np.random.default_rng(99)
         x = rng.uniform(0, 100, 500)
         y = rng.uniform(0, 100, 500)
         z = rng.uniform(0, 100, 500)
         idx = morton_sort_indices(x, y, z)
-        # Check that the sorted array isn't just the original order
-        assert not np.array_equal(idx, np.arange(len(idx)))
+        pts_sorted = np.column_stack([x[idx], y[idx], z[idx]])
+        pts_random = np.column_stack([x, y, z])
+        mean_d_sorted = np.mean(
+            np.linalg.norm(np.diff(pts_sorted, axis=0), axis=1)
+        )
+        mean_d_random = np.mean(
+            np.linalg.norm(np.diff(pts_random, axis=0), axis=1)
+        )
+        # Morton sort should bring neighbours closer by a large factor
+        # (typically 5-10x on uniform 3D scatter); 2x is a conservative
+        # lower bound that a pure identity or reversed permutation cannot
+        # satisfy.
+        assert mean_d_sorted < 0.5 * mean_d_random
 
     def test_bits_1_gives_8_possible_codes(self):
         # 1 bit per axis = 8 octants
@@ -420,12 +436,17 @@ class TestSingleFileParquet:
         assert "speed" in table.column_names
 
     def test_speed_column_stripped_on_read(self, tmp_path: Path):
+        # Writers stamp a derived ``speed`` column for predicate
+        # pushdown, but ParticleData has no ``speed`` field; forwarding
+        # it from Arrow back into the dataclass would raise or leak a
+        # redundant attribute.  Pin that the read path strips it cleanly.
         pcl = _make_particles(50)
         fpath = tmp_path / "strip.parquet"
         particles_to_parquet(pcl, fpath)
         rebuilt = particles_from_parquet(fpath)
-        # ParticleData should not have a speed attribute leak
         assert rebuilt.n_particles == 50
+        assert not hasattr(rebuilt, "speed")
+        assert "speed" not in rebuilt.metadata
 
     def test_sort_by_invalid_raises(self, tmp_path: Path):
         pcl = _make_particles(10)
