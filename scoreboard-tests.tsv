@@ -45,54 +45,54 @@ tests/test_invariants/test_hall_and_ideal_perpendicularity.py::test_hall_electri
 tests/test_invariants/test_hall_and_ideal_perpendicularity.py::test_hall_electric_field_perpendicular_to_b	1	kept	E_Hall . B = 0 — completes the JxB perpendicularity pair (one alone is component-swap-tolerant).	ba1699a
 tests/test_invariants/test_hall_and_ideal_perpendicularity.py::test_hall_electric_field_uses_charge_magnitude	1	kept	hall_E(+q) == hall_E(-q) — pins |q| convention from derived.py:1777 docstring; catches missing abs().	ba1699a
 tests/test_invariants/test_lagrange_identity.py::test_lagrange_identity	1	kept	|ExB|^2 + (E.B)^2 = |E|^2|B|^2 Lagrange — pins cross-product expansion together with iter-15 S.B=0.	ba1699a
-tests/test_invariants/test_lorentz_consistency.py::test_lorentz_factor_from_v_and_u_agree	0	not-yet-reviewed		
-tests/test_invariants/test_lorentz_consistency.py::test_lorentz_factor_at_rest_is_one	0	not-yet-reviewed		
-tests/test_invariants/test_lorentz_consistency.py::test_lorentz_factor_is_even_in_velocity	0	not-yet-reviewed		
-tests/test_invariants/test_lorentz_consistency.py::test_lorentz_factor_is_at_least_one	0	not-yet-reviewed		
-tests/test_invariants/test_lorentz_consistency.py::test_magnetization_is_non_negative	0	not-yet-reviewed		
-tests/test_invariants/test_lorentz_consistency.py::test_magnetization_vanishes_at_zero_b	0	not-yet-reviewed		
-tests/test_invariants/test_macro_charge_identity.py::test_macro_charge_and_mass_bit_exact	0	not-yet-reviewed		
-tests/test_invariants/test_macro_charge_identity.py::test_macro_raises_when_species_scalar_missing	0	not-yet-reviewed		
-tests/test_invariants/test_macro_charge_identity.py::test_macro_raises_when_weight_missing	0	not-yet-reviewed		
-tests/test_invariants/test_norm_roundtrip.py::test_base_quantity_round_trip	0	not-yet-reviewed		
-tests/test_invariants/test_norm_roundtrip.py::test_every_system_covers_every_base_quantity[pic_standard-norm0]	0	not-yet-reviewed		
-tests/test_invariants/test_norm_roundtrip.py::test_every_system_covers_every_base_quantity[pic_electron-norm1]	0	not-yet-reviewed		
-tests/test_invariants/test_norm_roundtrip.py::test_every_system_covers_every_base_quantity[mhd_standard-norm2]	0	not-yet-reviewed		
-tests/test_invariants/test_norm_roundtrip.py::test_every_system_covers_every_base_quantity[identity-norm3]	0	not-yet-reviewed		
-tests/test_invariants/test_norm_roundtrip.py::test_compound_quantity_si_factor_round_trip	0	not-yet-reviewed		
-tests/test_invariants/test_ohms_law_decomposition.py::test_non_ideal_plus_ideal_equals_total_e	0	not-yet-reviewed		
-tests/test_invariants/test_ohms_law_decomposition.py::test_ideal_e_perpendicular_to_b	0	not-yet-reviewed		
-tests/test_invariants/test_ohms_law_decomposition.py::test_shear_angle_self_is_zero	0	not-yet-reviewed		
-tests/test_invariants/test_ohms_law_decomposition.py::test_shear_angle_antiparallel_is_pi	0	not-yet-reviewed		
-tests/test_invariants/test_operator_identities.py::test_div_curl_is_zero_to_machine_precision	0	not-yet-reviewed		
-tests/test_invariants/test_operator_linearity.py::test_curl_of_gradient_is_zero	0	not-yet-reviewed		
-tests/test_invariants/test_parseval_identity.py::test_parseval_boxcar_integral_equals_variance	0	not-yet-reviewed		
-tests/test_invariants/test_parseval_identity.py::test_parseval_boxcar_pure_sinusoid	0	not-yet-reviewed		
-tests/test_invariants/test_pressure_rotation.py::test_pressure_trace_is_rotation_invariant	0	not-yet-reviewed		
-tests/test_invariants/test_pressure_rotation.py::test_parallel_pressure_is_rotation_invariant	0	not-yet-reviewed		
-tests/test_invariants/test_pressure_rotation.py::test_perpendicular_pressure_is_rotation_invariant	0	not-yet-reviewed		
-tests/test_invariants/test_pressure_rotation.py::test_isotropic_pressure_equals_par_plus_two_perp_over_three	0	not-yet-reviewed		
-tests/test_invariants/test_pressure_two_path_consistency.py::test_total_pressure_from_per_species_tensors_two_paths	0	not-yet-reviewed		
-tests/test_invariants/test_reduction_identities.py::test_field_energy_is_linear_in_field	0	not-yet-reviewed		
-tests/test_invariants/test_reduction_identities.py::test_field_energy_scales_as_alpha_cubed_in_spacing	0	not-yet-reviewed		
-tests/test_invariants/test_reduction_identities.py::test_spatial_mean_is_linear	0	not-yet-reviewed		
-tests/test_invariants/test_reduction_identities.py::test_spatial_rms_is_homogeneous_in_magnitude	0	not-yet-reviewed		
-tests/test_invariants/test_reduction_identities.py::test_spatial_rms_squared_equals_mean_of_squares	0	not-yet-reviewed		
-tests/test_invariants/test_relativistic_limit.py::test_alfven_speed_limit	0	not-yet-reviewed		
-tests/test_invariants/test_relativistic_limit.py::test_sound_speed_limit	0	not-yet-reviewed		
-tests/test_invariants/test_relativistic_limit.py::test_magnetosonic_speed_limit	0	not-yet-reviewed		
-tests/test_invariants/test_relativistic_limit.py::test_thermal_speed_limit	0	not-yet-reviewed		
-tests/test_invariants/test_relativistic_limit.py::test_kinetic_energy_density_limit	0	not-yet-reviewed		
-tests/test_invariants/test_relativistic_limit.py::test_enthalpy_excluded_from_limit_is_ill_posed	0	not-yet-reviewed		
-tests/test_invariants/test_relativistic_speed_bounds.py::test_relativistic_alfven_speed_bounded_by_c	0	not-yet-reviewed		
-tests/test_invariants/test_relativistic_speed_bounds.py::test_relativistic_magnetosonic_speed_bounded_by_c	0	not-yet-reviewed		
-tests/test_invariants/test_relativistic_speed_bounds.py::test_magnetosonic_speed_exceeds_both_components	0	not-yet-reviewed		
-tests/test_invariants/test_relativistic_speed_bounds.py::test_relativistic_thermal_speed_bounded_by_c	0	not-yet-reviewed		
-tests/test_invariants/test_relativistic_speed_bounds.py::test_nonrelativistic_magnetosonic_can_exceed_c	0	not-yet-reviewed		
-tests/test_invariants/test_rotation_roundtrip.py::test_vector_magnitude_is_rotation_invariant	0	not-yet-reviewed		
-tests/test_invariants/test_rotation_roundtrip.py::test_vector_rotation_inverse_is_transpose	0	not-yet-reviewed		
-tests/test_invariants/test_rotation_roundtrip.py::test_pressure_tensor_rotation_inverse_is_transpose	0	not-yet-reviewed		
-tests/test_invariants/test_rotation_roundtrip.py::test_pressure_tensor_frobenius_norm_is_rotation_invariant	0	not-yet-reviewed		
+tests/test_invariants/test_lorentz_consistency.py::test_lorentz_factor_from_v_and_u_agree	2	kept	gamma_v(v) == gamma_u(gamma*v) — pins consistency between two Lorentz formulas; either alone could have sign/exponent bug.	<pending>
+tests/test_invariants/test_lorentz_consistency.py::test_lorentz_factor_at_rest_is_one	2	kept	gamma(v=0) = 1 exact for both formulas at any c — boundary case independent of normalization.	<pending>
+tests/test_invariants/test_lorentz_consistency.py::test_lorentz_factor_is_even_in_velocity	2	kept	gamma(-v) = gamma(v) bit-exact — pins v^2 dependence, catches sign-leak from missing square in 1 - v^2/c^2.	<pending>
+tests/test_invariants/test_lorentz_consistency.py::test_lorentz_factor_is_at_least_one	2	kept	gamma >= 1 for v in [0, c) — pins docstring claim 'Bounded [1, infinity)' (derived.py:2002).	<pending>
+tests/test_invariants/test_lorentz_consistency.py::test_magnetization_is_non_negative	2	kept	sigma = B^2/(rho*c^2) >= 0 — pins non-negativity from squared/positive-only inputs; catches sign leak.	<pending>
+tests/test_invariants/test_lorentz_consistency.py::test_magnetization_vanishes_at_zero_b	2	kept	sigma(B=0) = 0 exact — boundary case catches stray additive term in sigma formula.	<pending>
+tests/test_invariants/test_macro_charge_identity.py::test_macro_charge_and_mass_bit_exact	2	kept	macro_charge = species_charge*weight bit-exact — catches lossy refactor (float32 cast or dropped column reintroduction).	<pending>
+tests/test_invariants/test_macro_charge_identity.py::test_macro_raises_when_species_scalar_missing	2	kept	Missing species_charge/mass raises ValueError — Step 25b 'no two-branch fallback' contract.	<pending>
+tests/test_invariants/test_macro_charge_identity.py::test_macro_raises_when_weight_missing	2	kept	Missing weight raises ValueError naming weight — fail-loud per Step 25b contract.	<pending>
+tests/test_invariants/test_norm_roundtrip.py::test_base_quantity_round_trip	2	kept	to_si(normalize(x)) approx x for every base quantity x normalization system — round-trip gates SI conversion boundary.	<pending>
+tests/test_invariants/test_norm_roundtrip.py::test_every_system_covers_every_base_quantity[pic_standard-norm0]	2	kept	pic_standard normalization accepts all 6 base quantities — guards against constructor leaving any *_ref field unset.	<pending>
+tests/test_invariants/test_norm_roundtrip.py::test_every_system_covers_every_base_quantity[pic_electron-norm1]	2	kept	pic_electron normalization accepts all 6 base quantities — guards against constructor leaving any *_ref field unset.	<pending>
+tests/test_invariants/test_norm_roundtrip.py::test_every_system_covers_every_base_quantity[mhd_standard-norm2]	2	kept	mhd_standard normalization accepts all 6 base quantities — guards against constructor leaving any *_ref field unset.	<pending>
+tests/test_invariants/test_norm_roundtrip.py::test_every_system_covers_every_base_quantity[identity-norm3]	2	kept	identity normalization accepts all 6 base quantities — guards against constructor leaving any *_ref field unset.	<pending>
+tests/test_invariants/test_norm_roundtrip.py::test_compound_quantity_si_factor_round_trip	2	kept	x*si_factor/si_factor approx x for compound quantities; factor finite + positive — pins SI factor table validity.	<pending>
+tests/test_invariants/test_ohms_law_decomposition.py::test_non_ideal_plus_ideal_equals_total_e	2	kept	E' + E_ideal = E component-wise — V*B cancellation pins V*B sign consistency across two recipes.	<pending>
+tests/test_invariants/test_ohms_law_decomposition.py::test_ideal_e_perpendicular_to_b	2	kept	E_ideal . B = 0 — convective E perpendicular to B by construction; companion to iter-15 S.B=0.	<pending>
+tests/test_invariants/test_ohms_law_decomposition.py::test_shear_angle_self_is_zero	2	kept	theta(B,B) = 0 to ~1e-7 (arccos(1) amplification) — pins self-parallel limit, catches arccos-domain bug.	<pending>
+tests/test_invariants/test_ohms_law_decomposition.py::test_shear_angle_antiparallel_is_pi	2	kept	theta(B,-B) = pi — exercises arccos(-1) branch independently from arccos(1) limit.	<pending>
+tests/test_invariants/test_operator_identities.py::test_div_curl_is_zero_to_machine_precision	2	kept	div(curl F) = 0 bit-exactly everywhere (incl. boundary one-sided stencils) — pins linear-op commutativity.	<pending>
+tests/test_invariants/test_operator_linearity.py::test_curl_of_gradient_is_zero	2	kept	curl(grad f) = 0 bit-exactly — dual to div(curl F)=0; together pin np.gradient mixed-partial cancellation.	<pending>
+tests/test_invariants/test_parseval_identity.py::test_parseval_boxcar_integral_equals_variance	2	kept	integral P(k)dk = var(f) for boxcar window — pins Parseval normalization (spectral.py:26-30 docstring).	<pending>
+tests/test_invariants/test_parseval_identity.py::test_parseval_boxcar_pure_sinusoid	2	kept	Pure sinusoid PSD integral = A^2/2 — single-bin power-balance check independent of variance test.	<pending>
+tests/test_invariants/test_pressure_rotation.py::test_pressure_trace_is_rotation_invariant	2	kept	Tr(R*P*R^T) = Tr(P) — first symmetric-tensor invariant, generalizes single-axis test to full SO(3).	<pending>
+tests/test_invariants/test_pressure_rotation.py::test_parallel_pressure_is_rotation_invariant	2	kept	P_par invariant under joint (P,B) rotation — pins bilinear scalar contraction property of bhat.P.bhat.	<pending>
+tests/test_invariants/test_pressure_rotation.py::test_perpendicular_pressure_is_rotation_invariant	2	kept	P_perp invariant under joint rotation — derived from invariant trace + P_par; catches drift in chain.	<pending>
+tests/test_invariants/test_pressure_rotation.py::test_isotropic_pressure_equals_par_plus_two_perp_over_three	2	kept	P_iso = (P_par + 2*P_perp)/3 — equations.md sec 4 [^9] ties three scalars derived from same tensor.	<pending>
+tests/test_invariants/test_pressure_two_path_consistency.py::test_total_pressure_from_per_species_tensors_two_paths	2	kept	Two paths to P (split-then-add vs add-then-divide) agree — pins isotropic_pressure 1/3 + total_pressure linearity.	<pending>
+tests/test_invariants/test_reduction_identities.py::test_field_energy_is_linear_in_field	2	kept	E(alpha*f) = alpha*E(f) — catches accidental L2-norm^2 refactor (would give alpha^2 and lose sign).	<pending>
+tests/test_invariants/test_reduction_identities.py::test_field_energy_scales_as_alpha_cubed_in_spacing	2	kept	E(f, alpha*dx) = alpha^ndim * E(f, dx) — pins math.prod(spacing) (sum vs prod swap would give n*alpha).	<pending>
+tests/test_invariants/test_reduction_identities.py::test_spatial_mean_is_linear	2	kept	spatial_mean(alpha*f+beta*g) = alpha*mean(f)+beta*mean(g) — pure linearity of NaN-free unweighted mean.	<pending>
+tests/test_invariants/test_reduction_identities.py::test_spatial_rms_is_homogeneous_in_magnitude	2	kept	rms(alpha*f) = |alpha|*rms(f) — abs from squaring; sign-leak catches alpha-not-abs refactor.	<pending>
+tests/test_invariants/test_reduction_identities.py::test_spatial_rms_squared_equals_mean_of_squares	2	kept	rms(f)^2 = mean(f^2) literal definition check — sqrt round-trip incurs <=1 ulp; tightest reduction identity.	<pending>
+tests/test_invariants/test_relativistic_limit.py::test_alfven_speed_limit	2	kept	v_A^rel(c=1e6) approx v_A nonrel — pins c->inf limit per equations.md sec 8.1 column Notes.	<pending>
+tests/test_invariants/test_relativistic_limit.py::test_sound_speed_limit	2	kept	c_s^rel(c=1e6) approx c_s nonrel — same c->inf limit pattern, exercises sound_speed branch.	<pending>
+tests/test_invariants/test_relativistic_limit.py::test_magnetosonic_speed_limit	2	kept	v_ms^rel(c=1e6) approx sqrt(v_A^2+c_s^2) — relativistic composition reduces to non-rel additive form.	<pending>
+tests/test_invariants/test_relativistic_limit.py::test_thermal_speed_limit	2	kept	v_th^rel(c=1e6) approx v_th nonrel — pins Juttner-cap reduces to NRL form at v_th<<c.	<pending>
+tests/test_invariants/test_relativistic_limit.py::test_kinetic_energy_density_limit	2	kept	(gamma-1)*rho*c^2 -> 0.5*rho*v^2 at v<<c WITHOUT cancellation — regression for iter-7 rewrite (gamma^2*v^2*rho/(gamma+1) form).	<pending>
+tests/test_invariants/test_relativistic_limit.py::test_enthalpy_excluded_from_limit_is_ill_posed	2	kept	Doc guard: enthalpy h_rel = c^2 + h_nonrel by design (eq.md sec 2); test fires alarm if it accidentally converges.	<pending>
+tests/test_invariants/test_relativistic_speed_bounds.py::test_relativistic_alfven_speed_bounded_by_c	2	kept	v_A^rel <= c always — pins c-cap from sigma/(1+sigma) in [0,1) ratio.	<pending>
+tests/test_invariants/test_relativistic_speed_bounds.py::test_relativistic_magnetosonic_speed_bounded_by_c	2	kept	v_ms^rel <= c always (with 4*eps*c float64 sqrt overshoot atol from iter 22).	<pending>
+tests/test_invariants/test_relativistic_speed_bounds.py::test_magnetosonic_speed_exceeds_both_components	2	kept	v_ms >= max(v_A, c_s) — fast-mode ordering; catches sign/exponent bug in composition.	<pending>
+tests/test_invariants/test_relativistic_speed_bounds.py::test_relativistic_thermal_speed_bounded_by_c	2	kept	v_th^rel <= c at any T/m (incl. ultra-rel T/m up to 1e12) — Juttner cap is load-bearing in this regime.	<pending>
+tests/test_invariants/test_relativistic_speed_bounds.py::test_nonrelativistic_magnetosonic_can_exceed_c	2	kept	Non-rel v_ms can exceed c — guards against accidental cap on non-rel branch (alarm if rel cap leaks).	<pending>
+tests/test_invariants/test_rotation_roundtrip.py::test_vector_magnitude_is_rotation_invariant	2	kept	|R*v|^2 = |v|^2 for any SO(3) R — rank-0 invariant; squared form preserves precision over sqrt.	<pending>
+tests/test_invariants/test_rotation_roundtrip.py::test_vector_rotation_inverse_is_transpose	2	kept	R^T(R*v) = v — orthogonality round-trip; catches axis-order swap in rotate_vector_components.	<pending>
+tests/test_invariants/test_rotation_roundtrip.py::test_pressure_tensor_rotation_inverse_is_transpose	2	kept	R^T(R*P*R^T)R = P — 6-component round-trip catches index confusion R_ik R_jl <-> R_ki R_lj.	<pending>
+tests/test_invariants/test_rotation_roundtrip.py::test_pressure_tensor_frobenius_norm_is_rotation_invariant	2	kept	||P||_F^2 invariant — second symmetric-tensor invariant complementing iter-10 trace invariance.	<pending>
 tests/test_invariants/test_selection_keyerror.py::test_resolve_key_raises_keyerror	0	not-yet-reviewed		
 tests/test_invariants/test_selection_keyerror.py::test_getitem_raises_keyerror	0	not-yet-reviewed		
 tests/test_invariants/test_selection_keyerror.py::test_select_fields_raises_keyerror	0	not-yet-reviewed		
