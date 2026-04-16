@@ -264,43 +264,6 @@ tests/test_comparison.py::TestFieldDifferenceDataset::test_si_units_round_trip_n
 tests/test_comparison.py::TestFieldDifferenceDataset::test_code_units_keeps_source_normalization	5	kept	Pins units='code' preserves a.normalization (no identity swap) — catches a regression that zeros out the normalisation on every diff, breaking downstream in_si().	3470622
 tests/test_comparison.py::TestFieldDifferenceDataset::test_plottable_via_plot_field_slice	5	kept	Pins diff integrates with plot_field_slice end-to-end — catches a regression where field_difference_dataset emits a FieldDataset shape/metadata the plotting layer rejects.	3470622
 tests/test_comparison.py::TestFieldDifferenceDataset::test_explicit_field_list	5	kept	Pins fields=['B1'] restricts diff.field_names() to exactly ['B1'] — catches a regression where the kwarg is parsed but all intersected fields are still written.	3470622
-
-tests/test_comparison.py::TestCompareFields::test_identical_datasets_l2_zero	0	not-yet-reviewed		
-tests/test_comparison.py::TestCompareFields::test_identical_datasets_linf_zero	0	not-yet-reviewed		
-tests/test_comparison.py::TestCompareFields::test_uniform_offset_linf_matches	0	not-yet-reviewed		
-tests/test_comparison.py::TestCompareFields::test_matches_manual_alignment	0	not-yet-reviewed		
-tests/test_comparison.py::TestCompareFields::test_unknown_metric_raises	0	not-yet-reviewed		
-tests/test_comparison.py::TestCompareFields::test_unknown_units_raises	0	not-yet-reviewed		
-tests/test_comparison.py::TestCompareFields::test_unknown_field_raises	0	not-yet-reviewed		
-tests/test_comparison.py::TestCompareFields::test_alias_roundtrip	0	not-yet-reviewed		
-tests/test_comparison.py::TestCompareFields::test_si_vs_code_units_scale_linearly	0	not-yet-reviewed		
-tests/test_comparison.py::TestCompareFields::test_si_vs_code_l2_identical	0	not-yet-reviewed		
-tests/test_comparison.py::TestCompareFields::test_code_units_mismatched_normalization_raises	0	not-yet-reviewed		
-tests/test_comparison.py::TestCompareFields::test_code_units_same_normalization_still_works	0	not-yet-reviewed		
-tests/test_comparison.py::TestCompareFields::test_alias_survives_frame_alignment	0	not-yet-reviewed		
-tests/test_comparison.py::TestCompareFields::test_ambiguous_alias_mapping_raises	0	not-yet-reviewed		
-tests/test_comparison.py::TestCompareFields::test_bad_method_rejected_on_same_grid	0	not-yet-reviewed		
-tests/test_comparison.py::TestFieldComparisonReport::test_default_fields_intersection	0	not-yet-reviewed		
-tests/test_comparison.py::TestFieldComparisonReport::test_explicit_field_list	0	not-yet-reviewed		
-tests/test_comparison.py::TestFieldComparisonReport::test_report_shape	0	not-yet-reviewed		
-tests/test_comparison.py::TestFieldComparisonReport::test_no_common_fields_raises	0	not-yet-reviewed		
-tests/test_comparison.py::TestFieldComparisonReport::test_resolution_ratio_correct	0	not-yet-reviewed		
-tests/test_comparison.py::TestFieldComparisonReport::test_custom_alias_survives_alignment	0	not-yet-reviewed		
-tests/test_comparison.py::TestFieldComparisonReport::test_bad_field_raises_before_alignment	0	not-yet-reviewed		
-tests/test_comparison.py::TestFieldComparisonReport::test_custom_alias_survives_frame_alignment	0	not-yet-reviewed		
-tests/test_comparison.py::TestFieldComparisonReport::test_code_units_mismatched_normalization_raises	0	not-yet-reviewed		
-tests/test_comparison.py::TestFieldComparisonReport::test_bad_method_rejected_on_same_grid	0	not-yet-reviewed		
-tests/test_comparison.py::TestFieldDifferenceDataset::test_grid_matches_common_grid	0	not-yet-reviewed		
-tests/test_comparison.py::TestFieldDifferenceDataset::test_identical_datasets_all_zero	0	not-yet-reviewed		
-tests/test_comparison.py::TestFieldDifferenceDataset::test_canonical_field_names	0	not-yet-reviewed		
-tests/test_comparison.py::TestFieldDifferenceDataset::test_field_info_preserved	0	not-yet-reviewed		
-tests/test_comparison.py::TestFieldDifferenceDataset::test_metadata_records_units	0	not-yet-reviewed		
-tests/test_comparison.py::TestFieldDifferenceDataset::test_metadata_records_source_frames	0	not-yet-reviewed		
-tests/test_comparison.py::TestFieldDifferenceDataset::test_metadata_records_code_units	0	not-yet-reviewed		
-tests/test_comparison.py::TestFieldDifferenceDataset::test_si_units_round_trip_no_double_conversion	0	not-yet-reviewed		
-tests/test_comparison.py::TestFieldDifferenceDataset::test_code_units_keeps_source_normalization	0	not-yet-reviewed		
-tests/test_comparison.py::TestFieldDifferenceDataset::test_plottable_via_plot_field_slice	0	not-yet-reviewed		
-tests/test_comparison.py::TestFieldDifferenceDataset::test_explicit_field_list	0	not-yet-reviewed		
 tests/test_comparison.py::TestFieldDifferenceDataset::test_alias_survives_frame_alignment	0	not-yet-reviewed		
 tests/test_comparison.py::TestFieldDifferenceDataset::test_code_units_mismatched_normalization_raises	0	not-yet-reviewed		
 tests/test_comparison.py::TestFieldDifferenceDataset::test_bad_method_rejected_on_same_grid	0	not-yet-reviewed		
