@@ -23,11 +23,17 @@ against it, run it. Commit one of two outcomes:
 
 ## Philosophy
 
-Prefer invariants with **a citable source**. If you cannot point at a
-line in `schema.md`, `CLAUDE.md`, `equations.md`, or a public docstring
-that the property encodes, the property is not worth testing — it is
-speculation dressed up as a test. Every property file has a one-line
-source citation at the top.
+Prefer invariants with **a citable source AND a named bug class**. If
+you cannot point at a line in `schema.md`, `CLAUDE.md`, `equations.md`,
+or a public docstring that the property encodes, the property is not
+worth testing — it is speculation dressed up as a test. Every property
+file has a **two-line header**: (a) source citation, (b) `Catches:
+<concrete bug class>`. Vague catches like "any sign error" or "any
+refactor that..." don't count — name a specific shape of mistake
+(a wrong CGL exponent, a missing factor of 1/2 between two formulas,
+a degenerate-input overshoot, an axis-aligned coordinate leak, a
+silent reader/registry name mismatch). If you can't name the bug class
+concretely, the property isn't worth testing.
 
 **Good invariants**
 
@@ -68,9 +74,11 @@ thresholds" in the QP loop):
 - No loosening of existing tolerances to accommodate a new property.
 - No `@pytest.mark.xfail` without a source-linked comment naming which
   claim is known-broken and why the fix is out of scope.
-- Every new property cites its source in a header comment:
-  `# schema.md § 4`, `# CLAUDE.md "fail loud on unmatched names"`,
-  `# equations.md footnote [^9]`, `# units.py:309 docstring`.
+- Every new property file opens with the **two-line header** required
+  by § "Philosophy": (a) source citation
+  (`# schema.md § 4`, `# CLAUDE.md "fail loud on unmatched names"`,
+  `# equations.md footnote [^9]`, `# units.py:309 docstring`) and
+  (b) `# Catches: <concrete bug class>`.
 - Fixes must not change the on-disk schema (schema.md § 4) or break any
   existing Zarr/Parquet/Arrow round-trip test.
 - Strategy shrinks are a yellow flag: ≥2 consecutive iterations that
@@ -78,9 +86,12 @@ thresholds" in the QP loop):
 
 ## Invariant backlog (ordered by ROI)
 
-The loop works top-down. When this list is exhausted, re-read
-`docs/schema.md`, `docs/equations.md`, and `CLAUDE.md` and propose the
-next invariant.
+The loop works top-down. **When this list is exhausted, halt and
+surface to the user.** Restart only when a source-of-truth artifact
+changes: `docs/schema.md`, `docs/equations.md`, `docs/conventions.md`,
+`CLAUDE.md`, or a new step ships in `TASKS.md` that introduces a
+derived function with a non-trivial docstring claim. The loop is a
+*responder* to documented contracts, not a generator of them.
 
 1. **Normalization round-trip on all four systems × all base quantities.**
    `tests/test_units.py:65` covers `pic_electron` + `mhd_standard` only.
@@ -109,13 +120,20 @@ next invariant.
 
 ## Iteration contract
 
-1. Read `scoreboard-invariants.tsv`. Pick the next unchecked backlog item,
-   or propose a fresh invariant if the list is exhausted (cite the source
-   line in the proposal).
-2. Write the property at `tests/test_invariants/test_<cluster>.py`. Start
-   the file with a source-citation comment. Reuse the strategies in
-   `tests/strategies.py` and the factories in `tests/_helpers.py` —
-   do not duplicate them.
+1. Read `scoreboard-invariants.tsv`. Pick the next unchecked backlog
+   item. **If the backlog is exhausted, halt and surface to the user**
+   (see § "Invariant backlog" — the loop does not manufacture fresh
+   invariants).
+2. Write the property at `tests/test_invariants/test_<cluster>.py`.
+   Start the file with the **two-line header** required by §
+   "Philosophy": (a) source citation, (b) `Catches: <concrete bug
+   class>`. Reuse the strategies in `tests/strategies.py` and the
+   factories in `tests/_helpers.py` — do not duplicate them.
+   - **Sub-test budget**: ≤2 `@given` functions per file. Bundle
+     multiple facets of one identity into a single parametrized test
+     (iter 23's CGL-exponent test is the reference shape: one
+     function, three algebraic checks). If a third `@given` looks
+     necessary, drop the weakest or split into a separate iteration.
 3. Run just the new file first:
    ```
    uv run pytest tests/test_invariants/test_<cluster>.py --hypothesis-seed=random -x
@@ -128,11 +146,27 @@ next invariant.
    uv run mypy src
    ```
    All three must be green.
-5. Append one row to `scoreboard-invariants.tsv`. Commit message format:
+5. Append one row to `scoreboard-invariants.tsv` (including the
+   `sub_tests` column count for this iteration) AND identify the
+   weakest existing invariant test. Either delete it in the same
+   commit, or write one sentence in the scoreboard `notes` column
+   explaining why every existing test still pulls weight. The total
+   invariant test count must not grow monotonically — adding requires
+   either replacing or justifying. Commit message format:
    - Bug: `fix: <short why, not what>` + `Assisted-by: Claude Opus 4.6 (1M context)`.
-   - Property: `test: hypothesis property for <invariant>` + same suffix.
-6. Halt after 20 iterations, 2 consecutive `ill-posed` outcomes, or 2
-   consecutive `strategy-shrink` events — whichever first.
+   - Property: `test: hypothesis property for <invariant>` + same
+     suffix. If the iteration also pruned, name the dropped test in
+     the body.
+6. Halt after any of:
+   - 10 iterations
+   - 2 consecutive `ill-posed` outcomes
+   - 2 consecutive `strategy-shrink` events
+   - **10 consecutive `test-added` iterations with no `bug-fixed` or
+     `bug-surfaced` outcome.** The loop's purpose is bug hunting; if
+     10 in a row produce only properties, the marginal value is below
+     the maintenance cost. Surface to the user with a recommendation
+     to switch to mutation testing (`mutmut` / `cosmic-ray`) and let
+     surviving mutants drive the next round of properties.
 
 ## What you CAN modify
 
@@ -141,7 +175,8 @@ next invariant.
 | `tests/test_invariants/*.py` | Every iteration — new properties land here. |
 | `tests/strategies.py` | When a new invariant needs a strategy not yet in the catalog. Add, don't mutate existing strategies. |
 | `src/pypic/**/*.py` | Only when a counterexample reveals a real bug. Minimal fix; preserve the public API. |
-| `scoreboard-invariants.tsv` | Append one row per iteration. |
+| `scoreboard-invariants.tsv` | Append one row per iteration (with `sub_tests` count). |
+| `tests/test_invariants/*.py` (deletes) | Iteration step 5 prunes the weakest existing test alongside any add. |
 
 ## What you CANNOT modify
 
