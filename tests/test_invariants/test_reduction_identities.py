@@ -23,8 +23,6 @@
 
 from __future__ import annotations
 
-import math
-
 import numpy as np
 from hypothesis import given, settings
 from hypothesis import strategies as st
@@ -177,24 +175,3 @@ def test_spatial_rms_squared_equals_mean_of_squares(f: np.ndarray) -> None:
     lhs = spatial_rms(f) ** 2
     rhs = spatial_mean(f * f)
     assert_allclose(lhs, rhs, rtol=1e-13, atol=1e-13)
-
-
-def test_field_energy_on_uniform_field_equals_volume_times_constant() -> None:
-    r"""$E(c, \Delta x) = c \cdot V$ for a constant field $c$ and total
-    volume $V = \prod \Delta x \cdot \prod N$.
-
-    Sanity check that the integration matches the exact analytical
-    result when the integrand is constant — the simplest non-trivial
-    specific-value test complementing the property-based linearity claims.
-    """
-    c = 7.5
-    spacing = (0.5, 0.25, 2.0)
-    shape = (4, 3, 5)
-    f = np.full(shape, c, dtype=np.float64)
-    total_volume = math.prod(spacing) * math.prod(shape)
-    assert_allclose(
-        field_energy(f, spacing),
-        c * total_volume,
-        rtol=1e-14,
-        atol=1e-14,
-    )

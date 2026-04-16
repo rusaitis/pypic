@@ -60,6 +60,23 @@ def _positive_array(
     )
 
 
+def _perpendicularity_atol(
+    a: tuple[np.ndarray, np.ndarray, np.ndarray],
+    b: tuple[np.ndarray, np.ndarray, np.ndarray],
+) -> float:
+    """Float64 floor for ``a · b == 0`` when the dot is algebraically zero.
+
+    The dot product accumulates ~``eps · |a| · |b|`` per term; a few
+    dozen multiplies + cancellations push the constant up to ~100·eps.
+    Returning the bound rather than a fixed atol keeps the assertion
+    tight when ``|a|, |b|`` are small and forgiving when ``E_Hall``
+    blows up because ``n|q|`` is small.
+    """
+    a_max = max(float(np.max(np.abs(c))) for c in a)
+    b_max = max(float(np.max(np.abs(c))) for c in b)
+    return 100.0 * np.finfo(np.float64).eps * a_max * b_max
+
+
 @given(
     v1=_bounded_array(),
     v2=_bounded_array(),
@@ -115,10 +132,16 @@ def test_hall_electric_field_perpendicular_to_j(
     r"""$\mathbf{E}_{Hall} \cdot \mathbf{J} = 0$ — the Hall term is
     proportional to $\mathbf{J} \times \mathbf{B}$, perpendicular to
     $\mathbf{J}$. Division by the scalar $n|q|$ preserves direction.
+
+    Tolerance: the dot product's float floor scales with
+    ``|E_Hall| · |J|``; pin ``atol`` to that natural scale times
+    ``100 · eps`` rather than a fixed constant, so the test stays
+    robust when ``n|q|`` is small enough to amplify ``E_Hall``.
     """
     eh1, eh2, eh3 = hall_electric_field(j1, j2, j3, b1, b2, b3, n, charge)
     dot = eh1 * j1 + eh2 * j2 + eh3 * j3
-    assert_allclose(dot, 0.0, atol=1e-11)
+    atol = _perpendicularity_atol((eh1, eh2, eh3), (j1, j2, j3))
+    assert_allclose(dot, 0.0, atol=atol)
 
 
 @given(
@@ -146,11 +169,12 @@ def test_hall_electric_field_perpendicular_to_b(
 ) -> None:
     r"""$\mathbf{E}_{Hall} \cdot \mathbf{B} = 0$ — completes the pair
     of perpendicularities that pin down the $\mathbf{J} \times \mathbf{B}$
-    cross product.
+    cross product. Tolerance scaling matches the J-side test above.
     """
     eh1, eh2, eh3 = hall_electric_field(j1, j2, j3, b1, b2, b3, n, charge)
     dot = eh1 * b1 + eh2 * b2 + eh3 * b3
-    assert_allclose(dot, 0.0, atol=1e-11)
+    atol = _perpendicularity_atol((eh1, eh2, eh3), (b1, b2, b3))
+    assert_allclose(dot, 0.0, atol=atol)
 
 
 @given(

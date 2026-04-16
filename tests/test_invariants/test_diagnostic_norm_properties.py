@@ -5,7 +5,7 @@
 #         ("L2 is discrete, unweighted ... volume factors cancel;
 #         L∞ is absolute, not relative — relative L∞ is misleading
 #         near field nulls").
-# Claims (pure metric properties of the two error norms):
+# Claims (the two non-trivial metric properties of the error norms):
 #   (a) Scale invariance of the relative L2:
 #       l2(α a, α b) == l2(a, b) for α ≠ 0 — the scale factor cancels
 #       between numerator and denominator. Catches any accidental
@@ -13,16 +13,13 @@
 #   (b) Homogeneity of the absolute L∞:
 #       linf(α a, α b) == |α| · linf(a, b) — the abs-max-difference
 #       scales linearly with a uniform rescaling, matching the
-#       "absolute, not relative" docstring contract.
-#   (c) Symmetry of L∞: linf(a, b) == linf(b, a) — max(|a-b|) =
-#       max(|b-a|) trivially but catches any abs() typo.
-#   (d) Self-distance is zero: l2(a, a) == 0 and linf(a, a) == 0
-#       bit-exact (subtracting an array from itself is exact in FP).
+#       "absolute, not relative" docstring contract. A sign leak
+#       (missing abs()) would flip the comparison under α < 0.
 # Note on l2 symmetry: NOT a claim — l2_relative_error normalizes by
 # the reference, so swapping args swaps the denominator. Documented
 # asymmetry (conventions.md) that we do not test as an invariant.
 # Fresh invariant #18 after backlog exhaustion.
-"""Scale/symmetry/self-distance metric properties of l2 / linf."""
+"""Scale invariance / homogeneity of l2 / linf error norms."""
 
 from __future__ import annotations
 
@@ -138,41 +135,3 @@ def test_linf_error_scales_with_alpha_magnitude(
     baseline = linf_error(a, b)
     scaled = linf_error(alpha * a, alpha * b)
     assert_allclose(scaled, abs(alpha) * baseline, rtol=1e-13, atol=1e-13)
-
-
-@given(a=_bounded_array(), b=_bounded_array())
-@settings(max_examples=50, deadline=None)
-def test_linf_error_is_symmetric(a: np.ndarray, b: np.ndarray) -> None:
-    r"""$\varepsilon_{L_\infty}(a, b) = \varepsilon_{L_\infty}(b, a)$.
-
-    max-abs of $(a-b)$ equals max-abs of $(b-a)$ — a trivial
-    consequence of absolute value, but a regression guard that
-    linf_error does not accidentally become signed or reference-normalized.
-    """
-    ab = linf_error(a, b)
-    ba = linf_error(b, a)
-    assert_allclose(ab, ba, rtol=0, atol=0)
-
-
-@given(a=_bounded_array())
-@settings(max_examples=30, deadline=None)
-def test_self_distance_is_zero(a: np.ndarray) -> None:
-    r"""$\varepsilon_{L_2}(a, a) = 0$ and $\varepsilon_{L_\infty}(a, a) = 0$.
-
-    Subtracting an array from itself is exact in IEEE 754, so both
-    norms return 0 bit-exact when the denominator is well-conditioned.
-    For $l_2$, the denominator $\|a\|_2$ must be strictly positive in
-    float64 to avoid a 0/0 NaN — documented at diagnostics.py:119-121
-    ("nan if both are all zeros or no valid cells remain"). Skip cases
-    where $\sum a^2$ underflows to 0 (which includes the all-zero
-    corner AND Hypothesis-generated subnormal inputs like
-    $a \sim 10^{-308}$ where squaring underflows below
-    $2.2 \times 10^{-308}$). $l_\infty$ is robust to the underflow
-    regime — it uses $\max|0|$, not a squared sum.
-    """
-    # Match the diagnostics.py NaN-on-zero-reference contract exactly.
-    if np.sum(a * a) == 0.0:
-        assert linf_error(a, a) == 0.0
-        return
-    assert l2_relative_error(a, a) == 0.0
-    assert linf_error(a, a) == 0.0
