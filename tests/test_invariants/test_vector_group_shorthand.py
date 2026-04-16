@@ -89,13 +89,6 @@ def _make_sim() -> Simulation:
     return Simulation(_RecordingReader(), config, path=Path("/tmp/test"))
 
 
-def test_bare_prefix_expands_to_numbered_components() -> None:
-    """``fields=["B"]`` loads ``{B1, B2, B3}`` — the canonical expansion."""
-    sim = _make_sim()
-    ds = sim.read(0, fields=["B"])
-    assert set(ds.field_names()) == {"B1", "B2", "B3"}
-
-
 def test_explicit_components_match_bare_prefix() -> None:
     """``fields=["B"]`` and ``fields=["B1","B2","B3"]`` load the same set.
 
