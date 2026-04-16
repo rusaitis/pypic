@@ -332,16 +332,24 @@ class TestFindVectorTriplets:
         assert len(result) == 2
 
     def test_b0_split_field(self) -> None:
+        # Canonical split-B components per schema.md § "Split-B naming"
+        # are B0_1/B0_2/B0_3 (underscore separator because the B0 prefix
+        # ends in a digit). The triplet regex must match these so that
+        # FieldDataset.transform_to() rotates the background field.
         result = find_vector_triplets(["B0_1", "B0_2", "B0_3"])
-        # B0_1 doesn't match the regex (B0 + 1, not B + 0_1)
-        # Actually the pattern is "B0" prefix + component "1"/"2"/"3"
-        # "B0_1" won't match since there's an underscore before the digit
-        # The canonical form is B01, B02, B03
-        assert result == []
+        assert result == [("B0_1", "B0_2", "B0_3")]
 
-    def test_canonical_b0(self) -> None:
-        result = find_vector_triplets(["B01", "B02", "B03"])
-        assert result == [("B01", "B02", "B03")]
+    def test_b0_triplet_matched_in_mixed_list(self) -> None:
+        # Regression guard for the silent BATSRUS physics bug: frame
+        # rotations used to skip B0_1/B0_2/B0_3 because the regex only
+        # matched a phantom B01/B02/B03 form that no reader emits.
+        result = find_vector_triplets(
+            ["B1", "B2", "B3", "B0_1", "B0_2", "B0_3"]
+        )
+        assert set(result) == {
+            ("B1", "B2", "B3"),
+            ("B0_1", "B0_2", "B0_3"),
+        }
 
 
 class TestFindPressureTensorGroups:

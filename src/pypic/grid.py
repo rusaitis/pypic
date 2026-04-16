@@ -174,8 +174,15 @@ def _build_aliases(
     """
     aliases: dict[str, str] = {}
     for alias_prefix, canonical_prefix in _FIELD_PREFIX_PAIRS:
+        # Canonical prefixes ending in a digit (e.g. "B0") need an
+        # underscore separator before the component index to stay
+        # unambiguous per schema.md § "Split-B naming": canonical is
+        # "B0_1", not "B01".
+        canonical_sep = "_" if canonical_prefix[-1].isdigit() else ""
         for i, suffix in enumerate(suffixes, 1):
-            aliases[f"{alias_prefix}{separator}{suffix}"] = f"{canonical_prefix}{i}"
+            aliases[f"{alias_prefix}{separator}{suffix}"] = (
+                f"{canonical_prefix}{canonical_sep}{i}"
+            )
     return aliases
 
 
@@ -190,8 +197,11 @@ _CYLINDRICAL_UNDERSCORE_ALIASES = _build_aliases(("r", "phi", "z"), separator="_
 # Numbered underscore aliases (B_1→B1, E_2→E2, etc.) — geometry-independent
 _NUMBERED_UNDERSCORE_ALIASES: dict[str, str] = {}
 for _alias_pfx, _canon_pfx in _FIELD_PREFIX_PAIRS:
+    _canon_sep = "_" if _canon_pfx[-1].isdigit() else ""
     for _i in (1, 2, 3):
-        _NUMBERED_UNDERSCORE_ALIASES[f"{_alias_pfx}_{_i}"] = f"{_canon_pfx}{_i}"
+        _NUMBERED_UNDERSCORE_ALIASES[f"{_alias_pfx}_{_i}"] = (
+            f"{_canon_pfx}{_canon_sep}{_i}"
+        )
 
 # Scalar underscore aliases (P_e→Pe, T_i→Ti, pressure tensor components)
 _SCALAR_UNDERSCORE_ALIASES: dict[str, str] = {

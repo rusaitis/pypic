@@ -683,10 +683,13 @@ class TestAuditFieldPrefixAliases:
         np.testing.assert_array_equal(ds["EFx"], ds["EF1"])
 
     def test_b0x_alias_resolves(self):
+        # Canonical split-B name is "B0_1" (schema.md § "Split-B naming":
+        # the B0 prefix ends in a digit, so components use an underscore
+        # separator). The Cartesian alias B0x must resolve to it.
         shape = (2, 2, 2)
-        data = {"B01": np.full(shape, 3.0)}
+        data = {"B0_1": np.full(shape, 3.0)}
         ds = make_test_dataset(data, shape=shape)
-        np.testing.assert_array_equal(ds["B0x"], ds["B01"])
+        np.testing.assert_array_equal(ds["B0x"], ds["B0_1"])
 
     def test_ion_acoustic_speed_alias(self):
         assert _COMPUTE_ALIASES["ion_acoustic_speed"] == "c_ia"

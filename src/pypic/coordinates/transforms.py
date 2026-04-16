@@ -313,7 +313,14 @@ def resolve_transform(
 
 
 def _build_vector_triplet_regex() -> re.Pattern[str]:
-    """Build regex from the canonical vector prefixes in readers.base."""
+    """Build regex from the canonical vector prefixes in readers.base.
+
+    Digit-ending canonical prefixes (e.g. ``B0``) require an underscore
+    before the component index (``B0_1``, not ``B01``) per
+    ``schema.md § "Split-B naming"``. The separator is folded into the
+    prefix alternation so the captured group includes it; callers strip
+    the trailing underscore.
+    """
     from pypic.grid import _FIELD_PREFIX_PAIRS
 
     prefixes = sorted(
@@ -321,7 +328,10 @@ def _build_vector_triplet_regex() -> re.Pattern[str]:
         key=len,
         reverse=True,
     )
-    return re.compile(rf"^({'|'.join(prefixes)})([123])(?:_s(\d+))?$")
+    parts = [
+        re.escape(p) + ("_" if p[-1].isdigit() else "") for p in prefixes
+    ]
+    return re.compile(rf"^({'|'.join(parts)})([123])(?:_s(\d+))?$")
 
 
 _VECTOR_TRIPLET_RE = _build_vector_triplet_regex()
@@ -358,6 +368,9 @@ def find_vector_triplets(
         m = _VECTOR_TRIPLET_RE.match(name)
         if m:
             prefix, component, species = m.groups()
+            # Digit-ending canonicals (e.g. "B0_") captured their
+            # underscore separator; strip it to form a stable key.
+            prefix = prefix.rstrip("_")
             key = f"{prefix}_s{species}" if species else prefix
             groups.setdefault(key, {})[int(component)] = name
     return [(g[1], g[2], g[3]) for g in groups.values() if 1 in g and 2 in g and 3 in g]
