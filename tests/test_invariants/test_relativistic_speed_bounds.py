@@ -171,9 +171,17 @@ def test_relativistic_thermal_speed_bounded_by_c(
     allowed up to $10^{12}$, giving $v_{th} \gg c$) where the cap is
     load-bearing: without it the thermal speed would exceed $c$ by
     many orders of magnitude.
+
+    Tolerance: $v_{th}/\sqrt{1 + v_{th}^2/c^2}$ reduces to
+    $c \cdot x/\sqrt{1+x^2}$ with $x = v_{th}/c$. At $x \gg 1$ the
+    $+1$ underflows, giving $\sqrt{x^2} = x$ and the division
+    $x/x$ in float64 rounds to the bit-exact $c$ — but with a
+    possible $\pm$ 1-ulp overshoot from IEEE 754 sqrt (same
+    property that drove iter 22's $v_{ms}$ atol). Absorb 4·eps·c.
     """
     v_th = thermal_speed(temperature, mass, c=c)
-    assert np.all(v_th <= c)
+    atol = 4.0 * np.finfo(np.float64).eps * c
+    assert np.all(v_th <= c + atol)
     assert np.all(v_th >= 0.0)
 
 
