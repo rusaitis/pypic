@@ -214,7 +214,15 @@ class TestPhdf5Reader:
                 assert_allclose(ds[f"{comp}_s{s}"], 0.0, atol=1e-12)
 
     def test_species_metadata(self, ds):
+        # Count-only is weak: a reader that populated garbage species (wrong
+        # charge sign, swapped mass) still passes.  Pin the canonical iPIC3D
+        # convention: species 0 = electrons (q=-1, m=1/|qom_0|=1/64),
+        # species 1 = ions (q=+1, m=1/|qom_1|=1).
         assert len(ds.species) == 2
+        assert ds.species[0].charge == -1.0
+        assert_allclose(ds.species[0].mass, 1.0 / 64.0)
+        assert ds.species[1].charge == 1.0
+        assert_allclose(ds.species[1].mass, 1.0)
 
     def test_grid_info(self, ds):
         assert ds.grid.dimensions == (NX, NY, NZ)
@@ -394,9 +402,17 @@ class TestH5hutReader:
             total = ds[f"{comp}_s0"] + ds[f"{comp}_s1"]
             assert_allclose(ds[comp], total)
 
-    def test_electron_pressure_positive(self, ds):
-        for comp in ("P11", "P22", "P33"):
-            assert ds[f"{comp}_s0"].min() >= 0.0, f"{comp}_s0 has negative values"
+    def test_diagonal_pressure_positive(self, ds):
+        # H5hut has no test_pressure_values_match_phdf5 for pressure (unlike
+        # shdf5), and test_pressure_p_over_rho_consistency divides P by rho
+        # so a common sign flip in both cancels in the ratio.  Positivity
+        # is the residual discriminator — extend to ions so a sign flip in
+        # the ion-specific 4π correction branch is caught.
+        for s in range(2):
+            for comp in ("P11", "P22", "P33"):
+                assert ds[f"{comp}_s{s}"].min() >= 0.0, (
+                    f"{comp}_s{s} has negative values"
+                )
 
     def test_pressure_p_over_rho_consistency(self, ds):
         """Physical P/|rho_c| = v_th²/|qom| (mass-weighted pressure)."""
@@ -506,8 +522,17 @@ class TestConservedQuantitiesSyntheticFormatB:
         assert len(cq.species_kinetic_energy) == 2
 
     def test_species_arrays_length(self, cq):
-        for arr in cq.species_npart:
-            assert len(arr) == len(cq.cycle)
+        # Originally only species_npart was checked.  A parser bug that
+        # truncates species_charge or species_kinetic_energy (e.g. skipping
+        # the last row on one of the per-species columns) slipped through.
+        expected = len(cq.cycle)
+        for family in (
+            cq.species_npart,
+            cq.species_charge,
+            cq.species_kinetic_energy,
+        ):
+            for arr in family:
+                assert len(arr) == expected
 
     def test_particle_counts(self, cq):
         for arr in cq.species_npart:
@@ -721,12 +746,6 @@ class TestShdf5PressureTensor:
         cfg = parse_inp(SHDF5_DIR / "synthetic_serial.inp")
         reader = IPic3DSerialReader(cfg)
         return reader.read_timestep(SHDF5_DIR, 0)
-
-    @pytest.mark.parametrize("species", [0, 1])
-    def test_diagonal_pressure_positive(self, ds, species):
-        for comp in ("P11", "P22", "P33"):
-            p = ds[f"{comp}_s{species}"]
-            assert np.all(p >= 0), f"{comp}_s{species} has negative values"
 
     def test_pressure_values_match_phdf5(self, ds):
         """shdf5 pressure should match phdf5 exactly."""

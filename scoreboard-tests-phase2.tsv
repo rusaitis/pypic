@@ -733,56 +733,56 @@ tests/test_ipic3d_particles.py::TestParticleData::test_position_only	13	kept	Pin
 tests/test_ipic3d_particles.py::TestParticleData::test_velocity_only	13	kept	Pins position=None branch: position is None, velocity not None.	92b7b9ea4ef1302f93c22008fa27a49eead6d10f
 tests/test_ipic3d_particles.py::TestParticleData::test_xyz_vxyz_are_views	13	kept	Pins zero-copy view semantics via np.shares_memory AND pointwise equality (pos[:,0]) for x/y/z/vx/vy/vz properties.	92b7b9ea4ef1302f93c22008fa27a49eead6d10f
 tests/test_ipic3d_particles.py::TestParticleData::test_access_unloaded_raises	13	kept	Pins ValueError('position was not loaded') for x/y and ('velocity was not loaded') for vx when not loaded.	92b7b9ea4ef1302f93c22008fa27a49eead6d10f
-tests/test_ipic3d_particles.py::TestParticleData::test_shape_mismatch_raises	0	not-yet-reviewed		
-tests/test_ipic3d_particles.py::TestParticleData::test_weight_dtype_float64	0	not-yet-reviewed		
-tests/test_ipic3d_particles.py::TestParticleData::test_both_none_raises	0	not-yet-reviewed		
-tests/test_ipic3d_particles.py::TestParticleData::test_metadata_frozen	0	not-yet-reviewed		
-tests/test_ipic3d_particles.py::TestParticleData::test_repr	0	not-yet-reviewed		
-tests/test_ipic3d_particles.py::TestParticleData::test_len	0	not-yet-reviewed		
-tests/test_ipic3d_particles.py::TestMacroProperties::test_macro_charge	0	not-yet-reviewed		
-tests/test_ipic3d_particles.py::TestMacroProperties::test_macro_charge_missing_raises	0	not-yet-reviewed		
-tests/test_ipic3d_particles.py::TestMacroProperties::test_macro_mass	0	not-yet-reviewed		
-tests/test_ipic3d_particles.py::TestMacroProperties::test_macro_mass_missing_raises	0	not-yet-reviewed		
-tests/test_ipic3d_particles.py::TestPhdf5ParticleReader::test_detect_particle_steps	0	not-yet-reviewed		
-tests/test_ipic3d_particles.py::TestPhdf5ParticleReader::test_read_all_columns	0	not-yet-reviewed		
-tests/test_ipic3d_particles.py::TestPhdf5ParticleReader::test_read_position_only	0	not-yet-reviewed		
-tests/test_ipic3d_particles.py::TestPhdf5ParticleReader::test_read_velocity_only	0	not-yet-reviewed		
-tests/test_ipic3d_particles.py::TestPhdf5ParticleReader::test_particle_count_correct	0	not-yet-reviewed		
-tests/test_ipic3d_particles.py::TestPhdf5ParticleReader::test_position_values	0	not-yet-reviewed		
-tests/test_ipic3d_particles.py::TestPhdf5ParticleReader::test_macro_charge_reconstructed	0	not-yet-reviewed		
-tests/test_ipic3d_particles.py::TestPhdf5ParticleReader::test_weight_dtype	0	not-yet-reviewed		
-tests/test_ipic3d_particles.py::TestPhdf5ParticleReader::test_canonical_form_no_charge_attribute	0	not-yet-reviewed		
-tests/test_ipic3d_particles.py::TestPhdf5ParticleReader::test_species_name	0	not-yet-reviewed		
-tests/test_ipic3d_particles.py::TestPhdf5ParticleReader::test_weight_unit_in_fixture	0	not-yet-reviewed		
-tests/test_ipic3d_particles.py::TestPhdf5ParticleReader::test_species_charge_populated	0	not-yet-reviewed		
-tests/test_ipic3d_particles.py::TestPhdf5ParticleReader::test_species_mass_populated	0	not-yet-reviewed		
-tests/test_ipic3d_particles.py::TestNonUniformWeight::test_per_particle_q_round_trip	0	not-yet-reviewed		
-tests/test_ipic3d_particles.py::TestNonUniformWeight::test_q_size_mismatch_raises	0	not-yet-reviewed		
-tests/test_ipic3d_particles.py::TestParticleIdSupport::test_id_loaded	0	not-yet-reviewed		
-tests/test_ipic3d_particles.py::TestParticleIdSupport::test_id_values	0	not-yet-reviewed		
-tests/test_ipic3d_particles.py::TestParticleIdSupport::test_id_species_offset	0	not-yet-reviewed		
-tests/test_ipic3d_particles.py::TestParticleIdSupport::test_id_in_repr	0	not-yet-reviewed		
-tests/test_ipic3d_particles.py::TestParticleIdSupport::test_id_none_when_absent	0	not-yet-reviewed		
-tests/test_ipic3d_particles.py::TestParticleIdSupport::test_id_shape_validation	0	not-yet-reviewed		
-tests/test_ipic3d_particles.py::TestParticleDataReaderProtocol::test_parallel_reader_is_particle_reader	0	not-yet-reviewed		
-tests/test_ipic3d_particles.py::TestParticleDataReaderProtocol::test_available_particle_steps	0	not-yet-reviewed		
-tests/test_ipic3d_particles.py::TestParticleDataReaderProtocol::test_read_particles_via_reader	0	not-yet-reviewed		
-tests/test_ipic3d_particles.py::TestSimulationParticles::test_particles_via_simulation	0	not-yet-reviewed		
-tests/test_ipic3d_particles.py::TestSimulationParticles::test_particle_steps_property	0	not-yet-reviewed		
-tests/test_ipic3d_particles.py::TestSimulationParticles::test_unsupported_reader_raises_typeerror	0	not-yet-reviewed		
-tests/test_ipic3d_synthetic.py::TestParseInpSynthetic::test_grid_and_domain	0	not-yet-reviewed		
-tests/test_ipic3d_synthetic.py::TestParseInpSynthetic::test_species_and_physics	0	not-yet-reviewed		
-tests/test_ipic3d_synthetic.py::TestParseInpSynthetic::test_inline_comment_stripped	0	not-yet-reviewed		
-tests/test_ipic3d_synthetic.py::TestParseSettingsHdfSynthetic::test_settings_hdf_matches_inp	0	not-yet-reviewed		
-tests/test_ipic3d_synthetic.py::TestToSimulationConfigSynthetic::test_grid_geometry	0	not-yet-reviewed		
-tests/test_ipic3d_synthetic.py::TestToSimulationConfigSynthetic::test_species_and_model	0	not-yet-reviewed		
-tests/test_ipic3d_synthetic.py::TestToSimulationConfigSynthetic::test_stagger_metadata	0	not-yet-reviewed		
-tests/test_ipic3d_synthetic.py::TestToSimulationConfigSynthetic::test_missing_key_raises	0	not-yet-reviewed		
-tests/test_ipic3d_synthetic.py::TestPhdf5Reader::test_available_timesteps	0	not-yet-reviewed		
-tests/test_ipic3d_synthetic.py::TestPhdf5Reader::test_available_fields_matches_read	0	not-yet-reviewed		
-tests/test_ipic3d_synthetic.py::TestPhdf5Reader::test_field_shapes	0	not-yet-reviewed		
-tests/test_ipic3d_synthetic.py::TestPhdf5Reader::test_b_field_exact	0	not-yet-reviewed		
-tests/test_ipic3d_synthetic.py::TestPhdf5Reader::test_e_field_zero	0	not-yet-reviewed		
+tests/test_ipic3d_particles.py::TestParticleData::test_shape_mismatch_raises	14	kept	Three parametrize-like branches: position shape != (n,3), velocity shape != (n,3), weight shape != (n,). Each has a distinct error string matched, so a bug that only validates one of the three axes is caught.	<pending>
+tests/test_ipic3d_particles.py::TestParticleData::test_weight_dtype_float64	14	kept	Pins the explicit `weight must be float64` guard in ParticleData.__post_init__ — catches a regression where float32 weights silently accepted (schema invariant per docs/schema.md § Per-particle data columns).	<pending>
+tests/test_ipic3d_particles.py::TestParticleData::test_both_none_raises	14	kept	Pins the 'At least one of position or velocity must be provided' invariant — catches a regression where both-None silently produces an empty container (divide-by-zero downstream when .n_particles is accessed via self.position).	<pending>
+tests/test_ipic3d_particles.py::TestParticleData::test_metadata_frozen	14	kept	Pins the MappingProxyType wrap in __post_init__ — catches a regression where metadata is stored as a plain dict, letting downstream code mutate reader-provided metadata and poison subsequent reads (the class is frozen=slots for thread safety).	<pending>
+tests/test_ipic3d_particles.py::TestParticleData::test_repr	14	kept	Pins that repr includes species_name, n_particles, 'position', 'weight', 'species_charge' — catches a 'loaded=[]' bug where optional fields are never appended to the loaded list (regression from a refactor of the conditional chain).	<pending>
+tests/test_ipic3d_particles.py::TestParticleData::test_len	14	kept	Pins that __len__ returns n_particles, not len(self.position) — catches a bug where position=None with velocity-only data would raise TypeError on len() because position is None.	<pending>
+tests/test_ipic3d_particles.py::TestMacroProperties::test_macro_charge	14	kept	Pins macro_charge = species_charge × weight against hand-computed values ([-1,-2,-3] from q=-1, w=[1,2,3]) — catches a sign flip or operator-swap (addition) that produces different magnitudes.	<pending>
+tests/test_ipic3d_particles.py::TestMacroProperties::test_macro_charge_missing_raises	14	kept	Pins that macro_charge raises when weight or species_charge is None — catches a bug where the getter silently returns 0 or NaN, which would poison downstream moments (charge density, current).	<pending>
+tests/test_ipic3d_particles.py::TestMacroProperties::test_macro_mass	14	kept	Pins macro_mass = species_mass × weight with species_mass=2.5, weight=[1,2,4] → [2.5,5,10] — asymmetric values catch an accidental use of species_charge (which is not set here) or a swapped operand order in product.	<pending>
+tests/test_ipic3d_particles.py::TestMacroProperties::test_macro_mass_missing_raises	14	kept	Pins that macro_mass raises when species_mass is None even if weight is set — catches a bug where the check uses 'or' instead of 'and' (returning weight alone).	<pending>
+tests/test_ipic3d_particles.py::TestPhdf5ParticleReader::test_detect_particle_steps	14	kept	Pins the `Particles_\d+` regex scan against the committed fixture (one step=0 directory) — catches a regex bug that matches Moments_* or misses zero-padded directories.	<pending>
+tests/test_ipic3d_particles.py::TestPhdf5ParticleReader::test_read_all_columns	14	kept	Pins that default columns=None loads position+velocity+weight AND n_particles=18 (from the 3x3x2 sub-grid fixture) — catches a regression where the default column set drops one of the optional datasets.	<pending>
+tests/test_ipic3d_particles.py::TestPhdf5ParticleReader::test_read_position_only	14	kept	Pins that columns=['position'] loads position+weight but NOT velocity — catches a reader bug that ignores the columns kwarg (would load everything) or conflates position/velocity selection (would load velocity).	<pending>
+tests/test_ipic3d_particles.py::TestPhdf5ParticleReader::test_read_velocity_only	14	kept	Mirror of test_read_position_only on the opposite column — catches a set-membership bug (e.g. `if 'position' not in want` with inverted logic) that would fail differently from the position-only case.	<pending>
+tests/test_ipic3d_particles.py::TestPhdf5ParticleReader::test_particle_count_correct	14	kept	Pins exact shapes (18,3)/(18,3)/(18,) across position/velocity/weight — catches a reader bug where weight is loaded as (18,3) because it reuses the position-shape code path.	<pending>
+tests/test_ipic3d_particles.py::TestPhdf5ParticleReader::test_position_values	14	hardened	Was min/max envelope-only on each axis (all three axes share the same [0.1,0.9] envelope, so axis-swap bugs pass). Now pins the exact 3-point, 3-point, 2-point linspace per axis plus per-value count, catching axis transpose and generator-grid-mismatch bugs.	<pending>
+tests/test_ipic3d_particles.py::TestPhdf5ParticleReader::test_macro_charge_reconstructed	14	kept	Pins macro_charge=-1 for species 0 (electrons) and +1 for species 1 (ions) across all 18 particles — catches a bug where the sign(qom) logic is flipped in read_phdf5_particles (which would populate species_charge=+1 for electrons).	<pending>
+tests/test_ipic3d_particles.py::TestPhdf5ParticleReader::test_weight_dtype	14	kept	Pins that the reader promotes the on-disk q dataset to float64 — catches a dtype-preservation bug where weight stays float32 and later fails ParticleData.__post_init__'s explicit float64 check.	<pending>
+tests/test_ipic3d_particles.py::TestPhdf5ParticleReader::test_canonical_form_no_charge_attribute	14	kept	Pins the Step 25b migration outcome: ParticleData no longer carries a per-particle `charge` attribute. Catches a regression that re-introduces the redundant field (would break Parquet round-trip tests and schema contract in docs/schema.md).	<pending>
+tests/test_ipic3d_particles.py::TestPhdf5ParticleReader::test_species_name	14	kept	Pins that species_name is populated with the HDF5 group basename ('species_0', 'species_1'), not an empty string or hard-coded 'electrons' — catches a bug where the reader loses the species index when constructing the name.	<pending>
+tests/test_ipic3d_particles.py::TestPhdf5ParticleReader::test_weight_unit_in_fixture	14	kept	Pins that a scalar/singleton q=±1 on disk broadcasts to weight=1.0 per particle (the np.full branch in read_phdf5_particles) — catches a bug where only the array-size-N branch works and singleton-q runs return shape-mismatched weight.	<pending>
+tests/test_ipic3d_particles.py::TestPhdf5ParticleReader::test_species_charge_populated	14	kept	Pins species_charge = sign(qom_s) — catches a bug that stores the raw qom value (-64 for electrons) instead of its sign, which would propagate into macro_charge=w*(-64) and inflate current density 64x.	<pending>
+tests/test_ipic3d_particles.py::TestPhdf5ParticleReader::test_species_mass_populated	14	hardened	Was `species_mass > 0` only — would pass for stray-sign or inverted-ratio bugs. Now pins exact 1/|qom|: electron=1/64, ion=1.0, catching any formula drift from the canonical m_s = 1/|qom_s| iPIC3D normalization.	<pending>
+tests/test_ipic3d_particles.py::TestNonUniformWeight::test_per_particle_q_round_trip	14	kept	Pins the per-particle-q branch of read_phdf5_particles: disk q=[-1,-0.5,-2,-0.25,-1.5,-0.75,-3] produces weight=|q| AND macro_charge=-|q|. Distinct asymmetric values catch a bug where the reader collapses per-particle q to a scalar or drops the sign.	<pending>
+tests/test_ipic3d_particles.py::TestNonUniformWeight::test_q_size_mismatch_raises	14	kept	Pins the 'neither 1 nor n_particles' ValueError branch (q.size=3, n=5). Catches a bug where a mismatched q size is silently broadcast/repeated instead of raising, which would silently corrupt moments.	<pending>
+tests/test_ipic3d_particles.py::TestParticleIdSupport::test_id_loaded	14	kept	Pins id dtype=int64 and shape (18,) — catches a bug where the reader stores IDs as float64 (loses precision past 2^53) or shape (18,1) from an unravelled read.	<pending>
+tests/test_ipic3d_particles.py::TestParticleIdSupport::test_id_values	14	kept	Pins exact id values = arange(18) for species 0 — catches a bug where IDs are read with wrong offset, reversed order, or with a 1-based indexing shift.	<pending>
+tests/test_ipic3d_particles.py::TestParticleIdSupport::test_id_species_offset	14	kept	Pins that species 1 IDs start at 18, not 0 — catches a bug where the reader resets IDs per species file (losing cross-species uniqueness required for trajectory tracking).	<pending>
+tests/test_ipic3d_particles.py::TestParticleIdSupport::test_id_in_repr	14	kept	Pins that 'id' appears in the __repr__ loaded-list when id is set — catches a regression where the if-chain in __repr__ is reordered and id-conditional gets dropped.	<pending>
+tests/test_ipic3d_particles.py::TestParticleIdSupport::test_id_none_when_absent	14	kept	Pins that files without an 'ID' dataset yield pcl.id=None rather than raising KeyError — catches a bug in read_phdf5_particles where the `if 'ID' in group` check is inverted or omitted.	<pending>
+tests/test_ipic3d_particles.py::TestParticleIdSupport::test_id_shape_validation	14	kept	Pins that id with shape (5,) when n_particles=3 raises with the 'id shape' message — catches the __post_init__ id-shape validation getting dropped or using the wrong expected tuple (e.g. (n,3)).	<pending>
+tests/test_ipic3d_particles.py::TestParticleDataReaderProtocol::test_parallel_reader_is_particle_reader	14	kept	Pins structural subtyping: IPic3DParallelReader satisfies the ParticleDataReader Protocol. Catches accidental removal of available_particle_steps or read_particles methods (would break Simulation.particles).	<pending>
+tests/test_ipic3d_particles.py::TestParticleDataReaderProtocol::test_available_particle_steps	14	kept	Pins the reader method dispatches to detect_particle_steps (same [0] result) — catches a bug where the method is stubbed or calls available_timesteps (which would include non-particle steps).	<pending>
+tests/test_ipic3d_particles.py::TestParticleDataReaderProtocol::test_read_particles_via_reader	14	kept	Pins that reader.read_particles returns the same n_particles=18 as the module-level function — catches a bug where the reader wrapper loses/mangles particles during forwarding.	<pending>
+tests/test_ipic3d_particles.py::TestSimulationParticles::test_particles_via_simulation	14	kept	Pins the Simulation.particles() end-to-end: reader + config → particles dispatch returns n=18. Catches a bug in the duck-type check or argument forwarding that produces wrong n or raises unrelated errors.	<pending>
+tests/test_ipic3d_particles.py::TestSimulationParticles::test_particle_steps_property	14	kept	Pins the Simulation.particle_steps property returns the reader-provided list ([0]) — catches a bug where the property always returns [] or delegates to available_timesteps.	<pending>
+tests/test_ipic3d_particles.py::TestSimulationParticles::test_unsupported_reader_raises_typeerror	14	kept	Pins the dual contract: readers lacking the Protocol return particle_steps=[] AND raise TypeError on particles(). Catches a bug where an AttributeError leaks or where particle_steps raises instead of returning [].	<pending>
+tests/test_ipic3d_synthetic.py::TestParseInpSynthetic::test_grid_and_domain	14	kept	Pins nxc/nyc/nzc + lx/ly/lz + dx/dy/dz + periodic flags against module-level constants derived from the fixture .inp. Catches a parser bug where one of dx/dy/dz is dropped (defaulting to L/N elsewhere) or periodic BC parsing inverts true/false.	<pending>
+tests/test_ipic3d_synthetic.py::TestParseInpSynthetic::test_species_and_physics	14	kept	Pins ns, qom tuple, b0 vector, and write_method — catches a parser bug that truncates qom to one species or loses B0 vector components (would silently change derived Alfven speed etc).	<pending>
+tests/test_ipic3d_synthetic.py::TestParseInpSynthetic::test_inline_comment_stripped	14	kept	Pins that iPIC3D inline '# comment' after a value is stripped before type-coercing write_method — catches a parser bug where the 'h5hut' value retains trailing garbage (breaking string comparison downstream).	<pending>
+tests/test_ipic3d_synthetic.py::TestParseSettingsHdfSynthetic::test_settings_hdf_matches_inp	14	kept	Pins that parse_settings_hdf (binary settings.hdf path) produces identical grid/QoM/thermal velocities to parse_inp (text path) — catches drift between the two parsers (different conventions, e.g. qom column order flipped).	<pending>
+tests/test_ipic3d_synthetic.py::TestToSimulationConfigSynthetic::test_grid_geometry	14	kept	Pins (a) grid dims, (b) origin at -dx/2 node offset (not 0 or -dx), (c) coordinate arrays start at 0 and end at L (not L-dx), (d) boundary conventions. Catches the node-centered convention getting replaced by a cell-centered one (documented in docs/conventions.md § Node-Centered Grid Convention).	<pending>
+tests/test_ipic3d_synthetic.py::TestToSimulationConfigSynthetic::test_species_and_model	14	kept	Pins the canonical iPIC3D-normalization mapping: electron charge=-1 (not qom), mass=1/|qom_0|=1/64, model_name='iPIC3D', model_type='PIC'. Catches a bug that stores raw qom into charge or mass fields.	<pending>
+tests/test_ipic3d_synthetic.py::TestToSimulationConfigSynthetic::test_stagger_metadata	14	kept	Pins StaggerInfo.convention == 'node' (schema.md § StaggerInfo provenance, Step 34) — catches a regression where iPIC3D is tagged 'cell' or 'staggered', misleading downstream destagger checks in cross-model comparisons.	<pending>
+tests/test_ipic3d_synthetic.py::TestToSimulationConfigSynthetic::test_missing_key_raises	14	kept	Pins that parse_inp raises ExceptionGroup (not single ValueError) listing all missing keys. Catches fail-fast-on-first-missing regressions that hide which keys are absent (ExceptionGroup is the Python 3.11+ pattern for multi-error validation, see CLAUDE.md).	<pending>
+tests/test_ipic3d_synthetic.py::TestPhdf5Reader::test_available_timesteps	14	kept	Pins the reader returns sorted [0] from a single-step fixture — catches a regex bug that matches Particles_* or Moments_* dirs (inflating step count) or unsorted output.	<pending>
+tests/test_ipic3d_synthetic.py::TestPhdf5Reader::test_available_fields_matches_read	14	kept	Pins that the lightweight probe and the full read return the identical field list. Catches a probe bug that lists different fields than the full reader would produce (which would silently drop fields from a shallow-scan UI like `pypic fields` CLI).	<pending>
+tests/test_ipic3d_synthetic.py::TestPhdf5Reader::test_field_shapes	14	kept	Pins ds['B1'].shape == (NX,NY,NZ) with the node-centered +1 convention. Catches a reader bug that returns cell-centered shape (NXC,NYC,NZC) or transposes x/z.	<pending>
+tests/test_ipic3d_synthetic.py::TestPhdf5Reader::test_b_field_exact	14	kept	Pins B1(y) = B0x * tanh((y-Ly/2)/delta) against an analytical field at atol=1e-14. Catches any axis-swap, 4π/μ0 factor, or destagger offset — the tanh profile gives distinct values per y-slice so a flipped axis would fail catastrophically.	<pending>
+tests/test_ipic3d_synthetic.py::TestPhdf5Reader::test_e_field_zero	14	kept	Pins E1=E2=E3=0 at atol=1e-14 from the zero-initialization fixture — catches a reader bug that reads garbage memory (producing small non-zero noise) or swaps E with B in the layout.	<pending>
 tests/test_ipic3d_synthetic.py::TestPhdf5Reader::test_electron_density_exact	0	not-yet-reviewed		
 tests/test_ipic3d_synthetic.py::TestPhdf5Reader::test_ion_density_exact	0	not-yet-reviewed		
 tests/test_ipic3d_synthetic.py::TestPhdf5Reader::test_total_charge_is_sum	0	not-yet-reviewed		
@@ -791,7 +791,7 @@ tests/test_ipic3d_synthetic.py::TestPhdf5Reader::test_diagonal_pressure_positive
 tests/test_ipic3d_synthetic.py::TestPhdf5Reader::test_diagonal_pressure_positive[1]	0	not-yet-reviewed		
 tests/test_ipic3d_synthetic.py::TestPhdf5Reader::test_pressure_values	0	not-yet-reviewed		
 tests/test_ipic3d_synthetic.py::TestPhdf5Reader::test_off_diagonal_pressure_zero	0	not-yet-reviewed		
-tests/test_ipic3d_synthetic.py::TestPhdf5Reader::test_species_metadata	0	not-yet-reviewed		
+tests/test_ipic3d_synthetic.py::TestPhdf5Reader::test_species_metadata	14	hardened	Was len(ds.species)==2 only — a reader producing garbage SpeciesInfo (wrong charge sign, swapped mass) still passed. Now pins canonical charge=±1 and mass=1/|qom| per species, matching the iPIC3D convention documented in docs/schema.md.	<pending>
 tests/test_ipic3d_synthetic.py::TestPhdf5Reader::test_grid_info	0	not-yet-reviewed		
 tests/test_ipic3d_synthetic.py::TestShdf5Reader::test_available_timesteps	0	not-yet-reviewed		
 tests/test_ipic3d_synthetic.py::TestShdf5Reader::test_available_fields_matches_read	0	not-yet-reviewed		
@@ -819,7 +819,7 @@ tests/test_ipic3d_synthetic.py::TestH5hutReader::test_electron_density_4pi_corre
 tests/test_ipic3d_synthetic.py::TestH5hutReader::test_ion_density_4pi_corrected	0	not-yet-reviewed		
 tests/test_ipic3d_synthetic.py::TestH5hutReader::test_total_charge_is_sum	0	not-yet-reviewed		
 tests/test_ipic3d_synthetic.py::TestH5hutReader::test_total_current_is_sum	0	not-yet-reviewed		
-tests/test_ipic3d_synthetic.py::TestH5hutReader::test_electron_pressure_positive	0	not-yet-reviewed		
+tests/test_ipic3d_synthetic.py::TestH5hutReader::test_diagonal_pressure_positive	14	hardened	Renamed from test_electron_pressure_positive; was species-0-only. H5hut has no pressure-match-phdf5 test (unlike shdf5) and test_pressure_p_over_rho_consistency divides P by rho (cancels common sign flips). Positivity is the residual discriminator. Now covers both species, catching a sign bug isolated to the ion-specific 4π correction path.	<pending>
 tests/test_ipic3d_synthetic.py::TestH5hutReader::test_pressure_p_over_rho_consistency	0	not-yet-reviewed		
 tests/test_ipic3d_synthetic.py::TestH5hutUnknownFieldPassthrough::test_extra_field_included	0	not-yet-reviewed		
 tests/test_ipic3d_synthetic.py::TestOpenIpic3dSynthetic::test_detects_parallel	0	not-yet-reviewed		
@@ -833,7 +833,7 @@ tests/test_ipic3d_synthetic.py::TestConservedQuantitiesSyntheticFormatB::test_cy
 tests/test_ipic3d_synthetic.py::TestConservedQuantitiesSyntheticFormatB::test_cycles_deduplicated	0	not-yet-reviewed		
 tests/test_ipic3d_synthetic.py::TestConservedQuantitiesSyntheticFormatB::test_dedup_keeps_later_file	0	not-yet-reviewed		
 tests/test_ipic3d_synthetic.py::TestConservedQuantitiesSyntheticFormatB::test_species_count	0	not-yet-reviewed		
-tests/test_ipic3d_synthetic.py::TestConservedQuantitiesSyntheticFormatB::test_species_arrays_length	0	not-yet-reviewed		
+tests/test_ipic3d_synthetic.py::TestConservedQuantitiesSyntheticFormatB::test_species_arrays_length	14	hardened	Was species_npart-only — species_charge and species_kinetic_energy could be truncated (e.g. parser skips the last line for one column) and pass. Extended to iterate all three families, catching per-column row-count drift.	<pending>
 tests/test_ipic3d_synthetic.py::TestConservedQuantitiesSyntheticFormatB::test_particle_counts	0	not-yet-reviewed		
 tests/test_ipic3d_synthetic.py::TestConservedToTabular::test_structure	0	not-yet-reviewed		
 tests/test_ipic3d_synthetic.py::TestConservedToTabular::test_columns_present	0	not-yet-reviewed		
@@ -858,8 +858,8 @@ tests/test_ipic3d_synthetic.py::TestIPic3DAvailableAuxiliary::test_empty_dir_ret
 tests/test_ipic3d_synthetic.py::TestIPic3DLoadAuxiliary::test_phdf5_load_conserved	0	not-yet-reviewed		
 tests/test_ipic3d_synthetic.py::TestIPic3DLoadAuxiliary::test_h5hut_load_conserved	0	not-yet-reviewed		
 tests/test_ipic3d_synthetic.py::TestIPic3DLoadAuxiliary::test_unknown_name_raises	0	not-yet-reviewed		
-tests/test_ipic3d_synthetic.py::TestShdf5PressureTensor::test_diagonal_pressure_positive[0]	0	not-yet-reviewed		
-tests/test_ipic3d_synthetic.py::TestShdf5PressureTensor::test_diagonal_pressure_positive[1]	0	not-yet-reviewed		
+tests/test_ipic3d_synthetic.py::TestShdf5PressureTensor::test_diagonal_pressure_positive[0]	14	dropped	Positivity of shdf5 P11/P22/P33 for species 0 is transitively pinned: test_pressure_values_match_phdf5 asserts shdf5 == phdf5 at atol=1e-12 AND TestPhdf5Reader::test_diagonal_pressure_positive[0] pins phdf5 positivity. No bug class remains that this alone catches.	<pending>
+tests/test_ipic3d_synthetic.py::TestShdf5PressureTensor::test_diagonal_pressure_positive[1]	14	dropped	Same reasoning as [0] for species 1: phdf5 positivity test plus shdf5==phdf5 match_phdf5 test jointly pin shdf5 positivity to machine precision. Redundant.	<pending>
 tests/test_ipic3d_synthetic.py::TestShdf5PressureTensor::test_pressure_values_match_phdf5	0	not-yet-reviewed		
 tests/test_ipic3d_synthetic.py::TestShdf5PressureTensor::test_off_diagonal_pressure_zero	0	not-yet-reviewed		
 tests/test_ipic3d_synthetic.py::TestEnergyFluxPhdf5::test_eflux_present	0	not-yet-reviewed		

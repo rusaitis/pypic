@@ -311,15 +311,18 @@ class TestPhdf5ParticleReader:
         assert pcl.weight.shape == (18,)
 
     def test_position_values(self, ipic3d_config) -> None:
+        # Fixture generator lays particles on a deterministic 3x3x2 sub-grid:
+        # x = linspace(0.1, 0.9, 3), y = same, z = linspace(0.1, 0.9, 2).
+        # Flat [0.1, 0.9] range on every axis means a min/max-only check
+        # would not catch an axis swap (all three fit the same envelope),
+        # so pin the exact unique-value sets per axis.
         pcl = read_phdf5_particles(FIXTURE_DIR, 0, 0, ipic3d_config)
-        # Positions were generated on a 3x3x2 sub-grid within first cell
-        dx, dy, dz = 1.0, 1.0, 1.0  # fixture cell spacing
-        assert pcl.x.min() >= 0.0
-        assert pcl.x.max() < dx
-        assert pcl.y.min() >= 0.0
-        assert pcl.y.max() < dy
-        assert pcl.z.min() >= 0.0
-        assert pcl.z.max() < dz
+        np.testing.assert_allclose(np.unique(pcl.x), np.linspace(0.1, 0.9, 3))
+        np.testing.assert_allclose(np.unique(pcl.y), np.linspace(0.1, 0.9, 3))
+        np.testing.assert_allclose(np.unique(pcl.z), np.linspace(0.1, 0.9, 2))
+        # With a 3x3x2 lattice, each x value appears 6 times, each z value 9.
+        assert np.count_nonzero(pcl.x == 0.1) == 6
+        assert np.count_nonzero(pcl.z == 0.1) == 9
 
     def test_macro_charge_reconstructed(self, ipic3d_config) -> None:
         # Canonical form gives us species_charge × weight.  Both fixture
@@ -363,13 +366,15 @@ class TestPhdf5ParticleReader:
         assert pcl_i.species_charge == 1.0  # ions
 
     def test_species_mass_populated(self, ipic3d_config) -> None:
-        # iPIC3D convention: species_mass = 1/|qom|
+        # iPIC3D convention: species_mass = 1/|qom|.  Fixture QOM=(-64, 1),
+        # so m_e = 1/64 (real electron) and m_i = 1.  Pins the exact
+        # 1/|qom| formula — a stray sign, inverted ratio (|qom|/1), or
+        # swap with |qom| itself all produce >0 values that passed the
+        # pre-iter-14 positivity-only check.
         pcl_e = read_phdf5_particles(FIXTURE_DIR, 0, 0, ipic3d_config)
         pcl_i = read_phdf5_particles(FIXTURE_DIR, 0, 1, ipic3d_config)
-        assert pcl_e.species_mass is not None
-        assert pcl_i.species_mass is not None
-        assert pcl_e.species_mass > 0
-        assert pcl_i.species_mass > 0
+        assert pcl_e.species_mass == 1.0 / 64.0
+        assert pcl_i.species_mass == 1.0
 
 
 class TestNonUniformWeight:
