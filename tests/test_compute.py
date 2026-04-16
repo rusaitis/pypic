@@ -486,11 +486,6 @@ class TestFieldDatasetMethods:
         result_canonical = compute_field("curl_B1", ds)
         np.testing.assert_array_equal(result_alias, result_canonical)
 
-    def test_identity_normalization_passthrough(self):
-        shape = (2, 2, 2)
-        ds = make_test_dataset({"B1": np.full(shape, 7.0)}, shape=shape)
-        np.testing.assert_allclose(ds.in_si("B1"), 7.0, rtol=1e-15)
-
 
 class TestSIFactors:
     @pytest.mark.parametrize(

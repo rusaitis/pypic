@@ -264,49 +264,49 @@ tests/test_comparison.py::TestFieldDifferenceDataset::test_si_units_round_trip_n
 tests/test_comparison.py::TestFieldDifferenceDataset::test_code_units_keeps_source_normalization	5	kept	Pins units='code' preserves a.normalization (no identity swap) — catches a regression that zeros out the normalisation on every diff, breaking downstream in_si().	3470622
 tests/test_comparison.py::TestFieldDifferenceDataset::test_plottable_via_plot_field_slice	5	kept	Pins diff integrates with plot_field_slice end-to-end — catches a regression where field_difference_dataset emits a FieldDataset shape/metadata the plotting layer rejects.	3470622
 tests/test_comparison.py::TestFieldDifferenceDataset::test_explicit_field_list	5	kept	Pins fields=['B1'] restricts diff.field_names() to exactly ['B1'] — catches a regression where the kwarg is parsed but all intersected fields are still written.	3470622
-tests/test_comparison.py::TestFieldDifferenceDataset::test_alias_survives_frame_alignment	0	not-yet-reviewed		
-tests/test_comparison.py::TestFieldDifferenceDataset::test_code_units_mismatched_normalization_raises	0	not-yet-reviewed		
-tests/test_comparison.py::TestFieldDifferenceDataset::test_bad_method_rejected_on_same_grid	0	not-yet-reviewed		
-tests/test_comparison.py::TestFrameAlignment::test_compare_fields_auto_transforms	0	not-yet-reviewed		
-tests/test_comparison.py::TestFrameAlignment::test_no_transform_raises_value_error	0	not-yet-reviewed		
-tests/test_comparison.py::TestFrameAlignment::test_explicit_frame_transforms_both	0	not-yet-reviewed		
-tests/test_comparison.py::TestFrameAlignment::test_explicit_frame_missing_transform_on_a_raises	0	not-yet-reviewed		
-tests/test_comparison.py::TestFrameAlignment::test_explicit_frame_missing_transform_on_b_raises	0	not-yet-reviewed		
-tests/test_comparison.py::TestFrameAlignment::test_empty_frame_string_raises	0	not-yet-reviewed		
-tests/test_comparison.py::TestFrameAlignment::test_explicit_frame_already_native_is_noop	0	not-yet-reviewed		
-tests/test_comparison.py::TestFrameAlignment::test_field_difference_dataset_explicit_frame	0	not-yet-reviewed		
-tests/test_comparison.py::TestFrameAlignment::test_field_difference_dataset_result_in_a_frame	0	not-yet-reviewed		
-tests/test_comparison.py::TestFrameAlignment::test_field_comparison_report_auto_transforms	0	not-yet-reviewed		
-tests/test_comparison.py::TestFrameAlignment::test_same_frame_skips_transform	0	not-yet-reviewed		
-tests/test_comparison.py::TestCoarseMismatchWarning::test_no_warning_under_threshold	0	not-yet-reviewed		
-tests/test_comparison.py::TestCoarseMismatchWarning::test_warns_above_threshold	0	not-yet-reviewed		
-tests/test_comparison.py::TestCoarseMismatchWarning::test_warns_once_per_report	0	not-yet-reviewed		
-tests/test_comparison.py::TestNaNHandling::test_synthetic_nan_eliminated_by_tight_common_grid	0	not-yet-reviewed		
-tests/test_comparison.py::TestNaNHandling::test_real_nan_returns_finite_metric_with_warning	0	not-yet-reviewed		
-tests/test_comparison.py::TestNaNHandling::test_real_nan_propagate_policy_returns_nan	0	not-yet-reviewed		
-tests/test_comparison.py::TestMethodPassthrough::test_method_cubic_differs_from_linear_on_curved_field	0	not-yet-reviewed		
-tests/test_comparison.py::TestMethodPassthrough::test_method_validation_unknown_string_raises_via_scipy	0	not-yet-reviewed		
-tests/test_comparison.py::test_compare_fields_equivalent_to_align_plus_pure[grid_a_params0-grid_b_params0]	0	not-yet-reviewed		
-tests/test_comparison.py::test_compare_fields_equivalent_to_align_plus_pure[grid_a_params1-grid_b_params1]	0	not-yet-reviewed		
-tests/test_comparison.py::test_compare_fields_equivalent_to_align_plus_pure[grid_a_params2-grid_b_params2]	0	not-yet-reviewed		
+tests/test_comparison.py::TestFieldDifferenceDataset::test_alias_survives_frame_alignment	6	kept	Pins named regression: aliases must survive transform_to+regrid in field_difference_dataset (see docstring).	<pending>
+tests/test_comparison.py::TestFieldDifferenceDataset::test_code_units_mismatched_normalization_raises	6	kept	Pins units='code' contract: cross-normalization refused. Guards against silent meaningless comparison of PIC vs MHD code values.	<pending>
+tests/test_comparison.py::TestFieldDifferenceDataset::test_bad_method_rejected_on_same_grid	6	kept	Pins named regression: same-grid regrid shortcut used to bypass method validation, silently defaulting to linear.	<pending>
+tests/test_comparison.py::TestFrameAlignment::test_compare_fields_auto_transforms	6	kept	Pins auto-transform of B to A's frame in compare_fields; regression if _align_frames is short-circuited when frames differ.	<pending>
+tests/test_comparison.py::TestFrameAlignment::test_no_transform_raises_value_error	6	kept	Pins error message mentions both 'GSE' and 'GSM'; guards against regressed error that omits one frame name making diagnosis harder.	<pending>
+tests/test_comparison.py::TestFrameAlignment::test_explicit_frame_transforms_both	6	kept	Pins frame=... transforms BOTH inputs (not just B). Regression if explicit frame is applied one-sided.	<pending>
+tests/test_comparison.py::TestFrameAlignment::test_explicit_frame_missing_transform_on_a_raises	6	kept	Error message pins 'dataset A' + both frame names — regression if naming is generic or misattributes failure to B.	<pending>
+tests/test_comparison.py::TestFrameAlignment::test_explicit_frame_missing_transform_on_b_raises	6	kept	Error message pins 'dataset B' (after A succeeds) — guards against transform-check order bugs where A's failure shadows B's.	<pending>
+tests/test_comparison.py::TestFrameAlignment::test_empty_frame_string_raises	6	kept	Boundary validation: frame='' rejected at entry with clear message, not deep in transform_to. Guards against silent no-op behavior for falsy strings.	<pending>
+tests/test_comparison.py::TestFrameAlignment::test_explicit_frame_already_native_is_noop	6	kept	Pins the frame=A.frame fast-path: no transform attempted on A, matches default behavior. Regression if branch mis-tests equality.	<pending>
+tests/test_comparison.py::TestFrameAlignment::test_field_difference_dataset_explicit_frame	6	kept	Pins that diff.frame equals the requested frame AND source_frames records originals — two-sided invariant for provenance.	<pending>
+tests/test_comparison.py::TestFrameAlignment::test_field_difference_dataset_result_in_a_frame	6	kept	Pins default: diff.frame == a.frame. Regression if the auto-transform mistakenly writes B's frame to the result.	<pending>
+tests/test_comparison.py::TestFrameAlignment::test_field_comparison_report_auto_transforms	6	kept	Pins that field_comparison_report runs the same _align_frames path as compare_fields; regression if report bypasses transform.	<pending>
+tests/test_comparison.py::TestFrameAlignment::test_same_frame_skips_transform	6	kept	Pins named regression: a==b.frame with no transforms must not raise KeyError('No transforms registered'). Guards the lazy-skip branch.	<pending>
+tests/test_comparison.py::TestCoarseMismatchWarning::test_no_warning_under_threshold	6	kept	Pins ratio<=10x does NOT emit the cross-scale warning; regression if threshold is dropped or swapped (<).	<pending>
+tests/test_comparison.py::TestCoarseMismatchWarning::test_warns_above_threshold	6	kept	Pins ratio>10x emits UserWarning matching 'cross-scale'; guards against silent comparison across incompatible scales.	<pending>
+tests/test_comparison.py::TestCoarseMismatchWarning::test_warns_once_per_report	6	kept	Regression guard: field_comparison_report used to fire N warnings (one per field); pins single-shot semantics.	<pending>
+tests/test_comparison.py::TestNaNHandling::test_synthetic_nan_eliminated_by_tight_common_grid	6	kept	Pins named regression #1a: tight common_grid must prevent synthetic boundary NaN in different-resolution same-domain comparisons.	<pending>
+tests/test_comparison.py::TestNaNHandling::test_real_nan_returns_finite_metric_with_warning	6	kept	Pins named regression #1b: default nan_policy='omit' masks NaN and emits ONE UserWarning per call, not per cell.	<pending>
+tests/test_comparison.py::TestNaNHandling::test_real_nan_propagate_policy_returns_nan	6	kept	Pins nan_policy='propagate' public API: result is NaN when inputs contain NaN. Guards the escape hatch from default 'omit'.	<pending>
+tests/test_comparison.py::TestMethodPassthrough::test_method_cubic_differs_from_linear_on_curved_field	6	kept	Pins that method='cubic' is actually passed through to regrid (not silently dropped); cubic<linear for sin(x) is a real observable.	<pending>
+tests/test_comparison.py::TestMethodPassthrough::test_method_validation_unknown_string_raises_via_scipy	6	kept	Pins that bad method= surfaces via scipy's ValueError, not hangs or linear fallback. Regression guard.	<pending>
+tests/test_comparison.py::test_compare_fields_equivalent_to_align_plus_pure[grid_a_params0-grid_b_params0]	6	kept	Structural invariant: compare_fields = align_grids + pure diagnostic (same-size grids). Regression if implementations diverge.	<pending>
+tests/test_comparison.py::test_compare_fields_equivalent_to_align_plus_pure[grid_a_params1-grid_b_params1]	6	kept	Structural invariant case: compare_fields = align_grids + pure diagnostic (coarse vs fine, 2x ratio).	<pending>
+tests/test_comparison.py::test_compare_fields_equivalent_to_align_plus_pure[grid_a_params2-grid_b_params2]	6	kept	Structural invariant case: compare_fields = align_grids + pure diagnostic (8x8 vs 5x5, upsampling direction).	<pending>
 tests/test_compute.py::TestRegistryIntegrity::test_no_duplicate_names	0	not-yet-reviewed		
 tests/test_compute.py::TestRegistryIntegrity::test_all_aliases_resolve	0	not-yet-reviewed		
 tests/test_compute.py::TestRegistryIntegrity::test_available_quantities_nonempty	0	not-yet-reviewed		
 tests/test_compute.py::TestRegistryIntegrity::test_available_quantities_sorted	0	not-yet-reviewed		
 tests/test_compute.py::TestRegistryIntegrity::test_species_recipes_have_species_args	0	not-yet-reviewed		
-tests/test_compute.py::TestMagnitudes::test_345_triangle[|B|-fields0]	0	not-yet-reviewed		
-tests/test_compute.py::TestMagnitudes::test_345_triangle[|E|-fields1]	0	not-yet-reviewed		
-tests/test_compute.py::TestMagnitudes::test_345_triangle[|J|-fields2]	0	not-yet-reviewed		
-tests/test_compute.py::TestMagnitudes::test_345_triangle[|V|-fields3]	0	not-yet-reviewed		
-tests/test_compute.py::TestDependencyChains::test_beta_auto_computes_bmag	0	not-yet-reviewed		
-tests/test_compute.py::TestDependencyChains::test_P_from_species_tensors	0	not-yet-reviewed		
-tests/test_compute.py::TestDependencyChains::test_P_raw_takes_precedence	0	not-yet-reviewed		
-tests/test_compute.py::TestDependencyChains::test_beta_from_species_tensors	0	not-yet-reviewed		
-tests/test_compute.py::TestDependencyChains::test_Pe_from_species_tensor	0	not-yet-reviewed		
-tests/test_compute.py::TestDependencyChains::test_Pi_from_species_tensor	0	not-yet-reviewed		
-tests/test_compute.py::TestDependencyChains::test_alfven_mach_chain	0	not-yet-reviewed		
-tests/test_compute.py::TestDependencyChains::test_vorticity_magnitude_chain	0	not-yet-reviewed		
-tests/test_compute.py::TestDependencyChains::test_existing_field_returned_directly	0	not-yet-reviewed		
+tests/test_compute.py::TestMagnitudes::test_345_triangle[|B|-fields0]	6	kept	Pins |B|=5 for (3,4,0) — 3-4-5 Pythagorean sanity. Guards against component-index swap or missing sqrt.	<pending>
+tests/test_compute.py::TestMagnitudes::test_345_triangle[|E|-fields1]	6	kept	Pins |E| magnitude uses E1/E2/E3 components correctly via 3-4-5 triangle. Different recipe from |B|, independent regression.	<pending>
+tests/test_compute.py::TestMagnitudes::test_345_triangle[|J|-fields2]	6	kept	Pins |J| recipe with J1/J2/J3 inputs; independent of |B|/|E|. 3-4-5 sanity.	<pending>
+tests/test_compute.py::TestMagnitudes::test_345_triangle[|V|-fields3]	6	kept	Pins |V| recipe with V1/V2/V3 inputs (ion/fluid velocity). Independent of electron |Ve|.	<pending>
+tests/test_compute.py::TestDependencyChains::test_beta_auto_computes_bmag	6	kept	Pins beta auto-computes |B| from components when |B| not in dataset. Regression if dependency resolver misses the magnitude step.	<pending>
+tests/test_compute.py::TestDependencyChains::test_P_from_species_tensors	6	kept	Pins P fallback chain: when raw P missing, computes P=Pe+Pi via per-species tensor traces. Regression if fallback order swaps.	<pending>
+tests/test_compute.py::TestDependencyChains::test_P_raw_takes_precedence	6	kept	Pins precedence invariant: dataset-present P returned directly, not recomputed from species tensors. Guards against chain overriding raw data.	<pending>
+tests/test_compute.py::TestDependencyChains::test_beta_from_species_tensors	6	kept	End-to-end chain: beta → P → (Pe+Pi) → species tensors + |B| → components. Guards the full two-level fallback.	<pending>
+tests/test_compute.py::TestDependencyChains::test_Pe_from_species_tensor	6	kept	Pins Pe = Tr(P_s0)/3 fallback; guards against accidentally using P_s1 trace for Pe.	<pending>
+tests/test_compute.py::TestDependencyChains::test_Pi_from_species_tensor	6	kept	Pins Pi = Tr(P_s1)/3 fallback; guards against electron/ion species-index swap in fallback.	<pending>
+tests/test_compute.py::TestDependencyChains::test_alfven_mach_chain	6	kept	Pins M_A = |V|/v_A chain works end-to-end with |V|, |B|, rho_m intermediates. Regression if any link in the chain breaks.	<pending>
+tests/test_compute.py::TestDependencyChains::test_vorticity_magnitude_chain	6	kept	Pins |vort| auto-chains through vort1/2/3 via curl; uniform V → zero result (exact). Guards the scalar-from-vector chain.	<pending>
+tests/test_compute.py::TestDependencyChains::test_existing_field_returned_directly	6	kept	Pins direct passthrough for raw fields — B1 present in dataset must not invoke any recipe. Regression against inadvertent recomputation.	<pending>
 tests/test_compute.py::TestSpeciesDependent::test_omega_pe	0	not-yet-reviewed		
 tests/test_compute.py::TestSpeciesDependent::test_omega_ci	0	not-yet-reviewed		
 tests/test_compute.py::TestSpeciesDependent::test_skin_depth	0	not-yet-reviewed		
@@ -314,20 +314,20 @@ tests/test_compute.py::TestSpeciesDependent::test_thermal_speed	0	not-yet-review
 tests/test_compute.py::TestSpeciesDependent::test_gyroradius	0	not-yet-reviewed		
 tests/test_compute.py::TestSpeciesDependent::test_debye_length	0	not-yet-reviewed		
 tests/test_compute.py::TestSpeciesDependent::test_missing_species_raises	0	not-yet-reviewed		
-tests/test_compute.py::TestGridDependent::test_div_b_uniform	0	not-yet-reviewed		
-tests/test_compute.py::TestGridDependent::test_curl_component	0	not-yet-reviewed		
+tests/test_compute.py::TestGridDependent::test_div_b_uniform	6	kept	Pins div_B of uniform B = 0 (div-B cleaning sanity). Regression if divergence stencil is broken on uniform input.	<pending>
+tests/test_compute.py::TestGridDependent::test_curl_component	6	kept	Pins curl_B1 of uniform B = 0 to machine precision. Regression if curl stencil has spurious offset or dx normalization error.	<pending>
 tests/test_compute.py::TestPhysicsConfig::test_sound_speed_custom_gamma	0	not-yet-reviewed		
 tests/test_compute.py::TestPhysicsConfig::test_sound_speed_default_gamma	0	not-yet-reviewed		
-tests/test_compute.py::TestMultiComponent::test_poynting_components	0	not-yet-reviewed		
-tests/test_compute.py::TestMultiComponent::test_vorticity_component	0	not-yet-reviewed		
-tests/test_compute.py::TestFieldDatasetMethods::test_compute_method	0	not-yet-reviewed		
-tests/test_compute.py::TestFieldDatasetMethods::test_in_si_with_identity	0	not-yet-reviewed		
-tests/test_compute.py::TestFieldDatasetMethods::test_in_si_with_normalization	0	not-yet-reviewed		
-tests/test_compute.py::TestFieldDatasetMethods::test_in_si_dimensionless	0	not-yet-reviewed		
-tests/test_compute.py::TestFieldDatasetMethods::test_in_units_nt	0	not-yet-reviewed		
-tests/test_compute.py::TestFieldDatasetMethods::test_in_units_unknown_raises	0	not-yet-reviewed		
-tests/test_compute.py::TestFieldDatasetMethods::test_cartesian_compute_aliases	0	not-yet-reviewed		
-tests/test_compute.py::TestFieldDatasetMethods::test_identity_normalization_passthrough	0	not-yet-reviewed		
+tests/test_compute.py::TestMultiComponent::test_poynting_components	6	kept	Pins S3 = E1*B2 - E2*B1 (z-component of ExB) via cross-product. Guards against component-index/sign bugs in Poynting recipe.	<pending>
+tests/test_compute.py::TestMultiComponent::test_vorticity_component	6	kept	Pins vort2 (single component via curl) = 0 for uniform V; complements |vort| test.	<pending>
+tests/test_compute.py::TestFieldDatasetMethods::test_compute_method	6	kept	Pins FieldDataset.compute() as public API shim to compute_field; guards against method-removal/signature drift.	<pending>
+tests/test_compute.py::TestFieldDatasetMethods::test_in_si_with_identity	6	kept	Pins identity normalization passthrough in in_si — factor of 1.0. Regression if identity isn't treated as a no-op.	<pending>
+tests/test_compute.py::TestFieldDatasetMethods::test_in_si_with_normalization	6	kept	Pins in_si('B1') multiplies by b_field_ref. Guards against applying wrong reference (e.g. e_field_ref or density_ref).	<pending>
+tests/test_compute.py::TestFieldDatasetMethods::test_in_si_dimensionless	6	kept	Pins dimensionless quantities (beta) unaffected by in_si under PIC normalization. Guards against accidental SI factor on dimensionless outputs.	<pending>
+tests/test_compute.py::TestFieldDatasetMethods::test_in_units_nt	6	kept	Pins in_units('B1','nT') = b_field_ref / 1e-9 conversion. Regression if display-unit factor is applied inversely.	<pending>
+tests/test_compute.py::TestFieldDatasetMethods::test_in_units_unknown_raises	6	kept	Pins ValueError('Unknown unit') when user passes unsupported unit via in_units; guards silent fallback.	<pending>
+tests/test_compute.py::TestFieldDatasetMethods::test_cartesian_compute_aliases	6	kept	Pins Cartesian alias resolution for derived quantities: curl_Bx == curl_B1. Guards against alias table omission for derived fields.	<pending>
+tests/test_compute.py::TestFieldDatasetMethods::test_identity_normalization_passthrough	6	dropped	Copy-paste variant: duplicates TestFieldDatasetMethods::test_in_si_with_identity (same setup, same identity normalization, same in_si('B1') passthrough assertion, only the sentinel value differs 5.0 vs 7.0). Merged coverage is preserved by the sibling test.	<pending>
 tests/test_compute.py::TestSIFactors::test_si_factor[pressure]	0	not-yet-reviewed		
 tests/test_compute.py::TestSIFactors::test_si_factor[frequency]	0	not-yet-reviewed		
 tests/test_compute.py::TestSIFactors::test_si_factor[B0]	0	not-yet-reviewed		
@@ -339,11 +339,11 @@ tests/test_compute.py::TestSIFactors::test_si_factor[vort1]	0	not-yet-reviewed
 tests/test_compute.py::TestSIFactors::test_si_factor[enthalpy]	0	not-yet-reviewed		
 tests/test_compute.py::TestSIFactors::test_div_b_factor	0	not-yet-reviewed		
 tests/test_compute.py::TestSIFactors::test_div_e_factor	0	not-yet-reviewed		
-tests/test_compute.py::TestDisplayUnits::test_known_unit	0	not-yet-reviewed		
-tests/test_compute.py::TestDisplayUnits::test_unknown_unit_raises	0	not-yet-reviewed		
-tests/test_compute.py::TestErrorMessages::test_unknown_name_suggests	0	not-yet-reviewed		
-tests/test_compute.py::TestErrorMessages::test_missing_dependency_lists_available	0	not-yet-reviewed		
-tests/test_compute.py::TestErrorMessages::test_recursion_depth	0	not-yet-reviewed		
+tests/test_compute.py::TestDisplayUnits::test_known_unit	6	kept	Pins display_unit_factor values: nT=1e-9, km/s=1e3, R_E=6.371e6, eV=scipy.constants.eV, normalized=1.0. Guards against typos in unit table.	<pending>
+tests/test_compute.py::TestDisplayUnits::test_unknown_unit_raises	6	kept	Pins ValueError with 'Unknown unit' for unknown units; guards silent fallback.	<pending>
+tests/test_compute.py::TestErrorMessages::test_unknown_name_suggests	6	kept	Pins typo-suggestion 'Did you mean' in KeyError for misspelled names — guards against removal of difflib.get_close_matches.	<pending>
+tests/test_compute.py::TestErrorMessages::test_missing_dependency_lists_available	6	kept	Pins 'requires' word + available fields in error message — guards against generic error hiding what's actually missing.	<pending>
+tests/test_compute.py::TestErrorMessages::test_recursion_depth	6	kept	Pins bounded depth termination: compute_field must raise (not hang or infinite-recurse) when dependency chain is missing all inputs.	<pending>
 tests/test_compute.py::TestThermodynamicCompute::test_enthalpy	0	not-yet-reviewed		
 tests/test_compute.py::TestThermodynamicCompute::test_entropy_unit_values	0	not-yet-reviewed		
 tests/test_compute.py::TestThermodynamicCompute::test_species_entropy	0	not-yet-reviewed		
@@ -356,12 +356,12 @@ tests/test_compute.py::TestSpeciesAliases::test_four_velocity_aliases_resolve	0	
 tests/test_compute.py::TestPressureTensor::test_parallel_and_perpendicular_pressure	0	not-yet-reviewed		
 tests/test_compute.py::TestPerSpeciesPressureDecomposition::test_per_species_parallel_pressure	0	not-yet-reviewed		
 tests/test_compute.py::TestPerSpeciesPressureDecomposition::test_per_species_perpendicular_pressure	0	not-yet-reviewed		
-tests/test_compute.py::TestPerSpeciesPressureDecomposition::test_per_species_agyrotropy_isotropic	0	not-yet-reviewed		
-tests/test_compute.py::TestPerSpeciesPressureDecomposition::test_alias_resolution	0	not-yet-reviewed		
+tests/test_compute.py::TestPerSpeciesPressureDecomposition::test_per_species_agyrotropy_isotropic	6	kept	Pins agyrotropy_e = 0 for isotropic tensor. Regression if Q metric has spurious offset or uses wrong tensor reduction.	<pending>
+tests/test_compute.py::TestPerSpeciesPressureDecomposition::test_alias_resolution	6	kept	Pins P_par_s0 (dynamic alias) produces identical result to P_par_e (static) — guards the species-index alias table consistency.	<pending>
 tests/test_compute.py::TestPerSpeciesPressureDecomposition::test_total_equals_sum_of_per_species	0	not-yet-reviewed		
-tests/test_compute.py::TestPerSpeciesPressureDecomposition::test_dynamic_species_without_species_metadata	0	not-yet-reviewed		
-tests/test_compute.py::TestGeometryGuard::test_compute_rejects_spherical[div_B-components0]	0	not-yet-reviewed		
-tests/test_compute.py::TestGeometryGuard::test_compute_rejects_spherical[vort1-components1]	0	not-yet-reviewed		
+tests/test_compute.py::TestPerSpeciesPressureDecomposition::test_dynamic_species_without_species_metadata	6	kept	Pins dynamic species recipe synthesis: P_par_s2 works purely from tensor fields even without species[2] in metadata. Guards against unnecessary metadata requirement.	<pending>
+tests/test_compute.py::TestGeometryGuard::test_compute_rejects_spherical[div_B-components0]	6	kept	Pins NotImplementedError with 'Cartesian' for div_B on spherical grids. Guards against silent wrong-metric result.	<pending>
+tests/test_compute.py::TestGeometryGuard::test_compute_rejects_spherical[vort1-components1]	6	kept	Pins NotImplementedError for vort1 on spherical grids. Same guard, different operator.	<pending>
 tests/test_compute.py::TestRegisterRecipe::test_register_and_compute	0	not-yet-reviewed		
 tests/test_compute.py::TestRegisterRecipe::test_unregister_removes_recipe_and_metadata	0	not-yet-reviewed		
 tests/test_compute.py::TestRegisterRecipe::test_duplicate_name_raises	0	not-yet-reviewed		
