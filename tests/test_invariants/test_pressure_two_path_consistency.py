@@ -16,7 +16,16 @@
 # Both reduce to (Tr(P_s0) + Tr(P_s1))/3. The split-then-add vs
 # add-then-divide paths must agree: any factor-of-3 or sign bug in
 # either recipe would break the identity.
-# Fresh invariant #11 — written as the autoresearcher's 20th iteration.
+#
+# Audit note: two sub-tests were dropped in the 21st-iteration audit:
+# ``test_isotropic_pressure_equals_trace_over_three`` was a literal
+# tautology of the one-line ``isotropic_pressure`` body at
+# derived.py:1348 (iter 10's ``test_isotropic_pressure_equals_par_plus_
+# two_perp_over_three`` already validates the same scalar through the
+# independent parallel/perpendicular decomposition). The
+# commutativity/associativity checks on ``total_pressure`` — a two-arg
+# addition — were < 1 ulp above noise. See
+# /Users/leo/.claude/plans/staged-dazzling-map.md.
 """Isotropic pressure via two independent paths."""
 
 from __future__ import annotations
@@ -87,49 +96,3 @@ def test_total_pressure_from_per_species_tensors_two_paths(
     path_b = isotropic_pressure(p11_e + p11_i, p22_e + p22_i, p33_e + p33_i)
 
     assert_allclose(path_a, path_b, rtol=1e-13, atol=1e-13)
-
-
-@given(
-    p11=_tensor_component(),
-    p22=_tensor_component(),
-    p33=_tensor_component(),
-)
-@settings(max_examples=30, deadline=None)
-def test_isotropic_pressure_equals_trace_over_three(
-    p11: np.ndarray, p22: np.ndarray, p33: np.ndarray
-) -> None:
-    r"""``isotropic_pressure(P11, P22, P33) == (P11 + P22 + P33) / 3``
-    — the first tensor invariant divided by 3. Encodes the
-    equations.md § 4 footnote [^9] claim "P = Tr(P)/3" at the recipe
-    level, distinct from iteration 10's rotation-invariance test
-    which asserts the trace is a *rotation* invariant.
-    """
-    p = isotropic_pressure(p11, p22, p33)
-    assert_allclose(p, (p11 + p22 + p33) / 3.0, rtol=0, atol=0)
-
-
-@given(
-    p_a=_tensor_component(),
-    p_b=_tensor_component(),
-    p_c=_tensor_component(),
-)
-@settings(max_examples=30, deadline=None)
-def test_total_pressure_is_commutative_and_associative(
-    p_a: np.ndarray, p_b: np.ndarray, p_c: np.ndarray
-) -> None:
-    r"""``total_pressure`` is addition — commutative and associative
-    bit-exact for positive inputs with no cancellation. Guards against
-    any future change that introduces non-linearity (e.g. a weighted
-    average or a max).
-    """
-    # Commutativity.
-    assert_allclose(
-        total_pressure(p_a, p_b), total_pressure(p_b, p_a), rtol=0, atol=0
-    )
-    # Associativity — float64 addition is NOT exactly associative in
-    # general; rearrangement can introduce 1-ulp error per step, so for
-    # inputs up to 1e3 the absolute difference is bounded by ~eps·|sum|
-    # ≈ 1e-13.
-    lhs = total_pressure(total_pressure(p_a, p_b), p_c)
-    rhs = total_pressure(p_a, total_pressure(p_b, p_c))
-    assert_allclose(lhs, rhs, rtol=1e-13, atol=1e-13)
