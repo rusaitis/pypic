@@ -683,56 +683,56 @@ tests/test_fields.py::TestWithField::test_survives_plane_selection	12	kept	with_
 tests/test_fields.py::TestWithField::test_invalid_quantity_type	12	kept	with_field with unknown quantity_type must raise ValueError.	6a3296e783fe03337b20fd29d96551f0f6e19353
 tests/test_fields.py::TestWithField::test_immutable_original	12	kept	with_field returns new FieldDataset — original field_names set unchanged. Immutability contract.	6a3296e783fe03337b20fd29d96551f0f6e19353
 tests/test_fields.py::TestWithField::test_string_quantity_type	12	kept	with_field accepts string (not only enum) quantity_type with full SI-unit derivation.	6a3296e783fe03337b20fd29d96551f0f6e19353
-tests/test_fields.py::TestAttrsOverrideRegistry::test_field_info_uses_attrs_over_registry	13	kept	Pins quantity_type, long_name, and latex returned by field_info after with_field override (B1 treated as pressure instead of default b_field). Override semantics proven by distinct pressure quantity_type.	<pending>
-tests/test_fields.py::TestAttrsOverrideRegistry::test_in_si_uses_attrs_over_registry	13	kept	Proves in_si picks attrs-declared VELOCITY factor over registry's B1 default (b_field) by computing expected value via si_factor('velocity'); different factor makes override observable.	<pending>
-tests/test_fields.py::TestFromArraysQuantityTypeAttr::test_canonical_field_has_quantity_type	13	kept	Pins per-field attrs set by from_arrays for canonical B1 (b_field, T) and rho_m (mass_density, kg/m^3). Concrete schema contract.	<pending>
-tests/test_fields.py::TestFromArraysQuantityTypeAttr::test_unknown_field_no_quantity_type	13	kept	Pins absence semantics: unknown field names get no quantity_type attr. Concrete negative assertion.	<pending>
-tests/test_geometry.py::TestGeometryType::test_values	13	kept	Pins StrEnum values (cartesian/spherical/cylindrical) — schema anchor for [coordinates] geometry field.	<pending>
-tests/test_geometry.py::TestGeometryType::test_from_string	13	kept	Pins round-trip construction from string values.	<pending>
-tests/test_geometry.py::TestAxisNames::test_cartesian	13	kept	Pins axis_names and axis_units tuples for Cartesian geometry.	<pending>
-tests/test_geometry.py::TestAxisNames::test_spherical	13	kept	Pins (r, theta, phi) names and (length, angle, angle) units for spherical.	<pending>
-tests/test_geometry.py::TestAxisNames::test_cylindrical	13	kept	Pins (r, phi, z) names and (length, angle, length) units for cylindrical.	<pending>
-tests/test_geometry.py::TestCartesianMetricFactors::test_scalar	13	kept	Pins h1=h2=h3=1 at (1,2,3) — Cartesian metric is identity.	<pending>
-tests/test_geometry.py::TestSphericalMetricFactors::test_unit_sphere_equator	13	kept	Pins h1=h2=h3=1 at r=1, theta=pi/2 (degenerate point where metric is locally isotropic).	<pending>
-tests/test_geometry.py::TestSphericalMetricFactors::test_pole	13	kept	Pins h3 = r*sin(theta) = 0 at theta=0 (coordinate singularity). h2=r=5 confirms non-trivial metric.	<pending>
-tests/test_geometry.py::TestSphericalMetricFactors::test_general_point	13	kept	Pins h2=r=2 and h3=r*sin(pi/6)=1 at r=2, theta=pi/6 — hand-calculation anchor.	<pending>
-tests/test_geometry.py::TestSphericalMetricFactors::test_array	13	kept	Pins array broadcasting: h2=r, h3=r*sin(pi/2)=r for array inputs.	<pending>
-tests/test_geometry.py::TestCylindricalMetricFactors::test_scalar	13	kept	Pins h2=r=3 at (3, 0, 1) — cylindrical h2 is radial coord.	<pending>
-tests/test_geometry.py::TestCylindricalMetricFactors::test_array	13	kept	Pins h2=r and h3=1 for array inputs.	<pending>
-tests/test_geometry.py::TestFrozenDataclass::test_immutable	13	kept	Pins frozen=True invariant on CoordinateGeometry (attribute assignment raises).	<pending>
-tests/test_icechunk_io.py::TestToZarrIcechunk::test_round_trip_basic	13	kept	Round-trips B1 and B2 with np.testing.assert_allclose against source; pins grid.dimensions equality and identity normalization after reload.	<pending>
-tests/test_icechunk_io.py::TestToZarrIcechunk::test_round_trip_full_metadata	13	kept	Round-trips grid.dt, boundary, species count/name, physics.gamma/relativistic, frame, transforms key, and field values — wide but each assertion pins a distinct metadata branch.	<pending>
-tests/test_icechunk_io.py::TestToZarrIcechunk::test_returns_snapshot_id	13	kept	Pins return type (non-empty string snapshot_id) for icechunk backend — needed by callers.	<pending>
-tests/test_icechunk_io.py::TestToZarrIcechunk::test_custom_message	13	kept	Pins that message kwarg reaches commit history visible via icechunk_ancestry.	<pending>
-tests/test_icechunk_io.py::TestToZarrIcechunk::test_dtype_downcast	13	kept	Pins float64->float32 downcast round-trip with rtol=1e-6; dtype=float32 kwarg contract.	<pending>
-tests/test_icechunk_io.py::TestToZarrIcechunk::test_plain_zarr_returns_none	13	kept	Pins None return for non-icechunk backend (differs from icechunk snapshot_id string).	<pending>
-tests/test_icechunk_io.py::TestToZarrIcechunk::test_unknown_backend_raises	13	kept	Pins ValueError with 'Unknown backend' match for unregistered backend string.	<pending>
-tests/test_icechunk_io.py::TestToZarrIcechunk::test_failed_write_cleans_up_fresh_repo	13	kept	Pins regression: aborted write (set metadata triggers xarray attr validator) removes half-initialized repo. Asserts both !store.exists() and !is_icechunk_store().	<pending>
-tests/test_icechunk_io.py::TestToZarrIcechunk::test_failed_write_preserves_existing_repo	13	kept	Pins negative: pre-existing successful commits survive a later failed write; main branch still reads back 7.0.	<pending>
-tests/test_icechunk_io.py::TestFromZarrIcechunk::test_auto_detect	13	kept	Pins that from_zarr auto-detects icechunk stores without explicit backend kwarg.	<pending>
-tests/test_icechunk_io.py::TestFromZarrIcechunk::test_read_by_tag	13	kept	Pins tag kwarg: v1.0 tag created via icechunk_create_tag is readable by from_zarr(tag='v1.0').	<pending>
-tests/test_icechunk_io.py::TestFromZarrIcechunk::test_read_by_snapshot	13	kept	Pins snapshot_id round-trip from to_zarr return to from_zarr input.	<pending>
-tests/test_icechunk_io.py::TestFromZarrIcechunk::test_read_by_branch	13	kept	Pins branch='main' read on main-branch write.	<pending>
-tests/test_icechunk_io.py::TestFromZarrIcechunk::test_write_creates_non_main_branch	13	kept	Regression pin: writing to non-existent branch 'analysis' must fork from main tip. Asserts data (7.0) readable via branch='analysis'.	<pending>
-tests/test_icechunk_io.py::TestFromZarrIcechunk::test_multiple_refs_raises	13	kept	Pins ValueError('at most one') when both branch= and tag= supplied to from_zarr.	<pending>
-tests/test_icechunk_io.py::TestTimeseriesIcechunk::test_timeseries_atomic_write	13	kept	Pins time dim presence and size=2 after writing 2 timesteps via to_zarr_timeseries with icechunk backend.	<pending>
-tests/test_icechunk_io.py::TestTimeseriesIcechunk::test_timeseries_rejects_field_drift	13	kept	Pins ValueError('field set...differs...B2') when step1 has extra field; asserts !store.exists() to confirm cleanup.	<pending>
-tests/test_icechunk_io.py::TestTimeseriesIcechunk::test_timeseries_empty_source_cleans_up_fresh_repo	13	kept	Pins ValueError('No timesteps') on empty input AND !store.exists() cleanup of half-initialized repo.	<pending>
-tests/test_icechunk_io.py::TestTimeseriesIcechunk::test_timeseries_empty_source_cleans_up_preexisting_empty_dir	13	kept	Pins cleanup even when caller supplies pre-existing empty dir; asserts !is_icechunk_store() after abort.	<pending>
-tests/test_icechunk_io.py::TestTimeseriesIcechunk::test_timeseries_shape_drift_cleans_up_fresh_repo	13	kept	Pins ValueError('grid differ from the first step') on grid-shape mismatch AND !store.exists() cleanup.	<pending>
-tests/test_icechunk_io.py::TestTimeseriesIcechunk::test_timeseries_preserves_existing_repo_on_failure	13	kept	Pins negative: pre-committed repo on main survives failing empty-write on nightly branch; main B1 still 5.0.	<pending>
-tests/test_icechunk_io.py::TestTimeseriesIcechunk::test_timeseries_branch_created	13	kept	Pins that timeseries writer forks non-main branch 'nightly' from main; loaded time dim size=2.	<pending>
-tests/test_icechunk_io.py::TestTimeseriesIcechunk::test_timeseries_metadata_preserved	13	kept	Pins frame='sim' and species[0].name='electrons' survive timeseries round-trip through icechunk.	<pending>
-tests/test_icechunk_io.py::TestIcechunkHelpers::test_create_tag	13	kept	Pins icechunk_create_tag appears in repo.list_tags() after creation.	<pending>
-tests/test_icechunk_io.py::TestIcechunkHelpers::test_ancestry	13	kept	Pins both 'first' and 'second' commit messages surface in ancestry history.	<pending>
-tests/test_icechunk_io.py::TestIcechunkHelpers::test_is_icechunk_store_positive	13	kept	Pins True for real icechunk store.	<pending>
-tests/test_icechunk_io.py::TestIcechunkHelpers::test_is_icechunk_store_negative	13	kept	Pins False for non-existent path.	<pending>
-tests/test_icechunk_io.py::TestIcechunkHelpers::test_is_icechunk_store_plain_zarr	13	kept	Pins False for plain zarr store (distinct from icechunk).	<pending>
-tests/test_ipic3d_particles.py::TestParticleData::test_construction_and_properties	13	kept	Smoke test pinning species_index, species_name, n_particles after construction. Minimal but distinct — deeper attrs covered by sibling tests.	<pending>
-tests/test_ipic3d_particles.py::TestParticleData::test_position_only	13	kept	Pins velocity=None branch: position not None, velocity is None after construction with velocity=None.	<pending>
-tests/test_ipic3d_particles.py::TestParticleData::test_velocity_only	13	kept	Pins position=None branch: position is None, velocity not None.	<pending>
-tests/test_ipic3d_particles.py::TestParticleData::test_xyz_vxyz_are_views	13	kept	Pins zero-copy view semantics via np.shares_memory AND pointwise equality (pos[:,0]) for x/y/z/vx/vy/vz properties.	<pending>
-tests/test_ipic3d_particles.py::TestParticleData::test_access_unloaded_raises	13	kept	Pins ValueError('position was not loaded') for x/y and ('velocity was not loaded') for vx when not loaded.	<pending>
+tests/test_fields.py::TestAttrsOverrideRegistry::test_field_info_uses_attrs_over_registry	13	kept	Pins quantity_type, long_name, and latex returned by field_info after with_field override (B1 treated as pressure instead of default b_field). Override semantics proven by distinct pressure quantity_type.	92b7b9ea4ef1302f93c22008fa27a49eead6d10f
+tests/test_fields.py::TestAttrsOverrideRegistry::test_in_si_uses_attrs_over_registry	13	kept	Proves in_si picks attrs-declared VELOCITY factor over registry's B1 default (b_field) by computing expected value via si_factor('velocity'); different factor makes override observable.	92b7b9ea4ef1302f93c22008fa27a49eead6d10f
+tests/test_fields.py::TestFromArraysQuantityTypeAttr::test_canonical_field_has_quantity_type	13	kept	Pins per-field attrs set by from_arrays for canonical B1 (b_field, T) and rho_m (mass_density, kg/m^3). Concrete schema contract.	92b7b9ea4ef1302f93c22008fa27a49eead6d10f
+tests/test_fields.py::TestFromArraysQuantityTypeAttr::test_unknown_field_no_quantity_type	13	kept	Pins absence semantics: unknown field names get no quantity_type attr. Concrete negative assertion.	92b7b9ea4ef1302f93c22008fa27a49eead6d10f
+tests/test_geometry.py::TestGeometryType::test_values	13	kept	Pins StrEnum values (cartesian/spherical/cylindrical) — schema anchor for [coordinates] geometry field.	92b7b9ea4ef1302f93c22008fa27a49eead6d10f
+tests/test_geometry.py::TestGeometryType::test_from_string	13	kept	Pins round-trip construction from string values.	92b7b9ea4ef1302f93c22008fa27a49eead6d10f
+tests/test_geometry.py::TestAxisNames::test_cartesian	13	kept	Pins axis_names and axis_units tuples for Cartesian geometry.	92b7b9ea4ef1302f93c22008fa27a49eead6d10f
+tests/test_geometry.py::TestAxisNames::test_spherical	13	kept	Pins (r, theta, phi) names and (length, angle, angle) units for spherical.	92b7b9ea4ef1302f93c22008fa27a49eead6d10f
+tests/test_geometry.py::TestAxisNames::test_cylindrical	13	kept	Pins (r, phi, z) names and (length, angle, length) units for cylindrical.	92b7b9ea4ef1302f93c22008fa27a49eead6d10f
+tests/test_geometry.py::TestCartesianMetricFactors::test_scalar	13	kept	Pins h1=h2=h3=1 at (1,2,3) — Cartesian metric is identity.	92b7b9ea4ef1302f93c22008fa27a49eead6d10f
+tests/test_geometry.py::TestSphericalMetricFactors::test_unit_sphere_equator	13	kept	Pins h1=h2=h3=1 at r=1, theta=pi/2 (degenerate point where metric is locally isotropic).	92b7b9ea4ef1302f93c22008fa27a49eead6d10f
+tests/test_geometry.py::TestSphericalMetricFactors::test_pole	13	kept	Pins h3 = r*sin(theta) = 0 at theta=0 (coordinate singularity). h2=r=5 confirms non-trivial metric.	92b7b9ea4ef1302f93c22008fa27a49eead6d10f
+tests/test_geometry.py::TestSphericalMetricFactors::test_general_point	13	kept	Pins h2=r=2 and h3=r*sin(pi/6)=1 at r=2, theta=pi/6 — hand-calculation anchor.	92b7b9ea4ef1302f93c22008fa27a49eead6d10f
+tests/test_geometry.py::TestSphericalMetricFactors::test_array	13	kept	Pins array broadcasting: h2=r, h3=r*sin(pi/2)=r for array inputs.	92b7b9ea4ef1302f93c22008fa27a49eead6d10f
+tests/test_geometry.py::TestCylindricalMetricFactors::test_scalar	13	kept	Pins h2=r=3 at (3, 0, 1) — cylindrical h2 is radial coord.	92b7b9ea4ef1302f93c22008fa27a49eead6d10f
+tests/test_geometry.py::TestCylindricalMetricFactors::test_array	13	kept	Pins h2=r and h3=1 for array inputs.	92b7b9ea4ef1302f93c22008fa27a49eead6d10f
+tests/test_geometry.py::TestFrozenDataclass::test_immutable	13	kept	Pins frozen=True invariant on CoordinateGeometry (attribute assignment raises).	92b7b9ea4ef1302f93c22008fa27a49eead6d10f
+tests/test_icechunk_io.py::TestToZarrIcechunk::test_round_trip_basic	13	kept	Round-trips B1 and B2 with np.testing.assert_allclose against source; pins grid.dimensions equality and identity normalization after reload.	92b7b9ea4ef1302f93c22008fa27a49eead6d10f
+tests/test_icechunk_io.py::TestToZarrIcechunk::test_round_trip_full_metadata	13	kept	Round-trips grid.dt, boundary, species count/name, physics.gamma/relativistic, frame, transforms key, and field values — wide but each assertion pins a distinct metadata branch.	92b7b9ea4ef1302f93c22008fa27a49eead6d10f
+tests/test_icechunk_io.py::TestToZarrIcechunk::test_returns_snapshot_id	13	kept	Pins return type (non-empty string snapshot_id) for icechunk backend — needed by callers.	92b7b9ea4ef1302f93c22008fa27a49eead6d10f
+tests/test_icechunk_io.py::TestToZarrIcechunk::test_custom_message	13	kept	Pins that message kwarg reaches commit history visible via icechunk_ancestry.	92b7b9ea4ef1302f93c22008fa27a49eead6d10f
+tests/test_icechunk_io.py::TestToZarrIcechunk::test_dtype_downcast	13	kept	Pins float64->float32 downcast round-trip with rtol=1e-6; dtype=float32 kwarg contract.	92b7b9ea4ef1302f93c22008fa27a49eead6d10f
+tests/test_icechunk_io.py::TestToZarrIcechunk::test_plain_zarr_returns_none	13	kept	Pins None return for non-icechunk backend (differs from icechunk snapshot_id string).	92b7b9ea4ef1302f93c22008fa27a49eead6d10f
+tests/test_icechunk_io.py::TestToZarrIcechunk::test_unknown_backend_raises	13	kept	Pins ValueError with 'Unknown backend' match for unregistered backend string.	92b7b9ea4ef1302f93c22008fa27a49eead6d10f
+tests/test_icechunk_io.py::TestToZarrIcechunk::test_failed_write_cleans_up_fresh_repo	13	kept	Pins regression: aborted write (set metadata triggers xarray attr validator) removes half-initialized repo. Asserts both !store.exists() and !is_icechunk_store().	92b7b9ea4ef1302f93c22008fa27a49eead6d10f
+tests/test_icechunk_io.py::TestToZarrIcechunk::test_failed_write_preserves_existing_repo	13	kept	Pins negative: pre-existing successful commits survive a later failed write; main branch still reads back 7.0.	92b7b9ea4ef1302f93c22008fa27a49eead6d10f
+tests/test_icechunk_io.py::TestFromZarrIcechunk::test_auto_detect	13	kept	Pins that from_zarr auto-detects icechunk stores without explicit backend kwarg.	92b7b9ea4ef1302f93c22008fa27a49eead6d10f
+tests/test_icechunk_io.py::TestFromZarrIcechunk::test_read_by_tag	13	kept	Pins tag kwarg: v1.0 tag created via icechunk_create_tag is readable by from_zarr(tag='v1.0').	92b7b9ea4ef1302f93c22008fa27a49eead6d10f
+tests/test_icechunk_io.py::TestFromZarrIcechunk::test_read_by_snapshot	13	kept	Pins snapshot_id round-trip from to_zarr return to from_zarr input.	92b7b9ea4ef1302f93c22008fa27a49eead6d10f
+tests/test_icechunk_io.py::TestFromZarrIcechunk::test_read_by_branch	13	kept	Pins branch='main' read on main-branch write.	92b7b9ea4ef1302f93c22008fa27a49eead6d10f
+tests/test_icechunk_io.py::TestFromZarrIcechunk::test_write_creates_non_main_branch	13	kept	Regression pin: writing to non-existent branch 'analysis' must fork from main tip. Asserts data (7.0) readable via branch='analysis'.	92b7b9ea4ef1302f93c22008fa27a49eead6d10f
+tests/test_icechunk_io.py::TestFromZarrIcechunk::test_multiple_refs_raises	13	kept	Pins ValueError('at most one') when both branch= and tag= supplied to from_zarr.	92b7b9ea4ef1302f93c22008fa27a49eead6d10f
+tests/test_icechunk_io.py::TestTimeseriesIcechunk::test_timeseries_atomic_write	13	kept	Pins time dim presence and size=2 after writing 2 timesteps via to_zarr_timeseries with icechunk backend.	92b7b9ea4ef1302f93c22008fa27a49eead6d10f
+tests/test_icechunk_io.py::TestTimeseriesIcechunk::test_timeseries_rejects_field_drift	13	kept	Pins ValueError('field set...differs...B2') when step1 has extra field; asserts !store.exists() to confirm cleanup.	92b7b9ea4ef1302f93c22008fa27a49eead6d10f
+tests/test_icechunk_io.py::TestTimeseriesIcechunk::test_timeseries_empty_source_cleans_up_fresh_repo	13	kept	Pins ValueError('No timesteps') on empty input AND !store.exists() cleanup of half-initialized repo.	92b7b9ea4ef1302f93c22008fa27a49eead6d10f
+tests/test_icechunk_io.py::TestTimeseriesIcechunk::test_timeseries_empty_source_cleans_up_preexisting_empty_dir	13	kept	Pins cleanup even when caller supplies pre-existing empty dir; asserts !is_icechunk_store() after abort.	92b7b9ea4ef1302f93c22008fa27a49eead6d10f
+tests/test_icechunk_io.py::TestTimeseriesIcechunk::test_timeseries_shape_drift_cleans_up_fresh_repo	13	kept	Pins ValueError('grid differ from the first step') on grid-shape mismatch AND !store.exists() cleanup.	92b7b9ea4ef1302f93c22008fa27a49eead6d10f
+tests/test_icechunk_io.py::TestTimeseriesIcechunk::test_timeseries_preserves_existing_repo_on_failure	13	kept	Pins negative: pre-committed repo on main survives failing empty-write on nightly branch; main B1 still 5.0.	92b7b9ea4ef1302f93c22008fa27a49eead6d10f
+tests/test_icechunk_io.py::TestTimeseriesIcechunk::test_timeseries_branch_created	13	kept	Pins that timeseries writer forks non-main branch 'nightly' from main; loaded time dim size=2.	92b7b9ea4ef1302f93c22008fa27a49eead6d10f
+tests/test_icechunk_io.py::TestTimeseriesIcechunk::test_timeseries_metadata_preserved	13	kept	Pins frame='sim' and species[0].name='electrons' survive timeseries round-trip through icechunk.	92b7b9ea4ef1302f93c22008fa27a49eead6d10f
+tests/test_icechunk_io.py::TestIcechunkHelpers::test_create_tag	13	kept	Pins icechunk_create_tag appears in repo.list_tags() after creation.	92b7b9ea4ef1302f93c22008fa27a49eead6d10f
+tests/test_icechunk_io.py::TestIcechunkHelpers::test_ancestry	13	kept	Pins both 'first' and 'second' commit messages surface in ancestry history.	92b7b9ea4ef1302f93c22008fa27a49eead6d10f
+tests/test_icechunk_io.py::TestIcechunkHelpers::test_is_icechunk_store_positive	13	kept	Pins True for real icechunk store.	92b7b9ea4ef1302f93c22008fa27a49eead6d10f
+tests/test_icechunk_io.py::TestIcechunkHelpers::test_is_icechunk_store_negative	13	kept	Pins False for non-existent path.	92b7b9ea4ef1302f93c22008fa27a49eead6d10f
+tests/test_icechunk_io.py::TestIcechunkHelpers::test_is_icechunk_store_plain_zarr	13	kept	Pins False for plain zarr store (distinct from icechunk).	92b7b9ea4ef1302f93c22008fa27a49eead6d10f
+tests/test_ipic3d_particles.py::TestParticleData::test_construction_and_properties	13	kept	Smoke test pinning species_index, species_name, n_particles after construction. Minimal but distinct — deeper attrs covered by sibling tests.	92b7b9ea4ef1302f93c22008fa27a49eead6d10f
+tests/test_ipic3d_particles.py::TestParticleData::test_position_only	13	kept	Pins velocity=None branch: position not None, velocity is None after construction with velocity=None.	92b7b9ea4ef1302f93c22008fa27a49eead6d10f
+tests/test_ipic3d_particles.py::TestParticleData::test_velocity_only	13	kept	Pins position=None branch: position is None, velocity not None.	92b7b9ea4ef1302f93c22008fa27a49eead6d10f
+tests/test_ipic3d_particles.py::TestParticleData::test_xyz_vxyz_are_views	13	kept	Pins zero-copy view semantics via np.shares_memory AND pointwise equality (pos[:,0]) for x/y/z/vx/vy/vz properties.	92b7b9ea4ef1302f93c22008fa27a49eead6d10f
+tests/test_ipic3d_particles.py::TestParticleData::test_access_unloaded_raises	13	kept	Pins ValueError('position was not loaded') for x/y and ('velocity was not loaded') for vx when not loaded.	92b7b9ea4ef1302f93c22008fa27a49eead6d10f
 tests/test_ipic3d_particles.py::TestParticleData::test_shape_mismatch_raises	0	not-yet-reviewed		
 tests/test_ipic3d_particles.py::TestParticleData::test_weight_dtype_float64	0	not-yet-reviewed		
 tests/test_ipic3d_particles.py::TestParticleData::test_both_none_raises	0	not-yet-reviewed		
