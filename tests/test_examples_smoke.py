@@ -11,7 +11,6 @@ Standard ``uv run pytest`` collects zero tests from this file.
 
 from __future__ import annotations
 
-import logging
 import re
 from functools import lru_cache
 from pathlib import Path
@@ -25,8 +24,6 @@ from pypic.readers.batsrus import open_batsrus
 from pypic.readers.ipic3d import open_ipic3d
 from pypic.readers.openggcm import open_openggcm
 from pypic.units import Normalization
-
-log = logging.getLogger(__name__)
 
 _OPENERS = {
     "ipic3d": open_ipic3d,
@@ -73,18 +70,6 @@ def _first_timestep(path: Path, model: str) -> int:
         if steps_b:
             return min(steps_b)
     return 0
-
-
-_AUXILIARY_PATTERNS = [
-    ("ConservedQuantities.txt", "ConservedQuantities (Format A)"),
-    ("info-conserved", "ConservedQuantities (Format B, multi-file)"),
-    ("SimulationData.txt", "SimulationData"),
-    ("SpeciesQuantities.txt", "SpeciesQuantities"),
-]
-
-
-def _detect_auxiliary(path: Path) -> list[str]:
-    return [label for pat, label in _AUXILIARY_PATTERNS if (path / pat).exists()]
 
 
 def _is_mhducla(path: Path) -> bool:
@@ -237,12 +222,6 @@ class TestSmoke:
         assert len(grid_dims) == len(field_shape), (
             f"Grid ndim={len(grid_dims)} vs field ndim={len(field_shape)}"
         )
-
-    def test_auxiliary_files_detected(self, sim_dir: Path) -> None:
-        found = _detect_auxiliary(sim_dir)
-        if found:
-            log.info("Auxiliary files in %s: %s", sim_dir.name, ", ".join(found))
-
 
 # -- MHDUCLA physics validation ----------------------------------------------
 

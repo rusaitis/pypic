@@ -583,56 +583,56 @@ tests/test_diagnostics.py::TestFieldEnergy::test_2d	10	kept	2D integration: 9 * 
 tests/test_diagnostics.py::TestFieldEnergy::test_spacing_dimension_mismatch_raises	10	kept	ValueError when len(spacing) != ndim. Prevents silent missing-axis integration.	e869858
 tests/test_diagnostics.py::TestFieldEnergy::test_nan_propagation	10	kept	NaN in field -> NaN in integral (no nanable sum). Default is strict.	e869858
 tests/test_diagnostics.py::TestDivB::test_div_curl_is_zero	10	kept	Vector identity div(curl(A)) = 0 to atol=1e-10 using the same FD stencil. Guards stencil consistency between curl and div.	e869858
-tests/test_diagnostics.py::TestDivB::test_known_divergence	0	not-yet-reviewed		
-tests/test_diagnostics.py::TestDivB::test_nan_propagation	0	not-yet-reviewed		
-tests/test_diagnostics.py::TestMaxDivB::test_wraps_div_b	0	not-yet-reviewed		
-tests/test_diagnostics.py::TestDivE::test_gauss_law_point_charge	0	not-yet-reviewed		
-tests/test_diagnostics.py::TestConvergence::test_divergence_second_order	0	not-yet-reviewed		
-tests/test_diagnostics.py::TestGeometryForwarding::test_rejects_spherical[div_b]	0	not-yet-reviewed		
-tests/test_diagnostics.py::TestGeometryForwarding::test_rejects_spherical[max_div_b]	0	not-yet-reviewed		
-tests/test_diagnostics.py::TestGeometryForwarding::test_rejects_spherical[div_e]	0	not-yet-reviewed		
-tests/test_diagnostics.py::TestSpatialStatistics::test_mean	0	not-yet-reviewed		
-tests/test_diagnostics.py::TestSpatialStatistics::test_mean_with_nan	0	not-yet-reviewed		
-tests/test_diagnostics.py::TestSpatialStatistics::test_rms	0	not-yet-reviewed		
-tests/test_diagnostics.py::TestSpatialStatistics::test_rms_with_nan	0	not-yet-reviewed		
-tests/test_diagnostics.py::TestSpatialStatistics::test_extrema	0	not-yet-reviewed		
-tests/test_diagnostics.py::TestSpatialStatistics::test_extrema_with_nan	0	not-yet-reviewed		
-tests/test_diagnostics.py::TestSpatialStatistics::test_2d_array	0	not-yet-reviewed		
-tests/test_examples.py::test_custom_reader_example	0	not-yet-reviewed		
-tests/test_examples_smoke.py::TestSmoke::test_opens_without_error[NOTSET]	0	not-yet-reviewed		
-tests/test_examples_smoke.py::TestSmoke::test_reads_first_timestep[NOTSET]	0	not-yet-reviewed		
-tests/test_examples_smoke.py::TestSmoke::test_has_em_fields[NOTSET]	0	not-yet-reviewed		
-tests/test_examples_smoke.py::TestSmoke::test_field_shapes_consistent[NOTSET]	0	not-yet-reviewed		
-tests/test_examples_smoke.py::TestSmoke::test_no_all_nan_fields[NOTSET]	0	not-yet-reviewed		
-tests/test_examples_smoke.py::TestSmoke::test_no_all_zero_b_field[NOTSET]	0	not-yet-reviewed		
-tests/test_examples_smoke.py::TestSmoke::test_grid_matches_fields[NOTSET]	0	not-yet-reviewed		
-tests/test_examples_smoke.py::TestSmoke::test_auxiliary_files_detected[NOTSET]	0	not-yet-reviewed		
-tests/test_examples_smoke.py::TestMHDUCLAPhysics::test_mhducla_solar_wind_density[NOTSET]	0	not-yet-reviewed		
-tests/test_examples_smoke.py::TestMHDUCLAPhysics::test_mhducla_quasineutrality[NOTSET]	0	not-yet-reviewed		
-tests/test_examples_smoke.py::TestMHDUCLAPhysics::test_mhducla_velocity[NOTSET]	0	not-yet-reviewed		
-tests/test_examples_smoke.py::TestMHDUCLAPhysics::test_mhducla_imf_magnitude[NOTSET]	0	not-yet-reviewed		
-tests/test_examples_smoke.py::TestMHDUCLAPhysics::test_mhducla_dipole_dominance[NOTSET]	0	not-yet-reviewed		
-tests/test_fields.py::TestRegistryIntegrity::test_all_entries_consistent	0	not-yet-reviewed		
-tests/test_fields.py::TestRegistryIntegrity::test_all_fields_have_valid_quantity_type	0	not-yet-reviewed		
-tests/test_fields.py::TestFieldInfoLookup::test_canonical_name	0	not-yet-reviewed		
-tests/test_fields.py::TestFieldInfoLookup::test_alias_resolution[B_mag-|B|]	0	not-yet-reviewed		
-tests/test_fields.py::TestFieldInfoLookup::test_alias_resolution[plasma_beta-beta]	0	not-yet-reviewed		
-tests/test_fields.py::TestFieldInfoLookup::test_alias_resolution[Bx-B1]	0	not-yet-reviewed		
-tests/test_fields.py::TestFieldInfoLookup::test_alias_resolution[P_e-Pe]	0	not-yet-reviewed		
-tests/test_fields.py::TestFieldInfoLookup::test_alias_resolution[B_1-B1]	0	not-yet-reviewed		
-tests/test_fields.py::TestFieldInfoLookup::test_species_patterns[n_s5-density-Number density (species 5)]	0	not-yet-reviewed		
-tests/test_fields.py::TestFieldInfoLookup::test_species_patterns[omega_p_s3-frequency-Plasma frequency (species 3)]	0	not-yet-reviewed		
-tests/test_fields.py::TestFieldInfoLookup::test_species_patterns[v_th_s2-velocity-Thermal speed (species 2)]	0	not-yet-reviewed		
-tests/test_fields.py::TestFieldInfoLookup::test_species_patterns[T_s4-temperature-Temperature (species 4)]	0	not-yet-reviewed		
-tests/test_fields.py::TestFieldInfoLookup::test_species_patterns[J1_s2-current_density-Current density component 1 (species 2)]	0	not-yet-reviewed		
-tests/test_fields.py::TestFieldInfoLookup::test_unknown_raises_keyerror	0	not-yet-reviewed		
-tests/test_fields.py::test_unit_label[B1-True-T]	0	not-yet-reviewed		
-tests/test_fields.py::test_unit_label[B1-False-normalized]	0	not-yet-reviewed		
-tests/test_fields.py::test_unit_label[beta-True-]	0	not-yet-reviewed		
-tests/test_fields.py::test_unit_label[beta-False-]	0	not-yet-reviewed		
-tests/test_fields.py::test_unit_label[v_A-True-m/s]	0	not-yet-reviewed		
-tests/test_fields.py::TestQuantityUnits::test_known_type	0	not-yet-reviewed		
-tests/test_fields.py::TestQuantityUnits::test_unknown_raises	0	not-yet-reviewed		
+tests/test_diagnostics.py::TestDivB::test_known_divergence	11	kept	Pins div(x,y,z)=3 exactly via central differences on a linear field (rtol 1e-14); catches a wrong stencil sign or spacing argument.	<pending>
+tests/test_diagnostics.py::TestDivB::test_nan_propagation	11	kept	Ensures a single NaN in B1 propagates into div_b output — guards against masked-away NaN from overzealous nan_to_num in the operator path.	<pending>
+tests/test_diagnostics.py::TestMaxDivB::test_wraps_div_b	11	kept	Pins max_div_b == max(|div_b|) to rtol 1e-15; catches a drift to signed max or mean-based norm.	<pending>
+tests/test_diagnostics.py::TestDivE::test_gauss_law_point_charge	11	kept	Pins div(E)=1 exactly on linear E=(x,0,0) (rtol 1e-14); same stencil regression guard as div_b but for the electric field path.	<pending>
+tests/test_diagnostics.py::TestConvergence::test_divergence_second_order	11	kept	Richardson test: ratios > 3.5 at n=16/32/64 confirm O(h^2) convergence — catches a silent regression to first-order stencil.	<pending>
+tests/test_diagnostics.py::TestGeometryForwarding::test_rejects_spherical[div_b]	11	kept	Pins NotImplementedError for spherical geometry (match='spherical'); guards against a silent Cartesian fallback when a spherical grid is passed.	<pending>
+tests/test_diagnostics.py::TestGeometryForwarding::test_rejects_spherical[max_div_b]	11	kept	Same spherical-rejection guard extended to max_div_b wrapper.	<pending>
+tests/test_diagnostics.py::TestGeometryForwarding::test_rejects_spherical[div_e]	11	kept	Same spherical-rejection guard extended to div_e.	<pending>
+tests/test_diagnostics.py::TestSpatialStatistics::test_mean	11	kept	Pins spatial_mean(np.array([1,2,3])) == 2.0; catches a switch from nanmean to sum/N without NaN handling.	<pending>
+tests/test_diagnostics.py::TestSpatialStatistics::test_mean_with_nan	11	kept	Pins nanmean behavior: NaN-containing arrays return the mean of valid entries; catches a regression to plain np.mean which would return NaN.	<pending>
+tests/test_diagnostics.py::TestSpatialStatistics::test_rms	11	kept	Pins spatial_rms([3,4]) == sqrt(12.5) — catches a flipped sqrt(mean(x^2)) vs mean(sqrt(x^2)) rewrite.	<pending>
+tests/test_diagnostics.py::TestSpatialStatistics::test_rms_with_nan	11	kept	Pins NaN-aware rms behavior; guards against regression to plain np.mean inside RMS.	<pending>
+tests/test_diagnostics.py::TestSpatialStatistics::test_extrema	11	kept	Pins field_extrema returns (-1,7) for [3,-1,7] — catches a swapped min/max ordering.	<pending>
+tests/test_diagnostics.py::TestSpatialStatistics::test_extrema_with_nan	11	kept	Pins NaN-ignoring extrema (nanmin/nanmax); catches regression to min/max that would return NaN.	<pending>
+tests/test_diagnostics.py::TestSpatialStatistics::test_2d_array	11	kept	Confirms spatial_mean flattens multi-dim arrays; catches an axis=0 shortcut that would return per-column means.	<pending>
+tests/test_examples.py::test_custom_reader_example	11	kept	Sole runnable-smoke guard for examples/custom_reader_example.py; regressions in open_simple/open_simulation or the custom-reader example pipeline surface here.	<pending>
+tests/test_examples_smoke.py::TestSmoke::test_opens_without_error[NOTSET]	11	kept	Guards reader discovery for real iPIC3D/OpenGGCM/BATSRUS run dirs; catches a reader-registry regression that keeps imports green but returns None.	<pending>
+tests/test_examples_smoke.py::TestSmoke::test_reads_first_timestep[NOTSET]	11	kept	Guards that a real reader returns at least one canonical field; catches a read_timestep regression where the ds is constructed but empty.	<pending>
+tests/test_examples_smoke.py::TestSmoke::test_has_em_fields[NOTSET]	11	kept	Pins that every discovered run exposes B or E under canonical or Cartesian alias; catches an alias-registration regression hiding B1 from has_field.	<pending>
+tests/test_examples_smoke.py::TestSmoke::test_field_shapes_consistent[NOTSET]	11	kept	Pins that all fields share ndim ≥ 2 per run; catches a reader producing a mix of 2D/3D arrays (staggered-destagger regression).	<pending>
+tests/test_examples_smoke.py::TestSmoke::test_no_all_nan_fields[NOTSET]	11	kept	Structural invariant: no reader produces an all-NaN field on real data; catches a silent mask-fill regression in destaggering or AMR regridding.	<pending>
+tests/test_examples_smoke.py::TestSmoke::test_no_all_zero_b_field[NOTSET]	11	kept	Guards the iPIC3D B-correction path (named bug class): catches a missed B0 application producing identically-zero B1.	<pending>
+tests/test_examples_smoke.py::TestSmoke::test_grid_matches_fields[NOTSET]	11	kept	Pins GridInfo.dimensions ndim == field ndim; catches reader/grid desync (e.g. 3D grid metadata with 2D field arrays).	<pending>
+tests/test_examples_smoke.py::TestSmoke::test_auxiliary_files_detected[NOTSET]	11	dropped	Body has no assertion — only logs. Passes unconditionally even if _detect_auxiliary returns garbage. Dead _AUXILIARY_PATTERNS and _detect_auxiliary helper removed with it.	<pending>
+tests/test_examples_smoke.py::TestMHDUCLAPhysics::test_mhducla_solar_wind_density[NOTSET]	11	kept	Pins known MHDUCLA ion density to ~24 (atol 1.0); catches a reader normalization regression that scales rho_c_s1 by the wrong factor.	<pending>
+tests/test_examples_smoke.py::TestMHDUCLAPhysics::test_mhducla_quasineutrality[NOTSET]	11	kept	Pins rho_c ≈ 0 (atol 0.5) — guards the charge-density quasineutrality invariant; catches a sign flip on one species.	<pending>
+tests/test_examples_smoke.py::TestMHDUCLAPhysics::test_mhducla_velocity[NOTSET]	11	kept	Pins |V1| ≈ 530 km/s / c in code units (rtol 5%); catches a velocity normalization regression where c is not applied.	<pending>
+tests/test_examples_smoke.py::TestMHDUCLAPhysics::test_mhducla_imf_magnitude[NOTSET]	11	kept	Pins |B| ≈ 8 nT / b_field_ref (rtol 5%); catches a B-field normalization regression using the wrong reference B.	<pending>
+tests/test_examples_smoke.py::TestMHDUCLAPhysics::test_mhducla_dipole_dominance[NOTSET]	11	kept	Pins max|B| > 100× IMF magnitude; catches a regression that skips or attenuates the dipole in the Earth geometry setup.	<pending>
+tests/test_fields.py::TestRegistryIntegrity::test_all_entries_consistent	11	kept	Structural invariant: every _FIELD_INFO entry's si_unit must match _QUANTITY_UNITS — catches an added field with mismatched SI unit string.	<pending>
+tests/test_fields.py::TestRegistryIntegrity::test_all_fields_have_valid_quantity_type	11	kept	Structural invariant: every _FIELD_INFO quantity_type must be registered in _QUANTITY_UNITS — catches a typo'd qtype string on a new entry.	<pending>
+tests/test_fields.py::TestFieldInfoLookup::test_canonical_name	11	kept	Pins |B| metadata: qtype=b_field, si_unit=T, long_name='Magnetic field magnitude', latex=$|B|$; catches any silent label rewrite.	<pending>
+tests/test_fields.py::TestFieldInfoLookup::test_alias_resolution[B_mag-|B|]	11	kept	Pins alias B_mag → |B|; guards against dropped alias in the registry.	<pending>
+tests/test_fields.py::TestFieldInfoLookup::test_alias_resolution[plasma_beta-beta]	11	kept	Pins alias plasma_beta → beta; guards against dropped alias in the registry.	<pending>
+tests/test_fields.py::TestFieldInfoLookup::test_alias_resolution[Bx-B1]	11	kept	Pins Cartesian alias Bx → B1; this is the schema.md-documented dual-naming contract for Cartesian users.	<pending>
+tests/test_fields.py::TestFieldInfoLookup::test_alias_resolution[P_e-Pe]	11	kept	Pins alias P_e → Pe (schema.md e/i convenience aliases); catches a regression that broke underscore-prefixed pressure alias.	<pending>
+tests/test_fields.py::TestFieldInfoLookup::test_alias_resolution[B_1-B1]	11	kept	Pins alias B_1 → B1 (underscore-number form); guards schema.md-documented equivalence.	<pending>
+tests/test_fields.py::TestFieldInfoLookup::test_species_patterns[n_s5-density-Number density (species 5)]	11	kept	Pins n_s<N> pattern: correct quantity_type=density and long_name with species index interpolated; catches regex regression.	<pending>
+tests/test_fields.py::TestFieldInfoLookup::test_species_patterns[omega_p_s3-frequency-Plasma frequency (species 3)]	11	kept	Pins omega_p_s<N> pattern: qtype=frequency + species-index-aware long_name; catches wrong qtype or broken regex.	<pending>
+tests/test_fields.py::TestFieldInfoLookup::test_species_patterns[v_th_s2-velocity-Thermal speed (species 2)]	11	kept	Pins v_th_s<N> pattern: qtype=velocity + species long_name; catches velocity-vs-speed misclassification.	<pending>
+tests/test_fields.py::TestFieldInfoLookup::test_species_patterns[T_s4-temperature-Temperature (species 4)]	11	kept	Pins T_s<N> pattern: qtype=temperature + species long_name; catches energy-vs-temperature misclassification.	<pending>
+tests/test_fields.py::TestFieldInfoLookup::test_species_patterns[J1_s2-current_density-Current density component 1 (species 2)]	11	kept	Pins J<i>_s<N> pattern: qtype=current_density + component-and-species long_name; catches broken multi-group regex.	<pending>
+tests/test_fields.py::TestFieldInfoLookup::test_unknown_raises_keyerror	11	kept	Pins KeyError (not default dict / None) on unknown field names — matches selection-APIs-fail-loud rule in CLAUDE.md.	<pending>
+tests/test_fields.py::test_unit_label[B1-True-T]	11	kept	Pins unit_label('B1', si=True) == 'T'; catches SI-unit label regression in label rendering path.	<pending>
+tests/test_fields.py::test_unit_label[B1-False-normalized]	11	kept	Pins unit_label('B1', si=False) == 'normalized'; catches regression that exposes SI units when plotting in code units.	<pending>
+tests/test_fields.py::test_unit_label[beta-True-]	11	kept	Pins dimensionless quantities render empty string (not 'dimensionless' literal) in SI mode.	<pending>
+tests/test_fields.py::test_unit_label[beta-False-]	11	kept	Pins dimensionless quantities render empty string in code-units mode too; mirrors SI case to guard label-path symmetry.	<pending>
+tests/test_fields.py::test_unit_label[v_A-True-m/s]	11	kept	Pins unit_label('v_A', si=True) == 'm/s'; catches a velocity-vs-speed unit confusion on Alfven speed.	<pending>
+tests/test_fields.py::TestQuantityUnits::test_known_type	11	kept	Pins quantity_units('b_field')='T', 'pressure'='Pa', 'dimensionless'=''; catches a table reshuffle affecting three common quantity types.	<pending>
+tests/test_fields.py::TestQuantityUnits::test_unknown_raises	11	kept	Pins KeyError on unknown quantity type — guards fail-loud semantics for invalid user-supplied type strings.	<pending>
 tests/test_fields.py::TestFieldDatasetFieldInfo::test_resolves_canonical_and_alias	0	not-yet-reviewed		
 tests/test_fields.py::TestXarrayAttrs::test_known_field_has_attrs	0	not-yet-reviewed		
 tests/test_fields.py::TestXarrayAttrs::test_unknown_field_no_attrs	0	not-yet-reviewed		
