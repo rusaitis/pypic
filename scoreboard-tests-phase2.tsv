@@ -411,56 +411,56 @@ tests/test_config.py::TestMergeSimulationToml::test_no_sim_dir_returns_base_unch
 tests/test_config.py::TestMergeSimulationToml::test_missing_toml_returns_base_unchanged	7	kept	tmp_path without simulation.toml must return base identity-equal; sibling case to no_sim_dir — both branches of the early-return guard.	0b88869
 tests/test_config.py::TestMergeSimulationToml::test_toml_overrides_normalization_frame_metadata	7	kept	Reader-supplied config + simulation.toml merge: toml wins on normalization/frame, reader keeps grid/model_name/metadata — the central merge contract.	0b88869
 tests/test_config.py::TestMergeSimulationToml::test_toml_metadata_wins_on_key_conflict	7	kept	Explicit metadata key-conflict policy: toml overrides, reader-only keys preserved; catches a dict-union direction regression.	0b88869
-tests/test_derived.py::TestMagnitudes::test_345_triangle[magnetic_field_magnitude]	0	not-yet-reviewed		
-tests/test_derived.py::TestMagnitudes::test_345_triangle[electric_field_magnitude]	0	not-yet-reviewed		
-tests/test_derived.py::TestMagnitudes::test_345_triangle[current_density_magnitude]	0	not-yet-reviewed		
-tests/test_derived.py::TestMagnitudes::test_345_triangle[velocity_magnitude]	0	not-yet-reviewed		
-tests/test_derived.py::TestMagnitudes::test_multidimensional[magnetic_field_magnitude]	0	not-yet-reviewed		
-tests/test_derived.py::TestMagnitudes::test_multidimensional[electric_field_magnitude]	0	not-yet-reviewed		
-tests/test_derived.py::TestMagnitudes::test_multidimensional[current_density_magnitude]	0	not-yet-reviewed		
-tests/test_derived.py::TestMagnitudes::test_multidimensional[velocity_magnitude]	0	not-yet-reviewed		
-tests/test_derived.py::TestMagnitudes::test_nan_propagation[magnetic_field_magnitude]	0	not-yet-reviewed		
-tests/test_derived.py::TestMagnitudes::test_nan_propagation[electric_field_magnitude]	0	not-yet-reviewed		
-tests/test_derived.py::TestMagnitudes::test_nan_propagation[current_density_magnitude]	0	not-yet-reviewed		
-tests/test_derived.py::TestMagnitudes::test_nan_propagation[velocity_magnitude]	0	not-yet-reviewed		
-tests/test_derived.py::TestPlasmaBeta::test_known_values	0	not-yet-reviewed		
-tests/test_derived.py::TestPlasmaBeta::test_zero_b_gives_nan	0	not-yet-reviewed		
-tests/test_derived.py::TestAlfvenSpeed::test_known_values	0	not-yet-reviewed		
-tests/test_derived.py::TestAlfvenSpeed::test_invalid_density_gives_nan	0	not-yet-reviewed		
-tests/test_derived.py::TestEnergyDensities::test_known_values	0	not-yet-reviewed		
-tests/test_derived.py::TestEnergyDensities::test_thermal_energy	0	not-yet-reviewed		
-tests/test_derived.py::TestPoyntingFlux::test_e_along_x_b_along_y	0	not-yet-reviewed		
-tests/test_derived.py::TestPoyntingFlux::test_antisymmetry	0	not-yet-reviewed		
-tests/test_derived.py::TestPoyntingFlux::test_multidimensional	0	not-yet-reviewed		
-tests/test_derived.py::TestThermodynamics::test_internal_energy_default_gamma	0	not-yet-reviewed		
-tests/test_derived.py::TestThermodynamics::test_enthalpy_is_gamma_times_internal	0	not-yet-reviewed		
-tests/test_derived.py::TestThermodynamics::test_enthalpy_equals_internal_plus_p_over_rho	0	not-yet-reviewed		
-tests/test_derived.py::TestThermodynamics::test_relativistic_enthalpy	0	not-yet-reviewed		
-tests/test_derived.py::TestThermodynamics::test_entropy_values	0	not-yet-reviewed		
-tests/test_derived.py::TestThermodynamics::test_gyrotropic_entropy	0	not-yet-reviewed		
-tests/test_derived.py::TestThermodynamics::test_negative_pressure_gives_nan	0	not-yet-reviewed		
-tests/test_derived.py::TestDefaultParameters::test_explicit_equals_implicit[thermal_energy_density]	0	not-yet-reviewed		
-tests/test_derived.py::TestDefaultParameters::test_explicit_equals_implicit[internal_energy]	0	not-yet-reviewed		
-tests/test_derived.py::TestDefaultParameters::test_explicit_equals_implicit[enthalpy]	0	not-yet-reviewed		
-tests/test_derived.py::TestDefaultParameters::test_explicit_equals_implicit[relativistic_enthalpy]	0	not-yet-reviewed		
-tests/test_derived.py::TestDefaultParameters::test_explicit_equals_implicit[entropy]	0	not-yet-reviewed		
-tests/test_derived.py::TestEdgeCases::test_nan_in_energy	0	not-yet-reviewed		
-tests/test_derived.py::TestEdgeCases::test_nan_in_thermodynamics	0	not-yet-reviewed		
-tests/test_derived.py::TestThermalSpeed::test_t4_m1	0	not-yet-reviewed		
-tests/test_derived.py::TestThermalSpeed::test_mass_scaling	0	not-yet-reviewed		
-tests/test_derived.py::TestGyrofrequency::test_negative_charge_gives_positive	0	not-yet-reviewed		
-tests/test_derived.py::TestGyrofrequency::test_mass_scaling	0	not-yet-reviewed		
-tests/test_derived.py::TestPlasmaFrequency::test_negative_charge_invariant	0	not-yet-reviewed		
-tests/test_derived.py::TestPlasmaFrequency::test_density_scaling	0	not-yet-reviewed		
-tests/test_derived.py::TestSkinDepth::test_skin_depth	0	not-yet-reviewed		
-tests/test_derived.py::TestGyroradius::test_gyroradius	0	not-yet-reviewed		
-tests/test_derived.py::TestDebyeLength::test_debye_length	0	not-yet-reviewed		
-tests/test_derived.py::TestSoundSpeed::test_default_gamma	0	not-yet-reviewed		
-tests/test_derived.py::TestSoundSpeed::test_gamma_2	0	not-yet-reviewed		
-tests/test_derived.py::TestIonAcousticSpeed::test_cold_ions	0	not-yet-reviewed		
-tests/test_derived.py::TestIonAcousticSpeed::test_defaults	0	not-yet-reviewed		
-tests/test_derived.py::TestIonAcousticSpeed::test_known_value	0	not-yet-reviewed		
-tests/test_derived.py::TestMagnetosonicSpeed::test_pythagorean	0	not-yet-reviewed		
+tests/test_derived.py::TestMagnitudes::test_345_triangle[magnetic_field_magnitude]	8	kept	Hand-verified 3-4-5 Pythagorean identity for magnetic_field_magnitude; pins _vector_magnitude wiring — a dropped component index or swapped squaring breaks this.	<pending>
+tests/test_derived.py::TestMagnitudes::test_345_triangle[electric_field_magnitude]	8	kept	Hand-verified 3-4-5 identity for electric_field_magnitude; per-function dispatch guard — accidental alias to B-magnitude would pass a generic test but fail this.	<pending>
+tests/test_derived.py::TestMagnitudes::test_345_triangle[current_density_magnitude]	8	kept	Hand-verified 3-4-5 identity for current_density_magnitude; guards against wrong component routing in the J magnitude wrapper.	<pending>
+tests/test_derived.py::TestMagnitudes::test_345_triangle[velocity_magnitude]	8	kept	Hand-verified 3-4-5 identity for velocity_magnitude; pins the V wrapper — swapping v1/v3 or missing a square would still satisfy symmetric fixtures but breaks this.	<pending>
+tests/test_derived.py::TestMagnitudes::test_multidimensional[magnetic_field_magnitude]	8	kept	Multi-dim shape preservation + three numeric pins; catches vectorization regressions where per-cell reduction collapses an axis.	<pending>
+tests/test_derived.py::TestMagnitudes::test_multidimensional[electric_field_magnitude]	8	kept	Multi-dim shape preservation for E; same bug class as B variant but exercises the distinct public entry point.	<pending>
+tests/test_derived.py::TestMagnitudes::test_multidimensional[current_density_magnitude]	8	kept	Multi-dim shape for J; guards against broadcasting regressions that would pass 1D fixtures.	<pending>
+tests/test_derived.py::TestMagnitudes::test_multidimensional[velocity_magnitude]	8	kept	Multi-dim shape for V; catches axis-collapse bugs in the velocity wrapper.	<pending>
+tests/test_derived.py::TestMagnitudes::test_nan_propagation[magnetic_field_magnitude]	8	kept	NaN propagation for B magnitude; catches accidental masking (np.nan_to_num or masked array) that hides unphysical cells.	<pending>
+tests/test_derived.py::TestMagnitudes::test_nan_propagation[electric_field_magnitude]	8	kept	NaN propagation for E magnitude; per-function NaN contract guard.	<pending>
+tests/test_derived.py::TestMagnitudes::test_nan_propagation[current_density_magnitude]	8	kept	NaN propagation for J magnitude; per-function NaN contract guard.	<pending>
+tests/test_derived.py::TestMagnitudes::test_nan_propagation[velocity_magnitude]	8	kept	NaN propagation for V magnitude; per-function NaN contract guard.	<pending>
+tests/test_derived.py::TestPlasmaBeta::test_known_values	8	kept	Three hand-computed beta values including beta=1 at P=B^2/2; pins the factor-of-2 in beta = 2P/B^2 (common miswriting as P/B^2 would flip all three).	<pending>
+tests/test_derived.py::TestPlasmaBeta::test_zero_b_gives_nan	8	kept	Zero-B edge case returns NaN; guards against a 1/0 warning-turned-exception or a masked-zero protection that hides null fields.	<pending>
+tests/test_derived.py::TestAlfvenSpeed::test_known_values	8	kept	Two Alfven speed hand values v_A=B/sqrt(rho); catches wrong exponent or missing sqrt in the rho factor.	<pending>
+tests/test_derived.py::TestAlfvenSpeed::test_invalid_density_gives_nan	8	kept	rho=0 and rho<0 both return NaN; pins both sqrt(<0)->NaN and 1/0->NaN paths — either silenced raise would regress this.	<pending>
+tests/test_derived.py::TestEnergyDensities::test_known_values	8	kept	Hand values for e_B=B^2/2, e_E=E^2/2, and e_k=rho V^2/2; pins the factor-of-2 in all three — SI-rationalized-normalization regression guard (see docs/conventions.md Gaussian-vs-SI section).	<pending>
+tests/test_derived.py::TestEnergyDensities::test_thermal_energy	8	kept	e_th = P/(gamma-1) at default gamma=5/3 and gamma=2; pins the (gamma-1) denominator separately from sound_speed's gamma coupling.	<pending>
+tests/test_derived.py::TestPoyntingFlux::test_e_along_x_b_along_y	8	kept	ExB hand calc with E=x_hat, B=y_hat -> S=z_hat; pins cross-product component order — a swapped sign or index rotation would fail.	<pending>
+tests/test_derived.py::TestPoyntingFlux::test_antisymmetry	8	kept	S(E,B) = -S(B,E) identity; pins the antisymmetry of the cross product, orthogonal check to the hand calc.	<pending>
+tests/test_derived.py::TestPoyntingFlux::test_multidimensional	8	kept	Multi-dim shape + numeric pin for Poynting flux; guards against axis-collapse in the cross-product broadcast.	<pending>
+tests/test_derived.py::TestThermodynamics::test_internal_energy_default_gamma	8	kept	e_int(P=1, rho=1) = 1/(gamma-1) = 1.5 at default gamma=5/3; pins the default.	<pending>
+tests/test_derived.py::TestThermodynamics::test_enthalpy_is_gamma_times_internal	8	kept	Identity h = gamma*e_int; cross-function invariant that catches independent drift of enthalpy vs internal_energy formulas.	<pending>
+tests/test_derived.py::TestThermodynamics::test_enthalpy_equals_internal_plus_p_over_rho	8	kept	Thermodynamic identity h = e_int + P/rho; catches wrong algebraic form of enthalpy.	<pending>
+tests/test_derived.py::TestThermodynamics::test_relativistic_enthalpy	8	kept	h_rel = c^2 + h at c=1 and c=10; pins the c^2 rest-mass offset and its c-dependence (equations.md §2 footnote).	<pending>
+tests/test_derived.py::TestThermodynamics::test_entropy_values	8	kept	s(1,1)=0 and s(e,1)=1; pins the log and gamma=5/3 default jointly (exp(gamma*log(1))=1).	<pending>
+tests/test_derived.py::TestThermodynamics::test_gyrotropic_entropy	8	kept	s_gyro log(P_par P_perp^2 / n^5) hand check; the '5' exponent is a CGL invariant (not gamma), so this catches accidental replacement with 3*gamma-like exponents — see conventions.md §Gamma.	<pending>
+tests/test_derived.py::TestThermodynamics::test_negative_pressure_gives_nan	8	kept	Negative P -> NaN for entropy and gyrotropic_entropy (log domain); guards against silent log-of-negative warning suppression.	<pending>
+tests/test_derived.py::TestDefaultParameters::test_explicit_equals_implicit[thermal_energy_density]	8	kept	gamma=5/3 default pin for thermal_energy_density; API contract guard — changing the default would be a silent SI regression.	<pending>
+tests/test_derived.py::TestDefaultParameters::test_explicit_equals_implicit[internal_energy]	8	kept	gamma=5/3 default pin for internal_energy; parallel contract guard.	<pending>
+tests/test_derived.py::TestDefaultParameters::test_explicit_equals_implicit[enthalpy]	8	kept	gamma=5/3 default pin for enthalpy; parallel contract guard.	<pending>
+tests/test_derived.py::TestDefaultParameters::test_explicit_equals_implicit[relativistic_enthalpy]	8	kept	c=1 default pin for relativistic_enthalpy; catches silent change to c=scipy.constants.c that would break normalized-units workflow.	<pending>
+tests/test_derived.py::TestDefaultParameters::test_explicit_equals_implicit[entropy]	8	kept	gamma=5/3 default pin for entropy (3D dof); conventions.md §Gamma rationale.	<pending>
+tests/test_derived.py::TestEdgeCases::test_nan_in_energy	8	kept	NaN propagation across three energy-density functions in one assertion; CLAUDE.md-aligned aggregated invariant.	<pending>
+tests/test_derived.py::TestEdgeCases::test_nan_in_thermodynamics	8	kept	NaN propagation across entropy/enthalpy/gyrotropic_entropy; aggregated invariant.	<pending>
+tests/test_derived.py::TestThermalSpeed::test_t4_m1	8	kept	v_th = sqrt(T/m) hand value; pins NRL convention (not the sqrt(2T/m) variant) — conventions.md §Thermal Speed.	<pending>
+tests/test_derived.py::TestThermalSpeed::test_mass_scaling	8	kept	v_th scaling with m: T=4,m=4 -> v=1; orthogonal to the T-scaling check.	<pending>
+tests/test_derived.py::TestGyrofrequency::test_negative_charge_gives_positive	8	kept	|q|B/m convention — stored gyrofreq is positive even for electrons; pins conventions.md §Cyclotron Frequency.	<pending>
+tests/test_derived.py::TestGyrofrequency::test_mass_scaling	8	kept	omega_c scales as 1/m; orthogonal to charge-sign check.	<pending>
+tests/test_derived.py::TestPlasmaFrequency::test_negative_charge_invariant	8	kept	omega_p depends on q^2; catches refactor that replaces q**2 with q.	<pending>
+tests/test_derived.py::TestPlasmaFrequency::test_density_scaling	8	kept	omega_p = sqrt(n*q^2/m); n=4 -> 2 pins the sqrt(n) dependence.	<pending>
+tests/test_derived.py::TestSkinDepth::test_skin_depth	8	kept	Identity d*omega_p=c plus hand value; cross-function consistency between skin_depth and plasma_frequency (catches independent-drift refactors).	<pending>
+tests/test_derived.py::TestGyroradius::test_gyroradius	8	kept	Charge-sign invariance + identity r=v_th/omega_c; cross-function consistency guard.	<pending>
+tests/test_derived.py::TestDebyeLength::test_debye_length	8	kept	Charge-sign invariance + hand value T=4,n=1,q=1 -> 2; pins q^2 dependence plus NRL electron-Debye form.	<pending>
+tests/test_derived.py::TestSoundSpeed::test_default_gamma	8	kept	gamma=5/3 default pin for sound_speed; adiabatic-index API contract guard.	<pending>
+tests/test_derived.py::TestSoundSpeed::test_gamma_2	8	kept	c_s at gamma=2 hand value; pins the gamma-in-numerator form (not denominator).	<pending>
+tests/test_derived.py::TestIonAcousticSpeed::test_cold_ions	8	kept	Cold-ion limit: Te=1,Ti=0,m=1,gamma_e=1 -> 1; pins the gamma_e*Te term is used (not Te alone).	<pending>
+tests/test_derived.py::TestIonAcousticSpeed::test_defaults	8	kept	gamma_e=1, gamma_i=3 defaults pin; conventions.md §Sound Speed vs Ion Acoustic (isothermal-electron + 1D-adiabatic-ion).	<pending>
+tests/test_derived.py::TestIonAcousticSpeed::test_known_value	8	kept	Hand value exercising both Te and Ti branches plus mass scaling; catches mis-weighting of either.	<pending>
+tests/test_derived.py::TestMagnetosonicSpeed::test_pythagorean	8	kept	Hand value v_ms(v_A=3, c_s=4) = 5; Pythagorean composition per equations.md §5.	<pending>
 tests/test_derived.py::TestMagnetosonicSpeed::test_limiting_cases	0	not-yet-reviewed		
 tests/test_derived.py::TestMachNumbers::test_known_values	0	not-yet-reviewed		
 tests/test_derived.py::TestMachNumbers::test_zero_denominator_gives_nan	0	not-yet-reviewed		
