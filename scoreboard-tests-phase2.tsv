@@ -109,56 +109,56 @@ tests/test_batsrus.py::TestTargetResolutionHDF5::test_preserves_uniform_density	
 tests/test_batsrus.py::TestTargetResolutionHDF5::test_preserves_harris_profile	2	kept	Harris Bx sign survives coarsening — pins against a bug where block-average fill overshoots and zeroes out the gradient near the current sheet.	d1dc5c0
 tests/test_batsrus.py::TestTargetResolutionHDF5::test_no_nan_at_coarse_resolution	2	kept	Coarse-resolution regrid leaves no NaN — catches the AMR routine silently leaving cells unassigned when target dx > finest dx.	d1dc5c0
 tests/test_batsrus.py::TestTargetResolutionHDF5::test_intermediate_snaps_to_nearest	2	kept	target_resolution=0.7 snaps to 0.5 (32×32) while 0.8 snaps to 1.0 (16×16) — pins the nearest-valid-dx snapping rule against a round-up-only or round-down-only bug.	d1dc5c0
-tests/test_batsrus.py::TestTargetResolutionHDF5::test_grid_spacing_matches_target	0	not-yet-reviewed		
-tests/test_batsrus.py::TestTargetResolutionIDL::test_coarsens_output	0	not-yet-reviewed		
-tests/test_batsrus.py::TestTargetResolutionIDL::test_none_is_finest	0	not-yet-reviewed		
-tests/test_batsrus.py::TestTargetResolutionIDL::test_preserves_uniform_density	0	not-yet-reviewed		
-tests/test_batsrus.py::TestTargetResolutionIDL::test_preserves_harris_profile	0	not-yet-reviewed		
-tests/test_batsrus.py::TestTargetResolutionIDL::test_no_nan_at_coarse_resolution	0	not-yet-reviewed		
-tests/test_batsrus.py::TestTargetResolutionIDL::test_intermediate_snaps_to_nearest	0	not-yet-reviewed		
-tests/test_batsrus.py::TestSelectiveReadIDL::test_subset_returns_only_requested	0	not-yet-reviewed		
-tests/test_batsrus.py::TestSelectiveReadIDL::test_subset_values_match_full	0	not-yet-reviewed		
-tests/test_batsrus.py::TestSelectiveReadIDL::test_none_reads_all	0	not-yet-reviewed		
-tests/test_batsrus.py::TestSelectiveReadHDF5::test_subset_returns_only_requested	0	not-yet-reviewed		
-tests/test_batsrus.py::TestSelectiveReadHDF5::test_subset_values_match_full	0	not-yet-reviewed		
-tests/test_batsrus.py::TestSelectiveReadHDF5::test_none_reads_all	0	not-yet-reviewed		
-tests/test_batsrus.py::TestSelectiveReadHDF5::test_single_field	0	not-yet-reviewed		
-tests/test_batsrus.py::TestIsUniformIDL::test_uniform	0	not-yet-reviewed		
-tests/test_batsrus.py::TestIsUniformIDL::test_amr	0	not-yet-reviewed		
-tests/test_batsrus.py::TestGeometryPropagation::test_cartesian_geometry_propagates	0	not-yet-reviewed		
-tests/test_batsrus.py::TestParamInSplitbDivb::test_splitb[True]	0	not-yet-reviewed		
-tests/test_batsrus.py::TestParamInSplitbDivb::test_splitb[False]	0	not-yet-reviewed		
-tests/test_batsrus.py::TestParamInSplitbDivb::test_divb_method	0	not-yet-reviewed		
-tests/test_batsrus.py::TestParamInSplitbDivb::test_splitb_in_physics_metadata	0	not-yet-reviewed		
-tests/test_cli.py::test_version	0	not-yet-reviewed		
-tests/test_cli.py::test_info_text	0	not-yet-reviewed		
-tests/test_cli.py::test_info_json	0	not-yet-reviewed		
-tests/test_cli.py::test_fields_default	0	not-yet-reviewed		
-tests/test_cli.py::test_fields_mapping	0	not-yet-reviewed		
-tests/test_cli.py::test_fields_mapping_json_preserves_null	0	not-yet-reviewed		
-tests/test_cli.py::test_fields_derived	0	not-yet-reviewed		
-tests/test_cli.py::test_fields_aux	0	not-yet-reviewed		
-tests/test_cli.py::test_fields_json	0	not-yet-reviewed		
-tests/test_cli.py::test_fields_all	0	not-yet-reviewed		
-tests/test_cli.py::test_stats_single_step	0	not-yet-reviewed		
-tests/test_cli.py::test_stats_derived	0	not-yet-reviewed		
-tests/test_cli.py::test_stats_json	0	not-yet-reviewed		
-tests/test_cli.py::test_stats_multi_step	0	not-yet-reviewed		
-tests/test_cli.py::test_stats_multi_step_json	0	not-yet-reviewed		
-tests/test_cli.py::test_compare_single_field	0	not-yet-reviewed		
-tests/test_cli.py::test_compare_all_fields	0	not-yet-reviewed		
-tests/test_cli.py::test_compare_json	0	not-yet-reviewed		
-tests/test_cli.py::test_bad_step	0	not-yet-reviewed		
-tests/test_cli.py::test_step_not_available	0	not-yet-reviewed		
-tests/test_cli.py::test_empty_step_range	0	not-yet-reviewed		
-tests/test_cli.py::test_parse_steps_resolves_against_provided_list	0	not-yet-reviewed		
-tests/test_cli.py::test_multi_step_rejected_by_fields	0	not-yet-reviewed		
-tests/test_cli.py::test_multi_step_rejected_by_compare	0	not-yet-reviewed		
-tests/test_cli.py::test_bad_log_level	0	not-yet-reviewed		
-tests/test_cli.py::test_bad_metric	0	not-yet-reviewed		
-tests/test_cli.py::test_bad_units	0	not-yet-reviewed		
-tests/test_cli.py::test_bad_nan_policy	0	not-yet-reviewed		
-tests/test_cli.py::test_log_level_not_sticky	0	not-yet-reviewed		
+tests/test_batsrus.py::TestTargetResolutionHDF5::test_grid_spacing_matches_target	3	kept	Pins that target_resolution=1.0 produces GridInfo.spacing=(1.0,1.0) — catches a regression where target_resolution is honoured for shape but not propagated into grid metadata.	<pending>
+tests/test_batsrus.py::TestTargetResolutionIDL::test_coarsens_output	3	kept	Asserts shape (16,16) at target=1.0 over a 16-unit domain — catches wrong block-average stride in IDL AMR regridding (e.g. dropping a factor-of-2 level).	<pending>
+tests/test_batsrus.py::TestTargetResolutionIDL::test_none_is_finest	3	kept	rtol=1e-15 roundtrip between default and explicit None — pins target_resolution=None ≡ finest level default; catches a refactor that silently changes the default.	<pending>
+tests/test_batsrus.py::TestTargetResolutionIDL::test_preserves_uniform_density	3	kept	Block-averaging a uniform field must stay uniform — catches a weighting bug in AMR→uniform regrid where cells at different refinement levels are double-counted.	<pending>
+tests/test_batsrus.py::TestTargetResolutionIDL::test_preserves_harris_profile	3	kept	Harris-sheet asymptotes ±1 preserved after coarsening — catches sign-flip or axis-transpose bugs in IDL block-average regridding that pass a uniform-density test but scramble spatial structure.	<pending>
+tests/test_batsrus.py::TestTargetResolutionIDL::test_no_nan_at_coarse_resolution	3	kept	Pins no-gap invariant after AMR→uniform regrid — catches a bug where block boundaries or out-of-level cells produce NaN in the coarsened output.	<pending>
+tests/test_batsrus.py::TestTargetResolutionIDL::test_intermediate_snaps_to_nearest	3	kept	Target 0.7 → 32x32 (dx=0.5), 0.8 → 16x16 (dx=1.0) — pins the round-to-nearest-valid-level snap rule; catches off-by-one in the level-selection arithmetic.	<pending>
+tests/test_batsrus.py::TestSelectiveReadIDL::test_subset_returns_only_requested	3	kept	Pins fields=['B1','rho_m'] returns exactly that set — catches the silent-ignore-fields-arg bug class (reader reads everything regardless of filter).	<pending>
+tests/test_batsrus.py::TestSelectiveReadIDL::test_subset_values_match_full	3	kept	rtol=1e-15 between subset-read and full-read — pins bitwise identity; catches a bug where selective read re-parses with different numerics (e.g. skipping a unit conversion branch).	<pending>
+tests/test_batsrus.py::TestSelectiveReadIDL::test_none_reads_all	3	kept	fields=None loads >2 fields — pins None≡all sentinel; catches a bug where None is treated as empty list.	<pending>
+tests/test_batsrus.py::TestSelectiveReadHDF5::test_subset_returns_only_requested	3	kept	Same invariant as IDL twin but for HDF5 BATL — sibling readers must share the selective-read contract per CLAUDE.md 'scan sibling readers' rule.	<pending>
+tests/test_batsrus.py::TestSelectiveReadHDF5::test_subset_values_match_full	3	kept	rtol=1e-15 subset≡full bitwise for HDF5 BATL — mirrors IDL test; pins sibling reader parity (both code paths must give identical numerics).	<pending>
+tests/test_batsrus.py::TestSelectiveReadHDF5::test_none_reads_all	3	kept	HDF5 sibling of the IDL test — pins that None≡all in BATL HDF5 as well; guards against drift between sibling readers.	<pending>
+tests/test_batsrus.py::TestSelectiveReadHDF5::test_single_field	3	kept	Pins that fields=['rho_m'] returns exactly ['rho_m'] (list ordering/uniqueness) — catches a bug where singleton filter implicitly expands to a group.	<pending>
+tests/test_batsrus.py::TestIsUniformIDL::test_uniform	3	kept	All-equal dx returns True — the sole unit test for the AMR-detection helper; dropping it removes coverage of the is_uniform_idl public function.	<pending>
+tests/test_batsrus.py::TestIsUniformIDL::test_amr	3	kept	Mixed dx array returns False — pins the tolerance semantics of is_uniform_idl; catches a bug where np.ptp threshold is loose enough to mis-classify AMR as uniform.	<pending>
+tests/test_batsrus.py::TestGeometryPropagation::test_cartesian_geometry_propagates	3	kept	Pins that parse_param_in → SimulationConfig → reader → FieldDataset all carry geometry='cartesian' — catches a drop on the config-to-dataset handoff path.	<pending>
+tests/test_batsrus.py::TestParamInSplitbDivb::test_splitb[True]	3	kept	'T'/'F' flag in #SPLITB block parses to Python bool True — catches a BATSRUS-specific TOML-style parse bug where the single-letter boolean convention is misread as a string.	<pending>
+tests/test_batsrus.py::TestParamInSplitbDivb::test_splitb[False]	3	kept	'F' flag parses to Python bool False — pins the False branch that a True-only test would miss (common FORTRAN-boolean-parse bug).	<pending>
+tests/test_batsrus.py::TestParamInSplitbDivb::test_divb_method	3	kept	'CT' parses as divb_method string — pins the symbolic-token branch of PARAM.in parser; catches a bug where the token is interpreted as a variable name.	<pending>
+tests/test_batsrus.py::TestParamInSplitbDivb::test_splitb_in_physics_metadata	3	kept	Pins that use_splitb and divb_method land in sim.physics.extra dict — catches a bug where PARAM.in flags are parsed but dropped before reaching SimulationConfig.	<pending>
+tests/test_cli.py::test_version	3	kept	Pins that --version exits 0 and prints 'pypic' — the sole smoke test for the CLI entry point; catches a broken typer app registration.	<pending>
+tests/test_cli.py::test_info_text	3	kept	Asserts model name, '4 x 4 x 4' dims, 'cartesian', and 'Units:' all appear — pins four distinct info-command output sections; catches silent truncation of the rich-formatted report.	<pending>
+tests/test_cli.py::test_info_json	3	kept	Pins JSON keys model_name, model_type, grid.dimensions, steps, normalization.length_ref — catches a schema drift in the machine-readable info output.	<pending>
+tests/test_cli.py::test_fields_default	3	kept	Pins that the bare `fields` command lists B1, B2, B3 for the fixture — catches a regression where native fields are filtered to an empty set by default.	<pending>
+tests/test_cli.py::test_fields_mapping	3	kept	Pins the Unicode '→' arrow in the native→canonical mapping output — catches a formatter regression that replaces the arrow with '->' or drops it entirely.	<pending>
+tests/test_cli.py::test_fields_mapping_json_preserves_null	3	kept	Pins that null values in native_mapping stay null and never stringify to '(computed)' — catches a JSON-serialization bug where the rich-display sentinel leaks into machine output.	<pending>
+tests/test_cli.py::test_fields_derived	3	kept	Pins that --derived lists |B| for a dataset with B1/B2/B3 — catches a registry-lookup regression where derived magnitudes fail to dispatch.	<pending>
+tests/test_cli.py::test_fields_aux	3	kept	Pins '(none)' placeholder for the no-aux branch — catches a bug where the empty-aux case renders blank output, which a 'tokens appear' test would miss.	<pending>
+tests/test_cli.py::test_fields_json	3	kept	Pins the {'fields': [...]} JSON schema for `fields --json` — catches a rename or key-removal in the machine-readable output.	<pending>
+tests/test_cli.py::test_fields_all	3	kept	Pins that --all emits both 'Derived' and 'Auxiliary' section headers — catches a regression where --all falls back to only-native or drops one section.	<pending>
+tests/test_cli.py::test_stats_single_step	3	kept	Pins all five stat labels (min/max/mean/rms/NaN) appear — catches a regression where stats dispatch silently drops a column (e.g. NaN count).	<pending>
+tests/test_cli.py::test_stats_derived	3	kept	Pins that --field '|B|' dispatches through the derived-quantity registry from the stats command — catches a bug where compute() is only wired into plot/compare, not stats.	<pending>
+tests/test_cli.py::test_stats_json	3	kept	Pins JSON keys min/max/mean/rms/nan_count and that numeric values are Python float — catches a drift where the numeric type is str (json.dumps of NumPy scalar mis-handled).	<pending>
+tests/test_cli.py::test_stats_multi_step	3	hardened	Tightened '>= 4 lines' to '== 5' — the old lower bound would silently accept row duplication or missed iterations in the stats-over-all-steps loop.	<pending>
+tests/test_cli.py::test_stats_multi_step_json	3	kept	Pins len(data['steps']) == 3 for a 3-step fixture — catches an off-by-one in the multi-step aggregation loop; already tight (exact match, not >=).	<pending>
+tests/test_cli.py::test_compare_single_field	3	kept	Pins four distinct labels ('L2 relative error:', 'L-inf error:', 'Grid:', 'A dims:') — catches a regression that drops grid context from single-field compare output.	<pending>
+tests/test_cli.py::test_compare_all_fields	3	hardened	Now asserts every row shows L2=0 and L∞=0 for self-compare — catches a silent drift in the all-fields compare pipeline (spurious casts, wrong normalization branch) that a tokens-appear test would miss.	<pending>
+tests/test_cli.py::test_compare_json	3	kept	Pins {'l2','linf','field':'B1'} JSON keys for `compare --json` — catches a schema drift in the machine-readable compare output.	<pending>
+tests/test_cli.py::test_bad_step	3	hardened	Added assertion that error output contains 'banana' — pins that the 'Invalid --step value {raw!r}' format preserves the user's input so typo messages are fixable.	<pending>
+tests/test_cli.py::test_step_not_available	3	kept	Pins 'not available' substring in error — catches parse_steps branching where a step int outside the available set raises a generic error without saying why.	<pending>
+tests/test_cli.py::test_empty_step_range	3	kept	Pins 'No available steps' error for a range that matches nothing — catches parse_steps returning [] silently instead of raising BadParameter.	<pending>
+tests/test_cli.py::test_parse_steps_resolves_against_provided_list	3	kept	Pins that 'last'/'first'/'all' consult the PROVIDED step list (not sim.steps globally) — documented bug class: convert-particles commands would otherwise resolve 'last' against fields cadence instead of particles.	<pending>
+tests/test_cli.py::test_multi_step_rejected_by_fields	3	kept	Pins 'single step' error message for `fields --step all` — catches a regression where a single-step-only command silently iterates (producing N concatenated outputs).	<pending>
+tests/test_cli.py::test_multi_step_rejected_by_compare	3	kept	Same single-step contract as test_multi_step_rejected_by_fields but for compare — catches sibling-command drift in the multi-step-rejection logic.	<pending>
+tests/test_cli.py::test_bad_log_level	3	kept	Pins 'Invalid --log-level' error substring for bad level — catches a regression where the top-level --log-level callback swallows the value without validation.	<pending>
+tests/test_cli.py::test_bad_metric	3	kept	Pins 'Invalid --metric' error — catches a regression where compare accepts arbitrary metric strings and dispatches to an undefined branch (typically producing NaN silently).	<pending>
+tests/test_cli.py::test_bad_units	3	kept	Pins 'Invalid --units' error for 'cgs' (an unsupported unit system) — catches a silent-fallback-to-code-units bug.	<pending>
+tests/test_cli.py::test_bad_nan_policy	3	kept	Pins 'Invalid --nan-policy' error for 'ignore' (valid values are omit/propagate/raise) — catches a typo-tolerance bug where the CLI accepts unknown policy strings.	<pending>
+tests/test_cli.py::test_log_level_not_sticky	3	kept	Pins logging.basicConfig(force=True) — catches a regression where a prior debug-level invocation leaks level state to subsequent -q invocations (documented bug class in the docstring).	<pending>
 tests/test_cli.py::test_missing_field_stats	0	not-yet-reviewed		
 tests/test_cli.py::test_missing_field_compare	0	not-yet-reviewed		
 tests/test_cli.py::test_quiet_flag	0	not-yet-reviewed		

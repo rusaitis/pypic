@@ -213,9 +213,11 @@ def test_stats_multi_step(tmp_path):
     d = _make_sim_dir(tmp_path, n_steps=3)
     result = runner.invoke(app, ["stats", str(d), "--field", "B1", "--step", "all"])
     assert result.exit_code == 0, result.output
-    # Should have a header row and 3 data rows
+    # Field-header + table-header + 3 data rows = 5 non-blank lines.
+    # Pinning the exact count catches silent row-duplication / missing-row
+    # regressions that the old `>= 4` lower bound would have masked.
     lines = [ln for ln in result.output.strip().splitlines() if ln.strip()]
-    assert len(lines) >= 4  # header + label + 3 data rows
+    assert len(lines) == 5
 
 
 def test_stats_multi_step_json(tmp_path):
@@ -250,6 +252,18 @@ def test_compare_all_fields(tmp_path):
     assert result.exit_code == 0, result.output
     assert "B1" in result.output
     assert "B2" in result.output
+    # Self-compare must yield exact zeros on every row — guards against a
+    # silent drift in the compare pipeline (e.g. spurious float cast,
+    # wrong normalization branch, or accidental rtol-based "close enough"
+    # masking real non-zero differences).
+    for field in ("B1", "B2", "B3"):
+        row = next(
+            ln for ln in result.output.splitlines() if ln.lstrip().startswith(field)
+        )
+        # Extract the two numeric columns after the field name.
+        parts = row.split()
+        assert float(parts[1]) == 0.0, row
+        assert float(parts[2]) == 0.0, row
 
 
 def test_compare_json(tmp_path):
@@ -272,6 +286,11 @@ def test_bad_step(tmp_path):
     d = _make_sim_dir(tmp_path)
     result = runner.invoke(app, ["fields", str(d), "--step", "banana"])
     assert result.exit_code != 0
+    # Error message must name the offending value so users can fix typos.
+    # Pinning this guards against a regression where typer.BadParameter is
+    # swallowed or the "Invalid --step value {raw!r}" formatting drops the
+    # user's input (parse_steps in cli.py:127-134).
+    assert "banana" in result.output
 
 
 def test_step_not_available(tmp_path):
