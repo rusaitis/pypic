@@ -633,56 +633,56 @@ tests/test_fields.py::test_unit_label[beta-False-]	11	kept	Pins dimensionless qu
 tests/test_fields.py::test_unit_label[v_A-True-m/s]	11	kept	Pins unit_label('v_A', si=True) == 'm/s'; catches a velocity-vs-speed unit confusion on Alfven speed.	41d47fc
 tests/test_fields.py::TestQuantityUnits::test_known_type	11	kept	Pins quantity_units('b_field')='T', 'pressure'='Pa', 'dimensionless'=''; catches a table reshuffle affecting three common quantity types.	41d47fc
 tests/test_fields.py::TestQuantityUnits::test_unknown_raises	11	kept	Pins KeyError on unknown quantity type — guards fail-loud semantics for invalid user-supplied type strings.	41d47fc
-tests/test_fields.py::TestFieldDatasetFieldInfo::test_resolves_canonical_and_alias	12	kept	Pins latex ($\beta$) and long_name (Magnetic field x-component) on both canonical and alias lookup through FieldDataset — guards schema.md field-label contract.	<pending>
-tests/test_fields.py::TestXarrayAttrs::test_known_field_has_attrs	12	kept	Pins xarray attrs long_name/units for B1 and rho_m — catches from_arrays metadata-attachment regressions.	<pending>
-tests/test_fields.py::TestXarrayAttrs::test_unknown_field_no_attrs	12	kept	Negative-contract test: custom field must not receive long_name/units attrs — guards against registry pollution.	<pending>
-tests/test_fields.py::TestFieldSiFactorRegression::test_all_canonical_names_return_float	12	kept	Structural invariant: every _FIELD_INFO entry must return a float si_factor. Broad-coverage single assertion over registry.	<pending>
-tests/test_fields.py::TestFieldSiFactorRegression::test_alias_matches_canonical	12	kept	Bx and B1 must resolve to the same si_factor — guards the alias-to-canonical round-trip.	<pending>
-tests/test_fields.py::TestFieldSiFactorRegression::test_species_pattern	12	kept	n_s5 (species-pattern path) must return a float — guards regex-based lookup in field_si_factor.	<pending>
-tests/test_fields.py::TestGeometryAwareLabels::test_vector_components[B1-axes0-Magnetic field x-component-$B_x$]	12	kept	Parametrized row pinning Cartesian x-component long_name+latex. Cartesian axes sweep.	<pending>
-tests/test_fields.py::TestGeometryAwareLabels::test_vector_components[B2-axes1-Magnetic field y-component-$B_y$]	12	kept	Parametrized row pinning Cartesian y-component long_name+latex.	<pending>
-tests/test_fields.py::TestGeometryAwareLabels::test_vector_components[B1-axes2-Magnetic field r-component-$B_r$]	12	kept	Parametrized row pinning spherical r-component long_name+latex.	<pending>
-tests/test_fields.py::TestGeometryAwareLabels::test_vector_components[B2-axes3-Magnetic field \u03b8-component-$B_{\\theta}$]	12	kept	Parametrized row pinning spherical θ-component with escaped-unicode latex.	<pending>
-tests/test_fields.py::TestGeometryAwareLabels::test_vector_components[V2-axes4-Bulk velocity \u03c6-component-$V_{\\phi}$]	12	kept	Parametrized row pinning cylindrical φ-component long_name+latex.	<pending>
-tests/test_fields.py::TestGeometryAwareLabels::test_electron_velocity	12	kept	Pins Ve1 electron-velocity latex $V_{e,x}$ — guards the 'Ve' species-aware label template.	<pending>
-tests/test_fields.py::TestGeometryAwareLabels::test_background_b	12	kept	Pins B0_1 background-field latex $B_{0,x}$ — guards the split-B underscore-separator naming convention.	<pending>
-tests/test_fields.py::TestGeometryAwareLabels::test_curl_component	12	kept	Pins curl_B1 latex $(\nabla \times B)_x$ — guards the curl naming template.	<pending>
-tests/test_fields.py::TestGeometryAwareLabels::test_species_component	12	kept	Pins J1_s2 latex $J_{x,s2}$ — guards combined vector-index+species-index label template.	<pending>
-tests/test_fields.py::TestGeometryAwareLabels::test_no_geometry_unchanged	12	kept	Fallback path: without axis_names, B1 resolves to 'Magnetic field component 1' / $B_1$. Critical contract boundary.	<pending>
-tests/test_fields.py::TestGeometryAwareLabels::test_scalar_unaffected	12	kept	Scalar fields (|B|, beta, rho_m) must be identical with and without axis_names. Guards against spurious localization.	<pending>
-tests/test_fields.py::TestGeometryAwareLabels::test_vorticity_component	12	kept	Pins vort1 latex $\omega_x$ — guards vorticity naming (distinct from curl).	<pending>
-tests/test_fields.py::TestGeometryAwareLabels::test_poynting_flux_spherical	12	kept	Pins S2 spherical latex $S_{\theta}$ — guards Poynting-flux label in spherical geometry.	<pending>
-tests/test_fields.py::TestGeometryAwareLabels::test_species_electron_velocity_component	12	kept	Pins Ve2_s1 latex $V_{e,y,s1}$ — guards triple-subscript (species+electron+component) label template.	<pending>
-tests/test_fields.py::TestNewFieldEntries::test_dimensionless_entry[gamma_L-$\\gamma$]	12	kept	Pins gamma_L quantity_type=dimensionless and latex=$\gamma$. Relativistic-field registry entry.	<pending>
-tests/test_fields.py::TestNewFieldEntries::test_dimensionless_entry[sigma-$\\sigma$]	12	kept	Pins sigma (magnetization) dimensionless + latex. Schema.md §8 relativistic.	<pending>
-tests/test_fields.py::TestNewFieldEntries::test_dimensionless_entry[gamma_eos-$\\gamma_{eos}$]	12	kept	Pins gamma_eos (adiabatic index) dimensionless + subscripted latex.	<pending>
-tests/test_fields.py::TestNewFieldEntries::test_high_species_index	12	kept	n_s99 must hit regex path and yield long_name='Number density (species 99)'. Guards species-index upper bound.	<pending>
-tests/test_fields.py::TestNewFieldEntries::test_pressure_scalar_species_s0_alias	12	kept	P_s0 must resolve via alias to 'Electron pressure'. Guards the hardcoded electron-alias convention in schema.md §3.	<pending>
-tests/test_fields.py::TestNewFieldEntries::test_pressure_scalar_species_s3	12	kept	P_s3 (no alias, species ≥ 2) uses regex path with pinned long_name+latex.	<pending>
-tests/test_fields.py::TestNewFieldEntries::test_pressure_tensor_species	12	kept	P11_s2 pressure-tensor-with-species latex $P_{11,s2}$. Pins the full tensor naming pattern.	<pending>
-tests/test_fields.py::TestQuantityTypeCoverage::test_quantity_types_complete	12	kept	Cross-registry invariant: si_factor_types == unit_label_types set equality. Guards registry synchronization.	<pending>
-tests/test_fields.py::TestQuantityTypeCoverage::test_species_patterns_have_known_quantity_types	12	kept	Every _SPECIES_INFO_PATTERNS entry must reference a registered quantity_type. Guards regex-registry consistency.	<pending>
-tests/test_fields.py::TestFieldRegistration::test_register_and_lookup	12	kept	Basic round-trip for register_field/field_info with custom long_name and latex.	<pending>
-tests/test_fields.py::TestFieldRegistration::test_register_enables_si_factor	12	kept	Registered field must resolve via field_si_factor — guards the field_si_factor registry lookup path.	<pending>
-tests/test_fields.py::TestFieldRegistration::test_register_auto_fills_si_unit	12	kept	Auto-fill: register_field without si_unit pulls from _QUANTITY_UNITS. Pressure→Pa.	<pending>
-tests/test_fields.py::TestFieldRegistration::test_register_custom_si_unit	12	kept	Explicit si_unit override wins over auto-fill. Pressure field with 'nPa' unit.	<pending>
-tests/test_fields.py::TestFieldRegistration::test_register_invalid_quantity_type	12	kept	register_field with unknown quantity_type must raise ValueError.	<pending>
-tests/test_fields.py::TestFieldRegistration::test_unregister	12	kept	unregister_field followed by field_info must raise KeyError. Round-trip negative contract.	<pending>
-tests/test_fields.py::TestFieldRegistration::test_unregister_nonexistent	12	kept	unregister_field on unknown name must raise KeyError with 'No field metadata' message.	<pending>
-tests/test_fields.py::TestFieldRegistration::test_overwrite_warns	12	kept	register_field over an existing name must emit WARNING log and apply the new entry.	<pending>
-tests/test_fields.py::TestFieldRegistration::test_register_visible_to_si_factor	12	kept	Registered field must immediately be visible to field_si_factor (no cache staleness).	<pending>
-tests/test_fields.py::TestFieldRegistration::test_register_with_enum	12	kept	register_field accepts QuantityType enum (not just string). StrEnum coercion contract.	<pending>
-tests/test_fields.py::TestQuantityType::test_covers_all_quantity_units	12	kept	QuantityType StrEnum value set == _QUANTITY_UNITS key set. Guards enum completeness.	<pending>
-tests/test_fields.py::TestQuantityType::test_strenum_equality_with_strings	12	kept	QuantityType.B_FIELD == 'b_field' — StrEnum string-interop contract.	<pending>
-tests/test_fields.py::TestQuantityType::test_usable_as_dict_key	12	kept	_QUANTITY_UNITS[QuantityType.PRESSURE] works — enum as dict key contract.	<pending>
-tests/test_fields.py::TestWithField::test_basic	12	kept	with_field basic round-trip: custom dimensionless field retrievable with same values.	<pending>
-tests/test_fields.py::TestWithField::test_in_si_via_attrs	12	kept	with_field VELOCITY type must propagate to in_si via attrs — guards attrs-driven SI conversion path.	<pending>
-tests/test_fields.py::TestWithField::test_field_info_from_attrs	12	kept	with_field custom long_name+latex must survive and override registry for field_info lookups.	<pending>
-tests/test_fields.py::TestWithField::test_survives_isel	12	kept	with_field metadata must survive isel slicing — guards attrs-preservation across xarray ops.	<pending>
-tests/test_fields.py::TestWithField::test_survives_plane_selection	12	kept	with_field metadata must survive PlaneSelection — guards attrs-preservation across pypic Selection ops.	<pending>
-tests/test_fields.py::TestWithField::test_invalid_quantity_type	12	kept	with_field with unknown quantity_type must raise ValueError.	<pending>
-tests/test_fields.py::TestWithField::test_immutable_original	12	kept	with_field returns new FieldDataset — original field_names set unchanged. Immutability contract.	<pending>
-tests/test_fields.py::TestWithField::test_string_quantity_type	12	kept	with_field accepts string (not only enum) quantity_type with full SI-unit derivation.	<pending>
+tests/test_fields.py::TestFieldDatasetFieldInfo::test_resolves_canonical_and_alias	12	kept	Pins latex ($\beta$) and long_name (Magnetic field x-component) on both canonical and alias lookup through FieldDataset — guards schema.md field-label contract.	6a3296e783fe03337b20fd29d96551f0f6e19353
+tests/test_fields.py::TestXarrayAttrs::test_known_field_has_attrs	12	kept	Pins xarray attrs long_name/units for B1 and rho_m — catches from_arrays metadata-attachment regressions.	6a3296e783fe03337b20fd29d96551f0f6e19353
+tests/test_fields.py::TestXarrayAttrs::test_unknown_field_no_attrs	12	kept	Negative-contract test: custom field must not receive long_name/units attrs — guards against registry pollution.	6a3296e783fe03337b20fd29d96551f0f6e19353
+tests/test_fields.py::TestFieldSiFactorRegression::test_all_canonical_names_return_float	12	kept	Structural invariant: every _FIELD_INFO entry must return a float si_factor. Broad-coverage single assertion over registry.	6a3296e783fe03337b20fd29d96551f0f6e19353
+tests/test_fields.py::TestFieldSiFactorRegression::test_alias_matches_canonical	12	kept	Bx and B1 must resolve to the same si_factor — guards the alias-to-canonical round-trip.	6a3296e783fe03337b20fd29d96551f0f6e19353
+tests/test_fields.py::TestFieldSiFactorRegression::test_species_pattern	12	kept	n_s5 (species-pattern path) must return a float — guards regex-based lookup in field_si_factor.	6a3296e783fe03337b20fd29d96551f0f6e19353
+tests/test_fields.py::TestGeometryAwareLabels::test_vector_components[B1-axes0-Magnetic field x-component-$B_x$]	12	kept	Parametrized row pinning Cartesian x-component long_name+latex. Cartesian axes sweep.	6a3296e783fe03337b20fd29d96551f0f6e19353
+tests/test_fields.py::TestGeometryAwareLabels::test_vector_components[B2-axes1-Magnetic field y-component-$B_y$]	12	kept	Parametrized row pinning Cartesian y-component long_name+latex.	6a3296e783fe03337b20fd29d96551f0f6e19353
+tests/test_fields.py::TestGeometryAwareLabels::test_vector_components[B1-axes2-Magnetic field r-component-$B_r$]	12	kept	Parametrized row pinning spherical r-component long_name+latex.	6a3296e783fe03337b20fd29d96551f0f6e19353
+tests/test_fields.py::TestGeometryAwareLabels::test_vector_components[B2-axes3-Magnetic field \u03b8-component-$B_{\\theta}$]	12	kept	Parametrized row pinning spherical θ-component with escaped-unicode latex.	6a3296e783fe03337b20fd29d96551f0f6e19353
+tests/test_fields.py::TestGeometryAwareLabels::test_vector_components[V2-axes4-Bulk velocity \u03c6-component-$V_{\\phi}$]	12	kept	Parametrized row pinning cylindrical φ-component long_name+latex.	6a3296e783fe03337b20fd29d96551f0f6e19353
+tests/test_fields.py::TestGeometryAwareLabels::test_electron_velocity	12	kept	Pins Ve1 electron-velocity latex $V_{e,x}$ — guards the 'Ve' species-aware label template.	6a3296e783fe03337b20fd29d96551f0f6e19353
+tests/test_fields.py::TestGeometryAwareLabels::test_background_b	12	kept	Pins B0_1 background-field latex $B_{0,x}$ — guards the split-B underscore-separator naming convention.	6a3296e783fe03337b20fd29d96551f0f6e19353
+tests/test_fields.py::TestGeometryAwareLabels::test_curl_component	12	kept	Pins curl_B1 latex $(\nabla \times B)_x$ — guards the curl naming template.	6a3296e783fe03337b20fd29d96551f0f6e19353
+tests/test_fields.py::TestGeometryAwareLabels::test_species_component	12	kept	Pins J1_s2 latex $J_{x,s2}$ — guards combined vector-index+species-index label template.	6a3296e783fe03337b20fd29d96551f0f6e19353
+tests/test_fields.py::TestGeometryAwareLabels::test_no_geometry_unchanged	12	kept	Fallback path: without axis_names, B1 resolves to 'Magnetic field component 1' / $B_1$. Critical contract boundary.	6a3296e783fe03337b20fd29d96551f0f6e19353
+tests/test_fields.py::TestGeometryAwareLabels::test_scalar_unaffected	12	kept	Scalar fields (|B|, beta, rho_m) must be identical with and without axis_names. Guards against spurious localization.	6a3296e783fe03337b20fd29d96551f0f6e19353
+tests/test_fields.py::TestGeometryAwareLabels::test_vorticity_component	12	kept	Pins vort1 latex $\omega_x$ — guards vorticity naming (distinct from curl).	6a3296e783fe03337b20fd29d96551f0f6e19353
+tests/test_fields.py::TestGeometryAwareLabels::test_poynting_flux_spherical	12	kept	Pins S2 spherical latex $S_{\theta}$ — guards Poynting-flux label in spherical geometry.	6a3296e783fe03337b20fd29d96551f0f6e19353
+tests/test_fields.py::TestGeometryAwareLabels::test_species_electron_velocity_component	12	kept	Pins Ve2_s1 latex $V_{e,y,s1}$ — guards triple-subscript (species+electron+component) label template.	6a3296e783fe03337b20fd29d96551f0f6e19353
+tests/test_fields.py::TestNewFieldEntries::test_dimensionless_entry[gamma_L-$\\gamma$]	12	kept	Pins gamma_L quantity_type=dimensionless and latex=$\gamma$. Relativistic-field registry entry.	6a3296e783fe03337b20fd29d96551f0f6e19353
+tests/test_fields.py::TestNewFieldEntries::test_dimensionless_entry[sigma-$\\sigma$]	12	kept	Pins sigma (magnetization) dimensionless + latex. Schema.md §8 relativistic.	6a3296e783fe03337b20fd29d96551f0f6e19353
+tests/test_fields.py::TestNewFieldEntries::test_dimensionless_entry[gamma_eos-$\\gamma_{eos}$]	12	kept	Pins gamma_eos (adiabatic index) dimensionless + subscripted latex.	6a3296e783fe03337b20fd29d96551f0f6e19353
+tests/test_fields.py::TestNewFieldEntries::test_high_species_index	12	kept	n_s99 must hit regex path and yield long_name='Number density (species 99)'. Guards species-index upper bound.	6a3296e783fe03337b20fd29d96551f0f6e19353
+tests/test_fields.py::TestNewFieldEntries::test_pressure_scalar_species_s0_alias	12	kept	P_s0 must resolve via alias to 'Electron pressure'. Guards the hardcoded electron-alias convention in schema.md §3.	6a3296e783fe03337b20fd29d96551f0f6e19353
+tests/test_fields.py::TestNewFieldEntries::test_pressure_scalar_species_s3	12	kept	P_s3 (no alias, species ≥ 2) uses regex path with pinned long_name+latex.	6a3296e783fe03337b20fd29d96551f0f6e19353
+tests/test_fields.py::TestNewFieldEntries::test_pressure_tensor_species	12	kept	P11_s2 pressure-tensor-with-species latex $P_{11,s2}$. Pins the full tensor naming pattern.	6a3296e783fe03337b20fd29d96551f0f6e19353
+tests/test_fields.py::TestQuantityTypeCoverage::test_quantity_types_complete	12	kept	Cross-registry invariant: si_factor_types == unit_label_types set equality. Guards registry synchronization.	6a3296e783fe03337b20fd29d96551f0f6e19353
+tests/test_fields.py::TestQuantityTypeCoverage::test_species_patterns_have_known_quantity_types	12	kept	Every _SPECIES_INFO_PATTERNS entry must reference a registered quantity_type. Guards regex-registry consistency.	6a3296e783fe03337b20fd29d96551f0f6e19353
+tests/test_fields.py::TestFieldRegistration::test_register_and_lookup	12	kept	Basic round-trip for register_field/field_info with custom long_name and latex.	6a3296e783fe03337b20fd29d96551f0f6e19353
+tests/test_fields.py::TestFieldRegistration::test_register_enables_si_factor	12	kept	Registered field must resolve via field_si_factor — guards the field_si_factor registry lookup path.	6a3296e783fe03337b20fd29d96551f0f6e19353
+tests/test_fields.py::TestFieldRegistration::test_register_auto_fills_si_unit	12	kept	Auto-fill: register_field without si_unit pulls from _QUANTITY_UNITS. Pressure→Pa.	6a3296e783fe03337b20fd29d96551f0f6e19353
+tests/test_fields.py::TestFieldRegistration::test_register_custom_si_unit	12	kept	Explicit si_unit override wins over auto-fill. Pressure field with 'nPa' unit.	6a3296e783fe03337b20fd29d96551f0f6e19353
+tests/test_fields.py::TestFieldRegistration::test_register_invalid_quantity_type	12	kept	register_field with unknown quantity_type must raise ValueError.	6a3296e783fe03337b20fd29d96551f0f6e19353
+tests/test_fields.py::TestFieldRegistration::test_unregister	12	kept	unregister_field followed by field_info must raise KeyError. Round-trip negative contract.	6a3296e783fe03337b20fd29d96551f0f6e19353
+tests/test_fields.py::TestFieldRegistration::test_unregister_nonexistent	12	kept	unregister_field on unknown name must raise KeyError with 'No field metadata' message.	6a3296e783fe03337b20fd29d96551f0f6e19353
+tests/test_fields.py::TestFieldRegistration::test_overwrite_warns	12	kept	register_field over an existing name must emit WARNING log and apply the new entry.	6a3296e783fe03337b20fd29d96551f0f6e19353
+tests/test_fields.py::TestFieldRegistration::test_register_visible_to_si_factor	12	kept	Registered field must immediately be visible to field_si_factor (no cache staleness).	6a3296e783fe03337b20fd29d96551f0f6e19353
+tests/test_fields.py::TestFieldRegistration::test_register_with_enum	12	kept	register_field accepts QuantityType enum (not just string). StrEnum coercion contract.	6a3296e783fe03337b20fd29d96551f0f6e19353
+tests/test_fields.py::TestQuantityType::test_covers_all_quantity_units	12	kept	QuantityType StrEnum value set == _QUANTITY_UNITS key set. Guards enum completeness.	6a3296e783fe03337b20fd29d96551f0f6e19353
+tests/test_fields.py::TestQuantityType::test_strenum_equality_with_strings	12	kept	QuantityType.B_FIELD == 'b_field' — StrEnum string-interop contract.	6a3296e783fe03337b20fd29d96551f0f6e19353
+tests/test_fields.py::TestQuantityType::test_usable_as_dict_key	12	kept	_QUANTITY_UNITS[QuantityType.PRESSURE] works — enum as dict key contract.	6a3296e783fe03337b20fd29d96551f0f6e19353
+tests/test_fields.py::TestWithField::test_basic	12	kept	with_field basic round-trip: custom dimensionless field retrievable with same values.	6a3296e783fe03337b20fd29d96551f0f6e19353
+tests/test_fields.py::TestWithField::test_in_si_via_attrs	12	kept	with_field VELOCITY type must propagate to in_si via attrs — guards attrs-driven SI conversion path.	6a3296e783fe03337b20fd29d96551f0f6e19353
+tests/test_fields.py::TestWithField::test_field_info_from_attrs	12	kept	with_field custom long_name+latex must survive and override registry for field_info lookups.	6a3296e783fe03337b20fd29d96551f0f6e19353
+tests/test_fields.py::TestWithField::test_survives_isel	12	kept	with_field metadata must survive isel slicing — guards attrs-preservation across xarray ops.	6a3296e783fe03337b20fd29d96551f0f6e19353
+tests/test_fields.py::TestWithField::test_survives_plane_selection	12	kept	with_field metadata must survive PlaneSelection — guards attrs-preservation across pypic Selection ops.	6a3296e783fe03337b20fd29d96551f0f6e19353
+tests/test_fields.py::TestWithField::test_invalid_quantity_type	12	kept	with_field with unknown quantity_type must raise ValueError.	6a3296e783fe03337b20fd29d96551f0f6e19353
+tests/test_fields.py::TestWithField::test_immutable_original	12	kept	with_field returns new FieldDataset — original field_names set unchanged. Immutability contract.	6a3296e783fe03337b20fd29d96551f0f6e19353
+tests/test_fields.py::TestWithField::test_string_quantity_type	12	kept	with_field accepts string (not only enum) quantity_type with full SI-unit derivation.	6a3296e783fe03337b20fd29d96551f0f6e19353
 tests/test_fields.py::TestAttrsOverrideRegistry::test_field_info_uses_attrs_over_registry	0	not-yet-reviewed		
 tests/test_fields.py::TestAttrsOverrideRegistry::test_in_si_uses_attrs_over_registry	0	not-yet-reviewed		
 tests/test_fields.py::TestFromArraysQuantityTypeAttr::test_canonical_field_has_quantity_type	0	not-yet-reviewed		
