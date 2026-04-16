@@ -91,9 +91,12 @@ def test_non_ideal_plus_ideal_equals_total_e(
     """
     ep1, ep2, ep3 = non_ideal_electric_field(e1, e2, e3, v1, v2, v3, b1, b2, b3)
     ei1, ei2, ei3 = ideal_electric_field(v1, v2, v3, b1, b2, b3)
-    assert_allclose(ep1 + ei1, e1, rtol=0, atol=1e-14)
-    assert_allclose(ep2 + ei2, e2, rtol=0, atol=1e-14)
-    assert_allclose(ep3 + ei3, e3, rtol=0, atol=1e-14)
+    # V×B products reach ~100 when V, B are both bounded by ±10; the
+    # cancellation ``E + V×B - V×B`` therefore carries roundoff up to
+    # ~100 × eps ≈ 2e-14. 1e-12 absorbs that comfortably.
+    assert_allclose(ep1 + ei1, e1, rtol=0, atol=1e-12)
+    assert_allclose(ep2 + ei2, e2, rtol=0, atol=1e-12)
+    assert_allclose(ep3 + ei3, e3, rtol=0, atol=1e-12)
 
 
 @given(
