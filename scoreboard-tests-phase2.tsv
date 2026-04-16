@@ -835,91 +835,91 @@ tests/test_ipic3d_synthetic.py::TestConservedQuantitiesSyntheticFormatB::test_de
 tests/test_ipic3d_synthetic.py::TestConservedQuantitiesSyntheticFormatB::test_species_count	15	kept	Pins len(species_npart) == len(species_charge) == len(species_kinetic_energy) == 2; guards against only one of the three species-array families being populated.	7359079
 tests/test_ipic3d_synthetic.py::TestConservedQuantitiesSyntheticFormatB::test_species_arrays_length	14	hardened	Was species_npart-only — species_charge and species_kinetic_energy could be truncated (e.g. parser skips the last line for one column) and pass. Extended to iterate all three families, catching per-column row-count drift.	e7364e2
 tests/test_ipic3d_synthetic.py::TestConservedQuantitiesSyntheticFormatB::test_particle_counts	15	kept	Pins per-cycle particle counts at 1000 for both species arrays; concrete numeric anchor on species_npart independent of the structural test_species_count.	7359079
-tests/test_ipic3d_synthetic.py::TestConservedToTabular::test_structure	16	kept	Pins TabularData name, index_column, and length from cq.cycle; paired with test_values_match for value identity.	<pending>
-tests/test_ipic3d_synthetic.py::TestConservedToTabular::test_columns_present	16	kept	Column-contract anchor: asserts all required total+per-species columns materialize; paired with values_match for identity.	<pending>
-tests/test_ipic3d_synthetic.py::TestConservedToTabular::test_values_match	16	kept	Strong numerical identity check: tabular columns == source ConservedQuantities arrays via assert_allclose for all scalars+species_npart.	<pending>
-tests/test_ipic3d_synthetic.py::TestAuxiliaryErrors::test_unknown_name_raises_key_error	16	kept	Pins KeyError (not ValueError/RuntimeError) + message pattern for unknown dataset — error-contract anchor.	<pending>
-tests/test_ipic3d_synthetic.py::TestAuxiliaryErrors::test_missing_conserved_raises_file_not_found	16	kept	Pins FileNotFoundError (not KeyError) on missing disk file — distinguishes unknown-name vs missing-file branches.	<pending>
-tests/test_ipic3d_synthetic.py::TestAuxiliaryErrors::test_missing_species_quantities_raises_file_not_found	16	kept	Same error contract for species_quantities — separate message pattern verifies the distinct branch.	<pending>
-tests/test_ipic3d_synthetic.py::TestSelectiveReadPhdf5::test_b_fields_only	16	kept	Exact equality on sorted field_names list — catches extra/missing fields when fields={B1,B2,B3}.	<pending>
-tests/test_ipic3d_synthetic.py::TestSelectiveReadPhdf5::test_values_match_full_read	16	kept	Numerical identity via assert_allclose: selective read(B1) bit-matches full read.	<pending>
-tests/test_ipic3d_synthetic.py::TestSelectiveReadPhdf5::test_total_expands_dependencies	16	kept	Semantic guard: rho_c present, per-species rho_c_s0/s1 absent — catches dependency leaks into result.	<pending>
-tests/test_ipic3d_synthetic.py::TestSelectiveReadPhdf5::test_total_value_correct	16	kept	Numerical identity: selective-read rho_c == full-read rho_c; verifies species summation correctness.	<pending>
-tests/test_ipic3d_synthetic.py::TestSelectiveReadPhdf5::test_per_species_without_total	16	kept	Pins three-way set: rho_c_s0 + B1 present, rho_c absent — covers per-species-only branch.	<pending>
-tests/test_ipic3d_synthetic.py::TestSelectiveReadShdf5::test_b_fields_only	16	kept	Serial-format selective read: sorted field_names equality anchor.	<pending>
-tests/test_ipic3d_synthetic.py::TestSelectiveReadShdf5::test_total_value_correct	16	kept	Serial-format numerical identity for J1 selective vs full.	<pending>
-tests/test_ipic3d_synthetic.py::TestSelectiveReadH5hut::test_b_fields_only	16	kept	H5hut selective read: sorted field_names equality.	<pending>
-tests/test_ipic3d_synthetic.py::TestSelectiveReadH5hut::test_total_expands_dependencies	16	kept	H5hut dependency-expansion semantic guard (rho_c present, rho_c_s0 absent).	<pending>
-tests/test_ipic3d_synthetic.py::TestSelectiveReadH5hut::test_total_value_correct	16	kept	H5hut numerical identity: selective rho_c == full rho_c.	<pending>
-tests/test_ipic3d_synthetic.py::TestSelectiveReadH5hut::test_em_and_moment_mix	16	kept	Mixed EM+per-species moment read: asserts exact sorted field_names [B1,J1_s0,rho_c_s0].	<pending>
-tests/test_ipic3d_synthetic.py::TestIPic3DAvailableAuxiliary::test_phdf5_detects_conserved	16	kept	Reader.available_auxiliary detects conserved_quantities in phdf5 directory — registry contract.	<pending>
-tests/test_ipic3d_synthetic.py::TestIPic3DAvailableAuxiliary::test_h5hut_detects_conserved	16	kept	Same detection for H5hut format — covers the sibling reader branch.	<pending>
-tests/test_ipic3d_synthetic.py::TestIPic3DAvailableAuxiliary::test_empty_dir_returns_empty	16	kept	Empty directory → empty list (not error) — negative-space contract.	<pending>
-tests/test_ipic3d_synthetic.py::TestIPic3DLoadAuxiliary::test_phdf5_load_conserved	16	kept	Reader.load_auxiliary returns TabularData with name+key — interface contract.	<pending>
-tests/test_ipic3d_synthetic.py::TestIPic3DLoadAuxiliary::test_h5hut_load_conserved	16	kept	Same for H5hut reader — asserts len>0 to catch empty-returns.	<pending>
-tests/test_ipic3d_synthetic.py::TestIPic3DLoadAuxiliary::test_unknown_name_raises	16	kept	Reader interface forwards KeyError for unknown dataset name — fail-loud contract.	<pending>
+tests/test_ipic3d_synthetic.py::TestConservedToTabular::test_structure	16	kept	Pins TabularData name, index_column, and length from cq.cycle; paired with test_values_match for value identity.	cba381f
+tests/test_ipic3d_synthetic.py::TestConservedToTabular::test_columns_present	16	kept	Column-contract anchor: asserts all required total+per-species columns materialize; paired with values_match for identity.	cba381f
+tests/test_ipic3d_synthetic.py::TestConservedToTabular::test_values_match	16	kept	Strong numerical identity check: tabular columns == source ConservedQuantities arrays via assert_allclose for all scalars+species_npart.	cba381f
+tests/test_ipic3d_synthetic.py::TestAuxiliaryErrors::test_unknown_name_raises_key_error	16	kept	Pins KeyError (not ValueError/RuntimeError) + message pattern for unknown dataset — error-contract anchor.	cba381f
+tests/test_ipic3d_synthetic.py::TestAuxiliaryErrors::test_missing_conserved_raises_file_not_found	16	kept	Pins FileNotFoundError (not KeyError) on missing disk file — distinguishes unknown-name vs missing-file branches.	cba381f
+tests/test_ipic3d_synthetic.py::TestAuxiliaryErrors::test_missing_species_quantities_raises_file_not_found	16	kept	Same error contract for species_quantities — separate message pattern verifies the distinct branch.	cba381f
+tests/test_ipic3d_synthetic.py::TestSelectiveReadPhdf5::test_b_fields_only	16	kept	Exact equality on sorted field_names list — catches extra/missing fields when fields={B1,B2,B3}.	cba381f
+tests/test_ipic3d_synthetic.py::TestSelectiveReadPhdf5::test_values_match_full_read	16	kept	Numerical identity via assert_allclose: selective read(B1) bit-matches full read.	cba381f
+tests/test_ipic3d_synthetic.py::TestSelectiveReadPhdf5::test_total_expands_dependencies	16	kept	Semantic guard: rho_c present, per-species rho_c_s0/s1 absent — catches dependency leaks into result.	cba381f
+tests/test_ipic3d_synthetic.py::TestSelectiveReadPhdf5::test_total_value_correct	16	kept	Numerical identity: selective-read rho_c == full-read rho_c; verifies species summation correctness.	cba381f
+tests/test_ipic3d_synthetic.py::TestSelectiveReadPhdf5::test_per_species_without_total	16	kept	Pins three-way set: rho_c_s0 + B1 present, rho_c absent — covers per-species-only branch.	cba381f
+tests/test_ipic3d_synthetic.py::TestSelectiveReadShdf5::test_b_fields_only	16	kept	Serial-format selective read: sorted field_names equality anchor.	cba381f
+tests/test_ipic3d_synthetic.py::TestSelectiveReadShdf5::test_total_value_correct	16	kept	Serial-format numerical identity for J1 selective vs full.	cba381f
+tests/test_ipic3d_synthetic.py::TestSelectiveReadH5hut::test_b_fields_only	16	kept	H5hut selective read: sorted field_names equality.	cba381f
+tests/test_ipic3d_synthetic.py::TestSelectiveReadH5hut::test_total_expands_dependencies	16	kept	H5hut dependency-expansion semantic guard (rho_c present, rho_c_s0 absent).	cba381f
+tests/test_ipic3d_synthetic.py::TestSelectiveReadH5hut::test_total_value_correct	16	kept	H5hut numerical identity: selective rho_c == full rho_c.	cba381f
+tests/test_ipic3d_synthetic.py::TestSelectiveReadH5hut::test_em_and_moment_mix	16	kept	Mixed EM+per-species moment read: asserts exact sorted field_names [B1,J1_s0,rho_c_s0].	cba381f
+tests/test_ipic3d_synthetic.py::TestIPic3DAvailableAuxiliary::test_phdf5_detects_conserved	16	kept	Reader.available_auxiliary detects conserved_quantities in phdf5 directory — registry contract.	cba381f
+tests/test_ipic3d_synthetic.py::TestIPic3DAvailableAuxiliary::test_h5hut_detects_conserved	16	kept	Same detection for H5hut format — covers the sibling reader branch.	cba381f
+tests/test_ipic3d_synthetic.py::TestIPic3DAvailableAuxiliary::test_empty_dir_returns_empty	16	kept	Empty directory → empty list (not error) — negative-space contract.	cba381f
+tests/test_ipic3d_synthetic.py::TestIPic3DLoadAuxiliary::test_phdf5_load_conserved	16	kept	Reader.load_auxiliary returns TabularData with name+key — interface contract.	cba381f
+tests/test_ipic3d_synthetic.py::TestIPic3DLoadAuxiliary::test_h5hut_load_conserved	16	kept	Same for H5hut reader — asserts len>0 to catch empty-returns.	cba381f
+tests/test_ipic3d_synthetic.py::TestIPic3DLoadAuxiliary::test_unknown_name_raises	16	kept	Reader interface forwards KeyError for unknown dataset name — fail-loud contract.	cba381f
 tests/test_ipic3d_synthetic.py::TestShdf5PressureTensor::test_diagonal_pressure_positive[0]	14	dropped	Positivity of shdf5 P11/P22/P33 for species 0 is transitively pinned: test_pressure_values_match_phdf5 asserts shdf5 == phdf5 at atol=1e-12 AND TestPhdf5Reader::test_diagonal_pressure_positive[0] pins phdf5 positivity. No bug class remains that this alone catches.	e7364e2
 tests/test_ipic3d_synthetic.py::TestShdf5PressureTensor::test_diagonal_pressure_positive[1]	14	dropped	Same reasoning as [0] for species 1: phdf5 positivity test plus shdf5==phdf5 match_phdf5 test jointly pin shdf5 positivity to machine precision. Redundant.	e7364e2
-tests/test_ipic3d_synthetic.py::TestShdf5PressureTensor::test_pressure_values_match_phdf5	16	kept	Cross-format identity: all 6 pressure components × 2 species, atol=1e-12 — strong sibling-reader parity test.	<pending>
-tests/test_ipic3d_synthetic.py::TestShdf5PressureTensor::test_off_diagonal_pressure_zero	16	kept	Pins P12=P13=P23=0 from isotropic-Maxwellian fixture — catches spurious off-diagonal contamination.	<pending>
-tests/test_ipic3d_synthetic.py::TestEnergyFluxPhdf5::test_eflux_present	16	kept	has_field anchor for EF1/EF2/EF3 × 2 species = 6 assertions; paired with 4pi-corrected and shape tests.	<pending>
-tests/test_ipic3d_synthetic.py::TestEnergyFluxPhdf5::test_eflux_shape	16	kept	Shape pin (NX,NY,NZ) for EF1_s0 — small but specific; paired with value-identity tests.	<pending>
-tests/test_ipic3d_synthetic.py::TestEnergyFluxPhdf5::test_eflux_4pi_corrected	16	hardened	Added EF3_s0 and EF3_s1 assertions (non-zero drifts W0=0.001/-0.064): prior form only checked EF1_s0=0 which was vacuous (U0=0). New form pins the 4π factor — without it EF3 would differ by ~12.57×.	<pending>
-tests/test_ipic3d_synthetic.py::TestEnergyFluxShdf5::test_eflux_matches_phdf5	16	kept	Cross-format identity: all 6 EF components × 2 species, atol=1e-12 — strong sibling parity.	<pending>
-tests/test_ipic3d_synthetic.py::TestEnergyFluxH5hut::test_eflux_present	16	kept	has_field(EF1_s{0,1}) — paired with matches_phdf5 identity test; retained as presence anchor.	<pending>
-tests/test_ipic3d_synthetic.py::TestEnergyFluxH5hut::test_eflux_matches_phdf5	16	kept	H5hut↔phdf5 EF identity, atol=1e-5 (lower precision is H5hut float32 source storage).	<pending>
-tests/test_ipic3d_synthetic.py::TestFieldOutputTag::test_field_output_tag_parsed	16	kept	Pins 'pressure' and 'E_flux' substrings in FieldOutputTag — catches dropped-token parse bugs.	<pending>
-tests/test_ipic3d_synthetic.py::TestFieldOutputTag::test_particles_output_cycle_parsed	16	kept	Pins particles_output_cycle == 10 — exact integer anchor.	<pending>
-tests/test_ipic3d_synthetic.py::TestFieldOutputTag::test_field_output_tag_in_metadata	16	hardened	Replaced two `in sim_cfg.metadata` presence checks with value assertions (pressure/E_flux substrings + particles_output_cycle==10); catches dropped-key AND mis-copied-value bugs.	<pending>
-tests/test_ipic3d_synthetic.py::TestFieldOutputTag::test_settings_hdf_defaults	16	kept	Pins settings.hdf defaults (empty tag, cycle=0) — covers the no-inp fallback branch.	<pending>
-tests/test_ipic3d_synthetic.py::TestSpeciesQuantities::test_load_species_quantities	16	kept	Pins name='species_quantities', index_column='cycle', len==3 — structural anchor.	<pending>
-tests/test_ipic3d_synthetic.py::TestSpeciesQuantities::test_columns_present	16	kept	Column contract: momentum/total_ke/bulk_ke/thermal_ke × 2 species = 8 assertions.	<pending>
-tests/test_ipic3d_synthetic.py::TestSpeciesQuantities::test_values_correct	16	kept	Exact numeric pins: momentum_s0[0]=1e-3, thermal_ke_s1[0]=0.22 with rtol=1e-10 — column-to-value identity.	<pending>
-tests/test_ipic3d_synthetic.py::TestSpeciesQuantities::test_detect_species_quantities	16	kept	Sole registry coverage for species_quantities detection — unique branch.	<pending>
-tests/test_ipic3d_synthetic.py::TestSpeciesQuantities::test_load_via_auxiliary_interface	16	kept	Reader.load_auxiliary wires through to species_quantities (TabularData + column presence).	<pending>
-tests/test_ipic3d_synthetic.py::TestProbeImprovements::test_phdf5_with_moments_higher_confidence	16	hardened	Replaced loose `score >= 0.5` with exact `pytest.approx(0.75)` — the loose bound didn't distinguish .inp-only (0.5) from full (.inp+Moments+Particles=0.75), missing dropped reinforcement signals.	<pending>
-tests/test_ipic3d_synthetic.py::TestProbeImprovements::test_moments_detected_in_phdf5	16	hardened	Replaced `>= 0.35` with exact `pytest.approx(0.35)`: loose bound accepted Fields-only (0.2) or Moments-only paths that shouldn't match; now pins Fields+Moments sum.	<pending>
-tests/test_ipic3d_synthetic.py::TestProbeImprovements::test_particles_detected_in_phdf5	16	hardened	Replaced `>= 0.3` with exact `pytest.approx(0.30)`: pins Fields(0.2)+Particles(0.1) sum.	<pending>
-tests/test_openggcm.py::TestUnitConversions::test_velocity_to_si	16	kept	Exact conversion pin km/s→m/s: 500→5e5 via assert_allclose.	<pending>
-tests/test_openggcm.py::TestUnitConversions::test_bfield_to_si	16	kept	Exact pin nT→T: 10→10e-9.	<pending>
-tests/test_openggcm.py::TestUnitConversions::test_density_to_si	16	kept	Exact pin cm⁻³→m⁻³: 5→5e6.	<pending>
-tests/test_openggcm.py::TestUnitConversions::test_density_to_mass_density_si	16	kept	Exact pin n→ρ_m: uses scipy.constants.m_p — cross-checks proton-mass convention.	<pending>
-tests/test_openggcm.py::TestUnitConversions::test_pressure_to_si	16	kept	Exact pin pPa→Pa: 1000→1e-9.	<pending>
-tests/test_openggcm.py::TestFieldNameMap::test_all_velocity_components	16	kept	Dict pins vx/vy/vz→V1/V2/V3 — canonical-name contract.	<pending>
-tests/test_openggcm.py::TestFieldNameMap::test_all_bfield_components	16	kept	Dict pins bx1/by1/bz1→B1/B2/B3.	<pending>
-tests/test_openggcm.py::TestFieldNameMap::test_density_and_pressure	16	kept	Dict pins rr→rho_m and pp→P.	<pending>
-tests/test_openggcm.py::TestGridParser::test_dimensions	16	kept	Pins grid (nx,ny,nz)=(29,16,16) against fixture file.	<pending>
-tests/test_openggcm.py::TestGridParser::test_x_range	16	kept	Pins x[0]=-22.1 and x[-1]=300.1 within tight tolerance — x-axis orientation anchor (solar-wind convention).	<pending>
-tests/test_openggcm.py::TestGridParser::test_yz_symmetric	16	kept	Pins y==z coordinate arrays and y[0]==-y[-1] (centered) — catches transposed/mirrored-axis bugs.	<pending>
-tests/test_openggcm.py::TestGridParser::test_x_non_uniform	16	kept	Pins dx min<3 and max>50 — verifies non-uniform grid is actually non-uniform (catches uniform-linearization bugs).	<pending>
-tests/test_openggcm.py::TestGridParser::test_stagger_grids_present	16	kept	Pins 6 staggered components (bx/by/bz/ex/ey/ez) and their sizes — Yee-mesh schema contract.	<pending>
-tests/test_openggcm.py::TestGridParser::test_metadata	16	hardened	Replaced two `in grid.metadata` presence checks with value-equality (DIPOLETIME='1967:01:01:00:00:00' + BASETIME prefix); catches dropped-header AND mis-parsed-value bugs.	<pending>
-tests/test_openggcm.py::TestFieldIO::test_read_3df_fields	16	kept	Pins timestep 6300, grid (29,16,16), 8 decoded fields, and shape for each — strong read-contract anchor.	<pending>
-tests/test_openggcm.py::TestFieldIO::test_field_sanity_checks	16	hardened	Replaced `min>=0` and `|B|<1e6` loose bounds with physics-aware ranges on rr/vx/pp/|B|: catches WRN2 endian/sign/decode bugs that would produce values outside MHD-magnetotail regime.	<pending>
-tests/test_openggcm.py::TestOpenGGCMReader::test_open_and_timesteps	16	kept	Pins model_name='OpenGGCM', model_type='MHD', frame='GSM', step 6300 present, sorted order — integration anchor.	<pending>
-tests/test_openggcm.py::TestOpenGGCMReader::test_read_timestep	16	kept	Pins 9 canonical field names present + shape (29,16,16) + order-of-magnitude bounds on B1/V1; paired with TestFieldIO for tight value checks.	<pending>
-tests/test_openggcm.py::TestOpenGGCMReader::test_cartesian_aliases	16	kept	Pins geometry-aware alias Bx==B1 (identity via assert_array_equal) — canonical-name alias contract.	<pending>
-tests/test_openggcm.py::TestOpenGGCMReader::test_non_uniform_coordinates	16	kept	Pins x-coord length + non-allclose(dx, dx[0]) — catches uniform-spacing regression.	<pending>
-tests/test_openggcm.py::TestOpenGGCMReader::test_missing_timestep_raises	16	kept	Pins FileNotFoundError for non-existent step — error contract.	<pending>
-tests/test_openggcm_wrn2.py::TestDecodeRle::test_literal_values	16	kept	Tight algorithmic pin: 4-byte literal line with computed checksum → exact data list + n=1.	<pending>
-tests/test_openggcm_wrn2.py::TestDecodeRle::test_rle_run	16	kept	Pins RLE semantics: byte=170+count triggers repeat; exact data list + n=2.	<pending>
-tests/test_openggcm_wrn2.py::TestDecodeRle::test_checksum_failure_returns_error	16	kept	Sentinel value n=-5 on bad checksum; empty data — defensive-error contract.	<pending>
-tests/test_openggcm_wrn2.py::TestDecodeRle::test_real_compressed_line	16	kept	Real-world byte pattern [57,234,78,32] with verified checksum math — production fixture cross-ref.	<pending>
-tests/test_openggcm_wrn2.py::TestDecodeRle::test_newline_in_line_is_skipped	16	kept	Pins newline (byte 10) is silently dropped during decode — Fortran compat.	<pending>
-tests/test_openggcm_wrn2.py::TestDecodeRle::test_empty_line_returns_error	16	kept	Space-only line → n=-5 sentinel — edge case.	<pending>
-tests/test_openggcm_wrn2.py::TestDecompressField::test_uniform_field	16	kept	Pins zmin==zmax shortcut: shape (100,) + all-equal-to-zmin — catches degenerate path bugs.	<pending>
-tests/test_openggcm_wrn2.py::TestDecompressField::test_single_chunk	16	kept	End-to-end chunk decode: expected value computed from (i1_adj, i2_adj, dzi, zmin) formula, rtol=1e-10.	<pending>
-tests/test_openggcm_wrn2.py::TestDecompressField::test_negative_values	16	kept	Sign-bit semantics: i1>=80 produces negative output — catches sign-encoding regressions.	<pending>
-tests/test_openggcm_wrn2.py::TestDecompressField::test_multiple_chunks	16	kept	65-value 2-chunk decode with constant i1/i2 across chunks; asserts all values equal.	<pending>
-tests/test_openggcm_wrn2.py::TestBuildExpLut::test_exp_lut_properties	16	kept	Pins LUT shape (4418,), dtype float64, monotonicity, + direct exp(dzi*i3+zmin) match at 4 indices, rtol=1e-14.	<pending>
-tests/test_openggcm_wrn2.py::TestClassifyRleBytes::test_all_literals	16	kept	Pins literal vs non-literal classification for bytes 33-126 and newline (10).	<pending>
-tests/test_openggcm_wrn2.py::TestClassifyRleBytes::test_marker_and_consumed	16	kept	Pins marker (>127) + consumed-next-byte semantics.	<pending>
-tests/test_openggcm_wrn2.py::TestClassifyRleBytes::test_space_not_literal	16	kept	Pins space (32) as structural sentinel, not data.	<pending>
-tests/test_openggcm_wrn2.py::TestClassifyRleBytes::test_mixed_markers_and_literals	16	kept	5-element mixed sequence pins full classification dispatch table.	<pending>
-tests/test_openggcm_wrn2.py::TestDecompressFieldVectorized::test_single_chunk_matches_original	16	kept	Vectorized-vs-loop parity: bit-equal result via assert_array_equal.	<pending>
-tests/test_openggcm_wrn2.py::TestDecompressFieldVectorized::test_negative_values	16	kept	Vectorized decoder preserves sign-bit semantics (array_equal parity).	<pending>
-tests/test_openggcm_wrn2.py::TestDecompressFieldVectorized::test_multiple_chunks	16	kept	Multi-chunk parity with mixed literal-and-RLE chunks.	<pending>
-tests/test_openggcm_wrn2.py::TestDecompressFieldVectorized::test_mixed_literal_and_rle	16	kept	Mixed-encoding parity: 4-value line with all-literal checksum math.	<pending>
+tests/test_ipic3d_synthetic.py::TestShdf5PressureTensor::test_pressure_values_match_phdf5	16	kept	Cross-format identity: all 6 pressure components × 2 species, atol=1e-12 — strong sibling-reader parity test.	cba381f
+tests/test_ipic3d_synthetic.py::TestShdf5PressureTensor::test_off_diagonal_pressure_zero	16	kept	Pins P12=P13=P23=0 from isotropic-Maxwellian fixture — catches spurious off-diagonal contamination.	cba381f
+tests/test_ipic3d_synthetic.py::TestEnergyFluxPhdf5::test_eflux_present	16	kept	has_field anchor for EF1/EF2/EF3 × 2 species = 6 assertions; paired with 4pi-corrected and shape tests.	cba381f
+tests/test_ipic3d_synthetic.py::TestEnergyFluxPhdf5::test_eflux_shape	16	kept	Shape pin (NX,NY,NZ) for EF1_s0 — small but specific; paired with value-identity tests.	cba381f
+tests/test_ipic3d_synthetic.py::TestEnergyFluxPhdf5::test_eflux_4pi_corrected	16	hardened	Added EF3_s0 and EF3_s1 assertions (non-zero drifts W0=0.001/-0.064): prior form only checked EF1_s0=0 which was vacuous (U0=0). New form pins the 4π factor — without it EF3 would differ by ~12.57×.	cba381f
+tests/test_ipic3d_synthetic.py::TestEnergyFluxShdf5::test_eflux_matches_phdf5	16	kept	Cross-format identity: all 6 EF components × 2 species, atol=1e-12 — strong sibling parity.	cba381f
+tests/test_ipic3d_synthetic.py::TestEnergyFluxH5hut::test_eflux_present	16	kept	has_field(EF1_s{0,1}) — paired with matches_phdf5 identity test; retained as presence anchor.	cba381f
+tests/test_ipic3d_synthetic.py::TestEnergyFluxH5hut::test_eflux_matches_phdf5	16	kept	H5hut↔phdf5 EF identity, atol=1e-5 (lower precision is H5hut float32 source storage).	cba381f
+tests/test_ipic3d_synthetic.py::TestFieldOutputTag::test_field_output_tag_parsed	16	kept	Pins 'pressure' and 'E_flux' substrings in FieldOutputTag — catches dropped-token parse bugs.	cba381f
+tests/test_ipic3d_synthetic.py::TestFieldOutputTag::test_particles_output_cycle_parsed	16	kept	Pins particles_output_cycle == 10 — exact integer anchor.	cba381f
+tests/test_ipic3d_synthetic.py::TestFieldOutputTag::test_field_output_tag_in_metadata	16	hardened	Replaced two `in sim_cfg.metadata` presence checks with value assertions (pressure/E_flux substrings + particles_output_cycle==10); catches dropped-key AND mis-copied-value bugs.	cba381f
+tests/test_ipic3d_synthetic.py::TestFieldOutputTag::test_settings_hdf_defaults	16	kept	Pins settings.hdf defaults (empty tag, cycle=0) — covers the no-inp fallback branch.	cba381f
+tests/test_ipic3d_synthetic.py::TestSpeciesQuantities::test_load_species_quantities	16	kept	Pins name='species_quantities', index_column='cycle', len==3 — structural anchor.	cba381f
+tests/test_ipic3d_synthetic.py::TestSpeciesQuantities::test_columns_present	16	kept	Column contract: momentum/total_ke/bulk_ke/thermal_ke × 2 species = 8 assertions.	cba381f
+tests/test_ipic3d_synthetic.py::TestSpeciesQuantities::test_values_correct	16	kept	Exact numeric pins: momentum_s0[0]=1e-3, thermal_ke_s1[0]=0.22 with rtol=1e-10 — column-to-value identity.	cba381f
+tests/test_ipic3d_synthetic.py::TestSpeciesQuantities::test_detect_species_quantities	16	kept	Sole registry coverage for species_quantities detection — unique branch.	cba381f
+tests/test_ipic3d_synthetic.py::TestSpeciesQuantities::test_load_via_auxiliary_interface	16	kept	Reader.load_auxiliary wires through to species_quantities (TabularData + column presence).	cba381f
+tests/test_ipic3d_synthetic.py::TestProbeImprovements::test_phdf5_with_moments_higher_confidence	16	hardened	Replaced loose `score >= 0.5` with exact `pytest.approx(0.75)` — the loose bound didn't distinguish .inp-only (0.5) from full (.inp+Moments+Particles=0.75), missing dropped reinforcement signals.	cba381f
+tests/test_ipic3d_synthetic.py::TestProbeImprovements::test_moments_detected_in_phdf5	16	hardened	Replaced `>= 0.35` with exact `pytest.approx(0.35)`: loose bound accepted Fields-only (0.2) or Moments-only paths that shouldn't match; now pins Fields+Moments sum.	cba381f
+tests/test_ipic3d_synthetic.py::TestProbeImprovements::test_particles_detected_in_phdf5	16	hardened	Replaced `>= 0.3` with exact `pytest.approx(0.30)`: pins Fields(0.2)+Particles(0.1) sum.	cba381f
+tests/test_openggcm.py::TestUnitConversions::test_velocity_to_si	16	kept	Exact conversion pin km/s→m/s: 500→5e5 via assert_allclose.	cba381f
+tests/test_openggcm.py::TestUnitConversions::test_bfield_to_si	16	kept	Exact pin nT→T: 10→10e-9.	cba381f
+tests/test_openggcm.py::TestUnitConversions::test_density_to_si	16	kept	Exact pin cm⁻³→m⁻³: 5→5e6.	cba381f
+tests/test_openggcm.py::TestUnitConversions::test_density_to_mass_density_si	16	kept	Exact pin n→ρ_m: uses scipy.constants.m_p — cross-checks proton-mass convention.	cba381f
+tests/test_openggcm.py::TestUnitConversions::test_pressure_to_si	16	kept	Exact pin pPa→Pa: 1000→1e-9.	cba381f
+tests/test_openggcm.py::TestFieldNameMap::test_all_velocity_components	16	kept	Dict pins vx/vy/vz→V1/V2/V3 — canonical-name contract.	cba381f
+tests/test_openggcm.py::TestFieldNameMap::test_all_bfield_components	16	kept	Dict pins bx1/by1/bz1→B1/B2/B3.	cba381f
+tests/test_openggcm.py::TestFieldNameMap::test_density_and_pressure	16	kept	Dict pins rr→rho_m and pp→P.	cba381f
+tests/test_openggcm.py::TestGridParser::test_dimensions	16	kept	Pins grid (nx,ny,nz)=(29,16,16) against fixture file.	cba381f
+tests/test_openggcm.py::TestGridParser::test_x_range	16	kept	Pins x[0]=-22.1 and x[-1]=300.1 within tight tolerance — x-axis orientation anchor (solar-wind convention).	cba381f
+tests/test_openggcm.py::TestGridParser::test_yz_symmetric	16	kept	Pins y==z coordinate arrays and y[0]==-y[-1] (centered) — catches transposed/mirrored-axis bugs.	cba381f
+tests/test_openggcm.py::TestGridParser::test_x_non_uniform	16	kept	Pins dx min<3 and max>50 — verifies non-uniform grid is actually non-uniform (catches uniform-linearization bugs).	cba381f
+tests/test_openggcm.py::TestGridParser::test_stagger_grids_present	16	kept	Pins 6 staggered components (bx/by/bz/ex/ey/ez) and their sizes — Yee-mesh schema contract.	cba381f
+tests/test_openggcm.py::TestGridParser::test_metadata	16	hardened	Replaced two `in grid.metadata` presence checks with value-equality (DIPOLETIME='1967:01:01:00:00:00' + BASETIME prefix); catches dropped-header AND mis-parsed-value bugs.	cba381f
+tests/test_openggcm.py::TestFieldIO::test_read_3df_fields	16	kept	Pins timestep 6300, grid (29,16,16), 8 decoded fields, and shape for each — strong read-contract anchor.	cba381f
+tests/test_openggcm.py::TestFieldIO::test_field_sanity_checks	16	hardened	Replaced `min>=0` and `|B|<1e6` loose bounds with physics-aware ranges on rr/vx/pp/|B|: catches WRN2 endian/sign/decode bugs that would produce values outside MHD-magnetotail regime.	cba381f
+tests/test_openggcm.py::TestOpenGGCMReader::test_open_and_timesteps	16	kept	Pins model_name='OpenGGCM', model_type='MHD', frame='GSM', step 6300 present, sorted order — integration anchor.	cba381f
+tests/test_openggcm.py::TestOpenGGCMReader::test_read_timestep	16	kept	Pins 9 canonical field names present + shape (29,16,16) + order-of-magnitude bounds on B1/V1; paired with TestFieldIO for tight value checks.	cba381f
+tests/test_openggcm.py::TestOpenGGCMReader::test_cartesian_aliases	16	kept	Pins geometry-aware alias Bx==B1 (identity via assert_array_equal) — canonical-name alias contract.	cba381f
+tests/test_openggcm.py::TestOpenGGCMReader::test_non_uniform_coordinates	16	kept	Pins x-coord length + non-allclose(dx, dx[0]) — catches uniform-spacing regression.	cba381f
+tests/test_openggcm.py::TestOpenGGCMReader::test_missing_timestep_raises	16	kept	Pins FileNotFoundError for non-existent step — error contract.	cba381f
+tests/test_openggcm_wrn2.py::TestDecodeRle::test_literal_values	16	kept	Tight algorithmic pin: 4-byte literal line with computed checksum → exact data list + n=1.	cba381f
+tests/test_openggcm_wrn2.py::TestDecodeRle::test_rle_run	16	kept	Pins RLE semantics: byte=170+count triggers repeat; exact data list + n=2.	cba381f
+tests/test_openggcm_wrn2.py::TestDecodeRle::test_checksum_failure_returns_error	16	kept	Sentinel value n=-5 on bad checksum; empty data — defensive-error contract.	cba381f
+tests/test_openggcm_wrn2.py::TestDecodeRle::test_real_compressed_line	16	kept	Real-world byte pattern [57,234,78,32] with verified checksum math — production fixture cross-ref.	cba381f
+tests/test_openggcm_wrn2.py::TestDecodeRle::test_newline_in_line_is_skipped	16	kept	Pins newline (byte 10) is silently dropped during decode — Fortran compat.	cba381f
+tests/test_openggcm_wrn2.py::TestDecodeRle::test_empty_line_returns_error	16	kept	Space-only line → n=-5 sentinel — edge case.	cba381f
+tests/test_openggcm_wrn2.py::TestDecompressField::test_uniform_field	16	kept	Pins zmin==zmax shortcut: shape (100,) + all-equal-to-zmin — catches degenerate path bugs.	cba381f
+tests/test_openggcm_wrn2.py::TestDecompressField::test_single_chunk	16	kept	End-to-end chunk decode: expected value computed from (i1_adj, i2_adj, dzi, zmin) formula, rtol=1e-10.	cba381f
+tests/test_openggcm_wrn2.py::TestDecompressField::test_negative_values	16	kept	Sign-bit semantics: i1>=80 produces negative output — catches sign-encoding regressions.	cba381f
+tests/test_openggcm_wrn2.py::TestDecompressField::test_multiple_chunks	16	kept	65-value 2-chunk decode with constant i1/i2 across chunks; asserts all values equal.	cba381f
+tests/test_openggcm_wrn2.py::TestBuildExpLut::test_exp_lut_properties	16	kept	Pins LUT shape (4418,), dtype float64, monotonicity, + direct exp(dzi*i3+zmin) match at 4 indices, rtol=1e-14.	cba381f
+tests/test_openggcm_wrn2.py::TestClassifyRleBytes::test_all_literals	16	kept	Pins literal vs non-literal classification for bytes 33-126 and newline (10).	cba381f
+tests/test_openggcm_wrn2.py::TestClassifyRleBytes::test_marker_and_consumed	16	kept	Pins marker (>127) + consumed-next-byte semantics.	cba381f
+tests/test_openggcm_wrn2.py::TestClassifyRleBytes::test_space_not_literal	16	kept	Pins space (32) as structural sentinel, not data.	cba381f
+tests/test_openggcm_wrn2.py::TestClassifyRleBytes::test_mixed_markers_and_literals	16	kept	5-element mixed sequence pins full classification dispatch table.	cba381f
+tests/test_openggcm_wrn2.py::TestDecompressFieldVectorized::test_single_chunk_matches_original	16	kept	Vectorized-vs-loop parity: bit-equal result via assert_array_equal.	cba381f
+tests/test_openggcm_wrn2.py::TestDecompressFieldVectorized::test_negative_values	16	kept	Vectorized decoder preserves sign-bit semantics (array_equal parity).	cba381f
+tests/test_openggcm_wrn2.py::TestDecompressFieldVectorized::test_multiple_chunks	16	kept	Multi-chunk parity with mixed literal-and-RLE chunks.	cba381f
+tests/test_openggcm_wrn2.py::TestDecompressFieldVectorized::test_mixed_literal_and_rle	16	kept	Mixed-encoding parity: 4-value line with all-literal checksum math.	cba381f
 tests/test_openggcm_wrn2.py::TestDecompressFieldVectorized::test_offset_into_buffer	0	not-yet-reviewed		
 tests/test_openggcm_wrn2.py::TestConvertFieldsPassthrough::test_unknown_fields_pass_through	0	not-yet-reviewed		
 tests/test_openggcm_wrn2.py::TestRealData::test_first_wrn2_block	0	not-yet-reviewed		
