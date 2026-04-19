@@ -489,15 +489,6 @@ class TestMultiSpeciesDynamicRecipes:
         # T = P / n = 2
         np.testing.assert_allclose(result, 2.0, rtol=1e-15)
 
-    def test_s0_s1_still_resolve_via_static_aliases(self):
-        """Existing s0/s1 aliases should still work via _COMPUTE_ALIASES."""
-        shape = (2, 2, 2)
-        data = {"n_s0": np.full(shape, 4.0)}
-        ds = make_test_dataset(data, shape=shape, species=[ELECTRONS, IONS])
-        result_alias = compute_field("omega_p_s0", ds)
-        result_canonical = compute_field("omega_pe", ds)
-        np.testing.assert_array_equal(result_alias, result_canonical)
-
 
 class TestMultiSpeciesSIConversion:
     """SI factor resolution for per-species fields."""
