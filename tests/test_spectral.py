@@ -17,7 +17,7 @@ class TestPowerSpectrum1D:
         field = np.sin(k0 * x)
         k, power = power_spectrum_1d(field, dx)
         peak_k = k[np.argmax(power)]
-        np.testing.assert_allclose(peak_k, k0, rtol=0.05)
+        np.testing.assert_allclose(peak_k, k0, rtol=1e-12)
 
     def test_parseval(self) -> None:
         """Total power approximates field variance (Parseval's theorem)."""
@@ -27,7 +27,7 @@ class TestPowerSpectrum1D:
         k, power = power_spectrum_1d(field, dx, window="boxcar")
         dk = k[1] - k[0]
         total_power = float(np.sum(power) * dk)
-        np.testing.assert_allclose(total_power, np.var(field), rtol=0.15)
+        np.testing.assert_allclose(total_power, np.var(field), rtol=1e-10)
 
     def test_2d_input_averages(self) -> None:
         """2D input: spectrum is averaged over non-FFT axis."""
@@ -79,7 +79,7 @@ class TestPowerSpectrum2D:
         field = rng.standard_normal((128, 128))
         _k, power = power_spectrum_2d(field, 1.0, 1.0, n_bins=20)
         cv = float(np.std(power) / np.mean(power))
-        assert cv < 1.0
+        assert cv < 0.5
 
     def test_positive_wavenumbers(self) -> None:
         rng = np.random.default_rng(1)
@@ -106,7 +106,7 @@ class TestPowerSpectrum3D:
         field = rng.standard_normal((48, 48, 48))
         _k, power = power_spectrum_3d(field, 1.0, 1.0, 1.0, n_bins=15)
         cv = float(np.std(power) / np.mean(power))
-        assert cv < 1.0
+        assert cv < 0.5
 
     def test_positive_wavenumbers(self) -> None:
         rng = np.random.default_rng(1)
@@ -120,6 +120,8 @@ class TestPowerSpectrum3D:
         k, power = power_spectrum_3d(field, 0.5, 1.0, 2.0, n_bins=10)
         assert len(k) > 0
         assert np.all(np.isfinite(power))
+        assert np.all(np.diff(k) > 0), "k bins must be monotonically increasing"
+        assert np.all(power >= 0), "PSD must be non-negative"
 
 
 class TestSpectralEdgeCases:
