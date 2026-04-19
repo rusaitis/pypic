@@ -436,13 +436,15 @@ class TestGyroradiusEstimate:
         pts = _circle_points(n, radius=1.0)
         v_mag = 2.0
         tangents = tangent_vectors(pts)
-        vel = v_mag * tangents
+        # Velocity purely perpendicular to the curve tangent (which the
+        # estimator uses as the B-direction proxy): v_perp = v_mag.
+        # r_g = m * v_perp / (|q| * B) = 2 * 2 / (1 * 4) = 1.0
+        normals = np.column_stack([-tangents[:, 1], tangents[:, 0], np.zeros(n)])
+        vel = v_mag * normals
         b_mag = np.full(n, 4.0)
         rg = gyroradius_estimate(pts, vel, b_mag, charge=1.0, mass=2.0)
-        # For pure perpendicular motion: r_g = m * v_perp / (|q| * B) = 2*2/(1*4) = 1
-        # The estimate is approximate since tangent ≠ B direction
         assert rg.shape == (n,)
-        assert np.all(np.isfinite(rg))
+        np.testing.assert_allclose(rg, 1.0, rtol=0.05)
 
     def test_zero_b_gives_nan(self) -> None:
         pts = _straight_line(3)
@@ -547,6 +549,7 @@ class TestSampling:
         )
         tr2 = attach_scalars_to_trace(tr, data, ["rho"])
         assert "rho" in tr2.scalars
+        np.testing.assert_allclose(tr2.scalars["rho"], [0.5, 1.5, 2.5])
 
     def test_invalid_method_rejects(self, field_dataset: object) -> None:
         from pypic.dataset import FieldDataset
@@ -688,7 +691,9 @@ class TestVectorFieldInterpolator:
         from pypic.traces import VectorFieldInterpolator
 
         interp = VectorFieldInterpolator.from_dataset(uniform_field_data)
-        assert interp is not None
+        # Verify construction succeeded AND evaluates correctly at the center
+        result = interp(np.array([10.0, 10.0, 10.0]))
+        np.testing.assert_allclose(result, [1.0, 0.0, 0.0])
 
     def test_call_inside_domain(self, uniform_field_data: FieldDataset) -> None:
         from pypic.traces import VectorFieldInterpolator

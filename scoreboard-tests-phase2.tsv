@@ -1568,100 +1568,100 @@ tests/test_structured_aliases.py::TestEnergyFluxAliases::test_energy_flux_alias_
 tests/test_structured_aliases.py::TestEnergyFluxAliases::test_energy_flux_alias_resolves[energy_flux_y-EF2]	24	kept	Pins energy_flux_y→EF2 descriptive alias.	053f512
 tests/test_structured_aliases.py::TestEnergyFluxAliases::test_energy_flux_alias_resolves[energy_flux_z-EF3]	24	kept	Pins energy_flux_z→EF3 descriptive alias.	053f512
 tests/test_structured_aliases.py::TestEnergyFluxAliases::test_energy_flux_x_passthrough	24	kept	End-to-end: energy_flux_x compute returns EF1 data unchanged (passthrough recipe); verifies no accidental transformation.	053f512
-tests/test_tabular_data.py::TestConstruction::test_basic_construction	0	not-yet-reviewed		
-tests/test_tabular_data.py::TestConstruction::test_empty_columns	0	not-yet-reviewed		
-tests/test_tabular_data.py::TestConstruction::test_with_index_and_metadata	0	not-yet-reviewed		
-tests/test_tabular_data.py::TestValidation::test_unequal_lengths_raises	0	not-yet-reviewed		
-tests/test_tabular_data.py::TestValidation::test_missing_index_column_raises	0	not-yet-reviewed		
-tests/test_tabular_data.py::TestGetitem::test_get_existing_column	0	not-yet-reviewed		
-tests/test_tabular_data.py::TestGetitem::test_missing_column_raises_keyerror	0	not-yet-reviewed		
-tests/test_tabular_data.py::TestContains::test_membership	0	not-yet-reviewed		
-tests/test_tabular_data.py::TestColumnNames::test_sorted	0	not-yet-reviewed		
-tests/test_tabular_data.py::TestIndex::test_with_index_column	0	not-yet-reviewed		
-tests/test_tabular_data.py::TestIndex::test_without_index_column	0	not-yet-reviewed		
-tests/test_tabular_data.py::TestIndex::test_empty_index	0	not-yet-reviewed		
-tests/test_traces.py::TestFieldLine::test_construction	0	not-yet-reviewed		
-tests/test_traces.py::TestFieldLine::test_wrong_shape_rejects	0	not-yet-reviewed		
-tests/test_traces.py::TestFieldLine::test_too_few_points_rejects	0	not-yet-reviewed		
-tests/test_traces.py::TestFieldLine::test_invalid_direction_rejects	0	not-yet-reviewed		
-tests/test_traces.py::TestFieldLine::test_scalar_shape_mismatch_rejects	0	not-yet-reviewed		
-tests/test_traces.py::TestFieldLine::test_start_end_points	0	not-yet-reviewed		
-tests/test_traces.py::TestFieldLine::test_len	0	not-yet-reviewed		
-tests/test_traces.py::TestFieldLine::test_scalars_are_readonly	0	not-yet-reviewed		
-tests/test_traces.py::TestFieldLine::test_metadata_is_readonly	0	not-yet-reviewed		
-tests/test_traces.py::TestFieldLine::test_copy_replace	0	not-yet-reviewed		
-tests/test_traces.py::TestFieldLine::test_with_scalars	0	not-yet-reviewed		
-tests/test_traces.py::TestFieldLine::test_repr	0	not-yet-reviewed		
-tests/test_traces.py::TestParticleTrace::test_construction	0	not-yet-reviewed		
-tests/test_traces.py::TestParticleTrace::test_wrong_time_shape_rejects	0	not-yet-reviewed		
-tests/test_traces.py::TestParticleTrace::test_non_monotonic_time_rejects	0	not-yet-reviewed		
-tests/test_traces.py::TestParticleTrace::test_wrong_velocity_shape_rejects	0	not-yet-reviewed		
-tests/test_traces.py::TestParticleTrace::test_duration	0	not-yet-reviewed		
-tests/test_traces.py::TestParticleTrace::test_start_end_time	0	not-yet-reviewed		
-tests/test_traces.py::TestParticleTrace::test_start_end_point	0	not-yet-reviewed		
-tests/test_traces.py::TestParticleTrace::test_len	0	not-yet-reviewed		
-tests/test_traces.py::TestParticleTrace::test_scalars_readonly	0	not-yet-reviewed		
-tests/test_traces.py::TestParticleTrace::test_copy_replace	0	not-yet-reviewed		
-tests/test_traces.py::TestParticleTrace::test_with_scalars	0	not-yet-reviewed		
-tests/test_traces.py::TestParticleTrace::test_repr	0	not-yet-reviewed		
-tests/test_traces.py::TestArcLength::test_straight_line	0	not-yet-reviewed		
-tests/test_traces.py::TestArcLength::test_total_equals_last_cumulative	0	not-yet-reviewed		
-tests/test_traces.py::TestArcLength::test_diagonal	0	not-yet-reviewed		
-tests/test_traces.py::TestArcLength::test_circle_arc_length	0	not-yet-reviewed		
-tests/test_traces.py::TestTangentVectors::test_straight_line_tangents	0	not-yet-reviewed		
-tests/test_traces.py::TestTangentVectors::test_unit_length	0	not-yet-reviewed		
-tests/test_traces.py::TestCurvature::test_straight_line_zero_curvature	0	not-yet-reviewed		
-tests/test_traces.py::TestCurvature::test_circle_curvature	0	not-yet-reviewed		
-tests/test_traces.py::TestDisplacement::test_straight_line	0	not-yet-reviewed		
-tests/test_traces.py::TestDisplacement::test_closed_curve_zero	0	not-yet-reviewed		
-tests/test_traces.py::TestClosestApproach::test_exact_point	0	not-yet-reviewed		
-tests/test_traces.py::TestClosestApproach::test_between_points	0	not-yet-reviewed		
-tests/test_traces.py::TestPlaneCrossings::test_single_crossing	0	not-yet-reviewed		
-tests/test_traces.py::TestPlaneCrossings::test_no_crossing	0	not-yet-reviewed		
-tests/test_traces.py::TestPlaneCrossings::test_sine_curve_z_crossings	0	not-yet-reviewed		
-tests/test_traces.py::TestPlaneCrossings::test_equatorial_equals_z_plane	0	not-yet-reviewed		
-tests/test_traces.py::TestResample::test_output_count	0	not-yet-reviewed		
-tests/test_traces.py::TestResample::test_uniform_spacing	0	not-yet-reviewed		
-tests/test_traces.py::TestResample::test_scalars_resampled	0	not-yet-reviewed		
-tests/test_traces.py::TestResample::test_too_few_rejects	0	not-yet-reviewed		
-tests/test_traces.py::TestSpeed::test_constant_velocity	0	not-yet-reviewed		
-tests/test_traces.py::TestKineticEnergy::test_basic	0	not-yet-reviewed		
-tests/test_traces.py::TestMirrorPoints::test_known_maxima	0	not-yet-reviewed		
-tests/test_traces.py::TestMirrorPoints::test_no_maxima	0	not-yet-reviewed		
-tests/test_traces.py::TestMirrorPoints::test_too_short	0	not-yet-reviewed		
-tests/test_traces.py::TestGyroradiusEstimate::test_uniform_field	0	not-yet-reviewed		
-tests/test_traces.py::TestGyroradiusEstimate::test_zero_b_gives_nan	0	not-yet-reviewed		
-tests/test_traces.py::TestDriftVelocity::test_constant_motion	0	not-yet-reviewed		
-tests/test_traces.py::TestDriftVelocity::test_smoothing_reduces_oscillation	0	not-yet-reviewed		
-tests/test_traces.py::TestSampling::test_nearest_at_grid_nodes	0	not-yet-reviewed		
-tests/test_traces.py::TestSampling::test_outside_domain_returns_nan	0	not-yet-reviewed		
-tests/test_traces.py::TestSampling::test_linear_interpolation	0	not-yet-reviewed		
-tests/test_traces.py::TestSampling::test_attach_scalars_to_fieldline	0	not-yet-reviewed		
-tests/test_traces.py::TestSampling::test_attach_scalars_to_particletrace	0	not-yet-reviewed		
-tests/test_traces.py::TestSampling::test_invalid_method_rejects	0	not-yet-reviewed		
-tests/test_traces.py::TestSampleFieldsBatching::test_empty_fields_returns_empty_dict	0	not-yet-reviewed		
-tests/test_traces.py::TestSampleFieldsBatching::test_batched_matches_per_field[nearest]	0	not-yet-reviewed		
-tests/test_traces.py::TestSampleFieldsBatching::test_batched_matches_per_field[linear]	0	not-yet-reviewed		
-tests/test_traces.py::TestSamplingEdgeCases::test_single_node_axis_does_not_crash	0	not-yet-reviewed		
-tests/test_traces.py::TestSamplingEdgeCases::test_single_node_axis_far_z_out_of_bounds	0	not-yet-reviewed		
-tests/test_traces.py::TestVectorFieldInterpolator::test_from_dataset	0	not-yet-reviewed		
-tests/test_traces.py::TestVectorFieldInterpolator::test_call_inside_domain	0	not-yet-reviewed		
-tests/test_traces.py::TestVectorFieldInterpolator::test_call_outside_domain	0	not-yet-reviewed		
-tests/test_traces.py::TestTraceFieldLine::test_uniform_field_straight_line	0	not-yet-reviewed		
-tests/test_traces.py::TestTraceFieldLine::test_forward_only	0	not-yet-reviewed		
-tests/test_traces.py::TestTraceFieldLine::test_backward_only	0	not-yet-reviewed		
-tests/test_traces.py::TestTraceFieldLine::test_both_directions	0	not-yet-reviewed		
-tests/test_traces.py::TestTraceFieldLine::test_domain_exit_terminates	0	not-yet-reviewed		
-tests/test_traces.py::TestTraceFieldLine::test_terminate_callback	0	not-yet-reviewed		
-tests/test_traces.py::TestTraceFieldLine::test_invalid_direction_rejects	0	not-yet-reviewed		
-tests/test_traces.py::TestTraceFieldLine::test_seed_outside_domain_rejects	0	not-yet-reviewed		
-tests/test_traces.py::TestTraceFieldLine::test_callback_terminates_after_first_step	0	not-yet-reviewed		
-tests/test_traces.py::TestTraceFieldLineAdaptive::test_uniform_field_straight_line	0	not-yet-reviewed		
-tests/test_traces.py::TestTraceFieldLineAdaptive::test_adaptive_stores_max_local_error	0	not-yet-reviewed		
-tests/test_traces.py::TestEstimateTracingError::test_error_estimate	0	not-yet-reviewed		
-tests/test_traces.py::TestEstimateTracingError::test_missing_metadata_raises	0	not-yet-reviewed		
-tests/test_traces.py::TestFieldNameFromComponents::test_valid	0	not-yet-reviewed		
-tests/test_traces.py::TestFieldNameFromComponents::test_mismatched_rejects	0	not-yet-reviewed		
+tests/test_tabular_data.py::TestConstruction::test_basic_construction	25	kept	Pins name attribute propagation and len() contract (row count from first column); catches a __post_init__ that forgets to freeze or miscounts.	<pending>
+tests/test_tabular_data.py::TestConstruction::test_empty_columns	25	kept	Pins len()==0 on empty columns dict — catches a StopIteration crash in __len__ from next(iter({})).	<pending>
+tests/test_tabular_data.py::TestConstruction::test_with_index_and_metadata	25	kept	Pins index_column and metadata passthrough — catches a __post_init__ that drops optional fields during MappingProxyType wrapping.	<pending>
+tests/test_tabular_data.py::TestValidation::test_unequal_lengths_raises	25	kept	Pins the column-length consistency guard; catches silent truncation or broadcast of mismatched arrays.	<pending>
+tests/test_tabular_data.py::TestValidation::test_missing_index_column_raises	25	kept	Pins the index_column existence guard; catches a downstream KeyError that would surface far from the construction site.	<pending>
+tests/test_tabular_data.py::TestGetitem::test_get_existing_column	25	kept	Pins __getitem__ column retrieval with value equality — catches a bug that returns wrong column or copies data.	<pending>
+tests/test_tabular_data.py::TestGetitem::test_missing_column_raises_keyerror	25	kept	Pins KeyError on missing column with match string — catches silent None return or wrong exception type.	<pending>
+tests/test_tabular_data.py::TestContains::test_membership	25	kept	Pins __contains__ for both present and absent keys — catches a delegation bug if columns is wrapped differently.	<pending>
+tests/test_tabular_data.py::TestColumnNames::test_sorted	25	kept	Pins sorted ordering of column_names property — catches an insertion-order leak from the dict.	<pending>
+tests/test_tabular_data.py::TestIndex::test_with_index_column	25	kept	Pins index property returning the designated column by value — catches a bug that returns arange even when index_column is set.	<pending>
+tests/test_tabular_data.py::TestIndex::test_without_index_column	25	kept	Pins fallback to np.arange when no index_column — catches a None-dereference or empty-array bug.	<pending>
+tests/test_tabular_data.py::TestIndex::test_empty_index	25	kept	Pins empty index on empty TabularData — catches a shape error from arange(0) or StopIteration.	<pending>
+tests/test_traces.py::TestFieldLine::test_construction	25	kept	Pins n_points and field_name on a straight-line FieldLine — catches __post_init__ validation rejecting valid input.	<pending>
+tests/test_traces.py::TestFieldLine::test_wrong_shape_rejects	25	kept	Pins ValueError on 1D array — catches a missing ndim check that would create a corrupt FieldLine.	<pending>
+tests/test_traces.py::TestFieldLine::test_too_few_points_rejects	25	kept	Pins the >= 2 minimum point count — catches a single-point line that breaks arc-length and tangent computations.	<pending>
+tests/test_traces.py::TestFieldLine::test_invalid_direction_rejects	25	kept	Pins direction validation against the frozenset — catches a typo like 'up' silently creating an invalid direction.	<pending>
+tests/test_traces.py::TestFieldLine::test_scalar_shape_mismatch_rejects	25	kept	Pins scalar shape guard (N,) — catches a scalar array that doesn't match point count.	<pending>
+tests/test_traces.py::TestFieldLine::test_start_end_points	25	kept	Pins start_point/end_point tuple extraction from first/last row — catches an off-by-one or wrong index.	<pending>
+tests/test_traces.py::TestFieldLine::test_len	25	kept	Pins __len__ == n_points — catches a __len__ that returns a different value than n_points property.	<pending>
+tests/test_traces.py::TestFieldLine::test_scalars_are_readonly	25	kept	Pins MappingProxyType wrapping — catches a mutation path that would break frozen-dataclass invariant.	<pending>
+tests/test_traces.py::TestFieldLine::test_metadata_is_readonly	25	kept	Pins metadata immutability via MappingProxyType — symmetric with scalars test, both wrap mutable dicts.	<pending>
+tests/test_traces.py::TestFieldLine::test_copy_replace	25	kept	Pins copy.replace on frozen dataclass — catches a __replace__ regression or slots mismatch.	<pending>
+tests/test_traces.py::TestFieldLine::test_with_scalars	25	kept	Pins immutable scalar extension: new FieldLine has scalar, original doesn't — catches in-place mutation.	<pending>
+tests/test_traces.py::TestFieldLine::test_repr	25	kept	Pins repr includes field_name and optional time formatting — catches a __repr__ that omits time when present.	<pending>
+tests/test_traces.py::TestParticleTrace::test_construction	25	kept	Pins n_points and species_name on a valid ParticleTrace — catches __post_init__ rejecting valid input.	<pending>
+tests/test_traces.py::TestParticleTrace::test_wrong_time_shape_rejects	25	kept	Pins time shape must match (N,) — catches a trace with mismatched time/position counts.	<pending>
+tests/test_traces.py::TestParticleTrace::test_non_monotonic_time_rejects	25	kept	Pins strict monotonic time constraint — catches a trajectory with backwards time steps.	<pending>
+tests/test_traces.py::TestParticleTrace::test_wrong_velocity_shape_rejects	25	kept	Pins velocity shape (N,3) — catches velocity array that doesn't match point count.	<pending>
+tests/test_traces.py::TestParticleTrace::test_duration	25	kept	Pins duration = t[-1] - t[0] with exact tolerance — catches an off-by-one or dt-sum implementation.	<pending>
+tests/test_traces.py::TestParticleTrace::test_start_end_time	25	kept	Pins start/end time extraction from time array — catches wrong indexing.	<pending>
+tests/test_traces.py::TestParticleTrace::test_start_end_point	25	kept	Pins start/end point extraction as exact tuples — catches index swap or wrong coordinate.	<pending>
+tests/test_traces.py::TestParticleTrace::test_len	25	kept	Pins __len__ == constructor point count — catches mismatch.	<pending>
+tests/test_traces.py::TestParticleTrace::test_scalars_readonly	25	kept	Pins MappingProxyType wrapping on scalars — catches mutation path.	<pending>
+tests/test_traces.py::TestParticleTrace::test_copy_replace	25	kept	Pins copy.replace on frozen ParticleTrace — catches __replace__ regression.	<pending>
+tests/test_traces.py::TestParticleTrace::test_with_scalars	25	kept	Pins immutable scalar extension without mutation of original — catches in-place dict update.	<pending>
+tests/test_traces.py::TestParticleTrace::test_repr	25	kept	Pins repr includes species_name — catches a __repr__ that formats the wrong field.	<pending>
+tests/test_traces.py::TestArcLength::test_straight_line	25	kept	Pins exact cumulative arc length [0,1,2,3,4] on unit-step x-axis — catches a cumsum off-by-one or missing zero prefix.	<pending>
+tests/test_traces.py::TestArcLength::test_total_equals_last_cumulative	25	kept	Pins arc_length_total == arc_length_cumulative[-1] — catches divergent implementations.	<pending>
+tests/test_traces.py::TestArcLength::test_diagonal	25	kept	Pins 3-4-5 triangle Euclidean distance = 5.0 — catches a missing axis=1 in norm.	<pending>
+tests/test_traces.py::TestArcLength::test_circle_arc_length	25	kept	Pins circle circumference 2*pi*r within rtol=1e-4 — catches a segment-length bug (e.g. missing endpoint).	<pending>
+tests/test_traces.py::TestTangentVectors::test_straight_line_tangents	25	kept	Pins unit tangent = (1,0,0) on x-axis line — catches gradient-based tangent normalization bug.	<pending>
+tests/test_traces.py::TestTangentVectors::test_unit_length	25	kept	Pins all tangent norms = 1 on circle — catches a normalization denominator bug.	<pending>
+tests/test_traces.py::TestCurvature::test_straight_line_zero_curvature	25	kept	Pins kappa = 0 on straight line — catches a finite-difference artifact that introduces spurious curvature.	<pending>
+tests/test_traces.py::TestCurvature::test_circle_curvature	25	kept	Pins kappa = 1/R on circle interior within rtol=0.02 — catches a dt/ds scaling bug in the curvature formula.	<pending>
+tests/test_traces.py::TestDisplacement::test_straight_line	25	kept	Pins end-to-end displacement = 4.0 on 5-point x-axis — catches wrong endpoint indexing.	<pending>
+tests/test_traces.py::TestDisplacement::test_closed_curve_zero	25	kept	Pins displacement = 0 on closed circle — catches a bug that uses arc_length instead of endpoint distance.	<pending>
+tests/test_traces.py::TestClosestApproach::test_exact_point	25	kept	Pins exact match: idx=2 and dist=0 — catches an argmin off-by-one.	<pending>
+tests/test_traces.py::TestClosestApproach::test_between_points	25	kept	Pins nearest grid point idx=1 and dist=0.3 for off-grid query — catches a rounding or searchsorted bug.	<pending>
+tests/test_traces.py::TestPlaneCrossings::test_single_crossing	25	kept	Pins crossing at origin for line crossing x=0 plane — catches a linear interpolation sign error.	<pending>
+tests/test_traces.py::TestPlaneCrossings::test_no_crossing	25	kept	Pins empty (0,3) result when line doesn't cross — catches a false positive from boundary points.	<pending>
+tests/test_traces.py::TestPlaneCrossings::test_sine_curve_z_crossings	25	kept	Pins 3 equatorial crossings of sin(t) over [0,4pi] — catches a sign-change detection off-by-one.	<pending>
+tests/test_traces.py::TestPlaneCrossings::test_equatorial_equals_z_plane	25	kept	Pins equatorial_crossings == plane_crossings(z-normal) — catches divergent implementations.	<pending>
+tests/test_traces.py::TestResample::test_output_count	25	kept	Pins output shape (20,3) — catches a resample that returns wrong count.	<pending>
+tests/test_traces.py::TestResample::test_uniform_spacing	25	kept	Pins uniform dx via np.diff at rtol=1e-12 — catches non-uniform arc-length parameterization.	<pending>
+tests/test_traces.py::TestResample::test_scalars_resampled	25	kept	Pins scalar boundary values and shape after resample — catches a scalar interpolation bug.	<pending>
+tests/test_traces.py::TestResample::test_too_few_rejects	25	kept	Pins ValueError on n_out=1 — catches a silent degenerate resample.	<pending>
+tests/test_traces.py::TestSpeed::test_constant_velocity	25	kept	Pins speed = 5.0 for (3,4,0) velocity via Pythagorean triple — catches a missing axis=1 in norm.	<pending>
+tests/test_traces.py::TestKineticEnergy::test_basic	25	kept	Pins KE = 0.5*m*v^2 = [1.0, 4.0] for m=2 — catches a wrong factor or axis reduction.	<pending>
+tests/test_traces.py::TestMirrorPoints::test_known_maxima	25	kept	Pins local maxima at indices [1,3] — catches a comparison direction error (< vs >).	<pending>
+tests/test_traces.py::TestMirrorPoints::test_no_maxima	25	kept	Pins empty result on monotonic array — catches false positives at endpoints.	<pending>
+tests/test_traces.py::TestMirrorPoints::test_too_short	25	kept	Pins empty result for len < 3 — catches an index-out-of-range on short arrays.	<pending>
+tests/test_traces.py::TestGyroradiusEstimate::test_uniform_field	25	hardened	Fixed velocity direction from parallel (zero v_perp) to perpendicular to tangent; now pins rg = m*v_perp/(|q|*B) = 1.0 at rtol=0.05.	<pending>
+tests/test_traces.py::TestGyroradiusEstimate::test_zero_b_gives_nan	25	kept	Pins NaN at B=0 grid points — catches a division-by-zero that returns inf instead of NaN.	<pending>
+tests/test_traces.py::TestDriftVelocity::test_constant_motion	25	kept	Pins drift velocity = 2.0 on uniform linear motion — catches a gradient/dt normalization bug.	<pending>
+tests/test_traces.py::TestDriftVelocity::test_smoothing_reduces_oscillation	25	kept	Pins std(smoothed) < std(raw) on gyromotion signal — catches a window convolution that amplifies noise.	<pending>
+tests/test_traces.py::TestSampling::test_nearest_at_grid_nodes	25	kept	Pins nearest-neighbor sampling returns exact cell-center values — catches a searchsorted off-by-one.	<pending>
+tests/test_traces.py::TestSampling::test_outside_domain_returns_nan	25	kept	Pins NaN for out-of-bounds points — catches a clamp that silently returns boundary values.	<pending>
+tests/test_traces.py::TestSampling::test_linear_interpolation	25	kept	Pins trilinear interpolation at midpoint between cell centers — catches a RegularGridInterpolator misconfiguration.	<pending>
+tests/test_traces.py::TestSampling::test_attach_scalars_to_fieldline	25	kept	Pins attach_scalars returns new FieldLine with correct sampled values — catches a coordinate mismatch.	<pending>
+tests/test_traces.py::TestSampling::test_attach_scalars_to_particletrace	25	hardened	Added value assertion (was membership-only); now pins sampled rho = [0.5, 1.5, 2.5] matching cell centers.	<pending>
+tests/test_traces.py::TestSampling::test_invalid_method_rejects	25	kept	Pins ValueError on unsupported method='cubic' — catches a fallthrough that silently defaults.	<pending>
+tests/test_traces.py::TestSampleFieldsBatching::test_empty_fields_returns_empty_dict	25	kept	Pins empty dict return for empty field list — catches a crash on zero fields.	<pending>
+tests/test_traces.py::TestSampleFieldsBatching::test_batched_matches_per_field[nearest]	25	kept	Pins batched nearest matches per-field sampling — catches index-reuse bug across fields.	<pending>
+tests/test_traces.py::TestSampleFieldsBatching::test_batched_matches_per_field[linear]	25	kept	Pins batched linear matches per-field — catches interpolator stacking bug.	<pending>
+tests/test_traces.py::TestSamplingEdgeCases::test_single_node_axis_does_not_crash	25	kept	Regression guard: single-node z axis samples correctly — catches np.clip(0, len-2) underflow.	<pending>
+tests/test_traces.py::TestSamplingEdgeCases::test_single_node_axis_far_z_out_of_bounds	25	kept	Pins NaN for far-out-of-bounds query on single-node axis — catches a clamp returning valid index.	<pending>
+tests/test_traces.py::TestVectorFieldInterpolator::test_from_dataset	25	hardened	Replaced 'is not None' with functional evaluation check: pins interpolated B=(1,0,0) at domain center.	<pending>
+tests/test_traces.py::TestVectorFieldInterpolator::test_call_inside_domain	25	kept	Pins shape (3,), no NaN, and exact B=(1,0,0) at center — catches wrong stacking order.	<pending>
+tests/test_traces.py::TestVectorFieldInterpolator::test_call_outside_domain	25	kept	Pins all-NaN for far out-of-bounds point — catches a bounds_error=True crash.	<pending>
+tests/test_traces.py::TestTraceFieldLine::test_uniform_field_straight_line	25	kept	Pins y=z=10 (no transverse drift) and x advances in uniform B=(1,0,0) — catches a RK4 direction bug.	<pending>
+tests/test_traces.py::TestTraceFieldLine::test_forward_only	25	kept	Pins direction='forward', seed at x=10, monotonic x increase — catches a sign error in forward tracing.	<pending>
+tests/test_traces.py::TestTraceFieldLine::test_backward_only	25	kept	Pins direction='backward' and correct point ordering (stored start-to-end) — catches assembly reversal bug.	<pending>
+tests/test_traces.py::TestTraceFieldLine::test_both_directions	25	kept	Pins direction='both' with n_points > 3 (fwd + bwd + seed) — catches a degenerate assembly.	<pending>
+tests/test_traces.py::TestTraceFieldLine::test_domain_exit_terminates	25	kept	Pins TerminationReason.DOMAIN_EXIT near boundary — catches a reason mis-classification.	<pending>
+tests/test_traces.py::TestTraceFieldLine::test_terminate_callback	25	kept	Pins CALLBACK reason and final x > 12 — catches a callback that's never evaluated.	<pending>
+tests/test_traces.py::TestTraceFieldLine::test_invalid_direction_rejects	25	kept	Pins ValueError for invalid direction string — catches a match/case fall-through.	<pending>
+tests/test_traces.py::TestTraceFieldLine::test_seed_outside_domain_rejects	25	kept	Pins ValueError for far-outside seed — catches a missing validation.	<pending>
+tests/test_traces.py::TestTraceFieldLine::test_callback_terminates_after_first_step	25	kept	Pins n_points=2 (seed + 1 step) with CALLBACK reason — catches a callback timing bug (evaluated before/after step).	<pending>
+tests/test_traces.py::TestTraceFieldLineAdaptive::test_uniform_field_straight_line	25	kept	Pins y=z=10 and x-advance in adaptive Dormand-Prince on uniform B — catches adaptive step rejection on smooth field.	<pending>
+tests/test_traces.py::TestTraceFieldLineAdaptive::test_adaptive_stores_max_local_error	25	kept	Pins 'max_local_error' and method='rk45_dopri' in metadata — catches missing metadata population.	<pending>
+tests/test_traces.py::TestEstimateTracingError::test_error_estimate	25	kept	Pins Richardson error < 1e-6 on uniform field (RK4 exact) — catches a half-step re-trace bug.	<pending>
+tests/test_traces.py::TestEstimateTracingError::test_missing_metadata_raises	25	kept	Pins ValueError when step_size metadata is missing — catches a KeyError that gives unhelpful message.	<pending>
+tests/test_traces.py::TestFieldNameFromComponents::test_valid	25	kept	Pins B1/B2/B3 -> 'B' and Ve1/Ve2/Ve3 -> 'Ve' — catches a rstrip over-stripping bug.	<pending>
+tests/test_traces.py::TestFieldNameFromComponents::test_mismatched_rejects	25	kept	Pins ValueError on mixed prefix (B1,E2,B3) — catches silent use of wrong field name.	<pending>
 tests/test_tracing.py::TestVectorFieldInterpolator::test_evaluate_at_grid_center	0	not-yet-reviewed		
 tests/test_tracing.py::TestVectorFieldInterpolator::test_outside_domain_gives_nan	0	not-yet-reviewed		
 tests/test_tracing.py::TestVectorFieldInterpolator::test_linear_interpolation_accuracy	0	not-yet-reviewed		
