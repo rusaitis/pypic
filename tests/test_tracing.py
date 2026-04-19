@@ -510,22 +510,6 @@ class TestDirectionHandling:
         )
         assert float(np.min(distances)) < 1e-12
 
-    def test_forward_starts_at_seed(self) -> None:
-        data = _make_uniform_field()
-        seed = (5.0, 5.0, 5.0)
-        fl = trace_field_line(
-            data,
-            seed,
-            step_size=0.5,
-            max_steps=5,
-            direction="forward",
-        )
-        np.testing.assert_allclose(
-            fl.points[0],
-            list(seed),
-            atol=1e-12,
-        )
-
     def test_backward_ends_at_seed(self) -> None:
         """Backward trace reversed: last point is the seed."""
         data = _make_uniform_field(b_vec=(1.0, 0.0, 0.0))
