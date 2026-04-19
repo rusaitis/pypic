@@ -198,7 +198,8 @@ class TestRegrid:
         expected = fx + fy + fz
         assert_allclose(result["f"], expected, atol=1e-12)
 
-    def test_output_shape(self) -> None:
+    def test_output_shape_and_constant_preserved(self) -> None:
+        """Regridding a constant field preserves both shape and value."""
         coarse = make_uniform_grid(4, 6, spacing=1.0)
         ds = FieldDataset.from_arrays(
             {"B1": np.ones((4, 6))}, coarse, Normalization.identity()
@@ -206,6 +207,9 @@ class TestRegrid:
         target = make_uniform_grid(8, 12, spacing=0.5)
         result = regrid(ds, target)
         assert result["B1"].shape == (8, 12)
+        # A constant field must remain constant after linear interpolation.
+        finite = np.isfinite(result["B1"])
+        assert_allclose(result["B1"][finite], 1.0, atol=1e-14)
 
     def test_nan_outside_domain(self) -> None:
         """Points outside source domain are NaN."""
@@ -241,6 +245,9 @@ class TestRegrid:
         fine = make_uniform_grid(8, spacing=0.5)
         result = regrid(ds, fine)
         assert sorted(result.field_names()) == sorted(ds.field_names())
+        # Constant fields must survive regridding with their values intact.
+        finite_b2 = np.isfinite(result["B2"])
+        assert_allclose(result["B2"][finite_b2], 2.0, atol=1e-14)
 
     def test_multifield_matches_independent_single_field(self) -> None:
         """Stacked multi-field regrid matches per-field regrids exactly.

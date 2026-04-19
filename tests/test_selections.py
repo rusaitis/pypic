@@ -126,19 +126,23 @@ class TestPlaneSelection:
 
 
 class TestBoxSelection:
-    def test_subbox_shape(self, cartesian_3d: FieldDataset) -> None:
+    def test_subbox_shape_and_values(self, cartesian_3d: FieldDataset) -> None:
         result = BoxSelection(ranges={"x": (1, 5), "y": (0, 3)}).apply(cartesian_3d)
         assert result["B1"].shape == (4, 3, 4)
+        # Interior values must be preserved exactly (integer-index slice).
+        assert_array_equal(result["B1"], cartesian_3d["B1"][1:5, 0:3, :])
 
     def test_single_axis_range(self, cartesian_3d: FieldDataset) -> None:
         result = BoxSelection(ranges={"z": (1, 3)}).apply(cartesian_3d)
         assert result["B1"].shape == (8, 6, 2)
+        assert_array_equal(result["B1"], cartesian_3d["B1"][:, :, 1:3])
 
     def test_all_axes_ranged(self, cartesian_3d: FieldDataset) -> None:
         result = BoxSelection(ranges={"x": (2, 6), "y": (1, 4), "z": (0, 2)}).apply(
             cartesian_3d
         )
         assert result["B1"].shape == (4, 3, 2)
+        assert_array_equal(result["B1"], cartesian_3d["B1"][2:6, 1:4, 0:2])
 
     def test_empty_ranges_noop(self, cartesian_3d: FieldDataset) -> None:
         result = BoxSelection(ranges={}).apply(cartesian_3d)
@@ -156,6 +160,9 @@ class TestBoxSelection:
     def test_grid_origin_updated(self, cartesian_3d: FieldDataset) -> None:
         result = BoxSelection(ranges={"x": (2, 6)}).apply(cartesian_3d)
         np.testing.assert_allclose(result.grid.origin[0], 2.0, atol=1e-12)
+        # Unsliced axes keep their original origin.
+        assert result.grid.origin[1] == 0.0
+        assert result.grid.origin[2] == 0.0
 
     def test_grid_spacing_preserved(self, cartesian_3d: FieldDataset) -> None:
         result = BoxSelection(ranges={"x": (1, 5)}).apply(cartesian_3d)
@@ -202,6 +209,8 @@ class TestSphereSelection:
         result = sel.apply(cartesian_3d)
         assert result["B1"].shape == (8, 6, 4)
         assert result.grid.dimensions == (8, 6, 4)
+        # Some points inside radius=2.0 must be NaN-masked.
+        assert np.any(np.isnan(result["B1"]))
 
     def test_preserves_grid_metadata(self, cartesian_3d: FieldDataset) -> None:
         sel = SphereSelection(center=(4.0, 3.0, 2.0), radius=2.0, keep="inside")
