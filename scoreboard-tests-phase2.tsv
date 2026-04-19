@@ -1436,138 +1436,138 @@ tests/test_spectral.py::TestSpectralEdgeCases::test_nyquist_handling_parity[64]	
 tests/test_spectral.py::TestSpectralEdgeCases::test_nyquist_handling_parity[65]	23	kept	Odd N: k monotonically increasing and power finite — catches off-by-one in rfftfreq length for odd N.	8eae5a9
 tests/test_spectral.py::TestSpectralEdgeCases::test_all_zero_field_2d	23	kept	2D zero field → all power == 0.0 — catches NaN from empty-bin averaging with zero input.	8eae5a9
 tests/test_spectral.py::TestSpectralEdgeCases::test_all_zero_field_3d	23	kept	3D zero field → all power == 0.0 — catches NaN from empty-shell averaging with zero input.	8eae5a9
-tests/test_stagger_info.py::TestStaggerInfoConstruction::test_minimal	24	kept	Pins default None for optional fields on the StaggerInfo frozen dataclass; catches broken __init__ defaults.	<pending>
-tests/test_stagger_info.py::TestStaggerInfoConstruction::test_full	24	kept	Pins all four StaggerInfo fields round-trip through construction; catches field_locations dict access and interpolation_order/notes storage.	<pending>
-tests/test_stagger_info.py::TestStaggerInfoConstruction::test_field_locations_frozen_to_mapping_proxy	24	kept	Guards the __post_init__ MappingProxyType wrapping of field_locations; without it a plain dict leaks through and StaggerInfo is mutable.	<pending>
-tests/test_stagger_info.py::TestStaggerInfoConstruction::test_frozen	24	kept	Pins frozen=True on the dataclass; catches accidental removal of immutability which would break thread safety contract.	<pending>
-tests/test_stagger_info.py::TestStaggerInfoConstruction::test_copy_replace	24	kept	Pins copy.replace() (Python 3.13+ frozen dataclass copy) producing a new object with changed convention while leaving original intact.	<pending>
-tests/test_stagger_info.py::TestStaggerInFieldDataset::test_stagger_in_metadata	24	kept	Pins StaggerInfo round-trip through FieldDataset.metadata dict; catches metadata serialization or wrapping that loses the stagger object.	<pending>
-tests/test_stagger_info.py::TestStaggerInFieldDataset::test_stagger_survives_selection	24	kept	Pins metadata propagation through isel (3D→2D slice); catches metadata being dropped during dimension reduction.	<pending>
-tests/test_structured_aliases.py::TestUnderscoreFieldAliases::test_cartesian_underscore_aliases[B_x-B1]	24	kept	Pins underscore-separated Cartesian alias B_x→B1 through FieldDataset __getitem__; catches alias table omission for this form.	<pending>
-tests/test_structured_aliases.py::TestUnderscoreFieldAliases::test_cartesian_underscore_aliases[B_y-B2]	24	kept	Pins B_y→B2 alias resolution through dataset access.	<pending>
-tests/test_structured_aliases.py::TestUnderscoreFieldAliases::test_cartesian_underscore_aliases[B_z-B3]	24	kept	Pins B_z→B3 alias resolution through dataset access.	<pending>
-tests/test_structured_aliases.py::TestUnderscoreFieldAliases::test_cartesian_underscore_aliases[E_x-E1]	24	kept	Pins E_x→E1 alias resolution; exercises the E-field prefix path alongside B-field.	<pending>
-tests/test_structured_aliases.py::TestUnderscoreFieldAliases::test_cartesian_underscore_aliases[V_y-V2]	24	kept	Pins V_y→V2 alias resolution; exercises velocity prefix path.	<pending>
-tests/test_structured_aliases.py::TestUnderscoreFieldAliases::test_cartesian_underscore_aliases[J_z-J3]	24	kept	Pins J_z→J3 alias resolution; exercises current density prefix path.	<pending>
-tests/test_structured_aliases.py::TestUnderscoreFieldAliases::test_numbered_underscore_aliases[B_1-B1]	24	kept	Pins B_1→B1 numbered underscore alias; distinct from letter-suffix form (B_x vs B_1).	<pending>
-tests/test_structured_aliases.py::TestUnderscoreFieldAliases::test_numbered_underscore_aliases[E_2-E2]	24	kept	Pins E_2→E2 numbered underscore alias.	<pending>
-tests/test_structured_aliases.py::TestUnderscoreFieldAliases::test_numbered_underscore_aliases[V_3-V3]	24	kept	Pins V_3→V3 numbered underscore alias.	<pending>
-tests/test_structured_aliases.py::TestUnderscoreFieldAliases::test_numbered_underscore_aliases[J_1-J1]	24	kept	Pins J_1→J1 numbered underscore alias.	<pending>
-tests/test_structured_aliases.py::TestUnderscoreFieldAliases::test_scalar_underscore_aliases[P_e-Pe]	24	kept	Pins P_e→Pe scalar alias; catches missing underscore variant for electron pressure.	<pending>
-tests/test_structured_aliases.py::TestUnderscoreFieldAliases::test_scalar_underscore_aliases[P_i-Pi]	24	kept	Pins P_i→Pi scalar alias for ion pressure.	<pending>
-tests/test_structured_aliases.py::TestUnderscoreFieldAliases::test_scalar_underscore_aliases[T_e-Te]	24	kept	Pins T_e→Te scalar alias for electron temperature.	<pending>
-tests/test_structured_aliases.py::TestUnderscoreFieldAliases::test_scalar_underscore_aliases[T_i-Ti]	24	kept	Pins T_i→Ti scalar alias for ion temperature.	<pending>
-tests/test_structured_aliases.py::TestUnderscoreFieldAliases::test_scalar_underscore_aliases[P_11-P11]	24	kept	Pins P_11→P11 pressure tensor component alias; catches parser confusion with tensor index vs species index.	<pending>
-tests/test_structured_aliases.py::TestUnderscoreFieldAliases::test_scalar_underscore_aliases[P_12-P12]	24	kept	Pins P_12→P12 off-diagonal pressure tensor alias.	<pending>
-tests/test_structured_aliases.py::TestUnderscoreFieldAliases::test_scalar_underscore_aliases[P_33-P33]	24	kept	Pins P_33→P33 pressure tensor diagonal alias.	<pending>
-tests/test_structured_aliases.py::TestUnderscoreFieldAliases::test_has_field_with_underscore_alias	24	kept	Pins has_field() accepting underscore aliases (both B_x and B_1 forms); catches has_field not going through alias resolution.	<pending>
-tests/test_structured_aliases.py::TestMagnitudeComputeAliases::test_magnitude_aliases[B_mag-|B|]	24	kept	Pins B_mag→|B| through full compute_field pipeline; catches broken magnitude alias mapping.	<pending>
-tests/test_structured_aliases.py::TestMagnitudeComputeAliases::test_magnitude_aliases[Bmag-|B|]	24	kept	Pins no-underscore Bmag→|B| variant; distinct code path from B_mag (different string pattern).	<pending>
-tests/test_structured_aliases.py::TestMagnitudeComputeAliases::test_magnitude_aliases[E_mag-|E|]	24	kept	Pins E_mag→|E| magnitude alias through compute.	<pending>
-tests/test_structured_aliases.py::TestMagnitudeComputeAliases::test_magnitude_aliases[Emag-|E|]	24	kept	Pins Emag→|E| variant.	<pending>
-tests/test_structured_aliases.py::TestMagnitudeComputeAliases::test_magnitude_aliases[J_mag-|J|]	24	kept	Pins J_mag→|J| magnitude alias.	<pending>
-tests/test_structured_aliases.py::TestMagnitudeComputeAliases::test_magnitude_aliases[Jmag-|J|]	24	kept	Pins Jmag→|J| variant.	<pending>
-tests/test_structured_aliases.py::TestMagnitudeComputeAliases::test_magnitude_aliases[V_mag-|V|]	24	kept	Pins V_mag→|V| magnitude alias.	<pending>
-tests/test_structured_aliases.py::TestMagnitudeComputeAliases::test_magnitude_aliases[Vmag-|V|]	24	kept	Pins Vmag→|V| variant.	<pending>
-tests/test_structured_aliases.py::TestDescriptiveComputeAliases::test_plasma_beta	24	kept	End-to-end compute through 'plasma_beta' alias; verifies numeric result (2P/B^2 = 2.0) not just alias resolution.	<pending>
-tests/test_structured_aliases.py::TestDescriptiveComputeAliases::test_v_alfven	24	kept	End-to-end compute through 'alfven_speed' alias; verifies B/sqrt(rho_m) = 0.5.	<pending>
-tests/test_structured_aliases.py::TestDescriptiveComputeAliases::test_descriptive_aliases_resolve[energy_magnetic-e_B]	24	kept	Pins energy_magnetic→e_B alias mapping in _COMPUTE_ALIASES table.	<pending>
-tests/test_structured_aliases.py::TestDescriptiveComputeAliases::test_descriptive_aliases_resolve[energy_electric-e_E]	24	kept	Pins energy_electric→e_E alias mapping.	<pending>
-tests/test_structured_aliases.py::TestDescriptiveComputeAliases::test_descriptive_aliases_resolve[energy_kinetic-e_k]	24	kept	Pins energy_kinetic→e_k alias mapping.	<pending>
-tests/test_structured_aliases.py::TestDescriptiveComputeAliases::test_descriptive_aliases_resolve[energy_thermal-e_th]	24	kept	Pins energy_thermal→e_th alias mapping.	<pending>
-tests/test_structured_aliases.py::TestDescriptiveComputeAliases::test_descriptive_aliases_resolve[enthalpy-h]	24	kept	Pins enthalpy→h alias mapping.	<pending>
-tests/test_structured_aliases.py::TestDescriptiveComputeAliases::test_descriptive_aliases_resolve[energy_internal-e_int]	24	kept	Pins energy_internal→e_int alias mapping.	<pending>
-tests/test_structured_aliases.py::TestDescriptiveComputeAliases::test_descriptive_aliases_resolve[c_ms-v_ms]	24	kept	Pins c_ms→v_ms alias (magnetosonic speed alternate name).	<pending>
-tests/test_structured_aliases.py::TestStructuredSpeciesComputeAliases::test_omega_p_s0	24	kept	End-to-end compute of omega_p_s0 matching omega_pe; verifies species-indexed alias routes to electron plasma frequency recipe.	<pending>
-tests/test_structured_aliases.py::TestStructuredSpeciesComputeAliases::test_d_s1	24	kept	End-to-end compute of d_s1 matching d_i; verifies ion skin depth via species-indexed alias.	<pending>
-tests/test_structured_aliases.py::TestStructuredSpeciesComputeAliases::test_larmor_radius_s0	24	kept	End-to-end compute of larmor_radius_s0 matching r_e; verifies electron gyroradius via species-indexed alias.	<pending>
-tests/test_structured_aliases.py::TestStructuredSpeciesComputeAliases::test_species_aliases_resolve[omega_p_s0-omega_pe]	24	kept	Pins omega_p_s0→omega_pe alias table entry.	<pending>
-tests/test_structured_aliases.py::TestStructuredSpeciesComputeAliases::test_species_aliases_resolve[omega_p_s1-omega_pi]	24	kept	Pins omega_p_s1→omega_pi alias table entry.	<pending>
-tests/test_structured_aliases.py::TestStructuredSpeciesComputeAliases::test_species_aliases_resolve[omega_c_s0-omega_ce]	24	kept	Pins omega_c_s0→omega_ce alias table entry.	<pending>
-tests/test_structured_aliases.py::TestStructuredSpeciesComputeAliases::test_species_aliases_resolve[omega_c_s1-omega_ci]	24	kept	Pins omega_c_s1→omega_ci alias table entry.	<pending>
-tests/test_structured_aliases.py::TestStructuredSpeciesComputeAliases::test_species_aliases_resolve[d_s0-d_e]	24	kept	Pins d_s0→d_e alias table entry.	<pending>
-tests/test_structured_aliases.py::TestStructuredSpeciesComputeAliases::test_species_aliases_resolve[d_s1-d_i]	24	kept	Pins d_s1→d_i alias table entry.	<pending>
-tests/test_structured_aliases.py::TestStructuredSpeciesComputeAliases::test_species_aliases_resolve[v_thermal_s0-v_th_e]	24	kept	Pins v_thermal_s0→v_th_e alias (long-form thermal speed name).	<pending>
-tests/test_structured_aliases.py::TestStructuredSpeciesComputeAliases::test_species_aliases_resolve[v_thermal_s1-v_th_i]	24	kept	Pins v_thermal_s1→v_th_i alias.	<pending>
-tests/test_structured_aliases.py::TestStructuredSpeciesComputeAliases::test_species_aliases_resolve[v_th_s0-v_th_e]	24	kept	Pins v_th_s0→v_th_e alias (short-form with species index).	<pending>
-tests/test_structured_aliases.py::TestStructuredSpeciesComputeAliases::test_species_aliases_resolve[v_th_s1-v_th_i]	24	kept	Pins v_th_s1→v_th_i alias.	<pending>
-tests/test_structured_aliases.py::TestStructuredSpeciesComputeAliases::test_species_aliases_resolve[rL_s0-r_e]	24	kept	Pins rL_s0→r_e alias (Larmor radius alternate prefix).	<pending>
-tests/test_structured_aliases.py::TestStructuredSpeciesComputeAliases::test_species_aliases_resolve[rL_s1-r_i]	24	kept	Pins rL_s1→r_i alias.	<pending>
-tests/test_structured_aliases.py::TestStructuredSpeciesComputeAliases::test_species_aliases_resolve[r_s0-r_e]	24	kept	Pins r_s0→r_e alias (short gyroradius name).	<pending>
-tests/test_structured_aliases.py::TestStructuredSpeciesComputeAliases::test_species_aliases_resolve[r_s1-r_i]	24	kept	Pins r_s1→r_i alias.	<pending>
-tests/test_structured_aliases.py::TestStructuredSpeciesComputeAliases::test_species_aliases_resolve[beta_s0-beta_e]	24	kept	Pins beta_s0→beta_e alias.	<pending>
-tests/test_structured_aliases.py::TestStructuredSpeciesComputeAliases::test_species_aliases_resolve[beta_s1-beta_i]	24	kept	Pins beta_s1→beta_i alias.	<pending>
-tests/test_structured_aliases.py::TestStructuredSpeciesComputeAliases::test_species_aliases_resolve[entropy_s0-s_e]	24	kept	Pins entropy_s0→s_e alias.	<pending>
-tests/test_structured_aliases.py::TestStructuredSpeciesComputeAliases::test_species_aliases_resolve[entropy_s1-s_i]	24	kept	Pins entropy_s1→s_i alias.	<pending>
-tests/test_structured_aliases.py::TestStructuredSpeciesComputeAliases::test_species_aliases_resolve[T_s0-Te]	24	kept	Pins T_s0→Te alias.	<pending>
-tests/test_structured_aliases.py::TestStructuredSpeciesComputeAliases::test_species_aliases_resolve[T_s1-Ti]	24	kept	Pins T_s1→Ti alias.	<pending>
-tests/test_structured_aliases.py::TestStructuredSpeciesComputeAliases::test_species_aliases_resolve[P_s0-Pe]	24	kept	Pins P_s0→Pe alias.	<pending>
-tests/test_structured_aliases.py::TestStructuredSpeciesComputeAliases::test_species_aliases_resolve[P_s1-Pi]	24	kept	Pins P_s1→Pi alias.	<pending>
-tests/test_structured_aliases.py::TestStructuredSpeciesComputeAliases::test_species_aliases_resolve[lambda_D_s0-lambda_D]	24	kept	Pins lambda_D_s0→lambda_D alias (Debye length species-indexed form).	<pending>
-tests/test_structured_aliases.py::TestOperatorAliases::test_operator_aliases_resolve[curl_B_x-curl_B1]	24	kept	Pins curl_B_x→curl_B1 operator alias.	<pending>
-tests/test_structured_aliases.py::TestOperatorAliases::test_operator_aliases_resolve[curl_B_y-curl_B2]	24	kept	Pins curl_B_y→curl_B2 operator alias.	<pending>
-tests/test_structured_aliases.py::TestOperatorAliases::test_operator_aliases_resolve[curl_B_z-curl_B3]	24	kept	Pins curl_B_z→curl_B3 operator alias.	<pending>
-tests/test_structured_aliases.py::TestOperatorAliases::test_operator_aliases_resolve[curl_B_1-curl_B1]	24	kept	Pins curl_B_1→curl_B1 numbered underscore variant.	<pending>
-tests/test_structured_aliases.py::TestOperatorAliases::test_operator_aliases_resolve[curl_B_2-curl_B2]	24	kept	Pins curl_B_2→curl_B2 numbered underscore variant.	<pending>
-tests/test_structured_aliases.py::TestOperatorAliases::test_operator_aliases_resolve[curl_B_3-curl_B3]	24	kept	Pins curl_B_3→curl_B3 numbered underscore variant.	<pending>
-tests/test_structured_aliases.py::TestOperatorAliases::test_operator_aliases_resolve[vort_1-vort1]	24	kept	Pins vort_1→vort1 vorticity component alias.	<pending>
-tests/test_structured_aliases.py::TestOperatorAliases::test_operator_aliases_resolve[vort_2-vort2]	24	kept	Pins vort_2→vort2 vorticity component alias.	<pending>
-tests/test_structured_aliases.py::TestOperatorAliases::test_operator_aliases_resolve[vort_3-vort3]	24	kept	Pins vort_3→vort3 vorticity component alias.	<pending>
-tests/test_structured_aliases.py::TestOperatorAliases::test_operator_aliases_resolve[S_1-S1]	24	kept	Pins S_1→S1 Poynting flux component alias.	<pending>
-tests/test_structured_aliases.py::TestOperatorAliases::test_operator_aliases_resolve[S_x-S1]	24	kept	Pins S_x→S1 Poynting flux Cartesian alias.	<pending>
-tests/test_structured_aliases.py::TestOperatorAliases::test_operator_aliases_resolve[S_z-S3]	24	kept	Pins S_z→S3 Poynting flux z-component alias.	<pending>
-tests/test_structured_aliases.py::TestOperatorAliases::test_curl_b_x_computes	24	kept	End-to-end compute through curl_B_x alias; verifies actual curl computation routes through alias, not just dict lookup.	<pending>
-tests/test_structured_aliases.py::TestOperatorAliases::test_s_x_computes	24	kept	End-to-end compute of Poynting S_x component through alias; verifies cross product E×B routes correctly.	<pending>
-tests/test_structured_aliases.py::TestSIConversionThroughAliases::test_bx_si_factor	24	kept	Pins field_si_factor resolving Bx (letter alias) to b_field quantity type; catches SI lookup skipping alias resolution.	<pending>
-tests/test_structured_aliases.py::TestSIConversionThroughAliases::test_b_x_underscore_si_factor	24	kept	Pins field_si_factor resolving B_x (underscore alias) to b_field; distinct alias form from Bx.	<pending>
-tests/test_structured_aliases.py::TestSIConversionThroughAliases::test_p_e_underscore_si_factor	24	kept	Pins P_e→Pe SI factor equality; catches pressure alias not resolving through SI lookup.	<pending>
-tests/test_structured_aliases.py::TestSIConversionThroughAliases::test_in_si_through_field_alias	24	kept	End-to-end ds.in_si('Bx') returning code_value * b_ref; pins the full alias→SI pipeline through FieldDataset.	<pending>
-tests/test_structured_aliases.py::TestSIConversionThroughAliases::test_in_si_through_underscore_alias	24	kept	End-to-end ds.in_si('B_x') through the underscore alias path; distinct from test_in_si_through_field_alias.	<pending>
-tests/test_structured_aliases.py::TestSIConversionThroughAliases::test_in_si_magnitude_alias	24	kept	End-to-end ds.in_si('B_mag') through compute+SI pipeline; verifies magnitude aliases work in SI context.	<pending>
-tests/test_structured_aliases.py::TestFieldAliasIntegrity::test_no_underscore_field_alias_collides_with_canonical	24	kept	Structural: no alias key in _default_aliases collides with canonical field names; catches alias shadowing a real field.	<pending>
-tests/test_structured_aliases.py::TestFieldAliasIntegrity::test_underscore_aliases_present_in_defaults	24	kept	Structural: key underscore aliases (B_x, B_1, P_e, T_i, P_11) exist in _default_aliases; catches incomplete alias table.	<pending>
-tests/test_structured_aliases.py::TestMultiSpeciesDynamicRecipes::test_omega_p_s2_computes	24	kept	End-to-end: omega_p for species index 2 (alphas, q=2, m=4); verifies dynamic recipe templating beyond hardcoded s0/s1.	<pending>
-tests/test_structured_aliases.py::TestMultiSpeciesDynamicRecipes::test_omega_c_s2_computes	24	kept	End-to-end: omega_c for alphas (|q|B/m = 2*2/4 = 1); verifies cyclotron frequency dynamic recipe.	<pending>
-tests/test_structured_aliases.py::TestMultiSpeciesDynamicRecipes::test_d_s2_computes	24	kept	End-to-end: skin depth for alphas (c/omega_p = 1); verifies skin depth dynamic recipe.	<pending>
-tests/test_structured_aliases.py::TestMultiSpeciesDynamicRecipes::test_v_th_s2_computes	24	kept	End-to-end: thermal speed for alphas (sqrt(T/m) = 1); chains through T_s2 = P_s2/n_s2 intermediate.	<pending>
-tests/test_structured_aliases.py::TestMultiSpeciesDynamicRecipes::test_r_s2_computes	24	kept	End-to-end: gyroradius for alphas (sqrt(mT)/(|q|B) = 2); most complex dynamic recipe chain (P→T→v_th→r).	<pending>
-tests/test_structured_aliases.py::TestMultiSpeciesDynamicRecipes::test_lambda_d_s2_computes	24	kept	End-to-end: Debye length for alphas (sqrt(T/(n*q^2)) = 1); verifies Debye length dynamic recipe.	<pending>
-tests/test_structured_aliases.py::TestMultiSpeciesDynamicRecipes::test_beta_s2_computes	24	kept	End-to-end: plasma beta for alphas (2P/B^2 = 10); verifies per-species beta dynamic recipe.	<pending>
-tests/test_structured_aliases.py::TestMultiSpeciesDynamicRecipes::test_s_s2_computes	24	kept	End-to-end: entropy for alphas (ln(P/n^gamma) = 0); verifies per-species entropy dynamic recipe.	<pending>
-tests/test_structured_aliases.py::TestMultiSpeciesDynamicRecipes::test_temperature_s2_computes	24	kept	End-to-end: temperature for alphas (P/n = 2); verifies T_s2 dynamic recipe.	<pending>
-tests/test_structured_aliases.py::TestMultiSpeciesDynamicRecipes::test_s0_s1_still_resolve_via_static_aliases	24	dropped	Exact duplicate of test_omega_p_s0 (same data, same compute calls, same assertion); killed-mutant set is identical.	<pending>
-tests/test_structured_aliases.py::TestMultiSpeciesSIConversion::test_species_si_factor[density]	24	kept	Pins SI factor for n_s2 = density_ref; verifies species-indexed density maps to density quantity type.	<pending>
-tests/test_structured_aliases.py::TestMultiSpeciesSIConversion::test_species_si_factor[frequency]	24	kept	Pins SI factor for omega_p_s2 = 1/time_ref; verifies species-indexed frequency maps to frequency quantity type.	<pending>
-tests/test_structured_aliases.py::TestMultiSpeciesSIConversion::test_species_si_factor[velocity]	24	kept	Pins SI factor for v_th_s2 = velocity_ref; verifies species-indexed thermal speed maps to velocity quantity type.	<pending>
-tests/test_structured_aliases.py::TestMultiSpeciesSIConversion::test_species_si_factor[dimensionless]	24	kept	Pins SI factor for beta_s2 = 1.0; verifies dimensionless species quantities have identity factor.	<pending>
-tests/test_structured_aliases.py::TestSpeciesNameAliases::test_n_alphas_resolves_to_n_s2	24	kept	End-to-end: n_alphas alias resolves to n_s2 data; verifies species-name-based alias generation from config.	<pending>
-tests/test_structured_aliases.py::TestSpeciesNameAliases::test_n_e_n_i_aliases_take_priority	24	kept	Guards that hardcoded n_e/n_i aliases are not overwritten by species-name logic; priority collision would silently break two-species shorthand.	<pending>
-tests/test_structured_aliases.py::TestSpeciesNameAliases::test_species_alias_not_added_without_data	24	kept	Pins that species-name alias is only registered when the canonical field exists; prevents phantom aliases that would fail on access.	<pending>
-tests/test_structured_aliases.py::TestAuditIssue2SGyroRename::test_s_gyro_e_is_canonical	24	kept	Pins s_gyro_e as a registered canonical compute entry; guards against renaming regression.	<pending>
-tests/test_structured_aliases.py::TestAuditIssue2SGyroRename::test_s_gyro_i_is_canonical	24	kept	Pins s_gyro_i as a registered canonical compute entry.	<pending>
-tests/test_structured_aliases.py::TestAuditIssue2SGyroRename::test_bare_s_gyro_not_in_aliases	24	kept	Guards against bare 's_gyro' being added as an alias; ambiguous without species qualifier per schema convention.	<pending>
-tests/test_structured_aliases.py::TestAuditIssue2SGyroRename::test_bare_s_gyro_raises_with_suggestions	24	kept	End-to-end: bare 's_gyro' raises KeyError mentioning 's_gyro_e'; verifies helpful error message guides users to correct name.	<pending>
-tests/test_structured_aliases.py::TestAuditIssue6ElectronVelocityMagnitude::test_ve_magnitude_345	24	kept	End-to-end: |Ve| = sqrt(3^2+4^2) = 5; pins electron velocity magnitude compute recipe.	<pending>
-tests/test_structured_aliases.py::TestAuditIssue6ElectronVelocityMagnitude::test_ve_magnitude_aliases[Ve_mag]	24	kept	Pins Ve_mag→|Ve| alias through compute; underscore form.	<pending>
-tests/test_structured_aliases.py::TestAuditIssue6ElectronVelocityMagnitude::test_ve_magnitude_aliases[Vemag]	24	kept	Pins Vemag→|Ve| alias through compute; no-underscore form.	<pending>
-tests/test_structured_aliases.py::TestAuditSIFactorGaps::test_gyrotropic_entropy_si_factor[s_gyro_e]	24	kept	Pins SI factor for s_gyro_e = 1.0 (dimensionless); catches missing quantity type registration for gyrotropic entropy.	<pending>
-tests/test_structured_aliases.py::TestAuditSIFactorGaps::test_gyrotropic_entropy_si_factor[s_gyro_i]	24	kept	Pins SI factor for s_gyro_i = 1.0 (dimensionless).	<pending>
-tests/test_structured_aliases.py::TestAuditSIFactorGaps::test_ef_si_factor[EF1]	24	kept	Pins SI factor for EF1 with identity norm; verifies energy flux field is registered in SI lookup.	<pending>
-tests/test_structured_aliases.py::TestAuditSIFactorGaps::test_ef_si_factor[EF2]	24	kept	Pins SI factor for EF2.	<pending>
-tests/test_structured_aliases.py::TestAuditSIFactorGaps::test_ef_si_factor[EF3]	24	kept	Pins SI factor for EF3.	<pending>
-tests/test_structured_aliases.py::TestAuditSIFactorGaps::test_b0_si_factor[B0_1]	24	kept	Pins SI factor for B0_1 (background B) = b_field_ref; catches split-B field not being registered with b_field quantity type.	<pending>
-tests/test_structured_aliases.py::TestAuditSIFactorGaps::test_b0_si_factor[B0_2]	24	kept	Pins SI factor for B0_2 = b_field_ref.	<pending>
-tests/test_structured_aliases.py::TestAuditSIFactorGaps::test_b0_si_factor[B0_3]	24	kept	Pins SI factor for B0_3 = b_field_ref.	<pending>
-tests/test_structured_aliases.py::TestAuditSIFactorGaps::test_ef1_s0_si_factor	24	kept	Pins SI factor for per-species energy flux EF1_s0; verifies species-indexed EF field maps to energy_flux quantity.	<pending>
-tests/test_structured_aliases.py::TestAuditSIFactorGaps::test_ve1_s0_si_factor	24	kept	Pins SI factor for Ve1_s0 = velocity_ref; verifies species-indexed electron velocity maps to velocity quantity.	<pending>
-tests/test_structured_aliases.py::TestAuditSIFactorGaps::test_ve_magnitude_si_factor	24	kept	Pins SI factor for |Ve| = velocity_ref; verifies electron velocity magnitude has correct SI mapping.	<pending>
-tests/test_structured_aliases.py::TestAuditFieldPrefixAliases::test_efx_alias_resolves	24	kept	End-to-end: EFx→EF1 through FieldDataset; verifies _FIELD_PREFIX_PAIRS registers EF prefix aliases.	<pending>
-tests/test_structured_aliases.py::TestAuditFieldPrefixAliases::test_b0x_alias_resolves	24	kept	End-to-end: B0x→B0_1 through FieldDataset; pins split-B Cartesian alias per schema.md underscore separator convention.	<pending>
-tests/test_structured_aliases.py::TestAuditFieldPrefixAliases::test_ion_acoustic_speed_alias	24	kept	Pins ion_acoustic_speed→c_ia alias mapping in _COMPUTE_ALIASES.	<pending>
-tests/test_structured_aliases.py::TestEnergyFluxAliases::test_energy_flux_alias_resolves[energy_flux_x-EF1]	24	kept	Pins energy_flux_x→EF1 descriptive alias.	<pending>
-tests/test_structured_aliases.py::TestEnergyFluxAliases::test_energy_flux_alias_resolves[energy_flux_y-EF2]	24	kept	Pins energy_flux_y→EF2 descriptive alias.	<pending>
-tests/test_structured_aliases.py::TestEnergyFluxAliases::test_energy_flux_alias_resolves[energy_flux_z-EF3]	24	kept	Pins energy_flux_z→EF3 descriptive alias.	<pending>
-tests/test_structured_aliases.py::TestEnergyFluxAliases::test_energy_flux_x_passthrough	24	kept	End-to-end: energy_flux_x compute returns EF1 data unchanged (passthrough recipe); verifies no accidental transformation.	<pending>
+tests/test_stagger_info.py::TestStaggerInfoConstruction::test_minimal	24	kept	Pins default None for optional fields on the StaggerInfo frozen dataclass; catches broken __init__ defaults.	053f512
+tests/test_stagger_info.py::TestStaggerInfoConstruction::test_full	24	kept	Pins all four StaggerInfo fields round-trip through construction; catches field_locations dict access and interpolation_order/notes storage.	053f512
+tests/test_stagger_info.py::TestStaggerInfoConstruction::test_field_locations_frozen_to_mapping_proxy	24	kept	Guards the __post_init__ MappingProxyType wrapping of field_locations; without it a plain dict leaks through and StaggerInfo is mutable.	053f512
+tests/test_stagger_info.py::TestStaggerInfoConstruction::test_frozen	24	kept	Pins frozen=True on the dataclass; catches accidental removal of immutability which would break thread safety contract.	053f512
+tests/test_stagger_info.py::TestStaggerInfoConstruction::test_copy_replace	24	kept	Pins copy.replace() (Python 3.13+ frozen dataclass copy) producing a new object with changed convention while leaving original intact.	053f512
+tests/test_stagger_info.py::TestStaggerInFieldDataset::test_stagger_in_metadata	24	kept	Pins StaggerInfo round-trip through FieldDataset.metadata dict; catches metadata serialization or wrapping that loses the stagger object.	053f512
+tests/test_stagger_info.py::TestStaggerInFieldDataset::test_stagger_survives_selection	24	kept	Pins metadata propagation through isel (3D→2D slice); catches metadata being dropped during dimension reduction.	053f512
+tests/test_structured_aliases.py::TestUnderscoreFieldAliases::test_cartesian_underscore_aliases[B_x-B1]	24	kept	Pins underscore-separated Cartesian alias B_x→B1 through FieldDataset __getitem__; catches alias table omission for this form.	053f512
+tests/test_structured_aliases.py::TestUnderscoreFieldAliases::test_cartesian_underscore_aliases[B_y-B2]	24	kept	Pins B_y→B2 alias resolution through dataset access.	053f512
+tests/test_structured_aliases.py::TestUnderscoreFieldAliases::test_cartesian_underscore_aliases[B_z-B3]	24	kept	Pins B_z→B3 alias resolution through dataset access.	053f512
+tests/test_structured_aliases.py::TestUnderscoreFieldAliases::test_cartesian_underscore_aliases[E_x-E1]	24	kept	Pins E_x→E1 alias resolution; exercises the E-field prefix path alongside B-field.	053f512
+tests/test_structured_aliases.py::TestUnderscoreFieldAliases::test_cartesian_underscore_aliases[V_y-V2]	24	kept	Pins V_y→V2 alias resolution; exercises velocity prefix path.	053f512
+tests/test_structured_aliases.py::TestUnderscoreFieldAliases::test_cartesian_underscore_aliases[J_z-J3]	24	kept	Pins J_z→J3 alias resolution; exercises current density prefix path.	053f512
+tests/test_structured_aliases.py::TestUnderscoreFieldAliases::test_numbered_underscore_aliases[B_1-B1]	24	kept	Pins B_1→B1 numbered underscore alias; distinct from letter-suffix form (B_x vs B_1).	053f512
+tests/test_structured_aliases.py::TestUnderscoreFieldAliases::test_numbered_underscore_aliases[E_2-E2]	24	kept	Pins E_2→E2 numbered underscore alias.	053f512
+tests/test_structured_aliases.py::TestUnderscoreFieldAliases::test_numbered_underscore_aliases[V_3-V3]	24	kept	Pins V_3→V3 numbered underscore alias.	053f512
+tests/test_structured_aliases.py::TestUnderscoreFieldAliases::test_numbered_underscore_aliases[J_1-J1]	24	kept	Pins J_1→J1 numbered underscore alias.	053f512
+tests/test_structured_aliases.py::TestUnderscoreFieldAliases::test_scalar_underscore_aliases[P_e-Pe]	24	kept	Pins P_e→Pe scalar alias; catches missing underscore variant for electron pressure.	053f512
+tests/test_structured_aliases.py::TestUnderscoreFieldAliases::test_scalar_underscore_aliases[P_i-Pi]	24	kept	Pins P_i→Pi scalar alias for ion pressure.	053f512
+tests/test_structured_aliases.py::TestUnderscoreFieldAliases::test_scalar_underscore_aliases[T_e-Te]	24	kept	Pins T_e→Te scalar alias for electron temperature.	053f512
+tests/test_structured_aliases.py::TestUnderscoreFieldAliases::test_scalar_underscore_aliases[T_i-Ti]	24	kept	Pins T_i→Ti scalar alias for ion temperature.	053f512
+tests/test_structured_aliases.py::TestUnderscoreFieldAliases::test_scalar_underscore_aliases[P_11-P11]	24	kept	Pins P_11→P11 pressure tensor component alias; catches parser confusion with tensor index vs species index.	053f512
+tests/test_structured_aliases.py::TestUnderscoreFieldAliases::test_scalar_underscore_aliases[P_12-P12]	24	kept	Pins P_12→P12 off-diagonal pressure tensor alias.	053f512
+tests/test_structured_aliases.py::TestUnderscoreFieldAliases::test_scalar_underscore_aliases[P_33-P33]	24	kept	Pins P_33→P33 pressure tensor diagonal alias.	053f512
+tests/test_structured_aliases.py::TestUnderscoreFieldAliases::test_has_field_with_underscore_alias	24	kept	Pins has_field() accepting underscore aliases (both B_x and B_1 forms); catches has_field not going through alias resolution.	053f512
+tests/test_structured_aliases.py::TestMagnitudeComputeAliases::test_magnitude_aliases[B_mag-|B|]	24	kept	Pins B_mag→|B| through full compute_field pipeline; catches broken magnitude alias mapping.	053f512
+tests/test_structured_aliases.py::TestMagnitudeComputeAliases::test_magnitude_aliases[Bmag-|B|]	24	kept	Pins no-underscore Bmag→|B| variant; distinct code path from B_mag (different string pattern).	053f512
+tests/test_structured_aliases.py::TestMagnitudeComputeAliases::test_magnitude_aliases[E_mag-|E|]	24	kept	Pins E_mag→|E| magnitude alias through compute.	053f512
+tests/test_structured_aliases.py::TestMagnitudeComputeAliases::test_magnitude_aliases[Emag-|E|]	24	kept	Pins Emag→|E| variant.	053f512
+tests/test_structured_aliases.py::TestMagnitudeComputeAliases::test_magnitude_aliases[J_mag-|J|]	24	kept	Pins J_mag→|J| magnitude alias.	053f512
+tests/test_structured_aliases.py::TestMagnitudeComputeAliases::test_magnitude_aliases[Jmag-|J|]	24	kept	Pins Jmag→|J| variant.	053f512
+tests/test_structured_aliases.py::TestMagnitudeComputeAliases::test_magnitude_aliases[V_mag-|V|]	24	kept	Pins V_mag→|V| magnitude alias.	053f512
+tests/test_structured_aliases.py::TestMagnitudeComputeAliases::test_magnitude_aliases[Vmag-|V|]	24	kept	Pins Vmag→|V| variant.	053f512
+tests/test_structured_aliases.py::TestDescriptiveComputeAliases::test_plasma_beta	24	kept	End-to-end compute through 'plasma_beta' alias; verifies numeric result (2P/B^2 = 2.0) not just alias resolution.	053f512
+tests/test_structured_aliases.py::TestDescriptiveComputeAliases::test_v_alfven	24	kept	End-to-end compute through 'alfven_speed' alias; verifies B/sqrt(rho_m) = 0.5.	053f512
+tests/test_structured_aliases.py::TestDescriptiveComputeAliases::test_descriptive_aliases_resolve[energy_magnetic-e_B]	24	kept	Pins energy_magnetic→e_B alias mapping in _COMPUTE_ALIASES table.	053f512
+tests/test_structured_aliases.py::TestDescriptiveComputeAliases::test_descriptive_aliases_resolve[energy_electric-e_E]	24	kept	Pins energy_electric→e_E alias mapping.	053f512
+tests/test_structured_aliases.py::TestDescriptiveComputeAliases::test_descriptive_aliases_resolve[energy_kinetic-e_k]	24	kept	Pins energy_kinetic→e_k alias mapping.	053f512
+tests/test_structured_aliases.py::TestDescriptiveComputeAliases::test_descriptive_aliases_resolve[energy_thermal-e_th]	24	kept	Pins energy_thermal→e_th alias mapping.	053f512
+tests/test_structured_aliases.py::TestDescriptiveComputeAliases::test_descriptive_aliases_resolve[enthalpy-h]	24	kept	Pins enthalpy→h alias mapping.	053f512
+tests/test_structured_aliases.py::TestDescriptiveComputeAliases::test_descriptive_aliases_resolve[energy_internal-e_int]	24	kept	Pins energy_internal→e_int alias mapping.	053f512
+tests/test_structured_aliases.py::TestDescriptiveComputeAliases::test_descriptive_aliases_resolve[c_ms-v_ms]	24	kept	Pins c_ms→v_ms alias (magnetosonic speed alternate name).	053f512
+tests/test_structured_aliases.py::TestStructuredSpeciesComputeAliases::test_omega_p_s0	24	kept	End-to-end compute of omega_p_s0 matching omega_pe; verifies species-indexed alias routes to electron plasma frequency recipe.	053f512
+tests/test_structured_aliases.py::TestStructuredSpeciesComputeAliases::test_d_s1	24	kept	End-to-end compute of d_s1 matching d_i; verifies ion skin depth via species-indexed alias.	053f512
+tests/test_structured_aliases.py::TestStructuredSpeciesComputeAliases::test_larmor_radius_s0	24	kept	End-to-end compute of larmor_radius_s0 matching r_e; verifies electron gyroradius via species-indexed alias.	053f512
+tests/test_structured_aliases.py::TestStructuredSpeciesComputeAliases::test_species_aliases_resolve[omega_p_s0-omega_pe]	24	kept	Pins omega_p_s0→omega_pe alias table entry.	053f512
+tests/test_structured_aliases.py::TestStructuredSpeciesComputeAliases::test_species_aliases_resolve[omega_p_s1-omega_pi]	24	kept	Pins omega_p_s1→omega_pi alias table entry.	053f512
+tests/test_structured_aliases.py::TestStructuredSpeciesComputeAliases::test_species_aliases_resolve[omega_c_s0-omega_ce]	24	kept	Pins omega_c_s0→omega_ce alias table entry.	053f512
+tests/test_structured_aliases.py::TestStructuredSpeciesComputeAliases::test_species_aliases_resolve[omega_c_s1-omega_ci]	24	kept	Pins omega_c_s1→omega_ci alias table entry.	053f512
+tests/test_structured_aliases.py::TestStructuredSpeciesComputeAliases::test_species_aliases_resolve[d_s0-d_e]	24	kept	Pins d_s0→d_e alias table entry.	053f512
+tests/test_structured_aliases.py::TestStructuredSpeciesComputeAliases::test_species_aliases_resolve[d_s1-d_i]	24	kept	Pins d_s1→d_i alias table entry.	053f512
+tests/test_structured_aliases.py::TestStructuredSpeciesComputeAliases::test_species_aliases_resolve[v_thermal_s0-v_th_e]	24	kept	Pins v_thermal_s0→v_th_e alias (long-form thermal speed name).	053f512
+tests/test_structured_aliases.py::TestStructuredSpeciesComputeAliases::test_species_aliases_resolve[v_thermal_s1-v_th_i]	24	kept	Pins v_thermal_s1→v_th_i alias.	053f512
+tests/test_structured_aliases.py::TestStructuredSpeciesComputeAliases::test_species_aliases_resolve[v_th_s0-v_th_e]	24	kept	Pins v_th_s0→v_th_e alias (short-form with species index).	053f512
+tests/test_structured_aliases.py::TestStructuredSpeciesComputeAliases::test_species_aliases_resolve[v_th_s1-v_th_i]	24	kept	Pins v_th_s1→v_th_i alias.	053f512
+tests/test_structured_aliases.py::TestStructuredSpeciesComputeAliases::test_species_aliases_resolve[rL_s0-r_e]	24	kept	Pins rL_s0→r_e alias (Larmor radius alternate prefix).	053f512
+tests/test_structured_aliases.py::TestStructuredSpeciesComputeAliases::test_species_aliases_resolve[rL_s1-r_i]	24	kept	Pins rL_s1→r_i alias.	053f512
+tests/test_structured_aliases.py::TestStructuredSpeciesComputeAliases::test_species_aliases_resolve[r_s0-r_e]	24	kept	Pins r_s0→r_e alias (short gyroradius name).	053f512
+tests/test_structured_aliases.py::TestStructuredSpeciesComputeAliases::test_species_aliases_resolve[r_s1-r_i]	24	kept	Pins r_s1→r_i alias.	053f512
+tests/test_structured_aliases.py::TestStructuredSpeciesComputeAliases::test_species_aliases_resolve[beta_s0-beta_e]	24	kept	Pins beta_s0→beta_e alias.	053f512
+tests/test_structured_aliases.py::TestStructuredSpeciesComputeAliases::test_species_aliases_resolve[beta_s1-beta_i]	24	kept	Pins beta_s1→beta_i alias.	053f512
+tests/test_structured_aliases.py::TestStructuredSpeciesComputeAliases::test_species_aliases_resolve[entropy_s0-s_e]	24	kept	Pins entropy_s0→s_e alias.	053f512
+tests/test_structured_aliases.py::TestStructuredSpeciesComputeAliases::test_species_aliases_resolve[entropy_s1-s_i]	24	kept	Pins entropy_s1→s_i alias.	053f512
+tests/test_structured_aliases.py::TestStructuredSpeciesComputeAliases::test_species_aliases_resolve[T_s0-Te]	24	kept	Pins T_s0→Te alias.	053f512
+tests/test_structured_aliases.py::TestStructuredSpeciesComputeAliases::test_species_aliases_resolve[T_s1-Ti]	24	kept	Pins T_s1→Ti alias.	053f512
+tests/test_structured_aliases.py::TestStructuredSpeciesComputeAliases::test_species_aliases_resolve[P_s0-Pe]	24	kept	Pins P_s0→Pe alias.	053f512
+tests/test_structured_aliases.py::TestStructuredSpeciesComputeAliases::test_species_aliases_resolve[P_s1-Pi]	24	kept	Pins P_s1→Pi alias.	053f512
+tests/test_structured_aliases.py::TestStructuredSpeciesComputeAliases::test_species_aliases_resolve[lambda_D_s0-lambda_D]	24	kept	Pins lambda_D_s0→lambda_D alias (Debye length species-indexed form).	053f512
+tests/test_structured_aliases.py::TestOperatorAliases::test_operator_aliases_resolve[curl_B_x-curl_B1]	24	kept	Pins curl_B_x→curl_B1 operator alias.	053f512
+tests/test_structured_aliases.py::TestOperatorAliases::test_operator_aliases_resolve[curl_B_y-curl_B2]	24	kept	Pins curl_B_y→curl_B2 operator alias.	053f512
+tests/test_structured_aliases.py::TestOperatorAliases::test_operator_aliases_resolve[curl_B_z-curl_B3]	24	kept	Pins curl_B_z→curl_B3 operator alias.	053f512
+tests/test_structured_aliases.py::TestOperatorAliases::test_operator_aliases_resolve[curl_B_1-curl_B1]	24	kept	Pins curl_B_1→curl_B1 numbered underscore variant.	053f512
+tests/test_structured_aliases.py::TestOperatorAliases::test_operator_aliases_resolve[curl_B_2-curl_B2]	24	kept	Pins curl_B_2→curl_B2 numbered underscore variant.	053f512
+tests/test_structured_aliases.py::TestOperatorAliases::test_operator_aliases_resolve[curl_B_3-curl_B3]	24	kept	Pins curl_B_3→curl_B3 numbered underscore variant.	053f512
+tests/test_structured_aliases.py::TestOperatorAliases::test_operator_aliases_resolve[vort_1-vort1]	24	kept	Pins vort_1→vort1 vorticity component alias.	053f512
+tests/test_structured_aliases.py::TestOperatorAliases::test_operator_aliases_resolve[vort_2-vort2]	24	kept	Pins vort_2→vort2 vorticity component alias.	053f512
+tests/test_structured_aliases.py::TestOperatorAliases::test_operator_aliases_resolve[vort_3-vort3]	24	kept	Pins vort_3→vort3 vorticity component alias.	053f512
+tests/test_structured_aliases.py::TestOperatorAliases::test_operator_aliases_resolve[S_1-S1]	24	kept	Pins S_1→S1 Poynting flux component alias.	053f512
+tests/test_structured_aliases.py::TestOperatorAliases::test_operator_aliases_resolve[S_x-S1]	24	kept	Pins S_x→S1 Poynting flux Cartesian alias.	053f512
+tests/test_structured_aliases.py::TestOperatorAliases::test_operator_aliases_resolve[S_z-S3]	24	kept	Pins S_z→S3 Poynting flux z-component alias.	053f512
+tests/test_structured_aliases.py::TestOperatorAliases::test_curl_b_x_computes	24	kept	End-to-end compute through curl_B_x alias; verifies actual curl computation routes through alias, not just dict lookup.	053f512
+tests/test_structured_aliases.py::TestOperatorAliases::test_s_x_computes	24	kept	End-to-end compute of Poynting S_x component through alias; verifies cross product E×B routes correctly.	053f512
+tests/test_structured_aliases.py::TestSIConversionThroughAliases::test_bx_si_factor	24	kept	Pins field_si_factor resolving Bx (letter alias) to b_field quantity type; catches SI lookup skipping alias resolution.	053f512
+tests/test_structured_aliases.py::TestSIConversionThroughAliases::test_b_x_underscore_si_factor	24	kept	Pins field_si_factor resolving B_x (underscore alias) to b_field; distinct alias form from Bx.	053f512
+tests/test_structured_aliases.py::TestSIConversionThroughAliases::test_p_e_underscore_si_factor	24	kept	Pins P_e→Pe SI factor equality; catches pressure alias not resolving through SI lookup.	053f512
+tests/test_structured_aliases.py::TestSIConversionThroughAliases::test_in_si_through_field_alias	24	kept	End-to-end ds.in_si('Bx') returning code_value * b_ref; pins the full alias→SI pipeline through FieldDataset.	053f512
+tests/test_structured_aliases.py::TestSIConversionThroughAliases::test_in_si_through_underscore_alias	24	kept	End-to-end ds.in_si('B_x') through the underscore alias path; distinct from test_in_si_through_field_alias.	053f512
+tests/test_structured_aliases.py::TestSIConversionThroughAliases::test_in_si_magnitude_alias	24	kept	End-to-end ds.in_si('B_mag') through compute+SI pipeline; verifies magnitude aliases work in SI context.	053f512
+tests/test_structured_aliases.py::TestFieldAliasIntegrity::test_no_underscore_field_alias_collides_with_canonical	24	kept	Structural: no alias key in _default_aliases collides with canonical field names; catches alias shadowing a real field.	053f512
+tests/test_structured_aliases.py::TestFieldAliasIntegrity::test_underscore_aliases_present_in_defaults	24	kept	Structural: key underscore aliases (B_x, B_1, P_e, T_i, P_11) exist in _default_aliases; catches incomplete alias table.	053f512
+tests/test_structured_aliases.py::TestMultiSpeciesDynamicRecipes::test_omega_p_s2_computes	24	kept	End-to-end: omega_p for species index 2 (alphas, q=2, m=4); verifies dynamic recipe templating beyond hardcoded s0/s1.	053f512
+tests/test_structured_aliases.py::TestMultiSpeciesDynamicRecipes::test_omega_c_s2_computes	24	kept	End-to-end: omega_c for alphas (|q|B/m = 2*2/4 = 1); verifies cyclotron frequency dynamic recipe.	053f512
+tests/test_structured_aliases.py::TestMultiSpeciesDynamicRecipes::test_d_s2_computes	24	kept	End-to-end: skin depth for alphas (c/omega_p = 1); verifies skin depth dynamic recipe.	053f512
+tests/test_structured_aliases.py::TestMultiSpeciesDynamicRecipes::test_v_th_s2_computes	24	kept	End-to-end: thermal speed for alphas (sqrt(T/m) = 1); chains through T_s2 = P_s2/n_s2 intermediate.	053f512
+tests/test_structured_aliases.py::TestMultiSpeciesDynamicRecipes::test_r_s2_computes	24	kept	End-to-end: gyroradius for alphas (sqrt(mT)/(|q|B) = 2); most complex dynamic recipe chain (P→T→v_th→r).	053f512
+tests/test_structured_aliases.py::TestMultiSpeciesDynamicRecipes::test_lambda_d_s2_computes	24	kept	End-to-end: Debye length for alphas (sqrt(T/(n*q^2)) = 1); verifies Debye length dynamic recipe.	053f512
+tests/test_structured_aliases.py::TestMultiSpeciesDynamicRecipes::test_beta_s2_computes	24	kept	End-to-end: plasma beta for alphas (2P/B^2 = 10); verifies per-species beta dynamic recipe.	053f512
+tests/test_structured_aliases.py::TestMultiSpeciesDynamicRecipes::test_s_s2_computes	24	kept	End-to-end: entropy for alphas (ln(P/n^gamma) = 0); verifies per-species entropy dynamic recipe.	053f512
+tests/test_structured_aliases.py::TestMultiSpeciesDynamicRecipes::test_temperature_s2_computes	24	kept	End-to-end: temperature for alphas (P/n = 2); verifies T_s2 dynamic recipe.	053f512
+tests/test_structured_aliases.py::TestMultiSpeciesDynamicRecipes::test_s0_s1_still_resolve_via_static_aliases	24	dropped	Exact duplicate of test_omega_p_s0 (same data, same compute calls, same assertion); killed-mutant set is identical.	053f512
+tests/test_structured_aliases.py::TestMultiSpeciesSIConversion::test_species_si_factor[density]	24	kept	Pins SI factor for n_s2 = density_ref; verifies species-indexed density maps to density quantity type.	053f512
+tests/test_structured_aliases.py::TestMultiSpeciesSIConversion::test_species_si_factor[frequency]	24	kept	Pins SI factor for omega_p_s2 = 1/time_ref; verifies species-indexed frequency maps to frequency quantity type.	053f512
+tests/test_structured_aliases.py::TestMultiSpeciesSIConversion::test_species_si_factor[velocity]	24	kept	Pins SI factor for v_th_s2 = velocity_ref; verifies species-indexed thermal speed maps to velocity quantity type.	053f512
+tests/test_structured_aliases.py::TestMultiSpeciesSIConversion::test_species_si_factor[dimensionless]	24	kept	Pins SI factor for beta_s2 = 1.0; verifies dimensionless species quantities have identity factor.	053f512
+tests/test_structured_aliases.py::TestSpeciesNameAliases::test_n_alphas_resolves_to_n_s2	24	kept	End-to-end: n_alphas alias resolves to n_s2 data; verifies species-name-based alias generation from config.	053f512
+tests/test_structured_aliases.py::TestSpeciesNameAliases::test_n_e_n_i_aliases_take_priority	24	kept	Guards that hardcoded n_e/n_i aliases are not overwritten by species-name logic; priority collision would silently break two-species shorthand.	053f512
+tests/test_structured_aliases.py::TestSpeciesNameAliases::test_species_alias_not_added_without_data	24	kept	Pins that species-name alias is only registered when the canonical field exists; prevents phantom aliases that would fail on access.	053f512
+tests/test_structured_aliases.py::TestAuditIssue2SGyroRename::test_s_gyro_e_is_canonical	24	kept	Pins s_gyro_e as a registered canonical compute entry; guards against renaming regression.	053f512
+tests/test_structured_aliases.py::TestAuditIssue2SGyroRename::test_s_gyro_i_is_canonical	24	kept	Pins s_gyro_i as a registered canonical compute entry.	053f512
+tests/test_structured_aliases.py::TestAuditIssue2SGyroRename::test_bare_s_gyro_not_in_aliases	24	kept	Guards against bare 's_gyro' being added as an alias; ambiguous without species qualifier per schema convention.	053f512
+tests/test_structured_aliases.py::TestAuditIssue2SGyroRename::test_bare_s_gyro_raises_with_suggestions	24	kept	End-to-end: bare 's_gyro' raises KeyError mentioning 's_gyro_e'; verifies helpful error message guides users to correct name.	053f512
+tests/test_structured_aliases.py::TestAuditIssue6ElectronVelocityMagnitude::test_ve_magnitude_345	24	kept	End-to-end: |Ve| = sqrt(3^2+4^2) = 5; pins electron velocity magnitude compute recipe.	053f512
+tests/test_structured_aliases.py::TestAuditIssue6ElectronVelocityMagnitude::test_ve_magnitude_aliases[Ve_mag]	24	kept	Pins Ve_mag→|Ve| alias through compute; underscore form.	053f512
+tests/test_structured_aliases.py::TestAuditIssue6ElectronVelocityMagnitude::test_ve_magnitude_aliases[Vemag]	24	kept	Pins Vemag→|Ve| alias through compute; no-underscore form.	053f512
+tests/test_structured_aliases.py::TestAuditSIFactorGaps::test_gyrotropic_entropy_si_factor[s_gyro_e]	24	kept	Pins SI factor for s_gyro_e = 1.0 (dimensionless); catches missing quantity type registration for gyrotropic entropy.	053f512
+tests/test_structured_aliases.py::TestAuditSIFactorGaps::test_gyrotropic_entropy_si_factor[s_gyro_i]	24	kept	Pins SI factor for s_gyro_i = 1.0 (dimensionless).	053f512
+tests/test_structured_aliases.py::TestAuditSIFactorGaps::test_ef_si_factor[EF1]	24	kept	Pins SI factor for EF1 with identity norm; verifies energy flux field is registered in SI lookup.	053f512
+tests/test_structured_aliases.py::TestAuditSIFactorGaps::test_ef_si_factor[EF2]	24	kept	Pins SI factor for EF2.	053f512
+tests/test_structured_aliases.py::TestAuditSIFactorGaps::test_ef_si_factor[EF3]	24	kept	Pins SI factor for EF3.	053f512
+tests/test_structured_aliases.py::TestAuditSIFactorGaps::test_b0_si_factor[B0_1]	24	kept	Pins SI factor for B0_1 (background B) = b_field_ref; catches split-B field not being registered with b_field quantity type.	053f512
+tests/test_structured_aliases.py::TestAuditSIFactorGaps::test_b0_si_factor[B0_2]	24	kept	Pins SI factor for B0_2 = b_field_ref.	053f512
+tests/test_structured_aliases.py::TestAuditSIFactorGaps::test_b0_si_factor[B0_3]	24	kept	Pins SI factor for B0_3 = b_field_ref.	053f512
+tests/test_structured_aliases.py::TestAuditSIFactorGaps::test_ef1_s0_si_factor	24	kept	Pins SI factor for per-species energy flux EF1_s0; verifies species-indexed EF field maps to energy_flux quantity.	053f512
+tests/test_structured_aliases.py::TestAuditSIFactorGaps::test_ve1_s0_si_factor	24	kept	Pins SI factor for Ve1_s0 = velocity_ref; verifies species-indexed electron velocity maps to velocity quantity.	053f512
+tests/test_structured_aliases.py::TestAuditSIFactorGaps::test_ve_magnitude_si_factor	24	kept	Pins SI factor for |Ve| = velocity_ref; verifies electron velocity magnitude has correct SI mapping.	053f512
+tests/test_structured_aliases.py::TestAuditFieldPrefixAliases::test_efx_alias_resolves	24	kept	End-to-end: EFx→EF1 through FieldDataset; verifies _FIELD_PREFIX_PAIRS registers EF prefix aliases.	053f512
+tests/test_structured_aliases.py::TestAuditFieldPrefixAliases::test_b0x_alias_resolves	24	kept	End-to-end: B0x→B0_1 through FieldDataset; pins split-B Cartesian alias per schema.md underscore separator convention.	053f512
+tests/test_structured_aliases.py::TestAuditFieldPrefixAliases::test_ion_acoustic_speed_alias	24	kept	Pins ion_acoustic_speed→c_ia alias mapping in _COMPUTE_ALIASES.	053f512
+tests/test_structured_aliases.py::TestEnergyFluxAliases::test_energy_flux_alias_resolves[energy_flux_x-EF1]	24	kept	Pins energy_flux_x→EF1 descriptive alias.	053f512
+tests/test_structured_aliases.py::TestEnergyFluxAliases::test_energy_flux_alias_resolves[energy_flux_y-EF2]	24	kept	Pins energy_flux_y→EF2 descriptive alias.	053f512
+tests/test_structured_aliases.py::TestEnergyFluxAliases::test_energy_flux_alias_resolves[energy_flux_z-EF3]	24	kept	Pins energy_flux_z→EF3 descriptive alias.	053f512
+tests/test_structured_aliases.py::TestEnergyFluxAliases::test_energy_flux_x_passthrough	24	kept	End-to-end: energy_flux_x compute returns EF1 data unchanged (passthrough recipe); verifies no accidental transformation.	053f512
 tests/test_tabular_data.py::TestConstruction::test_basic_construction	0	not-yet-reviewed		
 tests/test_tabular_data.py::TestConstruction::test_empty_columns	0	not-yet-reviewed		
 tests/test_tabular_data.py::TestConstruction::test_with_index_and_metadata	0	not-yet-reviewed		
