@@ -1746,105 +1746,105 @@ tests/test_transforms.py::TestFieldDatasetTransformTo::test_pressure_tensor_rota
 tests/test_transforms.py::TestFieldDatasetTransformTo::test_normalization_preserved	26	kept	Pins normalization object identity-preserved through transform; catches transform_to accidentally rebuilding normalization.	d6f8d3b
 tests/test_transforms.py::TestFieldDatasetTransformTo::test_general_rotation_raises	26	kept	Pins NotImplementedError for non-permutation rotation (45deg); sole guard for the signed-permutation restriction.	d6f8d3b
 tests/test_transforms.py::TestFieldDatasetTransformTo::test_round_trip	26	kept	Pins transform_to('GSM').transform_to('sim') recovers original B components; end-to-end round-trip integration test.	d6f8d3b
-tests/test_units.py::TestPicElectron::test_velocity_ref_is_c	27	kept	Pins that PIC velocity_ref normalizes scipy.constants.c to exactly 1.0; catches any drift in the omega_pe derivation chain.	<pending>
-tests/test_units.py::TestPicElectron::test_length_ref_is_skin_depth	27	kept	Pins electron skin depth d_e = c/omega_pe from first principles (scipy.constants); catches errors in pic_electron -> pic_standard reference derivation.	<pending>
-tests/test_units.py::TestPicElectron::test_time_ref_is_inverse_omega	27	kept	Pins time_ref = 1/omega_pe from scipy.constants; any sign or exponent error in the plasma frequency formula would break this.	<pending>
-tests/test_units.py::TestMhd::test_alfven_speed	27	kept	Pins MHD velocity_ref = v_A = B0/sqrt(mu_0*rho_0) from scipy.constants; catches mu_0 inclusion errors in the Alfven speed derivation.	<pending>
-tests/test_units.py::TestMhd::test_time_ref	27	kept	Pins MHD time_ref = l_0/v_A; catches dimension errors in the Alfven crossing time.	<pending>
-tests/test_units.py::TestMhd::test_density_is_number_density	27	kept	Pins density_ref = rho_0/m_p (mass->number density conversion via proton mass); catches wrong reference species mass in MHD normalization.	<pending>
-tests/test_units.py::test_round_trip_scalar[pic-length]	27	kept	Round-trip normalize->to_si for PIC length; catches asymmetric ref usage between the two methods.	<pending>
-tests/test_units.py::test_round_trip_scalar[pic-time]	27	kept	Round-trip normalize->to_si for PIC time.	<pending>
-tests/test_units.py::test_round_trip_scalar[pic-velocity]	27	kept	Round-trip normalize->to_si for PIC velocity.	<pending>
-tests/test_units.py::test_round_trip_scalar[pic-b_field]	27	kept	Round-trip normalize->to_si for PIC b_field.	<pending>
-tests/test_units.py::test_round_trip_scalar[pic-e_field]	27	kept	Round-trip normalize->to_si for PIC e_field.	<pending>
-tests/test_units.py::test_round_trip_scalar[pic-density]	27	kept	Round-trip normalize->to_si for PIC density.	<pending>
-tests/test_units.py::test_round_trip_scalar[mhd-length]	27	kept	Round-trip normalize->to_si for MHD length.	<pending>
-tests/test_units.py::test_round_trip_scalar[mhd-time]	27	kept	Round-trip normalize->to_si for MHD time.	<pending>
-tests/test_units.py::test_round_trip_scalar[mhd-velocity]	27	kept	Round-trip normalize->to_si for MHD velocity.	<pending>
-tests/test_units.py::test_round_trip_scalar[mhd-b_field]	27	kept	Round-trip normalize->to_si for MHD b_field.	<pending>
-tests/test_units.py::test_round_trip_scalar[mhd-e_field]	27	kept	Round-trip normalize->to_si for MHD e_field.	<pending>
-tests/test_units.py::test_round_trip_scalar[mhd-density]	27	kept	Round-trip normalize->to_si for MHD density.	<pending>
-tests/test_units.py::test_invalid_quantity_raises	27	kept	Guards the typo-detection error path in normalize/to_si — tests both methods with a misspelled quantity and an unsupported compound type.	<pending>
-tests/test_units.py::TestPhysicsConstants::test_mhd_normalized	27	kept	Pins MHD PhysicsConstants: c=inf, epsilon_0=mu_0=1; catches any default drift in the MHD factory.	<pending>
-tests/test_units.py::TestPhysicsConstants::test_inv_c_squared_mhd	27	kept	Pins inv_c_squared()=0.0 for infinite c; catches the inf guard in the displacement-current elimination.	<pending>
-tests/test_units.py::TestPhysicsConstants::test_electromagnetic_identity	27	kept	Pins c^2*mu_0*epsilon_0=1 for PIC; this is the fundamental EM identity that all derived formulas depend on.	<pending>
-tests/test_units.py::TestSpeciesInfoFromQom::test_negative_qom	27	kept	Pins qom=-256 decomposition: charge=-1, mass=1/256; catches sign-flip in the |q|=1 convention.	<pending>
-tests/test_units.py::TestSpeciesInfoFromQom::test_positive_qom	27	kept	Pins qom=+256 decomposition: charge=+1, mass=1/256; catches sign error for ions.	<pending>
-tests/test_units.py::TestSpeciesInfoFromQom::test_fractional_qom	27	kept	Pins fractional qom=0.5 -> charge=1, mass=2; catches integer-division bugs in the mass derivation.	<pending>
-tests/test_units.py::TestSpeciesInfoValidation::test_no_params_raises	27	kept	Guards that SpeciesInfo with no charge/mass/qom raises ValueError; catches silent default-to-None acceptance.	<pending>
-tests/test_units.py::TestSpeciesInfoValidation::test_only_charge_raises	27	kept	Guards incomplete species (charge without mass) raises ValueError.	<pending>
-tests/test_units.py::TestSpeciesInfoValidation::test_only_mass_raises	27	kept	Guards incomplete species (mass without charge) raises ValueError.	<pending>
-tests/test_units.py::TestSpeciesInfoValidation::test_zero_qom_raises	27	kept	Guards q/m=0 raises ValueError; division by zero would produce inf mass.	<pending>
-tests/test_units.py::TestSpeciesInfoValidation::test_inconsistent_all_three_raises	27	kept	Guards that inconsistent charge+mass+qom raises ValueError; catches silent acceptance of contradictory species params.	<pending>
-tests/test_units.py::TestSpeciesInfoValidation::test_consistent_all_three_ok	27	kept	Confirms consistent charge+mass+qom is accepted; guards against overzealous validation rejecting valid input.	<pending>
-tests/test_units.py::TestSpeciesInfoValidation::test_zero_mass_raises	27	kept	Guards zero mass raises ValueError; division by zero in qom computation.	<pending>
-tests/test_units.py::TestSpeciesInfoValidation::test_negative_mass_raises	27	kept	Guards negative mass raises ValueError; unphysical mass would corrupt all derived scales.	<pending>
-tests/test_units.py::TestCompoundSiFactors::test_compound_factor[pic-dimensionless-<lambda>]	27	kept	Pins dimensionless SI factor = 1.0 for PIC normalization.	<pending>
-tests/test_units.py::TestCompoundSiFactors::test_compound_factor[pic-pressure-<lambda>]	27	kept	Pins pressure SI factor = n_ref*m_ref*v_ref^2 for PIC; catches any missing factor in the compound derivation.	<pending>
-tests/test_units.py::TestCompoundSiFactors::test_compound_factor[pic-temperature-<lambda>]	27	kept	Pins temperature SI factor = m_ref*v_ref^2 for PIC (energy-unit temperatures).	<pending>
-tests/test_units.py::TestCompoundSiFactors::test_compound_factor[pic-energy_density-<lambda>]	27	kept	Pins energy_density SI factor for PIC; same formula as pressure (intentional — different physical meaning).	<pending>
-tests/test_units.py::TestCompoundSiFactors::test_compound_factor[pic-current_density-<lambda>]	27	kept	Pins current_density SI factor = q_ref*n_ref*v_ref for PIC.	<pending>
-tests/test_units.py::TestCompoundSiFactors::test_compound_factor[pic-frequency-<lambda>]	27	kept	Pins frequency SI factor = 1/t_ref for PIC.	<pending>
-tests/test_units.py::TestCompoundSiFactors::test_compound_factor[pic-mass_density-<lambda>]	27	kept	Pins mass_density SI factor = n_ref*m_ref for PIC.	<pending>
-tests/test_units.py::TestCompoundSiFactors::test_compound_factor[pic-charge_density-<lambda>]	27	kept	Pins charge_density SI factor = q_ref*n_ref for PIC.	<pending>
-tests/test_units.py::TestCompoundSiFactors::test_compound_factor[pic-poynting_flux-<lambda>]	27	kept	Pins poynting_flux SI factor = E_ref*B_ref for PIC; catches confusion with energy_flux (n_ref*m_ref*v_ref^3).	<pending>
-tests/test_units.py::TestCompoundSiFactors::test_compound_factor[mhd-dimensionless-<lambda>]	27	kept	Pins dimensionless SI factor = 1.0 for MHD normalization.	<pending>
-tests/test_units.py::TestCompoundSiFactors::test_compound_factor[mhd-pressure-<lambda>]	27	kept	Pins pressure SI factor for MHD normalization.	<pending>
-tests/test_units.py::TestCompoundSiFactors::test_compound_factor[mhd-temperature-<lambda>]	27	kept	Pins temperature SI factor for MHD normalization.	<pending>
-tests/test_units.py::TestCompoundSiFactors::test_compound_factor[mhd-energy_density-<lambda>]	27	kept	Pins energy_density SI factor for MHD normalization.	<pending>
-tests/test_units.py::TestCompoundSiFactors::test_compound_factor[mhd-current_density-<lambda>]	27	kept	Pins current_density SI factor for MHD normalization.	<pending>
-tests/test_units.py::TestCompoundSiFactors::test_compound_factor[mhd-frequency-<lambda>]	27	kept	Pins frequency SI factor for MHD normalization.	<pending>
-tests/test_units.py::TestCompoundSiFactors::test_compound_factor[mhd-mass_density-<lambda>]	27	kept	Pins mass_density SI factor for MHD normalization.	<pending>
-tests/test_units.py::TestCompoundSiFactors::test_compound_factor[mhd-charge_density-<lambda>]	27	kept	Pins charge_density SI factor for MHD normalization.	<pending>
-tests/test_units.py::TestCompoundSiFactors::test_compound_factor[mhd-poynting_flux-<lambda>]	27	kept	Pins poynting_flux SI factor for MHD normalization.	<pending>
-tests/test_units.py::TestCompoundSiFactors::test_unknown_compound_raises[pic]	27	kept	Guards that unknown compound quantity raises ValueError for PIC norm; catches silent fallback to wrong factor.	<pending>
-tests/test_units.py::TestCompoundSiFactors::test_unknown_compound_raises[mhd]	27	kept	Guards that unknown compound quantity raises ValueError for MHD norm.	<pending>
-tests/test_units.py::TestNormalizationValidation::test_zero_ref_raises	27	kept	Guards that zero reference value raises ValueError; zero length_ref would produce division-by-zero in normalize().	<pending>
-tests/test_units.py::TestNormalizationValidation::test_negative_ref_raises	27	kept	Guards that negative reference value raises ValueError; negative density_ref would produce wrong-sign SI conversions.	<pending>
-tests/test_virtual_io.py::TestOpenVirtual::test_basic_round_trip	27	kept	End-to-end HDF5->virtual->FieldDataset round-trip asserting field values (1.0 and 0.5) survive; catches broken VirtualiZarr byte-range resolution.	<pending>
-tests/test_virtual_io.py::TestOpenVirtual::test_grid_metadata_preserved	27	kept	Pins grid metadata (dims, spacing, origin, dt) through virtual layer; catches dropped attrs in _read_metadata_from_h5.	<pending>
-tests/test_virtual_io.py::TestOpenVirtual::test_normalization_preserved	27	kept	Pins normalization round-trip through HDF5 attrs; catches mismatched attr names in _read_metadata_from_h5.	<pending>
-tests/test_virtual_io.py::TestOpenVirtual::test_identity_normalization_when_missing	27	kept	Pins fallback to identity normalization when HDF5 has no normalization group; catches None-propagation instead of default.	<pending>
-tests/test_virtual_io.py::TestOpenVirtual::test_no_grid_raises	27	kept	Guards that missing grid group raises ValueError with actionable message; catches silent None grid acceptance.	<pending>
-tests/test_virtual_io.py::TestOpenVirtual::test_explicit_config_overrides_h5	27	kept	Pins that SimulationConfig overrides HDF5-embedded metadata (spacing 2.0 vs 1.0); catches config being ignored.	<pending>
-tests/test_virtual_io.py::TestOpenVirtual::test_drop_variables	27	kept	Pins drop_variables kwarg excludes named fields from virtual view; catches passthrough failure to VirtualiZarr.	<pending>
-tests/test_virtual_io.py::TestOpenVirtual::test_root_group	27	kept	Pins fields_group=None reads datasets from HDF5 root; catches hardcoded 'fields' group assumption.	<pending>
-tests/test_virtual_io.py::TestOpenVirtual::test_constant_field_round_trip	27	kept	Regression: constant-value (all-zero) HDF5 datasets must survive virtual layer; old Kerchunk path returned fill value.	<pending>
-tests/test_virtual_io.py::TestOpenVirtual::test_byte_string_attrs_decoded	27	kept	Pins byte-string attr decoding (b'cartesian'->str); str(b'x')='b\'x\'' corruption caught by _as_text.	<pending>
-tests/test_virtual_io.py::TestOpenVirtual::test_coordinate_arrays_match_grid	27	kept	Pins coordinate arrays match GridInfo.coordinate_arrays(); catches off-by-half or wrong-spacing coord generation.	<pending>
-tests/test_virtual_io.py::TestToIcechunkVirtualVersioning::test_second_commit_to_same_branch	27	kept	Regression: second virtual write to same branch must succeed and produce distinct snapshots; catches ContainsGroupError from stale root.	<pending>
-tests/test_virtual_io.py::TestToIcechunkVirtualVersioning::test_new_branch_fork_from_populated_main	27	kept	Regression: forking a new branch off populated main must work; catches inherited root-group collision.	<pending>
-tests/test_virtual_io.py::TestToIcechunkVirtualVersioning::test_sources_in_different_directories	27	kept	Regression: commits from different source dirs must both remain readable; catches missing virtual chunk container merging.	<pending>
-tests/test_virtual_io.py::TestToIcechunkVirtualVersioning::test_numpy_scalar_root_attrs	27	kept	Regression: numpy scalar HDF5 attrs must be coerced before Zarr write; catches xarray attr validator rejection.	<pending>
-tests/test_virtual_io.py::TestToIcechunkVirtualVersioning::test_failed_validation_cleans_up_fresh_repo	27	kept	Regression: failed virtual write (no grid group) must clean up repo dir; catches orphaned half-initialized store.	<pending>
-tests/test_zarr_io.py::TestSerializationHelpers::test_grid_round_trip_basic	27	kept	Pins GridInfo dict serialization round-trip for all required fields; catches field name mismatches between grid_to_dict/dict_to_grid.	<pending>
-tests/test_zarr_io.py::TestSerializationHelpers::test_grid_round_trip_with_optional_fields	27	kept	Pins optional GridInfo fields (dt, boundary, surviving_axes) survive serialization; catches None-handling bugs.	<pending>
-tests/test_zarr_io.py::TestSerializationHelpers::test_normalization_round_trip	27	kept	Pins Normalization dict round-trip with PIC values; catches dropped or misnamed reference fields.	<pending>
-tests/test_zarr_io.py::TestSerializationHelpers::test_normalization_identity_round_trip	27	kept	Pins identity normalization preserves is_identity after round-trip; catches ref values drifting from 1.0.	<pending>
-tests/test_zarr_io.py::TestSerializationHelpers::test_species_round_trip	27	kept	Pins SpeciesInfo tuple round-trip (name, charge, mass); catches lost species or swapped field names.	<pending>
-tests/test_zarr_io.py::TestSerializationHelpers::test_species_empty_list	27	kept	Pins empty species list round-trip; catches crash on missing species key.	<pending>
-tests/test_zarr_io.py::TestSerializationHelpers::test_species_with_optional_fields	27	kept	Pins SpeciesInfo optional fields (temperature, thermal_velocity tuple, drift_velocity, ppc) survive round-trip.	<pending>
-tests/test_zarr_io.py::TestSerializationHelpers::test_physics_round_trip	27	kept	Pins PhysicsParams round-trip (gamma, c, relativistic, extra dict); catches lost extra params or wrong gamma.	<pending>
-tests/test_zarr_io.py::TestSerializationHelpers::test_physics_inf_c_round_trip	27	kept	Pins math.inf c survives JSON serialization via 'inf' string tag; catches broken MHD physics params.	<pending>
-tests/test_zarr_io.py::TestSerializationHelpers::test_transforms_round_trip	27	kept	Pins FrameTransform round-trip (origin, rotation matrix, scale, target_axis_names); catches tuple->list conversion loss.	<pending>
-tests/test_zarr_io.py::TestSerializationHelpers::test_transforms_empty	27	kept	Pins empty transforms dict round-trip; catches crash on missing transforms key.	<pending>
-tests/test_zarr_io.py::TestSerializationHelpers::test_metadata_numpy_scalars_round_trip	27	kept	Regression: numpy scalar types in metadata must be coerced to JSON-native before Zarr write; catches xarray attr validator rejection.	<pending>
-tests/test_zarr_io.py::TestSerializationHelpers::test_metadata_stagger_info_round_trip	27	kept	Regression: StaggerInfo dataclass in metadata must survive Zarr round-trip as typed object, not plain dict.	<pending>
-tests/test_zarr_io.py::TestToZarrFromZarr::test_round_trip_basic	27	kept	End-to-end to_zarr/from_zarr round-trip asserting field values, names, grid properties, and identity normalization.	<pending>
-tests/test_zarr_io.py::TestToZarrFromZarr::test_round_trip_full_metadata	27	kept	Full metadata round-trip: grid with dt/boundary, species, physics, frame, transforms, field values; the most comprehensive Zarr test.	<pending>
-tests/test_zarr_io.py::TestToZarrFromZarr::test_dtype_float32_downcast	27	kept	Pins dtype='float32' downcast on write; catches ignored dtype kwarg or precision loss beyond float32 tolerance.	<pending>
-tests/test_zarr_io.py::TestToZarrFromZarr::test_round_trip_2d_surviving_axes	27	kept	Pins 2D slice round-trip with surviving_axes=(0,2); catches surviving_axes serialization failure or wrong axis names.	<pending>
-tests/test_zarr_io.py::TestToZarrFromZarr::test_per_field_metadata_preserved	27	kept	Pins per-field DataArray attrs (quantity_type, si_unit) survive Zarr round-trip; catches lost field-level metadata.	<pending>
-tests/test_zarr_io.py::TestToZarrFromZarr::test_spherical_geometry_round_trip	27	kept	Pins spherical geometry survives Zarr round-trip including axis names (r, theta, phi); catches geometry serialization bugs.	<pending>
-tests/test_zarr_io.py::TestToZarrFromZarr::test_no_pypic_attrs_raises	27	kept	Guards that from_zarr on a non-pypic Zarr store raises ValueError; catches silent fallback to broken FieldDataset.	<pending>
-tests/test_zarr_io.py::TestToZarrFromZarr::test_failed_write_cleans_up_fresh_store	27	kept	Regression: failed to_zarr must remove partial store; catches orphaned zarr.json misleading later from_zarr.	<pending>
-tests/test_zarr_io.py::TestToZarrTimeseries::test_timeseries_basic	27	kept	End-to-end timeseries write/read: 3 steps, asserts time dimension, step count, and per-step field values.	<pending>
-tests/test_zarr_io.py::TestToZarrTimeseries::test_timeseries_rejects_field_drift	27	kept	Guards that changing field sets across steps raises ValueError; catches silent store corruption from inconsistent variable sets.	<pending>
-tests/test_zarr_io.py::TestToZarrTimeseries::test_timeseries_cleans_partial_store_on_append_failure	27	kept	Regression: shape/grid drift between steps must clean up partial store; catches orphaned single-step store on failure.	<pending>
-tests/test_zarr_io.py::TestToZarrTimeseries::test_timeseries_cleans_stub_on_first_write_failure	27	kept	Regression: first-step write failure must clean stub store; catches zarr.json orphan from materialization crash.	<pending>
-tests/test_zarr_io.py::TestToZarrTimeseries::test_timeseries_preserves_metadata	27	kept	Pins species and frame survive timeseries round-trip; catches metadata loss during append-mode writes.	<pending>
-tests/test_zarr_io.py::TestToZarrTimeseries::test_timeseries_rejects_grid_drift	27	kept	Guards that changing grid (spacing/origin) across steps raises ValueError; catches silent identity mismatch.	<pending>
-tests/test_zarr_io.py::TestToZarrTimeseries::test_timeseries_rejects_frame_drift	27	kept	Guards that changing frame name across steps raises ValueError; catches silent frame identity mismatch.	<pending>
-tests/test_zarr_io.py::TestToZarrTimeseries::test_timeseries_intersects_per_step_metadata	27	kept	Pins metadata intersection: shared keys survive, diverging keys are dropped; catches silent step-0-only metadata.	<pending>
-tests/test_zarr_io.py::TestToZarrTimeseries::test_metadata_tuple_round_trip	27	kept	Regression: tuple metadata must survive Zarr round-trip as tuple (not list); catches __pypic_class__ tagging failure.	<pending>
-tests/test_zarr_io.py::TestToZarrTimeseries::test_metadata_non_string_keys_round_trip	27	kept	Regression: integer-keyed dicts must survive round-trip with key type preserved; catches JSON string-key collision.	<pending>
+tests/test_units.py::TestPicElectron::test_velocity_ref_is_c	27	kept	Pins that PIC velocity_ref normalizes scipy.constants.c to exactly 1.0; catches any drift in the omega_pe derivation chain.	0f613cf
+tests/test_units.py::TestPicElectron::test_length_ref_is_skin_depth	27	kept	Pins electron skin depth d_e = c/omega_pe from first principles (scipy.constants); catches errors in pic_electron -> pic_standard reference derivation.	0f613cf
+tests/test_units.py::TestPicElectron::test_time_ref_is_inverse_omega	27	kept	Pins time_ref = 1/omega_pe from scipy.constants; any sign or exponent error in the plasma frequency formula would break this.	0f613cf
+tests/test_units.py::TestMhd::test_alfven_speed	27	kept	Pins MHD velocity_ref = v_A = B0/sqrt(mu_0*rho_0) from scipy.constants; catches mu_0 inclusion errors in the Alfven speed derivation.	0f613cf
+tests/test_units.py::TestMhd::test_time_ref	27	kept	Pins MHD time_ref = l_0/v_A; catches dimension errors in the Alfven crossing time.	0f613cf
+tests/test_units.py::TestMhd::test_density_is_number_density	27	kept	Pins density_ref = rho_0/m_p (mass->number density conversion via proton mass); catches wrong reference species mass in MHD normalization.	0f613cf
+tests/test_units.py::test_round_trip_scalar[pic-length]	27	kept	Round-trip normalize->to_si for PIC length; catches asymmetric ref usage between the two methods.	0f613cf
+tests/test_units.py::test_round_trip_scalar[pic-time]	27	kept	Round-trip normalize->to_si for PIC time.	0f613cf
+tests/test_units.py::test_round_trip_scalar[pic-velocity]	27	kept	Round-trip normalize->to_si for PIC velocity.	0f613cf
+tests/test_units.py::test_round_trip_scalar[pic-b_field]	27	kept	Round-trip normalize->to_si for PIC b_field.	0f613cf
+tests/test_units.py::test_round_trip_scalar[pic-e_field]	27	kept	Round-trip normalize->to_si for PIC e_field.	0f613cf
+tests/test_units.py::test_round_trip_scalar[pic-density]	27	kept	Round-trip normalize->to_si for PIC density.	0f613cf
+tests/test_units.py::test_round_trip_scalar[mhd-length]	27	kept	Round-trip normalize->to_si for MHD length.	0f613cf
+tests/test_units.py::test_round_trip_scalar[mhd-time]	27	kept	Round-trip normalize->to_si for MHD time.	0f613cf
+tests/test_units.py::test_round_trip_scalar[mhd-velocity]	27	kept	Round-trip normalize->to_si for MHD velocity.	0f613cf
+tests/test_units.py::test_round_trip_scalar[mhd-b_field]	27	kept	Round-trip normalize->to_si for MHD b_field.	0f613cf
+tests/test_units.py::test_round_trip_scalar[mhd-e_field]	27	kept	Round-trip normalize->to_si for MHD e_field.	0f613cf
+tests/test_units.py::test_round_trip_scalar[mhd-density]	27	kept	Round-trip normalize->to_si for MHD density.	0f613cf
+tests/test_units.py::test_invalid_quantity_raises	27	kept	Guards the typo-detection error path in normalize/to_si — tests both methods with a misspelled quantity and an unsupported compound type.	0f613cf
+tests/test_units.py::TestPhysicsConstants::test_mhd_normalized	27	kept	Pins MHD PhysicsConstants: c=inf, epsilon_0=mu_0=1; catches any default drift in the MHD factory.	0f613cf
+tests/test_units.py::TestPhysicsConstants::test_inv_c_squared_mhd	27	kept	Pins inv_c_squared()=0.0 for infinite c; catches the inf guard in the displacement-current elimination.	0f613cf
+tests/test_units.py::TestPhysicsConstants::test_electromagnetic_identity	27	kept	Pins c^2*mu_0*epsilon_0=1 for PIC; this is the fundamental EM identity that all derived formulas depend on.	0f613cf
+tests/test_units.py::TestSpeciesInfoFromQom::test_negative_qom	27	kept	Pins qom=-256 decomposition: charge=-1, mass=1/256; catches sign-flip in the |q|=1 convention.	0f613cf
+tests/test_units.py::TestSpeciesInfoFromQom::test_positive_qom	27	kept	Pins qom=+256 decomposition: charge=+1, mass=1/256; catches sign error for ions.	0f613cf
+tests/test_units.py::TestSpeciesInfoFromQom::test_fractional_qom	27	kept	Pins fractional qom=0.5 -> charge=1, mass=2; catches integer-division bugs in the mass derivation.	0f613cf
+tests/test_units.py::TestSpeciesInfoValidation::test_no_params_raises	27	kept	Guards that SpeciesInfo with no charge/mass/qom raises ValueError; catches silent default-to-None acceptance.	0f613cf
+tests/test_units.py::TestSpeciesInfoValidation::test_only_charge_raises	27	kept	Guards incomplete species (charge without mass) raises ValueError.	0f613cf
+tests/test_units.py::TestSpeciesInfoValidation::test_only_mass_raises	27	kept	Guards incomplete species (mass without charge) raises ValueError.	0f613cf
+tests/test_units.py::TestSpeciesInfoValidation::test_zero_qom_raises	27	kept	Guards q/m=0 raises ValueError; division by zero would produce inf mass.	0f613cf
+tests/test_units.py::TestSpeciesInfoValidation::test_inconsistent_all_three_raises	27	kept	Guards that inconsistent charge+mass+qom raises ValueError; catches silent acceptance of contradictory species params.	0f613cf
+tests/test_units.py::TestSpeciesInfoValidation::test_consistent_all_three_ok	27	kept	Confirms consistent charge+mass+qom is accepted; guards against overzealous validation rejecting valid input.	0f613cf
+tests/test_units.py::TestSpeciesInfoValidation::test_zero_mass_raises	27	kept	Guards zero mass raises ValueError; division by zero in qom computation.	0f613cf
+tests/test_units.py::TestSpeciesInfoValidation::test_negative_mass_raises	27	kept	Guards negative mass raises ValueError; unphysical mass would corrupt all derived scales.	0f613cf
+tests/test_units.py::TestCompoundSiFactors::test_compound_factor[pic-dimensionless-<lambda>]	27	kept	Pins dimensionless SI factor = 1.0 for PIC normalization.	0f613cf
+tests/test_units.py::TestCompoundSiFactors::test_compound_factor[pic-pressure-<lambda>]	27	kept	Pins pressure SI factor = n_ref*m_ref*v_ref^2 for PIC; catches any missing factor in the compound derivation.	0f613cf
+tests/test_units.py::TestCompoundSiFactors::test_compound_factor[pic-temperature-<lambda>]	27	kept	Pins temperature SI factor = m_ref*v_ref^2 for PIC (energy-unit temperatures).	0f613cf
+tests/test_units.py::TestCompoundSiFactors::test_compound_factor[pic-energy_density-<lambda>]	27	kept	Pins energy_density SI factor for PIC; same formula as pressure (intentional — different physical meaning).	0f613cf
+tests/test_units.py::TestCompoundSiFactors::test_compound_factor[pic-current_density-<lambda>]	27	kept	Pins current_density SI factor = q_ref*n_ref*v_ref for PIC.	0f613cf
+tests/test_units.py::TestCompoundSiFactors::test_compound_factor[pic-frequency-<lambda>]	27	kept	Pins frequency SI factor = 1/t_ref for PIC.	0f613cf
+tests/test_units.py::TestCompoundSiFactors::test_compound_factor[pic-mass_density-<lambda>]	27	kept	Pins mass_density SI factor = n_ref*m_ref for PIC.	0f613cf
+tests/test_units.py::TestCompoundSiFactors::test_compound_factor[pic-charge_density-<lambda>]	27	kept	Pins charge_density SI factor = q_ref*n_ref for PIC.	0f613cf
+tests/test_units.py::TestCompoundSiFactors::test_compound_factor[pic-poynting_flux-<lambda>]	27	kept	Pins poynting_flux SI factor = E_ref*B_ref for PIC; catches confusion with energy_flux (n_ref*m_ref*v_ref^3).	0f613cf
+tests/test_units.py::TestCompoundSiFactors::test_compound_factor[mhd-dimensionless-<lambda>]	27	kept	Pins dimensionless SI factor = 1.0 for MHD normalization.	0f613cf
+tests/test_units.py::TestCompoundSiFactors::test_compound_factor[mhd-pressure-<lambda>]	27	kept	Pins pressure SI factor for MHD normalization.	0f613cf
+tests/test_units.py::TestCompoundSiFactors::test_compound_factor[mhd-temperature-<lambda>]	27	kept	Pins temperature SI factor for MHD normalization.	0f613cf
+tests/test_units.py::TestCompoundSiFactors::test_compound_factor[mhd-energy_density-<lambda>]	27	kept	Pins energy_density SI factor for MHD normalization.	0f613cf
+tests/test_units.py::TestCompoundSiFactors::test_compound_factor[mhd-current_density-<lambda>]	27	kept	Pins current_density SI factor for MHD normalization.	0f613cf
+tests/test_units.py::TestCompoundSiFactors::test_compound_factor[mhd-frequency-<lambda>]	27	kept	Pins frequency SI factor for MHD normalization.	0f613cf
+tests/test_units.py::TestCompoundSiFactors::test_compound_factor[mhd-mass_density-<lambda>]	27	kept	Pins mass_density SI factor for MHD normalization.	0f613cf
+tests/test_units.py::TestCompoundSiFactors::test_compound_factor[mhd-charge_density-<lambda>]	27	kept	Pins charge_density SI factor for MHD normalization.	0f613cf
+tests/test_units.py::TestCompoundSiFactors::test_compound_factor[mhd-poynting_flux-<lambda>]	27	kept	Pins poynting_flux SI factor for MHD normalization.	0f613cf
+tests/test_units.py::TestCompoundSiFactors::test_unknown_compound_raises[pic]	27	kept	Guards that unknown compound quantity raises ValueError for PIC norm; catches silent fallback to wrong factor.	0f613cf
+tests/test_units.py::TestCompoundSiFactors::test_unknown_compound_raises[mhd]	27	kept	Guards that unknown compound quantity raises ValueError for MHD norm.	0f613cf
+tests/test_units.py::TestNormalizationValidation::test_zero_ref_raises	27	kept	Guards that zero reference value raises ValueError; zero length_ref would produce division-by-zero in normalize().	0f613cf
+tests/test_units.py::TestNormalizationValidation::test_negative_ref_raises	27	kept	Guards that negative reference value raises ValueError; negative density_ref would produce wrong-sign SI conversions.	0f613cf
+tests/test_virtual_io.py::TestOpenVirtual::test_basic_round_trip	27	kept	End-to-end HDF5->virtual->FieldDataset round-trip asserting field values (1.0 and 0.5) survive; catches broken VirtualiZarr byte-range resolution.	0f613cf
+tests/test_virtual_io.py::TestOpenVirtual::test_grid_metadata_preserved	27	kept	Pins grid metadata (dims, spacing, origin, dt) through virtual layer; catches dropped attrs in _read_metadata_from_h5.	0f613cf
+tests/test_virtual_io.py::TestOpenVirtual::test_normalization_preserved	27	kept	Pins normalization round-trip through HDF5 attrs; catches mismatched attr names in _read_metadata_from_h5.	0f613cf
+tests/test_virtual_io.py::TestOpenVirtual::test_identity_normalization_when_missing	27	kept	Pins fallback to identity normalization when HDF5 has no normalization group; catches None-propagation instead of default.	0f613cf
+tests/test_virtual_io.py::TestOpenVirtual::test_no_grid_raises	27	kept	Guards that missing grid group raises ValueError with actionable message; catches silent None grid acceptance.	0f613cf
+tests/test_virtual_io.py::TestOpenVirtual::test_explicit_config_overrides_h5	27	kept	Pins that SimulationConfig overrides HDF5-embedded metadata (spacing 2.0 vs 1.0); catches config being ignored.	0f613cf
+tests/test_virtual_io.py::TestOpenVirtual::test_drop_variables	27	kept	Pins drop_variables kwarg excludes named fields from virtual view; catches passthrough failure to VirtualiZarr.	0f613cf
+tests/test_virtual_io.py::TestOpenVirtual::test_root_group	27	kept	Pins fields_group=None reads datasets from HDF5 root; catches hardcoded 'fields' group assumption.	0f613cf
+tests/test_virtual_io.py::TestOpenVirtual::test_constant_field_round_trip	27	kept	Regression: constant-value (all-zero) HDF5 datasets must survive virtual layer; old Kerchunk path returned fill value.	0f613cf
+tests/test_virtual_io.py::TestOpenVirtual::test_byte_string_attrs_decoded	27	kept	Pins byte-string attr decoding (b'cartesian'->str); str(b'x')='b\'x\'' corruption caught by _as_text.	0f613cf
+tests/test_virtual_io.py::TestOpenVirtual::test_coordinate_arrays_match_grid	27	kept	Pins coordinate arrays match GridInfo.coordinate_arrays(); catches off-by-half or wrong-spacing coord generation.	0f613cf
+tests/test_virtual_io.py::TestToIcechunkVirtualVersioning::test_second_commit_to_same_branch	27	kept	Regression: second virtual write to same branch must succeed and produce distinct snapshots; catches ContainsGroupError from stale root.	0f613cf
+tests/test_virtual_io.py::TestToIcechunkVirtualVersioning::test_new_branch_fork_from_populated_main	27	kept	Regression: forking a new branch off populated main must work; catches inherited root-group collision.	0f613cf
+tests/test_virtual_io.py::TestToIcechunkVirtualVersioning::test_sources_in_different_directories	27	kept	Regression: commits from different source dirs must both remain readable; catches missing virtual chunk container merging.	0f613cf
+tests/test_virtual_io.py::TestToIcechunkVirtualVersioning::test_numpy_scalar_root_attrs	27	kept	Regression: numpy scalar HDF5 attrs must be coerced before Zarr write; catches xarray attr validator rejection.	0f613cf
+tests/test_virtual_io.py::TestToIcechunkVirtualVersioning::test_failed_validation_cleans_up_fresh_repo	27	kept	Regression: failed virtual write (no grid group) must clean up repo dir; catches orphaned half-initialized store.	0f613cf
+tests/test_zarr_io.py::TestSerializationHelpers::test_grid_round_trip_basic	27	kept	Pins GridInfo dict serialization round-trip for all required fields; catches field name mismatches between grid_to_dict/dict_to_grid.	0f613cf
+tests/test_zarr_io.py::TestSerializationHelpers::test_grid_round_trip_with_optional_fields	27	kept	Pins optional GridInfo fields (dt, boundary, surviving_axes) survive serialization; catches None-handling bugs.	0f613cf
+tests/test_zarr_io.py::TestSerializationHelpers::test_normalization_round_trip	27	kept	Pins Normalization dict round-trip with PIC values; catches dropped or misnamed reference fields.	0f613cf
+tests/test_zarr_io.py::TestSerializationHelpers::test_normalization_identity_round_trip	27	kept	Pins identity normalization preserves is_identity after round-trip; catches ref values drifting from 1.0.	0f613cf
+tests/test_zarr_io.py::TestSerializationHelpers::test_species_round_trip	27	kept	Pins SpeciesInfo tuple round-trip (name, charge, mass); catches lost species or swapped field names.	0f613cf
+tests/test_zarr_io.py::TestSerializationHelpers::test_species_empty_list	27	kept	Pins empty species list round-trip; catches crash on missing species key.	0f613cf
+tests/test_zarr_io.py::TestSerializationHelpers::test_species_with_optional_fields	27	kept	Pins SpeciesInfo optional fields (temperature, thermal_velocity tuple, drift_velocity, ppc) survive round-trip.	0f613cf
+tests/test_zarr_io.py::TestSerializationHelpers::test_physics_round_trip	27	kept	Pins PhysicsParams round-trip (gamma, c, relativistic, extra dict); catches lost extra params or wrong gamma.	0f613cf
+tests/test_zarr_io.py::TestSerializationHelpers::test_physics_inf_c_round_trip	27	kept	Pins math.inf c survives JSON serialization via 'inf' string tag; catches broken MHD physics params.	0f613cf
+tests/test_zarr_io.py::TestSerializationHelpers::test_transforms_round_trip	27	kept	Pins FrameTransform round-trip (origin, rotation matrix, scale, target_axis_names); catches tuple->list conversion loss.	0f613cf
+tests/test_zarr_io.py::TestSerializationHelpers::test_transforms_empty	27	kept	Pins empty transforms dict round-trip; catches crash on missing transforms key.	0f613cf
+tests/test_zarr_io.py::TestSerializationHelpers::test_metadata_numpy_scalars_round_trip	27	kept	Regression: numpy scalar types in metadata must be coerced to JSON-native before Zarr write; catches xarray attr validator rejection.	0f613cf
+tests/test_zarr_io.py::TestSerializationHelpers::test_metadata_stagger_info_round_trip	27	kept	Regression: StaggerInfo dataclass in metadata must survive Zarr round-trip as typed object, not plain dict.	0f613cf
+tests/test_zarr_io.py::TestToZarrFromZarr::test_round_trip_basic	27	kept	End-to-end to_zarr/from_zarr round-trip asserting field values, names, grid properties, and identity normalization.	0f613cf
+tests/test_zarr_io.py::TestToZarrFromZarr::test_round_trip_full_metadata	27	kept	Full metadata round-trip: grid with dt/boundary, species, physics, frame, transforms, field values; the most comprehensive Zarr test.	0f613cf
+tests/test_zarr_io.py::TestToZarrFromZarr::test_dtype_float32_downcast	27	kept	Pins dtype='float32' downcast on write; catches ignored dtype kwarg or precision loss beyond float32 tolerance.	0f613cf
+tests/test_zarr_io.py::TestToZarrFromZarr::test_round_trip_2d_surviving_axes	27	kept	Pins 2D slice round-trip with surviving_axes=(0,2); catches surviving_axes serialization failure or wrong axis names.	0f613cf
+tests/test_zarr_io.py::TestToZarrFromZarr::test_per_field_metadata_preserved	27	kept	Pins per-field DataArray attrs (quantity_type, si_unit) survive Zarr round-trip; catches lost field-level metadata.	0f613cf
+tests/test_zarr_io.py::TestToZarrFromZarr::test_spherical_geometry_round_trip	27	kept	Pins spherical geometry survives Zarr round-trip including axis names (r, theta, phi); catches geometry serialization bugs.	0f613cf
+tests/test_zarr_io.py::TestToZarrFromZarr::test_no_pypic_attrs_raises	27	kept	Guards that from_zarr on a non-pypic Zarr store raises ValueError; catches silent fallback to broken FieldDataset.	0f613cf
+tests/test_zarr_io.py::TestToZarrFromZarr::test_failed_write_cleans_up_fresh_store	27	kept	Regression: failed to_zarr must remove partial store; catches orphaned zarr.json misleading later from_zarr.	0f613cf
+tests/test_zarr_io.py::TestToZarrTimeseries::test_timeseries_basic	27	kept	End-to-end timeseries write/read: 3 steps, asserts time dimension, step count, and per-step field values.	0f613cf
+tests/test_zarr_io.py::TestToZarrTimeseries::test_timeseries_rejects_field_drift	27	kept	Guards that changing field sets across steps raises ValueError; catches silent store corruption from inconsistent variable sets.	0f613cf
+tests/test_zarr_io.py::TestToZarrTimeseries::test_timeseries_cleans_partial_store_on_append_failure	27	kept	Regression: shape/grid drift between steps must clean up partial store; catches orphaned single-step store on failure.	0f613cf
+tests/test_zarr_io.py::TestToZarrTimeseries::test_timeseries_cleans_stub_on_first_write_failure	27	kept	Regression: first-step write failure must clean stub store; catches zarr.json orphan from materialization crash.	0f613cf
+tests/test_zarr_io.py::TestToZarrTimeseries::test_timeseries_preserves_metadata	27	kept	Pins species and frame survive timeseries round-trip; catches metadata loss during append-mode writes.	0f613cf
+tests/test_zarr_io.py::TestToZarrTimeseries::test_timeseries_rejects_grid_drift	27	kept	Guards that changing grid (spacing/origin) across steps raises ValueError; catches silent identity mismatch.	0f613cf
+tests/test_zarr_io.py::TestToZarrTimeseries::test_timeseries_rejects_frame_drift	27	kept	Guards that changing frame name across steps raises ValueError; catches silent frame identity mismatch.	0f613cf
+tests/test_zarr_io.py::TestToZarrTimeseries::test_timeseries_intersects_per_step_metadata	27	kept	Pins metadata intersection: shared keys survive, diverging keys are dropped; catches silent step-0-only metadata.	0f613cf
+tests/test_zarr_io.py::TestToZarrTimeseries::test_metadata_tuple_round_trip	27	kept	Regression: tuple metadata must survive Zarr round-trip as tuple (not list); catches __pypic_class__ tagging failure.	0f613cf
+tests/test_zarr_io.py::TestToZarrTimeseries::test_metadata_non_string_keys_round_trip	27	kept	Regression: integer-keyed dicts must survive round-trip with key type preserved; catches JSON string-key collision.	0f613cf
