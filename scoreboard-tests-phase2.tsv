@@ -1372,70 +1372,70 @@ tests/test_selections.py::TestSphereSelection::test_all_fields_masked	22	kept	Pi
 tests/test_selections.py::TestFieldDatasetWhere::test_custom_mask	22	kept	Pins that False→NaN and True→finite in the where() API — the sole unit test for the public FieldDataset.where() method.	817525d
 tests/test_selections.py::TestFieldDatasetWhere::test_preserves_shape	22	kept	Pins that where(all-True) preserves shape identically — catches a bug that drops or squeezes dimensions.	817525d
 tests/test_selections.py::TestFieldDatasetWhere::test_custom_fill_value	22	kept	Pins other=-999.0 fill value — catches a hardcoded-NaN default that ignores the other= kwarg.	817525d
-tests/test_simple_reader.py::TestParseFilePattern::test_default_pattern	23	kept	Pins glob+regex extraction from format string — catches a regex escape bug that would silently match wrong filenames.	<pending>
-tests/test_simple_reader.py::TestParseFilePattern::test_custom_pattern	23	kept	Asserts capture group extracts the step substring '0100' — catches a regex with wrong or missing group.	<pending>
-tests/test_simple_reader.py::TestParseFilePattern::test_no_prefix	23	kept	Edge case: no prefix before {step} yields '*.h5' glob — catches a regex that requires a non-empty prefix.	<pending>
-tests/test_simple_reader.py::TestAvailableTimesteps::test_finds_all_steps	23	kept	Pins sorted step discovery [0,10,20] from synthetic HDF5 filenames — catches a glob/regex mismatch that would miss or duplicate steps.	<pending>
-tests/test_simple_reader.py::TestAvailableTimesteps::test_empty_directory	23	kept	Empty dir returns [] not None/error — catches a missing guard on empty glob results.	<pending>
-tests/test_simple_reader.py::TestAvailableTimesteps::test_custom_pattern	23	kept	Non-default pattern 'snap_{step:04d}.h5' finds [5,15] — catches hardcoded pattern assumptions in available_timesteps.	<pending>
-tests/test_simple_reader.py::TestReadTimestepAutoDetect::test_reads_fields_with_correct_values_and_grid	23	kept	Asserts field values via assert_allclose against known-seed data + grid dims/spacing/origin + alias Bx==B1 — end-to-end reader correctness.	<pending>
-tests/test_simple_reader.py::TestReadTimestepAutoDetect::test_aliases_metadata_and_missing_file	23	kept	Pins step/time metadata extraction from HDF5 attrs + FileNotFoundError for missing step — catches silent fallback to step=0.	<pending>
-tests/test_simple_reader.py::TestReadTimestepWithConfig::test_config_fallback_when_no_metadata	23	kept	Bare HDF5 (no grid/ group) + config → reads successfully — catches a path that always requires HDF5 metadata.	<pending>
-tests/test_simple_reader.py::TestReadTimestepWithConfig::test_hdf5_metadata_takes_priority	23	kept	HDF5 grid attrs override conflicting config grid — pins the priority order documented in the docstring.	<pending>
-tests/test_simple_reader.py::TestReadTimestepWithConfig::test_physics_from_config	23	kept	Config physics (gamma=5/3) propagates to FieldDataset — catches a path that drops physics when HDF5 metadata is present.	<pending>
-tests/test_simple_reader.py::TestReadTimestepWithConfig::test_explicit_grid_without_config	23	kept	Explicit grid= kwarg without full config provides grid — catches a code path that only accepts config.	<pending>
-tests/test_simple_reader.py::TestReadTimestepWithConfig::test_explicit_normalization	23	kept	Explicit normalization= propagates via identity check — catches a path that ignores the kwarg when HDF5 has no normalization.	<pending>
-tests/test_simple_reader.py::TestFieldMapping::test_maps_native_to_canonical	23	kept	field_map renames native→canonical and registers Bx alias — catches a field_map that only stores but doesn't apply the mapping.	<pending>
-tests/test_simple_reader.py::TestFieldMapping::test_unmapped_fields_pass_through	23	kept	Partial field_map: mapped fields get canonical names, unmapped pass through with native names — catches a filter that drops unmapped fields.	<pending>
-tests/test_simple_reader.py::TestFieldsAtRoot::test_explicit_root	23	kept	fields_group='' reads datasets at HDF5 root — catches a code path that always requires a 'fields/' group.	<pending>
-tests/test_simple_reader.py::TestFieldsAtRoot::test_scalars_skipped_without_field_map	23	kept	Scalar and 1D datasets at root are excluded from fields — catches a missing ndim>=2 guard that would import coordinate arrays as fields.	<pending>
-tests/test_simple_reader.py::TestFieldsGroupMisconfig::test_fields_group_pointing_at_dataset_raises	23	kept	fields_group pointing at a Dataset (not Group) raises TypeError with clear message — catches a confusing downstream AttributeError.	<pending>
-tests/test_simple_reader.py::TestMissingMetadataError::test_no_grid_no_config_raises	23	kept	No grid metadata + no config → ValueError with 'grid' in message — catches silent fallback to a wrong default grid.	<pending>
-tests/test_simple_reader.py::TestOpenSimple::test_with_hdf5_metadata	23	kept	open_simple extracts model_name/type from HDF5 + reads fields — integration test for the auto-detect path.	<pending>
-tests/test_simple_reader.py::TestOpenSimple::test_config_sources	23	kept	Tests both config= and grid= kwarg paths through open_simple — catches a path that only accepts one form.	<pending>
-tests/test_simple_reader.py::TestOpenSimple::test_tuple_unpacking_still_works	23	kept	Simulation supports (reader, config) unpacking — backward compat guard for the old 2-tuple API.	<pending>
-tests/test_simple_reader.py::TestOpenSimple::test_no_files_raises	23	kept	Empty dir raises FileNotFoundError — catches a silent return of a broken Simulation object.	<pending>
-tests/test_simple_reader.py::TestOpenSimple::test_simulation_toml_auto_discovery	23	kept	simulation.toml in data dir auto-discovered, model_name/grid propagated — catches a path that only uses HDF5 attrs.	<pending>
-tests/test_simple_reader.py::TestOpenSimple::test_config_path_outside_data_dir	23	kept	config_path= outside data dir works — catches a path that only searches inside the data directory.	<pending>
-tests/test_simple_reader.py::TestCanReadConfidence::test_empty_dir	23	kept	Empty dir → 0.0 confidence — catches a positive score on any directory.	<pending>
-tests/test_simple_reader.py::TestCanReadConfidence::test_generic_h5	23	kept	Any .h5 file → non-zero confidence (base score 0.2) — catches a probe that only fires on canonical layout.	<pending>
-tests/test_simple_reader.py::TestCanReadConfidence::test_canonical_h5	23	kept	HDF5 with fields/+grid/ groups → confidence >= 0.5 — catches a scoring bug that doesn't distinguish canonical from generic.	<pending>
-tests/test_simple_reader.py::TestCustomReadRaw::test_subclass_bypasses_hdf5	23	kept	Subclass _read_raw returns in-memory arrays, values match known seed — catches a path that always opens the file.	<pending>
-tests/test_simple_reader.py::TestCustomReadRaw::test_field_map_applied_after_read_raw	23	kept	field_map applies to _read_raw output, native name gone, canonical present with correct values — catches field_map only applying to HDF5 path.	<pending>
-tests/test_simple_reader.py::TestCustomReadRaw::test_missing_grid_raises	23	kept	Custom _read_raw without grid raises ValueError — catches a path that silently uses zero-grid or crashes opaquely.	<pending>
-tests/test_simple_reader.py::TestCustomReadRaw::test_config_provides_grid	23	kept	Config provides grid for custom _read_raw + physics propagates — catches a path that only accepts explicit grid= kwarg.	<pending>
-tests/test_simple_reader.py::TestCustomReadRaw::test_transposed_hdf5	23	kept	Custom _read_raw transposes arrays, result matches original — demonstrates the extension point for non-standard HDF5 layouts.	<pending>
-tests/test_simple_reader.py::TestSelectFields::test_select_fields_keeps_and_resolves	23	kept	select_fields keeps requested fields, resolves aliases, preserves values and metadata — comprehensive field selection test.	<pending>
-tests/test_simple_reader.py::TestSelectFields::test_missing_field_raises	23	kept	Missing field in select_fields raises KeyError — pins the 'fail loud' contract from CLAUDE.md architecture rules.	<pending>
-tests/test_simple_reader.py::TestSelectFields::test_preserves_caller_order	23	kept	Regression test: select_fields returns fields in caller order, not alphabetical — pins fix for set+sorted bug.	<pending>
-tests/test_simple_reader.py::TestSelectFields::test_deduplicates_aliases_preserving_first_occurrence	23	kept	Duplicate/aliased names collapse to one entry at first position — catches a double-entry or wrong-position bug.	<pending>
-tests/test_simple_reader.py::TestSelectiveRead::test_reads_only_requested_fields	23	kept	fields= kwarg at reader level limits loaded fields — catches a code path that ignores the filter and reads all.	<pending>
-tests/test_simple_reader.py::TestSelectiveRead::test_values_match_full_read	23	kept	Selective read values match full read — catches a reordering or dtype bug in the filtered path.	<pending>
-tests/test_simple_reader.py::TestSelectiveRead::test_with_field_map	23	kept	Selective read with field_map works in canonical names — catches a filter that uses native names when canonical are expected.	<pending>
-tests/test_simple_reader.py::TestSelectiveReadViaSimulation::test_alias_resolution	23	kept	Alias 'Bx' resolves to 'B1' through Simulation.read — integration test for the alias path through the registry layer.	<pending>
-tests/test_simple_reader.py::TestSelectiveReadViaSimulation::test_none_reads_all	23	kept	fields=None reads all 4 fields — catches a default that filters to empty.	<pending>
-tests/test_spectral.py::TestPowerSpectrum1D::test_single_mode_peak	23	hardened	Tightened rtol from 0.05 to 1e-12 — peak location is exact when wavelength divides domain evenly (integer mode number).	<pending>
-tests/test_spectral.py::TestPowerSpectrum1D::test_parseval	23	hardened	Tightened rtol from 0.15 to 1e-10 — Parseval holds to machine precision with boxcar window (verified: relative error ~1e-16).	<pending>
-tests/test_spectral.py::TestPowerSpectrum1D::test_2d_input_averages	23	kept	2D input averaged over non-FFT axis produces 1D output with matching k,power lengths — catches a shape mismatch in the averaging path.	<pending>
-tests/test_spectral.py::TestPowerSpectrum1D::test_window_reduces_leakage	23	kept	Hann median power << boxcar median (ratio ~1e-8) — pins that windowing reduces spectral leakage by orders of magnitude.	<pending>
-tests/test_spectral.py::TestPowerSpectrum1D::test_dc_excluded	23	kept	k[0] > 0 for constant field — pins that DC component is excluded as documented in the docstring.	<pending>
-tests/test_spectral.py::TestPowerSpectrum1D::test_k_units_radians	23	kept	k[0] == 2*pi/(N*dx) to rtol=1e-12 — pins wavenumber units as radians/length, not cycles/length.	<pending>
-tests/test_spectral.py::TestPowerSpectrum2D::test_basic_shape	23	kept	2D PSD returns 1D k,power arrays with matching lengths — catches a shape bug in radial binning.	<pending>
-tests/test_spectral.py::TestPowerSpectrum2D::test_invalid_shape	23	kept	1D input raises ValueError with '2D' — catches missing ndim guard.	<pending>
-tests/test_spectral.py::TestPowerSpectrum2D::test_isotropic_noise_roughly_flat	23	hardened	Tightened CV threshold from 1.0 to 0.5 (actual ~0.14 with fixed seed) — white noise must have roughly flat spectrum.	<pending>
-tests/test_spectral.py::TestPowerSpectrum2D::test_positive_wavenumbers	23	kept	All k > 0 — pins DC exclusion in radial binning (DC bin would have k=0).	<pending>
-tests/test_spectral.py::TestPowerSpectrum3D::test_basic_shape	23	kept	3D PSD returns 1D k,power with matching lengths — catches shape bug in spherical shell binning.	<pending>
-tests/test_spectral.py::TestPowerSpectrum3D::test_invalid_shape	23	kept	2D input raises ValueError with '3D' — catches missing ndim guard.	<pending>
-tests/test_spectral.py::TestPowerSpectrum3D::test_isotropic_noise_roughly_flat	23	hardened	Tightened CV threshold from 1.0 to 0.5 (actual ~0.07 with fixed seed) — white noise must have roughly flat 3D spectrum.	<pending>
-tests/test_spectral.py::TestPowerSpectrum3D::test_positive_wavenumbers	23	kept	All k > 0 — pins DC exclusion in spherical shell binning.	<pending>
-tests/test_spectral.py::TestPowerSpectrum3D::test_anisotropic_spacing	23	hardened	Added monotonic k and non-negative power assertions — was only checking len>0 and isfinite (pure no-crash test).	<pending>
-tests/test_spectral.py::TestSpectralEdgeCases::test_all_zero_field_1d	23	kept	Zero field → all power == 0.0 and finite — catches a division-by-zero in the normalization or NaN from 0/0.	<pending>
-tests/test_spectral.py::TestSpectralEdgeCases::test_nan_propagates_1d	23	kept	NaN in input propagates to output — catches silent NaN dropping that would produce artificially clean spectra.	<pending>
-tests/test_spectral.py::TestSpectralEdgeCases::test_invalid_window_raises	23	kept	Unknown window name raises ValueError — catches a silent fallback to boxcar or scipy default.	<pending>
-tests/test_spectral.py::TestSpectralEdgeCases::test_nyquist_handling_parity[64]	23	kept	Even N: k monotonically increasing and power finite — catches Nyquist bin duplication or sign error for even N.	<pending>
-tests/test_spectral.py::TestSpectralEdgeCases::test_nyquist_handling_parity[65]	23	kept	Odd N: k monotonically increasing and power finite — catches off-by-one in rfftfreq length for odd N.	<pending>
-tests/test_spectral.py::TestSpectralEdgeCases::test_all_zero_field_2d	23	kept	2D zero field → all power == 0.0 — catches NaN from empty-bin averaging with zero input.	<pending>
-tests/test_spectral.py::TestSpectralEdgeCases::test_all_zero_field_3d	23	kept	3D zero field → all power == 0.0 — catches NaN from empty-shell averaging with zero input.	<pending>
+tests/test_simple_reader.py::TestParseFilePattern::test_default_pattern	23	kept	Pins glob+regex extraction from format string — catches a regex escape bug that would silently match wrong filenames.	8eae5a9
+tests/test_simple_reader.py::TestParseFilePattern::test_custom_pattern	23	kept	Asserts capture group extracts the step substring '0100' — catches a regex with wrong or missing group.	8eae5a9
+tests/test_simple_reader.py::TestParseFilePattern::test_no_prefix	23	kept	Edge case: no prefix before {step} yields '*.h5' glob — catches a regex that requires a non-empty prefix.	8eae5a9
+tests/test_simple_reader.py::TestAvailableTimesteps::test_finds_all_steps	23	kept	Pins sorted step discovery [0,10,20] from synthetic HDF5 filenames — catches a glob/regex mismatch that would miss or duplicate steps.	8eae5a9
+tests/test_simple_reader.py::TestAvailableTimesteps::test_empty_directory	23	kept	Empty dir returns [] not None/error — catches a missing guard on empty glob results.	8eae5a9
+tests/test_simple_reader.py::TestAvailableTimesteps::test_custom_pattern	23	kept	Non-default pattern 'snap_{step:04d}.h5' finds [5,15] — catches hardcoded pattern assumptions in available_timesteps.	8eae5a9
+tests/test_simple_reader.py::TestReadTimestepAutoDetect::test_reads_fields_with_correct_values_and_grid	23	kept	Asserts field values via assert_allclose against known-seed data + grid dims/spacing/origin + alias Bx==B1 — end-to-end reader correctness.	8eae5a9
+tests/test_simple_reader.py::TestReadTimestepAutoDetect::test_aliases_metadata_and_missing_file	23	kept	Pins step/time metadata extraction from HDF5 attrs + FileNotFoundError for missing step — catches silent fallback to step=0.	8eae5a9
+tests/test_simple_reader.py::TestReadTimestepWithConfig::test_config_fallback_when_no_metadata	23	kept	Bare HDF5 (no grid/ group) + config → reads successfully — catches a path that always requires HDF5 metadata.	8eae5a9
+tests/test_simple_reader.py::TestReadTimestepWithConfig::test_hdf5_metadata_takes_priority	23	kept	HDF5 grid attrs override conflicting config grid — pins the priority order documented in the docstring.	8eae5a9
+tests/test_simple_reader.py::TestReadTimestepWithConfig::test_physics_from_config	23	kept	Config physics (gamma=5/3) propagates to FieldDataset — catches a path that drops physics when HDF5 metadata is present.	8eae5a9
+tests/test_simple_reader.py::TestReadTimestepWithConfig::test_explicit_grid_without_config	23	kept	Explicit grid= kwarg without full config provides grid — catches a code path that only accepts config.	8eae5a9
+tests/test_simple_reader.py::TestReadTimestepWithConfig::test_explicit_normalization	23	kept	Explicit normalization= propagates via identity check — catches a path that ignores the kwarg when HDF5 has no normalization.	8eae5a9
+tests/test_simple_reader.py::TestFieldMapping::test_maps_native_to_canonical	23	kept	field_map renames native→canonical and registers Bx alias — catches a field_map that only stores but doesn't apply the mapping.	8eae5a9
+tests/test_simple_reader.py::TestFieldMapping::test_unmapped_fields_pass_through	23	kept	Partial field_map: mapped fields get canonical names, unmapped pass through with native names — catches a filter that drops unmapped fields.	8eae5a9
+tests/test_simple_reader.py::TestFieldsAtRoot::test_explicit_root	23	kept	fields_group='' reads datasets at HDF5 root — catches a code path that always requires a 'fields/' group.	8eae5a9
+tests/test_simple_reader.py::TestFieldsAtRoot::test_scalars_skipped_without_field_map	23	kept	Scalar and 1D datasets at root are excluded from fields — catches a missing ndim>=2 guard that would import coordinate arrays as fields.	8eae5a9
+tests/test_simple_reader.py::TestFieldsGroupMisconfig::test_fields_group_pointing_at_dataset_raises	23	kept	fields_group pointing at a Dataset (not Group) raises TypeError with clear message — catches a confusing downstream AttributeError.	8eae5a9
+tests/test_simple_reader.py::TestMissingMetadataError::test_no_grid_no_config_raises	23	kept	No grid metadata + no config → ValueError with 'grid' in message — catches silent fallback to a wrong default grid.	8eae5a9
+tests/test_simple_reader.py::TestOpenSimple::test_with_hdf5_metadata	23	kept	open_simple extracts model_name/type from HDF5 + reads fields — integration test for the auto-detect path.	8eae5a9
+tests/test_simple_reader.py::TestOpenSimple::test_config_sources	23	kept	Tests both config= and grid= kwarg paths through open_simple — catches a path that only accepts one form.	8eae5a9
+tests/test_simple_reader.py::TestOpenSimple::test_tuple_unpacking_still_works	23	kept	Simulation supports (reader, config) unpacking — backward compat guard for the old 2-tuple API.	8eae5a9
+tests/test_simple_reader.py::TestOpenSimple::test_no_files_raises	23	kept	Empty dir raises FileNotFoundError — catches a silent return of a broken Simulation object.	8eae5a9
+tests/test_simple_reader.py::TestOpenSimple::test_simulation_toml_auto_discovery	23	kept	simulation.toml in data dir auto-discovered, model_name/grid propagated — catches a path that only uses HDF5 attrs.	8eae5a9
+tests/test_simple_reader.py::TestOpenSimple::test_config_path_outside_data_dir	23	kept	config_path= outside data dir works — catches a path that only searches inside the data directory.	8eae5a9
+tests/test_simple_reader.py::TestCanReadConfidence::test_empty_dir	23	kept	Empty dir → 0.0 confidence — catches a positive score on any directory.	8eae5a9
+tests/test_simple_reader.py::TestCanReadConfidence::test_generic_h5	23	kept	Any .h5 file → non-zero confidence (base score 0.2) — catches a probe that only fires on canonical layout.	8eae5a9
+tests/test_simple_reader.py::TestCanReadConfidence::test_canonical_h5	23	kept	HDF5 with fields/+grid/ groups → confidence >= 0.5 — catches a scoring bug that doesn't distinguish canonical from generic.	8eae5a9
+tests/test_simple_reader.py::TestCustomReadRaw::test_subclass_bypasses_hdf5	23	kept	Subclass _read_raw returns in-memory arrays, values match known seed — catches a path that always opens the file.	8eae5a9
+tests/test_simple_reader.py::TestCustomReadRaw::test_field_map_applied_after_read_raw	23	kept	field_map applies to _read_raw output, native name gone, canonical present with correct values — catches field_map only applying to HDF5 path.	8eae5a9
+tests/test_simple_reader.py::TestCustomReadRaw::test_missing_grid_raises	23	kept	Custom _read_raw without grid raises ValueError — catches a path that silently uses zero-grid or crashes opaquely.	8eae5a9
+tests/test_simple_reader.py::TestCustomReadRaw::test_config_provides_grid	23	kept	Config provides grid for custom _read_raw + physics propagates — catches a path that only accepts explicit grid= kwarg.	8eae5a9
+tests/test_simple_reader.py::TestCustomReadRaw::test_transposed_hdf5	23	kept	Custom _read_raw transposes arrays, result matches original — demonstrates the extension point for non-standard HDF5 layouts.	8eae5a9
+tests/test_simple_reader.py::TestSelectFields::test_select_fields_keeps_and_resolves	23	kept	select_fields keeps requested fields, resolves aliases, preserves values and metadata — comprehensive field selection test.	8eae5a9
+tests/test_simple_reader.py::TestSelectFields::test_missing_field_raises	23	kept	Missing field in select_fields raises KeyError — pins the 'fail loud' contract from CLAUDE.md architecture rules.	8eae5a9
+tests/test_simple_reader.py::TestSelectFields::test_preserves_caller_order	23	kept	Regression test: select_fields returns fields in caller order, not alphabetical — pins fix for set+sorted bug.	8eae5a9
+tests/test_simple_reader.py::TestSelectFields::test_deduplicates_aliases_preserving_first_occurrence	23	kept	Duplicate/aliased names collapse to one entry at first position — catches a double-entry or wrong-position bug.	8eae5a9
+tests/test_simple_reader.py::TestSelectiveRead::test_reads_only_requested_fields	23	kept	fields= kwarg at reader level limits loaded fields — catches a code path that ignores the filter and reads all.	8eae5a9
+tests/test_simple_reader.py::TestSelectiveRead::test_values_match_full_read	23	kept	Selective read values match full read — catches a reordering or dtype bug in the filtered path.	8eae5a9
+tests/test_simple_reader.py::TestSelectiveRead::test_with_field_map	23	kept	Selective read with field_map works in canonical names — catches a filter that uses native names when canonical are expected.	8eae5a9
+tests/test_simple_reader.py::TestSelectiveReadViaSimulation::test_alias_resolution	23	kept	Alias 'Bx' resolves to 'B1' through Simulation.read — integration test for the alias path through the registry layer.	8eae5a9
+tests/test_simple_reader.py::TestSelectiveReadViaSimulation::test_none_reads_all	23	kept	fields=None reads all 4 fields — catches a default that filters to empty.	8eae5a9
+tests/test_spectral.py::TestPowerSpectrum1D::test_single_mode_peak	23	hardened	Tightened rtol from 0.05 to 1e-12 — peak location is exact when wavelength divides domain evenly (integer mode number).	8eae5a9
+tests/test_spectral.py::TestPowerSpectrum1D::test_parseval	23	hardened	Tightened rtol from 0.15 to 1e-10 — Parseval holds to machine precision with boxcar window (verified: relative error ~1e-16).	8eae5a9
+tests/test_spectral.py::TestPowerSpectrum1D::test_2d_input_averages	23	kept	2D input averaged over non-FFT axis produces 1D output with matching k,power lengths — catches a shape mismatch in the averaging path.	8eae5a9
+tests/test_spectral.py::TestPowerSpectrum1D::test_window_reduces_leakage	23	kept	Hann median power << boxcar median (ratio ~1e-8) — pins that windowing reduces spectral leakage by orders of magnitude.	8eae5a9
+tests/test_spectral.py::TestPowerSpectrum1D::test_dc_excluded	23	kept	k[0] > 0 for constant field — pins that DC component is excluded as documented in the docstring.	8eae5a9
+tests/test_spectral.py::TestPowerSpectrum1D::test_k_units_radians	23	kept	k[0] == 2*pi/(N*dx) to rtol=1e-12 — pins wavenumber units as radians/length, not cycles/length.	8eae5a9
+tests/test_spectral.py::TestPowerSpectrum2D::test_basic_shape	23	kept	2D PSD returns 1D k,power arrays with matching lengths — catches a shape bug in radial binning.	8eae5a9
+tests/test_spectral.py::TestPowerSpectrum2D::test_invalid_shape	23	kept	1D input raises ValueError with '2D' — catches missing ndim guard.	8eae5a9
+tests/test_spectral.py::TestPowerSpectrum2D::test_isotropic_noise_roughly_flat	23	hardened	Tightened CV threshold from 1.0 to 0.5 (actual ~0.14 with fixed seed) — white noise must have roughly flat spectrum.	8eae5a9
+tests/test_spectral.py::TestPowerSpectrum2D::test_positive_wavenumbers	23	kept	All k > 0 — pins DC exclusion in radial binning (DC bin would have k=0).	8eae5a9
+tests/test_spectral.py::TestPowerSpectrum3D::test_basic_shape	23	kept	3D PSD returns 1D k,power with matching lengths — catches shape bug in spherical shell binning.	8eae5a9
+tests/test_spectral.py::TestPowerSpectrum3D::test_invalid_shape	23	kept	2D input raises ValueError with '3D' — catches missing ndim guard.	8eae5a9
+tests/test_spectral.py::TestPowerSpectrum3D::test_isotropic_noise_roughly_flat	23	hardened	Tightened CV threshold from 1.0 to 0.5 (actual ~0.07 with fixed seed) — white noise must have roughly flat 3D spectrum.	8eae5a9
+tests/test_spectral.py::TestPowerSpectrum3D::test_positive_wavenumbers	23	kept	All k > 0 — pins DC exclusion in spherical shell binning.	8eae5a9
+tests/test_spectral.py::TestPowerSpectrum3D::test_anisotropic_spacing	23	hardened	Added monotonic k and non-negative power assertions — was only checking len>0 and isfinite (pure no-crash test).	8eae5a9
+tests/test_spectral.py::TestSpectralEdgeCases::test_all_zero_field_1d	23	kept	Zero field → all power == 0.0 and finite — catches a division-by-zero in the normalization or NaN from 0/0.	8eae5a9
+tests/test_spectral.py::TestSpectralEdgeCases::test_nan_propagates_1d	23	kept	NaN in input propagates to output — catches silent NaN dropping that would produce artificially clean spectra.	8eae5a9
+tests/test_spectral.py::TestSpectralEdgeCases::test_invalid_window_raises	23	kept	Unknown window name raises ValueError — catches a silent fallback to boxcar or scipy default.	8eae5a9
+tests/test_spectral.py::TestSpectralEdgeCases::test_nyquist_handling_parity[64]	23	kept	Even N: k monotonically increasing and power finite — catches Nyquist bin duplication or sign error for even N.	8eae5a9
+tests/test_spectral.py::TestSpectralEdgeCases::test_nyquist_handling_parity[65]	23	kept	Odd N: k monotonically increasing and power finite — catches off-by-one in rfftfreq length for odd N.	8eae5a9
+tests/test_spectral.py::TestSpectralEdgeCases::test_all_zero_field_2d	23	kept	2D zero field → all power == 0.0 — catches NaN from empty-bin averaging with zero input.	8eae5a9
+tests/test_spectral.py::TestSpectralEdgeCases::test_all_zero_field_3d	23	kept	3D zero field → all power == 0.0 — catches NaN from empty-shell averaging with zero input.	8eae5a9
 tests/test_stagger_info.py::TestStaggerInfoConstruction::test_minimal	0	not-yet-reviewed		
 tests/test_stagger_info.py::TestStaggerInfoConstruction::test_full	0	not-yet-reviewed		
 tests/test_stagger_info.py::TestStaggerInfoConstruction::test_field_locations_frozen_to_mapping_proxy	0	not-yet-reviewed		
