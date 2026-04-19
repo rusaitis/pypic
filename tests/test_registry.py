@@ -54,10 +54,14 @@ def _mock_factory(
 
 class TestRegisterUnregister:
     def test_register_and_lookup(self) -> None:
-        register_reader("test_reader", lambda _: 0.5, _mock_factory)
+        probe = lambda _: 0.5  # noqa: E731
+        register_reader("test_reader", probe, _mock_factory)
         readers = registered_readers()
         assert "test_reader" in readers
-        assert readers["test_reader"].name == "test_reader"
+        entry = readers["test_reader"]
+        assert entry.name == "test_reader"
+        assert entry.can_read_confidence is probe
+        assert entry.factory is _mock_factory
 
     def test_unregister_removes_entry(self) -> None:
         register_reader("temp", lambda _: 0.5, _mock_factory)
@@ -233,11 +237,14 @@ class TestOpenSimulationAutoDetect:
         tmp_path: Path,
     ) -> None:
         register_reader("str_test", lambda _: 0.5, _mock_factory)
-        reader, _cfg = open_simulation(
+        sim = open_simulation(
             str(tmp_path),
             reader="str_test",
         )
-        assert reader is not None
+        import pathlib
+
+        assert sim.path == tmp_path
+        assert isinstance(sim.path, pathlib.Path)
 
 
 def _probe_func(reader_id: str) -> Callable[[Path], float]:
@@ -336,9 +343,9 @@ def test_ipic3d_probe_rejects_file_path(tmp_path: Path) -> None:
 class TestBuiltinReadersRegistered:
     def test_all_builtins_present(self) -> None:
         readers = registered_readers()
-        assert "ipic3d" in readers
-        assert "batsrus" in readers
-        assert "openggcm" in readers
+        expected = {"ipic3d", "batsrus", "openggcm", "simple"}
+        missing = expected - set(readers)
+        assert not missing, f"Missing builtin readers: {missing}"
 
 
 class TestSimulationFacade:
