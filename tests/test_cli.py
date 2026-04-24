@@ -31,17 +31,32 @@ mpl_required = pytest.mark.skipif(not _HAS_MPL, reason="matplotlib required")
 
 runner = CliRunner()
 
-# Minimal simulation.toml for a SimpleReader-compatible dataset.
+# Minimal simulation.toml for a SimpleReader-compatible dataset (schema v1.0).
 _TOML = """\
+schema_version = "1.0"
+
+[schema]
+version = "1.0"
+
 [model]
 name = "test_sim"
 type = "MHD"
 
+[run]
+name = "cli_test_run"
+
+[time]
+scheme = "fixed"
+dt = 0.1
+t_start = 0.0
+t_end = 1.0
+n_steps = 10
+
 [grid]
 dimensions = [4, 4, 4]
 spacing = [1.0, 1.0, 1.0]
-origin = [0.0, 0.0, 0.0]
-dt = 0.1
+lower = [0.0, 0.0, 0.0]
+upper = [4.0, 4.0, 4.0]
 
 [units]
 system = "SI"
@@ -52,6 +67,11 @@ frame = "simulation"
 
 [physics.mhd]
 gamma = 1.6667
+
+[[species]]
+name = "p"
+charge = 1.0
+mass = 1.0
 """
 
 
@@ -895,14 +915,30 @@ class TestPlotAnimate:
 # -- 2D dataset edge case ---------------------------------------------------
 
 _TOML_2D = """\
+schema_version = "1.0"
+
+[schema]
+version = "1.0"
+
 [model]
 name = "test_2d"
 type = "MHD"
 
+[run]
+name = "cli_2d_test"
+
+[time]
+scheme = "fixed"
+dt = 0.1
+t_start = 0.0
+t_end = 1.0
+n_steps = 10
+
 [grid]
 dimensions = [8, 6]
 spacing = [1.0, 1.0]
-origin = [0.0, 0.0]
+lower = [0.0, 0.0]
+upper = [8.0, 6.0]
 
 [units]
 system = "SI"
@@ -913,6 +949,11 @@ frame = "simulation"
 
 [physics.mhd]
 gamma = 1.6667
+
+[[species]]
+name = "p"
+charge = 1.0
+mass = 1.0
 """
 
 

@@ -1,23 +1,48 @@
-"""Load simulation configuration from a TOML file."""
+"""Load simulation configuration from a TOML file.
+
+The Pydantic validator in :mod:`pypic.schema` is the authoritative
+source of the v1.0 schema — this module is a thin translator from a
+validated :class:`~pypic.schema.SimulationSchema` to the internal
+dataclasses (:class:`~pypic.containers.SimulationConfig`, :class:`GridInfo`,
+:class:`Normalization`, :class:`SpeciesInfo`). All shape validation
+happens in the Pydantic layer; this module only maps fields.
+"""
 
 from __future__ import annotations
 
 import copy
 import logging
-import tomllib
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
 from scipy import constants
 
-if TYPE_CHECKING:
-    from pathlib import Path
-
 from pypic.containers import SimulationConfig, StaggerInfo
 from pypic.coordinates.geometry import GEOMETRY_BY_NAME, CoordinateGeometry
 from pypic.coordinates.transforms import FrameTransform
 from pypic.grid import GridInfo
+from pypic.schema import (
+    SimulationSchema,
+    UnitsCustom,
+    UnitsMHD,
+    UnitsPIC,
+    UnitsSI,
+    validate_simulation_toml,
+)
 from pypic.units import Normalization, PhysicsParams, SpeciesInfo
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    from pypic.schema import (
+        BoundaryConditions,
+        Coordinates,
+        Grid,
+        Physics,
+        Species,
+        Time,
+        Units,
+    )
 
 log = logging.getLogger(__name__)
 
@@ -126,7 +151,6 @@ def apply_physical_extent(
     new_metadata["physical_extent"] = physical_extent
     new_metadata["physical_extent_unit"] = physical_extent_unit
 
-    # Compute shrink factor if normalization carries real physics
     if computed_scale is not None and not config.normalization.is_identity:
         norm_scale = config.normalization.length_ref / unit_factor
         shrink_factor = computed_scale / norm_scale
@@ -153,246 +177,85 @@ def apply_physical_extent(
 def load_config(path: Path) -> SimulationConfig:
     """Parse a ``simulation.toml`` file into a SimulationConfig.
 
+    Validates the file against the v1.0 schema
+    (:mod:`pypic.schema`) and builds the internal :class:`SimulationConfig`
+    from the result.
+
     Parameters
     ----------
     path : Path
-        Path to a TOML configuration file conforming to schema.md.
+        Path to a TOML file conforming to the v1.0 schema.
 
     Returns
     -------
     SimulationConfig
-        Fully typed configuration with grid, normalization, and species.
+        Fully typed configuration with grid, normalization, species,
+        physics, frame, and transforms populated.
 
     Raises
     ------
-    ExceptionGroup
-        If one or more sections contain validation errors.
+    pydantic.ValidationError
+        If the document fails schema validation. Dotted field paths in
+        the error message point to every violation.
     """
-    raw = tomllib.loads(path.read_text(encoding="utf-8"))
+    schema = validate_simulation_toml(path)
+    return _from_schema(schema)
 
-    errors: list[Exception] = []
 
-    model_name = ""
-    model_type = ""
-    model_extras: dict[str, Any] = {}
-    try:
-        model_name, model_type, model_extras = _parse_model(raw.get("model", {}))
-    except (ValueError, KeyError) as exc:
-        errors.append(exc)
-
-    geometry: CoordinateGeometry | None = None
-    frame = ""
-    try:
-        geometry, frame = _parse_coordinates(raw.get("coordinates", {}))
-    except (ValueError, KeyError) as exc:
-        errors.append(exc)
-
-    grid: GridInfo | None = None
-    if geometry is not None:
-        try:
-            grid = _parse_grid(raw.get("grid", {}), geometry)
-        except (ValueError, KeyError) as exc:
-            errors.append(exc)
-    else:
-        errors.append(ValueError("[grid] skipped: [coordinates] failed"))
-
-    normalization: Normalization | None = None
-    try:
-        normalization = _parse_units(raw.get("units", {}))
-    except (ValueError, KeyError) as exc:
-        errors.append(exc)
-
-    species: tuple[SpeciesInfo, ...] = ()
-    try:
-        species = _parse_species(raw.get("species", []))
-    except (ValueError, KeyError) as exc:
-        errors.append(exc)
-
-    if errors:
-        raise ExceptionGroup(f"Invalid simulation config: {path}", errors)
-
-    assert grid is not None
-    assert normalization is not None
-
-    metadata: dict[str, Any] = {}
-    if model_extras:
-        metadata.update(model_extras)
-    if "initial_conditions" in raw:
-        metadata["initial_conditions"] = raw["initial_conditions"]
-    if "output" in raw:
-        metadata["output"] = raw["output"]
-
-    grid_raw = raw.get("grid", {})
-    if "stagger" in grid_raw:
-        metadata["stagger"] = StaggerInfo(convention=str(grid_raw["stagger"]))
-
-    units_raw = raw.get("units", {})
-    scaling = {}
-    if "scaling_factor" in units_raw:
-        scaling["scaling_factor"] = units_raw["scaling_factor"]
-    if "scaling_description" in units_raw:
-        scaling["scaling_description"] = units_raw["scaling_description"]
-    if scaling:
-        metadata["scaling"] = scaling
-
-    transforms = _parse_transforms(raw.get("coordinates", {}), frame)
+def _from_schema(schema: SimulationSchema) -> SimulationConfig:
+    geometry = _build_geometry(schema.coordinates)
+    grid = _build_grid(schema.grid, schema.time, schema.boundary_conditions, geometry)
+    normalization = _build_normalization(schema.units)
+    species = tuple(_build_species(s) for s in schema.species)
+    physics = _build_physics(schema.physics)
+    transforms = _build_transforms(schema.coordinates, schema.coordinates.frame)
+    metadata = _build_metadata(schema)
 
     config = SimulationConfig(
-        model_name=model_name,
-        model_type=model_type,
+        model_name=schema.model.name,
+        model_type=schema.model.type,
         grid=grid,
         normalization=normalization,
         species=species,
-        physics=_parse_physics(raw.get("physics", {})),
-        frame=frame,
+        physics=physics,
+        frame=schema.coordinates.frame,
         transforms=transforms,
         metadata=metadata,
     )
 
-    coords_raw = raw.get("coordinates", {})
-    if "physical_extent" in coords_raw:
-        phys_ext = tuple(float(x) for x in coords_raw["physical_extent"])
-        phys_unit = str(coords_raw.get("physical_extent_unit", "m"))
+    if schema.coordinates.physical_extent is not None:
+        phys_ext = tuple(float(x) for x in schema.coordinates.physical_extent)
+        phys_unit = schema.coordinates.physical_extent_unit or "m"
         config = apply_physical_extent(config, phys_ext, phys_unit)
 
     return config
 
 
-def _parse_physics(raw: dict[str, Any]) -> PhysicsParams:
-    """Extract typed physics params from TOML ``[physics]`` section."""
-    # Flatten: look for known keys at top level or in subsections (pic/mhd)
-    flat: dict[str, Any] = {}
-    extra: dict[str, Any] = {}
-    for key, val in raw.items():
-        if isinstance(val, dict):
-            flat.update(val)
-            extra[key] = val
-        else:
-            flat[key] = val
-    gamma = float(flat.get("gamma", 5.0 / 3.0))
-    c = float(flat.get("speed_of_light", flat.get("c", 1.0)))
-    relativistic = bool(flat.get("relativistic", False))
-    # Non-typed leftovers go in extra
-    for k, v in flat.items():
-        if k not in {"gamma", "speed_of_light", "c", "relativistic"}:
-            extra[k] = v
-    return PhysicsParams(gamma=gamma, c=c, relativistic=relativistic, extra=extra)
-
-
-def _parse_transforms(
-    raw: dict[str, Any], default_frame: str
-) -> dict[str, FrameTransform]:
-    """Parse ``[coordinates.transforms.*]`` into FrameTransform objects.
-
-    Parameters
-    ----------
-    raw : dict
-        The ``[coordinates]`` section from the TOML file.
-    default_frame : str
-        Native frame name (from ``[coordinates] frame``).
-
-    Returns
-    -------
-    dict[str, FrameTransform]
-        Mapping of target frame name to transform.
-    """
-    transforms_section = raw.get("transforms", {})
-    if not transforms_section:
-        return {}
-
-    result: dict[str, FrameTransform] = {}
-    for target_name, spec in transforms_section.items():
-        origin = tuple(float(x) for x in spec.get("origin", [0.0, 0.0, 0.0]))
-        rotation_raw = spec.get("rotation", None)
-        kwargs: dict[str, Any] = {}
-        if rotation_raw is not None:
-            kwargs["rotation"] = tuple(
-                tuple(float(x) for x in row) for row in rotation_raw
-            )
-        scale = float(spec.get("scale", 1.0))
-        source = spec.get("from_frame", default_frame)
-        axis_labels = spec.get("axis_labels", None)
-        if axis_labels:
-            kwargs["target_axis_names"] = tuple(axis_labels)
-
-        result[target_name] = FrameTransform(
-            source_frame=source,
-            target_frame=target_name,
-            origin=origin,  # type: ignore[arg-type]
-            scale=scale,
-            **kwargs,
-        )
-    return result
-
-
-def _parse_model(raw: dict[str, Any]) -> tuple[str, str, dict[str, Any]]:
-    """Extract model name, type, and optional extras from ``[model]``."""
-    if not raw:
-        raise ValueError("[model] section is missing or empty")
-    if "name" not in raw:
-        raise ValueError("[model] missing required key 'name'")
-    if "type" not in raw:
-        raise ValueError("[model] missing required key 'type'")
-
-    extras: dict[str, Any] = {}
-    if "version" in raw:
-        extras["version"] = raw["version"]
-    if "description" in raw:
-        extras["description"] = raw["description"]
-    return raw["name"], raw["type"], extras
-
-
-def _parse_coordinates(
-    raw: dict[str, Any],
-) -> tuple[CoordinateGeometry, str]:
-    """Build a CoordinateGeometry and frame from ``[coordinates]``.
-
-    Defaults to Cartesian geometry with ``"simulation"`` frame when
-    the section is missing or empty.
-    """
-    if not raw:
-        return GEOMETRY_BY_NAME["cartesian"], "simulation"
-    if "geometry" not in raw:
-        raise ValueError("[coordinates] missing required key 'geometry'")
-    if "frame" not in raw:
-        raise ValueError("[coordinates] missing required key 'frame'")
-
-    geom_str = raw["geometry"].lower()
-    geometry = GEOMETRY_BY_NAME.get(geom_str)
-    if geometry is None:
-        valid = ", ".join(sorted(GEOMETRY_BY_NAME))
-        raise ValueError(f"Unknown geometry {raw['geometry']!r}. Valid: {valid}")
-
-    if "axis_labels" in raw:
-        labels = tuple(raw["axis_labels"])
+def _build_geometry(coords: Coordinates) -> CoordinateGeometry:
+    geometry = GEOMETRY_BY_NAME[coords.geometry]
+    if coords.axis_labels is not None:
+        labels = tuple(coords.axis_labels)
         if len(labels) != 3:
             raise ValueError(
-                f"axis_labels must have exactly 3 elements, got {len(labels)}"
+                f"[coordinates].axis_labels must have 3 elements, got {len(labels)}"
             )
         geometry = copy.replace(geometry, axis_names=labels)
+    return geometry
 
-    return geometry, raw["frame"]
 
-
-def _parse_grid(raw: dict[str, Any], geometry: CoordinateGeometry) -> GridInfo:
-    """Build a GridInfo from ``[grid]``."""
-    if not raw:
-        raise ValueError("[grid] section is missing or empty")
-    if "dimensions" not in raw:
-        raise ValueError("[grid] missing required key 'dimensions'")
-    if "spacing" not in raw:
-        raise ValueError("[grid] missing required key 'spacing'")
-
-    dimensions = tuple(int(d) for d in raw["dimensions"])
-    spacing = tuple(float(s) for s in raw["spacing"])
-    ndim = len(dimensions)
-    if "origin" in raw:
-        origin = tuple(float(o) for o in raw["origin"])
-    else:
-        origin = (0.0,) * ndim
-    dt = float(raw["dt"]) if "dt" in raw else None
-    boundary = tuple(str(b) for b in raw["boundary"]) if "boundary" in raw else None
-
+def _build_grid(
+    grid: Grid,
+    time: Time,
+    bcs: BoundaryConditions | None,
+    geometry: CoordinateGeometry,
+) -> GridInfo:
+    dimensions = tuple(int(d) for d in grid.dimensions)
+    spacing = tuple(float(s) for s in grid.spacing)
+    origin = tuple(float(x) for x in grid.lower)
+    dt = float(time.dt) if time.dt is not None else None
+    boundary: tuple[str, ...] | None = None
+    if bcs is not None:
+        boundary = tuple(str(b) for b in bcs.lower)
     return GridInfo(
         dimensions=dimensions,
         spacing=spacing,
@@ -403,49 +266,39 @@ def _parse_grid(raw: dict[str, Any], geometry: CoordinateGeometry) -> GridInfo:
     )
 
 
-def _parse_units(raw: dict[str, Any]) -> Normalization:
-    """Build a Normalization from ``[units]``.
-
-    Defaults to identity normalization when the section is missing or empty.
-    """
-    if not raw:
+def _build_normalization(units: Units) -> Normalization:
+    if isinstance(units, UnitsSI):
         return Normalization.identity()
-    if "system" not in raw:
-        raise ValueError("[units] missing required key 'system'")
+    if isinstance(units, UnitsPIC):
+        return _pic_norm(units)
+    if isinstance(units, UnitsMHD):
+        return Normalization.mhd_standard(
+            l_0=float(units.reference_length),
+            rho_0=float(units.reference_density),
+            b_0=float(units.reference_b_field),
+        )
+    if isinstance(units, UnitsCustom):
+        ref = units.reference
+        return Normalization(
+            length_ref=float(ref.length),
+            time_ref=float(ref.time) if ref.time is not None else 0.0,
+            velocity_ref=float(ref.velocity) if ref.velocity is not None else 0.0,
+            b_field_ref=float(ref.b_field) if ref.b_field is not None else 0.0,
+            e_field_ref=float(ref.e_field) if ref.e_field is not None else 0.0,
+            density_ref=float(ref.density) if ref.density is not None else 0.0,
+            mass_ref=float(ref.mass) if ref.mass is not None else 0.0,
+            charge_ref=float(ref.charge) if ref.charge is not None else 0.0,
+        )
+    raise TypeError(f"unsupported units variant: {type(units).__name__}")
 
-    system = raw["system"].upper()
 
-    match system:
-        case "PIC":
-            return _parse_units_pic(raw)
-        case "MHD":
-            return _parse_units_mhd(raw)
-        case "SI":
-            return Normalization.identity()
-        case "CUSTOM":
-            return _parse_units_custom(raw)
-        case _:
-            raise ValueError(
-                f"Unknown unit system {raw['system']!r}. Valid: PIC, MHD, SI, custom"
-            )
-
-
-def _parse_units_pic(raw: dict[str, Any]) -> Normalization:
-    """PIC normalization from reference species parameters."""
-    if "reference_density" not in raw:
-        raise ValueError("[units] PIC requires 'reference_density'")
-
-    reference_density = float(raw["reference_density"])
-    species_name = raw.get("reference_species", "electrons").lower()
-
+def _pic_norm(units: UnitsPIC) -> Normalization:
+    species_name = units.reference_species.lower()
     defaults = _DEFAULT_SPECIES_PARAMS.get(species_name)
-    if defaults is not None:
-        default_mass, default_charge = defaults
-    else:
-        default_mass, default_charge = None, None
+    default_mass, default_charge = defaults if defaults is not None else (None, None)
 
-    if "reference_mass" in raw:
-        mass = float(raw["reference_mass"])
+    if units.reference_mass is not None:
+        mass = float(units.reference_mass)
     elif default_mass is not None:
         mass = default_mass
     else:
@@ -454,8 +307,8 @@ def _parse_units_pic(raw: dict[str, Any]) -> Normalization:
             f"'reference_mass' is required"
         )
 
-    if "reference_charge" in raw:
-        charge = float(raw["reference_charge"])
+    if units.reference_charge is not None:
+        charge = float(units.reference_charge)
     elif default_charge is not None:
         charge = default_charge
     else:
@@ -464,96 +317,112 @@ def _parse_units_pic(raw: dict[str, Any]) -> Normalization:
             f"'reference_charge' is required"
         )
 
-    c = float(raw.get("speed_of_light", constants.c))
-
-    return Normalization.pic_standard(reference_density, mass, charge, c)
-
-
-def _parse_units_mhd(raw: dict[str, Any]) -> Normalization:
-    """MHD normalization from macroscopic reference quantities."""
-    missing = [
-        k
-        for k in ("reference_length", "reference_density", "reference_b_field")
-        if k not in raw
-    ]
-    if missing:
-        raise ValueError(f"[units] MHD requires: {', '.join(missing)}")
-    return Normalization.mhd_standard(
-        l_0=float(raw["reference_length"]),
-        rho_0=float(raw["reference_density"]),
-        b_0=float(raw["reference_b_field"]),
-    )
+    c = float(units.speed_of_light) if units.speed_of_light is not None else constants.c
+    return Normalization.pic_standard(float(units.reference_density), mass, charge, c)
 
 
-def _parse_units_custom(raw: dict[str, Any]) -> Normalization:
-    """Parse explicit reference values for custom normalization."""
-    ref = raw.get("reference")
-    if ref is None:
-        raise ValueError("[units] custom requires a [units.reference] sub-table")
-
-    required_keys = (
-        "length",
-        "time",
-        "velocity",
-        "b_field",
-        "e_field",
-        "density",
-        "mass",
-        "charge",
-    )
-    missing = [k for k in required_keys if k not in ref]
-    if missing:
-        raise ValueError(f"[units.reference] missing keys: {', '.join(missing)}")
-
-    return Normalization(
-        length_ref=float(ref["length"]),
-        time_ref=float(ref["time"]),
-        velocity_ref=float(ref["velocity"]),
-        b_field_ref=float(ref["b_field"]),
-        e_field_ref=float(ref["e_field"]),
-        density_ref=float(ref["density"]),
-        mass_ref=float(ref["mass"]),
-        charge_ref=float(ref["charge"]),
-    )
+def _build_species(sp: Species) -> SpeciesInfo:
+    kwargs: dict[str, Any] = {"name": sp.name}
+    if sp.charge is not None:
+        kwargs["charge"] = float(sp.charge)
+    if sp.mass is not None:
+        kwargs["mass"] = float(sp.mass)
+    if sp.charge_to_mass is not None:
+        kwargs["charge_to_mass"] = float(sp.charge_to_mass)
+    if sp.temperature is not None:
+        kwargs["temperature"] = float(sp.temperature)
+    if sp.density is not None:
+        kwargs["density"] = float(sp.density)
+    if sp.thermal_velocity is not None:
+        tv = sp.thermal_velocity
+        if isinstance(tv, list):
+            kwargs["thermal_velocity"] = tuple(float(v) for v in tv)
+        else:
+            kwargs["thermal_velocity"] = float(tv)
+    if sp.drift_velocity is not None:
+        kwargs["drift_velocity"] = tuple(float(v) for v in sp.drift_velocity)
+    if sp.particles_per_cell is not None:
+        ppc = sp.particles_per_cell
+        if isinstance(ppc, list):
+            kwargs["particles_per_cell"] = tuple(int(p) for p in ppc)
+        else:
+            kwargs["particles_per_cell"] = int(ppc)
+    return SpeciesInfo(**kwargs)
 
 
-def _parse_species(raw: list[dict[str, Any]]) -> tuple[SpeciesInfo, ...]:
-    """Build SpeciesInfo tuple from ``[[species]]`` entries."""
-    result: list[SpeciesInfo] = []
-    for i, entry in enumerate(raw):
-        if "name" not in entry:
-            raise ValueError(f"[[species]][{i}] missing required key 'name'")
+def _build_physics(physics: Physics | None) -> PhysicsParams:
+    if physics is None:
+        return PhysicsParams()
 
-        kwargs: dict[str, Any] = {"name": entry["name"]}
+    extra: dict[str, Any] = {}
+    gamma = 5.0 / 3.0
+    c = 1.0
+    relativistic = bool(physics.relativistic)
 
-        if "charge" in entry:
-            kwargs["charge"] = float(entry["charge"])
-        if "mass" in entry:
-            kwargs["mass"] = float(entry["mass"])
-        if "charge_to_mass" in entry:
-            kwargs["charge_to_mass"] = float(entry["charge_to_mass"])
-        if "temperature" in entry:
-            kwargs["temperature"] = float(entry["temperature"])
-        if "density" in entry:
-            kwargs["density"] = float(entry["density"])
+    for branch_name in ("pic", "mhd", "hybrid"):
+        branch = getattr(physics, branch_name, None)
+        if branch is None:
+            continue
+        branch_dict = branch.model_dump(exclude_none=True)
+        if "gamma" in branch_dict:
+            gamma = float(branch_dict["gamma"])
+        if "speed_of_light" in branch_dict:
+            c = float(branch_dict["speed_of_light"])
+        extra[branch_name] = branch_dict
 
-        if "thermal_velocity" in entry:
-            tv = entry["thermal_velocity"]
-            if isinstance(tv, list):
-                kwargs["thermal_velocity"] = tuple(float(v) for v in tv)
-            else:
-                kwargs["thermal_velocity"] = float(tv)
+    for key, value in (physics.__pydantic_extra__ or {}).items():
+        extra[key] = value
 
-        if "drift_velocity" in entry:
-            kwargs["drift_velocity"] = tuple(float(v) for v in entry["drift_velocity"])
+    return PhysicsParams(gamma=gamma, c=c, relativistic=relativistic, extra=extra)
 
-        if "particles_per_cell" in entry:
-            ppc = entry["particles_per_cell"]
-            if isinstance(ppc, list):
-                kwargs["particles_per_cell"] = tuple(int(p) for p in ppc)
-            else:
-                kwargs["particles_per_cell"] = int(ppc)
 
-        result.append(SpeciesInfo(**kwargs))
+def _build_transforms(
+    coords: Coordinates, default_frame: str
+) -> dict[str, FrameTransform]:
+    result: dict[str, FrameTransform] = {}
+    for target_name, spec in coords.transforms.items():
+        origin_source = spec.origin if spec.origin is not None else (0.0, 0.0, 0.0)
+        origin = tuple(float(x) for x in origin_source)
+        kwargs: dict[str, Any] = {}
+        if spec.rotation is not None:
+            kwargs["rotation"] = tuple(
+                tuple(float(x) for x in row) for row in spec.rotation
+            )
+        scale = float(spec.scale) if spec.scale is not None else 1.0
+        source = spec.from_frame if spec.from_frame is not None else default_frame
+        if spec.axis_labels is not None:
+            kwargs["target_axis_names"] = tuple(spec.axis_labels)
+        result[target_name] = FrameTransform(
+            source_frame=source,
+            target_frame=target_name,
+            origin=origin,  # type: ignore[arg-type]
+            scale=scale,
+            **kwargs,
+        )
+    return result
 
-    return tuple(result)
+
+def _build_metadata(schema: SimulationSchema) -> dict[str, Any]:
+    metadata: dict[str, Any] = {}
+    if schema.model.version is not None:
+        metadata["version"] = schema.model.version
+    if schema.model.description is not None:
+        metadata["description"] = schema.model.description
+    if schema.initial_conditions is not None:
+        metadata["initial_conditions"] = schema.initial_conditions.model_dump(
+            exclude_none=True
+        )
+    if schema.output is not None:
+        metadata["output"] = schema.output.model_dump(exclude_none=True)
+    if schema.grid.stagger is not None:
+        metadata["stagger"] = StaggerInfo(convention=str(schema.grid.stagger))
+    scaling: dict[str, Any] = {}
+    scaling_factor = getattr(schema.units, "scaling_factor", None)
+    if scaling_factor is not None:
+        scaling["scaling_factor"] = scaling_factor
+    scaling_description = getattr(schema.units, "scaling_description", None)
+    if scaling_description is not None:
+        scaling["scaling_description"] = scaling_description
+    if scaling:
+        metadata["scaling"] = scaling
+    return metadata

@@ -12,6 +12,7 @@ dependencies = [
     "scipy>=1.14",
     "xarray>=2024.6",
     "h5py>=3.11",
+    "pydantic>=2.6",
 ]
 
 [project.scripts]

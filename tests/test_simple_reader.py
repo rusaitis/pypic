@@ -427,13 +427,34 @@ class TestOpenSimple:
             _make_fields(),
         )
         toml_content = """\
+schema_version = "1.0"
+[schema]
+version = "1.0"
 [model]
 name = "toml_sim"
 type = "MHD"
-
+[run]
+name = "simple_reader_test"
+[time]
+scheme = "fixed"
+dt = 0.1
+t_start = 0.0
+t_end = 1.0
+n_steps = 10
 [grid]
 dimensions = [4, 3, 2]
 spacing = [1.0, 2.0, 3.0]
+lower = [0.0, 0.0, 0.0]
+upper = [4.0, 6.0, 6.0]
+[units]
+system = "SI"
+[coordinates]
+geometry = "cartesian"
+frame = "sim"
+[[species]]
+name = "p"
+charge = 1.0
+mass = 1.0
 """
         (tmp_path / "simulation.toml").write_text(toml_content)
         reader, config = open_simple(tmp_path)
@@ -454,13 +475,34 @@ spacing = [1.0, 2.0, 3.0]
         _write_h5(data_dir / "output_000000.h5", _make_fields())
 
         toml_content = """\
+schema_version = "1.0"
+[schema]
+version = "1.0"
 [model]
 name = "remote_toml"
 type = "PIC"
-
+[run]
+name = "remote_toml_test"
+[time]
+scheme = "fixed"
+dt = 0.1
+t_start = 0.0
+t_end = 1.0
+n_steps = 10
 [grid]
 dimensions = [4, 3, 2]
 spacing = [1.0, 2.0, 3.0]
+lower = [0.0, 0.0, 0.0]
+upper = [4.0, 6.0, 6.0]
+[units]
+system = "SI"
+[coordinates]
+geometry = "cartesian"
+frame = "sim"
+[[species]]
+name = "e"
+charge = -1.0
+mass = 1.0
 """
         toml_file = conf_dir / "simulation.toml"
         toml_file.write_text(toml_content)

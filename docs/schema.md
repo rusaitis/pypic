@@ -18,67 +18,198 @@ parameters live in open-ended sections that each code fills as needed.
 
 ---
 
-## 1. Configuration File: `simulation.toml`
+## 1. Configuration File: `simulation.toml` (schema v1.0)
 
-A TOML file that travels with the simulation output. Describes what the
-data contains, how it's normalized, and what coordinate system it uses.
+A TOML file that travels with the simulation output. Describes what
+the data contains, how it's normalized, and what coordinate system it
+uses. The canonical source of truth for the v1.0 schema is the Pydantic
+validator in :mod:`pypic.schema` — `validate_simulation_toml()` returns
+a strictly typed `SimulationSchema`, and `load_config()` builds the
+internal `SimulationConfig` from that. An annotated reference template
+lives at `pypic.simulation.toml` at the repo root.
 
 ### Required sections
 
-Every `simulation.toml` must have these sections:
+A valid v1.0 document must declare:
 
 ```toml
-[model]           # What produced this data
-[grid]            # Grid dimensions and spacing
-[units]           # How to convert between code units and SI
-[coordinates]     # Coordinate geometry and reference frame
+schema_version = "1.0"   # top-level bare key — lets a streaming parser
+                         # identify the schema without reading everything
+
+[schema]                 # [schema].version must match schema_version
+[model]                  # code identity (name, type)
+[run]                    # THIS run's identity + provenance
+[time]                   # dt, t_start, t_end, n_steps, scheme
+[grid]                   # dimensions, spacing, lower/upper
+[units]                  # normalization + reference values
+[coordinates]            # geometry, frame
+[[species]]              # ≥ 1 entry required (kinetic OR fluid species)
 ```
 
 ### Optional sections
 
 ```toml
-[[species]]           # Particle species (PIC, hybrid) — repeatable
-[physics]             # Model-specific physics parameters — open-ended
-[initial_conditions]  # Initial field/plasma configuration — open-ended
-[output]              # What fields are in the output files
-[[probes]]            # Virtual probes / spacecraft — repeatable
+[boundary_conditions]    # per-axis BC tags (lower/upper)
+[physics]                # model-agnostic flags + .{pic,mhd,hybrid} sub-tables
+[[bodies]]               # registry of physical objects (planets, coils, ...)
+[initial_conditions]     # flat table: setup type + type-specific keys
+[[drivers]]              # ongoing external coupling (magnetograms, SW inflow, ...)
+[restart]                # continuation pointer
+[output.checkpoints]     # lossless full-state dumps
+[output.fields]          # field output cadence + quantities
+[output.particles]       # particle output cadence + selection
+[output.probes]          # probe time-series cadence
+[output.diagnostics]     # on-the-fly derived quantities
+[[probes]]               # fixed or trajectory samplers
 ```
+
+### Extensions
+
+Non-portable code-specific knobs live under an `x-<code>.*` namespace
+(e.g. `[x-warpx]`, `[physics.pic.x-ipic3d]`). Validators accept any
+`x-*` or `x_*` key without validation. Unknown keys under
+`[physics.{pic,mhd,hybrid,vlasov}]` and their `.solver` sub-tables are
+also accepted — the solver vocabulary is explicitly reserved for
+evolution in v1.1+.
 
 ---
 
 ## 2. Section Specifications
 
+### [schema]
+
+Schema version tag and creation date.
+
+```toml
+[schema]
+version = "1.0"                    # REQUIRED — must equal schema_version bare key
+created = 2026-04-23               # optional TOML date literal
+```
+
 ### [model]
 
-Identifies the simulation code and model type.
+Identity of the *code* that produced the data.
 
 ```toml
 [model]
-name = "string"           # REQUIRED: code name ("iPIC3D", "plasma-sim", "BATSRUS", ...)
-type = "string"           # REQUIRED: "PIC" | "MHD" | "hybrid" — selects normalization defaults
-version = "string"        # optional: code version
-description = "string"    # optional: human-readable run description
+name = "string"                    # REQUIRED: "iPIC3D", "ARMS", "AIKEF", ...
+type = "string"                    # REQUIRED: "PIC" | "MHD" | "hybrid"
+version = "string"                 # optional
+description = "string"             # optional
+url = "string"                     # optional — code homepage
+doi = "string"                     # optional — code citation DOI
+license = "string"                 # optional — SPDX identifier for the code
+authors = [                        # optional — inline tables
+    { name = "...", orcid = "...", affiliation = "...", role = "..." },
+]
+```
+
+`[model]` is the code; `[run]` below is THIS run. Their metadata
+(`license`, `doi`, `authors`) are independent.
+
+### [run]
+
+Identity + provenance of this specific run.
+
+```toml
+[run]
+name = "string"                    # REQUIRED
+description = "string"             # optional
+authors = [ { name = "...", orcid = "...", ... } ]   # optional
+date = 2026-04-23                  # optional — TOML native date
+git_sha = "ea3fdfa"                # optional — commit of the input deck
+host = "stampede3.tacc.utexas.edu" # optional
+license = "CC-BY-4.0"              # optional — DATA license (SPDX id)
+doi = "10.5281/zenodo.12345678"    # optional — DATA DOI
+funding = ["NSF-AGS-2024001"]      # optional — grant IDs
+embargo = 2027-01-01               # optional — public-release date
+
+[run.resources]                    # optional — all sub-keys optional
+mpi_ranks        = 4096
+mpi_topology     = [16, 16, 16]
+nodes            = 64
+wall_clock_hours = 24.0
+cpu_core_hours   = 98304
+node_hours       = 1536
+peak_memory_gb   = 8192
+cpu_type         = "Intel Xeon Max 9480"
+gpu_hours        = 0
+energy_kwh       = 2400
+carbon_kg_co2eq  = 340
+
+# Heterogeneous hardware — repeatable
+[[run.resources.allocations]]
+type     = "cpu"                   # "cpu" | "gpu" | "tpu" | "accelerator"
+hardware = "AMD EPYC Milan 7763"
+count    = 8192
+hours    = 393216
+```
+
+### [time]
+
+Temporal integration controls.
+
+```toml
+[time]
+scheme  = "fixed"                  # "fixed" (default) | "adaptive" | "subcycled"
+dt      = 0.05                     # REQUIRED — timestep in code units
+t_start = 0.0                      # REQUIRED
+t_end   = 100.0                    # REQUIRED
+n_steps = 2000                     # REQUIRED
+cfl     = 0.4                      # optional — for scheme = "adaptive"
+dt_min  = 1.0e-5                   # optional — for scheme = "adaptive"
+dt_max  = 0.01                     # optional — for scheme = "adaptive"
+dt_field       = 0.004             # optional — for scheme = "subcycled"
+field_substeps = 5                 # REQUIRED when scheme = "subcycled"
 ```
 
 ### [grid]
 
-Describes the computational grid. All values are in **code units**.
+Computational grid in **code units**. Physical realization lives in
+`[coordinates].physical_extent`.
 
 ```toml
 [grid]
-dimensions = [nx, ny, nz]          # REQUIRED: number of cells
-spacing = [dx, dy, dz]             # REQUIRED: cell size in code units
-origin = [x_min, y_min, z_min]     # optional, default [0, 0, 0]
-dt = 0.0                           # optional: timestep in code units (essential for time-series analysis)
-boundary = ["periodic", "periodic", "periodic"]  # optional: boundary type per axis
-                                   #   "periodic" | "reflecting" | "conducting" | "open"
-stagger = "cell"                   # optional: "cell" | "node" | "staggered"
-                                   #   "cell" = all fields at cell centers (default)
-                                   #   "node" = all fields at cell vertices (e.g. iPIC3D)
-                                   #   "staggered" = Yee mesh (B faces, E edges, etc.)
-                                   #   Readers destagger to co-located grid on load.
-                                   #   Informational only — FieldDataset is always co-located.
+dimensions = [nx, ny, nz]          # REQUIRED — cells per axis
+spacing    = [dx, dy, dz]          # REQUIRED — cell sizes
+lower      = [x_min, y_min, z_min] # REQUIRED — lower corner
+upper      = [x_max, y_max, z_max] # REQUIRED — upper corner (must exceed lower)
+stagger    = "cell"                # optional: "cell" (default) | "node" | "staggered"
+                                   #   "cell"       — fields at cell centers
+                                   #   "node"       — fields at cell vertices (iPIC3D)
+                                   #   "staggered"  — Yee mesh (B faces, E edges, ...)
+                                   # Informational only; readers destagger to co-located.
+source        = "grids/mesh.h5"    # optional — external file for complex meshes
+source_format = "hdf5"             # optional
+
+# Dynamic adaptive refinement parameters (optional)
+[grid.amr]
+max_level            = 4
+refinement_ratio     = 2
+block_size           = [8, 8, 8]
+refinement_criteria  = ["current_density", "gradient_b"]
+refinement_threshold = 0.1
+
+# Static nested refinement boxes (optional, repeatable)
+[[grid.refinement]]
+level = 2
+box   = [[-60.0, -60.0, -60.0], [60.0, 60.0, 60.0]]
 ```
+
+### [boundary_conditions]
+
+Per-axis BC tags. Array length must match `grid.dimensions` length.
+
+```toml
+[boundary_conditions]
+lower = ["periodic", "periodic", "periodic"]
+upper = ["periodic", "periodic", "periodic"]
+```
+
+The tag vocabulary is free-form string — it's consumed by the reader,
+not constrained by the schema (different codes use different vocabularies:
+`periodic` / `reflecting` / `conducting` / `open` / `driven` / `inflow` /
+`outflow` / `pole` / `inner` / `outer`).
 
 ### [units]
 
@@ -130,14 +261,14 @@ reference_b_field = 5.0e-9         # Tesla (e.g., 5 nT)
 system = "custom"
 
 [units.reference]                  # all in SI
-length = 5.31e-3                   # meters
-time = 1.77e-11                    # seconds
-velocity = 2.998e8                 # m/s
-b_field = 1.07e-3                  # Tesla
-e_field = 3.21e5                   # V/m
-density = 1.0e18                   # m⁻³
-mass = 9.109e-31                   # kg
-charge = 1.602e-19                 # C
+length = 5.31e-3                   # meters — REQUIRED for custom
+time = 1.77e-11                    # optional
+velocity = 2.998e8                 # optional
+b_field = 1.07e-3                  # optional
+e_field = 3.21e5                   # optional
+density = 1.0e18                   # optional
+mass = 9.109e-31                   # optional
+charge = 1.602e-19                 # optional
 ```
 
 If `system` is "SI", all data is already in SI and no conversion is needed
@@ -207,74 +338,208 @@ Describes particle species (PIC and hybrid models) or fluid species
 
 ```toml
 [[species]]
-name = "string"                    # REQUIRED: "electrons", "ions", "alpha", ...
-charge = 0.0                       # in code units (required unless charge_to_mass is given)
-mass = 0.0                         # in code units (required unless charge_to_mass is given)
-charge_to_mass = 0.0               # optional: q/m ratio (alternative to separate charge/mass)
-particles_per_cell = [5, 5, 1]     # PIC/hybrid: per-cell count [x, y, z] or scalar; 0 for MHD
-temperature = 0.0                  # optional: scalar isotropic temperature (code units)
-thermal_velocity = [0.0, 0.0, 0.0] # optional: anisotropic thermal velocities (takes precedence)
-drift_velocity = [0.0, 0.0, 0.0]  # optional: initial bulk drift (code units)
-density = 1.0                      # optional: initial number density (code units)
+name = "string"                    # REQUIRED
+charge = 0.0                       # code units — REQUIRED together with mass ...
+mass = 0.0                         # code units — ... OR ...
+charge_to_mass = 0.0               # ... REQUIRED alone (XOR with charge+mass)
+particles_per_cell = [5, 5, 1]     # optional — scalar OR [nx, ny, nz]; 0 or absent = fluid
+temperature = 0.0                  # optional — scalar isotropic temperature (code units)
+thermal_velocity = [0.0, 0.0, 0.0] # optional — per-component thermal velocity
+drift_velocity = [0.0, 0.0, 0.0]   # optional — bulk drift (code units)
+density = 1.0                      # optional — number density (code units)
+closure = "adiabatic"              # optional (fluid species) — "isothermal" | "adiabatic"
+                                   #                           | "polytropic" | "braginskii"
+gamma_eos = 1.6666667              # optional (fluid species) — per-species adiabatic index
+inertia = 0.0                      # optional (hybrid fluid electrons) — me/mi; 0 = massless
 ```
 
-Each species must have either (`charge` + `mass`) or `charge_to_mass`.
+The validator enforces `(charge + mass)` XOR `charge_to_mass`: provide
+exactly one form. Species are indexed in declaration order — `_s0`
+binds to the first entry, `_s1` to the second, etc. Reordering is a
+breaking change to downstream field-name references.
+
 Relationship: $v_{th} = \sqrt{T/m}$ (see thermal speed convention in
 [Conventions](conventions.md)).
 
 ### [physics]
 
-Open-ended section for model-specific parameters. Only the subsection
-matching `[model] type` is expected to be present.
+Model-agnostic flags at top level; model-specific knobs in sub-tables.
+The sub-table that matches `[model].type` is the one the code consumes.
 
 ```toml
-[physics.pic]                      # PIC-specific parameters
-omega_pe_over_omega_ce = 3.0       # frequency ratio (sets B relative to density)
-theta = 0.5                        # implicitness parameter (0.5 = Crank-Nicolson)
-speed_of_light = 1.0               # normalized c (always 1.0 in standard PIC normalization)
-relativistic = false               # true if the code solved relativistic equations;
-                                   # derived quantities use relativistic formulas when set
-# ... any other PIC parameters the code needs to document
+[physics]
+relativistic = false               # semantics identical across PIC/MHD/hybrid
 
-[physics.mhd]                      # MHD-specific parameters
-gamma = 1.6667                     # adiabatic index
-resistivity = 0.0                  # η (0 = ideal)
-hall_term = false                  # include Hall physics?
-relativistic = false               # true for relativistic MHD (RMHD)
-# ... any other MHD parameters
+[physics.pic]                      # physics-model knobs for PIC codes
+omega_p_over_omega_c = 20.0        # reference-species plasma/cyclotron ratio
+
+[physics.pic.solver]               # numerical-method knobs for PIC codes
+scheme         = "semi-implicit"   # "explicit" | "semi-implicit" | "implicit"
+implicitness   = 0.5               # θ-scheme weight (0.5 = Crank-Nicolson)
+pusher         = "boris"           # "boris" | "vay" | "higuera-cary"
+field_solver   = "implicit-moment" # "fdtd-yee" | "pseudo-spectral" |
+                                   # "implicit-moment" | "implicit-gmres"
+preconditioner = "block-jacobi"    # "none" | "jacobi" | "block-jacobi" |
+                                   # "ilu" | "amg" | "additive-schwarz"
+
+[physics.mhd]
+gamma       = 1.6667
+resistivity = 0.0
+hall_term   = false
+
+[physics.mhd.solver]
+scheme              = "fct"        # "fct" | "godunov" | "muscl-hancock" | "ppm" | "weno"
+reconstruction      = "linear"     # "linear" | "plm" | "ppm" | "weno5" | "mp5"
+limiter             = "zalesak"    # "zalesak" | "minmod" | "mc" | "van-leer" | "superbee"
+divergence_cleaning = "ct"         # "ct" | "powell" | "dedner-glm" | "projection" | "none"
+# riemann = "hlld"                 # Godunov family: "roe" | "hll" | "hlle" | "hlld" | "lax-friedrichs"
+
+[physics.hybrid]
+# (physics-model knobs — currently minimal; hybrid fluid-species properties
+# live on the corresponding [[species]] entry, not here.)
+
+[physics.hybrid.solver]
+scheme            = "predictor-corrector"  # "predictor-corrector" | "current-advance-method"
+field_pusher      = "cyclic-leapfrog"      # "cyclic-leapfrog" | "implicit"
+resistivity       = 5.0e-4
+hyper_resistivity = 1.0e-6
+current_smoothing = 2
+```
+
+Key rename: `omega_pe_over_omega_ce` (v0) → `omega_p_over_omega_c`
+(v1.0). The new name is species-agnostic — the ratio applies to
+whichever species is declared in `[units].reference_species`.
+
+Unknown keys under `[physics.{pic,mhd,hybrid}]` and their `.solver`
+sub-tables are accepted without validation (vocabulary evolves in
+v1.1+). Code-specific knobs go under `[physics.<model>.x-<code>.*]`.
+
+### [[bodies]]
+
+Registry of physical objects in the domain (planets, stars, coils,
+exoplanet moons). Drivers and initial conditions reference bodies by
+name — no coordinate duplication.
+
+```toml
+[[bodies]]
+name                 = "mercury"
+center               = [0.0, 0.0, 0.0]    # code units
+radius               = 60.0
+shape                = "sphere"           # "sphere" | "torus" | "cuboid" | "mesh"
+intrinsic_dipole     = [0.0, 0.0, -190.0] # split-B analytic background
+dipole_center_offset = [0.0, 0.0, 11.8]
+rotation_axis        = [0.0, 0.0, 1.0]
+rotation_period      = 5067360.0          # seconds
+mass                 = 3.302e23           # kg
+surface_absorbs_ions = true
+has_atmosphere       = false
+has_intrinsic_field  = true
 ```
 
 ### [initial_conditions]
 
-Optional section documenting the initial field and plasma configuration.
-Open-ended by design; common entries shown below.
+Flat table: setup-specific keys live alongside `type`, no `.parameters`
+sub-table.
 
 ```toml
 [initial_conditions]
-type = "double_harris"             # human-readable label for the setup
-B0 = [0.097, 0.0, 0.0]            # initial/asymptotic magnetic field (code units)
-
-[initial_conditions.parameters]    # setup-specific parameters (open-ended)
-perturbation_amplitude = 0.4
-current_sheet_thickness = 0.25     # half-thickness of current sheet (code units)
+type                    = "double_harris"
+B0                      = [0.05, 0.0, 0.0]
+perturbation_amplitude  = 0.1
+current_sheet_thickness = 0.5
 ```
 
-### [output]
+### [[drivers]]
 
-Optional metadata about what's in the output files.
+Ongoing external coupling (magnetograms, solar-wind inflows, pickup-ion
+sources, surface absorption, MHD→PIC volume coupling). Repeatable.
 
 ```toml
-[output]
-format = "HDF5"                    # "HDF5" | "NetCDF" | "Arrow"
-fields = ["B1", "B2", "B3", "E1", "E2", "E3", "rho_c", "J1", "J2", "J3"]
-particle_data = false              # whether particle positions/velocities are saved
+[[drivers]]
+name          = "photospheric_magnetogram"
+type          = "magnetogram_timeseries"
+coupling      = "boundary"         # "boundary" | "volume" | "source" | "sink"
+direction     = "one_way"          # "one_way" (default) | "two_way"
+description   = "..."
+source        = "drivers/..."
+columns       = ["t", "B_r", "B_theta", "B_phi"]
+cadence       = 720.0              # seconds between samples
+interpolation = "linear"
+target_lower  = [1.0, 0.87, -0.87] # code units (optional)
+target_upper  = [1.0, 2.60, 0.87]
+body          = "mercury"          # optional — inherits body bounding box
 ```
 
-PIC outputs typically include `rho_c` (charge density); MHD outputs
-include `rho_m` (mass density). Both may include `n_e`, `n_i`.
+`coupling` and `direction` are orthogonal. Target precedence:
+1. `body` — defaults to that body's bounding box.
+2. `target_lower` / `target_upper` — explicit box; narrows `body` when both present.
+3. Neither — whole domain.
 
-See `examples/ipic3d_double_harris.toml` for a complete mapping from
-iPIC3D input to this schema.
+Driver-type-specific keys (`production_rate`, `fields`, etc.) are
+accepted beyond the core vocabulary above.
+
+### [restart]
+
+Continuation pointer from a prior run.
+
+```toml
+[restart]
+from = "./checkpoints/chk_000030.h5"   # REQUIRED (aliased — `from` is a Python keyword)
+step = 30000                            # optional
+time = 1500.0                           # optional
+```
+
+### [output.*]
+
+Output cadences, quantities, directories, and precisions.
+Five independent sub-sections; each is optional.
+
+```toml
+[output.checkpoints]                   # lossless full-state dumps
+step_interval = 5000                   # REQUIRED
+dir           = "./checkpoints"        # REQUIRED
+format        = "hdf5"                 # "hdf5" | "zarr" | "adios2" | "netcdf"
+precision     = "f64"                  # "f32" | "f64" — checkpoints default f64
+keep_last     = 3                      # optional — rolling retention
+
+[output.fields]                        # field output
+step_interval = 50
+quantities    = ["B", "E", "J", "rho_c", "V_s0"]  # vector/tensor groups auto-expand
+dir           = "./fields"
+format        = "hdf5"
+precision     = "f32"
+
+[output.fields.precision_overrides]    # optional — per-quantity exceptions
+rho_c = "f64"                          # names must appear in `quantities` above
+
+[output.particles]
+step_interval  = 200
+species        = ["electrons", "ions"]
+dir            = "./particles"
+format         = "hdf5"
+precision      = "f32"
+include_ids    = true
+include_energy = true
+sample         = 0.01                  # 0-1 fraction OR integer count
+
+[output.probes]
+step_interval = 1
+dir           = "./probes"
+format        = "hdf5"
+precision     = "f64"
+
+[output.diagnostics]                   # on-the-fly derived quantities
+step_interval = 100
+quantities    = ["div_B", "div_E", "|J|", "e_B", "e_E"]
+dir           = "./diagnostics"
+format        = "hdf5"
+precision     = "f32"
+```
+
+See `examples/ipic3d-double-harris.toml` for a complete mapping from
+iPIC3D input to this schema, and `pypic.simulation.toml` at the repo
+root for the annotated reference template (three scenarios: PIC, MHD,
+hybrid).
 
 ### [[probes]]
 

@@ -1,0 +1,1033 @@
+# pypic.simulation.toml — annotated template (schema v1.0 proposal)
+#
+# Full shape of a pypic simulation.toml under the proposed v1.0 schema,
+# shown side-by-side for three very different runs:
+#
+#   Scenario A — kinetic PIC (ion-normalized, two-species, Earth double Harris)
+#   Scenario B — solar eruption MHD (ARMS-style flux-rope eruption in
+#                spherical coordinates with HMI magnetogram driver;
+#                exercises spherical geometry, "driven" photospheric BC,
+#                and adaptive timestepping)
+#   Scenario C — heliospheric hybrid (Mercury solar-wind interaction in
+#                the BepiColombo era, AIKEF/LatHyS-like; demonstrates
+#                kinetic ions + fluid electrons at a planetary body)
+#
+# Scenario A is live; B and C are commented. Flip by swapping comments.
+#
+# v1.0 section index (one-liners — details live inside each section):
+#   [schema]               — schema version + creation date
+#   [model]                — code identity (name, type, version, DOI, license)
+#   [run]                  — THIS run's identity + provenance (distinct from [model])
+#   [run.resources]        — runtime accounting (wall, core-hours, MPI, memory);
+#                            [[run.resources.allocations]] for heterogeneous hardware
+#   [time]                 — dt, t_start, t_end, n_steps, scheme
+#   [grid]                 — dimensions, spacing, lower/upper; .amr + .source optional
+#   [[grid.refinement]]    — static nested refinement boxes
+#   [boundary_conditions]  — per-face lower/upper tag arrays
+#   [units]                — normalization system + reference values
+#   [coordinates]          — geometry, frame, physical_extent, transforms.*
+#   [physics]              — model-agnostic flags + .{pic,mhd,hybrid} sub-tables
+#   [[bodies]]             — registry of physical objects (planets, stars, coils);
+#                            home for split-B analytic dipoles referenced by name
+#   [initial_conditions]   — setup type + setup-specific keys (flat — no .parameters)
+#   [[drivers]]            — ongoing external coupling (see semantics block below)
+#   [restart]              — continuation pointer; `from` = prior checkpoint path
+#   [[species]]            — kinetic or fluid species (declaration order = _sN index)
+#   [output.checkpoints]   — lossless full-state dumps for fault tolerance
+#   [output.fields]        — cadence + quantities + precision; .precision_overrides
+#   [output.particles]     — cadence + sampling + extras
+#   [output.probes]        — cadence for probe time series
+#   [output.diagnostics]   — cadence + quantities for on-the-fly derived data
+#   [[probes]]             — fixed-point or trajectory samplers
+#
+# Required vs optional:
+#   REQUIRED — [schema], [model], [run], [time], [grid], [units], [coordinates],
+#              and at least one [[species]] entry.
+#   OPTIONAL — everything else. Absent sub-tables always mean "capability not
+#              present" (sub-table-as-signal). Validators MUST reject REQUIRED-
+#              missing files and MUST accept OPTIONAL-missing ones.
+#
+# [[drivers]] semantics
+#   coupling ∈ {"boundary", "volume", "source", "sink"} — orthogonal modes:
+#     boundary  — sets values at a surface (inflow face, photospheric BC)
+#     volume    — provides values throughout a region (MHD fields as PIC bg)
+#     source    — emits particles/energy into a region (pickup ions, SEP)
+#     sink      — removes particles/energy from a region (surface absorption)
+#   direction ∈ {"one_way" (default), "two_way"}. Two-way sub-fields
+#     (forward_fields, return_fields, sync_mode, sync_interval) are v1.1 —
+#     v1.0 emits the flag but leaves the structural fields undefined.
+#   Target precedence:
+#     1. body = "<name>" — defaults to that body's bounding box
+#     2. target_lower / target_upper — explicit box; with `body`, narrows it
+#     3. neither — whole domain (grid lower/upper)
+#   Diffuse backgrounds (CMB, GCR, ISRF, X-ray) are drivers with domain-spanning
+#   targets and coupling ∈ {"volume","source","sink"}, NOT bodies. Example:
+#
+#     [[drivers]]
+#     name          = "cmb_inverse_compton_cooling"
+#     type          = "blackbody_photon_field"
+#     coupling      = "sink"                 # energy sink on relativistic e⁻
+#     direction     = "one_way"
+#     temperature_k = 2.725
+#     effects       = ["inverse_compton_cooling"]
+#     target_lower  = [-192.0, -96.0, -96.0] # whole-grid target
+#     target_upper  = [192.0, 96.0, 96.0]
+#
+#   GCR, ISRF, and X-ray backgrounds follow the same pattern with
+#   coupling = "volume" (pressure) or "source" (ionization/heating). A
+#   dedicated [[backgrounds]] section or `scope = "domain"` shorthand is
+#   v1.1+ territory — ship when multiple astrophysics emitters demand it.
+#
+# Units policy:
+#   system = "PIC"     — μ₀ = ε₀ = 1, c = 1, derived from reference species
+#   system = "MHD"     — μ₀ = 1, derived from reference length/density/B
+#   system = "SI"      — already SI; all reference values = 1
+#   system = "custom"  — explicit [units.reference] block in SI
+#
+# Authorship:
+#   [model].authors and [run].authors are arrays of inline tables
+#   (name, orcid, affiliation, role). When [run].doi is set, ORCID is
+#   required for DataCite compliance and most funder mandates (NSF,
+#   NASA SMD, Horizon Europe). Placeholder `0000-0000-0000-0000` is
+#   intentional — replace with real ORCIDs before publishing.
+#   `0000-0002-1825-0097` is ORCID's published example (Josiah Carberry).
+#
+# Roadmap — non-breaking; the v1.0 structure already accommodates everything
+# below. New sub-tables slot in under existing namespaces; existing sub-tables
+# are never re-purposed in a breaking way across minor versions. Validators
+# MUST accept unknown sub-tables under [physics.{pic,mhd,hybrid,vlasov}]
+# without erroring and MAY warn. Until a knob is canonicalized, emit it
+# under [x-<code>.*].
+#
+#   v1.1
+#     [[validations]]              — spacecraft / instrument / date / metric
+#                                    observational comparisons (outward sibling
+#                                    of [[probes]])
+#     [x-<code>.*] namespace       — formal reservation for non-portable knobs
+#                                    (validators accept but don't validate)
+#     [[drivers]] two-way fields   — forward_fields, return_fields, sync_mode
+#                                    ("lockstep"|"fixed_lag"|"async"), sync_interval
+#     [physics.<model>.solver] extensions — richer discretization vocabulary:
+#         PIC:     collisions (Takizuka-Abe/Nanbu/Lemons), filter (binomial/
+#                  compensated/bilinear), deposition (Esirkepov/Villasenor-
+#                  Buneman/Vay zig-zag). Preconditioner vocabulary expands
+#                  (multigrid variants, Schwarz overlap, physics-based) for
+#                  implicit schemes.
+#         MHD:     riemann vocabulary settles (Roe/HLL/HLLE/HLLD/LLF), higher-
+#                  order reconstruction (PPM, WENO5, MP5), richer limiter set.
+#         Hybrid:  field_pusher variants, sub-cycling strategies.
+#     [physics.<model>.*] physics-model sub-tables (distinct from .solver):
+#         MHD:     cooling (Sutherland-Dopita, Schure, Draine), thermal_
+#                  conduction (Spitzer/Braginskii), gravity, viscosity,
+#                  ambipolar, heating (AWSoM-R coronal, Alfvén-wave)
+#         Hybrid:  neutral_coupling (cometary/exospheric)
+#     [physics.vlasov] + [physics.vlasov.solver] — velocity-space discretization
+#                                    for continuum codes (Vlasiator, Gkeyll)
+#     [output.*.precision_overrides] — per-quantity precision for checkpoints,
+#                                    particles, diagnostics (fields has it today)
+#     [output.fields.stagger_overrides] — for codes round-tripping Yee-mesh output
+#                                    (VPIC/WarpX); niche — pypic's invariant is
+#                                    co-located fields
+#     SPDX license strictness      — `license` SHOULD use SPDX IDs
+#                                    (https://spdx.org/licenses); non-SPDX strings
+#                                    like "US Government Work" → CC0-1.0 or
+#                                    NOASSERTION. Validators may warn.
+#     [schema].uri                 — canonical schema-document URI anchor
+#     [run.resources] hardware     — richer GPU/accelerator taxonomy (CUDA SM
+#                                    count, HBM capacity, NVLink topology) on
+#                                    [[run.resources.allocations]] entries
+#
+#   v1.2
+#     Component-ID vocabulary      — SWMF two-letter codes (GM, IM, IE, IH, SC,
+#                                    SP, OH, PS, PC, UA, PT, PW) + astrophysics
+#                                    extensions (AC, JT, SN, PU, NS, ISM, IG) for
+#                                    multi-component coupled runs. Natural home:
+#                                    [[drivers]].source_component / target_component.
+
+# =======================================================================
+# Scenario A — PIC run (active)
+# =======================================================================
+
+# Top-level bare key — lets a streaming parser / a simple `head -n 20` tell
+# you the schema version before seeing any section. The [schema] table at
+# the bottom still carries the creation date (and anything else v1.1 adds
+# there); `schema_version` here is the canonical version reference.
+schema_version = "1.0"
+
+[model]
+# Identity of the CODE that produced the data. Distinct from [run] which
+# identifies THIS particular run. The model description + url + doi let
+# consumers cite the code even without external knowledge.
+name        = "iPIC3D"                 # code that produced the data
+type        = "PIC"                    # "PIC" | "MHD" | "hybrid"
+version     = "2.1"
+description = "Implicit massively parallel Particle-in-Cell code"
+url         = "https://github.com/iPIC3D/iPIC3D"
+doi         = "10.1016/j.matcom.2009.08.038"   # optional — code citation
+license     = "Apache-2.0"             # optional — code license (SPDX identifier)
+authors = [
+    { name = "Stefano Markidis",      orcid = "0000-0000-0000-0000", affiliation = "KTH Royal Institute of Technology" },
+    { name = "Giovanni Lapenta",      orcid = "0000-0000-0000-0000", affiliation = "KU Leuven" },
+    { name = "Maria Elena Innocenti", orcid = "0000-0000-0000-0000", affiliation = "Ruhr-Universität Bochum" },
+]
+
+[run]
+# Identity + provenance of THIS specific run. FAIR-data metadata
+# (license/doi/funding/embargo) is separate from the code's own license
+# and DOI — grant mandates (NSF, NASA, Horizon Europe) and archives
+# (CDAWEB, SPASE, ESA PSA) require data-level provenance.
+name        = "double_harris_demo"
+description = "Double Harris sheet reconnection, ion-normalized"
+authors = [
+    { name = "L. Rusaitis", orcid = "0000-0002-1825-0097", affiliation = "Independent Researcher", role = "PI" },
+]
+date        = 2026-04-23               # TOML native date literal
+git_sha     = "ea3fdfa"                # commit of the input deck / code
+host        = "stampede3.tacc.utexas.edu"
+license     = "CC-BY-4.0"              # DATA license (SPDX identifier)
+doi         = "10.5281/zenodo.12345678"   # DATA DOI (distinct from code DOI)
+funding     = ["NSF-AGS-2024001", "NASA-80NSSC24K0123"]   # grant IDs
+# embargo   = 2027-01-01               # optional — release date for private data
+
+[run.resources]
+# Optional resource usage — all keys optional. Useful for reproducibility,
+# allocation accounting (NSF/NASA HPC centers bill in core-hours), and
+# sustainability reporting (required by some EU/UK grants; trending in US).
+mpi_ranks        = 4096                # total MPI rank count
+mpi_topology     = [16, 16, 16]        # Cartesian rank decomposition [n_x, n_y, n_z]
+nodes            = 64                  # # of compute nodes
+wall_clock_hours = 24.0                # elapsed real time
+cpu_core_hours   = 98304               # Σ(wall × cores) — primary accounting unit
+node_hours       = 1536                # Σ(wall × nodes)
+peak_memory_gb   = 8192                # peak RSS across all MPI ranks
+cpu_type         = "Intel Xeon Max 9480 (Sapphire Rapids HBM, 56-core)"
+# gpu_hours      = 0                   # omit when CPU-only; add for mixed jobs
+# energy_kwh     = 2400                # optional — carbon reporting
+# carbon_kg_co2eq = 340                # optional — via codecarbon / Green Algorithms
+
+[time]
+scheme   = "fixed"                     # "fixed" (default) | "adaptive" | "subcycled"
+dt       = 0.05                        # timestep in code units
+t_start  = 0.0
+t_end    = 100.0
+n_steps  = 2000                        # number of timesteps in the run (t_end - t_start) / dt
+
+[grid]
+# All spatial values are CODE UNITS (d_i here, for ion-normalized PIC).
+# Physical realization lives in [coordinates].physical_extent. For cross-
+# scale coupling (e.g. MHD fields loaded onto a PIC zoom with a shrink
+# factor), see [[drivers]].source_physical_extent / target_lower/target_upper.
+dimensions = [256, 128, 64]            # cells along each axis
+spacing    = [0.2, 0.2, 0.2]           # dx, dy, dz
+lower      = [-25.6, -12.8, -6.4]      # lower corner, per axis
+upper      = [25.6, 12.8, 6.4]         # upper corner; verified: upper - lower = dimensions × spacing
+stagger    = "node"                    # "cell" (default) | "node" | "staggered"
+                                       # iPIC3D writes fields on nodes
+# No [grid.amr] — uniform Harris-sheet run.
+# No [grid].source — grid is fully described inline. source/source_format
+# are for static mesh topology that can't be expressed here (unstructured,
+# curvilinear, composite, or 50+ static refinement boxes). See Scenario B.
+
+[boundary_conditions]
+# Per-axis tags (array length = spatial dimensions). Order matches the
+# axes in [grid] dimensions / [coordinates] axis_labels. For non-Cartesian
+# geometries the tag vocabulary adapts (e.g. spherical: "inner"/"outer"
+# for r, "north_pole"/"south_pole" for θ, "periodic" for φ).
+lower = ["periodic", "periodic", "periodic"]
+upper = ["periodic", "periodic", "periodic"]
+
+[units]
+system            = "PIC"
+reference_species = "ions"             # "electrons" (default) | "ions" | species name
+reference_density = 1.0e6              # m⁻³ (ion density)
+reference_mass    = 1.673e-27          # kg — proton mass (optional; defaults to m_e)
+reference_charge  = 1.602e-19          # C  (optional; defaults to |e|)
+speed_of_light    = 2.998e8            # m/s (optional; defaults to scipy.constants.c)
+scaling_factor      = 1.0              # informational "shrink" factor (no compute effect)
+scaling_description = "real mass ratio mi/me = 1836; no artificial rescaling"
+
+[coordinates]
+geometry             = "cartesian"     # "cartesian" | "spherical" | "cylindrical"
+frame                = "simulation"    # native frame label (arbitrary string)
+axis_labels          = ["x", "y", "z"] # optional — overrides default axis names
+physical_extent      = [51.2, 25.6, 12.8]   # domain size in target units (optional)
+physical_extent_unit = "d_i"
+
+# No [coordinates.transforms.*] here — the simulation frame IS the analysis
+# frame for this run. See Scenario B for heliographic HGS/HCI transforms
+# (time-dependent via `parameter = "carrington_longitude"`) and Scenario C
+# for Mercury MSO↔MSM with a dipole-tilt parameter.
+
+[physics]
+# DISCIPLINE: top-level [physics] holds only flags whose SEMANTICS are
+# identical across PIC, MHD, and hybrid. Model-specific physics-model knobs
+# go in [physics.{pic,mhd,hybrid}]; model-specific NUMERICAL knobs go one
+# level deeper in [physics.{pic,mhd,hybrid}.solver]. Namespacing prevents
+# key collisions (`theta` means different things in PIC and a hypothetical
+# MHD limiter); readers can do `config["physics"].get("pic", {})` to ignore
+# irrelevant sections. Do not flatten this — parallel evolution first,
+# abstraction only when a second code needs the same flag with the same
+# semantics.
+relativistic = false                   # true -> compute() uses relativistic formulas
+
+[physics.pic]
+# Physics-model knobs that apply to all PIC codes (explicit, semi-implicit,
+# fully implicit). Code-family numerical knobs (scheme, implicitness, pusher,
+# field solver, preconditioner, collisions, filter, deposition) live in
+# [physics.pic.solver] below. Code-specific knobs with no v1.0 canonical form
+# go in [x-<code>.*].
+#
+# `omega_p_over_omega_c` is the plasma/cyclotron frequency ratio for the
+# REFERENCE SPECIES declared in [units].reference_species. For this run
+# (reference_species = "ions"), that's ω_pi/ω_ci. For electron-normalized
+# laser-plasma PIC, the same field would carry ω_pe/ω_ce. The old name
+# "omega_pe_over_omega_ce" baked in an electron-normalization assumption
+# that doesn't hold for ion-normalized magnetospheric PIC — renamed for
+# species-agnostic interpretation.
+#
+# Physical identity: ω_ps/ω_cs = c/v_A,s (Alfvén speed using species s's
+# mass density). Codes that parameterize their input via c_over_v_A or
+# via cells_per_skin_depth can carry those names instead — any of these
+# single-number characterizations are equivalent given the run's units.
+omega_p_over_omega_c = 20.0            # reference-species plasma-to-cyclotron ratio
+                                       # (ω_pi/ω_ci here, since reference_species = "ions").
+                                       # Derivation check: with n_i = m_i = q_i = 1 in code
+                                       # units, ω_pi = 1; with B0 = 0.05, ω_ci = 0.05 →
+                                       # ω_pi/ω_ci = 20. Equivalently c/v_A,i = 20.
+
+[physics.pic.solver]
+# Discretization choices for the PIC model. Split from [physics.pic] so
+# physics-model knobs (omega_p_over_omega_c above) stay separate from
+# numerical-method knobs (scheme, pusher, field solver). Every PIC run
+# declares a `scheme`; `scheme = "explicit"` is first-class, not inferred
+# by sub-table omission. Scheme-dependent keys (implicitness, preconditioner)
+# are ignored when `scheme = "explicit"`. v1.1 will formalize richer pusher
+# / collisions / filter / deposition sub-tables under this block.
+scheme         = "semi-implicit"       # "explicit" | "semi-implicit" | "implicit"
+implicitness   = 0.5                   # θ-scheme weight; 0.5 = Crank-Nicolson,
+                                       # 1.0 = fully implicit backward Euler
+                                       # (ignored when scheme = "explicit")
+pusher         = "boris"               # "boris" | "vay" | "higuera-cary"
+field_solver   = "implicit-moment"     # "fdtd-yee" | "pseudo-spectral" |
+                                       # "implicit-moment" | "implicit-gmres"
+preconditioner = "block-jacobi"        # for implicit/semi-implicit Newton-Krylov:
+                                       # "none" | "jacobi" | "block-jacobi" |
+                                       # "ilu" | "amg" | "additive-schwarz"
+                                       # (ignored when scheme = "explicit")
+
+# No [[bodies]] — pure-plasma reconnection setup, no planets or structures.
+# See Scenario C for a body-aware run.
+
+[initial_conditions]
+# Flat table — setup-specific keys live alongside `type`/`B0`, no sub-table.
+type                    = "double_harris"
+B0                      = [0.05, 0.0, 0.0]   # asymptotic field in code units
+perturbation_amplitude  = 0.1
+current_sheet_thickness = 0.5                # half-thickness in code units
+
+# [drivers] — optional, ongoing external coupling. Not needed for this run
+# (Harris equilibrium is self-contained). See Scenario B for an example.
+
+# [restart] — optional, continuation from a prior run. `from` is the
+# provenance pointer: which checkpoint file THIS run resumed from.
+# [restart]
+# from = "./checkpoints/chk_000030.h5"
+# step = 30000
+# time = 1500.0
+
+# Species are indexed in DECLARATION ORDER — this is part of the v1.0 schema
+# contract, not a convenience. `_s0` always binds to the first [[species]]
+# entry, `_s1` to the second, etc.; reordering entries is a BREAKING change
+# to the file. Any `V_s0` / `P_s1` reference in [output.*].quantities,
+# [[drivers]].species, or [[probes]].fields is resolved via this positional
+# index. The per-species derived aliases (Pe = P_s0, Pi = P_s1, n_e = n_s0)
+# assume electrons-first, ions-second — standard in PIC codes. For 3+ species
+# (e.g. H⁺ + He²⁺ + O⁺) use the explicit _sN form throughout.
+# Provide either (charge + mass) OR charge_to_mass — not both. This template
+# uses (charge + mass) as the primitive form.
+[[species]]
+name                = "electrons"
+charge              = -1.0             # code units
+mass                = 0.005435         # m_e / m_i (reduced — full ratio also valid)
+particles_per_cell  = 10               # scalar or per-axis [nx, ny, nz]
+thermal_velocity    = [0.05, 0.05, 0.05]
+drift_velocity      = [0.0, 0.0, 0.008]
+density             = 1.0
+
+[[species]]
+name                = "ions"
+charge              = 1.0
+mass                = 1.0
+particles_per_cell  = 10
+thermal_velocity    = [0.0116, 0.0116, 0.0116]   # sqrt(T_i/m_i) — NRL convention
+drift_velocity      = [0.0, 0.0, -0.04]
+density             = 1.0
+
+[output.checkpoints]
+# Fault-tolerance dumps. Full simulation state (fields + all particles +
+# RNG state + solver state) at a sparse cadence. Distinct from
+# [output.fields] and [output.particles] which are science data — those
+# are selective and often lossy (f32). Checkpoints must be lossless so a
+# restart reproduces the run bit-for-bit (f64, all species, all fields).
+step_interval = 5000                   # sparse — wall-time cost is real
+dir           = "./checkpoints"
+format        = "hdf5"
+precision     = "f64"                  # lossless
+keep_last     = 3                      # rolling retention (optional)
+
+[output.fields]
+step_interval = 50                     # write every 50 steps
+quantities    = ["B", "E", "J", "rho_c",
+                 "V_s0", "V_s1",
+                 "P_s0", "P_s1"]       # vector/tensor groups auto-expand
+                                       # (B -> B1,B2,B3; P_s0 -> P11_s0..P33_s0)
+dir           = "./fields"
+format        = "hdf5"                 # "hdf5" | "zarr" | "adios2"
+precision     = "f32"                  # default for every quantity; "f32" | "f64"
+
+[output.fields.precision_overrides]
+# Optional — per-quantity precision exceptions, restricted to names that
+# appear in `quantities` above. Conservation variables benefit from f64 even
+# when bulk fields are fine at f32. Presence of this sub-table is the signal;
+# absent = all quantities use the default ("sub-table as signal" pattern).
+# For diagnostic precision (div_B, |J|, etc.) see
+# [output.diagnostics].precision_overrides — reserved for v1.1.
+rho_c = "f64"                          # charge density — conservation variable
+
+[output.particles]
+step_interval  = 200                   # particles are heavier; write less often
+species        = ["electrons", "ions"] # subset of species names
+dir            = "./particles"
+format         = "hdf5"
+precision      = "f32"
+include_ids    = true                  # per-particle tracer IDs for trajectory analysis
+include_energy = true                  # pre-compute |v|² for cheap energy cuts
+sample         = 0.01                  # random 1% subset per write (0-1 fraction or int count)
+
+[output.probes]
+step_interval = 1                      # probes get the finest cadence
+dir           = "./probes"
+format        = "hdf5"
+precision     = "f64"                  # probe time series benefit from full precision
+
+[output.diagnostics]
+# On-the-fly derived quantities computed and written by the code itself,
+# separate from analysis-time compute(). Many codes emit these already.
+step_interval = 100
+quantities    = ["div_B", "div_E", "|J|", "e_B", "e_E", "e_k", "e_th"]
+dir           = "./diagnostics"
+format        = "hdf5"
+precision     = "f32"
+
+[[probes]]
+name     = "reconnection_line"
+position = [0.0, 0.0, 0.0]
+fields   = ["B1", "B2", "B3", "E1", "E2", "E3", "J_dot_E"]
+
+[[probes]]
+name       = "virtual_MMS1"
+trajectory = "orbits/mms1_synthetic.csv"   # columns: t, x, y, z (code units)
+frame      = "simulation"
+
+[schema]
+version = "1.0"
+created = 2026-04-23
+
+
+# =======================================================================
+# Scenario B — solar eruption MHD (ARMS-style active-region flux-rope
+#              eruption in SPHERICAL coordinates; commented)
+# =======================================================================
+# Solar eruptions (flares, CMEs, filament eruptions) are the flagship
+# application of computational heliophysics MHD — ENLIL, EUHFORIA, MAS,
+# AWSoM-R, ARMS all target this regime. This scenario models an
+# active-region flux-rope eruption driven by an HMI photospheric
+# magnetogram time series. It demonstrates parts of the schema that
+# Cartesian scenarios don't exercise:
+#   * [coordinates].geometry = "spherical" — numbered fields B1/B2/B3 are
+#     physically B_r / B_θ / B_φ, selected by the geometry field.
+#   * Non-Cartesian [boundary_conditions] vocabulary — "driven" (photosphere
+#     forced by magnetogram), "pole" (θ axis handling), "periodic" (φ wrap).
+#   * Magnetogram-driven [[drivers]] at a coordinate surface (r = r_inner),
+#     with target_lower/target_upper describing the photospheric annulus.
+#   * Adaptive timestepping ([time].scheme = "adaptive") — standard for
+#     CFL-limited MHD with shock formation during eruption.
+#
+# [model]
+# name        = "ARMS"
+# type        = "MHD"
+# version     = "5.2"
+# description = "Adaptive Refined MHD Solver — coronal and heliospheric MHD"
+# url         = "https://www.nrl.navy.mil/ssd/branches/7680/arms"
+# doi         = "10.1086/524369"                     # DeVore & Antiochos 2008
+# license     = "US Government Work"
+# authors = [
+#     { name = "C. Richard DeVore",  orcid = "0000-0000-0000-0000", affiliation = "NASA Goddard Space Flight Center" },
+#     { name = "Spiro K. Antiochos", orcid = "0000-0000-0000-0000", affiliation = "NASA Goddard Space Flight Center" },
+#     { name = "Judith T. Karpen",   orcid = "0000-0000-0000-0000", affiliation = "NASA Goddard Space Flight Center" },
+# ]
+#
+# [run]
+# name        = "ar13664_flux_rope_eruption"
+# description = "AR 13664 flux-rope eruption, HMI-driven photosphere (2024-05-11)"
+# authors = [
+#     { name = "L. Rusaitis", orcid = "0000-0002-1825-0097", affiliation = "Independent Researcher", role = "PI" },
+# ]
+# date        = 2026-04-24
+# git_sha     = "8c1a5f3"
+# host        = "discover.nccs.nasa.gov"
+# license     = "CC-BY-4.0"
+# doi         = "10.5281/zenodo.45678901"
+# funding     = ["NASA-HSR-2024-0042", "NASA-LWS-2024-0018"]
+#
+# [run.resources]
+# # ARMS uses adaptive block decomposition — no static Cartesian topology, so
+# # mpi_topology is omitted (the block-to-rank assignment changes per timestep
+# # as AMR evolves).
+# mpi_ranks        = 8192
+# nodes            = 128
+# wall_clock_hours = 48.0
+# cpu_core_hours   = 393216
+# node_hours       = 6144
+# peak_memory_gb   = 32768
+# cpu_type         = "AMD EPYC Milan 7763 (Discover SCU15)"
+#
+# # Heterogeneous-allocation example (commented). Use when the run spanned
+# # different hardware types — e.g. CPU for the MHD solver and a GPU partition
+# # for post-processing FFT diagnostics. Replaces the flat cpu_core_hours /
+# # gpu_hours fields above when present.
+# # [[run.resources.allocations]]
+# # type     = "cpu"
+# # hardware = "AMD EPYC Milan 7763"
+# # count    = 8192
+# # hours    = 393216
+# # [[run.resources.allocations]]
+# # type     = "gpu"
+# # hardware = "NVIDIA A100 80GB (Discover GPU partition)"
+# # count    = 16
+# # hours    = 768
+#
+# [time]
+# # Time in Alfvén-crossing units: τ_A = R_sun / v_A ≈ 30 min for coronal
+# # base conditions. t_end = 4 → ~2 hours physical, covering CME launch.
+# dt      = 0.0                          # ignored for scheme = "adaptive"
+# t_start = 0.0
+# t_end   = 4.0
+# n_steps = 40000                        # approximate for adaptive
+#
+# scheme = "adaptive"                    # CFL-limited (standard for MHD with shocks)
+# cfl    = 0.4
+# dt_min = 1.0e-5
+# dt_max = 0.01
+#
+# [grid]
+# # SPHERICAL — axes are [r, θ, φ]. CODE UNITS: r in R_sun, θ and φ in
+# # radians. Wedge over ±50° around a central meridian, covering the
+# # active region's latitudinal + longitudinal extent. Full-sphere runs
+# # use n_φ up to 720 and θ ∈ [0, π] with "pole" BCs on both ends.
+# # (Grid geometry lives in [coordinates].geometry, not duplicated here.)
+# dimensions = [200, 96, 96]             # [n_r, n_θ, n_φ] — base (level 0) grid
+# spacing    = [0.1, 0.018, 0.018]       # [dr (R_sun), dθ (rad), dφ (rad) ≈ 1°]
+# lower      = [1.0, 0.87, -0.87]        # [r_min = 1 R_sun, θ_min ≈ 50° from N pole, φ_min = -50°]
+# upper      = [21.0, 2.60, 0.87]        # [r_max = 21 R_sun, θ_max ≈ 149°, φ_max = +50°]
+# stagger    = "cell"
+# # External file carrying the STATIC mesh topology — in this case, the
+# # curvilinear spherical-polar mapping with pole-region treatment and the
+# # full static refinement hierarchy (the [[grid.refinement]] entry below
+# # is a summary; the real hierarchy with ~40 static boxes lives in the
+# # file). Dynamic AMR state (which blocks are active at step k) stays in
+# # the per-step output files, NOT in source.
+# source        = "grids/ar13664_mesh.h5"
+# source_format = "hdf5"                 # "hdf5" | "zarr" | "cgns" | "exodus" | ...
+#
+# [grid.amr]
+# max_level            = 4
+# refinement_ratio     = 2
+# block_size           = [8, 8, 8]
+# refinement_criteria  = ["current_density", "gradient_b", "reconnection_indicator"]
+# refinement_threshold = 0.1
+#
+# [[grid.refinement]]
+# # Static refinement over the active region and flux-rope insertion site.
+# # Box is [(r, θ, φ)_lower, (r, θ, φ)_upper] in code units.
+# level = 3
+# box   = [[1.0, 1.2, -0.3], [2.0, 1.9, 0.3]]
+#
+# [boundary_conditions]
+# # Spherical boundaries in [r, θ, φ] order. "driven" = values sourced
+# # from the [[drivers]] magnetogram table. The θ/φ wedge edges are "open"
+# # for this sub-domain run; a full-sphere run would use "pole" for the
+# # θ axis and "periodic" for φ.
+# lower = ["driven",  "open", "open"]    # r_inner = photosphere, θ/φ = wedge edges
+# upper = ["open",    "open", "open"]    # r_outer = outflow, θ/φ = wedge edges
+#
+# [units]
+# system            = "MHD"
+# reference_length  = 6.96e8             # m — solar radius (1 R_sun)
+# reference_density = 1.67e-13           # kg/m³ — coronal base (~1e8 cm⁻³)
+# reference_b_field = 1.0e-4             # T — 1 Gauss (typical active-region field)
+#
+# [coordinates]
+# geometry             = "spherical"
+# frame                = "HGC"                     # Heliographic Carrington (rotates with Sun)
+# axis_labels          = ["r", "theta", "phi"]     # override default [x, y, z] for geometry
+# physical_extent      = [20.0, 1.73, 1.73]        # r in R_sun; θ, φ always in radians
+# physical_extent_unit = "R_sun"                   # length-axis unit only; angular axes are radians
+#
+# [coordinates.transforms.HGS]
+# # Heliographic Carrington → Heliographic Stonyhurst (fixed to the Earth-Sun line).
+# # Time-dependent: the Sun rotates relative to Earth once every ~27 days.
+# parameter = "carrington_longitude"
+# origin    = [0.0, 0.0, 0.0]
+#
+# [coordinates.transforms.HCI]
+# # Heliographic Carrington → Heliocentric Inertial (fixed to equinox).
+# parameter = "hci_rotation_angle"
+# origin    = [0.0, 0.0, 0.0]
+#
+# [physics]
+# relativistic = false
+#
+# [physics.mhd]
+# # Physics-model knobs: what the code is solving. Discretization knobs
+# # (scheme, Riemann solver, limiter) live under [physics.mhd.solver].
+# gamma       = 1.05                     # nearly isothermal corona (some ARMS runs use 1.0 or 5/3)
+# resistivity = 1.0e-5                   # physical η — reconnection is mostly numerical here
+# hall_term   = false
+#
+# [physics.mhd.solver]
+# # Discretization choices. The vocabulary below covers the dominant MHD
+# # solver families: FCT (Zalesak / DeVore-Antiochos / ARMS lineage), Godunov
+# # / MUSCL-Hancock / PPM (BATSRUS, Athena++, MPI-AMRVAC), WENO (high-order
+# # shock-capturing). Pick the scheme, then fill scheme-compatible keys.
+# scheme              = "fct"            # "fct" | "godunov" | "muscl-hancock" | "ppm" | "weno"
+# reconstruction      = "linear"         # "linear" | "plm" | "ppm" | "weno5" | "mp5"
+# limiter             = "zalesak"        # "zalesak" | "minmod" | "mc" | "van-leer" | "superbee"
+# divergence_cleaning = "ct"             # "ct" | "powell" | "dedner-glm" | "projection" | "none"
+# # CFL number lives in [time] (drives adaptive stepping); not duplicated here.
+# # preconditioner    = "amg"            # only when scheme implies an implicit solve;
+# #                                      # "none" | "jacobi" | "block-jacobi" |
+# #                                      # "ilu" | "amg" | "additive-schwarz"
+# # riemann           = "hlld"           # for Godunov-family schemes:
+# #                                      # "roe" | "hll" | "hlle" | "hlld" | "lax-friedrichs"
+#
+# # No [[bodies]] — the Sun sits OUTSIDE the domain (r_inner = 1 R_sun is
+# # the photospheric boundary driven by the magnetogram, not a body in the
+# # grid). The active region is a feature of the photospheric B distribution,
+# # not an independent body. See Scenario C for a body-aware run.
+#
+# [initial_conditions]
+# # PFSS extrapolation from the HMI magnetogram, augmented with an analytic
+# # Titov–Démoulin flux rope at the insertion site. Plasma follows a Parker
+# # solar-wind background. Flat table — no .parameters sub-table.
+# type                 = "magnetogram_plus_flux_rope"
+# source               = "magnetograms/hmi_2024_05_11T0900_ar13664.fits"
+# magnetogram_type     = "radial"                  # or "line_of_sight"
+# extrapolation        = "pfss"                    # Potential Field Source Surface
+# source_surface       = 2.5                       # R_sun — standard PFSS outer boundary
+# flux_rope_type       = "titov_demoulin"
+# flux_rope_location   = [1.05, 1.45, 0.0]         # (r, θ, φ) insertion point
+# flux_rope_axial_flux = 5.0e21                    # Wb — flux-rope strength
+# solar_wind_model     = "parker"
+#
+# # [[drivers]] — photospheric magnetogram drives the r_inner boundary.
+# # ARMS, AWSoM, MAS all use this pattern with HMI or SDO magnetograms.
+# [[drivers]]
+# name          = "photospheric_magnetogram"
+# type          = "magnetogram_timeseries"
+# coupling      = "boundary"             # sets B values at the r = r_inner surface
+# direction     = "one_way"              # HMI observations don't care what the corona does
+# description   = "SDO/HMI 720-s vector magnetograms of AR 13664, 2024-05-11 eruption"
+# source        = "drivers/hmi_ar13664_2024_05_11/"
+# columns       = ["t", "B_r", "B_theta", "B_phi"]
+# cadence       = 720.0                  # seconds (12-min smoothed HMI Sharp product)
+# interpolation = "linear"
+# # Target: the photospheric surface (r = r_inner = 1.0). All (θ, φ) at r = 1.0.
+# target_lower  = [1.0, 0.87, -0.87]     # (r, θ_min, φ_min)
+# target_upper  = [1.0, 2.60, 0.87]      # (r, θ_max, φ_max)
+#
+# # Optional second driver (commented) — Parker solar-wind outflow at the
+# # outer boundary, for runs that don't let r_outer simply be outflow.
+# # [[drivers]]
+# # name          = "solar_wind_outflow"
+# # type          = "parker_profile"
+# # coupling      = "boundary"           # imposed at r = r_outer surface
+# # direction     = "one_way"
+# # description   = "Parker solar-wind solution imposed at r = r_outer"
+# # target_lower  = [21.0, 0.87, -0.87]
+# # target_upper  = [21.0, 2.60, 0.87]
+#
+# # Optional third driver (commented) — MHD→PIC volume coupling. Fields from
+# # a global BATSRUS MHD run are loaded throughout a volume region (not just
+# # at a boundary surface) as a background onto which PIC-scale perturbations
+# # are superposed. Demonstrates coupling = "volume" in contrast to the
+# # surface-based boundary couplings above.
+# # [[drivers]]
+# # name                         = "mhd_fields_background"
+# # type                         = "mhd_field_coupling"
+# # coupling                     = "volume"    # fills throughout the target box
+# # direction                    = "one_way"   # pre-computed MHD fields; no feedback
+# # description                  = "BATSRUS MHD fields as coronal-scale background"
+# # source                       = "../batsrus_run_042/output/"
+# # fields                       = ["B1", "B2", "B3", "V1", "V2", "V3"]
+# # source_physical_extent       = [40.0, 20.0, 20.0]
+# # source_physical_extent_unit  = "R_sun"
+# # target_lower                 = [5.0, 0.87, -0.87]
+# # target_upper                 = [21.0, 2.60, 0.87]
+# # rescale                      = "linear"
+#
+# [[species]]
+# # Single-fluid MHD — entry present so per-species derived aliases (Pi, n_i)
+# # resolve. particles_per_cell = 0 marks a fluid, not kinetic. closure and
+# # gamma_eos are optional here (for single-fluid runs, [physics.mhd].gamma
+# # is the default); they're useful for multi-fluid MHD where different fluid
+# # species have different adiabatic indices.
+# name                = "protons"
+# charge              = 1.0
+# mass                = 1.0
+# particles_per_cell  = 0
+# density             = 1.0
+# closure             = "adiabatic"      # optional — overrides [physics.mhd] defaults per species
+# gamma_eos           = 1.6666667        # optional — default inherits from [physics.mhd].gamma
+#
+# [output.checkpoints]
+# step_interval = 2000
+# dir           = "./checkpoints"
+# format        = "hdf5"
+# precision     = "f64"
+# keep_last     = 3
+#
+# [output.fields]
+# step_interval = 50
+# quantities    = ["B", "V", "rho_m", "P", "J", "S"]   # Poynting flux useful for CME energy accounting
+# dir           = "./fields"
+# format        = "hdf5"
+# precision     = "f32"
+#
+# # No [output.particles] — MHD has no particles.
+#
+# [output.probes]
+# step_interval = 1
+# dir           = "./probes"
+# format        = "hdf5"
+# precision     = "f64"
+#
+# [output.diagnostics]
+# step_interval = 25
+# quantities    = ["div_B", "|J|", "beta", "M_A", "M_ms", "helicity"]
+# dir           = "./diagnostics"
+# format        = "hdf5"
+# precision     = "f32"
+#
+# [[probes]]
+# # Active-region apex — mimics SDO AIA line-of-sight sample above the AR
+# name     = "ar13664_apex"
+# position = [1.1, 1.45, 0.0]            # (r, θ, φ) in code units
+# fields   = ["B1", "B2", "B3", "V1", "V2", "V3", "P", "rho_m"]
+#
+# [[probes]]
+# # Parker Solar Probe encounter position (perihelion ≈ 9.86 R_sun, but
+# # PSP spends time out to ~15 R_sun during encounters)
+# name     = "psp_encounter"
+# position = [15.0, 1.73, 0.0]
+# fields   = ["B1", "B2", "B3", "V1", "V2", "V3", "rho_m", "P", "beta"]
+#
+# [schema]
+# version = "1.0"
+# created = 2026-04-24
+
+
+# =======================================================================
+# Scenario C — heliospheric hybrid (Mercury magnetosphere; commented)
+# =======================================================================
+# Hybrid codes are the workhorses of planetary solar-wind interaction
+# modeling: Mercury, Mars, Venus, comets, Titan. Ion gyroradius at these
+# bodies is comparable to the body size, so kinetic ion physics dominates
+# and fluid MHD is inadequate. This scenario models Mercury's magnetosphere
+# during the BepiColombo era (ESA/JAXA mission in Hermean orbit since 2025),
+# with solar-wind driving and a surface-absorption inner boundary (Mercury
+# has no atmosphere — ions that impact the surface are lost, not re-emitted).
+#
+# [model]
+# name        = "AIKEF"
+# type        = "hybrid"
+# version     = "4.1"
+# description = "Adaptive hybrid Ion-Kinetic Electron-Fluid code"
+# url         = "https://www.tu-braunschweig.de/iqst/aikef"
+# doi         = "10.5194/angeo-29-953-2011"   # Müller et al. 2011
+# license     = "Research-use"
+# authors = [
+#     { name = "Joachim Müller",    orcid = "0000-0000-0000-0000", affiliation = "TU Braunschweig" },
+#     { name = "Sven Simon",        orcid = "0000-0000-0000-0000", affiliation = "Georgia Institute of Technology" },
+#     { name = "Uwe Motschmann",    orcid = "0000-0000-0000-0000", affiliation = "TU Braunschweig" },
+# ]
+#
+# [run]
+# name        = "mercury_bepicolombo_2026_04"
+# description = "Mercury magnetosphere hybrid, BepiColombo MPO upstream monitor"
+# authors = [
+#     { name = "L. Rusaitis", orcid = "0000-0002-1825-0097", affiliation = "Independent Researcher", role = "PI" },
+# ]
+# date        = 2026-04-24
+# git_sha     = "7e4b2d9"
+# host        = "irene.tgcc.cea.fr"
+# license     = "CC-BY-4.0"
+# doi         = "10.5281/zenodo.34567890"
+# funding     = ["ESA-BepiColombo-SWT", "CNES-APR-2024-017"]
+#
+# [run.resources]
+# mpi_ranks        = 4096
+# mpi_topology     = [16, 8, 32]        # Cartesian decomposition for the [r, θ, φ]-like grid
+# nodes            = 64
+# wall_clock_hours = 24.0
+# cpu_core_hours   = 98304
+# node_hours       = 1536
+# peak_memory_gb   = 6144
+# cpu_type         = "AMD EPYC Rome 7H12 (Irene Rome partition)"
+#
+# [time]
+# dt      = 0.02                         # reference ion timestep (code units, 1/Ω_p)
+# t_start = 0.0
+# t_end   = 800.0                        # ~1 Hermean transit time
+# n_steps = 40000
+#
+# scheme         = "subcycled"           # field solver substeps relative to ion push
+# dt_field       = 0.004
+# field_substeps = 5
+#
+# [grid]
+# # All spatial values are CODE UNITS (d_i here, for ion-normalized hybrid).
+# # At Mercury solar-wind density n ≈ 30 cm⁻³, d_i ≈ 40 km and R_M ≈ 60 d_i.
+# # Physical realization in [coordinates].physical_extent (R_M).
+# dimensions = [384, 192, 192]           # base (level 0) grid
+# spacing    = [1.0, 1.0, 1.0]           # dx, dy, dz
+# lower      = [-192.0, -96.0, -96.0]    # box reaches ~±3 R_M tailward
+# upper      = [192.0, 96.0, 96.0]       # and ~±1.5 R_M cross-tail / north-south
+# stagger    = "staggered"               # hybrid codes typically use Yee mesh for B
+# # No [grid].source — simple Cartesian AMR is fully described inline.
+#
+# [grid.amr]
+# # Refine the dayside magnetopause and cusp regions where d_i-scale
+# # structure (reconnection, flux transfer events) needs resolving.
+# max_level            = 2
+# refinement_ratio     = 2
+# block_size           = [12, 12, 12]
+# refinement_criteria  = ["current_density", "gradient_b"]
+# refinement_threshold = 0.05
+#
+# [[grid.refinement]]
+# # Static refinement: always refine within ~1 R_M of Mercury (60 d_i).
+# level = 2
+# box   = [[-60.0, -60.0, -60.0], [60.0, 60.0, 60.0]]
+#
+# [boundary_conditions]
+# lower = ["inflow", "open", "open"]     # solar wind inflow on -x (Sun-ward in this convention)
+# upper = ["outflow", "open", "open"]
+#
+# [units]
+# system            = "PIC"              # hybrid uses ion-normalized PIC units
+# reference_species = "ions"
+# reference_density = 3.0e7              # m⁻³ (Mercury SW protons at 0.4 AU; ~10× Earth)
+# reference_mass    = 1.673e-27          # kg — proton mass
+# reference_charge  = 1.602e-19          # C
+#
+# [coordinates]
+# geometry             = "cartesian"
+# frame                = "MSM"           # Mercury Solar Magnetospheric (+x Sun, +z north)
+# axis_labels          = ["x", "y", "z"]
+# physical_extent      = [6.4, 3.2, 3.2] # ±3.2 R_M along x, ±1.6 R_M cross
+# physical_extent_unit = "R_M"           # Mercury radii (1 R_M = 2439.7 km)
+#
+# [coordinates.transforms.MSO]
+# # MSO = Mercury Solar Orbital (no dipole tilt); MSM includes tilt.
+# # Time-dependent because Mercury's dipole is tilted ~0° but offset ~480 km north.
+# parameter = "dipole_tilt"
+# origin    = [0.0, 0.0, 11.8]           # dipole offset ≈ 0.2 R_M northward
+#
+# [physics]
+# relativistic = false
+#
+# [physics.hybrid]
+# # Physics-model knobs. Per-species properties (closure, equation-of-state
+# # index, inertia) belong on [[species]] entries — the fluid species is
+# # whichever [[species]] entry has particles_per_cell = 0 (electrons here,
+# # but could be heavy ions for cometary-style kinetic-heavy hybrid runs).
+# # No top-level physics flags are needed for this run; all hybrid knobs
+# # below are discretization choices living in [physics.hybrid.solver].
+#
+# [physics.hybrid.solver]
+# # AIKEF/LatHyS-style predictor-corrector with cyclic-leapfrog field push.
+# # CAM-CL (Current Advance Method with Cyclic Leapfrog; Matthews 1994) is
+# # the dominant alternative among modern hybrid codes (HYPERS, dHybridR).
+# scheme            = "predictor-corrector"  # "predictor-corrector" | "current-advance-method"
+# field_pusher      = "cyclic-leapfrog"      # "cyclic-leapfrog" | "implicit"
+# resistivity       = 5.0e-4                 # collisional η (code units)
+# hyper_resistivity = 1.0e-6                 # artificial smoothing for numerical stability
+# current_smoothing = 2                      # binomial smoothing passes per step
+# # preconditioner  = "block-jacobi"         # only for field_pusher = "implicit"
+#
+# [[bodies]]
+# # Mercury — solid planetary body with a weak intrinsic dipole offset
+# # northward by ~0.2 R_M (Anderson et al. 2011). Hybrid codes treat the
+# # intrinsic field as a fixed analytic background B0 that the solver
+# # doesn't evolve; ion kinetics see the total B = B0 + B_perturbation.
+# # This is the canonical "split-B" pattern — the body IS the dipole's
+# # physical source, which is why [[bodies]] is the right home for it
+# # (not [initial_conditions], since B0 is imposed throughout the run,
+# # and not [[drivers]], since the field is an intrinsic property).
+# name                 = "mercury"
+# center               = [0.0, 0.0, 0.0]           # grid code units (d_i)
+# radius               = 60.0                       # 1 R_M ≈ 60 d_i at Hermean SW
+# shape                = "sphere"                   # "sphere" | "torus" | "cuboid" | "mesh"
+# # Intrinsic magnetic moment — canonical split-B / analytic-background treatment:
+# intrinsic_dipole     = [0.0, 0.0, -190.0]         # moment vector (code units)
+# dipole_center_offset = [0.0, 0.0, 11.8]           # 0.2 R_M northward (Anderson+2011)
+# # Rotational / gravitational properties (optional — inform observers + probes):
+# rotation_axis        = [0.0, 0.0, 1.0]
+# rotation_period      = 5067360.0                  # seconds — 58.646 Earth days
+# mass                 = 3.302e23                   # kg
+# # Body-plasma interaction flags (hints; actual physics lives in [[drivers]]):
+# surface_absorbs_ions = true
+# has_atmosphere       = false
+# has_intrinsic_field  = true                       # triggers split-B treatment
+#
+# # Multi-body runs are just more [[bodies]] entries. For a Jupiter-system
+# # simulation you'd add Jupiter + Io + Europa + Ganymede, each with its
+# # own center (at the moon's orbital position in code units), radius,
+# # and intrinsic_dipole. For a binary-star sim, two stellar bodies. For
+# # a fusion tokamak, separate entries for each PF / TF coil. Drivers and
+# # initial conditions reference bodies by name — no coordinate duplication.
+#
+# [initial_conditions]
+# # Flat table — upstream solar wind + Mercury's intrinsic field.
+# # The dipole is pulled from [[bodies]] (see dipole_bodies below), so
+# # dipole_moment / dipole_offset no longer appear here — they're body
+# # properties, not IC parameters.
+# type              = "body_dipoles_plus_solar_wind"
+# dipole_bodies     = ["mercury"]        # include intrinsic dipoles from these bodies at t=0
+# imf_B             = [5.0e-4, 0.0, -1.5e-4]   # upstream IMF in code units
+# upstream_density  = 1.0
+# upstream_velocity = [-5.0, 0.0, 0.0]   # M_A ≈ 5 at Mercury (lower than Earth's ~8)
+# upstream_pressure = 0.02
+#
+# # [[drivers]] — solar wind upstream + Mercury surface absorption.
+# [[drivers]]
+# name          = "bepicolombo_mpo_upstream"
+# type          = "solar_wind_timeseries"
+# coupling      = "boundary"             # sets B, V, n, T at the -x inflow face
+# direction     = "one_way"              # observational data; simulation can't affect spacecraft
+# description   = "BepiColombo MPO solar-wind monitor, Hermean dayside pass"
+# source        = "drivers/bepi_mpo_2026_04_20.csv"
+# columns       = ["t", "B1", "B2", "B3", "V1", "V2", "V3", "n", "T"]
+# cadence       = 8.0                    # seconds between samples (MPO MAG cadence)
+# interpolation = "linear"
+# # Inflow face at x = -192 d_i (-3.2 R_M, tailward edge of box)
+# target_lower  = [-192.0, -96.0, -96.0]
+# target_upper  = [-192.0, 96.0, 96.0]
+#
+# [[drivers]]
+# # Mercury has essentially no atmosphere (surface-bounded exosphere only).
+# # Solar wind protons that impact the planetary surface are absorbed, not
+# # re-emitted. This "surface sink" is a standard hybrid inner BC for Mercury.
+# name          = "mercury_surface_absorption"
+# type          = "body_surface_absorption"
+# coupling      = "sink"                 # removes particles impacting body surface
+# direction     = "one_way"              # body absorbs plasma; body state is static
+# description   = "Mercury surface absorbs impacting ions (no atmosphere)"
+# body          = "mercury"              # references [[bodies]] entry — inherits center + radius
+# # target_lower/target_upper optional here; when absent they default to
+# # the body's bounding box (center ± radius). Provide them only to narrow
+# # the active surface (e.g., dayside hemisphere only).
+#
+# # Optional third driver (commented) — sodium pickup ions from Mercury's
+# # exosphere. Na⁺ is observed by MESSENGER MASCS and BepiColombo SERENA;
+# # modeling it requires a second [[species]] for Na⁺ pickup ions.
+# # [[drivers]]
+# # name          = "mercury_exosphere_source"
+# # type          = "pickup_ion_source"
+# # coupling      = "source"              # emits Na⁺ macroparticles throughout an exosphere shell
+# # direction     = "one_way"             # prescribed production rate; exosphere not evolved
+# # description   = "Na⁺ photoionization from surface-bound exosphere"
+# # species       = "sodium"
+# # production_rate = 1.0e22               # ions / second (surface-integrated)
+# # target_lower  = [-90.0, -90.0, -90.0]  # dayside-illuminated exosphere shell
+# # target_upper  = [90.0, 90.0, 90.0]
+#
+# [[species]]
+# # Kinetic solar-wind protons. For runs that include Mercury's exosphere,
+# # add a third [[species]] for Na⁺ pickup ions with its own thermal/drift.
+# name                = "solar_wind_protons"
+# charge              = 1.0
+# mass                = 1.0
+# particles_per_cell  = [8, 8, 8]        # hybrid runs use fewer PPC than full PIC
+# thermal_velocity    = [0.05, 0.05, 0.05]
+# drift_velocity      = [-5.0, 0.0, 0.0]
+# density             = 1.0
+#
+# [[species]]
+# # Fluid electrons. particles_per_cell = 0 marks this as a fluid species
+# # (not tracked as macroparticles). closure, gamma_eos, and inertia are
+# # species-level properties rather than [physics.hybrid] globals — this
+# # generalizes to non-standard hybrid formulations where the fluid species
+# # might be heavy ions or background protons instead of electrons.
+# name               = "electrons"
+# charge             = -1.0
+# mass               = 0.000544617       # m_e/m_p; 0.0 for massless-electron hybrid
+# particles_per_cell = 0                 # FLUID
+# closure            = "adiabatic"       # "isothermal" | "adiabatic" | "polytropic" | "braginskii"
+# gamma_eos          = 1.6666667         # adiabatic index for this fluid species
+# inertia            = 0.0               # me/mi; 0.0 = massless-electron limit (standard for Mercury)
+# density            = 1.0
+#
+# [output.checkpoints]
+# step_interval = 5000
+# dir           = "./checkpoints"
+# format        = "hdf5"
+# precision     = "f64"
+# keep_last     = 3
+#
+# [output.fields]
+# step_interval = 100
+# quantities    = ["B", "E", "V", "P_s0", "rho_c", "J"]
+# dir           = "./fields"
+# format        = "hdf5"
+# precision     = "f32"
+#
+# [output.particles]
+# step_interval  = 500
+# species        = ["solar_wind_protons"]
+# dir            = "./particles"
+# format         = "hdf5"
+# precision      = "f32"
+# include_ids    = true
+# include_energy = true
+# sample         = 0.001                 # 0.1% — hybrid has many macroparticles
+#
+# [output.probes]
+# step_interval = 1
+# dir           = "./probes"
+# format        = "hdf5"
+# precision     = "f64"
+#
+# [output.diagnostics]
+# step_interval = 50
+# quantities    = ["div_B", "|J|", "beta", "M_A", "E_prime_1", "E_prime_2", "E_prime_3"]
+# dir           = "./diagnostics"
+# format        = "hdf5"
+# precision     = "f32"
+#
+# [[probes]]
+# # Subsolar bow shock at ~1.4 R_M upstream (typical Mercury standoff)
+# name     = "bow_shock_subsolar"
+# position = [84.0, 0.0, 0.0]            # +1.4 R_M ≈ +84 d_i
+# fields   = ["B1", "B2", "B3", "V1", "V2", "V3", "P_s0", "J_dot_E"]
+#
+# [[probes]]
+# # Northern cusp — where BepiColombo MPO samples field-aligned currents
+# name     = "cusp_north"
+# position = [30.0, 0.0, 50.0]
+# fields   = ["B1", "B2", "B3", "V1", "V2", "V3", "P_s0"]
+#
+# [schema]
+# version = "1.0"
+# created = 2026-04-24

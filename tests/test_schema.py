@@ -1,0 +1,416 @@
+"""Tests for ``pypic.schema`` — the v1.0 simulation.toml validator."""
+
+from __future__ import annotations
+
+import tomllib
+from pathlib import Path
+from textwrap import dedent
+
+import pytest
+from pydantic import ValidationError
+
+from pypic.schema import (
+    SimulationSchema,
+    UnitsMHD,
+    UnitsPIC,
+    validate_simulation_toml,
+)
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+LIVE_TEMPLATE = REPO_ROOT / "pypic.simulation.toml"
+
+
+def _minimal_doc(**overrides: str) -> str:
+    """Build a minimal valid v1.0 doc, with targeted overrides."""
+    base = (
+        dedent(
+            """
+        schema_version = "1.0"
+        [schema]
+        version = "1.0"
+        [model]
+        name = "demo"
+        type = "PIC"
+        [run]
+        name = "r0"
+        [time]
+        scheme = "fixed"
+        dt = 0.1
+        t_start = 0.0
+        t_end = 1.0
+        n_steps = 10
+        [grid]
+        dimensions = [4, 4, 4]
+        spacing = [1.0, 1.0, 1.0]
+        lower = [0.0, 0.0, 0.0]
+        upper = [4.0, 4.0, 4.0]
+        [units]
+        system = "SI"
+        [coordinates]
+        geometry = "cartesian"
+        frame = "sim"
+        [[species]]
+        name = "electrons"
+        charge = -1.0
+        mass = 1.0
+        """
+        ).strip()
+        + "\n"
+    )
+    for marker, replacement in overrides.items():
+        base = base.replace(marker, replacement)
+    return base
+
+
+def _extract_scenario_toml(full_text: str, scenario: str) -> str:
+    """Extract Scenario B or C from the live template by uncommenting.
+
+    The template uses a disciplined pattern: Scenarios B and C are
+    commented with a single leading ``# `` per TOML line, and any
+    *prose* inside the scenario is double-commented (``# # ``). Strip
+    one level and the result round-trips through ``tomllib``.
+    """
+    markers = {
+        "B": "Scenario B — solar eruption MHD (ARMS-style active-region",
+        "C": "Scenario C — heliospheric hybrid (Mercury magnetosphere",
+    }
+    start_needle = markers[scenario]
+    lines = full_text.splitlines()
+    idx_start = next(i for i, ln in enumerate(lines) if start_needle in ln)
+    idx_model = next(
+        i
+        for i, ln in enumerate(lines[idx_start:], idx_start)
+        if ln.strip() == "# [model]"
+    )
+    idx_end = len(lines)
+    for i in range(idx_model + 1, len(lines)):
+        if lines[i].startswith("# =======") or (
+            i + 1 < len(lines) and lines[i + 1].startswith("# =======")
+        ):
+            idx_end = i
+            break
+    extracted: list[str] = []
+    for ln in lines[idx_model:idx_end]:
+        if ln.startswith("# "):
+            extracted.append(ln[2:])
+        elif ln == "#":
+            extracted.append("")
+        else:
+            extracted.append(ln)
+    # Scenarios B/C lack the bare `schema_version` top-level key.
+    return 'schema_version = "1.0"\n' + "\n".join(extracted) + "\n"
+
+
+class TestLiveTemplate:
+    """The live template file must validate as-is (Scenario A active)."""
+
+    def test_scenario_a_validates(self) -> None:
+        result = validate_simulation_toml(LIVE_TEMPLATE)
+        assert isinstance(result, SimulationSchema)
+
+    def test_scenario_a_identity(self) -> None:
+        s = validate_simulation_toml(LIVE_TEMPLATE)
+        assert s.model.name == "iPIC3D"
+        assert s.model.type == "PIC"
+        assert s.schema_version == "1.0"
+
+    def test_scenario_a_species_order(self) -> None:
+        s = validate_simulation_toml(LIVE_TEMPLATE)
+        assert [sp.name for sp in s.species] == ["electrons", "ions"]
+
+    def test_scenario_a_units_discriminated(self) -> None:
+        s = validate_simulation_toml(LIVE_TEMPLATE)
+        assert isinstance(s.units, UnitsPIC)
+        assert s.units.reference_species == "ions"
+
+    def test_scenario_a_pic_solver_block_present(self) -> None:
+        s = validate_simulation_toml(LIVE_TEMPLATE)
+        assert s.physics is not None
+        assert s.physics.pic is not None
+        assert s.physics.pic.solver is not None
+        assert s.physics.pic.solver.scheme == "semi-implicit"
+        assert s.physics.pic.solver.preconditioner == "block-jacobi"
+
+
+class TestScenarioBMHD:
+    """Validate Scenario B (ARMS-like spherical MHD) after uncommenting."""
+
+    def test_scenario_b_validates(self) -> None:
+        toml = _extract_scenario_toml(LIVE_TEMPLATE.read_text(), "B")
+        s = validate_simulation_toml(toml)
+        assert s.model.type == "MHD"
+        assert s.coordinates.geometry == "spherical"
+        assert isinstance(s.units, UnitsMHD)
+        assert s.time.scheme == "adaptive"
+        assert s.physics is not None
+        assert s.physics.mhd is not None
+        assert s.physics.mhd.solver is not None
+        assert s.physics.mhd.solver.scheme == "fct"
+
+
+class TestScenarioCHybrid:
+    """Validate Scenario C (AIKEF-like Mercury hybrid)."""
+
+    def test_scenario_c_validates(self) -> None:
+        toml = _extract_scenario_toml(LIVE_TEMPLATE.read_text(), "C")
+        s = validate_simulation_toml(toml)
+        assert s.model.type == "hybrid"
+        assert s.physics is not None
+        assert s.physics.hybrid is not None
+        assert s.physics.hybrid.solver is not None
+        assert s.physics.hybrid.solver.scheme == "predictor-corrector"
+        assert len(s.bodies) == 1
+        assert s.bodies[0].name == "mercury"
+
+
+class TestMinimalDoc:
+    def test_roundtrips(self) -> None:
+        s = validate_simulation_toml(_minimal_doc())
+        assert s.model.name == "demo"
+
+    def test_rejects_missing_required(self) -> None:
+        doc = _minimal_doc().replace('[model]\nname = "demo"\ntype = "PIC"\n', "")
+        with pytest.raises(ValidationError, match="model"):
+            validate_simulation_toml(doc)
+
+    def test_rejects_unknown_top_level_without_x_prefix(self) -> None:
+        doc = _minimal_doc() + '\n[not_a_real_section]\nfoo = "bar"\n'
+        with pytest.raises(ValidationError, match="extension"):
+            validate_simulation_toml(doc)
+
+    def test_accepts_x_dash_extension_section(self) -> None:
+        doc = _minimal_doc() + '\n[x-warpx]\ndeposition = "esirkepov"\n'
+        s = validate_simulation_toml(doc)
+        assert s.model_extra is not None
+        assert "x-warpx" in s.model_extra
+
+    def test_accepts_x_underscore_extension_section(self) -> None:
+        doc = _minimal_doc() + "\n[x_custom]\nfoo = 1\n"
+        validate_simulation_toml(doc)
+
+    def test_schema_version_mismatch(self) -> None:
+        doc = _minimal_doc().replace('schema_version = "1.0"', 'schema_version = "1.1"')
+        with pytest.raises(ValidationError, match="must match"):
+            validate_simulation_toml(doc)
+
+    def test_rejects_non_v1_schema(self) -> None:
+        doc = dedent("""
+            schema_version = "2.0"
+            [schema]
+            version = "2.0"
+            [model]
+            name = "d"
+            type = "PIC"
+            [run]
+            name = "r"
+            [time]
+            dt = 0.1
+            t_start = 0.0
+            t_end = 1.0
+            n_steps = 10
+            [grid]
+            dimensions = [4,4,4]
+            spacing = [1.0,1.0,1.0]
+            lower = [0.0,0.0,0.0]
+            upper = [4.0,4.0,4.0]
+            [units]
+            system = "SI"
+            [coordinates]
+            geometry = "cartesian"
+            frame = "sim"
+            [[species]]
+            name = "e"
+            charge = -1
+            mass = 1
+        """).strip()
+        with pytest.raises(ValidationError, match=r"1\.x"):
+            validate_simulation_toml(doc)
+
+
+class TestCrossSectionInvariants:
+    def test_model_type_pic_forbids_mhd_block(self) -> None:
+        doc = _minimal_doc() + "\n[physics]\n[physics.mhd]\ngamma = 1.5\n"
+        with pytest.raises(ValidationError, match=r"model\.type"):
+            validate_simulation_toml(doc)
+
+    def test_model_type_mhd_permits_only_mhd_block(self) -> None:
+        doc = (
+            _minimal_doc(**{'type = "PIC"': 'type = "MHD"'})
+            + "\n[physics]\n[physics.mhd]\ngamma = 1.5\n"
+        )
+        s = validate_simulation_toml(doc)
+        assert s.physics is not None
+        assert s.physics.mhd is not None
+
+    def test_grid_axis_length_mismatch(self) -> None:
+        doc = _minimal_doc(**{"spacing = [1.0, 1.0, 1.0]": "spacing = [1.0, 1.0]"})
+        with pytest.raises(ValidationError, match="spacing"):
+            validate_simulation_toml(doc)
+
+    def test_grid_upper_not_above_lower(self) -> None:
+        doc = _minimal_doc(**{"upper = [4.0, 4.0, 4.0]": "upper = [4.0, 0.0, 4.0]"})
+        with pytest.raises(ValidationError, match="upper"):
+            validate_simulation_toml(doc)
+
+    def test_boundary_conditions_axis_mismatch(self) -> None:
+        doc = _minimal_doc() + dedent("""
+            [boundary_conditions]
+            lower = ["periodic", "periodic"]
+            upper = ["periodic", "periodic"]
+        """)
+        with pytest.raises(ValidationError, match="boundary_conditions"):
+            validate_simulation_toml(doc)
+
+    def test_reference_species_must_exist(self) -> None:
+        doc = _minimal_doc(
+            **{
+                'system = "SI"': dedent("""
+                    system = "PIC"
+                    reference_species = "ghost_species"
+                    reference_density = 1.0e6
+                """).strip(),
+            }
+        )
+        with pytest.raises(ValidationError, match="reference_species"):
+            validate_simulation_toml(doc)
+
+    def test_time_subcycled_requires_field_substeps(self) -> None:
+        doc = _minimal_doc(**{'scheme = "fixed"': 'scheme = "subcycled"'})
+        with pytest.raises(ValidationError, match="subcycled"):
+            validate_simulation_toml(doc)
+
+
+class TestSpecies:
+    def test_species_charge_plus_mass_accepted(self) -> None:
+        validate_simulation_toml(_minimal_doc())
+
+    def test_species_charge_to_mass_only_accepted(self) -> None:
+        doc = _minimal_doc(
+            **{
+                "charge = -1.0\nmass = 1.0": "charge_to_mass = -1.0",
+            }
+        )
+        s = validate_simulation_toml(doc)
+        assert s.species[0].charge_to_mass == -1.0
+
+    def test_species_both_rejected(self) -> None:
+        both = "charge = -1.0\nmass = 1.0\ncharge_to_mass = -1.0"
+        doc = _minimal_doc(**{"charge = -1.0\nmass = 1.0": both})
+        with pytest.raises(ValidationError, match="choose one"):
+            validate_simulation_toml(doc)
+
+    def test_species_neither_rejected(self) -> None:
+        doc = _minimal_doc(**{"charge = -1.0\nmass = 1.0": "density = 1.0"})
+        with pytest.raises(ValidationError, match="charge"):
+            validate_simulation_toml(doc)
+
+    def test_missing_species_rejected(self) -> None:
+        doc = dedent("""
+            schema_version = "1.0"
+            [schema]
+            version = "1.0"
+            [model]
+            name = "d"
+            type = "PIC"
+            [run]
+            name = "r"
+            [time]
+            dt = 0.1
+            t_start = 0.0
+            t_end = 1.0
+            n_steps = 10
+            [grid]
+            dimensions = [4,4,4]
+            spacing = [1.0,1.0,1.0]
+            lower = [0.0,0.0,0.0]
+            upper = [4.0,4.0,4.0]
+            [units]
+            system = "SI"
+            [coordinates]
+            geometry = "cartesian"
+            frame = "sim"
+        """).strip()
+        with pytest.raises(ValidationError):
+            validate_simulation_toml(doc)
+
+
+class TestProbe:
+    def test_probe_position_only(self) -> None:
+        doc = _minimal_doc() + dedent("""
+            [[probes]]
+            name = "p1"
+            position = [0.0, 0.0, 0.0]
+        """)
+        s = validate_simulation_toml(doc)
+        assert s.probes[0].name == "p1"
+
+    def test_probe_trajectory_only(self) -> None:
+        doc = _minimal_doc() + dedent("""
+            [[probes]]
+            name = "sat1"
+            trajectory = "orbits/sat1.csv"
+        """)
+        s = validate_simulation_toml(doc)
+        assert s.probes[0].trajectory == "orbits/sat1.csv"
+
+    def test_probe_both_rejected(self) -> None:
+        doc = _minimal_doc() + dedent("""
+            [[probes]]
+            name = "p1"
+            position = [0.0, 0.0, 0.0]
+            trajectory = "file.csv"
+        """)
+        with pytest.raises(ValidationError, match="exactly one"):
+            validate_simulation_toml(doc)
+
+    def test_probe_neither_rejected(self) -> None:
+        doc = _minimal_doc() + dedent("""
+            [[probes]]
+            name = "p1"
+        """)
+        with pytest.raises(ValidationError, match="exactly one"):
+            validate_simulation_toml(doc)
+
+
+class TestOutputFields:
+    def test_precision_overrides_subset(self) -> None:
+        doc = _minimal_doc() + dedent("""
+            [output.fields]
+            step_interval = 10
+            quantities = ["B", "E"]
+            dir = "./fields"
+            [output.fields.precision_overrides]
+            B = "f64"
+        """)
+        validate_simulation_toml(doc)
+
+    def test_precision_overrides_not_in_quantities_rejected(self) -> None:
+        doc = _minimal_doc() + dedent("""
+            [output.fields]
+            step_interval = 10
+            quantities = ["B", "E"]
+            dir = "./fields"
+            [output.fields.precision_overrides]
+            rho_c = "f64"
+        """)
+        with pytest.raises(ValidationError, match="precision_overrides"):
+            validate_simulation_toml(doc)
+
+
+class TestLoaderEntryPoint:
+    def test_accepts_path_object(self) -> None:
+        validate_simulation_toml(LIVE_TEMPLATE)
+
+    def test_accepts_str_path(self) -> None:
+        validate_simulation_toml(str(LIVE_TEMPLATE))
+
+    def test_accepts_dict(self) -> None:
+        with LIVE_TEMPLATE.open("rb") as f:
+            data = tomllib.load(f)
+        validate_simulation_toml(data)
+
+    def test_accepts_bytes(self) -> None:
+        validate_simulation_toml(LIVE_TEMPLATE.read_bytes())
+
+    def test_accepts_text_blob(self) -> None:
+        validate_simulation_toml(_minimal_doc())

@@ -1,11 +1,14 @@
-"""Tests for simulation.toml config loading."""
+"""Tests for ``load_config`` — the Pydantic-backed v1.0 TOML loader."""
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import pytest
+from pydantic import ValidationError
 from scipy import constants
 
 from pypic.readers.config import LENGTH_UNITS, apply_physical_extent, load_config
@@ -16,201 +19,137 @@ EXAMPLE_TOML = (
 )
 
 
-def _write_toml(tmp_path: Path, content: str) -> Path:
+def _shell(
+    *,
+    model: str = '[model]\nname = "test"\ntype = "PIC"',
+    time: str = (
+        '[time]\nscheme = "fixed"\ndt = 0.1\n'
+        "t_start = 0.0\nt_end = 1.0\nn_steps = 10"
+    ),
+    grid: str = (
+        "[grid]\ndimensions = [2, 2, 2]\nspacing = [1.0, 1.0, 1.0]\n"
+        "lower = [0.0, 0.0, 0.0]\nupper = [2.0, 2.0, 2.0]"
+    ),
+    units: str = '[units]\nsystem = "SI"',
+    coordinates: str = '[coordinates]\ngeometry = "cartesian"\nframe = "sim"',
+    species: str = '[[species]]\nname = "e"\ncharge = -1.0\nmass = 0.004',
+    extra: str = "",
+) -> str:
+    """Assemble a valid v1.0 TOML doc, with per-section overrides."""
+    return "\n\n".join(
+        [
+            'schema_version = "1.0"',
+            '[schema]\nversion = "1.0"',
+            model,
+            '[run]\nname = "r0"',
+            time,
+            grid,
+            units,
+            coordinates,
+            species,
+            extra,
+        ]
+    ).strip() + "\n"
+
+
+def _write(tmp_path: Path, content: str) -> Path:
     p = tmp_path / "simulation.toml"
     p.write_text(content, encoding="utf-8")
     return p
 
 
-class TestIPIC3DDoubleHarris:
+class TestLiveExample:
     @pytest.fixture
-    def cfg(self):
+    def cfg(self) -> Any:
         return load_config(EXAMPLE_TOML)
 
-    def test_model_and_metadata(self, cfg):
+    def test_model_and_metadata(self, cfg: Any) -> None:
         assert cfg.model_name == "iPIC3D"
         assert cfg.model_type == "PIC"
         assert cfg.physics.c == 1.0
         assert cfg.physics.gamma == pytest.approx(5.0 / 3.0)
-        assert cfg.physics.extra["theta"] == 0.5
         assert cfg.metadata["description"] == "Double Harris sheet reconnection"
 
-    def test_grid(self, cfg):
+    def test_physics_pic_branch_present(self, cfg: Any) -> None:
+        assert "pic" in cfg.physics.extra
+        assert cfg.physics.extra["pic"]["omega_p_over_omega_c"] == 10.0
+
+    def test_grid(self, cfg: Any) -> None:
         assert cfg.grid.dimensions == (100, 100, 1)
         np.testing.assert_allclose(cfg.grid.spacing, (0.3, 0.3, 1.0), rtol=1e-12)
         assert cfg.grid.dt == 0.125
+        assert cfg.grid.boundary == ("periodic", "periodic", "periodic")
 
-    def test_species(self, cfg):
+    def test_species(self, cfg: Any) -> None:
         assert len(cfg.species) == 4
         assert cfg.species[0].charge == -1.0
         np.testing.assert_allclose(cfg.species[0].mass, 1 / 256, rtol=1e-10)
 
-    def test_normalization(self, cfg):
+    def test_normalization(self, cfg: Any) -> None:
         np.testing.assert_allclose(
             cfg.normalization.velocity_ref, constants.c, rtol=1e-10
         )
 
 
-class TestParseModel:
-    def test_minimal(self, tmp_path):
-        cfg = load_config(
-            _write_toml(
-                tmp_path,
-                """
-[model]
-name = "test"
-type = "PIC"
-[grid]
-dimensions = [2, 2, 2]
-spacing = [1.0, 1.0, 1.0]
-[units]
-system = "SI"
-[coordinates]
-geometry = "cartesian"
-frame = "sim"
-""",
-            )
-        )
+class TestMinimal:
+    def test_minimal_doc_loads(self, tmp_path: Path) -> None:
+        cfg = load_config(_write(tmp_path, _shell()))
         assert cfg.model_name == "test"
 
-    def test_missing_name(self, tmp_path):
-        with pytest.raises(ExceptionGroup) as exc_info:
-            load_config(
-                _write_toml(
-                    tmp_path,
-                    """
-[model]
-type = "PIC"
-[grid]
-dimensions = [2, 2, 2]
-spacing = [1.0, 1.0, 1.0]
-[units]
-system = "SI"
-[coordinates]
-geometry = "cartesian"
-frame = "sim"
-""",
-                )
-            )
-        assert any("'name'" in str(e) for e in exc_info.value.exceptions)
+    def test_missing_model_section_raises(self, tmp_path: Path) -> None:
+        toml = _shell().replace('[model]\nname = "test"\ntype = "PIC"\n\n', "")
+        with pytest.raises(ValidationError, match="model"):
+            load_config(_write(tmp_path, toml))
 
-    def test_missing_type(self, tmp_path):
-        with pytest.raises(ExceptionGroup) as exc_info:
-            load_config(
-                _write_toml(
-                    tmp_path,
-                    """
-[model]
-name = "test"
-[grid]
-dimensions = [2, 2, 2]
-spacing = [1.0, 1.0, 1.0]
-[units]
-system = "SI"
-[coordinates]
-geometry = "cartesian"
-frame = "sim"
-""",
-                )
-            )
-        assert any("'type'" in str(e) for e in exc_info.value.exceptions)
+    def test_missing_type_raises(self, tmp_path: Path) -> None:
+        toml = _shell(model='[model]\nname = "test"')
+        with pytest.raises(ValidationError, match="type"):
+            load_config(_write(tmp_path, toml))
 
 
-class TestParseGrid:
-    def test_full(self, tmp_path):
-        cfg = load_config(
-            _write_toml(
-                tmp_path,
-                """
-[model]
-name = "test"
-type = "PIC"
-[grid]
-dimensions = [10, 20, 30]
-spacing = [0.1, 0.2, 0.3]
-origin = [1.0, 2.0, 3.0]
-dt = 0.01
-boundary = ["periodic", "open", "reflecting"]
-[units]
-system = "SI"
-[coordinates]
-geometry = "cartesian"
-frame = "sim"
-""",
-            )
+class TestGrid:
+    def test_full(self, tmp_path: Path) -> None:
+        grid = (
+            "[grid]\ndimensions = [10, 20, 30]\nspacing = [0.1, 0.2, 0.3]\n"
+            "lower = [1.0, 2.0, 3.0]\nupper = [2.0, 6.0, 12.0]"
         )
+        bcs = (
+            '[boundary_conditions]\n'
+            'lower = ["periodic", "open", "reflecting"]\n'
+            'upper = ["periodic", "open", "reflecting"]'
+        )
+        cfg = load_config(_write(tmp_path, _shell(grid=grid, extra=bcs)))
         assert cfg.grid.dimensions == (10, 20, 30)
         np.testing.assert_allclose(cfg.grid.origin, (1.0, 2.0, 3.0), rtol=1e-12)
+        assert cfg.grid.boundary == ("periodic", "open", "reflecting")
 
-    def test_default_origin(self, tmp_path):
-        cfg = load_config(
-            _write_toml(
-                tmp_path,
-                """
-[model]
-name = "test"
-type = "PIC"
-[grid]
-dimensions = [4, 4, 4]
-spacing = [1.0, 1.0, 1.0]
-[units]
-system = "SI"
-[coordinates]
-geometry = "cartesian"
-frame = "sim"
-""",
-            )
-        )
+    def test_lower_defaults_origin_for_grid_info(self, tmp_path: Path) -> None:
+        # [grid].lower in v1.0 → GridInfo.origin internally
+        cfg = load_config(_write(tmp_path, _shell()))
         assert cfg.grid.origin == (0.0, 0.0, 0.0)
 
     @pytest.mark.parametrize("missing_key", ["dimensions", "spacing"])
-    def test_missing_grid_key(self, tmp_path, missing_key):
+    def test_missing_required_grid_key(
+        self, tmp_path: Path, missing_key: str
+    ) -> None:
         if missing_key == "dimensions":
-            present = "spacing = [1.0, 1.0, 1.0]"
+            grid = (
+                "[grid]\nspacing = [1.0, 1.0, 1.0]\n"
+                "lower = [0.0, 0.0, 0.0]\nupper = [2.0, 2.0, 2.0]"
+            )
         else:
-            present = "dimensions = [2, 2, 2]"
-        with pytest.raises(ExceptionGroup) as exc_info:
-            load_config(
-                _write_toml(
-                    tmp_path,
-                    f"""
-[model]
-name = "test"
-type = "PIC"
-[grid]
-{present}
-[units]
-system = "SI"
-[coordinates]
-geometry = "cartesian"
-frame = "sim"
-""",
-                )
+            grid = (
+                "[grid]\ndimensions = [2, 2, 2]\n"
+                "lower = [0.0, 0.0, 0.0]\nupper = [2.0, 2.0, 2.0]"
             )
-        assert any(f"'{missing_key}'" in str(e) for e in exc_info.value.exceptions)
+        with pytest.raises(ValidationError, match=missing_key):
+            load_config(_write(tmp_path, _shell(grid=grid)))
 
 
-class TestParseUnits:
-    def test_pic_electron_default(self, tmp_path):
-        cfg = load_config(
-            _write_toml(
-                tmp_path,
-                """
-[model]
-name = "test"
-type = "PIC"
-[grid]
-dimensions = [2, 2, 2]
-spacing = [1.0, 1.0, 1.0]
-[units]
-system = "PIC"
-reference_density = 1.0e18
-[coordinates]
-geometry = "cartesian"
-frame = "sim"
-""",
-            )
-        )
+class TestUnits:
+    def test_pic_electron_default(self, tmp_path: Path) -> None:
+        units = '[units]\nsystem = "PIC"\nreference_density = 1.0e18'
+        cfg = load_config(_write(tmp_path, _shell(units=units)))
         np.testing.assert_allclose(
             cfg.normalization.velocity_ref, constants.c, rtol=1e-10
         )
@@ -218,228 +157,91 @@ frame = "sim"
             cfg.normalization.mass_ref, constants.m_e, rtol=1e-10
         )
 
-    def test_pic_ion_reference(self, tmp_path):
-        cfg = load_config(
-            _write_toml(
-                tmp_path,
-                """
-[model]
-name = "test"
-type = "PIC"
-[grid]
-dimensions = [2, 2, 2]
-spacing = [1.0, 1.0, 1.0]
-[units]
-system = "PIC"
-reference_species = "ions"
-reference_density = 1.0e18
-[coordinates]
-geometry = "cartesian"
-frame = "sim"
-""",
-            )
+    def test_pic_ion_reference(self, tmp_path: Path) -> None:
+        units = (
+            '[units]\nsystem = "PIC"\nreference_species = "ions"\n'
+            "reference_density = 1.0e18"
         )
+        cfg = load_config(_write(tmp_path, _shell(units=units)))
         np.testing.assert_allclose(
             cfg.normalization.mass_ref, constants.m_p, rtol=1e-10
         )
 
-    def test_pic_custom_species_requires_mass_charge(self, tmp_path):
-        with pytest.raises(ExceptionGroup) as exc_info:
-            load_config(
-                _write_toml(
-                    tmp_path,
-                    """
-[model]
-name = "test"
-type = "PIC"
-[grid]
-dimensions = [2, 2, 2]
-spacing = [1.0, 1.0, 1.0]
-[units]
-system = "PIC"
-reference_species = "alpha"
-reference_density = 1.0e18
-[coordinates]
-geometry = "cartesian"
-frame = "sim"
-""",
-                )
-            )
-        assert any("reference_mass" in str(e) for e in exc_info.value.exceptions)
-
-    def test_pic_custom_species_with_explicit(self, tmp_path):
-        cfg = load_config(
-            _write_toml(
-                tmp_path,
-                """
-[model]
-name = "test"
-type = "PIC"
-[grid]
-dimensions = [2, 2, 2]
-spacing = [1.0, 1.0, 1.0]
-[units]
-system = "PIC"
-reference_species = "alpha"
-reference_density = 1.0e18
-reference_mass = 6.644e-27
-reference_charge = 3.204e-19
-[coordinates]
-geometry = "cartesian"
-frame = "sim"
-""",
-            )
+    def test_pic_unknown_species_requires_explicit_mass(
+        self, tmp_path: Path
+    ) -> None:
+        units = (
+            '[units]\nsystem = "PIC"\nreference_species = "alpha"\n'
+            "reference_density = 1.0e18"
         )
+        with pytest.raises(ValidationError, match="reference_species"):
+            load_config(_write(tmp_path, _shell(units=units)))
+
+    def test_pic_unknown_species_with_explicit_mass(
+        self, tmp_path: Path
+    ) -> None:
+        species = (
+            '[[species]]\nname = "alpha"\ncharge = 2.0\nmass = 4.0'
+        )
+        units = (
+            '[units]\nsystem = "PIC"\nreference_species = "alpha"\n'
+            "reference_density = 1.0e18\n"
+            "reference_mass = 6.644e-27\n"
+            "reference_charge = 3.204e-19"
+        )
+        cfg = load_config(_write(tmp_path, _shell(units=units, species=species)))
         np.testing.assert_allclose(cfg.normalization.mass_ref, 6.644e-27, rtol=1e-10)
 
-    def test_mhd(self, tmp_path):
+    def test_mhd(self, tmp_path: Path) -> None:
+        units = (
+            '[units]\nsystem = "MHD"\nreference_length = 6.371e6\n'
+            "reference_density = 1.67e-17\nreference_b_field = 5.0e-9"
+        )
         cfg = load_config(
-            _write_toml(
+            _write(
                 tmp_path,
-                """
-[model]
-name = "test"
-type = "MHD"
-[grid]
-dimensions = [2, 2, 2]
-spacing = [1.0, 1.0, 1.0]
-[units]
-system = "MHD"
-reference_length = 6.371e6
-reference_density = 1.67e-17
-reference_b_field = 5.0e-9
-[coordinates]
-geometry = "cartesian"
-frame = "sim"
-""",
+                _shell(
+                    model='[model]\nname = "t"\ntype = "MHD"',
+                    units=units,
+                ),
             )
         )
         assert cfg.normalization.length_ref == 6.371e6
 
-    def test_si_identity(self, tmp_path):
-        cfg = load_config(
-            _write_toml(
-                tmp_path,
-                """
-[model]
-name = "test"
-type = "PIC"
-[grid]
-dimensions = [2, 2, 2]
-spacing = [1.0, 1.0, 1.0]
-[units]
-system = "SI"
-[coordinates]
-geometry = "cartesian"
-frame = "sim"
-""",
-            )
-        )
-        # ``system = "SI"`` must produce the identity normalization: every
-        # reference = 1.0, not just length.  Catching regressions that
-        # initialise one ref but leave others at zero/unit mismatch requires
-        # checking the aggregate invariant, not a single field.
+    def test_si_identity(self, tmp_path: Path) -> None:
+        cfg = load_config(_write(tmp_path, _shell()))
         assert cfg.normalization.is_identity
 
-    def test_custom(self, tmp_path):
-        cfg = load_config(
-            _write_toml(
-                tmp_path,
-                """
-[model]
-name = "test"
-type = "PIC"
-[grid]
-dimensions = [2, 2, 2]
-spacing = [1.0, 1.0, 1.0]
-[units]
-system = "custom"
-[units.reference]
-length = 5.31e-3
-time = 1.77e-11
-velocity = 2.998e8
-b_field = 1.07e-3
-e_field = 3.21e5
-density = 1.0e18
-mass = 9.109e-31
-charge = 1.602e-19
-[coordinates]
-geometry = "cartesian"
-frame = "sim"
-""",
-            )
+    def test_custom(self, tmp_path: Path) -> None:
+        units = (
+            '[units]\nsystem = "custom"\n'
+            "[units.reference]\nlength = 5.31e-3\ntime = 1.77e-11\n"
+            "velocity = 2.998e8\nb_field = 1.07e-3\ne_field = 3.21e5\n"
+            "density = 1.0e18\nmass = 9.109e-31\ncharge = 1.602e-19"
         )
+        cfg = load_config(_write(tmp_path, _shell(units=units)))
         np.testing.assert_allclose(cfg.normalization.length_ref, 5.31e-3, rtol=1e-10)
 
-    def test_custom_missing_ref(self, tmp_path):
-        with pytest.raises(ExceptionGroup) as exc_info:
-            load_config(
-                _write_toml(
-                    tmp_path,
-                    """
-[model]
-name = "test"
-type = "PIC"
-[grid]
-dimensions = [2, 2, 2]
-spacing = [1.0, 1.0, 1.0]
-[units]
-system = "custom"
-[coordinates]
-geometry = "cartesian"
-frame = "sim"
-""",
-                )
-            )
-        assert any("reference" in str(e) for e in exc_info.value.exceptions)
+    def test_custom_missing_reference_subtable(self, tmp_path: Path) -> None:
+        units = '[units]\nsystem = "custom"'
+        with pytest.raises(ValidationError, match="reference"):
+            load_config(_write(tmp_path, _shell(units=units)))
 
-    def test_unknown_system(self, tmp_path):
-        with pytest.raises(ExceptionGroup) as exc_info:
-            load_config(
-                _write_toml(
-                    tmp_path,
-                    """
-[model]
-name = "test"
-type = "PIC"
-[grid]
-dimensions = [2, 2, 2]
-spacing = [1.0, 1.0, 1.0]
-[units]
-system = "CGS"
-[coordinates]
-geometry = "cartesian"
-frame = "sim"
-""",
-                )
-            )
-        assert any("CGS" in str(e) for e in exc_info.value.exceptions)
+    def test_unknown_system(self, tmp_path: Path) -> None:
+        units = '[units]\nsystem = "CGS"'
+        with pytest.raises(ValidationError, match="CGS"):
+            load_config(_write(tmp_path, _shell(units=units)))
 
-    def test_scaling_metadata(self, tmp_path):
-        cfg = load_config(
-            _write_toml(
-                tmp_path,
-                """
-[model]
-name = "test"
-type = "PIC"
-[grid]
-dimensions = [2, 2, 2]
-spacing = [1.0, 1.0, 1.0]
-[units]
-system = "SI"
-scaling_factor = 10.0
-scaling_description = "reduced c/v_A"
-[coordinates]
-geometry = "cartesian"
-frame = "sim"
-""",
-            )
+    def test_scaling_metadata(self, tmp_path: Path) -> None:
+        units = (
+            '[units]\nsystem = "SI"\nscaling_factor = 10.0\n'
+            'scaling_description = "reduced c/v_A"'
         )
+        cfg = load_config(_write(tmp_path, _shell(units=units)))
         assert cfg.metadata["scaling"]["scaling_factor"] == 10.0
 
 
-class TestParseCoordinates:
+class TestCoordinates:
     @pytest.mark.parametrize(
         ("geom_str", "expected_names"),
         [
@@ -448,145 +250,55 @@ class TestParseCoordinates:
             ("cylindrical", ("r", "φ", "z")),
         ],
     )
-    def test_geometry_lookup(self, tmp_path, geom_str, expected_names):
-        cfg = load_config(
-            _write_toml(
-                tmp_path,
-                f"""
-[model]
-name = "test"
-type = "PIC"
-[grid]
-dimensions = [2, 2, 2]
-spacing = [1.0, 1.0, 1.0]
-[units]
-system = "SI"
-[coordinates]
-geometry = "{geom_str}"
-frame = "sim"
-""",
-            )
-        )
+    def test_geometry_lookup(
+        self,
+        tmp_path: Path,
+        geom_str: str,
+        expected_names: tuple[str, ...],
+    ) -> None:
+        coords = f'[coordinates]\ngeometry = "{geom_str}"\nframe = "sim"'
+        cfg = load_config(_write(tmp_path, _shell(coordinates=coords)))
         assert cfg.grid.geometry.axis_names == expected_names
 
-    def test_custom_labels_and_unknown_geometry(self, tmp_path):
-        # Custom axis labels
-        cfg = load_config(
-            _write_toml(
-                tmp_path,
-                """
-[model]
-name = "test"
-type = "PIC"
-[grid]
-dimensions = [2, 2, 2]
-spacing = [1.0, 1.0, 1.0]
-[units]
-system = "SI"
-[coordinates]
-geometry = "cartesian"
-frame = "sim"
-axis_labels = ["X", "Y", "Z"]
-""",
-            )
+    def test_custom_axis_labels(self, tmp_path: Path) -> None:
+        coords = (
+            '[coordinates]\ngeometry = "cartesian"\nframe = "sim"\n'
+            'axis_labels = ["X", "Y", "Z"]'
         )
+        cfg = load_config(_write(tmp_path, _shell(coordinates=coords)))
         assert cfg.grid.geometry.axis_names == ("X", "Y", "Z")
 
-        # Unknown geometry raises
-        with pytest.raises(ExceptionGroup) as exc_info:
-            load_config(
-                _write_toml(
-                    tmp_path,
-                    """
-[model]
-name = "test"
-type = "PIC"
-[grid]
-dimensions = [2, 2, 2]
-spacing = [1.0, 1.0, 1.0]
-[units]
-system = "SI"
-[coordinates]
-geometry = "toroidal"
-frame = "sim"
-""",
-                )
-            )
-        assert any("toroidal" in str(e) for e in exc_info.value.exceptions)
+    def test_unknown_geometry_raises(self, tmp_path: Path) -> None:
+        coords = '[coordinates]\ngeometry = "toroidal"\nframe = "sim"'
+        with pytest.raises(ValidationError, match="toroidal"):
+            load_config(_write(tmp_path, _shell(coordinates=coords)))
 
-    def test_missing_geometry(self, tmp_path):
-        with pytest.raises(ExceptionGroup) as exc_info:
-            load_config(
-                _write_toml(
-                    tmp_path,
-                    """
-[model]
-name = "test"
-type = "PIC"
-[grid]
-dimensions = [2, 2, 2]
-spacing = [1.0, 1.0, 1.0]
-[units]
-system = "SI"
-[coordinates]
-frame = "sim"
-""",
-                )
-            )
-        assert any("'geometry'" in str(e) for e in exc_info.value.exceptions)
+    def test_missing_geometry_raises(self, tmp_path: Path) -> None:
+        coords = '[coordinates]\nframe = "sim"'
+        with pytest.raises(ValidationError, match="geometry"):
+            load_config(_write(tmp_path, _shell(coordinates=coords)))
 
 
-class TestParseSpecies:
-    def test_single_species(self, tmp_path):
-        cfg = load_config(
-            _write_toml(
-                tmp_path,
-                """
-[model]
-name = "test"
-type = "PIC"
-[grid]
-dimensions = [2, 2, 2]
-spacing = [1.0, 1.0, 1.0]
-[units]
-system = "SI"
-[coordinates]
-geometry = "cartesian"
-frame = "sim"
-[[species]]
-name = "e"
-charge = -1.0
-mass = 0.004
-""",
-            )
-        )
+class TestSpecies:
+    def test_single_species_charge_and_mass(self, tmp_path: Path) -> None:
+        cfg = load_config(_write(tmp_path, _shell()))
         assert len(cfg.species) == 1
         assert cfg.species[0].name == "e"
 
-    def test_charge_to_mass_only(self, tmp_path):
-        cfg = load_config(
-            _write_toml(
-                tmp_path,
-                """
-[model]
-name = "test"
-type = "PIC"
-[grid]
-dimensions = [2, 2, 2]
-spacing = [1.0, 1.0, 1.0]
-[units]
-system = "SI"
-[coordinates]
-geometry = "cartesian"
-frame = "sim"
-[[species]]
-name = "e"
-charge_to_mass = -256.0
-""",
-            )
-        )
+    def test_charge_to_mass_only(self, tmp_path: Path) -> None:
+        species = '[[species]]\nname = "e"\ncharge_to_mass = -256.0'
+        cfg = load_config(_write(tmp_path, _shell(species=species)))
         assert cfg.species[0].charge == -1.0
+        assert cfg.species[0].mass is not None
         np.testing.assert_allclose(cfg.species[0].mass, 1.0 / 256, rtol=1e-10)
+
+    def test_both_forms_rejected(self, tmp_path: Path) -> None:
+        species = (
+            '[[species]]\nname = "e"\ncharge = -1.0\nmass = 0.004\n'
+            "charge_to_mass = -256.0"
+        )
+        with pytest.raises(ValidationError, match="choose one"):
+            load_config(_write(tmp_path, _shell(species=species)))
 
     @pytest.mark.parametrize(
         ("field_name", "toml_value", "attr", "expected"),
@@ -612,117 +324,96 @@ charge_to_mass = -256.0
         ],
     )
     def test_optional_vector_field(
-        self, tmp_path, field_name, toml_value, attr, expected
-    ):
-        cfg = load_config(
-            _write_toml(
-                tmp_path,
-                f"""
-[model]
-name = "test"
-type = "PIC"
-[grid]
-dimensions = [2, 2, 2]
-spacing = [1.0, 1.0, 1.0]
-[units]
-system = "SI"
-[coordinates]
-geometry = "cartesian"
-frame = "sim"
-[[species]]
-name = "e"
-charge = -1.0
-mass = 0.004
-{field_name} = {toml_value}
-""",
-            )
+        self,
+        tmp_path: Path,
+        field_name: str,
+        toml_value: str,
+        attr: str,
+        expected: tuple[float, ...],
+    ) -> None:
+        species = (
+            f'[[species]]\nname = "e"\ncharge = -1.0\nmass = 0.004\n'
+            f"{field_name} = {toml_value}"
         )
+        cfg = load_config(_write(tmp_path, _shell(species=species)))
         assert getattr(cfg.species[0], attr) == expected
 
-
-class TestExceptionGroup:
-    def test_multiple_errors(self, tmp_path):
-        with pytest.raises(ExceptionGroup) as exc_info:
-            load_config(
-                _write_toml(
-                    tmp_path,
-                    """
-[model]
-name = "test"
-[coordinates]
-frame = "sim"
-[units]
-system = "CGS"
-""",
-                )
-            )
-        assert len(exc_info.value.exceptions) >= 3
+    def test_zero_species_rejected(self, tmp_path: Path) -> None:
+        toml = _shell(species="")
+        with pytest.raises(ValidationError, match="species"):
+            load_config(_write(tmp_path, toml))
 
 
-_SCALING_TOML = """\
-[model]
-name = "test"
-type = "PIC"
+class TestValidationAggregation:
+    def test_multiple_errors_in_one_exception(self, tmp_path: Path) -> None:
+        # Deliberately break model, units, and coordinates. Pydantic
+        # reports all errors in a single ValidationError (not ExceptionGroup).
+        toml = _shell(
+            model='[model]\nname = "t"\ntype = "not_a_type"',
+            units='[units]\nsystem = "CGS"',
+            coordinates='[coordinates]\ngeometry = "toroidal"\nframe = "sim"',
+        )
+        with pytest.raises(ValidationError) as exc_info:
+            load_config(_write(tmp_path, toml))
+        # Pydantic gathers all violations per model_validate call
+        assert exc_info.value.error_count() >= 3
 
-[grid]
-dimensions = [460, 130, 320]
-spacing = [0.4, 0.4, 0.4]
 
-[coordinates]
-geometry = "cartesian"
-frame = "simulation"
-physical_extent = [46.0, 32.0, 13.0]
-physical_extent_unit = "R_E"
-
-[coordinates.transforms.GSM]
-origin = [52.0, 26.0, 64.0]
-rotation = [[-1, 0, 0], [0, 0, 1], [0, 1, 0]]
-axis_labels = ["x_GSM", "y_GSM", "z_GSM"]
-
-[units]
-system = "PIC"
-reference_species = "ions"
-reference_density = 0.25e6
-"""
+_SCALING_TOML = _shell(
+    model='[model]\nname = "test"\ntype = "PIC"',
+    grid=(
+        "[grid]\ndimensions = [460, 130, 320]\nspacing = [0.4, 0.4, 0.4]\n"
+        "lower = [0.0, 0.0, 0.0]\nupper = [184.0, 52.0, 128.0]"
+    ),
+    coordinates=(
+        '[coordinates]\ngeometry = "cartesian"\nframe = "simulation"\n'
+        'physical_extent = [46.0, 32.0, 13.0]\nphysical_extent_unit = "R_E"\n'
+        "[coordinates.transforms.GSM]\n"
+        "origin = [52.0, 26.0, 64.0]\n"
+        "rotation = [[-1, 0, 0], [0, 0, 1], [0, 1, 0]]\n"
+        'axis_labels = ["x_GSM", "y_GSM", "z_GSM"]'
+    ),
+    units=(
+        '[units]\nsystem = "PIC"\nreference_species = "ions"\n'
+        "reference_density = 0.25e6"
+    ),
+    species='[[species]]\nname = "ions"\ncharge = 1.0\nmass = 1.0',
+)
 
 
 class TestPhysicalExtent:
     def test_auto_scale_from_toml(self, tmp_path: Path) -> None:
-        cfg = load_config(_write_toml(tmp_path, _SCALING_TOML))
+        cfg = load_config(_write(tmp_path, _SCALING_TOML))
         np.testing.assert_allclose(cfg.transforms["GSM"].scale, 0.25, rtol=1e-6)
 
     def test_shrink_factor_computed(self, tmp_path: Path) -> None:
-        cfg = load_config(_write_toml(tmp_path, _SCALING_TOML))
+        cfg = load_config(_write(tmp_path, _SCALING_TOML))
         shrink = cfg.metadata["scaling"]["shrink_factor"]
         np.testing.assert_allclose(shrink, 3.5, rtol=0.01)
 
     def test_physical_extent_in_metadata(self, tmp_path: Path) -> None:
-        cfg = load_config(_write_toml(tmp_path, _SCALING_TOML))
+        cfg = load_config(_write(tmp_path, _SCALING_TOML))
         assert cfg.metadata["physical_extent"] == (46.0, 32.0, 13.0)
         assert cfg.metadata["physical_extent_unit"] == "R_E"
 
     def test_explicit_scale_validated(self, tmp_path: Path) -> None:
-        """Explicit scale that matches physical_extent passes without error."""
         toml = _SCALING_TOML.replace(
             "axis_labels = [",
             "scale = 0.25\naxis_labels = [",
         )
-        cfg = load_config(_write_toml(tmp_path, toml))
+        cfg = load_config(_write(tmp_path, toml))
         np.testing.assert_allclose(cfg.transforms["GSM"].scale, 0.25)
 
     def test_explicit_scale_mismatch_warns(
         self, tmp_path: Path, caplog: pytest.LogCaptureFixture
     ) -> None:
-        """Explicit scale that disagrees with physical_extent logs a warning."""
         toml = _SCALING_TOML.replace(
             "axis_labels = [",
             "scale = 0.30\naxis_labels = [",
         )
-        import logging
-
         with caplog.at_level(logging.WARNING, logger="pypic.readers.config"):
-            cfg = load_config(_write_toml(tmp_path, toml))
-        assert cfg.transforms["GSM"].scale == 0.30  # explicit wins
+            cfg = load_config(_write(tmp_path, toml))
+        assert cfg.transforms["GSM"].scale == 0.30
         assert "Scale mismatch" in caplog.text
 
     def test_unknown_unit_raises(self, tmp_path: Path) -> None:
@@ -753,7 +444,9 @@ class TestPhysicalExtent:
         cfg = SimulationConfig(
             model_name="t",
             model_type="PIC",
-            grid=GridInfo((100, 100, 100), (1.0, 1.0, 1.0), (0.0, 0.0, 0.0), CARTESIAN),
+            grid=GridInfo(
+                (100, 100, 100), (1.0, 1.0, 1.0), (0.0, 0.0, 0.0), CARTESIAN
+            ),
             normalization=Normalization.identity(),
             species=(),
             physics=PhysicsParams(),
@@ -773,7 +466,7 @@ class TestMergeSimulationToml:
     """Unit tests for the shared ``readers._config_helpers.merge_simulation_toml``."""
 
     @pytest.fixture
-    def base_config(self):  # type: ignore[no-untyped-def]
+    def base_config(self) -> Any:
         from pypic.containers import SimulationConfig
         from pypic.coordinates.geometry import CARTESIAN
         from pypic.grid import GridInfo
@@ -793,14 +486,14 @@ class TestMergeSimulationToml:
             metadata={"reader_only": "kept"},
         )
 
-    def test_no_sim_dir_returns_base_unchanged(self, base_config) -> None:
+    def test_no_sim_dir_returns_base_unchanged(self, base_config: Any) -> None:
         from pypic.readers._config_helpers import merge_simulation_toml
 
         result = merge_simulation_toml(None, base_config)
         assert result is base_config
 
     def test_missing_toml_returns_base_unchanged(
-        self, tmp_path: Path, base_config
+        self, tmp_path: Path, base_config: Any
     ) -> None:
         from pypic.readers._config_helpers import merge_simulation_toml
 
@@ -808,52 +501,45 @@ class TestMergeSimulationToml:
         assert result is base_config
 
     def test_toml_overrides_normalization_frame_metadata(
-        self, tmp_path: Path, base_config
+        self, tmp_path: Path, base_config: Any
     ) -> None:
         from pypic.readers._config_helpers import merge_simulation_toml
 
-        _write_toml(
+        _write(
             tmp_path,
-            """
-[model]
-name = "test"
-type = "MHD"
-
-[grid]
-dimensions = [10, 10, 10]
-spacing = [0.5, 0.5, 0.5]
-
-[units]
-system = "MHD"
-reference_length = 6.371e6
-reference_density = 1.67e-17
-reference_b_field = 5.0e-9
-
-[coordinates]
-geometry = "cartesian"
-frame = "simulation"
-
-[output]
-fields = ["B1"]
-""",
+            _shell(
+                model='[model]\nname = "test"\ntype = "MHD"',
+                grid=(
+                    "[grid]\ndimensions = [10, 10, 10]\n"
+                    "spacing = [0.5, 0.5, 0.5]\n"
+                    "lower = [0.0, 0.0, 0.0]\nupper = [5.0, 5.0, 5.0]"
+                ),
+                units=(
+                    '[units]\nsystem = "MHD"\nreference_length = 6.371e6\n'
+                    "reference_density = 1.67e-17\nreference_b_field = 5.0e-9"
+                ),
+                coordinates=(
+                    '[coordinates]\ngeometry = "cartesian"\n'
+                    'frame = "simulation"'
+                ),
+                species='[[species]]\nname = "p"\ncharge = 1.0\nmass = 1.0',
+                extra=(
+                    "[output.fields]\nstep_interval = 10\n"
+                    'quantities = ["B"]\ndir = "./fields"'
+                ),
+            ),
         )
         result = merge_simulation_toml(tmp_path, base_config)
-        # Frame override
         assert result.frame == "simulation"
-        # Reader-side metadata preserved
         assert result.metadata["reader_only"] == "kept"
-        # Toml metadata merged in (output goes into metadata)
         assert "output" in result.metadata
-        # Reader-side fields preserved
         assert result.model_name == "ReaderX"
         assert result.grid.dimensions == (4, 3, 2)
-        # Normalization actually replaced (not identity any more)
         assert result.normalization.length_ref == 6.371e6
 
     def test_toml_metadata_wins_on_key_conflict(
-        self, tmp_path: Path, base_config
+        self, tmp_path: Path, base_config: Any
     ) -> None:
-        # Re-create base with a metadata key that the toml will also set
         from pypic.containers import SimulationConfig
         from pypic.coordinates.geometry import CARTESIAN
         from pypic.grid import GridInfo
@@ -864,32 +550,32 @@ fields = ["B1"]
             model_name="X",
             model_type="MHD",
             grid=GridInfo(
-                dimensions=(4,), spacing=(1.0,), origin=(0.0,), geometry=CARTESIAN
+                dimensions=(4,),
+                spacing=(1.0,),
+                origin=(0.0,),
+                geometry=CARTESIAN,
             ),
             normalization=Normalization.identity(),
             metadata={"description": "from-reader", "reader_only": "kept"},
         )
-        _write_toml(
+        _write(
             tmp_path,
-            """
-[model]
-name = "test"
-type = "MHD"
-description = "from-toml"
-
-[grid]
-dimensions = [10, 10, 10]
-spacing = [0.5, 0.5, 0.5]
-
-[units]
-system = "SI"
-
-[coordinates]
-geometry = "cartesian"
-frame = "simulation"
-""",
+            _shell(
+                model=(
+                    '[model]\nname = "test"\ntype = "MHD"\n'
+                    'description = "from-toml"'
+                ),
+                grid=(
+                    "[grid]\ndimensions = [10, 10, 10]\n"
+                    "spacing = [0.5, 0.5, 0.5]\n"
+                    "lower = [0.0, 0.0, 0.0]\nupper = [5.0, 5.0, 5.0]"
+                ),
+                coordinates=(
+                    '[coordinates]\ngeometry = "cartesian"\nframe = "simulation"'
+                ),
+                species='[[species]]\nname = "p"\ncharge = 1.0\nmass = 1.0',
+            ),
         )
         result = merge_simulation_toml(tmp_path, base)
-        # Toml's description wins on conflict; reader_only is preserved
         assert result.metadata["description"] == "from-toml"
         assert result.metadata["reader_only"] == "kept"
