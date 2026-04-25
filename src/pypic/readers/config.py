@@ -49,14 +49,20 @@ log = logging.getLogger(__name__)
 _DEFAULT_SPECIES_PARAMS: dict[str, tuple[float, float]] = {
     "electrons": (constants.m_e, constants.e),
     "ions": (constants.m_p, constants.e),
+    "protons": (constants.m_p, constants.e),
 }
 
 LENGTH_UNITS: dict[str, float] = {
     "m": 1.0,
     "km": 1e3,
     "R_E": 6.371e6,
-    "R_S": 6.957e8,
+    "R_S": 6.957e8,  # solar radius (heliophysics convention)
+    "R_sun": 6.957e8,  # unambiguous synonym for R_S
+    "R_M": 2.4397e6,  # Mercury radius
+    "R_J": 6.9911e7,  # Jupiter radius
     "AU": constants.astronomical_unit,
+    # "d_i" (ion skin depth) is normalization-dependent, not a constant —
+    # resolved against ``Normalization.length_ref`` at apply time.
 }
 
 
@@ -97,12 +103,20 @@ def apply_physical_extent(
     ValueError
         If the unit is unknown or the implied scale is not uniform.
     """
-    unit_factor = LENGTH_UNITS.get(physical_extent_unit)
-    if unit_factor is None:
-        valid = ", ".join(sorted(LENGTH_UNITS))
-        raise ValueError(
-            f"Unknown physical_extent_unit {physical_extent_unit!r}. Valid: {valid}"
-        )
+    if physical_extent_unit == "d_i":
+        # d_i is the natural PIC length unit and equals the simulation's
+        # length_ref by construction. Identity normalization makes this a
+        # no-op (length_ref = 1), which is fine for grids already in d_i.
+        unit_factor = config.normalization.length_ref
+    else:
+        unit_factor_lookup = LENGTH_UNITS.get(physical_extent_unit)
+        if unit_factor_lookup is None:
+            valid = ", ".join(sorted(LENGTH_UNITS))
+            raise ValueError(
+                f"Unknown physical_extent_unit {physical_extent_unit!r}. "
+                f"Valid: {valid}, d_i"
+            )
+        unit_factor = unit_factor_lookup
 
     grid = config.grid
     grid_extent = tuple(
@@ -220,6 +234,11 @@ def _from_schema(schema: SimulationSchema) -> SimulationConfig:
         physics=physics,
         frame=schema.coordinates.frame,
         transforms=transforms,
+        initial_conditions=schema.initial_conditions,
+        output=schema.output,
+        bodies=tuple(schema.bodies),
+        drivers=tuple(schema.drivers),
+        restart=schema.restart,
         metadata=metadata,
     )
 
@@ -234,11 +253,12 @@ def _from_schema(schema: SimulationSchema) -> SimulationConfig:
 def _build_geometry(coords: Coordinates) -> CoordinateGeometry:
     geometry = GEOMETRY_BY_NAME[coords.geometry]
     if coords.axis_labels is not None:
-        labels = tuple(coords.axis_labels)
-        if len(labels) != 3:
-            raise ValueError(
-                f"[coordinates].axis_labels must have 3 elements, got {len(labels)}"
-            )
+        # Length-3 invariant is enforced by the Pydantic Coordinates model.
+        labels: tuple[str, str, str] = (
+            coords.axis_labels[0],
+            coords.axis_labels[1],
+            coords.axis_labels[2],
+        )
         geometry = copy.replace(geometry, axis_names=labels)
     return geometry
 
@@ -334,11 +354,7 @@ def _build_species(sp: Species) -> SpeciesInfo:
     if sp.density is not None:
         kwargs["density"] = float(sp.density)
     if sp.thermal_velocity is not None:
-        tv = sp.thermal_velocity
-        if isinstance(tv, list):
-            kwargs["thermal_velocity"] = tuple(float(v) for v in tv)
-        else:
-            kwargs["thermal_velocity"] = float(tv)
+        kwargs["thermal_velocity"] = tuple(float(v) for v in sp.thermal_velocity)
     if sp.drift_velocity is not None:
         kwargs["drift_velocity"] = tuple(float(v) for v in sp.drift_velocity)
     if sp.particles_per_cell is not None:
@@ -351,12 +367,17 @@ def _build_species(sp: Species) -> SpeciesInfo:
 
 
 def _build_physics(physics: Physics | None) -> PhysicsParams:
+    # PhysicsParams.c is the speed of light in *normalized* units. For the
+    # PIC normalization (velocity_ref = c_SI) it is 1.0 by construction;
+    # `[units].speed_of_light` is an SI value already consumed by
+    # `_pic_norm` to set velocity_ref, not a code-unit override. MHD/hybrid
+    # would want c_SI / v_A here, but the v1.0 schema does not yet expose
+    # that knob — left at the default until a future schema field lands.
     if physics is None:
         return PhysicsParams()
 
     extra: dict[str, Any] = {}
     gamma = 5.0 / 3.0
-    c = 1.0
     relativistic = bool(physics.relativistic)
 
     for branch_name in ("pic", "mhd", "hybrid"):
@@ -366,14 +387,12 @@ def _build_physics(physics: Physics | None) -> PhysicsParams:
         branch_dict = branch.model_dump(exclude_none=True)
         if "gamma" in branch_dict:
             gamma = float(branch_dict["gamma"])
-        if "speed_of_light" in branch_dict:
-            c = float(branch_dict["speed_of_light"])
         extra[branch_name] = branch_dict
 
     for key, value in (physics.__pydantic_extra__ or {}).items():
         extra[key] = value
 
-    return PhysicsParams(gamma=gamma, c=c, relativistic=relativistic, extra=extra)
+    return PhysicsParams(gamma=gamma, relativistic=relativistic, extra=extra)
 
 
 def _build_transforms(
@@ -403,17 +422,18 @@ def _build_transforms(
 
 
 def _build_metadata(schema: SimulationSchema) -> dict[str, Any]:
+    """Build the free-form ``metadata`` dict for ``SimulationConfig``.
+
+    ``initial_conditions`` and ``output`` are *not* duplicated here —
+    they live as typed attributes on ``SimulationConfig`` directly.
+    Callers that previously read ``cfg.metadata["output"]`` should now
+    use ``cfg.output`` (a validated ``Output`` model) instead.
+    """
     metadata: dict[str, Any] = {}
     if schema.model.version is not None:
         metadata["version"] = schema.model.version
     if schema.model.description is not None:
         metadata["description"] = schema.model.description
-    if schema.initial_conditions is not None:
-        metadata["initial_conditions"] = schema.initial_conditions.model_dump(
-            exclude_none=True
-        )
-    if schema.output is not None:
-        metadata["output"] = schema.output.model_dump(exclude_none=True)
     if schema.grid.stagger is not None:
         metadata["stagger"] = StaggerInfo(convention=str(schema.grid.stagger))
     scaling: dict[str, Any] = {}

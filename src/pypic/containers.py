@@ -14,7 +14,8 @@ from pypic.units import PhysicsParams
 
 if TYPE_CHECKING:
     from pypic.coordinates.transforms import FrameTransform
-    from pypic.types import FloatArray
+    from pypic.schema import Body, Driver, InitialConditions, Output, Restart
+    from pypic.types import FloatArray, ModelType
     from pypic.units import Normalization, SpeciesInfo
 
 
@@ -82,8 +83,9 @@ class SimulationConfig:
     ----------
     model_name : str
         Human-readable name for the simulation run.
-    model_type : str
-        Simulation type identifier (e.g. ``"pic"``, ``"mhd"``).
+    model_type : Literal["PIC", "MHD", "hybrid"]
+        Simulation type identifier — uppercase, matches ``[model].type``
+        in :doc:`/docs/schema` and the Pydantic ``Model.type`` Literal.
     grid : GridInfo
         Grid metadata (includes coordinate geometry).
     normalization : Normalization
@@ -94,14 +96,23 @@ class SimulationConfig:
         Physics parameters (frozen dataclass).
     frame : str
         Reference frame label (e.g. ``"GSM"``, ``"simulation"``).
+    initial_conditions : InitialConditions | None
+        Validated ``[initial_conditions]`` object from the v1.0 schema,
+        or ``None`` when the section is absent.
+    output : Output | None
+        Validated ``[output]`` umbrella object from the v1.0 schema, or
+        ``None`` when the section is absent.
     metadata : dict[str, Any]
-        Additional configuration data (immutable after construction).
+        Free-form annotations from readers (stagger, scaling, version,
+        description, ...). Schema-typed `[initial_conditions]` and
+        `[output]` payloads now live on dedicated attributes above
+        rather than as opaque dict entries here.
 
     Examples
     --------
     >>> from pypic.units import Normalization, SpeciesInfo
     >>> cfg = SimulationConfig(
-    ...     model_name="test", model_type="pic",
+    ...     model_name="test", model_type="PIC",
     ...     grid=GridInfo(
     ...         dimensions=(4,), spacing=(1.0,), origin=(0.0,),
     ...         geometry=CARTESIAN,
@@ -114,13 +125,18 @@ class SimulationConfig:
     """
 
     model_name: str
-    model_type: str
+    model_type: ModelType
     grid: GridInfo
     normalization: Normalization
     species: tuple[SpeciesInfo, ...] = ()
     physics: PhysicsParams = field(default_factory=lambda: PhysicsParams())
     frame: str = "simulation"
     transforms: dict[str, FrameTransform] = field(default_factory=dict)
+    initial_conditions: InitialConditions | None = None
+    output: Output | None = None
+    bodies: tuple[Body, ...] = ()
+    drivers: tuple[Driver, ...] = ()
+    restart: Restart | None = None
     metadata: dict[str, Any] = field(default_factory=dict)  # frozen via __post_init__
 
     def __post_init__(self) -> None:

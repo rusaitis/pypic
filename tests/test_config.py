@@ -23,8 +23,7 @@ def _shell(
     *,
     model: str = '[model]\nname = "test"\ntype = "PIC"',
     time: str = (
-        '[time]\nscheme = "fixed"\ndt = 0.1\n'
-        "t_start = 0.0\nt_end = 1.0\nn_steps = 10"
+        '[time]\nscheme = "fixed"\ndt = 0.1\nt_start = 0.0\nt_end = 1.0\nn_steps = 10'
     ),
     grid: str = (
         "[grid]\ndimensions = [2, 2, 2]\nspacing = [1.0, 1.0, 1.0]\n"
@@ -36,20 +35,23 @@ def _shell(
     extra: str = "",
 ) -> str:
     """Assemble a valid v1.0 TOML doc, with per-section overrides."""
-    return "\n\n".join(
-        [
-            'schema_version = "1.0"',
-            '[schema]\nversion = "1.0"',
-            model,
-            '[run]\nname = "r0"',
-            time,
-            grid,
-            units,
-            coordinates,
-            species,
-            extra,
-        ]
-    ).strip() + "\n"
+    return (
+        "\n\n".join(
+            [
+                'schema_version = "1.0"',
+                '[schema]\nversion = "1.0"',
+                model,
+                '[run]\nname = "r0"',
+                time,
+                grid,
+                units,
+                coordinates,
+                species,
+                extra,
+            ]
+        ).strip()
+        + "\n"
+    )
 
 
 def _write(tmp_path: Path, content: str) -> Path:
@@ -114,7 +116,7 @@ class TestGrid:
             "lower = [1.0, 2.0, 3.0]\nupper = [2.0, 6.0, 12.0]"
         )
         bcs = (
-            '[boundary_conditions]\n'
+            "[boundary_conditions]\n"
             'lower = ["periodic", "open", "reflecting"]\n'
             'upper = ["periodic", "open", "reflecting"]'
         )
@@ -129,9 +131,7 @@ class TestGrid:
         assert cfg.grid.origin == (0.0, 0.0, 0.0)
 
     @pytest.mark.parametrize("missing_key", ["dimensions", "spacing"])
-    def test_missing_required_grid_key(
-        self, tmp_path: Path, missing_key: str
-    ) -> None:
+    def test_missing_required_grid_key(self, tmp_path: Path, missing_key: str) -> None:
         if missing_key == "dimensions":
             grid = (
                 "[grid]\nspacing = [1.0, 1.0, 1.0]\n"
@@ -167,9 +167,7 @@ class TestUnits:
             cfg.normalization.mass_ref, constants.m_p, rtol=1e-10
         )
 
-    def test_pic_unknown_species_requires_explicit_mass(
-        self, tmp_path: Path
-    ) -> None:
+    def test_pic_unknown_species_requires_explicit_mass(self, tmp_path: Path) -> None:
         units = (
             '[units]\nsystem = "PIC"\nreference_species = "alpha"\n'
             "reference_density = 1.0e18"
@@ -177,12 +175,8 @@ class TestUnits:
         with pytest.raises(ValidationError, match="reference_species"):
             load_config(_write(tmp_path, _shell(units=units)))
 
-    def test_pic_unknown_species_with_explicit_mass(
-        self, tmp_path: Path
-    ) -> None:
-        species = (
-            '[[species]]\nname = "alpha"\ncharge = 2.0\nmass = 4.0'
-        )
+    def test_pic_unknown_species_with_explicit_mass(self, tmp_path: Path) -> None:
+        species = '[[species]]\nname = "alpha"\ncharge = 2.0\nmass = 4.0'
         units = (
             '[units]\nsystem = "PIC"\nreference_species = "alpha"\n'
             "reference_density = 1.0e18\n"
@@ -444,9 +438,7 @@ class TestPhysicalExtent:
         cfg = SimulationConfig(
             model_name="t",
             model_type="PIC",
-            grid=GridInfo(
-                (100, 100, 100), (1.0, 1.0, 1.0), (0.0, 0.0, 0.0), CARTESIAN
-            ),
+            grid=GridInfo((100, 100, 100), (1.0, 1.0, 1.0), (0.0, 0.0, 0.0), CARTESIAN),
             normalization=Normalization.identity(),
             species=(),
             physics=PhysicsParams(),
@@ -519,8 +511,7 @@ class TestMergeSimulationToml:
                     "reference_density = 1.67e-17\nreference_b_field = 5.0e-9"
                 ),
                 coordinates=(
-                    '[coordinates]\ngeometry = "cartesian"\n'
-                    'frame = "simulation"'
+                    '[coordinates]\ngeometry = "cartesian"\nframe = "simulation"'
                 ),
                 species='[[species]]\nname = "p"\ncharge = 1.0\nmass = 1.0',
                 extra=(
@@ -532,7 +523,9 @@ class TestMergeSimulationToml:
         result = merge_simulation_toml(tmp_path, base_config)
         assert result.frame == "simulation"
         assert result.metadata["reader_only"] == "kept"
-        assert "output" in result.metadata
+        assert result.output is not None
+        assert result.output.fields is not None
+        assert result.output.fields.step_interval == 10
         assert result.model_name == "ReaderX"
         assert result.grid.dimensions == (4, 3, 2)
         assert result.normalization.length_ref == 6.371e6
@@ -562,8 +555,7 @@ class TestMergeSimulationToml:
             tmp_path,
             _shell(
                 model=(
-                    '[model]\nname = "test"\ntype = "MHD"\n'
-                    'description = "from-toml"'
+                    '[model]\nname = "test"\ntype = "MHD"\ndescription = "from-toml"'
                 ),
                 grid=(
                     "[grid]\ndimensions = [10, 10, 10]\n"
@@ -579,3 +571,247 @@ class TestMergeSimulationToml:
         result = merge_simulation_toml(tmp_path, base)
         assert result.metadata["description"] == "from-toml"
         assert result.metadata["reader_only"] == "kept"
+
+
+class TestInitialConditionsAndOutput:
+    """Schema-validated `[initial_conditions]` and `[output]` reach the
+    typed attributes on SimulationConfig (E2 — no longer dict-dumped into
+    metadata).
+    """
+
+    def test_initial_conditions_typed(self, tmp_path: Path) -> None:
+        ic = (
+            "[initial_conditions]\n"
+            'type = "double_harris"\n'
+            "B0 = [0.05, 0.0, 0.0]\n"
+            "current_sheet_thickness = 0.5"
+        )
+        cfg = load_config(_write(tmp_path, _shell(extra=ic)))
+        assert cfg.initial_conditions is not None
+        assert cfg.initial_conditions.type == "double_harris"
+        # Extra (setup-specific) keys reach the model via _ExtensibleBase
+        assert cfg.initial_conditions.model_dump()["B0"] == [0.05, 0.0, 0.0]
+
+    def test_initial_conditions_absent(self, tmp_path: Path) -> None:
+        cfg = load_config(_write(tmp_path, _shell()))
+        assert cfg.initial_conditions is None
+
+    def test_output_typed(self, tmp_path: Path) -> None:
+        out = (
+            "[output.fields]\n"
+            "step_interval = 50\n"
+            'quantities = ["B", "E"]\n'
+            'dir = "./fields"\n'
+            "[output.checkpoints]\n"
+            "step_interval = 5000\n"
+            'dir = "./chk"\n'
+        )
+        cfg = load_config(_write(tmp_path, _shell(extra=out)))
+        assert cfg.output is not None
+        assert cfg.output.fields is not None
+        assert cfg.output.fields.step_interval == 50
+        assert cfg.output.fields.quantities == ["B", "E"]
+        assert cfg.output.checkpoints is not None
+        assert cfg.output.checkpoints.step_interval == 5000
+
+
+class TestBodiesDriversRestart:
+    """Validated `[[bodies]]`, `[[drivers]]`, `[restart]` survive translation."""
+
+    def test_bodies_typed(self, tmp_path: Path) -> None:
+        body = (
+            "[[bodies]]\n"
+            'name = "mercury"\n'
+            "center = [0.0, 0.0, 0.0]\n"
+            "radius = 60.0\n"
+            "intrinsic_dipole = [0.0, 0.0, -190.0]\n"
+            "rotation_axis = [0.0, 0.0, 1.0]\n"
+        )
+        cfg = load_config(_write(tmp_path, _shell(extra=body)))
+        assert len(cfg.bodies) == 1
+        assert cfg.bodies[0].name == "mercury"
+        assert cfg.bodies[0].radius == 60.0
+
+    def test_drivers_typed(self, tmp_path: Path) -> None:
+        drv = (
+            "[[drivers]]\n"
+            'name = "magnetogram"\n'
+            'type = "magnetogram_timeseries"\n'
+            'coupling = "boundary"\n'
+            "cadence = 720.0\n"
+            "target_lower = [1.0, 0.87, -0.87]\n"
+            "target_upper = [1.0, 2.60, 0.87]\n"  # thin photospheric sheet
+        )
+        cfg = load_config(_write(tmp_path, _shell(extra=drv)))
+        assert len(cfg.drivers) == 1
+        assert cfg.drivers[0].name == "magnetogram"
+        assert cfg.drivers[0].direction == "one_way"  # default
+
+    def test_driver_inverted_box_rejected(self, tmp_path: Path) -> None:
+        drv = (
+            "[[drivers]]\n"
+            'name = "bad"\n'
+            'type = "x"\n'
+            'coupling = "boundary"\n'
+            "target_lower = [0.0, 0.0, 0.0]\n"
+            "target_upper = [-1.0, 1.0, 1.0]\n"
+        )
+        with pytest.raises(ValidationError, match=">="):
+            load_config(_write(tmp_path, _shell(extra=drv)))
+
+    def test_restart_typed(self, tmp_path: Path) -> None:
+        rs = '[restart]\nfrom = "./chk/chk_000030.h5"\nstep = 30000\ntime = 1500.0\n'
+        cfg = load_config(_write(tmp_path, _shell(extra=rs)))
+        assert cfg.restart is not None
+        assert cfg.restart.from_ == "./chk/chk_000030.h5"
+        assert cfg.restart.step == 30000
+
+
+class TestPhysicsBranches:
+    """Translator handles MHD and hybrid physics branches symmetrically."""
+
+    def test_mhd_branch_into_extra(self, tmp_path: Path) -> None:
+        units = (
+            '[units]\nsystem = "MHD"\nreference_length = 6.371e6\n'
+            "reference_density = 1.67e-17\nreference_b_field = 5.0e-9"
+        )
+        physics = (
+            "[physics]\nrelativistic = false\n"
+            "[physics.mhd]\ngamma = 1.4\nresistivity = 1.0e-5\nhall_term = true\n"
+            '[physics.mhd.solver]\nscheme = "godunov"\nlimiter = "minmod"'
+        )
+        cfg = load_config(
+            _write(
+                tmp_path,
+                _shell(
+                    model='[model]\nname = "t"\ntype = "MHD"',
+                    units=units,
+                    extra=physics,
+                ),
+            )
+        )
+        assert cfg.physics.gamma == 1.4
+        assert "mhd" in cfg.physics.extra
+        assert cfg.physics.extra["mhd"]["resistivity"] == 1.0e-5
+        assert cfg.physics.extra["mhd"]["solver"]["scheme"] == "godunov"
+
+    def test_hybrid_branch_into_extra(self, tmp_path: Path) -> None:
+        physics = (
+            "[physics]\n[physics.hybrid]\n"
+            '[physics.hybrid.solver]\nscheme = "predictor-corrector"\n'
+            "resistivity = 5.0e-4\ncurrent_smoothing = 2"
+        )
+        cfg = load_config(
+            _write(
+                tmp_path,
+                _shell(
+                    model='[model]\nname = "t"\ntype = "hybrid"',
+                    extra=physics,
+                ),
+            )
+        )
+        assert "hybrid" in cfg.physics.extra
+        assert cfg.physics.extra["hybrid"]["solver"]["scheme"] == "predictor-corrector"
+
+    def test_physics_branch_must_match_model_type(self, tmp_path: Path) -> None:
+        physics = (
+            "[physics]\n[physics.pic]\nomega_p_over_omega_c = 10.0\n"
+            '[physics.pic.solver]\nscheme = "explicit"'
+        )
+        with pytest.raises(ValidationError, match=r"model\.type"):
+            load_config(
+                _write(
+                    tmp_path,
+                    _shell(
+                        model='[model]\nname = "t"\ntype = "MHD"',
+                        units=(
+                            '[units]\nsystem = "MHD"\nreference_length = 1e6\n'
+                            "reference_density = 1.0e-15\nreference_b_field = 1e-9"
+                        ),
+                        extra=physics,
+                    ),
+                )
+            )
+
+
+class TestGridAMR:
+    """`[grid.amr]` and `[[grid.refinement]]` reach the validated schema
+    object; pypic does not yet expose them on SimulationConfig but they
+    must validate cleanly."""
+
+    def test_amr_validates(self, tmp_path: Path) -> None:
+        grid = (
+            "[grid]\ndimensions = [16, 16, 16]\nspacing = [1.0, 1.0, 1.0]\n"
+            "lower = [0.0, 0.0, 0.0]\nupper = [16.0, 16.0, 16.0]\n"
+            "[grid.amr]\nmax_level = 4\nrefinement_ratio = 2\n"
+            "block_size = [8, 8, 8]\nrefinement_threshold = 0.1\n"
+            "[[grid.refinement]]\n"
+            "level = 2\nbox = [[-60.0, -60.0, -60.0], [60.0, 60.0, 60.0]]"
+        )
+        cfg = load_config(_write(tmp_path, _shell(grid=grid)))
+        assert cfg.grid.dimensions == (16, 16, 16)
+
+
+class TestCoordinateTransforms:
+    """Translation of `[coordinates.transforms.*]` covers chaining and
+    parameter-driven (time-dependent) transforms."""
+
+    def test_chain_via_from_frame(self, tmp_path: Path) -> None:
+        coords = (
+            '[coordinates]\ngeometry = "cartesian"\nframe = "simulation"\n'
+            "[coordinates.transforms.GSE]\norigin = [0.0, 0.0, 0.0]\n"
+            '[coordinates.transforms.GSM]\nfrom_frame = "GSE"\n'
+            "origin = [0.0, 0.0, 0.0]"
+        )
+        cfg = load_config(_write(tmp_path, _shell(coordinates=coords)))
+        assert "GSE" in cfg.transforms
+        assert "GSM" in cfg.transforms
+        # GSM transform's source_frame is the chained "GSE", not the native frame
+        assert cfg.transforms["GSM"].source_frame == "GSE"
+        assert cfg.transforms["GSE"].source_frame == "simulation"
+
+    def test_parameter_driven_transform(self, tmp_path: Path) -> None:
+        # Time-dependent transforms carry a `parameter` name; the FrameTransform
+        # itself doesn't yet act on it, but the schema field must round-trip.
+        coords = (
+            '[coordinates]\ngeometry = "cartesian"\nframe = "simulation"\n'
+            "[coordinates.transforms.GSM]\n"
+            'parameter = "dipole_tilt"\norigin = [0.0, 0.0, 0.0]'
+        )
+        cfg = load_config(_write(tmp_path, _shell(coordinates=coords)))
+        assert "GSM" in cfg.transforms
+
+
+class TestRoundTrip:
+    """A full v1.0 doc → schema → SimulationConfig pipeline does not lose
+    structural information for the typed attributes pypic now exposes."""
+
+    def test_roundtrip_preserves_typed_sections(self, tmp_path: Path) -> None:
+        doc = _shell(
+            extra=(
+                "[initial_conditions]\n"
+                'type = "harris"\nB0 = [0.1, 0.0, 0.0]\n'
+                "[output.fields]\n"
+                "step_interval = 25\n"
+                'quantities = ["B"]\n'
+                'dir = "./out"\n'
+                "[[bodies]]\n"
+                'name = "earth"\ncenter = [0.0, 0.0, 0.0]\nradius = 1.0\n'
+                "[[drivers]]\n"
+                'name = "sw"\ntype = "solar_wind"\ncoupling = "boundary"\n'
+                "[restart]\n"
+                'from = "./chk.h5"\n'
+            )
+        )
+        cfg = load_config(_write(tmp_path, doc))
+        assert cfg.initial_conditions is not None
+        assert cfg.initial_conditions.type == "harris"
+        assert cfg.output is not None
+        assert cfg.output.fields is not None
+        assert cfg.output.fields.step_interval == 25
+        assert len(cfg.bodies) == 1
+        assert cfg.bodies[0].name == "earth"
+        assert len(cfg.drivers) == 1
+        assert cfg.drivers[0].coupling == "boundary"
+        assert cfg.restart is not None
+        assert cfg.restart.from_ == "./chk.h5"

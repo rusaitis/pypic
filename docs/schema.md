@@ -331,6 +331,13 @@ names a time-varying quantity (e.g., `"dipole_tilt"`) looked up per
 step to compute the rotation matrix. SPICE kernels provide an
 alternative source for epoch-dependent rotations.
 
+```toml
+[coordinates.transforms.GSM]
+parameter = "dipole_tilt"          # rotation recomputed per step from
+                                   # the named time-varying scalar
+from_frame = "GSE"                 # chains: simulation → GSE → GSM
+```
+
 ### [[species]]
 
 Describes particle species (PIC and hybrid models) or fluid species
@@ -365,6 +372,12 @@ Relationship: $v_{th} = \sqrt{T/m}$ (see thermal speed convention in
 
 Model-agnostic flags at top level; model-specific knobs in sub-tables.
 The sub-table that matches `[model].type` is the one the code consumes.
+Top-level `[physics]` is reserved for flags whose semantics are
+identical across PIC, MHD, and hybrid; v1.0 enumerates only
+`relativistic`, but the validator accepts unknown top-level keys to
+leave room for v1.1+ portable additions (anticipated: `collisional`,
+`radiative`, `[physics.vlasov]`). Code-specific knobs go under
+`[physics.<model>.x-<code>.*]`, not at the top of `[physics]`.
 
 ```toml
 [physics]
@@ -551,7 +564,11 @@ locations. Either **fixed** (constant position) or a **trajectory**
 [[probes]]
 name = "magnetopause_monitor"      # REQUIRED: human-readable label
 position = [10.0, 0.0, 0.0]       # fixed: [x, y, z] in code units
-fields = ["B1", "B2", "B3", "beta"]  # optional: fields to sample (default: all)
+fields = ["B1", "B2", "B3", "beta"]  # optional: fields to sample.
+                                     # Default: every canonical field
+                                     # present in the dataset at probe time
+                                     # (including derived quantities exposed
+                                     # via `compute()`).
 
 [[probes]]
 name = "MMS1"                      # trajectory (virtual spacecraft)
@@ -717,6 +734,15 @@ MHD, CGL — can populate these fields. `P_par` and `P_perp` are
 decomposed from the **total** pressure tensor (`P11..P33`). Per-species
 decomposition (`P_par_s0`, `P_perp_s0`) uses the per-species tensors
 (`P11_s0..P33_s0`).
+
+**Storage vs derived.** Only the six tensor components (`Pij`,
+`Pij_s{N}`) are storage-primitive in the canonical HDF5/Zarr layout.
+The scalar `P` (trace/3), `P_par`, `P_perp`, and `agyrotropy` are
+*derived* and computed on demand by `compute()`. Listing `Pij` (or
+the per-species shorthand `Pi`/`Pe`) in `[output.fields].quantities`
+auto-expands to the six components; listing `P_par` writes the
+derived scalar, but the user is responsible for understanding that
+the post-hoc decomposition is then locked to the snapshot's $\hat{b}$.
 
 ### Characteristic scales (derived)
 
@@ -913,7 +939,7 @@ to this canonical layout. The Rust simulation writes this layout directly.
 
 ## 6. What This Schema Does NOT Define
 
-- **Simulation control parameters** (timestep count, solver tolerances, MPI decomposition, output intervals). Note: `dt` is in `[grid]` because it's essential for time-series analysis.
+- **Simulation control parameters** (solver tolerances, MPI decomposition, output intervals). Note: `dt` and `n_steps` live in `[time]` because they are essential for time-series analysis. Output cadence (`step_interval`) lives in `[output.*]`.
 - **Visualization settings** (colormaps, camera angles, slice positions).
 - **Exhaustive physics parameter lists.** The `[physics]` section is open-ended by design.
 - **Native file layouts** of existing codes. Readers handle the translation.

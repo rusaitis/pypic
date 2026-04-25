@@ -135,7 +135,7 @@ class TestOpenVirtual:
         grid_cfg = make_uniform_grid(4, 3, 2, spacing=2.0)
         config = SimulationConfig(
             model_name="test",
-            model_type="pic",
+            model_type="PIC",
             grid=grid_cfg,
             normalization=Normalization.identity(),
             species=(SpeciesInfo(name="e", charge=-1.0, mass=1.0),),

@@ -55,7 +55,9 @@ HybridSolverScheme = Literal["predictor-corrector", "current-advance-method"]
 HybridFieldPusher = Literal["cyclic-leapfrog", "implicit"]
 FormatLiteral = Literal["hdf5", "zarr", "adios2", "netcdf"]
 ShapeLiteral = Literal["sphere", "torus", "cuboid", "mesh"]
-PhysicalExtentUnit = Literal["m", "km", "R_E", "R_S", "R_sun", "R_M", "AU", "d_i"]
+PhysicalExtentUnit = Literal[
+    "m", "km", "R_E", "R_S", "R_sun", "R_M", "R_J", "AU", "d_i"
+]
 
 
 def _is_extension_key(key: str) -> bool:
@@ -156,7 +158,7 @@ class Time(_StrictBase):
     dt: NonNegativeFloat
     t_start: float
     t_end: float
-    n_steps: NonNegativeInt
+    n_steps: PositiveInt
     cfl: float | None = None
     dt_min: float | None = None
     dt_max: float | None = None
@@ -171,6 +173,10 @@ class Time(_StrictBase):
             raise ValueError(
                 "scheme='subcycled' requires field_substeps (and usually dt_field)"
             )
+        # `dt` is a placeholder for adaptive schemes (the actual step is
+        # CFL-driven), but for fixed/subcycled it is the integration step.
+        if self.scheme in ("fixed", "subcycled") and self.dt == 0.0:
+            raise ValueError(f"scheme={self.scheme!r} requires dt > 0")
         return self
 
 
@@ -295,12 +301,12 @@ Units = Annotated[
 class CoordinateTransform(_StrictBase):
     """One entry under ``[coordinates.transforms.<frame>]``."""
 
-    origin: list[float] | None = None
+    origin: list[float] | None = Field(None, min_length=1, max_length=3)
     rotation: list[list[float]] | None = None
     scale: float | None = None
     from_frame: str | None = None
     parameter: str | None = None
-    axis_labels: list[str] | None = None
+    axis_labels: list[str] | None = Field(None, min_length=3, max_length=3)
 
 
 class Coordinates(_StrictBase):
@@ -308,9 +314,11 @@ class Coordinates(_StrictBase):
 
     geometry: Geometry
     frame: str
-    axis_labels: list[str] | None = None
-    physical_extent: list[PositiveFloat] | None = None
-    physical_extent_unit: str | None = None
+    axis_labels: list[str] | None = Field(None, min_length=3, max_length=3)
+    physical_extent: list[PositiveFloat] | None = Field(
+        None, min_length=1, max_length=3
+    )
+    physical_extent_unit: PhysicalExtentUnit | None = None
     transforms: dict[str, CoordinateTransform] = Field(default_factory=dict)
 
 
@@ -388,9 +396,9 @@ class Body(_StrictBase):
     center: list[float] = Field(..., min_length=1, max_length=3)
     radius: PositiveFloat | None = None
     shape: ShapeLiteral = "sphere"
-    intrinsic_dipole: list[float] | None = None
-    dipole_center_offset: list[float] | None = None
-    rotation_axis: list[float] | None = None
+    intrinsic_dipole: list[float] | None = Field(None, min_length=3, max_length=3)
+    dipole_center_offset: list[float] | None = Field(None, min_length=3, max_length=3)
+    rotation_axis: list[float] | None = Field(None, min_length=3, max_length=3)
     rotation_period: NonNegativeFloat | None = None
     mass: PositiveFloat | None = None
     surface_absorbs_ions: bool | None = None
@@ -422,9 +430,36 @@ class Driver(_ExtensibleBase):
     columns: list[str] | None = None
     cadence: NonNegativeFloat | None = None
     interpolation: str | None = None
-    target_lower: list[float] | None = None
-    target_upper: list[float] | None = None
+    target_lower: list[float] | None = Field(None, min_length=1, max_length=3)
+    target_upper: list[float] | None = Field(None, min_length=1, max_length=3)
     body: str | None = None
+
+    @model_validator(mode="after")
+    def _check_target_box(self) -> Driver:
+        lo, up = self.target_lower, self.target_upper
+        if lo is None and up is None:
+            return self
+        if (lo is None) != (up is None):
+            raise ValueError(
+                f"driver '{self.name}': target_lower and target_upper must "
+                f"both be present or both absent"
+            )
+        assert lo is not None  # narrowed by the (lo is None) != (up is None) check
+        assert up is not None  # narrowed by the (lo is None) != (up is None) check
+        if len(lo) != len(up):
+            raise ValueError(
+                f"driver '{self.name}': target_lower has {len(lo)} entries "
+                f"but target_upper has {len(up)}"
+            )
+        # Allow per-axis equality (thin sheet / line / surface drivers like
+        # photospheric magnetograms); reject only an axis where upper < lower.
+        for i, (lov, upv) in enumerate(zip(lo, up, strict=True)):
+            if upv < lov:
+                raise ValueError(
+                    f"driver '{self.name}': target_upper[{i}] ({upv}) must be "
+                    f">= target_lower[{i}] ({lov})"
+                )
+        return self
 
 
 class Restart(_StrictBase):
@@ -440,16 +475,30 @@ class Species(_StrictBase):
 
     Provide either ``(charge, mass)`` OR ``charge_to_mass``, not both.
     Validated after the fact.
+
+    Species are indexed in declaration order — ``_s0`` binds to the
+    first ``[[species]]`` entry, ``_s1`` to the second, etc. Reordering
+    entries is a breaking change to any downstream field-name reference
+    that uses the ``_sN`` suffix.
     """
 
     name: str
     charge: float | None = None
     mass: PositiveFloat | None = None
     charge_to_mass: float | None = None
-    particles_per_cell: int | list[int] | None = None
+    # 0 (or absent) marks a fluid species — see [[species]] in schema.md.
+    particles_per_cell: (
+        NonNegativeInt
+        | Annotated[list[NonNegativeInt], Field(min_length=3, max_length=3)]
+        | None
+    ) = None
     temperature: NonNegativeFloat | None = None
-    thermal_velocity: list[float] | None = None
-    drift_velocity: list[float] | None = None
+    thermal_velocity: (
+        Annotated[list[float], Field(min_length=3, max_length=3)] | None
+    ) = None
+    drift_velocity: Annotated[list[float], Field(min_length=3, max_length=3)] | None = (
+        None
+    )
     density: NonNegativeFloat | None = None
     closure: Closure | None = None
     gamma_eos: PositiveFloat | None = None
@@ -617,14 +666,25 @@ class SimulationSchema(_ExtensibleBase):
             raise ValueError(
                 f"this validator implements schema v1.x; got '{self.schema_version}'"
             )
-        if self.boundary_conditions is not None:
-            n = len(self.grid.dimensions)
-            if len(self.boundary_conditions.lower) != n:
-                raise ValueError(
-                    f"boundary_conditions has "
-                    f"{len(self.boundary_conditions.lower)} axes but "
-                    f"grid.dimensions has {n}"
-                )
+        n = len(self.grid.dimensions)
+        if (
+            self.boundary_conditions is not None
+            and len(self.boundary_conditions.lower) != n
+        ):
+            raise ValueError(
+                f"boundary_conditions has "
+                f"{len(self.boundary_conditions.lower)} axes but "
+                f"grid.dimensions has {n}"
+            )
+        if (
+            self.coordinates.physical_extent is not None
+            and len(self.coordinates.physical_extent) != n
+        ):
+            raise ValueError(
+                f"coordinates.physical_extent has "
+                f"{len(self.coordinates.physical_extent)} entries but "
+                f"grid.dimensions has {n}"
+            )
         if self.physics is not None:
             self._check_physics_matches_model_type()
         self._check_reference_species_exists()

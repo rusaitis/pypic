@@ -64,5 +64,14 @@ def merge_simulation_toml(
         normalization=toml_config.normalization,
         frame=toml_config.frame,
         transforms=dict(toml_config.transforms),
+        initial_conditions=toml_config.initial_conditions
+        if toml_config.initial_conditions is not None
+        else base.initial_conditions,
+        output=toml_config.output if toml_config.output is not None else base.output,
+        bodies=toml_config.bodies if toml_config.bodies else base.bodies,
+        drivers=toml_config.drivers if toml_config.drivers else base.drivers,
+        restart=toml_config.restart
+        if toml_config.restart is not None
+        else base.restart,
         metadata=merged_metadata,
     )
