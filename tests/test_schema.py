@@ -414,3 +414,98 @@ class TestLoaderEntryPoint:
 
     def test_accepts_text_blob(self) -> None:
         validate_simulation_toml(_minimal_doc())
+
+    def test_accepts_generic_pathlike(self) -> None:
+        """``os.PathLike[str]`` other than ``Path`` is part of the contract."""
+
+        class _CustomPath:
+            def __init__(self, p: Path) -> None:
+                self._p = str(p)
+
+            def __fspath__(self) -> str:
+                return self._p
+
+        validate_simulation_toml(_CustomPath(LIVE_TEMPLATE))
+
+    def test_invalid_toml_syntax_propagates(self) -> None:
+        """``tomllib.TOMLDecodeError`` should surface unwrapped."""
+        with pytest.raises(tomllib.TOMLDecodeError):
+            validate_simulation_toml("[unclosed_section\nkey = 1")
+
+
+class TestRoundTrip:
+    """Catch one-way coercions silently introduced by future schema edits."""
+
+    def test_dump_reparse_roundtrip(self) -> None:
+        s1 = validate_simulation_toml(LIVE_TEMPLATE)
+        s2 = SimulationSchema.model_validate(
+            s1.model_dump(by_alias=True, exclude_none=True)
+        )
+        assert s1 == s2
+
+
+class TestAdaptiveScheme:
+    """Adaptive scheme is permissive in v1.0 — vocabulary still settling."""
+
+    def test_adaptive_scheme_minimal(self) -> None:
+        doc = _minimal_doc().replace('scheme = "fixed"', 'scheme = "adaptive"')
+        s = validate_simulation_toml(doc)
+        assert s.time.scheme == "adaptive"
+        assert s.time.cfl is None
+        assert s.time.dt_min is None
+        assert s.time.dt_max is None
+
+
+class TestDriverBodyReference:
+    """``[[drivers]].body`` must resolve to a declared ``[[bodies]].name``."""
+
+    def test_driver_body_matches_declared(self) -> None:
+        doc = _minimal_doc() + dedent("""
+            [[bodies]]
+            name = "earth"
+            center = [0.0, 0.0, 0.0]
+            radius = 1.0
+
+            [[drivers]]
+            name = "magnetogram"
+            type = "magnetogram_timeseries"
+            coupling = "boundary"
+            body = "earth"
+        """)
+        s = validate_simulation_toml(doc)
+        assert s.drivers[0].body == "earth"
+
+    def test_driver_body_unknown_rejected(self) -> None:
+        doc = _minimal_doc() + dedent("""
+            [[drivers]]
+            name = "magnetogram"
+            type = "magnetogram_timeseries"
+            coupling = "boundary"
+            body = "no_such_body"
+        """)
+        with pytest.raises(ValidationError, match="no_such_body"):
+            validate_simulation_toml(doc)
+
+
+class TestProbeFrame:
+    """``frame=`` is meaningful only on trajectory probes."""
+
+    def test_frame_on_fixed_probe_rejected(self) -> None:
+        doc = _minimal_doc() + dedent("""
+            [[probes]]
+            name = "p1"
+            position = [0.0, 0.0, 0.0]
+            frame = "GSM"
+        """)
+        with pytest.raises(ValidationError, match="frame"):
+            validate_simulation_toml(doc)
+
+    def test_frame_on_trajectory_probe_accepted(self) -> None:
+        doc = _minimal_doc() + dedent("""
+            [[probes]]
+            name = "MMS1"
+            trajectory = "orbits/mms1.csv"
+            frame = "GSM"
+        """)
+        s = validate_simulation_toml(doc)
+        assert s.probes[0].frame == "GSM"

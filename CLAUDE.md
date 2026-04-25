@@ -12,6 +12,7 @@ See @README.md for the project information.
 - **Selections describe regions, not data.** `PlaneSelection`, `BoxSelection` etc. are frozen dataclasses. `apply(data) → FieldDataset` returns a new standard FieldDataset.
 - **Explicit public API.** Every package `__init__.py` re-exports public names and declares `__all__`. Users import from `pypic` or `pypic.coordinates`, never from internal modules.
 - **Server is optional, not core.** `pypic.server` provides a Starlette/FastAPI data-serving layer for the Three.js/WebGPU viewer (webpic), gated behind a `server` extra. Core library imports never trigger server dependencies.
+- **Pydantic validator is authoritative for `simulation.toml`.** `pypic.schema` holds the Pydantic v2 models and `validate_simulation_toml()` entry point for the v1.0 schema. `readers.config.load_config()` is a thin translator that delegates all shape validation to Pydantic, then maps the validated `SimulationSchema` to the internal `SimulationConfig`/`GridInfo`/`Normalization`/`SpeciesInfo`. The subpackage has zero pypic-internal imports (only stdlib + pydantic) so it can be lifted into a standalone distribution. The annotated reference template lives at `pypic.simulation.toml` at the repo root. When changing the schema, touch `pypic/schema/_models.py` first — `readers/config.py` and `docs/schema.md` follow from it, not the other way around.
 - No `astropy.units` in computation path (10-100x overhead).
 - No hardcoded coordinate frame names (GSM, GSE, etc.) in function signatures.
 - No `# --- Section Header ---` comment blocks. Use module structure instead.
@@ -31,7 +32,7 @@ See @README.md for the project information.
 - **Thread safety:** Prefer immutable data (frozen dataclasses, tuples, frozensets) and pure functions. No shared mutable state across threads. Expose internal dicts as `MappingProxyType` via properties. Use `concurrent.futures` for parallelism, locks only for unavoidable mutations.
 - **Enums:** `StrEnum` for string enumerations.
 - **Pattern matching:** `match/case` where it improves readability over if/elif chains. After exhaustive enum matches, use `case _ as unreachable: assert_never(unreachable)` — not `raise ValueError`.
-- **Exception groups:** `ExceptionGroup` when a reader encounters multiple validation errors.
+- **Exception groups:** `ExceptionGroup` when a reader encounters multiple validation errors outside the TOML schema path. `simulation.toml` validation goes through `pydantic.ValidationError` — which already aggregates every field violation into one exception, so don't wrap it.
 - **Type alias imports:** Import from `pypic.types` inside `if TYPE_CHECKING:` blocks.
 - **Paths:** `pathlib.Path`, never `os.path`.
 - **TOML:** `tomllib` (stdlib), not `toml` or `tomli`.
@@ -116,7 +117,7 @@ Docs built with MkDocs Material + mkdocstrings.
 
 ## Dependencies
 
-Core: `numpy`, `scipy`, `xarray`, `h5py`
+Core: `numpy`, `scipy`, `xarray`, `h5py`, `pydantic` (v2, for `simulation.toml` validation)
 Optional: `matplotlib` (2D plotting), `pyvista` (3D plotting), `dask` (lazy I/O for large files)
 Dev: `pytest`, `ruff`, `mypy`, `mkdocs-material`, `mkdocstrings`
 

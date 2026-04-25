@@ -377,17 +377,21 @@ def _build_physics(physics: Physics | None) -> PhysicsParams:
         return PhysicsParams()
 
     extra: dict[str, Any] = {}
-    gamma = 5.0 / 3.0
     relativistic = bool(physics.relativistic)
+
+    # `gamma` is only a typed field on PhysicsMHD. Reading it from a stray
+    # `[physics.pic]` extra would silently let a misplaced key win.
+    gamma = (
+        float(physics.mhd.gamma)
+        if physics.mhd is not None and physics.mhd.gamma is not None
+        else 5.0 / 3.0
+    )
 
     for branch_name in ("pic", "mhd", "hybrid"):
         branch = getattr(physics, branch_name, None)
         if branch is None:
             continue
-        branch_dict = branch.model_dump(exclude_none=True)
-        if "gamma" in branch_dict:
-            gamma = float(branch_dict["gamma"])
-        extra[branch_name] = branch_dict
+        extra[branch_name] = branch.model_dump(exclude_none=True)
 
     for key, value in (physics.__pydantic_extra__ or {}).items():
         extra[key] = value

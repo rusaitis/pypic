@@ -91,6 +91,9 @@ def _load_toml(
     if isinstance(source, str):
         # Ambiguity: is this a path or TOML text? Heuristic: a string that
         # contains a newline or '=' is text; otherwise treat as a path.
+        # A pathological filename containing '=' would be misread as text;
+        # callers in that situation should pass ``Path(...)`` directly to
+        # bypass the heuristic.
         if "\n" in source or "=" in source:
             return tomllib.loads(source)
         return _load_path(Path(source))

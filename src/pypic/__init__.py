@@ -139,6 +139,7 @@ from pypic.readers import (
     unregister_reader,
 )
 from pypic.regrid import align_grids, common_grid, regrid
+from pypic.schema import SimulationSchema, validate_simulation_toml
 from pypic.selections import BoxSelection, PlaneSelection, SphereSelection
 from pypic.traces import (
     FieldLine,
@@ -188,6 +189,7 @@ __all__ = [
     "Simulation",
     "SimulationConfig",
     "SimulationReader",
+    "SimulationSchema",
     "SpeciesInfo",
     "SphereSelection",
     "StaggerInfo",
@@ -286,5 +288,6 @@ __all__ = [
     "unregister_field",
     "unregister_reader",
     "unregister_recipe",
+    "validate_simulation_toml",
     "velocity_magnitude",
 ]

@@ -65,9 +65,15 @@ def _is_extension_key(key: str) -> bool:
 
 
 class _StrictBase(BaseModel):
-    """Reject unknown keys — used for tables where typos are a bug."""
+    """Reject unknown keys — used for tables where typos are a bug.
 
-    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+    ``populate_by_name`` is left at the Pydantic v2 default (False): aliased
+    fields (``[restart].from``, ``[schema]`` itself) accept only the spec
+    spelling, never the Python field name (``from_``, ``schema_``). The
+    spec is the contract; we don't quietly admit a second name for it.
+    """
+
+    model_config = ConfigDict(extra="forbid")
 
 
 class _ExtensibleBase(BaseModel):
@@ -78,7 +84,7 @@ class _ExtensibleBase(BaseModel):
     experimental knobs that v1.0 spec explicitly permits.
     """
 
-    model_config = ConfigDict(extra="allow", populate_by_name=True)
+    model_config = ConfigDict(extra="allow")
 
 
 class Author(_StrictBase):
@@ -148,10 +154,19 @@ class Run(_StrictBase):
 class Time(_StrictBase):
     """``[time]`` — temporal integration controls.
 
-    Scheme-specific keys (``cfl``, ``dt_min``, ``dt_max`` for adaptive;
-    ``dt_field``, ``field_substeps`` for subcycled) are validated after
-    the fact rather than modeled as discriminated unions — the vocabulary
-    is still settling and the cost of a wrong shape here is low.
+    Scheme-specific keys are deliberately *not* modelled as a discriminated
+    union — the vocabulary is still settling and the cost of a wrong shape
+    here is low. v1.0 enforces only the cross-field invariants that are
+    unambiguous:
+
+    - fixed/subcycled require ``dt > 0`` (the integration step);
+    - subcycled requires ``field_substeps`` (``dt_field`` is recommended
+      but advisory, not enforced);
+    - adaptive accepts any combination of (``cfl``, ``dt_min``,
+      ``dt_max``) including all-None — the runtime owns CFL bookkeeping.
+
+    A future v1.1 may formalise these as a discriminated union once codes
+    converge on a common spelling.
     """
 
     scheme: TimeScheme = "fixed"
@@ -310,7 +325,14 @@ class CoordinateTransform(_StrictBase):
 
 
 class Coordinates(_StrictBase):
-    """``[coordinates]`` — geometry + reference frame."""
+    """``[coordinates]`` — geometry + reference frame.
+
+    ``physical_extent`` is metadata at the schema level: the validator
+    only checks shape and positivity. Post-translation, the reader-side
+    helper ``pypic.readers.config.apply_physical_extent`` consumes it to
+    auto-compute transform scale factors and a shrink-factor diagnostic
+    (see ``docs/schema.md`` § Coordinates).
+    """
 
     geometry: Geometry
     frame: str
@@ -333,7 +355,7 @@ class PICSolver(_ExtensibleBase):
 
 
 class PhysicsPIC(_ExtensibleBase):
-    """``[physics.pic]`` — PIC physics-model knobs."""
+    """``[physics.pic]`` — PIC physics-model knobs. Extra keys accepted."""
 
     omega_p_over_omega_c: PositiveFloat | None = None
     solver: PICSolver | None = None
@@ -351,7 +373,7 @@ class MHDSolver(_ExtensibleBase):
 
 
 class PhysicsMHD(_ExtensibleBase):
-    """``[physics.mhd]`` — MHD physics-model knobs."""
+    """``[physics.mhd]`` — MHD physics-model knobs. Extra keys accepted."""
 
     gamma: PositiveFloat | None = None
     resistivity: NonNegativeFloat | None = None
@@ -371,7 +393,7 @@ class HybridSolver(_ExtensibleBase):
 
 
 class PhysicsHybrid(_ExtensibleBase):
-    """``[physics.hybrid]`` — hybrid physics-model knobs."""
+    """``[physics.hybrid]`` — hybrid physics-model knobs. Extra keys accepted."""
 
     solver: HybridSolver | None = None
 
@@ -612,6 +634,15 @@ class Probe(_StrictBase):
                 f"probe '{self.name}' must have exactly one of "
                 f"`position` or `trajectory`"
             )
+        # `frame` is only meaningful for trajectory probes (it names the
+        # frame the trajectory file is expressed in). A fixed probe sits
+        # in `[coordinates].frame` by definition; carrying a `frame=` on
+        # it is silently ambiguous, so we reject it.
+        if has_pos and self.frame is not None:
+            raise ValueError(
+                f"probe '{self.name}': `frame` is only valid with "
+                f"`trajectory` (fixed probes inherit [coordinates].frame)"
+            )
         return self
 
 
@@ -634,6 +665,14 @@ class SimulationSchema(_ExtensibleBase):
     Extension policy at root: unknown keys must start with ``x-`` or
     ``x_``. Known optional sections that are present are strictly
     validated.
+
+    Note on ``schema_version`` vs ``[schema].version``: both are
+    required and ``_check_root_invariants`` enforces that they match.
+    The duplication is intentional — the bare top-level
+    ``schema_version`` lets a streaming parser identify the schema
+    version without descending into any table, while ``[schema]``
+    is the structured home for related metadata (``created`` date,
+    future provenance keys).
     """
 
     schema_version: str
@@ -688,6 +727,7 @@ class SimulationSchema(_ExtensibleBase):
         if self.physics is not None:
             self._check_physics_matches_model_type()
         self._check_reference_species_exists()
+        self._check_driver_body_references()
         self._check_extras_are_extensions()
         return self
 
@@ -704,6 +744,14 @@ class SimulationSchema(_ExtensibleBase):
                 )
 
     def _check_reference_species_exists(self) -> None:
+        """Ensure ``[units].reference_species`` resolves.
+
+        Either matches a declared ``[[species]].name`` entry, or names one
+        of the always-valid PIC builtins ``{electrons, ions, protons}``.
+        The builtin fallback covers legacy iPIC3D-style configs where the
+        normalization references a canonical species the run hasn't
+        explicitly declared in ``[[species]]``.
+        """
         ref = getattr(self.units, "reference_species", None)
         if ref is None:
             return
@@ -714,6 +762,22 @@ class SimulationSchema(_ExtensibleBase):
                 f"units.reference_species = '{ref}' does not match any "
                 f"[[species]].name entry: {sorted(names)}"
             )
+
+    def _check_driver_body_references(self) -> None:
+        """Ensure every ``[[drivers]].body`` references a declared body.
+
+        Drivers that delegate their target box to a body (``body = "..."``)
+        can only resolve if that body exists in ``[[bodies]]``. Same
+        string-as-foreign-key discipline as ``reference_species``.
+        """
+        body_names = {b.name for b in self.bodies}
+        for driver in self.drivers:
+            if driver.body is not None and driver.body not in body_names:
+                raise ValueError(
+                    f"driver '{driver.name}': body = '{driver.body}' does "
+                    f"not match any [[bodies]].name entry: "
+                    f"{sorted(body_names) or '(none declared)'}"
+                )
 
     def _check_extras_are_extensions(self) -> None:
         extra: dict[str, Any] = self.__pydantic_extra__ or {}
