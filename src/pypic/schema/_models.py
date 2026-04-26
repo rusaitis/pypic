@@ -59,6 +59,15 @@ PhysicalExtentUnit = Literal[
     "m", "km", "R_E", "R_S", "R_sun", "R_M", "R_J", "AU", "d_i"
 ]
 
+# Length-constrained list aliases used by every shape-checked vector field.
+# `Vec3*` = strictly 3D. `Axis*` = 1..3 axes (axis count is enforced against
+# `grid.dimensions` by the root validator).
+type Vec3Float = Annotated[list[float], Field(min_length=3, max_length=3)]
+type Vec3Str = Annotated[list[str], Field(min_length=3, max_length=3)]
+type AxisFloat = Annotated[list[float], Field(min_length=1, max_length=3)]
+type AxisInt = Annotated[list[PositiveInt], Field(min_length=1, max_length=3)]
+type AxisPosFloat = Annotated[list[PositiveFloat], Field(min_length=1, max_length=3)]
+
 
 def _is_extension_key(key: str) -> bool:
     return key.startswith(("x-", "x_"))
@@ -215,10 +224,10 @@ class GridRefinementBox(_StrictBase):
 class Grid(_StrictBase):
     """``[grid]`` — computational grid in code units."""
 
-    dimensions: list[PositiveInt] = Field(..., min_length=1, max_length=3)
-    spacing: list[PositiveFloat] = Field(..., min_length=1, max_length=3)
-    lower: list[float] = Field(..., min_length=1, max_length=3)
-    upper: list[float] = Field(..., min_length=1, max_length=3)
+    dimensions: AxisInt
+    spacing: AxisPosFloat
+    lower: AxisFloat
+    upper: AxisFloat
     stagger: StaggerKind = "cell"
     source: str | None = None
     source_format: str | None = None
@@ -316,12 +325,12 @@ Units = Annotated[
 class CoordinateTransform(_StrictBase):
     """One entry under ``[coordinates.transforms.<frame>]``."""
 
-    origin: list[float] | None = Field(None, min_length=1, max_length=3)
+    origin: AxisFloat | None = None
     rotation: list[list[float]] | None = None
     scale: float | None = None
     from_frame: str | None = None
     parameter: str | None = None
-    axis_labels: list[str] | None = Field(None, min_length=3, max_length=3)
+    axis_labels: Vec3Str | None = None
 
 
 class Coordinates(_StrictBase):
@@ -336,10 +345,8 @@ class Coordinates(_StrictBase):
 
     geometry: Geometry
     frame: str
-    axis_labels: list[str] | None = Field(None, min_length=3, max_length=3)
-    physical_extent: list[PositiveFloat] | None = Field(
-        None, min_length=1, max_length=3
-    )
+    axis_labels: Vec3Str | None = None
+    physical_extent: AxisPosFloat | None = None
     physical_extent_unit: PhysicalExtentUnit | None = None
     transforms: dict[str, CoordinateTransform] = Field(default_factory=dict)
 
@@ -415,12 +422,12 @@ class Body(_StrictBase):
     """One entry in ``[[bodies]]`` — registry of physical objects."""
 
     name: str
-    center: list[float] = Field(..., min_length=1, max_length=3)
+    center: AxisFloat
     radius: PositiveFloat | None = None
     shape: ShapeLiteral = "sphere"
-    intrinsic_dipole: list[float] | None = Field(None, min_length=3, max_length=3)
-    dipole_center_offset: list[float] | None = Field(None, min_length=3, max_length=3)
-    rotation_axis: list[float] | None = Field(None, min_length=3, max_length=3)
+    intrinsic_dipole: Vec3Float | None = None
+    dipole_center_offset: Vec3Float | None = None
+    rotation_axis: Vec3Float | None = None
     rotation_period: NonNegativeFloat | None = None
     mass: PositiveFloat | None = None
     surface_absorbs_ions: bool | None = None
@@ -452,8 +459,8 @@ class Driver(_ExtensibleBase):
     columns: list[str] | None = None
     cadence: NonNegativeFloat | None = None
     interpolation: str | None = None
-    target_lower: list[float] | None = Field(None, min_length=1, max_length=3)
-    target_upper: list[float] | None = Field(None, min_length=1, max_length=3)
+    target_lower: AxisFloat | None = None
+    target_upper: AxisFloat | None = None
     body: str | None = None
 
     @model_validator(mode="after")
@@ -461,13 +468,11 @@ class Driver(_ExtensibleBase):
         lo, up = self.target_lower, self.target_upper
         if lo is None and up is None:
             return self
-        if (lo is None) != (up is None):
+        if lo is None or up is None:
             raise ValueError(
                 f"driver '{self.name}': target_lower and target_upper must "
                 f"both be present or both absent"
             )
-        assert lo is not None  # narrowed by the (lo is None) != (up is None) check
-        assert up is not None  # narrowed by the (lo is None) != (up is None) check
         if len(lo) != len(up):
             raise ValueError(
                 f"driver '{self.name}': target_lower has {len(lo)} entries "
@@ -515,12 +520,8 @@ class Species(_StrictBase):
         | None
     ) = None
     temperature: NonNegativeFloat | None = None
-    thermal_velocity: (
-        Annotated[list[float], Field(min_length=3, max_length=3)] | None
-    ) = None
-    drift_velocity: Annotated[list[float], Field(min_length=3, max_length=3)] | None = (
-        None
-    )
+    thermal_velocity: Vec3Float | None = None
+    drift_velocity: Vec3Float | None = None
     density: NonNegativeFloat | None = None
     closure: Closure | None = None
     gamma_eos: PositiveFloat | None = None
@@ -543,24 +544,31 @@ class Species(_StrictBase):
         return self
 
 
-class OutputCheckpoints(_StrictBase):
-    """``[output.checkpoints]`` — lossless full-state dumps."""
+class _OutputBase(_StrictBase):
+    """Common fields shared by every ``[output.*]`` sub-table.
+
+    Subclasses override ``precision`` for write modes that should default
+    to ``f64`` (lossless checkpoints, probe time-series), and add their
+    own type-specific fields.
+    """
 
     step_interval: PositiveInt
     dir: str
     format: FormatLiteral = "hdf5"
+    precision: Precision = "f32"
+
+
+class OutputCheckpoints(_OutputBase):
+    """``[output.checkpoints]`` — lossless full-state dumps."""
+
     precision: Precision = "f64"
     keep_last: PositiveInt | None = None
 
 
-class OutputFields(_StrictBase):
+class OutputFields(_OutputBase):
     """``[output.fields]`` — field output cadence + quantities."""
 
-    step_interval: PositiveInt
     quantities: list[str]
-    dir: str
-    format: FormatLiteral = "hdf5"
-    precision: Precision = "f32"
     precision_overrides: dict[str, Precision] = Field(default_factory=dict)
 
     @model_validator(mode="after")
@@ -574,36 +582,25 @@ class OutputFields(_StrictBase):
         return self
 
 
-class OutputParticles(_StrictBase):
+class OutputParticles(_OutputBase):
     """``[output.particles]`` — particle output cadence + selection."""
 
-    step_interval: PositiveInt
     species: list[str]
-    dir: str
-    format: FormatLiteral = "hdf5"
-    precision: Precision = "f32"
     include_ids: bool = False
     include_energy: bool = False
     sample: float | int | None = None
 
 
-class OutputProbes(_StrictBase):
+class OutputProbes(_OutputBase):
     """``[output.probes]`` — probe time-series cadence."""
 
-    step_interval: PositiveInt
-    dir: str
-    format: FormatLiteral = "hdf5"
     precision: Precision = "f64"
 
 
-class OutputDiagnostics(_StrictBase):
+class OutputDiagnostics(_OutputBase):
     """``[output.diagnostics]`` — on-the-fly derived quantities."""
 
-    step_interval: PositiveInt
     quantities: list[str]
-    dir: str
-    format: FormatLiteral = "hdf5"
-    precision: Precision = "f32"
 
 
 class Output(_StrictBase):
