@@ -164,6 +164,7 @@ class FieldDataset:
         coords = {dim_names[i]: coord_arrays[i] for i in range(len(dim_names))}
 
         from pypic.fields import field_info as _field_info
+        from pypic.fields import quantity_dimension as _quantity_dimension
 
         data_vars: dict[str, xr.DataArray] = {}
         for var_name, arr in fields.items():
@@ -176,6 +177,8 @@ class FieldDataset:
                 da.attrs["si_unit"] = info.si_unit
                 if info.latex:
                     da.attrs["latex"] = info.latex
+                ud = info.unit_dimension or _quantity_dimension(info.quantity_type)
+                da.attrs["unit_dimension"] = list(ud)
             except KeyError:
                 pass
             data_vars[var_name] = da
@@ -742,12 +745,14 @@ class FieldDataset:
         """
         from pypic.fields import _QUANTITY_UNITS
         from pypic.fields import field_info as _field_info
+        from pypic.fields import quantity_dimension as _quantity_dimension
 
         expected = tuple(self._grid.dimensions)
         if data.shape != expected:
             msg = f"Array shape {data.shape} doesn't match grid dimensions {expected}"
             raise ValueError(msg)
 
+        info_ud: tuple[int, int, int, int, int, int, int] | None = None
         if quantity_type is None:
             try:
                 info = _field_info(name, axis_names=self._grid.geometry.axis_names)
@@ -759,6 +764,7 @@ class FieldDataset:
                 long_name = info.long_name
             if not latex:
                 latex = info.latex
+            info_ud = info.unit_dimension
         else:
             qt = str(quantity_type)
 
@@ -775,6 +781,7 @@ class FieldDataset:
         da.attrs["units"] = "normalized"
         da.attrs["long_name"] = long_name
         da.attrs["latex"] = latex
+        da.attrs["unit_dimension"] = list(info_ud or _quantity_dimension(qt))
 
         new_ds = self._ds.assign({name: da})
         return FieldDataset(
@@ -951,6 +958,16 @@ class FieldDataset:
         -------
         FloatArray
             Values in the requested units.
+
+        Notes
+        -----
+        Temperature is stored in **energy units** (J), so use
+        ``in_units(name, "eV")`` (or ``"keV"``, ``"MeV"``) for the
+        plasma working unit, or ``in_units(name, "K")`` for the
+        Boltzmann-factor-converted form. Magnetic field defaults to
+        T in SI; ``in_units(name, "nT")`` is the space-physics
+        idiom. See ``_DISPLAY_UNITS`` in ``pypic.compute`` for the
+        full vocabulary.
         """
         from pypic.compute import display_unit_factor
 

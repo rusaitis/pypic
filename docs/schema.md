@@ -233,21 +233,12 @@ scaling_factor = 10.0              # optional: informational shrink factor (no e
 scaling_description = "c/v_A reduced by 10x; mass ratio mi/me = 256 (real: 1836)"
 ```
 
-For **ion-normalized PIC** (e.g., iPIC3D large-scale runs):
-
-```toml
-[units]
-system = "PIC"
-reference_species = "ions"
-reference_density = 1.0e18         # m⁻³ (ion number density)
-reference_mass = 1.673e-27         # kg (proton mass)
-reference_charge = 1.602e-19       # C
-```
+For **ion-normalized PIC** (e.g. iPIC3D large-scale runs), set
+`reference_species = "ions"` and use proton mass/density values.
 
 ```toml
 [units]
 system = "MHD"
-
 # MHD normalization: derive all reference values from these
 reference_length = 6.371e6         # meters (e.g., Earth radius)
 reference_density = 1.67e-17       # kg/m³ (e.g., solar wind)
@@ -294,20 +285,17 @@ transform with the default ``scale=1.0`` is auto-computed as
 Can also be passed at runtime via
 ``open_simulation(path, physical_extent=..., physical_extent_unit=...)``.
 
-**Scale vs shrink factor.** The ``scale`` is a coordinate conversion
-factor: how many target units (e.g., R_E) per code unit (e.g., d_i).
-The ``shrink_factor`` is a physics diagnostic: ratio of the effective
-scale to the physical scale implied by the normalization. A shrink
-factor of 1.0 means the grid faithfully represents physical distances.
-A value > 1 (e.g., 3.5) means the physical domain has been compressed
-relative to kinetic scales — common in PIC simulations with reduced
-mass ratio or MHD-coupled boundaries. The shrink factor is logged
-automatically and stored in ``metadata["scaling"]["shrink_factor"]``.
-Shrinking affects only length-dependent quantities: intensive
-per-point values (fields, densities, β, Mach numbers) are unchanged,
-but extensive integrals over physical volume or area (total energy,
-magnetic flux) scale as shrink² or shrink³. Global transit times
-are compressed by the shrink factor (correct velocity, shorter path).
+**Scale vs shrink factor.** ``scale`` is a coordinate conversion
+factor (target units per code unit). ``shrink_factor`` is a physics
+diagnostic — the ratio of effective scale to the scale implied by
+the normalization. ``1.0`` means the grid faithfully represents
+physical distances; ``> 1`` means the domain has been compressed
+relative to kinetic scales (common in reduced-mass-ratio PIC and
+MHD-coupled boundaries). Stored in
+``metadata["scaling"]["shrink_factor"]``. Intensive per-point
+quantities (fields, densities, β, Mach numbers) are unaffected;
+extensive integrals scale as shrink² or shrink³, and transit times
+shorten by the shrink factor.
 
 **Frame transforms** (optional): define how to convert from the native
 frame to other reference frames. Frame names are arbitrary strings —
@@ -370,14 +358,12 @@ Relationship: $v_{th} = \sqrt{T/m}$ (see thermal speed convention in
 
 ### [physics]
 
-Model-agnostic flags at top level; model-specific knobs in sub-tables.
-The sub-table that matches `[model].type` is the one the code consumes.
-Top-level `[physics]` is reserved for flags whose semantics are
-identical across PIC, MHD, and hybrid; v1.0 enumerates only
-`relativistic`, but the validator accepts unknown top-level keys to
-leave room for v1.1+ portable additions (anticipated: `collisional`,
-`radiative`, `[physics.vlasov]`). Code-specific knobs go under
-`[physics.<model>.x-<code>.*]`, not at the top of `[physics]`.
+Model-agnostic flags at the top level; model-specific knobs under
+sub-tables matching `[model].type`. v1.0 enumerates only
+`relativistic` at the top level; unknown top-level keys are accepted
+to leave room for v1.1+ portable additions (anticipated:
+`collisional`, `radiative`, `[physics.vlasov]`). Code-specific knobs
+go under `[physics.<model>.x-<code>.*]`.
 
 ```toml
 [physics]
@@ -420,12 +406,10 @@ current_smoothing = 2
 ```
 
 Key rename: `omega_pe_over_omega_ce` (v0) → `omega_p_over_omega_c`
-(v1.0). The new name is species-agnostic — the ratio applies to
-whichever species is declared in `[units].reference_species`.
-
-Unknown keys under `[physics.{pic,mhd,hybrid}]` and their `.solver`
-sub-tables are accepted without validation (vocabulary evolves in
-v1.1+). Code-specific knobs go under `[physics.<model>.x-<code>.*]`.
+(v1.0) — species-agnostic, applies to whichever species is declared
+in `[units].reference_species`. Unknown keys under
+`[physics.{pic,mhd,hybrid}]` and their `.solver` sub-tables are
+accepted without validation (vocabulary evolves in v1.1+).
 
 ### [[bodies]]
 
@@ -628,14 +612,14 @@ geometry-appropriate aliases (e.g., `Br` → `B1` for spherical). The
 `n_i` are accepted as aliases for `n_s0` and `n_s1` (see convenience
 aliases table below).
 
-**Per-species naming:** Append `_s` plus the species index (0-based):
-`rho_c_s0`, `J1_s1`, `V1_s2`, `n_s3`. The species *name* lives in the
-`[[species]]` table, not in the field name. For vector fields, the
-component index comes before the species suffix: `J1_s0`, `EF2_s1`.
+**Per-species naming:** Append `_s` plus the 0-based species index
+(`rho_c_s0`, `J1_s1`, `n_s3`); the component index comes before the
+species suffix (`J1_s0`, `EF2_s1`). The species *name* lives in
+`[[species]]`, not in the field name.
 
 **Electron/ion convenience aliases:** For the common two-species case
-(species 0 = electrons, species 1 = ions), short `e`/`i` suffixed names
-are accepted as aliases for the canonical `_s0`/`_s1` forms:
+(species 0 = electrons, 1 = ions), `e`/`i` suffixed names alias the
+canonical `_s0`/`_s1` forms:
 
 | Alias | Canonical | Meaning |
 |-------|-----------|---------|
@@ -736,13 +720,12 @@ decomposition (`P_par_s0`, `P_perp_s0`) uses the per-species tensors
 (`P11_s0..P33_s0`).
 
 **Storage vs derived.** Only the six tensor components (`Pij`,
-`Pij_s{N}`) are storage-primitive in the canonical HDF5/Zarr layout.
-The scalar `P` (trace/3), `P_par`, `P_perp`, and `agyrotropy` are
-*derived* and computed on demand by `compute()`. Listing `Pij` (or
-the per-species shorthand `Pi`/`Pe`) in `[output.fields].quantities`
-auto-expands to the six components; listing `P_par` writes the
-derived scalar, but the user is responsible for understanding that
-the post-hoc decomposition is then locked to the snapshot's $\hat{b}$.
+`Pij_s{N}`) are storage-primitive in the canonical HDF5/Zarr layout;
+`P` (trace/3), `P_par`, `P_perp`, and `agyrotropy` are derived on
+demand by `compute()`. Listing `Pij` (or `Pi`/`Pe`) in
+`[output.fields].quantities` auto-expands to the six components;
+listing `P_par` writes the derived scalar — note that the post-hoc
+decomposition is then locked to the snapshot's $\hat{b}$.
 
 ### Characteristic scales (derived)
 
@@ -821,52 +804,33 @@ and :attr:`macro_mass` properties.
 The scalar `species_charge` and `species_mass` round-trip through the
 Arrow/Parquet schema metadata (no per-particle storage cost).
 
-#### Native layouts (reader concern)
+**Native layouts (reader concern).** PIC codes split into two camps
+for storing macroparticle charge on disk; readers handle the
+translation, so downstream consumers always see the canonical form.
 
-PIC codes split into two camps for how they store macroparticle charge
-$q_s w$ on disk, but this split is entirely handled by the readers —
-`ParticleData` and every downstream consumer see the same canonical
-form.
-
-- **Combined** (iPIC3D, OSIRIS): per-particle field on disk is
-  $q_s w$.  Readers split it into `weight` (derived as
-  $|q_s w|/|q_s|$) plus scalar `species_charge`/`species_mass` from
-  the run config.
+- **Combined** (iPIC3D, OSIRIS): on-disk field is $q_s w$. Readers
+  split it into `weight` ($|q_s w|/|q_s|$) plus scalars from the run
+  config.
 - **Separate** (VPIC, WarpX, Smilei, EPOCH, PIConGPU, TRISTAN-MP):
-  per-particle field on disk is `weight`; species charge/mass come
-  from the run config.  Readers pass these through unchanged.
+  on-disk field is already `weight`; scalars come from config.
 
-#### Computing per-particle quantities
+**Computing per-particle quantities.** `macro_charge`
+(`species_charge × weight`) drives current/charge density;
+`macro_mass` (`species_mass × weight`) drives kinetic energy and
+mass density; $N_{\mathrm{phys}} = \sum w$. In non-uniform-weight
+runs, each macroparticle's `weight` is unique at float64 precision
+and can serve as a tracking ID — pass `id_column="weight"` to
+`particles_from_dataset`.
 
-- `pcl.macro_charge` — returns `species_charge × weight`.  Used for
-  current density $J = \sum q_s w\, v$ and charge density
-  $\rho_c = \sum q_s w$.
-- `pcl.macro_mass` — returns `species_mass × weight`.  Used for
-  kinetic energy $KE = \tfrac{1}{2} m_s w\, v^2$, mass density
-  $\rho_m = \sum m_s w$, and physical particle counts
-  $N_{\mathrm{phys}} = \sum w$.
+**Single charge state per species.** One `[[species]]` entry carries
+one scalar `species_charge`. Mixed ionization states (H⁺ + H²⁺ +
+neutral H) must be modeled as separate species — every mainstream
+PIC code follows this convention.
 
-In non-uniform-weight runs (particle splitting/merging, non-uniform
-initial densities), each macroparticle's `weight` is unique at full
-float64 precision and can serve as a particle tracking ID — pass
-`id_column="weight"` to `particles_from_dataset` to filter by it.
-
-#### Single charge state per species
-
-One `[[species]]` entry carries a single scalar `species_charge`; all
-macroparticles of that species share it.  Mixed ionization states
-(e.g. both H⁺ and H²⁺ alongside neutral H) must be modeled as
-separate species in the simulation config.  Every mainstream PIC code
-follows this convention.
-
-#### Round-trip fidelity
-
-A pypic `read → write → read` cycle reconstructs $q_s w$ bit-exactly
-via float64 arithmetic ($q_s$ scalar × `weight` array), but does not
-preserve the original on-disk bytes of combined-storage native files
-(since the per-particle $q_s w$ column is not stored — only `weight`
-is).  pypic is an analysis toolkit, not a simulation engine: restart
-regeneration from pypic-written files is out of scope.
+**Round-trip fidelity.** `read → write → read` reconstructs $q_s w$
+bit-exactly via float64 arithmetic, but does not preserve the
+original on-disk bytes of combined-storage files. pypic is analysis,
+not simulation — restart regeneration is out of scope.
 
 ---
 
@@ -918,13 +882,11 @@ output_{step:06d}.h5
 ```
 
 Every file contains enough metadata to convert back to SI without the
-original `simulation.toml`. When a reader sees `geometry = "cartesian"`,
-it registers `Bx → B1`, `By → B2`, `Bz → B3` as aliases; for
-`geometry = "spherical"`, `Br → B1`, `Btheta → B2`, etc. The HDF5
-file itself always uses numbered names.
-
-Each reader (iPIC3D, BATSRUS, Rust code) maps its native file layout
-to this canonical layout. The Rust simulation writes this layout directly.
+original `simulation.toml`. The HDF5 file itself always uses numbered
+names; `geometry` drives alias registration in the reader (`Bx → B1`
+for cartesian, `Br → B1` for spherical, etc). Existing readers (iPIC3D,
+BATSRUS, ...) translate native layouts; the Rust code writes this
+layout directly.
 
 ---
 

@@ -215,6 +215,18 @@ Each step produces something testable. No step starts until the previous step's 
 - [ ] **Step 36: `pypic.readers.arms` — ARMS reader**
   `ARMSReader` implementing `SimulationReader`. ARMS (Adaptively Refined MHD Solver) outputs HDF5 with block-structured AMR. Regrid to uniform grid at `target_resolution` (like BATSRUS pattern). Field mapping from ARMS native names to canonical schema. Spherical geometry support (ARMS is commonly run in spherical coordinates for coronal/heliospheric simulations). `StaggerInfo(convention="staggered")` — ARMS uses a staggered mesh (CT for divergence-free B). Auto-detection: ARMS-specific HDF5 group structure. `open_arms()` convenience function. All tests use synthetic fixtures.
 
+- [ ] **Step 42: `pypic.readers.openpmd` — openPMD reader (WarpX, PIConGPU, Smilei, FBPIC)**
+  `OpenPMDReader` implementing `SimulationReader`. One reader covers four of the most-used modern PIC codes since they all emit the openPMD standard natively (HDF5 + ADIOS2 backends). High leverage compared to one reader per code.
+  **Iteration encoding:** support both `groupBased` (single file, `/data/<step>/`) and `fileBased` (one file per step, `%T` placeholder pattern). `variableBased` (ADIOS2 streaming) is out of scope for v1.
+  **Field mapping:** `meshes/B/{x,y,z}` → `B1/B2/B3`, `meshes/E/{x,y,z}` → `E1/E2/E3`, `meshes/J/{x,y,z}` → `J1/J2/J3`, `meshes/rho` → `rho_c`. Per-species moments where the code emits them.
+  **Stagger:** read the per-record `position` array (0.0–1.0 offset) directly into `StaggerInfo` (depends on Tier 2 per-component stagger work). Destagger to co-located grid for the canonical `FieldDataset`.
+  **Units:** read `unitDimension` 7-tuple + `unitSI` per record; preserve as field metadata. The simulation-level `[units]` block is reconstructed from ED-PIC particle records (`charge`, `mass`, `weighting`) plus reference density derivable from species moments. Codes that don't write enough metadata to reconstruct fall back to `Normalization.identity()` (treat as SI).
+  **Particles:** read `particles/<species>/{position,positionOffset,momentum,charge,mass,weighting,id}` and translate to canonical `ParticleData`. Honor `macroWeighted` + `weightingPower` semantics from ED-PIC when reading; always emit canonical form (per-particle `weight` + scalar `species_charge`/`species_mass`) per Step 25b.
+  **Geometry:** `cartesian` → our `cartesian`; `thetaMode` (FBPIC RZ-mode decomposition) requires an azimuthal-mode reconstruction step before destagger — likely punt to Phase 2 of this reader.
+  **Run metadata:** populate `[run].name` from `software` + `softwareVersion` attrs; `[run].date` from `date` attr; resources from `machine` attr.
+  **Code identification:** the openPMD `software` attribute (e.g., "WarpX", "PIConGPU") drives a small dispatch table for the few code-specific metadata quirks (path conventions, mass/charge units that don't follow ED-PIC strictly). Auto-detection: presence of `openPMD` root attribute.
+  Optional dep: `openpmd-api>=0.17` under an `openpmd` extra. All tests use synthetic openPMD files generated via openpmd-api in the test fixture setup. **Depends on:** Tier 1 ED-PIC vocabulary adoption (TASKS-schema-extension.md), Tier 2 per-component stagger (`StaggerInfo.position` array), Documentation backlog openPMD mapping.
+
 ---
 
 ## Pending Extensions

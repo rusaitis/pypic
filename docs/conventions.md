@@ -48,6 +48,46 @@ propagates into gyroradius definitions — always state the convention
 explicitly. The gyroradius $r = v_{th}/\omega_c$ uses whichever $v_{th}$
 is adopted.
 
+## Temperature in Energy Units
+
+pypic stores temperature in **energy units** (J in SI), not Kelvin.
+Concretely, `T = P/n` with no Boltzmann factor; the `temperature`
+quantity_type maps to the SI unit `"J"` and the openPMD
+`unitDimension` 7-tuple `(2, 1, -2, 0, 0, 0, 0)` — same as
+`energy_density`, not the Kelvin form `(0, 0, 0, 0, 1, 0, 0)`. This
+matches NRL Formulary, Chen, Krall & Trivelpiece, and the convention
+used by every production PIC code (iPIC3D, OSIRIS, VPIC, Smilei,
+WarpX, TRISTAN). Plasma formulas — sound speed, Debye length, plasma
+beta, gyroradii — stay free of $k_B$ as a result.
+
+### Converting to eV or K for display
+
+`in_si()` always returns Joules (SI by definition). For the
+plasma-physics working unit eV, or for K-equivalent comparison with
+thermometer data, use `in_units()`:
+
+```python
+T_J  = ds.in_si("Te")              # Joules
+T_eV = ds.in_units("Te", "eV")     # ÷ scipy.constants.eV
+T_K  = ds.in_units("Te", "K")      # ÷ scipy.constants.k
+T_keV = ds.in_units("Te", "keV")   # convenience alias
+```
+
+Same path works for any energy-dimensional quantity (pressure,
+energy_density, specific_energy), but eV is conventional only for
+temperature; pressure stays in Pa (or nPa for space), energy density
+in J/m³.
+
+### openPMD impedance
+
+When pypic eventually reads or writes openPMD data with temperature
+recorded in K, the reader/writer applies a `× k_B` (or `÷ k_B`)
+conversion at the boundary. The `unitDimension` attribute that pypic
+emits describes its internal representation (J), not the Kelvin form
+a downstream openPMD consumer might expect. Document the convention
+on the file rather than the schema if you intend the data to be
+consumed by tools that assume K.
+
 ## Cyclotron Frequency Convention
 
 $\omega_{ce}$ and $\omega_{ci}$ are defined as positive (magnitudes),

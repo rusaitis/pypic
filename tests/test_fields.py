@@ -5,10 +5,12 @@ from pypic.compute import field_si_factor
 from pypic.dataset import FieldDataset
 from pypic.fields import (
     _FIELD_INFO,
+    _QUANTITY_DIMENSIONS,
     _QUANTITY_UNITS,
     _SPECIES_INFO_PATTERNS,
     QuantityType,
     field_info,
+    quantity_dimension,
     quantity_units,
     register_field,
     unit_label,
@@ -398,6 +400,84 @@ class TestFieldRegistration:
             assert info.long_name == "Enum speed"
         finally:
             unregister_field(name)
+
+
+class TestUnitDimension:
+    """openPMD `unitDimension` 7-tuple lookup parallels _QUANTITY_UNITS."""
+
+    def test_every_quantity_type_has_dimension(self) -> None:
+        missing = [
+            qt.value for qt in QuantityType if qt.value not in _QUANTITY_DIMENSIONS
+        ]
+        assert not missing, f"missing dimensions: {missing}"
+
+    @pytest.mark.parametrize(
+        ("quantity", "expected"),
+        [
+            ("b_field", (0, 1, -2, -1, 0, 0, 0)),  # T
+            ("e_field", (1, 1, -3, -1, 0, 0, 0)),  # V/m
+            ("velocity", (1, 0, -1, 0, 0, 0, 0)),
+            ("pressure", (-1, 1, -2, 0, 0, 0, 0)),  # Pa
+            ("current_density", (-2, 0, 0, 1, 0, 0, 0)),  # A/m^2
+            ("frequency", (0, 0, -1, 0, 0, 0, 0)),
+            ("dimensionless", (0, 0, 0, 0, 0, 0, 0)),
+        ],
+    )
+    def test_known_values(self, quantity: str, expected: tuple[int, ...]) -> None:
+        assert quantity_dimension(quantity) == expected
+
+    def test_enum_input_form(self) -> None:
+        assert quantity_dimension(QuantityType.VELOCITY) == (1, 0, -1, 0, 0, 0, 0)
+        assert quantity_dimension(QuantityType.B_FIELD) == (0, 1, -2, -1, 0, 0, 0)
+
+    def test_unknown_raises_keyerror(self) -> None:
+        with pytest.raises(KeyError):
+            quantity_dimension("nonexistent_quantity")
+
+    def test_pressure_and_energy_density_share_dimension(self) -> None:
+        # J/m^3 = Pa — physically correct sharing.
+        assert quantity_dimension("pressure") == quantity_dimension("energy_density")
+
+    def test_canonical_field_attrs_carry_dimension(self) -> None:
+        ds = _make_dataset({"B1": np.ones((4, 3, 2))})
+        assert ds.xr["B1"].attrs["unit_dimension"] == [0, 1, -2, -1, 0, 0, 0]
+
+    def test_register_field_default_dimension(self) -> None:
+        name = "_test_ud_default"
+        try:
+            register_field(name, "velocity")
+            assert field_info(name).unit_dimension is None
+            ds = _make_dataset({name: np.ones((4, 3, 2))})
+            assert ds.xr[name].attrs["unit_dimension"] == [1, 0, -1, 0, 0, 0, 0]
+        finally:
+            unregister_field(name)
+
+    def test_register_field_dimension_override(self) -> None:
+        name = "_test_ud_override"
+        custom = (2, 1, -3, 0, 0, 0, 0)
+        try:
+            register_field(name, "dimensionless", unit_dimension=custom)
+            assert field_info(name).unit_dimension == custom
+            ds = _make_dataset({name: np.ones((4, 3, 2))})
+            assert ds.xr[name].attrs["unit_dimension"] == list(custom)
+        finally:
+            unregister_field(name)
+
+    def test_register_field_rejects_short_dimension(self) -> None:
+        with pytest.raises(ValueError, match="7-tuple"):
+            register_field(
+                "_test_ud_short",
+                "velocity",
+                unit_dimension=(1, 0, -1),  # type: ignore[arg-type]
+            )
+
+    def test_register_field_rejects_non_int_dimension(self) -> None:
+        with pytest.raises(ValueError, match="7-tuple"):
+            register_field(
+                "_test_ud_floats",
+                "velocity",
+                unit_dimension=(1.0, 0, -1, 0, 0, 0, 0),  # type: ignore[arg-type]
+            )
 
 
 class TestQuantityType:

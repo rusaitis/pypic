@@ -37,12 +37,19 @@ class FieldInfo:
         SI unit label (e.g. ``"T"``, ``"Pa"``, ``""`` for dimensionless).
     latex : str
         LaTeX symbol for plot labels (e.g. ``r"$B_1$"``).
+    unit_dimension : tuple[int, ...] | None
+        openPMD-style 7-tuple of integer SI base-unit powers
+        (length, mass, time, current, temperature, amount, luminosity).
+        ``None`` (the default) defers to ``quantity_dimension(quantity_type)``
+        at attrs-population time; a non-``None`` value overrides the
+        canonical lookup for custom-registered fields.
     """
 
     quantity_type: str
     long_name: str
     si_unit: str
     latex: str = ""
+    unit_dimension: tuple[int, int, int, int, int, int, int] | None = None
 
 
 class QuantityType(StrEnum):
@@ -113,6 +120,79 @@ _QUANTITY_UNITS: dict[str, str] = {
 assert set(QuantityType) == set(_QUANTITY_UNITS), (
     "QuantityType and _QUANTITY_UNITS out of sync"
 )
+
+
+# openPMD `unitDimension` 7-tuple — powers of the SI base units in the order
+# (length, mass, time, current, temperature, amount, luminosity).  Encodes the
+# same dimensional content as ``_QUANTITY_UNITS`` but in machine-checkable form.
+# Note: pypic stores temperature in *energy units* (J) by convention (see
+# ``docs/conventions.md``), so ``"temperature"`` shares its 7-tuple with
+# ``"energy_density"`` rather than carrying a Kelvin power.
+_QUANTITY_DIMENSIONS: dict[str, tuple[int, int, int, int, int, int, int]] = {
+    "b_field": (0, 1, -2, -1, 0, 0, 0),  # T
+    "e_field": (1, 1, -3, -1, 0, 0, 0),  # V/m
+    "velocity": (1, 0, -1, 0, 0, 0, 0),
+    "four_velocity": (1, 0, -1, 0, 0, 0, 0),
+    "length": (1, 0, 0, 0, 0, 0, 0),
+    "time": (0, 0, 1, 0, 0, 0, 0),
+    "density": (-3, 0, 0, 0, 0, 0, 0),  # m^-3
+    "mass_density": (-3, 1, 0, 0, 0, 0, 0),  # kg/m^3
+    "charge_density": (-3, 0, 1, 1, 0, 0, 0),  # C/m^3
+    "current_density": (-2, 0, 0, 1, 0, 0, 0),  # A/m^2
+    "pressure": (-1, 1, -2, 0, 0, 0, 0),  # Pa
+    "temperature": (2, 1, -2, 0, 0, 0, 0),  # J (pypic energy units)
+    "energy_density": (-1, 1, -2, 0, 0, 0, 0),  # J/m^3 = Pa
+    "frequency": (0, 0, -1, 0, 0, 0, 0),
+    "poynting_flux": (0, 1, -3, 0, 0, 0, 0),  # W/m^2
+    "energy_flux": (0, 1, -3, 0, 0, 0, 0),  # W/m^2
+    "b_field_per_length": (-1, 1, -2, -1, 0, 0, 0),  # T/m
+    "e_field_per_length": (0, 1, -3, -1, 0, 0, 0),  # V/m^2
+    "velocity_per_length": (0, 0, -1, 0, 0, 0, 0),  # 1/s
+    "specific_energy": (2, 0, -2, 0, 0, 0, 0),  # J/kg
+    "power_density": (-1, 1, -3, 0, 0, 0, 0),  # W/m^3
+    "dimensionless": (0, 0, 0, 0, 0, 0, 0),
+}
+
+assert set(QuantityType) == set(_QUANTITY_DIMENSIONS), (
+    "QuantityType and _QUANTITY_DIMENSIONS out of sync"
+)
+
+
+def quantity_dimension(
+    quantity: str | QuantityType,
+) -> tuple[int, int, int, int, int, int, int]:
+    r"""Return the openPMD ``unitDimension`` 7-tuple for a quantity type.
+
+    The tuple gives integer powers of the SI base units in the order
+    *(length, mass, time, current, temperature, amount, luminosity)*.
+
+    Parameters
+    ----------
+    quantity : str or QuantityType
+        Physical quantity type — one of the keys in ``_QUANTITY_UNITS``.
+
+    Returns
+    -------
+    tuple[int, ...]
+        Seven-element tuple of integer dimensional powers.
+
+    Raises
+    ------
+    KeyError
+        If *quantity* is not a recognized quantity type.
+
+    Examples
+    --------
+    >>> quantity_dimension("b_field")
+    (0, 1, -2, -1, 0, 0, 0)
+    >>> quantity_dimension(QuantityType.VELOCITY)
+    (1, 0, -1, 0, 0, 0, 0)
+    >>> quantity_dimension("dimensionless")
+    (0, 0, 0, 0, 0, 0, 0)
+    """
+    key = quantity.value if isinstance(quantity, QuantityType) else quantity
+    return _QUANTITY_DIMENSIONS[key]
+
 
 # Helper to keep long FieldInfo constructors within 88 columns
 _FI = FieldInfo
@@ -422,6 +502,7 @@ def register_field(
     long_name: str = "",
     si_unit: str | None = None,
     latex: str = "",
+    unit_dimension: tuple[int, int, int, int, int, int, int] | None = None,
 ) -> None:
     """Register metadata for a custom field.
 
@@ -441,11 +522,18 @@ def register_field(
         SI unit label.  If ``None``, inferred from *quantity_type*.
     latex : str
         LaTeX symbol for plot labels.
+    unit_dimension : tuple[int, ...] | None
+        openPMD ``unitDimension`` 7-tuple (powers of length, mass,
+        time, current, temperature, amount, luminosity).  ``None``
+        (the default) uses ``quantity_dimension(quantity_type)``.
+        Provide an explicit tuple only for non-canonical fields whose
+        dimension differs from the standard lookup.
 
     Raises
     ------
     ValueError
-        If *quantity_type* is not recognized.
+        If *quantity_type* is not recognized, or *unit_dimension* is
+        not a length-7 sequence of ints.
     """
     if quantity_type not in _QUANTITY_UNITS:
         valid = sorted(_QUANTITY_UNITS)
@@ -455,7 +543,15 @@ def register_field(
     if si_unit is None:
         si_unit = _QUANTITY_UNITS[quantity_type]
 
-    info = FieldInfo(quantity_type, long_name, si_unit, latex)
+    if unit_dimension is not None:
+        if len(unit_dimension) != 7 or not all(
+            isinstance(p, int) for p in unit_dimension
+        ):
+            msg = f"unit_dimension must be a 7-tuple of ints, got {unit_dimension!r}"
+            raise ValueError(msg)
+        unit_dimension = tuple(unit_dimension)  # type: ignore[assignment]
+
+    info = FieldInfo(quantity_type, long_name, si_unit, latex, unit_dimension)
 
     with _lock:
         if name in _FIELD_INFO:

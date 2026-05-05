@@ -383,6 +383,17 @@ class TestToZarrFromZarr:
             to_zarr(fds, store)
         assert not store.exists()
 
+    def test_unit_dimension_round_trip(self, tmp_path):
+        # openPMD-style 7-tuple survives Zarr write/read on canonical fields.
+        fds = make_test_dataset(
+            {"B1": np.ones((4, 3, 2)), "rho_m": np.ones((4, 3, 2))},
+        )
+        store = tmp_path / "ud.zarr"
+        to_zarr(fds, store)
+        loaded = from_zarr(store)
+        assert loaded.xr["B1"].attrs["unit_dimension"] == [0, 1, -2, -1, 0, 0, 0]
+        assert loaded.xr["rho_m"].attrs["unit_dimension"] == [-3, 1, 0, 0, 0, 0, 0]
+
 
 class TestToZarrTimeseries:
     """Tests for to_zarr_timeseries with iterable source."""

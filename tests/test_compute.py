@@ -483,6 +483,29 @@ class TestFieldDatasetMethods:
         with pytest.raises(ValueError, match="Unknown unit"):
             ds.in_units("B1", "furlongs")
 
+    def test_in_units_temperature_eV_and_K(self):
+        # pypic stores T in energy units (J).  in_units must convert to
+        # the plasma working unit (eV) and to K via the Boltzmann factor.
+        shape = (2, 2, 2)
+        # Identity normalization → code value equals SI value (J).
+        ds = make_test_dataset(
+            {"Te": np.full(shape, 1.602e-18)},  # ~10 eV electrons
+            shape=shape,
+        )
+        np.testing.assert_allclose(ds.in_si("Te"), 1.602e-18, rtol=1e-12)
+        # 1 eV = constants.eV J → 1.602e-18 J / 1.602e-19 (J/eV) ≈ 10 eV
+        np.testing.assert_allclose(
+            ds.in_units("Te", "eV"), 1.602e-18 / constants.eV, rtol=1e-12
+        )
+        # 1 K = constants.k J → 1.602e-18 J / 1.381e-23 (J/K) ≈ 1.16e5 K
+        np.testing.assert_allclose(
+            ds.in_units("Te", "K"), 1.602e-18 / constants.k, rtol=1e-12
+        )
+        # keV / MeV scale linearly
+        np.testing.assert_allclose(
+            ds.in_units("Te", "keV"), ds.in_units("Te", "eV") / 1e3, rtol=1e-12
+        )
+
     def test_cartesian_compute_aliases(self):
         shape = (4, 4, 4)
         data = {"B1": np.ones(shape), "B2": np.ones(shape), "B3": np.ones(shape)}
