@@ -48,6 +48,8 @@ schema_version = "1.0"   # top-level bare key — lets a streaming parser
 
 ### Optional sections
 
+Listed in the order §2 walks them.
+
 ```toml
 [boundary_conditions]    # per-axis BC tags (lower/upper) + per-field overrides
 [physics]                # model-agnostic flags + .{pic,mhd,hybrid} sub-tables
@@ -55,17 +57,18 @@ schema_version = "1.0"   # top-level bare key — lets a streaming parser
 [initial_conditions]     # flat table: setup type + type-specific keys
 [[drivers]]              # ongoing external coupling (magnetograms, SW inflow, ...)
 [restart]                # continuation pointer (incl. multi-file from_files)
-[output.checkpoints]     # lossless full-state dumps
-[output.fields]          # field output cadence + quantities
-[output.particles]       # particle output cadence + selection
-[output.probes]          # probe time-series cadence
-[output.diagnostics]     # on-the-fly derived quantities
-[[output.streams]]       # multi-cadence / region-of-interest output groups
-[[probes]]               # fixed or trajectory samplers
+[output.*]               # five sub-sections walked together in §2:
+                         #   [output.checkpoints]   lossless full-state dumps
+                         #   [output.fields]        field output cadence + quantities
+                         #   [output.particles]     particle output cadence + selection
+                         #   [output.probes]        probe time-series cadence
+                         #   [output.diagnostics]   on-the-fly derived quantities
+                         #   [[output.streams]]     multi-cadence / ROI output groups
 [phase_space]            # >3D phase-space grid for gyrokinetic / full Vlasov
                          #   (continuum-Vlasov sparse-block storage lives in
                          #   the [phase_space.storage] sub-table)
 [[collisions]]           # per-pair collision declarations (Smilei, EPOCH, ...)
+[[probes]]               # fixed or trajectory samplers
 ```
 
 ### Extensions
@@ -264,6 +267,7 @@ upper = ["periodic", "periodic", "open"]
 # Per-face driver foreign keys (optional, sparse).
 # Keys are axis indices ("0"/"1"/"2"); values must match a declared
 # [[drivers]].name entry. Faces without a driver simply don't appear.
+# Unresolved names raise a validation error.
 drivers_lower = { 2 = "solar_wind_inflow" }
 
 # Per-field BC overrides (optional). Apply only to "E", "B", or
@@ -347,10 +351,20 @@ Describes the coordinate geometry and reference frame.
 geometry = "string"                # REQUIRED: "cartesian" | "spherical" | "cylindrical"
                                    #            | "thetaMode"
 frame = "string"                   # REQUIRED: native frame name (arbitrary, e.g., "simulation")
-axis_labels = ["x", "y", "z"]     # optional: override default axis names
-physical_extent = [46.0, 32.0, 13.0]  # optional: domain size in target-frame physical units
-physical_extent_unit = "R_E"       # optional: unit for physical_extent (default "m")
-                                   #   valid: "m", "km", "R_E", "R_S", "AU"
+axis_labels = ["x", "y", "z"]     # optional: override default axis names. Always
+                                   #   length 3 — labels the embedding 3D coordinate
+                                   #   space, even when grid.dimensions is 1D or 2D.
+                                   #   Surviving labels are sliced from this 3-tuple
+                                   #   to match the active grid axes.
+physical_extent = [46.0, 32.0, 13.0]  # optional: domain size in target-frame physical units;
+                                   #   length must match grid.dimensions (1–3, per active axis)
+physical_extent_unit = "R_E"       # optional: unit for physical_extent (default "m"). Valid:
+                                   #   "m", "km" (SI lengths)
+                                   #   "R_E" (Earth), "R_M" (Mercury), "R_J" (Jupiter)
+                                   #   "R_S" (solar radius, heliophysics convention)
+                                   #   "R_sun" (unambiguous synonym for R_S)
+                                   #   "AU" (astronomical unit)
+                                   #   "d_i" (ion skin depth, normalization-resolved at apply time)
 
 # Required when geometry = "thetaMode" (FBPIC azimuthal-mode RZ
 # decomposition over an (r, z) grid). Forbidden otherwise.
@@ -491,6 +505,8 @@ scheme              = "fct"        # "fct" | "godunov" | "muscl-hancock" | "ppm"
 reconstruction      = "linear"     # "linear" | "plm" | "ppm" | "weno5" | "mp5"
 limiter             = "zalesak"    # "zalesak" | "minmod" | "mc" | "van-leer" | "superbee"
 divergence_cleaning = "ct"         # "ct" | "powell" | "dedner-glm" | "projection" | "none"
+preconditioner      = "ilu"        # optional — implicit MHD: "none" | "jacobi" |
+                                   #   "block-jacobi" | "ilu" | "amg" | "additive-schwarz"
 # riemann = "hlld"                 # Godunov family: "roe" | "hll" | "hlle" | "hlld" | "lax-friedrichs"
 
 [physics.hybrid]
@@ -503,6 +519,9 @@ field_pusher      = "cyclic-leapfrog"      # "cyclic-leapfrog" | "implicit"
 resistivity       = 5.0e-4
 hyper_resistivity = 1.0e-6
 current_smoothing = 2
+preconditioner    = "block-jacobi"         # optional — for "implicit" field_pusher only:
+                                           #   "none" | "jacobi" | "block-jacobi" |
+                                           #   "ilu" | "amg" | "additive-schwarz"
 ```
 
 Key rename: `omega_pe_over_omega_ce` (v0) → `omega_p_over_omega_c`
@@ -564,7 +583,9 @@ cadence       = 720.0              # seconds between samples
 interpolation = "linear"
 target_lower  = [1.0, 0.87, -0.87] # code units (optional)
 target_upper  = [1.0, 2.60, 0.87]
-body          = "mercury"          # optional — inherits body bounding box
+body          = "mercury"          # optional — inherits body bounding box.
+                                   #   Must match a declared [[bodies]].name;
+                                   #   unresolved names raise a validation error.
 ```
 
 `coupling` and `direction` are orthogonal. Target precedence:
@@ -741,33 +762,40 @@ section that overlapped with ``[phase_space]`` on axis identity. v1.0.x
 removes ``[velocity_mesh]`` and folds its ``block_size`` /
 ``sparsity_threshold`` into ``[phase_space.storage]``; the redundant
 ``dimensions``, ``extent``, and ``coordinate_system`` fields are
-retired in favor of the ``[phase_space]`` versions.
+retired in favor of the ``[phase_space]`` versions. If a config still
+contains ``[velocity_mesh]``, move ``block_size`` and ``sparsity_threshold``
+to ``[phase_space.storage]`` and drop the rest — ``[phase_space]`` already
+carries equivalent ``dimensions``, ``extents``, and ``coordinate_system``
+keys.
 
 ### [[collisions]]
 
 Per-pair collision declaration for collisional PIC codes (Smilei,
 EPOCH, OSIRIS-collisional, PIConGPU). Repeatable. Both species in
-``species_pair`` must match a declared ``[[species]].name``;
-self-collisions (same species twice) are permitted.
+``species_pair`` must match a declared ``[[species]].name`` —
+unresolved names raise a validation error. Self-collisions (same
+species twice) are permitted.
 
 ```toml
 [[collisions]]
-species_pair    = ["electrons", "ions"]
-model           = "coulomb"            # "coulomb" | "bgk" | "monte-carlo"
+species_pair    = ["electrons", "ions"] # REQUIRED — both names must match [[species]]
+model           = "coulomb"            # REQUIRED — "coulomb" | "bgk" | "monte-carlo"
 coulomb_log     = 10.0                 # optional — Λ for Coulomb collisions
 temperature_ref = 1.0                  # optional — reference T for the rate scale
 description     = "..."                # optional
+```
 
 ### [[probes]]
 
 Virtual probes (detectors, spacecraft) that sample fields at specific
-locations. Either **fixed** (constant position) or a **trajectory**
-(position varies with time). Repeatable.
+locations. Each probe is either **fixed** (constant `position`) or a
+**trajectory** (CSV file path); provide exactly one of `position` or
+`trajectory` — both or neither raises a validation error. Repeatable.
 
 ```toml
 [[probes]]
-name = "magnetopause_monitor"      # REQUIRED: human-readable label
-position = [10.0, 0.0, 0.0]       # fixed: [x, y, z] in code units
+name = "magnetopause_monitor"      # REQUIRED — human-readable label
+position = [10.0, 0.0, 0.0]        # XOR with `trajectory` — fixed: [x, y, z] in code units
 fields = ["B1", "B2", "B3", "beta"]  # optional: fields to sample.
                                      # Default (omitted): every
                                      # storage-primitive field present
@@ -778,8 +806,8 @@ fields = ["B1", "B2", "B3", "beta"]  # optional: fields to sample.
                                      # listed explicitly to opt in.
 
 [[probes]]
-name = "MMS1"                      # trajectory (virtual spacecraft)
-trajectory = "mms1_orbit.csv"      # CSV columns: t, x, y, z (code units)
+name = "MMS1"                      # REQUIRED — trajectory (virtual spacecraft)
+trajectory = "mms1_orbit.csv"      # XOR with `position` — CSV columns: t, x, y, z (code units)
 frame = "GSM"                      # optional: transform to simulation frame
 ```
 
@@ -1132,6 +1160,7 @@ layout directly.
 - **New field:** Add the name to the canonical table (this document), add to relevant readers, add derived functions if applicable.
 - **New model type:** Add a `[physics.NEW_TYPE]` subsection convention, document expected fields and species.
 - **New output format:** Define the layout mapping, write a reader. Everything downstream works unchanged via `FieldDataset`.
+- **Code-specific knobs:** Park them under an `x-<code>` namespace (see §1 *Extensions*). Both `x-<code>` and `x_<code>` spellings are accepted; prefer the hyphenated `x-<code>` form for cross-tool portability — it matches the JSON Schema, OpenAPI, and openPMD extension conventions, and TOML parsers that emit warnings on bare keys with hyphens still parse `x-` correctly under quoting rules.
 
 ---
 
