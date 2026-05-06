@@ -203,7 +203,12 @@ for _alias_pfx, _canon_pfx in _FIELD_PREFIX_PAIRS:
             f"{_canon_pfx}{_canon_sep}{_i}"
         )
 
-# Scalar underscore aliases (P_e→Pe, T_i→Ti, pressure tensor components)
+# Scalar underscore aliases (e.g. ``P_e`` is an alternate spelling of
+# ``Pe``).  The e/i form is what carries the rich electron/ion-specific
+# field metadata in ``_FIELD_INFO``; the universal-canonical flip from
+# v1.0.x lives at the compute layer (``_COMPUTE_ALIASES``).  These
+# entries keep underscore-spellings working for both labeling and
+# storage lookup.
 _SCALAR_UNDERSCORE_ALIASES: dict[str, str] = {
     "P_e": "Pe",
     "P_i": "Pi",
@@ -217,10 +222,18 @@ _SCALAR_UNDERSCORE_ALIASES: dict[str, str] = {
     "P_33": "P33",
 }
 
-# Species-convenience aliases (geometry-independent)
+# Species-convenience aliases (geometry-independent).
+# Storage-equivalent: same data under two names.  ``Pe`` and ``P_s0`` (etc.)
+# refer to the same array — readers that emit one form (e.g. iPIC3D writes
+# ``Pe``/``Pi``) satisfy recipes that ask for the other via the dataset's
+# bidirectional resolver.
 _SPECIES_ALIASES: dict[str, str] = {
     "n_e": "n_s0",
     "n_i": "n_s1",
+    "Pe": "P_s0",
+    "Pi": "P_s1",
+    "Te": "T_s0",
+    "Ti": "T_s1",
 }
 
 

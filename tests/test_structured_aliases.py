@@ -5,7 +5,6 @@ import pytest
 
 from pypic.compute import (
     _COMPUTE_ALIASES,
-    _REGISTRY,
     compute_field,
     field_si_factor,
 )
@@ -179,6 +178,8 @@ class TestStructuredSpeciesComputeAliases:
     @pytest.mark.parametrize(
         ("alias", "canonical"),
         [
+            # Species-coupled scales: e/i form remains canonical (recipe
+            # registered directly); _sN form aliases up to it.
             ("omega_p_s0", "omega_pe"),
             ("omega_p_s1", "omega_pi"),
             ("omega_c_s0", "omega_ce"),
@@ -193,15 +194,17 @@ class TestStructuredSpeciesComputeAliases:
             ("rL_s1", "r_i"),
             ("r_s0", "r_e"),
             ("r_s1", "r_i"),
-            ("beta_s0", "beta_e"),
-            ("beta_s1", "beta_i"),
-            ("entropy_s0", "s_e"),
-            ("entropy_s1", "s_i"),
-            ("T_s0", "Te"),
-            ("T_s1", "Ti"),
-            ("P_s0", "Pe"),
-            ("P_s1", "Pi"),
             ("lambda_D_s0", "lambda_D"),
+            # Moment quantities (post v1.0.x flip): _sN is canonical;
+            # the e/i convenience name aliases down to it.
+            ("Pe", "P_s0"),
+            ("Pi", "P_s1"),
+            ("Te", "T_s0"),
+            ("Ti", "T_s1"),
+            ("beta_e", "beta_s0"),
+            ("beta_i", "beta_s1"),
+            ("s_e", "s_s0"),
+            ("s_i", "s_s1"),
         ],
     )
     def test_species_aliases_resolve(self, alias, canonical):
@@ -371,7 +374,9 @@ class TestFieldAliasIntegrity:
         from pypic.coordinates import CARTESIAN
 
         aliases = _default_aliases(CARTESIAN)
-        canonical_fields = {"B1", "B2", "B3", "E1", "E2", "E3", "Pe", "Pi", "Te", "Ti"}
+        # Per v1.0.x, ``_sN`` is canonical for moments (P_s0, T_s0, ...).
+        # The bare-component names below are universally canonical.
+        canonical_fields = {"B1", "B2", "B3", "E1", "E2", "E3"}
         overlap = set(aliases) & canonical_fields
         assert not overlap, f"Alias collision with canonical: {overlap}"
 
@@ -568,13 +573,15 @@ class TestSpeciesNameAliases:
 
 
 class TestAuditIssue2SGyroRename:
-    """s_gyro_e/s_gyro_i are canonical; bare s_gyro is an error."""
+    """s_gyro_e/s_gyro_i resolve via the species template; bare s_gyro is an error."""
 
-    def test_s_gyro_e_is_canonical(self):
-        assert "s_gyro_e" in _REGISTRY
+    def test_s_gyro_e_resolves(self):
+        # Post v1.0.x: per-species entropies come from the ``"s_gyro"``
+        # species template (``s_gyro_s0``); ``s_gyro_e`` aliases down to it.
+        assert _COMPUTE_ALIASES["s_gyro_e"] == "s_gyro_s0"
 
-    def test_s_gyro_i_is_canonical(self):
-        assert "s_gyro_i" in _REGISTRY
+    def test_s_gyro_i_resolves(self):
+        assert _COMPUTE_ALIASES["s_gyro_i"] == "s_gyro_s1"
 
     def test_bare_s_gyro_not_in_aliases(self):
         assert "s_gyro" not in _COMPUTE_ALIASES

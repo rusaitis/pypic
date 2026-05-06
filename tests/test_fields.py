@@ -277,9 +277,15 @@ class TestNewFieldEntries:
         assert info.quantity_type == "density"
         assert info.long_name == "Number density (species 99)"
 
-    def test_pressure_scalar_species_s0_alias(self) -> None:
-        """P_s0 resolves to Pe via compute alias."""
+    def test_pressure_scalar_species_s0_canonical(self) -> None:
+        """P_s0 is canonical (post v1.0.x); generic species metadata."""
         info = field_info("P_s0")
+        assert info.quantity_type == "pressure"
+        assert info.long_name == "Pressure (species 0)"
+
+    def test_pe_resolves_to_electron_pressure(self) -> None:
+        """The e/i convenience name carries the rich electron-pressure label."""
+        info = field_info("Pe")
         assert info.quantity_type == "pressure"
         assert info.long_name == "Electron pressure"
 

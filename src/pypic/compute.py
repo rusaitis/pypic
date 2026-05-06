@@ -78,12 +78,6 @@ _SPECIES_PRESSURE_TENSOR_AND_B = (
 )
 
 
-def _species_tensor_b(species: int) -> tuple[str, ...]:
-    """Build per-species pressure tensor + B field tuple for static recipes."""
-    s = str(species)
-    return (*(f"{f}_s{s}" for f in _PRESSURE_TENSOR_FIELDS), "B1", "B2", "B3")
-
-
 def _vector_recipes(
     name_tmpl: str,
     func: Callable[..., Any],
@@ -131,10 +125,10 @@ _REGISTRY: dict[str, _Recipe] = {
     "|J|": _Recipe(derived.current_density_magnitude, ("J1", "J2", "J3")),
     "|V|": _Recipe(derived.velocity_magnitude, ("V1", "V2", "V3")),
     "|Ve|": _Recipe(derived.velocity_magnitude, ("Ve1", "Ve2", "Ve3")),
-    # Plasma parameters
+    # Plasma parameters.  Per-species ``beta_e``/``beta_i`` are produced by
+    # the species template ``"beta"`` (resolves ``beta_s0``/``beta_s1``);
+    # the e/i names alias to ``_sN`` via ``_COMPUTE_ALIASES``.
     "beta": _Recipe(derived.plasma_beta, ("P", "|B|")),
-    "beta_e": _Recipe(derived.plasma_beta, ("Pe", "|B|")),
-    "beta_i": _Recipe(derived.plasma_beta, ("Pi", "|B|")),
     "v_A": _Recipe(derived.alfven_speed, ("|B|", "rho_m"), supports_relativistic=True),
     "c_s": _Recipe(
         derived.sound_speed,
@@ -144,7 +138,7 @@ _REGISTRY: dict[str, _Recipe] = {
     ),
     "c_ia": _Recipe(
         derived.ion_acoustic_speed,
-        ("Te", "Ti"),
+        ("T_s0", "T_s1"),
         species_index=1,
         species_args=_SpeciesArgs.MASS_ONLY,
     ),
@@ -185,10 +179,8 @@ _REGISTRY: dict[str, _Recipe] = {
     "sigma": _Recipe(derived.magnetization, ("|B|", "rho_m"), needs_c=True),
     "e_int": _Recipe(derived.internal_energy, ("P", "rho_m"), needs_gamma=True),
     "s": _Recipe(derived.entropy, ("P", "rho_m"), needs_gamma=True),
-    "s_e": _Recipe(derived.entropy, ("Pe", "n_s0"), needs_gamma=True),
-    "s_i": _Recipe(derived.entropy, ("Pi", "n_s1"), needs_gamma=True),
-    "s_gyro_e": _Recipe(derived.gyrotropic_entropy, ("P_par_e", "P_perp_e", "n_s0")),
-    "s_gyro_i": _Recipe(derived.gyrotropic_entropy, ("P_par_i", "P_perp_i", "n_s1")),
+    # Per-species entropies (``s_e``, ``s_i``, ``s_gyro_e``, ``s_gyro_i``)
+    # come from the ``"s"`` and ``"s_gyro"`` species templates below.
     # Poynting flux (tuple return — component selects)
     **_vector_recipes(
         "S{c}",
@@ -224,20 +216,20 @@ _REGISTRY: dict[str, _Recipe] = {
     ),
     "v_th_e": _Recipe(
         derived.thermal_speed,
-        ("Te",),
+        ("T_s0",),
         species_index=0,
         species_args=_SpeciesArgs.MASS_ONLY,
         supports_relativistic=True,
     ),
     "r_e": _Recipe(
         derived.gyroradius,
-        ("Te", "|B|"),
+        ("T_s0", "|B|"),
         species_index=0,
         species_args=_SpeciesArgs.CHARGE_MASS,
     ),
     "lambda_D": _Recipe(
         derived.debye_length,
-        ("Te", "n_s0"),
+        ("T_s0", "n_s0"),
         species_index=0,
         species_args=_SpeciesArgs.CHARGE_ONLY,
     ),
@@ -263,33 +255,27 @@ _REGISTRY: dict[str, _Recipe] = {
     ),
     "v_th_i": _Recipe(
         derived.thermal_speed,
-        ("Ti",),
+        ("T_s1",),
         species_index=1,
         species_args=_SpeciesArgs.MASS_ONLY,
         supports_relativistic=True,
     ),
     "r_i": _Recipe(
         derived.gyroradius,
-        ("Ti", "|B|"),
+        ("T_s1", "|B|"),
         species_index=1,
         species_args=_SpeciesArgs.CHARGE_MASS,
     ),
-    # Total pressure from partial pressures (Pe, Pi each resolve from
-    # per-species tensor trace when not directly available).
-    "P": _Recipe(derived.total_pressure, ("Pe", "Pi")),
-    "Pe": _Recipe(derived.isotropic_pressure, ("P11_s0", "P22_s0", "P33_s0")),
-    "Pi": _Recipe(derived.isotropic_pressure, ("P11_s1", "P22_s1", "P33_s1")),
-    # Pressure tensor decomposition
+    # Total pressure from partial pressures.  ``P_s0``/``P_s1`` each resolve
+    # via the species template ``"P"`` (trace of the diagonal tensor) when
+    # not stored directly; ``Pe``/``Pi`` continue to work via the alias map.
+    "P": _Recipe(derived.total_pressure, ("P_s0", "P_s1")),
+    # Pressure tensor decomposition (total).  Per-species (``P_par_s0``,
+    # ``P_par_e``, ...) is produced by the ``"P_par"`` / ``"P_perp"`` /
+    # ``"agyrotropy"`` species templates below.
     "P_par": _Recipe(derived.parallel_pressure, _PRESSURE_TENSOR_AND_B),
     "P_perp": _Recipe(derived.perpendicular_pressure, _PRESSURE_TENSOR_AND_B),
     "agyrotropy": _Recipe(derived.agyrotropy, _PRESSURE_TENSOR_AND_B),
-    # Per-species pressure decomposition (electrons = s0, ions = s1)
-    "P_par_e": _Recipe(derived.parallel_pressure, _species_tensor_b(0)),
-    "P_par_i": _Recipe(derived.parallel_pressure, _species_tensor_b(1)),
-    "P_perp_e": _Recipe(derived.perpendicular_pressure, _species_tensor_b(0)),
-    "P_perp_i": _Recipe(derived.perpendicular_pressure, _species_tensor_b(1)),
-    "agyrotropy_e": _Recipe(derived.agyrotropy, _species_tensor_b(0)),
-    "agyrotropy_i": _Recipe(derived.agyrotropy, _species_tensor_b(1)),
     # Grid-dependent diagnostics
     "div_B": _Recipe(
         diagnostics.div_b,

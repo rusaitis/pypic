@@ -71,10 +71,10 @@ _COMPUTE_ALIASES: dict[str, str] = {
     "debye_length_e": "lambda_D",
     "parallel_pressure": "P_par",
     "perpendicular_pressure": "P_perp",
-    "parallel_pressure_e": "P_par_e",
-    "parallel_pressure_i": "P_par_i",
-    "perpendicular_pressure_e": "P_perp_e",
-    "perpendicular_pressure_i": "P_perp_i",
+    "parallel_pressure_e": "P_par_s0",
+    "parallel_pressure_i": "P_par_s1",
+    "perpendicular_pressure_e": "P_perp_s0",
+    "perpendicular_pressure_i": "P_perp_s1",
     # Descriptive names — energies and thermodynamics
     "energy_magnetic": "e_B",
     "energy_electric": "e_E",
@@ -96,25 +96,39 @@ _COMPUTE_ALIASES: dict[str, str] = {
     "larmor_radius_s1": "r_i",
     "rL_s0": "r_e",
     "rL_s1": "r_i",
-    "plasma_beta_s0": "beta_e",
-    "plasma_beta_s1": "beta_i",
-    "beta_s0": "beta_e",
-    "beta_s1": "beta_i",
-    "entropy_s0": "s_e",
-    "entropy_s1": "s_i",
-    "entropy_gyrotropic_s0": "s_gyro_e",
-    "entropy_gyrotropic_s1": "s_gyro_i",
-    # Per-species temperature/pressure aliases for s0/s1
-    "T_s0": "Te",
-    "T_s1": "Ti",
-    "P_s0": "Pe",
-    "P_s1": "Pi",
-    "P_par_s0": "P_par_e",
-    "P_par_s1": "P_par_i",
-    "P_perp_s0": "P_perp_e",
-    "P_perp_s1": "P_perp_i",
-    "agyrotropy_s0": "agyrotropy_e",
-    "agyrotropy_s1": "agyrotropy_i",
+    "plasma_beta_e": "beta_s0",
+    "plasma_beta_i": "beta_s1",
+    "plasma_beta_s0": "beta_s0",
+    "plasma_beta_s1": "beta_s1",
+    "entropy_e": "s_s0",
+    "entropy_i": "s_s1",
+    "entropy_s0": "s_s0",
+    "entropy_s1": "s_s1",
+    "entropy_gyrotropic_e": "s_gyro_s0",
+    "entropy_gyrotropic_i": "s_gyro_s1",
+    "entropy_gyrotropic_s0": "s_gyro_s0",
+    "entropy_gyrotropic_s1": "s_gyro_s1",
+    # Two-species e/i convenience: alias to the universal _sN canonical.
+    # Storage-equivalent (same data, different name) — the dataset's
+    # bidirectional alias resolver handles the case where the input
+    # data is stored under the e/i name and a recipe asks for _sN.
+    "Pe": "P_s0",
+    "Pi": "P_s1",
+    "Te": "T_s0",
+    "Ti": "T_s1",
+    # Derived per-species: e/i convenience name, _sN canonical.
+    "beta_e": "beta_s0",
+    "beta_i": "beta_s1",
+    "s_e": "s_s0",
+    "s_i": "s_s1",
+    "s_gyro_e": "s_gyro_s0",
+    "s_gyro_i": "s_gyro_s1",
+    "P_par_e": "P_par_s0",
+    "P_par_i": "P_par_s1",
+    "P_perp_e": "P_perp_s0",
+    "P_perp_i": "P_perp_s1",
+    "agyrotropy_e": "agyrotropy_s0",
+    "agyrotropy_i": "agyrotropy_s1",
     # Structured v_th aliases
     "v_th_s0": "v_th_e",
     "v_th_s1": "v_th_i",
@@ -298,8 +312,9 @@ def species_name_aliases(
 
     Examples
     --------
-    >>> species_name_aliases(("electrons", "ions"), ["n_s0", "P_s1", "B1"])
-    {'n_electrons': 'n_s0', 'P_ions': 'P_s1'}
+    >>> aliases = species_name_aliases(("electrons", "ions"), ["n_s0", "P_s1"])
+    >>> sorted(aliases.items())
+    [('P_ions', 'P_s1'), ('n_electrons', 'n_s0')]
     """
     aliases: dict[str, str] = {}
     if not species_names:

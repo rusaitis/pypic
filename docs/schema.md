@@ -893,8 +893,17 @@ canonical `_s0`/`_s1` forms:
 | `Ve1`..`Ve3` | `V1_s0`..`V3_s0` | Electron bulk velocity |
 | `Vi1`..`Vi3` | `V1_s1`..`V3_s1` | Ion bulk velocity |
 | `EFe`, `EFi` | `EF_s0`, `EF_s1` | Energy flux (vector group) |
-| `s_e`, `s_i` | — | Per-species entropy |
-| `beta_e`, `beta_i` | — | Per-species plasma beta |
+| `s_e`, `s_i` | `s_s0`, `s_s1` | Per-species entropy |
+| `beta_e`, `beta_i` | `beta_s0`, `beta_s1` | Per-species plasma beta |
+| `P_par_e`, `P_par_i` | `P_par_s0`, `P_par_s1` | Per-species parallel pressure |
+| `P_perp_e`, `P_perp_i` | `P_perp_s0`, `P_perp_s1` | Per-species perpendicular pressure |
+| `agyrotropy_e`, `agyrotropy_i` | `agyrotropy_s0`, `agyrotropy_s1` | Per-species agyrotropy |
+| `s_gyro_e`, `s_gyro_i` | `s_gyro_s0`, `s_gyro_s1` | Per-species gyrotropic entropy |
+
+The dataset's alias resolver is bidirectional for these e/i ↔ `_sN` pairs:
+a reader that emits `Pe` (e.g. iPIC3D) satisfies a recipe asking for `P_s0`,
+and vice versa. Storage is the same data either way; the canonical form
+is a documentation choice.
 
 This convention assumes species 0 = electrons, 1 = ions (standard in
 PIC codes). For multi-species simulations (e.g. H⁺ + He²⁺ + O⁺), use

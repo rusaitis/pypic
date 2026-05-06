@@ -110,8 +110,35 @@ class FieldDataset:
                 self._ds.data_vars,
             )
         )
-        # Only keep aliases whose canonical target exists
-        self._aliases = {k: v for k, v in merged.items() if v in self._ds.data_vars}
+        # Bidirectional alias filter.  First pass — forward direction:
+        # ``alias→canonical`` when the canonical is stored.  Reverse:
+        # ``canonical→alias`` when the data is stored under what's now
+        # considered the alias (e.g. ``Pe`` after the v1.0 cleanup made
+        # ``P_s0`` canonical).  Without the reverse direction, a recipe
+        # asking for the ``_sN`` form on a dataset that stores the
+        # ``e/i`` form would miss.
+        data_vars_set = set(self._ds.data_vars)
+        filtered: dict[str, str] = {}
+        for alias_name, canonical_name in merged.items():
+            if canonical_name in data_vars_set:
+                filtered[alias_name] = canonical_name
+            elif alias_name in data_vars_set:
+                filtered.setdefault(canonical_name, alias_name)
+        # Second pass — transitive chains: ``P_e → P_s0 → Pe`` collapses
+        # to ``P_e → Pe`` when only ``Pe`` is stored.  Iterates to a
+        # fixed point in O(|merged|) per round; chain depth is bounded
+        # by the alias graph (≤2 in practice).
+        for _round in range(3):
+            changed = False
+            for alias_name, canonical_name in merged.items():
+                if alias_name in filtered or alias_name in data_vars_set:
+                    continue
+                if canonical_name in filtered:
+                    filtered[alias_name] = filtered[canonical_name]
+                    changed = True
+            if not changed:
+                break
+        self._aliases = filtered
 
     @classmethod
     def from_arrays(
