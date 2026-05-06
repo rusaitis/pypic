@@ -42,16 +42,13 @@ def _species_scalar() -> st.SearchStrategy[float]:
     zero species_charge would collapse macro_charge to the zero vector and
     hide sign-convention bugs in the ``species_charge * weight`` product.
     """
-    return (
-        st.floats(
-            min_value=1e-20,
-            max_value=1e20,
-            allow_nan=False,
-            allow_infinity=False,
-            exclude_min=True,
-        )
-        .flatmap(lambda x: st.sampled_from([x, -x]))
-    )
+    return st.floats(
+        min_value=1e-20,
+        max_value=1e20,
+        allow_nan=False,
+        allow_infinity=False,
+        exclude_min=True,
+    ).flatmap(lambda x: st.sampled_from([x, -x]))
 
 
 def _make_particle_data(

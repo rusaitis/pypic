@@ -100,12 +100,16 @@ class FieldDataset:
         merged = _default_aliases(grid.geometry)
         if aliases:
             merged.update(aliases)
-        # Generate species-name aliases (e.g. n_electrons→n_s0) from config
-        for i, sp in enumerate(self._species):
-            candidate = f"n_{sp.name.lower()}"
-            target = f"n_s{i}"
-            if candidate not in merged and target in self._ds.data_vars:
-                merged[candidate] = target
+        # Generate species-name aliases for every per-species canonical
+        # actually in the dataset (n_electrons→n_s0, P_ions→P_s1, etc.).
+        from pypic._aliases import species_name_aliases as _species_name_aliases
+
+        merged.update(
+            _species_name_aliases(
+                tuple(sp.name for sp in self._species),
+                self._ds.data_vars,
+            )
+        )
         # Only keep aliases whose canonical target exists
         self._aliases = {k: v for k, v in merged.items() if v in self._ds.data_vars}
 

@@ -239,6 +239,10 @@ def _from_schema(schema: SimulationSchema) -> SimulationConfig:
         bodies=tuple(schema.bodies),
         drivers=tuple(schema.drivers),
         restart=schema.restart,
+        run=schema.run,
+        probes=tuple(schema.probes),
+        collisions=tuple(schema.collisions),
+        phase_space=schema.phase_space,
         metadata=metadata,
     )
 
@@ -444,7 +448,23 @@ def _build_metadata(schema: SimulationSchema) -> dict[str, Any]:
     if schema.model.description is not None:
         metadata["description"] = schema.model.description
     if schema.grid.stagger is not None:
-        metadata["stagger"] = StaggerInfo(convention=str(schema.grid.stagger))
+        # ``stagger_fields`` and ``stagger_position`` are optional per-component
+        # promotions of the single-string summary. They round-trip through
+        # ``StaggerInfo`` so consumers see one shape regardless of how the
+        # source TOML expressed it.
+        position: dict[str, tuple[float, ...]] | None = None
+        if schema.grid.stagger_position is not None:
+            position = {
+                name: tuple(float(x) for x in offsets)
+                for name, offsets in schema.grid.stagger_position.items()
+            }
+        metadata["stagger"] = StaggerInfo(
+            convention=str(schema.grid.stagger),
+            field_locations=dict(schema.grid.stagger_fields)
+            if schema.grid.stagger_fields is not None
+            else None,
+            position=position,
+        )
     scaling: dict[str, Any] = {}
     scaling_factor = getattr(schema.units, "scaling_factor", None)
     if scaling_factor is not None:

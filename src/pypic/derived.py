@@ -299,9 +299,7 @@ def kinetic_energy_density(
         # of the non-relativistic limit ½ρv². Identity: γ - 1 =
         # (γ² - 1)/(γ + 1) = (v²/c²) γ²/(γ + 1), hence (γ - 1) c² =
         # γ² v²/(γ + 1). Recovers ½ρv² as γ → 1.
-        result: FloatArray = (
-            rho_m * v**2 * lorentz_factor**2 / (lorentz_factor + 1.0)
-        )
+        result: FloatArray = rho_m * v**2 * lorentz_factor**2 / (lorentz_factor + 1.0)
         return result
     return 0.5 * rho_m * v**2
 

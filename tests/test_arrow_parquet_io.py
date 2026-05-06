@@ -111,12 +111,8 @@ class TestMortonEncoding:
         idx = morton_sort_indices(x, y, z)
         pts_sorted = np.column_stack([x[idx], y[idx], z[idx]])
         pts_random = np.column_stack([x, y, z])
-        mean_d_sorted = np.mean(
-            np.linalg.norm(np.diff(pts_sorted, axis=0), axis=1)
-        )
-        mean_d_random = np.mean(
-            np.linalg.norm(np.diff(pts_random, axis=0), axis=1)
-        )
+        mean_d_sorted = np.mean(np.linalg.norm(np.diff(pts_sorted, axis=0), axis=1))
+        mean_d_random = np.mean(np.linalg.norm(np.diff(pts_random, axis=0), axis=1))
         # Morton sort should bring neighbours closer by a large factor
         # (typically 5-10x on uniform 3D scatter); 2x is a conservative
         # lower bound that a pure identity or reversed permutation cannot

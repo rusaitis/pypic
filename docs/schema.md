@@ -62,8 +62,9 @@ schema_version = "1.0"   # top-level bare key — lets a streaming parser
 [output.diagnostics]     # on-the-fly derived quantities
 [[output.streams]]       # multi-cadence / region-of-interest output groups
 [[probes]]               # fixed or trajectory samplers
-[velocity_mesh]          # continuum-Vlasov VDF grid metadata
 [phase_space]            # >3D phase-space grid for gyrokinetic / full Vlasov
+                         #   (continuum-Vlasov sparse-block storage lives in
+                         #   the [phase_space.storage] sub-table)
 [[collisions]]           # per-pair collision declarations (Smilei, EPOCH, ...)
 ```
 
@@ -165,8 +166,10 @@ scheme  = "fixed"                  # "fixed" (default) | "adaptive" | "subcycled
                                    #   | "rk2" | "rk3" | "rk4" | "vl2"
                                    #   | "ssprk2" | "ssprk3"
                                    #   | "imex-rk2" | "imex-rk3"
-dt      = 0.05                     # REQUIRED — timestep in code units
-                                   #   (placeholder for scheme = "adaptive")
+dt      = 0.05                     # timestep in code units; required for every
+                                   #   scheme except "adaptive" (the runtime
+                                   #   derives the first step from cfl/dt_min
+                                   #   /dt_max and may ignore any value given)
 t_start = 0.0                      # REQUIRED
 t_end   = 100.0                    # REQUIRED
 n_steps = 2000                     # REQUIRED
@@ -194,9 +197,10 @@ stagger    = "cell"                # optional: "cell" (default) | "node" | "stag
                                    #   "cell"       — fields at cell centers
                                    #   "node"       — fields at cell vertices (iPIC3D)
                                    #   "staggered"  — Yee mesh (B faces, E edges, ...)
-                                   # Informational only; readers destagger to co-located.
-                                   # See StaggerInfo.position for per-component
-                                   # offsets (openPMD ED-PIC `position` semantics).
+                                   # Single-string summary; per-component truth lives
+                                   # in [grid.stagger_fields] / [grid.stagger_position]
+                                   # below. Informational only — readers destagger to
+                                   # co-located grids on load.
 ghost_cells   = [2, 2, 2]          # optional — halo width per axis (matches dimensions)
 source        = "grids/mesh.h5"    # optional — external file for complex meshes
 source_format = "hdf5"             # optional
@@ -227,6 +231,25 @@ box   = [[-60.0, -60.0, -60.0], [60.0, 60.0, 60.0]]
 [grid.stretched.axis_widths]
 0 = [0.5, 0.6, 0.8, 1.0, 1.3]      # x stretched
 2 = [0.1, 0.1, 0.2, 0.4, 0.8]      # z log-radial (ARMS, PLUTO style)
+
+# Per-field-group stagger locations (optional). Captures the Yee-mesh
+# truth that the single-string `stagger` cannot — B sits on faces,
+# E sits on edges, etc. Free-form keys (canonical field-group names);
+# values are "cell" | "node" | "face" | "edge".
+[grid.stagger_fields]
+B = "face"
+E = "edge"
+J = "edge"
+
+# Per-component openPMD ED-PIC offsets (optional). Each value is a
+# vector in [0.0, 1.0) giving the position of that field component
+# inside the local cell along each axis. The most precise stagger
+# representation; round-trips through StaggerInfo.position.
+[grid.stagger_position]
+B1 = [0.5, 0.0, 0.0]               # B_x on the x-face
+B2 = [0.0, 0.5, 0.0]               # B_y on the y-face
+B3 = [0.0, 0.0, 0.5]               # B_z on the z-face
+E1 = [0.0, 0.5, 0.5]               # E_x on the x-edge
 ```
 
 ### [boundary_conditions]
@@ -554,25 +577,35 @@ accepted beyond the core vocabulary above.
 
 ### [restart]
 
-Continuation pointer from a prior run. v1.0.x added the additive
-``restore`` and ``mode`` fields; the multi-file ``from`` widening for
-VPIC manifests is a v1.1 shape change.
+Continuation pointer from a prior run. ``from`` is the path to the
+restart artifact: a single file, a directory of per-rank checkpoints,
+or a glob pattern. Whether it resolves to one file or many is
+determined at read time by the filesystem and the code, not by the
+schema. ``from_files`` is a rarely-needed escape hatch for runs whose
+filenames don't follow the source code's convention.
 
 ```toml
 [restart]
-from = "./checkpoints/chk_000030.h5"   # REQUIRED (aliased — `from` is a Python keyword)
+from = "./checkpoints/chk_000030.h5"   # REQUIRED — path to the restart artifact.
+                                        #   Single file, directory of per-rank
+                                        #   files, or glob — code-determined.
+                                        #   (Aliased — `from` is a Python keyword.)
 step = 30000                            # optional
 time = 1500.0                           # optional
 restore = ["fields", "particles"]       # optional — partial restart selector
-                                        #   ("fields" | "particles" | "auxiliary"); entries
-                                        #   must be distinct. Omitting it restores everything.
-mode = "hot"                            # optional — "hot" (full state reload) | "cold"
-                                        #   (re-apply IC on saved geometry)
-from_files = [                          # optional — per-rank manifest for codes that
-    "chk_000030_rank_00000.h5",         #   write one checkpoint per MPI rank (VPIC,
-    "chk_000030_rank_00001.h5",         #   AMReX). When present, `from` typically points
-    "chk_000030_rank_00002.h5",         #   to a manifest while `from_files` enumerates
-]                                       #   the actual files. Distinct & non-empty.
+                                        #   ("fields" | "particles" | "auxiliary");
+                                        #   entries must be distinct. Omitting
+                                        #   restores everything.
+mode = "hot"                            # optional — "hot" (full state reload) |
+                                        #   "cold" (re-apply IC on saved geometry)
+from_files = [                          # optional escape hatch — explicit list
+    "chk_000030_rank_00000.h5",         #   for runs whose per-rank filenames
+    "chk_000030_rank_00001.h5",         #   don't follow the source code's
+    "chk_000030_rank_00002.h5",         #   convention (e.g. relocated reruns).
+]                                       #   Distinct & non-empty. When present,
+                                        #   `from` should point at a directory or
+                                        #   glob — not a single .h5/.bp/.zarr/.nc
+                                        #   file.
 ```
 
 ### [output.*]
@@ -662,30 +695,6 @@ iPIC3D input to this schema, and `pypic.simulation.toml` at the repo
 root for the annotated reference template (three scenarios: PIC, MHD,
 hybrid).
 
-### [velocity_mesh]
-
-Continuum-Vlasov velocity-grid metadata (Vlasiator, Gkeyll Vlasov-Maxwell).
-Recommended when ``[model].type = "vlasov"`` and the run writes VDFs;
-optional for moment-only output. Validators don't enforce its
-presence — the schema can't tell from TOML alone whether VDFs are
-emitted.
-
-```toml
-[velocity_mesh]
-dimensions = [50, 50, 50]              # cells per velocity-axis (1..3 entries)
-extent     = [                          # [v_min, v_max] per axis (m/s in SI)
-    [-2.0e6, 2.0e6],
-    [-2.0e6, 2.0e6],
-    [-2.0e6, 2.0e6],
-]
-block_size = [10, 10, 10]              # optional — sparse-block factor; must
-                                       #   evenly divide each `dimensions` entry
-sparsity_threshold = 1.0e-15           # optional — density floor below which
-                                       #   blocks are dropped from disk
-coordinate_system  = "cartesian"       # optional — "cartesian" (default) |
-                                       #   "spherical-velocity"
-```
-
 ### [phase_space]
 
 Augmented phase-space dimensionality for >3D kinetic codes — gyrokinetic
@@ -708,16 +717,31 @@ coordinate_system = "guiding-center"   # optional — "cartesian" (default) |
                                        #   "spherical-velocity"
 ```
 
-**Relationship to ``[velocity_mesh]``.** ``[velocity_mesh]`` describes
-the *storage layout* of the velocity grid (sparse-block structure,
-sparsity threshold, on-disk axis count) for continuum-Vlasov codes.
-``[phase_space]`` describes the *coordinate-system identity* of the
-augmented phase space (Cartesian vs guiding-center vs field-aligned).
-They are orthogonal: a sparse-block continuum-Vlasov run (Vlasiator-
-style) typically declares both — ``[velocity_mesh]`` for I/O metadata,
-``[phase_space]`` to record the coordinate frame. Gyrokinetic codes
-(5-D guiding-center) use only ``[phase_space]`` because their velocity
-representation is not a Cartesian mesh.
+**Sparse-block storage** (continuum-Vlasov codes only). Vlasiator and
+Gkeyll-Vlasov-Maxwell subdivide the velocity sub-grid into blocks for
+adaptive memory use, dropping blocks whose density falls below a
+threshold. Optional ``[phase_space.storage]`` sub-table:
+
+```toml
+[phase_space.storage]
+block_size         = [10, 10, 10]      # one entry per velocity axis;
+                                       #   must evenly divide
+                                       #   phase_space.dimensions[n_spatial:]
+sparsity_threshold = 1.0e-15           # density floor below which blocks
+                                       #   are dropped from disk
+```
+
+For 6D Vlasiator runs: the spatial part of ``dimensions`` matches
+``[grid].dimensions``, the trailing 3 entries are velocity axes, and
+``[phase_space.storage]`` carries the sparse-block knobs. Gyrokinetic
+codes omit ``[phase_space.storage]`` because their 5-D grid is dense.
+
+**Migration note.** v1.0 had a separate top-level ``[velocity_mesh]``
+section that overlapped with ``[phase_space]`` on axis identity. v1.0.x
+removes ``[velocity_mesh]`` and folds its ``block_size`` /
+``sparsity_threshold`` into ``[phase_space.storage]``; the redundant
+``dimensions``, ``extent``, and ``coordinate_system`` fields are
+retired in favor of the ``[phase_space]`` versions.
 
 ### [[collisions]]
 
@@ -745,10 +769,13 @@ locations. Either **fixed** (constant position) or a **trajectory**
 name = "magnetopause_monitor"      # REQUIRED: human-readable label
 position = [10.0, 0.0, 0.0]       # fixed: [x, y, z] in code units
 fields = ["B1", "B2", "B3", "beta"]  # optional: fields to sample.
-                                     # Default: every canonical field
-                                     # present in the dataset at probe time
-                                     # (including derived quantities exposed
-                                     # via `compute()`).
+                                     # Default (omitted): every
+                                     # storage-primitive field present
+                                     # in the dataset at probe time —
+                                     # what `reader.available_fields()`
+                                     # returns. Derived quantities like
+                                     # `|B|`, `beta`, `v_A` must be
+                                     # listed explicitly to opt in.
 
 [[probes]]
 name = "MMS1"                      # trajectory (virtual spacecraft)
@@ -812,6 +839,19 @@ aliases table below).
 (`rho_c_s0`, `J1_s1`, `n_s3`); the component index comes before the
 species suffix (`J1_s0`, `EF2_s1`). The species *name* lives in
 `[[species]]`, not in the field name.
+
+**Species-name aliases:** For any species, the canonical `<prefix>_s<index>`
+form has an automatically-generated `<prefix>_<species_name>` alias when
+the species name is declared in `[[species]]`. `n_s0` becomes `n_electrons`
+when `species[0].name == "electrons"`; `EF1_s1` becomes `EF1_protons` when
+`species[1].name == "protons"`. The alias is added at `FieldDataset`
+construction time and only registered when the underlying canonical is
+actually present in the dataset, so missing data produces a clean
+`KeyError` rather than misdirection.
+
+For multi-species runs (H⁺ + He²⁺ + O⁺), the species-name form is the
+unambiguous way to reference per-species quantities — the integer index
+depends on declaration order.
 
 **Electron/ion convenience aliases:** For the common two-species case
 (species 0 = electrons, 1 = ions), `e`/`i` suffixed names alias the

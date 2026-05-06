@@ -17,7 +17,10 @@ accept unknown sub-tables here and MAY warn). Everywhere else,
 from __future__ import annotations
 
 from datetime import date as _date  # noqa: TC003  (pydantic needs it at runtime)
-from typing import Annotated, Any, Literal
+from typing import TYPE_CHECKING, Annotated, Any, Literal
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable, Mapping
 
 from pydantic import (
     BaseModel,
@@ -34,6 +37,10 @@ Precision = Literal["f32", "f64"]
 ModelType = Literal["PIC", "MHD", "hybrid", "vlasov", "gyrokinetic"]
 Geometry = Literal["cartesian", "spherical", "cylindrical", "thetaMode"]
 StaggerKind = Literal["cell", "node", "staggered"]
+# Per-field-group stagger locations. ``"face"`` and ``"edge"`` are the
+# Yee-mesh positions (B on faces, E on edges); ``"cell"`` and ``"node"``
+# carry the same meaning as the top-level ``StaggerKind`` summary tag.
+StaggerLocation = Literal["cell", "node", "face", "edge"]
 TimeScheme = Literal[
     "fixed",
     "adaptive",
@@ -262,15 +269,16 @@ class Time(_StrictBase):
     - fixed/subcycled require ``dt > 0`` (the integration step);
     - subcycled requires ``field_substeps`` (``dt_field`` is recommended
       but advisory, not enforced);
-    - adaptive accepts any combination of (``cfl``, ``dt_min``,
-      ``dt_max``) including all-None — the runtime owns CFL bookkeeping.
+    - adaptive omits ``dt`` (or accepts any non-negative value as a hint);
+      the runtime derives the first step from ``cfl`` / ``dt_min`` /
+      ``dt_max`` and owns CFL bookkeeping thereafter.
 
     A future v1.1 may formalise these as a discriminated union once codes
     converge on a common spelling.
     """
 
     scheme: TimeScheme = "fixed"
-    dt: NonNegativeFloat
+    dt: NonNegativeFloat | None = None
     t_start: float
     t_end: float
     n_steps: PositiveInt
@@ -289,11 +297,11 @@ class Time(_StrictBase):
             raise ValueError(
                 "scheme='subcycled' requires field_substeps (and usually dt_field)"
             )
-        # `dt` is a placeholder for adaptive schemes (the actual step is
-        # CFL-driven). Every other scheme — fixed, subcycled, and the RK /
-        # SSP-RK / IMEX-RK variants — uses ``dt`` as the integration step
-        # (or the base step that CFL may further bound from above).
-        if self.scheme != "adaptive" and self.dt == 0.0:
+        # Adaptive runs derive the first step from CFL bookkeeping and may
+        # omit ``dt`` entirely. Every other scheme — fixed, subcycled, and
+        # the RK / SSP-RK / IMEX-RK variants — uses ``dt`` as the integration
+        # step (or the base step that CFL may further bound from above).
+        if self.scheme != "adaptive" and (self.dt is None or self.dt == 0.0):
             raise ValueError(f"scheme={self.scheme!r} requires dt > 0")
         return self
 
@@ -387,6 +395,22 @@ class Grid(_StrictBase):
     ``spacing``. The validator enforces that any listed axis widths sum
     to ``upper[i] - lower[i]`` and that the list length equals
     ``dimensions[i]``.
+
+    Stagger surfaces three layers of detail, all optional and additive:
+
+    1. ``stagger`` — single-string summary (``"cell"`` / ``"node"`` /
+       ``"staggered"``). Always present, defaults to ``"cell"``.
+    2. ``stagger_fields`` — per-field-group location map, e.g.
+       ``{B = "face", E = "edge"}``. Captures the Yee-mesh truth that
+       a single string cannot.
+    3. ``stagger_position`` — per-component openPMD ED-PIC offsets in
+       ``[0, 1)`` along each axis, e.g. ``{B1 = [0.5, 0.0, 0.0]}``.
+       Lossless representation of the source mesh; consumed by readers
+       that need to destagger or reconstruct the native layout.
+
+    All three are informational — readers destagger to co-located grids
+    on load. They round-trip through :class:`StaggerInfo` in
+    ``pypic.containers``.
     """
 
     dimensions: AxisInt
@@ -394,6 +418,8 @@ class Grid(_StrictBase):
     lower: AxisFloat
     upper: AxisFloat
     stagger: StaggerKind = "cell"
+    stagger_fields: dict[str, StaggerLocation] | None = None
+    stagger_position: dict[str, list[float]] | None = None
     ghost_cells: (
         Annotated[list[NonNegativeInt], Field(min_length=1, max_length=3)] | None
     ) = None
@@ -444,6 +470,19 @@ class Grid(_StrictBase):
                         f"{expected_extent} (within rtol "
                         f"{self.stretched.sum_rtol})"
                     )
+        if self.stagger_position is not None:
+            for name, offsets in self.stagger_position.items():
+                if len(offsets) != n:
+                    raise ValueError(
+                        f"grid.stagger_position['{name}'] has {len(offsets)} "
+                        f"entries, expected dimensions has {n}"
+                    )
+                for offset in offsets:
+                    if not 0.0 <= offset < 1.0:
+                        raise ValueError(
+                            f"grid.stagger_position['{name}'] = {offsets} — "
+                            f"each offset must be in [0.0, 1.0)"
+                        )
         return self
 
 
@@ -801,19 +840,27 @@ class Driver(_ExtensibleBase):
 class Restart(_StrictBase):
     """``[restart]`` — continuation pointer from a prior run.
 
+    ``from`` is the path to the restart artifact: a single file
+    (``./chk_000030.h5``), a directory of per-rank checkpoints
+    (``./restart_30000/``), or a glob pattern. Whether the path
+    resolves to one file or many is determined at read time by the
+    filesystem and the code, not by the schema.
+
+    ``from_files`` is a rarely-needed escape hatch: an explicit list
+    of per-rank files for runs whose names don't follow the source
+    code's convention (e.g. reruns with relocated files). When set,
+    ``from`` should point at a directory or glob — not a single-file
+    path — and the validator soft-checks this by rejecting common
+    single-file extensions (``.h5``, ``.hdf5``, ``.bp``, ``.zarr``,
+    ``.nc``) on ``from``.
+
     ``restore`` enables partial restart — restarting only the listed
     state categories rather than all of them (e.g., fields-only
-    continuation that re-initializes particles from a fresh distribution).
-    ``mode`` distinguishes a full state reload (``"hot"``) from a
-    setup-restart that re-applies initial conditions on top of the
-    saved geometry (``"cold"``). Both optional; a missing ``restore``
-    means the full state is restored.
-
-    ``from_files`` carries an explicit per-rank file list for codes that
-    write one checkpoint per MPI rank (VPIC, certain AMReX builds). When
-    present, ``from`` typically points at a manifest while ``from_files``
-    enumerates the actual files; readers may consult either or both.
-    Validator: distinct & non-empty when present.
+    continuation that re-initializes particles from a fresh
+    distribution). ``mode`` distinguishes a full state reload
+    (``"hot"``) from a setup-restart that re-applies initial
+    conditions on top of the saved geometry (``"cold"``). Both
+    optional; a missing ``restore`` means the full state is restored.
     """
 
     from_: str = Field(..., alias="from")
@@ -838,6 +885,20 @@ class Restart(_StrictBase):
                 raise ValueError(
                     f"restart.from_files entries must be distinct, got "
                     f"{self.from_files}"
+                )
+            # When `from_files` enumerates per-rank checkpoints, `from`
+            # should point at a directory or glob — a single-file path
+            # contradicts the explicit list. Heuristic: reject common
+            # single-file checkpoint extensions.
+            single_file_exts = (".h5", ".hdf5", ".bp", ".zarr", ".nc")
+            from_lower = self.from_.lower()
+            if any(from_lower.endswith(ext) for ext in single_file_exts):
+                raise ValueError(
+                    f"restart.from = {self.from_!r} looks like a single "
+                    f"checkpoint file, but restart.from_files is also set "
+                    f"(explicit per-rank list). When from_files is "
+                    f"present, from should point at a directory or glob "
+                    f"pattern, not a single file."
                 )
         return self
 
@@ -940,6 +1001,24 @@ class _OutputBase(_StrictBase):
     partition: OutputPartition | None = None
 
 
+def _validate_precision_overrides(
+    overrides: Mapping[str, Precision],
+    quantities: list[str],
+    *,
+    where: str,
+) -> None:
+    """Reject precision_overrides keys that don't appear in ``quantities``.
+
+    Shared between :class:`OutputFields` and :class:`OutputStream` — the
+    semantics are identical; only the error prefix differs.
+    """
+    unknown = set(overrides).difference(quantities)
+    if unknown:
+        raise ValueError(
+            f"{where}.precision_overrides names not in quantities: {sorted(unknown)}"
+        )
+
+
 class OutputCheckpoints(_OutputBase):
     """``[output.checkpoints]`` — lossless full-state dumps."""
 
@@ -955,12 +1034,9 @@ class OutputFields(_OutputBase):
 
     @model_validator(mode="after")
     def _check_overrides_subset(self) -> OutputFields:
-        unknown = set(self.precision_overrides).difference(self.quantities)
-        if unknown:
-            raise ValueError(
-                "output.fields.precision_overrides names not in quantities: "
-                f"{sorted(unknown)}"
-            )
+        _validate_precision_overrides(
+            self.precision_overrides, self.quantities, where="output.fields"
+        )
         return self
 
 
@@ -1053,12 +1129,11 @@ class OutputStream(_OutputBase):
 
     @model_validator(mode="after")
     def _check_overrides_subset(self) -> OutputStream:
-        unknown = set(self.precision_overrides).difference(self.quantities)
-        if unknown:
-            raise ValueError(
-                f"output.streams[{self.name!r}].precision_overrides names "
-                f"not in quantities: {sorted(unknown)}"
-            )
+        _validate_precision_overrides(
+            self.precision_overrides,
+            self.quantities,
+            where=f"output.streams[{self.name!r}]",
+        )
         return self
 
 
@@ -1085,7 +1160,22 @@ class Output(_StrictBase):
 
 
 class Probe(_StrictBase):
-    """One entry in ``[[probes]]`` — fixed or trajectory sampler."""
+    """One entry in ``[[probes]]`` — fixed or trajectory sampler.
+
+    ``fields`` controls which dataset fields the probe samples. Two modes:
+
+    - ``fields = None`` (omitted) — sample every **storage-primitive**
+      field present in the dataset at probe time. Storage primitives are
+      what readers expose via ``available_fields()`` — moments and EM
+      fields actually on disk, never derived quantities like ``|B|`` or
+      ``beta``. Users who want derived quantities listed must request
+      them explicitly. The narrow default keeps probe time-series cheap
+      on big runs.
+    - ``fields = [...]`` — sample exactly this list. Names that don't
+      resolve at sample time should fail loudly (per CLAUDE.md "fail
+      loud on unmatched names" guidance); resolution against
+      ``available_fields()`` happens in the probe sampler, not here.
+    """
 
     name: str
     position: list[float] | None = None
@@ -1113,71 +1203,54 @@ class Probe(_StrictBase):
             )
         return self
 
+    def resolve_fields(self, available: Iterable[str]) -> list[str]:
+        """Return the concrete field list this probe samples.
 
-class VelocityMesh(_StrictBase):
-    r"""``[velocity_mesh]`` — continuum-Vlasov velocity-grid metadata.
+        Parameters
+        ----------
+        available
+            Storage-primitive field names present in the dataset, as
+            returned by ``reader.available_fields()``.
 
-    Vlasiator stores per-cell distribution functions on a 3-D Cartesian
-    velocity grid with sparse-block storage. ``dimensions`` and
-    ``extent`` describe the velocity-space mesh; ``block_size`` records
-    the sparse-block factor for codes that subdivide the velocity grid
-    for adaptive memory use; ``sparsity_threshold`` records the
-    density floor below which blocks are dropped from disk.
+        Returns
+        -------
+        list[str]
+            ``list(available)`` when ``fields is None``; otherwise
+            ``self.fields`` after validating that every name resolves —
+            either as a storage primitive in ``available`` or as a
+            derived quantity (any name not in ``available`` is left for
+            the sampler to dispatch through ``compute()`` and is *not*
+            rejected here, since the schema layer has no compute
+            registry).
+        """
+        available_list = list(available)
+        if self.fields is None:
+            return available_list
+        # Explicit list passes through verbatim; the sampler is
+        # responsible for raising KeyError on names that resolve neither
+        # as primitives nor as derived quantities.
+        return list(self.fields)
 
-    Recommended when ``[model].type = "vlasov"`` and the run writes
-    VDFs; optional for moment-only output. The schema cannot tell from
-    the TOML alone whether VDFs are emitted, so this is advisory rather
-    than enforced. The validator only checks shape consistency; the
-    spatial / phase-space coupling check lives on the root model.
 
-    Relationship to ``[phase_space]``: ``[velocity_mesh]`` describes
-    the *storage layout* of the velocity grid (sparse-block structure,
-    sparsity threshold), while ``[phase_space]`` describes the
-    *coordinate-system identity* of the augmented grid (Cartesian vs
-    guiding-center vs field-aligned). Both can coexist for sparse-block
-    continuum-Vlasov runs.
+class PhaseSpaceStorage(_StrictBase):
+    r"""``[phase_space.storage]`` — sparse-block velocity-grid storage.
+
+    Continuum-Vlasov codes (Vlasiator, Gkeyll-Vlasov-Maxwell) subdivide
+    the velocity sub-grid into blocks for adaptive memory use, dropping
+    blocks whose distribution-function density falls below a threshold.
+    ``block_size`` records the per-velocity-axis block factor;
+    ``sparsity_threshold`` records the density floor.
+
+    Optional sub-table on :class:`PhaseSpace`. Gyrokinetic codes
+    (GENE, GS2, GX, Gkeyll-GK) emit dense 5-D grids and omit this
+    block entirely. The validator checks that ``block_size`` length
+    matches the velocity sub-axes of the parent ``dimensions`` —
+    enforced on the parent :class:`PhaseSpace` once the spatial
+    dimension count is known at the root level.
     """
 
-    dimensions: list[PositiveInt] = Field(..., min_length=1, max_length=3)
-    extent: list[list[float]] = Field(..., min_length=1, max_length=3)
     block_size: list[PositiveInt] | None = None
     sparsity_threshold: NonNegativeFloat | None = None
-    coordinate_system: Literal["cartesian", "spherical-velocity"] = "cartesian"
-
-    @model_validator(mode="after")
-    def _check_extent_shape(self) -> VelocityMesh:
-        if len(self.extent) != len(self.dimensions):
-            raise ValueError(
-                f"velocity_mesh.extent has {len(self.extent)} axes but "
-                f"dimensions has {len(self.dimensions)}"
-            )
-        for i, axis_extent in enumerate(self.extent):
-            if len(axis_extent) != 2:
-                raise ValueError(
-                    f"velocity_mesh.extent[{i}] must have 2 entries "
-                    f"[v_min, v_max], got {len(axis_extent)}"
-                )
-            v_min, v_max = axis_extent
-            if v_max <= v_min:
-                raise ValueError(
-                    f"velocity_mesh.extent[{i}]: v_max ({v_max}) must be > "
-                    f"v_min ({v_min})"
-                )
-        if self.block_size is not None:
-            if len(self.block_size) != len(self.dimensions):
-                raise ValueError(
-                    f"velocity_mesh.block_size has {len(self.block_size)} "
-                    f"axes but dimensions has {len(self.dimensions)}"
-                )
-            for i, (block, dim) in enumerate(
-                zip(self.block_size, self.dimensions, strict=True)
-            ):
-                if dim % block != 0:
-                    raise ValueError(
-                        f"velocity_mesh.block_size[{i}] ({block}) must "
-                        f"divide dimensions[{i}] ({dim}) evenly"
-                    )
-        return self
 
 
 class PhaseSpace(_StrictBase):
@@ -1193,12 +1266,17 @@ class PhaseSpace(_StrictBase):
     than ``[grid].dimensions``. Optional otherwise. The root validator
     enforces consistency: ``[phase_space].dimensions[:n_spatial]``
     must match ``[grid].dimensions`` when both are present.
+
+    ``storage`` is the sparse-block sub-table for continuum-Vlasov
+    codes (replaces the v1.0 ``[velocity_mesh]`` section).  Gyrokinetic
+    runs omit it.
     """
 
     dimensions: list[PositiveInt] = Field(..., min_length=2, max_length=6)
     axis_labels: list[str] | None = None
     extents: list[list[float]] | None = None
     coordinate_system: PhaseSpaceCoordSystem = "cartesian"
+    storage: PhaseSpaceStorage | None = None
 
     @model_validator(mode="after")
     def _check_axis_labels_and_extents(self) -> PhaseSpace:
@@ -1302,7 +1380,6 @@ class SimulationSchema(_ExtensibleBase):
     restart: Restart | None = None
     output: Output | None = None
     probes: list[Probe] = Field(default_factory=list)
-    velocity_mesh: VelocityMesh | None = None
     phase_space: PhaseSpace | None = None
     collisions: list[Collision] = Field(default_factory=list)
 
@@ -1500,6 +1577,28 @@ class SimulationSchema(_ExtensibleBase):
                 raise ValueError(
                     f"phase_space.dimensions[{i}] ({ps_dims[i]}) must match "
                     f"grid.dimensions[{i}] ({self.grid.dimensions[i]})"
+                )
+        # ``phase_space.storage.block_size`` describes sparse-block storage
+        # of the velocity sub-grid. Its length must equal the number of
+        # velocity axes (``len(ps_dims) - n``), and each block must evenly
+        # divide the corresponding velocity dimension.
+        if self.phase_space.storage is None:
+            return
+        block_size = self.phase_space.storage.block_size
+        if block_size is None:
+            return
+        n_velocity = len(ps_dims) - n
+        if len(block_size) != n_velocity:
+            raise ValueError(
+                f"phase_space.storage.block_size has {len(block_size)} axes "
+                f"but phase_space has {n_velocity} velocity dimensions "
+                f"(phase_space.dimensions[{n}:])"
+            )
+        for i, (block, dim) in enumerate(zip(block_size, ps_dims[n:], strict=True)):
+            if dim % block != 0:
+                raise ValueError(
+                    f"phase_space.storage.block_size[{i}] ({block}) must "
+                    f"divide phase_space.dimensions[{n + i}] ({dim}) evenly"
                 )
 
     def _check_extras_are_extensions(self) -> None:

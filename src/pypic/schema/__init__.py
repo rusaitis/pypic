@@ -76,6 +76,7 @@ from pypic.schema._models import (
     OutputProbes,
     OutputStream,
     PhaseSpace,
+    PhaseSpaceStorage,
     Physics,
     PhysicsHybrid,
     PhysicsMHD,
@@ -97,7 +98,6 @@ from pypic.schema._models import (
     UnitsPIC,
     UnitsReferenceTable,
     UnitsSI,
-    VelocityMesh,
 )
 
 __all__ = [
@@ -130,6 +130,7 @@ __all__ = [
     "OutputStream",
     "PICSolver",
     "PhaseSpace",
+    "PhaseSpaceStorage",
     "Physics",
     "PhysicsHybrid",
     "PhysicsMHD",
@@ -151,6 +152,5 @@ __all__ = [
     "UnitsReferenceTable",
     "UnitsSI",
     "ValidationError",
-    "VelocityMesh",
     "validate_simulation_toml",
 ]

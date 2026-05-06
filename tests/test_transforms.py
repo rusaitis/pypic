@@ -343,9 +343,7 @@ class TestFindVectorTriplets:
         # Regression guard for the silent BATSRUS physics bug: frame
         # rotations used to skip B0_1/B0_2/B0_3 because the regex only
         # matched a phantom B01/B02/B03 form that no reader emits.
-        result = find_vector_triplets(
-            ["B1", "B2", "B3", "B0_1", "B0_2", "B0_3"]
-        )
+        result = find_vector_triplets(["B1", "B2", "B3", "B0_1", "B0_2", "B0_3"])
         assert set(result) == {
             ("B1", "B2", "B3"),
             ("B0_1", "B0_2", "B0_3"),

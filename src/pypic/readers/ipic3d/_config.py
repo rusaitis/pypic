@@ -539,9 +539,7 @@ def to_toml(cfg: IPic3DConfig) -> str:
 
     g = sim_config.grid
     d = g.dimensions
-    upper = tuple(
-        o + n * s for o, n, s in zip(g.origin, d, g.spacing, strict=True)
-    )
+    upper = tuple(o + n * s for o, n, s in zip(g.origin, d, g.spacing, strict=True))
     lines.append("[grid]")
     lines.append(f"dimensions = [{d[0]}, {d[1]}, {d[2]}]")
     lines.append(f"spacing = [{g.spacing[0]}, {g.spacing[1]}, {g.spacing[2]}]")
@@ -551,9 +549,7 @@ def to_toml(cfg: IPic3DConfig) -> str:
 
     assert g.boundary is not None
     bnd = ", ".join(f'"{b}"' for b in g.boundary)
-    lines.extend(
-        ["[boundary_conditions]", f"lower = [{bnd}]", f"upper = [{bnd}]", ""]
-    )
+    lines.extend(["[boundary_conditions]", f"lower = [{bnd}]", f"upper = [{bnd}]", ""])
 
     lines.append("[units]")
     lines.append('system = "PIC"')

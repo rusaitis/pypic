@@ -144,9 +144,7 @@ def _rodrigues(
     # passes the ``FrameTransform`` post-init tolerance of 1e-6. Fall back
     # to the identity rotation in that regime.
     ax = np.array([1.0, 0.0, 0.0]) if norm < 1e-100 else ax / norm
-    k = np.array(
-        [[0.0, -ax[2], ax[1]], [ax[2], 0.0, -ax[0]], [-ax[1], ax[0], 0.0]]
-    )
+    k = np.array([[0.0, -ax[2], ax[1]], [ax[2], 0.0, -ax[0]], [-ax[1], ax[0], 0.0]])
     r = np.eye(3) + np.sin(angle) * k + (1.0 - np.cos(angle)) * (k @ k)
     return (
         (float(r[0, 0]), float(r[0, 1]), float(r[0, 2])),
@@ -190,9 +188,7 @@ def frame_transforms(
     compositions stay comfortably within float64's precision envelope —
     associativity tests need headroom, not extreme inputs.
     """
-    origin_component = st.floats(
-        -100.0, 100.0, allow_nan=False, allow_infinity=False
-    )
+    origin_component = st.floats(-100.0, 100.0, allow_nan=False, allow_infinity=False)
     return st.builds(
         FrameTransform,
         source_frame=st.just(source),

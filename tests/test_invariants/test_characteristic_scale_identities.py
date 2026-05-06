@@ -120,5 +120,3 @@ def test_debye_length_is_thermal_speed_over_plasma_frequency(
     v_th = thermal_speed(temperature, m)
     omega_p = plasma_frequency(n, q, m)
     assert_allclose(lam, v_th / omega_p, rtol=1e-13, atol=1e-13)
-
-

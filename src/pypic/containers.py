@@ -14,7 +14,17 @@ from pypic.units import PhysicsParams
 
 if TYPE_CHECKING:
     from pypic.coordinates.transforms import FrameTransform
-    from pypic.schema import Body, Driver, InitialConditions, Output, Restart
+    from pypic.schema import (
+        Body,
+        Collision,
+        Driver,
+        InitialConditions,
+        Output,
+        PhaseSpace,
+        Probe,
+        Restart,
+        Run,
+    )
     from pypic.types import FloatArray, ModelType
     from pypic.units import Normalization, SpeciesInfo
 
@@ -134,11 +144,24 @@ class SimulationConfig:
     output : Output | None
         Validated ``[output]`` umbrella object from the v1.0 schema, or
         ``None`` when the section is absent.
+    run : Run | None
+        Validated ``[run]`` provenance object — authors, DOI, license,
+        funding, embargo, ensemble, resource accounting. ``None`` only
+        when this config was assembled by hand outside the schema path.
+    probes : tuple[Probe, ...]
+        Validated ``[[probes]]`` entries; empty when no probes declared.
+    collisions : tuple[Collision, ...]
+        Validated ``[[collisions]]`` entries; empty when no collision
+        pairs declared.
+    phase_space : PhaseSpace | None
+        Validated ``[phase_space]`` block for >3D kinetic codes.
+        Continuum-Vlasov sparse-block storage knobs live under
+        ``phase_space.storage`` (replaces the v1.0 ``[velocity_mesh]``
+        section).
     metadata : dict[str, Any]
         Free-form annotations from readers (stagger, scaling, version,
-        description, ...). Schema-typed `[initial_conditions]` and
-        `[output]` payloads now live on dedicated attributes above
-        rather than as opaque dict entries here.
+        description, ...). Schema-typed sections live on dedicated
+        attributes above rather than as opaque dict entries here.
 
     Examples
     --------
@@ -169,6 +192,10 @@ class SimulationConfig:
     bodies: tuple[Body, ...] = ()
     drivers: tuple[Driver, ...] = ()
     restart: Restart | None = None
+    run: Run | None = None
+    probes: tuple[Probe, ...] = ()
+    collisions: tuple[Collision, ...] = ()
+    phase_space: PhaseSpace | None = None
     metadata: dict[str, Any] = field(default_factory=dict)  # frozen via __post_init__
 
     def __post_init__(self) -> None:

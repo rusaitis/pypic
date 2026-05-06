@@ -455,6 +455,21 @@ class TestAdaptiveScheme:
         assert s.time.dt_min is None
         assert s.time.dt_max is None
 
+    def test_adaptive_scheme_omits_dt(self) -> None:
+        # Adaptive runs derive the first step from CFL bookkeeping; ``dt``
+        # may be omitted entirely.
+        doc = _minimal_doc().replace(
+            'scheme = "fixed"\ndt = 0.1', 'scheme = "adaptive"'
+        )
+        s = validate_simulation_toml(doc)
+        assert s.time.scheme == "adaptive"
+        assert s.time.dt is None
+
+    def test_fixed_scheme_requires_dt(self) -> None:
+        doc = _minimal_doc().replace('scheme = "fixed"\ndt = 0.1', 'scheme = "fixed"')
+        with pytest.raises(ValidationError, match="requires dt > 0"):
+            validate_simulation_toml(doc)
+
 
 class TestDriverBodyReference:
     """``[[drivers]].body`` must resolve to a declared ``[[bodies]].name``."""
@@ -509,6 +524,33 @@ class TestProbeFrame:
         """)
         s = validate_simulation_toml(doc)
         assert s.probes[0].frame == "GSM"
+
+
+class TestProbeResolveFields:
+    """``Probe.resolve_fields`` narrows the omitted-default to primitives."""
+
+    def test_omitted_fields_resolves_to_all_primitives(self) -> None:
+        doc = _minimal_doc() + dedent("""
+            [[probes]]
+            name = "p1"
+            position = [0.0, 0.0, 0.0]
+        """)
+        s = validate_simulation_toml(doc)
+        primitives = ["B1", "B2", "B3", "rho_c", "n_s0"]
+        assert s.probes[0].resolve_fields(primitives) == primitives
+
+    def test_explicit_fields_pass_through(self) -> None:
+        doc = _minimal_doc() + dedent("""
+            [[probes]]
+            name = "p1"
+            position = [0.0, 0.0, 0.0]
+            fields = ["B1", "beta"]
+        """)
+        s = validate_simulation_toml(doc)
+        # Explicit list passes through verbatim — `beta` is derived, not
+        # a primitive, but the schema doesn't reject it; the sampler
+        # dispatches via `compute()`.
+        assert s.probes[0].resolve_fields(["B1", "B2"]) == ["B1", "beta"]
 
 
 # ---------------------------------------------------------------------------
@@ -730,6 +772,54 @@ class TestGridAdditions:
         assert s.grid.amr.amr_kind == "block"
         assert s.grid.amr.level_subcycling is False
 
+
+class TestGridStaggerFields:
+    """``[grid.stagger_fields]`` and ``[grid.stagger_position]`` sub-tables."""
+
+    def test_stagger_fields_per_group(self) -> None:
+        doc = _minimal_doc() + dedent("""
+            [grid.stagger_fields]
+            B = "face"
+            E = "edge"
+            J = "edge"
+        """)
+        s = validate_simulation_toml(doc)
+        assert s.grid.stagger_fields == {"B": "face", "E": "edge", "J": "edge"}
+
+    def test_stagger_position_offsets(self) -> None:
+        doc = _minimal_doc() + dedent("""
+            [grid.stagger_position]
+            B1 = [0.5, 0.0, 0.0]
+            E1 = [0.0, 0.5, 0.5]
+        """)
+        s = validate_simulation_toml(doc)
+        assert s.grid.stagger_position is not None
+        assert s.grid.stagger_position["B1"] == [0.5, 0.0, 0.0]
+
+    def test_stagger_position_offset_out_of_range_rejected(self) -> None:
+        doc = _minimal_doc() + dedent("""
+            [grid.stagger_position]
+            B1 = [1.0, 0.0, 0.0]
+        """)
+        with pytest.raises(ValidationError, match=r"\[0.0, 1.0\)"):
+            validate_simulation_toml(doc)
+
+    def test_stagger_position_axis_count_mismatch_rejected(self) -> None:
+        doc = _minimal_doc() + dedent("""
+            [grid.stagger_position]
+            B1 = [0.5, 0.0]
+        """)
+        with pytest.raises(ValidationError, match="dimensions has 3"):
+            validate_simulation_toml(doc)
+
+    def test_stagger_field_invalid_location_rejected(self) -> None:
+        doc = _minimal_doc() + dedent("""
+            [grid.stagger_fields]
+            B = "centroid"
+        """)
+        with pytest.raises(ValidationError):
+            validate_simulation_toml(doc)
+
     def test_amr_level_subcycling(self) -> None:
         doc = _minimal_doc() + dedent("""
             [grid.amr]
@@ -870,61 +960,78 @@ class TestOutputMultiFileLayout:
 # ---------------------------------------------------------------------------
 
 
-class TestVelocityMesh:
-    """``[velocity_mesh]`` — continuum-Vlasov VDF grid metadata."""
+class TestPhaseSpaceStorage:
+    """``[phase_space.storage]`` — sparse-block velocity-grid storage.
 
-    def test_minimal_velocity_mesh(self) -> None:
-        doc = _minimal_doc(**{'type = "PIC"': 'type = "vlasov"'}) + dedent("""
-            [velocity_mesh]
-            dimensions = [50, 50, 50]
-            extent = [[-2.0e6, 2.0e6], [-2.0e6, 2.0e6], [-2.0e6, 2.0e6]]
-        """)
-        s = validate_simulation_toml(doc)
-        assert s.velocity_mesh is not None
-        assert s.velocity_mesh.dimensions == [50, 50, 50]
-        assert s.velocity_mesh.coordinate_system == "cartesian"
+    Replaces the v1.0 ``[velocity_mesh]`` section. ``block_size`` is
+    validated against the velocity sub-axes of ``phase_space.dimensions``
+    by the root validator (it needs to know how many spatial axes
+    ``[grid]`` claims first).
+    """
 
-    def test_full_velocity_mesh(self) -> None:
-        doc = _minimal_doc(**{'type = "PIC"': 'type = "vlasov"'}) + dedent("""
-            [velocity_mesh]
-            dimensions = [50, 50, 50]
-            extent = [[-2e6, 2e6], [-2e6, 2e6], [-2e6, 2e6]]
+    @staticmethod
+    def _vlasov_doc(extra: str) -> str:
+        return (
+            _minimal_doc(**{'type = "PIC"': 'type = "vlasov"'})
+            + dedent(
+                """
+            [phase_space]
+            dimensions = [4, 4, 4, 50, 50, 50]
+            axis_labels = ["x", "y", "z", "vx", "vy", "vz"]
+            extents = [
+                [0.0, 4.0], [0.0, 4.0], [0.0, 4.0],
+                [-2e6, 2e6], [-2e6, 2e6], [-2e6, 2e6],
+            ]
+            """
+            )
+            + dedent(extra)
+        )
+
+    def test_minimal_phase_space(self) -> None:
+        s = validate_simulation_toml(self._vlasov_doc(""))
+        assert s.phase_space is not None
+        assert s.phase_space.dimensions == [4, 4, 4, 50, 50, 50]
+        assert s.phase_space.coordinate_system == "cartesian"
+        assert s.phase_space.storage is None
+
+    def test_storage_block_size(self) -> None:
+        doc = self._vlasov_doc("""
+            [phase_space.storage]
             block_size = [10, 10, 10]
             sparsity_threshold = 1.0e-15
-            coordinate_system = "spherical-velocity"
         """)
         s = validate_simulation_toml(doc)
-        assert s.velocity_mesh is not None
-        assert s.velocity_mesh.block_size == [10, 10, 10]
-        assert s.velocity_mesh.sparsity_threshold == 1.0e-15
-        assert s.velocity_mesh.coordinate_system == "spherical-velocity"
+        assert s.phase_space is not None
+        assert s.phase_space.storage is not None
+        assert s.phase_space.storage.block_size == [10, 10, 10]
+        assert s.phase_space.storage.sparsity_threshold == 1.0e-15
 
-    def test_extent_axis_count_mismatch_rejected(self) -> None:
-        doc = _minimal_doc(**{'type = "PIC"': 'type = "vlasov"'}) + dedent("""
-            [velocity_mesh]
-            dimensions = [50, 50, 50]
-            extent = [[-2e6, 2e6], [-2e6, 2e6]]
+    def test_block_size_axis_mismatch_rejected(self) -> None:
+        # block_size has 2 entries, but the velocity sub-grid has 3 axes
+        # (phase_space.dimensions[3:]).
+        doc = self._vlasov_doc("""
+            [phase_space.storage]
+            block_size = [10, 10]
         """)
-        with pytest.raises(ValidationError, match=r"velocity_mesh\.extent"):
+        with pytest.raises(ValidationError, match=r"phase_space\.storage\.block_size"):
             validate_simulation_toml(doc)
 
-    def test_extent_inverted_rejected(self) -> None:
-        doc = _minimal_doc(**{'type = "PIC"': 'type = "vlasov"'}) + dedent("""
-            [velocity_mesh]
-            dimensions = [50, 50, 50]
-            extent = [[-2e6, 2e6], [2e6, -2e6], [-2e6, 2e6]]
-        """)
-        with pytest.raises(ValidationError, match="v_max"):
-            validate_simulation_toml(doc)
-
-    def test_block_size_must_divide_dimensions(self) -> None:
-        doc = _minimal_doc(**{'type = "PIC"': 'type = "vlasov"'}) + dedent("""
-            [velocity_mesh]
-            dimensions = [50, 50, 50]
-            extent = [[-2e6, 2e6], [-2e6, 2e6], [-2e6, 2e6]]
+    def test_block_size_must_divide_velocity_dimensions(self) -> None:
+        doc = self._vlasov_doc("""
+            [phase_space.storage]
             block_size = [7, 10, 10]
         """)
         with pytest.raises(ValidationError, match="block_size"):
+            validate_simulation_toml(doc)
+
+    def test_velocity_mesh_section_now_rejected(self) -> None:
+        # The merged schema rejects the legacy section name as an unknown
+        # top-level key.
+        doc = _minimal_doc() + dedent("""
+            [velocity_mesh]
+            dimensions = [50, 50, 50]
+        """)
+        with pytest.raises(ValidationError):
             validate_simulation_toml(doc)
 
 
@@ -962,6 +1069,28 @@ class TestRestartFromFiles:
         """)
         with pytest.raises(ValidationError, match="distinct"):
             validate_simulation_toml(doc)
+
+    def test_single_file_from_with_from_files_rejected(self) -> None:
+        # When `from_files` enumerates per-rank checkpoints, `from` must
+        # point at a directory or glob — not a single-file path. Soft
+        # check via known single-file extensions.
+        doc = _minimal_doc() + dedent("""
+            [restart]
+            from = "./chk.h5"
+            from_files = ["a.h5", "b.h5"]
+        """)
+        with pytest.raises(ValidationError, match="looks like a single"):
+            validate_simulation_toml(doc)
+
+    def test_directory_from_with_from_files_accepted(self) -> None:
+        doc = _minimal_doc() + dedent("""
+            [restart]
+            from = "./restart_30000/"
+            from_files = ["chk_00000.h5", "chk_00001.h5"]
+        """)
+        s = validate_simulation_toml(doc)
+        assert s.restart is not None
+        assert s.restart.from_ == "./restart_30000/"
 
 
 class TestAnisotropicGammaEOS:

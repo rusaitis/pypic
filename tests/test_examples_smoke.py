@@ -223,6 +223,7 @@ class TestSmoke:
             f"Grid ndim={len(grid_dims)} vs field ndim={len(field_shape)}"
         )
 
+
 # -- MHDUCLA physics validation ----------------------------------------------
 
 

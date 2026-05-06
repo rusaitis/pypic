@@ -79,16 +79,13 @@ def _nonzero_reference() -> st.SearchStrategy[np.ndarray]:
 
 def _nonzero_scalar() -> st.SearchStrategy[float]:
     """Scalar α ≠ 0 for scale tests. Sign random, magnitude in [1e-3, 1e3]."""
-    return (
-        st.floats(
-            min_value=1e-3,
-            max_value=1e3,
-            allow_nan=False,
-            allow_infinity=False,
-            exclude_min=True,
-        )
-        .flatmap(lambda x: st.sampled_from([x, -x]))
-    )
+    return st.floats(
+        min_value=1e-3,
+        max_value=1e3,
+        allow_nan=False,
+        allow_infinity=False,
+        exclude_min=True,
+    ).flatmap(lambda x: st.sampled_from([x, -x]))
 
 
 @given(

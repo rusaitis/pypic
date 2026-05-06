@@ -328,9 +328,7 @@ def _build_vector_triplet_regex() -> re.Pattern[str]:
         key=len,
         reverse=True,
     )
-    parts = [
-        re.escape(p) + ("_" if p[-1].isdigit() else "") for p in prefixes
-    ]
+    parts = [re.escape(p) + ("_" if p[-1].isdigit() else "") for p in prefixes]
     return re.compile(rf"^({'|'.join(parts)})([123])(?:_s(\d+))?$")
 
 

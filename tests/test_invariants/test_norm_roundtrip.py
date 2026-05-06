@@ -23,9 +23,7 @@ from tests.strategies import (
 
 @given(norm=normalizations(), quantity=base_quantities(), x=finite_physical_floats())
 @settings(max_examples=400, deadline=None)
-def test_base_quantity_round_trip(
-    norm: Normalization, quantity: str, x: float
-) -> None:
+def test_base_quantity_round_trip(norm: Normalization, quantity: str, x: float) -> None:
     """``to_si(q, normalize(q, x)) ≈ x`` for every base quantity and system."""
     round_tripped = norm.to_si(quantity, norm.normalize(quantity, x))
     assert math.isclose(round_tripped, x, rel_tol=1e-13, abs_tol=0.0)

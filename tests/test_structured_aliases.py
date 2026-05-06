@@ -543,6 +543,29 @@ class TestSpeciesNameAliases:
         ds = make_test_dataset(data, shape=shape, species=[ELECTRONS, IONS, ALPHAS])
         assert not ds.has_field("n_alphas")
 
+    def test_scalar_per_species_aliases_for_pressure(self):
+        """The generic mechanism also produces P_<species_name>."""
+        shape = (2, 2, 2)
+        data = {
+            "P_s0": np.full(shape, 3.0),
+            "P_s1": np.full(shape, 4.0),
+        }
+        ds = make_test_dataset(data, shape=shape, species=[ELECTRONS, IONS])
+        np.testing.assert_array_equal(ds["P_electrons"], ds["P_s0"])
+        np.testing.assert_array_equal(ds["P_ions"], ds["P_s1"])
+
+    def test_vector_component_per_species_aliases(self):
+        shape = (2, 2, 2)
+        data = {
+            "V1_s0": np.full(shape, 1.0),
+            "V2_s0": np.full(shape, 2.0),
+            "EF1_s1": np.full(shape, 9.0),
+        }
+        ds = make_test_dataset(data, shape=shape, species=[ELECTRONS, IONS])
+        np.testing.assert_array_equal(ds["V1_electrons"], ds["V1_s0"])
+        np.testing.assert_array_equal(ds["V2_electrons"], ds["V2_s0"])
+        np.testing.assert_array_equal(ds["EF1_ions"], ds["EF1_s1"])
+
 
 class TestAuditIssue2SGyroRename:
     """s_gyro_e/s_gyro_i are canonical; bare s_gyro is an error."""

@@ -96,9 +96,7 @@ def test_pressure_trace_is_rotation_invariant(
     adds per rotated component times the ~40-term trace sum.
     """
     r = np.asarray(rotation, dtype=np.float64)
-    rp11, rp22, rp33, _, _, _ = rotate_pressure_tensor(
-        p11, p22, p33, p12, p13, p23, r
-    )
+    rp11, rp22, rp33, _, _, _ = rotate_pressure_tensor(p11, p22, p33, p12, p13, p23, r)
     trace_before = p11 + p22 + p33
     trace_after = rp11 + rp22 + rp33
     assert_allclose(trace_after, trace_before, rtol=1e-12, atol=1e-12)
@@ -113,9 +111,7 @@ def test_pressure_trace_is_rotation_invariant(
     p23=_symmetric_tensor_component(),
     b1=_nonzero_b_component(),
     b2=_nonzero_b_component(),
-    b3=st.floats(
-        min_value=0.5, max_value=5.0, allow_nan=False, allow_infinity=False
-    ),
+    b3=st.floats(min_value=0.5, max_value=5.0, allow_nan=False, allow_infinity=False),
     rotation=rotations(),
 )
 @settings(max_examples=40, deadline=None)
@@ -160,9 +156,7 @@ def test_parallel_pressure_is_rotation_invariant(
     p23=_symmetric_tensor_component(),
     b1=_nonzero_b_component(),
     b2=_nonzero_b_component(),
-    b3=st.floats(
-        min_value=0.5, max_value=5.0, allow_nan=False, allow_infinity=False
-    ),
+    b3=st.floats(min_value=0.5, max_value=5.0, allow_nan=False, allow_infinity=False),
     rotation=rotations(),
 )
 @settings(max_examples=40, deadline=None)
@@ -188,12 +182,8 @@ def test_perpendicular_pressure_is_rotation_invariant(
     )
     rb1, rb2, rb3 = rotate_vector_components(b1, b2, b3_arr, r)
 
-    before = perpendicular_pressure(
-        p11, p22, p33, p12, p13, p23, b1, b2, b3_arr
-    )
-    after = perpendicular_pressure(
-        rp11, rp22, rp33, rp12, rp13, rp23, rb1, rb2, rb3
-    )
+    before = perpendicular_pressure(p11, p22, p33, p12, p13, p23, b1, b2, b3_arr)
+    after = perpendicular_pressure(rp11, rp22, rp33, rp12, rp13, rp23, rb1, rb2, rb3)
     assert_allclose(after, before, rtol=1e-11, atol=1e-11)
 
 
@@ -206,9 +196,7 @@ def test_perpendicular_pressure_is_rotation_invariant(
     p23=_symmetric_tensor_component(),
     b1=_nonzero_b_component(),
     b2=_nonzero_b_component(),
-    b3=st.floats(
-        min_value=0.5, max_value=5.0, allow_nan=False, allow_infinity=False
-    ),
+    b3=st.floats(min_value=0.5, max_value=5.0, allow_nan=False, allow_infinity=False),
 )
 @settings(max_examples=40, deadline=None)
 def test_isotropic_pressure_equals_par_plus_two_perp_over_three(
@@ -231,9 +219,7 @@ def test_isotropic_pressure_equals_par_plus_two_perp_over_three(
     """
     b3_arr = np.full(SHAPE, b3, dtype=np.float64)
     p_par = parallel_pressure(p11, p22, p33, p12, p13, p23, b1, b2, b3_arr)
-    p_perp = perpendicular_pressure(
-        p11, p22, p33, p12, p13, p23, b1, b2, b3_arr
-    )
+    p_perp = perpendicular_pressure(p11, p22, p33, p12, p13, p23, b1, b2, b3_arr)
     p_iso = isotropic_pressure(p11, p22, p33)
 
     assert_allclose((p_par + 2.0 * p_perp) / 3.0, p_iso, rtol=1e-13, atol=1e-13)

@@ -61,16 +61,13 @@ def _positive_spacing() -> st.SearchStrategy[tuple[float, float, float]]:
 
 def _nonzero_scalar() -> st.SearchStrategy[float]:
     """Signed scalar α bounded away from zero, for linear scaling tests."""
-    return (
-        st.floats(
-            min_value=1e-3,
-            max_value=1e3,
-            allow_nan=False,
-            allow_infinity=False,
-            exclude_min=True,
-        )
-        .flatmap(lambda x: st.sampled_from([x, -x]))
-    )
+    return st.floats(
+        min_value=1e-3,
+        max_value=1e3,
+        allow_nan=False,
+        allow_infinity=False,
+        exclude_min=True,
+    ).flatmap(lambda x: st.sampled_from([x, -x]))
 
 
 @given(
@@ -145,9 +142,7 @@ def test_spatial_mean_is_linear(
     alpha=_nonzero_scalar(),
 )
 @settings(max_examples=40, deadline=None)
-def test_spatial_rms_is_homogeneous_in_magnitude(
-    f: np.ndarray, alpha: float
-) -> None:
+def test_spatial_rms_is_homogeneous_in_magnitude(f: np.ndarray, alpha: float) -> None:
     r"""$f_{rms}(\alpha f) = |\alpha| \cdot f_{rms}(f)$.
 
     rms is built from $f^2$: $f_{rms}(\alpha f) = \sqrt{\langle

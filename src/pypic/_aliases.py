@@ -8,6 +8,15 @@ arise if either module imported the other at top level.
 from __future__ import annotations
 
 import functools
+import re
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable, Sequence
+
+# Matches the canonical ``_s<index>`` species suffix; captures the
+# integer index so the reverse lookup is unambiguous.
+_SPECIES_SUFFIX = re.compile(r"_s(\d+)$")
 
 _COMPUTE_ALIASES: dict[str, str] = {
     "curl_Bx": "curl_B1",
@@ -257,3 +266,59 @@ def _build_field_alias_fallback() -> dict[str, str]:
 def _get_field_alias_fallback() -> dict[str, str]:
     """Return the field alias fallback dict (cached, thread-safe)."""
     return _build_field_alias_fallback()
+
+
+def species_name_aliases(
+    species_names: Sequence[str],
+    available: Iterable[str],
+) -> dict[str, str]:
+    """Build ``<prefix>_<species_name>`` → ``<prefix>_s<index>`` aliases.
+
+    Resolves every canonical name in ``available`` that ends in the
+    ``_s<i>`` suffix to a species-name-explicit alias.  ``P_s0`` becomes
+    ``P_electrons`` when ``species_names[0] == "electrons"``;
+    ``EF1_s1`` becomes ``EF1_protons`` when ``species_names[1] ==
+    "protons"``.  Unrelated names pass through untouched.
+
+    Parameters
+    ----------
+    species_names : Sequence[str]
+        Species names in declaration order. ``species_names[i]`` is the
+        name of the species addressed by the ``_s<i>`` suffix.
+    available : Iterable[str]
+        Canonical names actually present (e.g. ``ds.data_vars``). Only
+        aliases whose target appears here are produced — keeps the alias
+        map honest about what can resolve.
+
+    Returns
+    -------
+    dict[str, str]
+        ``{alias: canonical}`` mapping. Empty when no canonical name
+        matches the species suffix or when ``species_names`` is empty.
+
+    Examples
+    --------
+    >>> species_name_aliases(("electrons", "ions"), ["n_s0", "P_s1", "B1"])
+    {'n_electrons': 'n_s0', 'P_ions': 'P_s1'}
+    """
+    aliases: dict[str, str] = {}
+    if not species_names:
+        return aliases
+    available_set = set(available)
+    for canonical in available_set:
+        match = _SPECIES_SUFFIX.search(canonical)
+        if match is None:
+            continue
+        idx = int(match.group(1))
+        if idx >= len(species_names):
+            continue
+        species_name = species_names[idx].lower()
+        if not species_name:
+            continue
+        base = canonical[: match.start()]
+        alias = f"{base}_{species_name}"
+        # Don't shadow an existing canonical or earlier alias.
+        if alias in available_set or alias in aliases:
+            continue
+        aliases[alias] = canonical
+    return aliases

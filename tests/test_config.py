@@ -667,6 +667,114 @@ class TestBodiesDriversRestart:
         assert cfg.restart.step == 30000
 
 
+class TestForwardedSections:
+    """Sections previously dropped at the translator boundary now survive.
+
+    Probes, collisions, velocity_mesh, phase_space, and the full ``[run]``
+    provenance record reach ``SimulationConfig`` as raw schema objects —
+    same pattern as bodies/drivers/restart.
+    """
+
+    def test_run_provenance_typed(self, tmp_path: Path) -> None:
+        run = (
+            '[run]\nname = "harris-r2"\n'
+            'doi = "10.5281/zenodo.12345"\n'
+            'license = "CC-BY-4.0"\n'
+            'funding = ["NSF-AGS-2024001"]\n'
+            "random_seed = 42\n"
+        )
+        cfg = load_config(
+            _write(
+                tmp_path, _shell(extra="").replace('[run]\nname = "r0"', run.rstrip())
+            )
+        )
+        assert cfg.run is not None
+        assert cfg.run.doi == "10.5281/zenodo.12345"
+        assert cfg.run.license == "CC-BY-4.0"
+        assert cfg.run.funding == ["NSF-AGS-2024001"]
+        assert cfg.run.random_seed == 42
+
+    def test_probes_typed(self, tmp_path: Path) -> None:
+        prb = (
+            "[[probes]]\n"
+            'name = "magnetopause"\n'
+            "position = [10.0, 0.0, 0.0]\n"
+            'fields = ["B1", "B2", "B3"]\n'
+        )
+        cfg = load_config(_write(tmp_path, _shell(extra=prb)))
+        assert len(cfg.probes) == 1
+        assert cfg.probes[0].name == "magnetopause"
+        assert cfg.probes[0].position == [10.0, 0.0, 0.0]
+
+    def test_collisions_typed(self, tmp_path: Path) -> None:
+        col = (
+            '[[species]]\nname = "i"\ncharge = 1.0\nmass = 1.0\n'
+            "[[collisions]]\n"
+            'species_pair = ["e", "i"]\n'
+            'model = "coulomb"\n'
+            "coulomb_log = 10.0\n"
+        )
+        cfg = load_config(_write(tmp_path, _shell(extra=col)))
+        assert len(cfg.collisions) == 1
+        assert cfg.collisions[0].species_pair == ["e", "i"]
+        assert cfg.collisions[0].coulomb_log == 10.0
+
+    def test_phase_space_storage_typed(self, tmp_path: Path) -> None:
+        # [phase_space.storage] is the v1.0.x replacement for the dropped
+        # [velocity_mesh] section.
+        ps = (
+            "[phase_space]\n"
+            "dimensions = [2, 2, 2, 50, 50, 50]\n"
+            'axis_labels = ["x", "y", "z", "vx", "vy", "vz"]\n'
+            "[phase_space.storage]\n"
+            "block_size = [10, 10, 10]\n"
+            "sparsity_threshold = 1.0e-15\n"
+        )
+        cfg = load_config(_write(tmp_path, _shell(extra=ps)))
+        assert cfg.phase_space is not None
+        assert cfg.phase_space.storage is not None
+        assert cfg.phase_space.storage.block_size == [10, 10, 10]
+        assert cfg.phase_space.storage.sparsity_threshold == 1.0e-15
+
+    def test_phase_space_typed(self, tmp_path: Path) -> None:
+        ps = (
+            "[phase_space]\n"
+            "dimensions = [2, 2, 2, 16, 8]\n"
+            'axis_labels = ["x", "y", "z", "vpar", "mu"]\n'
+            'coordinate_system = "guiding-center"\n'
+        )
+        cfg = load_config(_write(tmp_path, _shell(extra=ps)))
+        assert cfg.phase_space is not None
+        assert cfg.phase_space.dimensions == [2, 2, 2, 16, 8]
+        assert cfg.phase_space.coordinate_system == "guiding-center"
+
+    def test_stagger_per_component_round_trips_into_stagger_info(
+        self, tmp_path: Path
+    ) -> None:
+        # ``[grid.stagger_fields]`` and ``[grid.stagger_position]`` survive
+        # translation as ``StaggerInfo.field_locations`` and
+        # ``StaggerInfo.position`` on ``cfg.metadata['stagger']``.
+        grid_with_stagger = (
+            "[grid]\n"
+            "dimensions = [2, 2, 2]\nspacing = [1.0, 1.0, 1.0]\n"
+            "lower = [0.0, 0.0, 0.0]\nupper = [2.0, 2.0, 2.0]\n"
+            'stagger = "staggered"\n'
+            "[grid.stagger_fields]\n"
+            'B = "face"\n'
+            'E = "edge"\n'
+            "[grid.stagger_position]\n"
+            "B1 = [0.5, 0.0, 0.0]\n"
+            "E1 = [0.0, 0.5, 0.5]\n"
+        )
+        cfg = load_config(_write(tmp_path, _shell(grid=grid_with_stagger)))
+        stagger = cfg.metadata["stagger"]
+        assert stagger.convention == "staggered"
+        assert stagger.field_locations is not None
+        assert stagger.field_locations["B"] == "face"
+        assert stagger.position is not None
+        assert stagger.position["B1"] == (0.5, 0.0, 0.0)
+
+
 class TestPhysicsBranches:
     """Translator handles MHD and hybrid physics branches symmetrically."""
 
