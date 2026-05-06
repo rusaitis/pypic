@@ -93,7 +93,8 @@ Identity of the *code* that produced the data.
 ```toml
 [model]
 name = "string"                    # REQUIRED: "iPIC3D", "ARMS", "AIKEF", ...
-type = "string"                    # REQUIRED: "PIC" | "MHD" | "hybrid"
+type = "string"                    # REQUIRED: "PIC" | "MHD" | "hybrid" |
+                                   #            "vlasov" | "gyrokinetic"
 version = "string"                 # optional
 description = "string"             # optional
 url = "string"                     # optional — code homepage
@@ -123,6 +124,11 @@ license = "CC-BY-4.0"              # optional — DATA license (SPDX id)
 doi = "10.5281/zenodo.12345678"    # optional — DATA DOI
 funding = ["NSF-AGS-2024001"]      # optional — grant IDs
 embargo = 2027-01-01               # optional — public-release date
+random_seed = 42                   # optional — RNG seed for reproducible setup
+
+[run.ensemble]                     # optional — ensemble-member identity
+member_id = 3                      # 1-indexed; must satisfy member_id <= total
+total     = 16
 
 [run.resources]                    # optional — all sub-keys optional
 mpi_ranks        = 4096
@@ -152,7 +158,11 @@ Temporal integration controls.
 ```toml
 [time]
 scheme  = "fixed"                  # "fixed" (default) | "adaptive" | "subcycled"
+                                   #   | "rk2" | "rk3" | "rk4" | "vl2"
+                                   #   | "ssprk2" | "ssprk3"
+                                   #   | "imex-rk2" | "imex-rk3"
 dt      = 0.05                     # REQUIRED — timestep in code units
+                                   #   (placeholder for scheme = "adaptive")
 t_start = 0.0                      # REQUIRED
 t_end   = 100.0                    # REQUIRED
 n_steps = 2000                     # REQUIRED
@@ -161,6 +171,8 @@ dt_min  = 1.0e-5                   # optional — for scheme = "adaptive"
 dt_max  = 0.01                     # optional — for scheme = "adaptive"
 dt_field       = 0.004             # optional — for scheme = "subcycled"
 field_substeps = 5                 # REQUIRED when scheme = "subcycled"
+splitting      = "strang"          # optional — "strang" | "lie" | "godunov"
+                                   #   for operator-split MHD/multi-physics
 ```
 
 ### [grid]
@@ -179,6 +191,9 @@ stagger    = "cell"                # optional: "cell" (default) | "node" | "stag
                                    #   "node"       — fields at cell vertices (iPIC3D)
                                    #   "staggered"  — Yee mesh (B faces, E edges, ...)
                                    # Informational only; readers destagger to co-located.
+                                   # See StaggerInfo.position for per-component
+                                   # offsets (openPMD ED-PIC `position` semantics).
+ghost_cells   = [2, 2, 2]          # optional — halo width per axis (matches dimensions)
 source        = "grids/mesh.h5"    # optional — external file for complex meshes
 source_format = "hdf5"             # optional
 
@@ -186,6 +201,12 @@ source_format = "hdf5"             # optional
 [grid.amr]
 max_level            = 4
 refinement_ratio     = 2
+amr_kind             = "block"     # optional — "block" (default) | "patch" | "octree"
+                                   #   discriminator for BoxLib/AMReX/Chombo (block),
+                                   #   refinement-region patches, or octree codes
+                                   #   (RAMSES, MPI-AMRVAC) where block_size doesn't apply
+level_subcycling     = false       # optional — different AMR levels advance at
+                                   #   different effective dt (Athena++, AMReX)
 block_size           = [8, 8, 8]
 refinement_criteria  = ["current_density", "gradient_b"]
 refinement_threshold = 0.1
@@ -272,11 +293,19 @@ Describes the coordinate geometry and reference frame.
 ```toml
 [coordinates]
 geometry = "string"                # REQUIRED: "cartesian" | "spherical" | "cylindrical"
+                                   #            | "thetaMode"
 frame = "string"                   # REQUIRED: native frame name (arbitrary, e.g., "simulation")
 axis_labels = ["x", "y", "z"]     # optional: override default axis names
 physical_extent = [46.0, 32.0, 13.0]  # optional: domain size in target-frame physical units
 physical_extent_unit = "R_E"       # optional: unit for physical_extent (default "m")
                                    #   valid: "m", "km", "R_E", "R_S", "AU"
+
+# Required when geometry = "thetaMode" (FBPIC azimuthal-mode RZ
+# decomposition over an (r, z) grid). Forbidden otherwise.
+[coordinates.modes]
+n_modes      = 3                   # number of azimuthal modes stored on disk
+mode_indices = [0, 1, 2]           # optional explicit mode numbers; defaults to
+                                   # [0, 1, ..., n_modes-1] when omitted
 ```
 
 When ``physical_extent`` is provided, the ``scale`` field of any
@@ -344,8 +373,13 @@ drift_velocity = [0.0, 0.0, 0.0]   # optional — bulk drift (code units)
 density = 1.0                      # optional — number density (code units)
 closure = "adiabatic"              # optional (fluid species) — "isothermal" | "adiabatic"
                                    #                           | "polytropic" | "braginskii"
+                                   #                           | "cgl" | "10moment" | "14moment"
 gamma_eos = 1.6666667              # optional (fluid species) — per-species adiabatic index
 inertia = 0.0                      # optional (hybrid fluid electrons) — me/mi; 0 = massless
+shape = "cic"                      # optional (PIC) — "ngp" | "cic" | "tsc" | "pqs"
+                                   #   (NGP=order 0, CIC=1, TSC=2, PQS=3; ED-PIC vocabulary)
+tracer = false                     # optional (PIC) — tagged subset for trajectory tracking;
+                                   # readers propagate the hint to particle analysis
 ```
 
 The validator enforces `(charge + mass)` XOR `charge_to_mass`: provide
@@ -373,13 +407,23 @@ relativistic = false               # semantics identical across PIC/MHD/hybrid
 omega_p_over_omega_c = 20.0        # reference-species plasma/cyclotron ratio
 
 [physics.pic.solver]               # numerical-method knobs for PIC codes
-scheme         = "semi-implicit"   # "explicit" | "semi-implicit" | "implicit"
-implicitness   = 0.5               # θ-scheme weight (0.5 = Crank-Nicolson)
-pusher         = "boris"           # "boris" | "vay" | "higuera-cary"
-field_solver   = "implicit-moment" # "fdtd-yee" | "pseudo-spectral" |
-                                   # "implicit-moment" | "implicit-gmres"
-preconditioner = "block-jacobi"    # "none" | "jacobi" | "block-jacobi" |
-                                   # "ilu" | "amg" | "additive-schwarz"
+scheme            = "semi-implicit"   # "explicit" | "semi-implicit" | "implicit"
+implicitness      = 0.5               # θ-scheme weight (0.5 = Crank-Nicolson)
+pusher            = "boris"           # "boris" | "vay" | "higuera-cary"
+                                      #   | "llrk4" | "free-streaming"
+field_solver      = "implicit-moment" # "fdtd-yee" | "pseudo-spectral"
+                                      #   | "psatd" | "spectral-azimuthal"
+                                      #   | "lehe" | "ck" | "ckc" | "pstd" | "gpstd"
+                                      #   | "implicit-moment" | "implicit-gmres"
+preconditioner    = "block-jacobi"    # "none" | "jacobi" | "block-jacobi" |
+                                      # "ilu" | "amg" | "additive-schwarz"
+current_smoothing = 0                 # optional — binomial filter passes per step
+charge_smoothing  = 0                 # optional — binomial filter passes per step
+charge_correction = "none"            # optional — "marder" | "langdon" | "boris" |
+                                      #   "hyperbolic" | "spectral" | "none"
+current_deposition = "esirkepov"      # optional — "esirkepov" | "zigzag" |
+                                      #   "villabune" | "direct-boris" |
+                                      #   "direct-morse-nielson" | "none"
 
 [physics.mhd]
 gamma       = 1.6667
@@ -477,13 +521,20 @@ accepted beyond the core vocabulary above.
 
 ### [restart]
 
-Continuation pointer from a prior run.
+Continuation pointer from a prior run. v1.0.x added the additive
+``restore`` and ``mode`` fields; the multi-file ``from`` widening for
+VPIC manifests is a v1.1 shape change.
 
 ```toml
 [restart]
 from = "./checkpoints/chk_000030.h5"   # REQUIRED (aliased — `from` is a Python keyword)
 step = 30000                            # optional
 time = 1500.0                           # optional
+restore = ["fields", "particles"]       # optional — partial restart selector
+                                        #   ("fields" | "particles" | "auxiliary"); entries
+                                        #   must be distinct. Omitting it restores everything.
+mode = "hot"                            # optional — "hot" (full state reload) | "cold"
+                                        #   (re-apply IC on saved geometry)
 ```
 
 ### [output.*]
@@ -498,6 +549,9 @@ dir           = "./checkpoints"        # REQUIRED
 format        = "hdf5"                 # "hdf5" | "zarr" | "adios2" | "netcdf"
 precision     = "f64"                  # "f32" | "f64" — checkpoints default f64
 keep_last     = 3                      # optional — rolling retention
+file_pattern  = "step_{step:06d}/rank_{rank:05d}.h5"  # optional — per-rank layout
+files_per_step = 64                    # optional — fan-out at each output step
+partition     = "by_rank"              # optional — "by_rank" | "by_field" | "monolithic"
 
 [output.fields]                        # field output
 step_interval = 50

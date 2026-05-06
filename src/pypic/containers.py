@@ -38,6 +38,16 @@ class StaggerInfo:
         ``{"B": "face", "E": "edge"}``.  Only meaningful for the
         ``"staggered"`` convention; ``None`` otherwise.  Frozen to
         ``MappingProxyType`` after construction.
+    position : dict[str, tuple[float, ...]] | None
+        Per-component stagger offsets in ``[0.0, 1.0)``, one tuple per
+        canonical field component (e.g. ``{"B1": (0.5, 0.0, 0.0),
+        "E1": (0.0, 0.5, 0.5)}``).  Adopts the openPMD ED-PIC
+        ``position`` semantics so Yee-mesh PIC, BATSRUS face-centered B,
+        and any future co-located write-out can describe their native
+        stagger losslessly even after the reader has destaggered.
+        Only meaningful for the ``"staggered"`` convention; ``None``
+        otherwise.  Each tuple is converted to a ``tuple[float, ...]``
+        on construction so the whole structure is hashable.
     interpolation_order : int | None
         Order of interpolation used during destaggering (1 = linear,
         2 = quadratic).  ``None`` if no destaggering was performed.
@@ -59,10 +69,18 @@ class StaggerInfo:
     ... )
     >>> si.field_locations["B"]
     'face'
+
+    >>> si = StaggerInfo(
+    ...     convention="staggered",
+    ...     position={"B1": (0.5, 0.0, 0.0), "E1": (0.0, 0.5, 0.5)},
+    ... )
+    >>> si.position["B1"]
+    (0.5, 0.0, 0.0)
     """
 
     convention: str
     field_locations: dict[str, str] | None = None
+    position: dict[str, tuple[float, ...]] | None = None
     interpolation_order: int | None = None
     notes: str | None = None
 
@@ -73,6 +91,17 @@ class StaggerInfo:
                 "field_locations",
                 MappingProxyType(dict(self.field_locations)),
             )
+        if self.position is not None:
+            normalized: dict[str, tuple[float, ...]] = {}
+            for name, offsets in self.position.items():
+                offset_tuple = tuple(float(x) for x in offsets)
+                if not all(0.0 <= x < 1.0 for x in offset_tuple):
+                    raise ValueError(
+                        f"StaggerInfo.position[{name!r}] = {offset_tuple} — "
+                        f"each offset must be in [0.0, 1.0)"
+                    )
+                normalized[name] = offset_tuple
+            object.__setattr__(self, "position", MappingProxyType(normalized))
 
 
 @dataclass(frozen=True, slots=True)
@@ -83,9 +112,12 @@ class SimulationConfig:
     ----------
     model_name : str
         Human-readable name for the simulation run.
-    model_type : Literal["PIC", "MHD", "hybrid"]
-        Simulation type identifier — uppercase, matches ``[model].type``
-        in :doc:`/docs/schema` and the Pydantic ``Model.type`` Literal.
+    model_type : Literal["PIC", "MHD", "hybrid", "vlasov", "gyrokinetic"]
+        Simulation type identifier — uppercase for fluid/PIC families,
+        lowercase for kinetic continuum codes. Matches ``[model].type`` in
+        :doc:`/docs/schema` and the Pydantic ``Model.type`` Literal. The
+        ``vlasov`` / ``gyrokinetic`` values land in v1.0.x ahead of the
+        readers that consume them — see ``TASKS-schema-extension.md``.
     grid : GridInfo
         Grid metadata (includes coordinate geometry).
     normalization : Normalization

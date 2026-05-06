@@ -232,11 +232,15 @@ def _stagger_to_dict(stagger: Any) -> dict[str, Any]:  # noqa: ANN401
     plain dict in ``metadata``.
     """
     field_locations = stagger.field_locations
+    position = stagger.position
     return {
         "__pypic_class__": "StaggerInfo",
         "convention": stagger.convention,
         "field_locations": (
             dict(field_locations) if field_locations is not None else None
+        ),
+        "position": (
+            {k: list(v) for k, v in position.items()} if position is not None else None
         ),
         "interpolation_order": stagger.interpolation_order,
         "notes": stagger.notes,
@@ -293,9 +297,16 @@ def _dict_to_stagger(d: dict[str, Any]) -> Any:  # noqa: ANN401
     """Reconstruct a StaggerInfo from a tagged dict written by ``_to_json_native``."""
     from pypic.containers import StaggerInfo
 
+    raw_position = d.get("position")
+    position: dict[str, tuple[float, ...]] | None
+    if raw_position is None:
+        position = None
+    else:
+        position = {k: tuple(float(x) for x in v) for k, v in raw_position.items()}
     return StaggerInfo(
         convention=d["convention"],
         field_locations=d.get("field_locations"),
+        position=position,
         interpolation_order=d.get("interpolation_order"),
         notes=d.get("notes"),
     )

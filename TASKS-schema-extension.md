@@ -25,142 +25,92 @@ v1.0 documents we can't perturb.
 
 ### TOML-schema additions
 
-- [ ] **PIC field solver vocabulary — PSATD vs PS.**
-  `PICFieldSolver` (`_models.py:43`) exposes `"pseudo-spectral"` but
-  conflates PS (FD-in-time, spectral-in-space) with PSATD (analytic in
-  time, spectral in space). Add `"psatd"` and `"spectral-azimuthal"`
-  (FBPIC's RZ-mode decomposition). Both are dominant production solvers
-  in WarpX and FBPIC.
+- [x] **PIC field solver vocabulary — PSATD vs PS.** Shipped: `psatd`,
+  `spectral-azimuthal` added to `PICFieldSolver` (and the ED-PIC stencils
+  below).
 
-- [ ] **PIC current/charge smoothing knobs.**
-  `PICSolver` (`_models.py:354`) lacks `current_smoothing` /
-  `charge_smoothing` fields (binomial passes, compensator filters).
-  Standard in every production PIC code. Oddly already present on
-  `HybridSolver` (`_models.py:391`).
+- [x] **PIC current/charge smoothing knobs.** Shipped: `current_smoothing`
+  and `charge_smoothing` are optional `NonNegativeInt | None` fields on
+  `PICSolver` (matching the long-standing `HybridSolver.current_smoothing`).
 
-- [ ] **Adopt openPMD ED-PIC vocabulary across PIC literals.**
-  The openPMD ED-PIC extension (`EXT_ED-PIC.md`, extension ID 1) defines
-  the *de facto* PIC vocabulary used by WarpX, PIConGPU, Smilei, and
-  FBPIC. While the openPMD standard itself has been frozen at v1.1.0
-  since Feb 2017, the ED-PIC vocabulary is what these production codes
-  actually emit on disk and is the natural alignment target for our
-  enums. Concrete additions:
-  - `PICFieldSolver` (`_models.py:43`) gains `"lehe"` (Lehe stencil),
-    `"ck"` / `"ckc"` (Cole-Kärkkäinen compact stencil), `"pstd"`,
-    `"gpstd"`. (`"psatd"` already covered above.)
-  - `PICPusher` (`_models.py:42`) gains `"llrk4"` and `"free-streaming"`.
-  - New literal `ChargeCorrection = "marder" | "langdon" | "boris" |
-    "hyperbolic" | "spectral" | "none"` on `PICSolver`.
-  - New literal `ParticleShape = "ngp" | "cic" | "tsc" | "pqs"` on
-    `Species` or `PICSolver` (NGP=order 0, CIC=1, TSC=2, PQS=3).
-  - New literal `CurrentDeposition = "esirkepov" | "zigzag" |
-    "villabune" | "direct-boris" | "direct-morse-nielson" | "none"` on
-    `PICSolver`.
-  All purely additive — existing v1.0 docs continue to validate.
+- [x] **Adopt openPMD ED-PIC vocabulary across PIC literals.** Shipped:
+  - `PICFieldSolver` += `lehe`, `ck`, `ckc`, `pstd`, `gpstd`
+    (and `psatd` / `spectral-azimuthal` from the entry above).
+  - `PICPusher` += `llrk4`, `free-streaming`.
+  - New `ChargeCorrection` literal exposed via the optional
+    `PICSolver.charge_correction` field.
+  - New `CurrentDeposition` literal exposed via the optional
+    `PICSolver.current_deposition` field.
+  - New `ParticleShape` literal exposed via the optional
+    `Species.shape` field (per-species — WarpX and Smilei vary the
+    deposition order by species).
 
-- [ ] **`ModelType` — admit Vlasov / gyrokinetic.**
-  `ModelType = "PIC" | "MHD" | "hybrid"` (`_models.py:34`) excludes
-  continuum-Vlasov (Vlasiator, Gkeyll Vlasov-Maxwell) and gyrokinetic
-  (GENE, GS2, GX, Gkeyll-GK). Add `"vlasov"` and `"gyrokinetic"`. Solver
-  vocabularies can land later — the root enum gate is the immediate
-  blocker.
+- [x] **`ModelType` — admit Vlasov / gyrokinetic.** Shipped:
+  `ModelType` += `vlasov`, `gyrokinetic`.
+  `_check_physics_matches_model_type` skips the typed-branch
+  cross-check for these new types — their physics knobs route through
+  the `[physics]` extras namespace until typed sub-tables land in
+  v1.1+.
 
-- [ ] **Tracer flag on `[[species]]`.**
-  Add `tracer: bool = False` to `Species` (`_models.py:500`). PIC codes
-  routinely write a tagged subset for trajectory tracking that must not
-  contribute to charge/current deposition. OSIRIS, Smilei, TRISTAN-MP
-  all support this natively. Open question before locking the API:
-  some codes distinguish *test* particles (passive, no back-reaction
-  on fields) from *tracer* particles (full dynamics, just tagged for
-  output). If the boolean turns out to be insufficient, a follow-up
-  `tracer_kind: "test" | "tagged"` field can land additively.
+- [x] **Tracer flag on `[[species]]`.** Shipped: `tracer: bool = False`
+  on `Species`. Test-particle vs tagged-tracer semantics may need a
+  follow-up `tracer_kind` field; the boolean is the additive starting
+  point and any later refinement remains additive.
 
-- [ ] **Time-integration vocabulary expansion.**
-  `TimeScheme = "fixed" | "adaptive" | "subcycled"` (`_models.py:37`)
-  doesn't express RK substages (`vl2`, `rk2`, `rk3`, `ssprk3`),
-  Strang/Lie operator splitting, or IMEX-RK schemes for stiff source
-  terms (radiation, cooling, chemistry). These are *the*
-  time-integration vocabulary across modern grid codes (Athena++,
-  PLUTO, FLASH). Additive shape: expand the literal and add an
-  optional `splitting: "strang" | "lie" | "godunov" | None` field on
-  `[time]`. No restructuring of the section.
+- [x] **Time-integration vocabulary expansion.** Shipped: `TimeScheme`
+  += `rk2`, `rk3`, `rk4`, `vl2`, `ssprk2`, `ssprk3`, `imex-rk2`,
+  `imex-rk3`. New optional `Time.splitting: 'strang' | 'lie' | 'godunov'
+  | None` field. The `dt > 0` requirement now applies to every scheme
+  except `adaptive` (the only CFL-driven mode where `dt` is a
+  placeholder).
 
-- [ ] **Stochasticity / ensemble metadata on `[run]`.**
-  Add optional `random_seed: int | None` and
-  `ensemble: {member_id, total} | None` to `Run` (`_models.py:147`).
-  Required for ensemble runs (cosmological PIC, turbulence
-  realizations). Cheap to add now; otherwise readers fall back to the
-  `x-` extension namespace.
+- [x] **Stochasticity / ensemble metadata on `[run]`.** Shipped:
+  optional `Run.random_seed: int | None` and `Run.ensemble: Ensemble |
+  None` fields. The `Ensemble` model validates `1 <= member_id <= total`.
 
-- [ ] **AMR kind discriminator.**
-  `GridAMR` (`_models.py:207`) implicitly assumes block/patch AMR with
-  a global `block_size`. Octree codes (RAMSES, MPI-AMRVAC) have no
-  fixed block size — each leaf is one cell. Add optional
-  `amr_kind: "block" | "patch" | "octree"` defaulting to `"block"`
-  (current implicit behavior). Without it, octree codes must use the
-  external-mesh escape hatch.
+- [x] **AMR kind discriminator.** Shipped: `GridAMR.amr_kind: 'block' |
+  'patch' | 'octree' = 'block'` — preserves current implicit behavior
+  while admitting RAMSES / MPI-AMRVAC octree codes.
 
-- [ ] **AMR temporal subcycling flag.**
-  Athena++ and AMReX-based codes sub-cycle different AMR levels at
-  different effective timesteps. Lightest fix lands additively in
-  v1.0.x: optional `level_subcycling: bool = False` on `[grid.amr]`.
-  A per-level `dt_factor` array would be a future v1.1 add if needed.
+- [x] **AMR temporal subcycling flag.** Shipped:
+  `GridAMR.level_subcycling: bool = False`. A per-level `dt_factor`
+  array remains a v1.1 candidate.
 
-- [ ] **Ghost cell counts.**
-  Many codes need ghost cell metadata for downstream edge-derivative
-  analysis. Optional one-liner: `ghost_cells: AxisInt | None = None`
-  on `[grid]`.
+- [x] **Ghost cell counts.** Shipped: `Grid.ghost_cells: list[int] |
+  None`, axis count enforced against `grid.dimensions` by the root
+  validator.
 
-- [ ] **Per-rank / multi-file output layout.**
-  `_OutputBase` (`_models.py:547`) describes a single `dir`,
-  `step_interval`, `format`, `precision`. VPIC writes one
-  band-interleaved binary per MPI rank per dump; WarpX/openPMD writes
-  per-process files plus an index. Add optional fields:
-  `file_pattern: str | None` (e.g. `"step_{step:06d}/rank_{rank:05d}.h5"`),
-  `files_per_step: int | None`,
-  `partition: "by_rank" | "by_field" | "monolithic"`. All optional —
-  existing single-file readers unaffected. Required for VPIC (Step 35),
-  nice-to-have for AMReX-based PIC.
+- [x] **Per-rank / multi-file output layout.** Shipped: optional
+  `file_pattern`, `files_per_step`, `partition` (`'by_rank' |
+  'by_field' | 'monolithic'`) on every `[output.*]` sub-table via
+  `_OutputBase`.
 
-- [ ] **Anisotropic closure enum values.**
-  `Closure` (`_models.py:40`) is `"isothermal" | "adiabatic" |
-  "polytropic" | "braginskii"`. Add `"cgl"` (double-adiabatic),
-  `"10moment"`, `"14moment"`. Pure enum expansion — codes can declare
-  a multi-moment closure on `[[species]]` even before the schema
-  carries the full anisotropic `gamma_eos` tuple (which is v1.1 because
-  it changes the existing scalar field type).
+- [x] **Anisotropic closure enum values.** Shipped: `Closure` += `cgl`,
+  `10moment`, `14moment`. Codes can declare multi-moment closures on
+  `[[species]]` even before the v1.1 anisotropic `gamma_eos` tuple.
 
-- [ ] **Restart granularity (additive fields).**
-  `Restart.from_` (`_models.py:492`) is a single path with no partial-
-  restart or hot/cold distinction. v1.0.x adds the additive parts:
-  optional `restore: list["fields" | "particles" | "auxiliary"]`
-  (partial restart — fields-only continuation) and
-  optional `mode: "hot" | "cold"`. The `from: str → str | list[str]`
-  widening (multi-file VPIC manifest) is type-changing on an existing
-  field and lands in v1.1.
+- [x] **Restart granularity (additive fields).** Shipped:
+  `Restart.restore: list['fields' | 'particles' | 'auxiliary'] | None`
+  (entries must be distinct and non-empty when present) and
+  `Restart.mode: 'hot' | 'cold' | None`. The `from: str → str |
+  list[str]` widening remains v1.1.
 
-- [ ] **`thetaMode` / RZ azimuthal-mode geometry.**
-  FBPIC decomposes EM fields into a small number of azimuthal modes
-  (m=0 cylindrically symmetric + the lowest few m components) on an
-  (r, z) grid, then reconstructs the full 3-D field on demand.
-  openPMD records this as `geometry = "thetaMode"` with a
-  `geometryParameters = "m=N,..."` string. Currently
-  `[coordinates].geometry` is `"cartesian" | "spherical" |
-  "cylindrical"` — none of these covers the modal decomposition
-  cleanly. Sketch: `[coordinates].geometry += "thetaMode"`; new
-  optional `[coordinates.modes]` sub-table with `n_modes: int` and
-  `mode_indices: list[int]`. Reader's job is either (a) reconstruct
-  full 3-D on read (default), or (b) expose the per-mode arrays as
-  separate fields when requested. **Step 42 (openPMD reader) defers
-  thetaMode to Phase 2** — landing this entry first lets the reader
-  describe the data losslessly when it gets there.
+- [x] **`thetaMode` / RZ azimuthal-mode geometry.** Shipped:
+  `Geometry` += `thetaMode`. New required `[coordinates.modes]`
+  sub-table (`CoordinatesModes`) with `n_modes: PositiveInt` and
+  optional `mode_indices: list[NonNegativeInt]`. The
+  `Coordinates._check_modes_geometry` validator enforces
+  `geometry = 'thetaMode' ⇔ modes is set`. The reader-side
+  `_build_geometry` maps `thetaMode → CYLINDRICAL` (post-reconstruction
+  physical grid); the openPMD reader (TASKS.md Step 42 Phase 2) will
+  consume the modal metadata when it lands.
 
 ### Runtime-metadata additions (FieldDataset / StaggerInfo)
 
 Not versioned by `schema_version`; land independently of the
 TOML-schema additions above.
 
-- [ ] **`unitDimension` per-field metadata.**
+- [x] **`unitDimension` per-field metadata.**
   openPMD records each array's dimensional fingerprint as a 7-tuple
   `[L, M, T, I, Θ, N, J]` (powers of SI base units). Adopt this as a
   derivable property on `FieldDataset` per-field metadata, sitting
@@ -183,20 +133,16 @@ TOML-schema additions above.
   reader that needs to honor per-record `unitDimension` / `unitSI`
   attributes (TASKS.md Step 42).
 
-- [ ] **Per-component stagger via `position` array.**
-  `Grid.stagger: "cell" | "node" | "staggered"` (`_models.py:231`) is a
-  single coarse enum that loses information for any code with a true
-  Yee mesh: `Bx` lives at `[0.5, 0, 0]` (face-centered in x), `By` at
-  `[0, 0.5, 0]`, `Ex` at `[0, 0.5, 0.5]` (edge-centered), and so on.
-  Our reader already destaggers to a co-located grid, so the metadata
-  is provenance-only — but provenance worth recording precisely. Adopt
-  openPMD's `position` semantics: a per-record array of length `ndim`
-  with values in `[0.0, 1.0)` describing the relative offset on the
-  cell. Lives on `StaggerInfo` (per-field), not on `[grid]` (per-
-  dataset). Existing enum stays as a top-level shorthand;
-  per-component `position` is the new precise form. Lets Yee-mesh
-  PIC, BATSRUS face-centered B, and any future co-located write-out
-  describe their native stagger losslessly.
+- [x] **Per-component stagger via `position` array.** Shipped: optional
+  `StaggerInfo.position: dict[str, tuple[float, ...]] | None` carrying
+  per-component cell offsets in ``[0.0, 1.0)``. The constructor coerces
+  list inputs to `tuple[float, ...]`, freezes the dict via
+  `MappingProxyType`, and rejects out-of-range offsets. Round-trips
+  through the Zarr serializer (`_serialize._stagger_to_dict` /
+  `_dict_to_stagger`). The existing `convention` enum stays as the
+  top-level shorthand; the `position` map is the precise form for
+  Yee-mesh PIC, BATSRUS face-centered B, and the openPMD reader
+  (TASKS.md Step 42).
 
 ## v1.1 — shape-change batch (ship with readers)
 
@@ -395,29 +341,31 @@ separately so they neither gate nor are gated by v1.1 shape work.
 ## Reader → blocker matrix
 
 What each pending reader needs from this backlog before it can ship a
-faithful description of its native data:
+faithful description of its native data. Items in the v1.0.x batch
+have shipped (✅); the v1.1 batch awaits its paired reader rollout.
 
 | Reader (TASKS.md step) | Blockers | Batch |
 |---|---|---|
-| Vlasiator (Step 23) — fluid moments only | `ModelType += "vlasov"` | v1.0.x |
+| Vlasiator (Step 23) — fluid moments only | ✅ `ModelType += "vlasov"` | v1.0.x |
 | Vlasiator (Step 23) — lossless VDFs | `[velocity_mesh]` | v1.1 |
-| VPIC (Step 35) — basic | per-rank file layout; restart `restore`/`mode` | v1.0.x |
+| VPIC (Step 35) — basic | ✅ per-rank file layout; restart `restore`/`mode` | v1.0.x |
 | VPIC (Step 35) — full per-rank restart | restart `from_` widening | v1.1 |
 | ARMS (Step 36) | stretched grids (spherical-r) | v1.1 |
-| WarpX, PIConGPU, Smilei (openPMD reader, Phase 1) | ED-PIC vocabulary; per-component stagger; `unitDimension`; openPMD docs mapping | v1.0.x; Docs |
-| FBPIC (openPMD reader, Phase 2) | above + `thetaMode` geometry | v1.0.x |
+| WarpX, PIConGPU, Smilei (openPMD reader, Phase 1) | ✅ ED-PIC vocabulary; ✅ per-component stagger; ✅ `unitDimension`; openPMD docs mapping | v1.0.x ✅; Docs |
+| FBPIC (openPMD reader, Phase 2) | above + ✅ `thetaMode` geometry | v1.0.x ✅ |
 | Smilei, EPOCH, OSIRIS-collisional | `[[collisions]]`; `[[ionization_chains]]`; QED | v1.1 |
-| Gkeyll, Hakim two-fluid 10-moment — vocabulary | anisotropic `Closure` enum values | v1.0.x |
+| Gkeyll, Hakim two-fluid 10-moment — vocabulary | ✅ anisotropic `Closure` enum values | v1.0.x ✅ |
 | Gkeyll, Hakim — full anisotropic `gamma_eos` | `gamma_eos` tuple form | v1.1 |
-| RAMSES, MPI-AMRVAC | AMR-kind discriminator (octree) | v1.0.x |
-| GENE, GS2, GX, Gkeyll-GK | `ModelType += "gyrokinetic"`; high-D grids | v1.0.x; v1.1 |
-| All production PIC | current/charge smoothing on `PICSolver` | v1.0.x |
+| RAMSES, MPI-AMRVAC | ✅ AMR-kind discriminator (octree) | v1.0.x ✅ |
+| GENE, GS2, GX, Gkeyll-GK | ✅ `ModelType += "gyrokinetic"`; high-D grids | v1.0.x ✅; v1.1 |
+| All production PIC | ✅ current/charge smoothing on `PICSolver` | v1.0.x ✅ |
 
 Cross-cutting items with no concrete reader on the hook: per-field
-BCs, multi-cadence output, tracer-particle flag, ensemble metadata.
+BCs, multi-cadence output. Tracer-particle flag and ensemble metadata
+shipped in the v1.0.x batch.
 
 **v1.0 contract is intact** for the iPIC3D / BATSRUS / OpenGGCM /
 SimpleHDF5 readers shipping today. The v1.0.x batch above is purely
-additive — v1.0 documents continue to validate against an upgraded
+additive — v1.0 documents continue to validate against the upgraded
 validator. Only the v1.1 batch breaks the contract; bundle it tied to
 a reader rollout to amortize the disruption.

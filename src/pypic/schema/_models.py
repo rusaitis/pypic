@@ -31,18 +31,69 @@ from pydantic import (
 )
 
 Precision = Literal["f32", "f64"]
-ModelType = Literal["PIC", "MHD", "hybrid"]
-Geometry = Literal["cartesian", "spherical", "cylindrical"]
+ModelType = Literal["PIC", "MHD", "hybrid", "vlasov", "gyrokinetic"]
+Geometry = Literal["cartesian", "spherical", "cylindrical", "thetaMode"]
 StaggerKind = Literal["cell", "node", "staggered"]
-TimeScheme = Literal["fixed", "adaptive", "subcycled"]
+TimeScheme = Literal[
+    "fixed",
+    "adaptive",
+    "subcycled",
+    # RK substages and SSP-RK schemes (Athena++, PLUTO, FLASH, AMReX).
+    "rk2",
+    "rk3",
+    "rk4",
+    "vl2",
+    "ssprk2",
+    "ssprk3",
+    # IMEX-RK for stiff source terms (radiation, cooling, chemistry).
+    "imex-rk2",
+    "imex-rk3",
+]
+TimeSplitting = Literal["strang", "lie", "godunov"]
 DriverCoupling = Literal["boundary", "volume", "source", "sink"]
 DriverDirection = Literal["one_way", "two_way"]
-Closure = Literal["isothermal", "adiabatic", "polytropic", "braginskii"]
-PICSolverScheme = Literal["explicit", "semi-implicit", "implicit"]
-PICPusher = Literal["boris", "vay", "higuera-cary"]
-PICFieldSolver = Literal[
-    "fdtd-yee", "pseudo-spectral", "implicit-moment", "implicit-gmres"
+Closure = Literal[
+    "isothermal",
+    "adiabatic",
+    "polytropic",
+    "braginskii",
+    # Anisotropic / multi-moment closures.
+    "cgl",
+    "10moment",
+    "14moment",
 ]
+PICSolverScheme = Literal["explicit", "semi-implicit", "implicit"]
+# Pusher: Boris and friends + ED-PIC additions (Lobatto-IIIA RK4, free-streaming).
+PICPusher = Literal["boris", "vay", "higuera-cary", "llrk4", "free-streaming"]
+# Field solver: FDTD-Yee + pseudo-spectral family + ED-PIC stencils (Lehe,
+# Cole-Karkkainen, PSTD, GPSTD, FBPIC's spectral-azimuthal RZ-mode).
+PICFieldSolver = Literal[
+    "fdtd-yee",
+    "pseudo-spectral",
+    "psatd",
+    "spectral-azimuthal",
+    "lehe",
+    "ck",
+    "ckc",
+    "pstd",
+    "gpstd",
+    "implicit-moment",
+    "implicit-gmres",
+]
+# ED-PIC charge-correction and current-deposition vocabularies.
+ChargeCorrection = Literal[
+    "marder", "langdon", "boris", "hyperbolic", "spectral", "none"
+]
+CurrentDeposition = Literal[
+    "esirkepov",
+    "zigzag",
+    "villabune",
+    "direct-boris",
+    "direct-morse-nielson",
+    "none",
+]
+# Particle shape factor (NGP=0, CIC=1, TSC=2, PQS=3).
+ParticleShape = Literal["ngp", "cic", "tsc", "pqs"]
 Preconditioner = Literal[
     "none", "jacobi", "block-jacobi", "ilu", "amg", "additive-schwarz"
 ]
@@ -55,6 +106,10 @@ HybridSolverScheme = Literal["predictor-corrector", "current-advance-method"]
 HybridFieldPusher = Literal["cyclic-leapfrog", "implicit"]
 FormatLiteral = Literal["hdf5", "zarr", "adios2", "netcdf"]
 ShapeLiteral = Literal["sphere", "torus", "cuboid", "mesh"]
+OutputPartition = Literal["by_rank", "by_field", "monolithic"]
+RestartMode = Literal["hot", "cold"]
+RestoreKind = Literal["fields", "particles", "auxiliary"]
+AMRKind = Literal["block", "patch", "octree"]
 PhysicalExtentUnit = Literal[
     "m", "km", "R_E", "R_S", "R_sun", "R_M", "R_J", "AU", "d_i"
 ]
@@ -144,6 +199,28 @@ class RunResources(_StrictBase):
     allocations: list[Allocation] = Field(default_factory=list)
 
 
+class Ensemble(_StrictBase):
+    """``[run.ensemble]`` — ensemble-member identity for stochastic runs.
+
+    Required for cosmological PIC, turbulence realizations, and any other
+    setup where multiple runs share initial conditions modulo a random
+    seed. ``member_id`` is 1-indexed and bounded by ``total``; the
+    validator enforces ``1 <= member_id <= total``.
+    """
+
+    member_id: PositiveInt
+    total: PositiveInt
+
+    @model_validator(mode="after")
+    def _check_member_id_in_range(self) -> Ensemble:
+        if self.member_id > self.total:
+            raise ValueError(
+                f"ensemble.member_id ({self.member_id}) must be "
+                f"<= ensemble.total ({self.total})"
+            )
+        return self
+
+
 class Run(_StrictBase):
     """``[run]`` — identity + provenance of THIS run."""
 
@@ -158,6 +235,10 @@ class Run(_StrictBase):
     funding: list[str] = Field(default_factory=list)
     embargo: _date | None = None
     resources: RunResources | None = None
+    # Stochasticity / ensemble metadata. Optional — readers fall back to
+    # the `x-` extension namespace for codes that don't expose either.
+    random_seed: int | None = None
+    ensemble: Ensemble | None = None
 
 
 class Time(_StrictBase):
@@ -188,6 +269,7 @@ class Time(_StrictBase):
     dt_max: float | None = None
     dt_field: float | None = None
     field_substeps: PositiveInt | None = None
+    splitting: TimeSplitting | None = None
 
     @model_validator(mode="after")
     def _check_time_range(self) -> Time:
@@ -198,20 +280,32 @@ class Time(_StrictBase):
                 "scheme='subcycled' requires field_substeps (and usually dt_field)"
             )
         # `dt` is a placeholder for adaptive schemes (the actual step is
-        # CFL-driven), but for fixed/subcycled it is the integration step.
-        if self.scheme in ("fixed", "subcycled") and self.dt == 0.0:
+        # CFL-driven). Every other scheme — fixed, subcycled, and the RK /
+        # SSP-RK / IMEX-RK variants — uses ``dt`` as the integration step
+        # (or the base step that CFL may further bound from above).
+        if self.scheme != "adaptive" and self.dt == 0.0:
             raise ValueError(f"scheme={self.scheme!r} requires dt > 0")
         return self
 
 
 class GridAMR(_StrictBase):
-    """``[grid.amr]`` — dynamic adaptive refinement parameters."""
+    """``[grid.amr]`` — dynamic adaptive refinement parameters.
+
+    ``amr_kind`` discriminates block/patch (BoxLib / AMReX / Chombo / FLASH)
+    from octree codes (RAMSES, MPI-AMRVAC); octree leaves are single cells
+    so ``block_size`` does not apply. ``level_subcycling`` records whether
+    different AMR levels advance at different effective timesteps (Athena++
+    and AMReX-based codes); a per-level ``dt_factor`` array would be a
+    future v1.1 add if needed.
+    """
 
     max_level: NonNegativeInt
     refinement_ratio: PositiveInt = 2
     block_size: list[PositiveInt] | None = None
     refinement_criteria: list[str] = Field(default_factory=list)
     refinement_threshold: NonNegativeFloat | None = None
+    amr_kind: AMRKind = "block"
+    level_subcycling: bool = False
 
 
 class GridRefinementBox(_StrictBase):
@@ -222,13 +316,21 @@ class GridRefinementBox(_StrictBase):
 
 
 class Grid(_StrictBase):
-    """``[grid]`` — computational grid in code units."""
+    """``[grid]`` — computational grid in code units.
+
+    ``ghost_cells`` records the number of ghost cells per axis used by the
+    code's halo exchange. Optional metadata for downstream edge-derivative
+    analysis; readers strip ghosts before populating ``FieldDataset``.
+    """
 
     dimensions: AxisInt
     spacing: AxisPosFloat
     lower: AxisFloat
     upper: AxisFloat
     stagger: StaggerKind = "cell"
+    ghost_cells: (
+        Annotated[list[NonNegativeInt], Field(min_length=1, max_length=3)] | None
+    ) = None
     source: str | None = None
     source_format: str | None = None
     amr: GridAMR | None = None
@@ -246,6 +348,11 @@ class Grid(_StrictBase):
         for i, (lo, up) in enumerate(zip(self.lower, self.upper, strict=True)):
             if up <= lo:
                 raise ValueError(f"upper[{i}] ({up}) must be > lower[{i}] ({lo})")
+        if self.ghost_cells is not None and len(self.ghost_cells) != n:
+            raise ValueError(
+                f"ghost_cells has {len(self.ghost_cells)} entries but "
+                f"dimensions has {n}"
+            )
         return self
 
 
@@ -333,6 +440,28 @@ class CoordinateTransform(_StrictBase):
     axis_labels: Vec3Str | None = None
 
 
+class CoordinatesModes(_StrictBase):
+    """``[coordinates.modes]`` — azimuthal-mode decomposition for FBPIC RZ.
+
+    Required when ``geometry = "thetaMode"``. ``n_modes`` counts the
+    azimuthal modes stored on disk (typically 1–3, with mode 0 cylindrically
+    symmetric). ``mode_indices`` is an optional explicit list of mode
+    numbers — when omitted, modes are assumed to run ``0, 1, ..., n_modes-1``.
+    """
+
+    n_modes: PositiveInt
+    mode_indices: list[NonNegativeInt] | None = None
+
+    @model_validator(mode="after")
+    def _check_indices_match_count(self) -> CoordinatesModes:
+        if self.mode_indices is not None and len(self.mode_indices) != self.n_modes:
+            raise ValueError(
+                f"coordinates.modes.mode_indices has "
+                f"{len(self.mode_indices)} entries but n_modes = {self.n_modes}"
+            )
+        return self
+
+
 class Coordinates(_StrictBase):
     """``[coordinates]`` — geometry + reference frame.
 
@@ -341,6 +470,9 @@ class Coordinates(_StrictBase):
     helper ``pypic.readers.config.apply_physical_extent`` consumes it to
     auto-compute transform scale factors and a shrink-factor diagnostic
     (see ``docs/schema.md`` § Coordinates).
+
+    ``modes`` is required when ``geometry = "thetaMode"`` (FBPIC azimuthal-
+    mode decomposition over an (r, z) grid) and forbidden otherwise.
     """
 
     geometry: Geometry
@@ -349,16 +481,43 @@ class Coordinates(_StrictBase):
     physical_extent: AxisPosFloat | None = None
     physical_extent_unit: PhysicalExtentUnit | None = None
     transforms: dict[str, CoordinateTransform] = Field(default_factory=dict)
+    modes: CoordinatesModes | None = None
+
+    @model_validator(mode="after")
+    def _check_modes_geometry(self) -> Coordinates:
+        if self.geometry == "thetaMode" and self.modes is None:
+            raise ValueError(
+                "coordinates.geometry = 'thetaMode' requires "
+                "[coordinates.modes] (n_modes at minimum)"
+            )
+        if self.geometry != "thetaMode" and self.modes is not None:
+            raise ValueError(
+                f"coordinates.modes is only valid for geometry = 'thetaMode' "
+                f"(got '{self.geometry}')"
+            )
+        return self
 
 
 class PICSolver(_ExtensibleBase):
-    """``[physics.pic.solver]``. Extra keys accepted — vocabulary evolves."""
+    """``[physics.pic.solver]``. Extra keys accepted — vocabulary evolves.
+
+    ``current_smoothing`` / ``charge_smoothing`` count the binomial /
+    compensator filter passes per step (standard in WarpX, Smilei,
+    PIConGPU, OSIRIS — already exposed on ``HybridSolver``).
+    ``charge_correction``, ``current_deposition`` adopt the openPMD
+    ED-PIC vocabulary; see :class:`ChargeCorrection`,
+    :class:`CurrentDeposition`.
+    """
 
     scheme: PICSolverScheme
     implicitness: float | None = None
     pusher: PICPusher | None = None
     field_solver: PICFieldSolver | None = None
     preconditioner: Preconditioner | None = None
+    current_smoothing: NonNegativeInt | None = None
+    charge_smoothing: NonNegativeInt | None = None
+    charge_correction: ChargeCorrection | None = None
+    current_deposition: CurrentDeposition | None = None
 
 
 class PhysicsPIC(_ExtensibleBase):
@@ -490,11 +649,32 @@ class Driver(_ExtensibleBase):
 
 
 class Restart(_StrictBase):
-    """``[restart]`` — continuation pointer from a prior run."""
+    """``[restart]`` — continuation pointer from a prior run.
+
+    ``restore`` enables partial restart — restarting only the listed
+    state categories rather than all of them (e.g., fields-only
+    continuation that re-initializes particles from a fresh distribution).
+    ``mode`` distinguishes a full state reload (``"hot"``) from a
+    setup-restart that re-applies initial conditions on top of the
+    saved geometry (``"cold"``). Both optional; a missing ``restore``
+    means the full state is restored.
+    """
 
     from_: str = Field(..., alias="from")
     step: NonNegativeInt | None = None
     time: NonNegativeFloat | None = None
+    restore: list[RestoreKind] | None = None
+    mode: RestartMode | None = None
+
+    @model_validator(mode="after")
+    def _check_restore_distinct(self) -> Restart:
+        if self.restore is not None and len(set(self.restore)) != len(self.restore):
+            raise ValueError(
+                f"restart.restore entries must be distinct, got {self.restore}"
+            )
+        if self.restore is not None and not self.restore:
+            raise ValueError("restart.restore must be non-empty when present")
+        return self
 
 
 class Species(_StrictBase):
@@ -526,6 +706,16 @@ class Species(_StrictBase):
     closure: Closure | None = None
     gamma_eos: PositiveFloat | None = None
     inertia: NonNegativeFloat | None = None
+    # Particle shape factor (NGP / CIC / TSC / PQS) per ED-PIC. Optional —
+    # codes that pin a global default leave this unset; codes that vary the
+    # shape per species (WarpX, Smilei) populate it explicitly.
+    shape: ParticleShape | None = None
+    # Tracer flag. PIC codes routinely write a tagged subset for trajectory
+    # tracking; the reader is responsible for propagating this hint to
+    # downstream particle-trajectory analysis. Test-particle vs tagged-tracer
+    # semantics may need a follow-up `tracer_kind` field; the boolean is the
+    # additive starting point.
+    tracer: bool = False
 
     @model_validator(mode="after")
     def _check_mass_charge(self) -> Species:
@@ -550,12 +740,20 @@ class _OutputBase(_StrictBase):
     Subclasses override ``precision`` for write modes that should default
     to ``f64`` (lossless checkpoints, probe time-series), and add their
     own type-specific fields.
+
+    ``file_pattern``, ``files_per_step``, and ``partition`` describe the
+    on-disk layout: VPIC writes one band-interleaved binary per MPI rank
+    per dump (``partition = "by_rank"``); WarpX/openPMD writes per-process
+    files plus an index. All optional — single-file readers ignore them.
     """
 
     step_interval: PositiveInt
     dir: str
     format: FormatLiteral = "hdf5"
     precision: Precision = "f32"
+    file_pattern: str | None = None
+    files_per_step: PositiveInt | None = None
+    partition: OutputPartition | None = None
 
 
 class OutputCheckpoints(_OutputBase):
@@ -730,14 +928,22 @@ class SimulationSchema(_ExtensibleBase):
 
     def _check_physics_matches_model_type(self) -> None:
         assert self.physics is not None
-        expected = {"PIC": "pic", "MHD": "mhd", "hybrid": "hybrid"}[self.model.type]
-        other_branches = {"pic", "mhd", "hybrid"} - {expected}
+        # Only PIC/MHD/hybrid have a typed sub-table at v1.0; the new
+        # vlasov/gyrokinetic model types route through the [physics]
+        # extras namespace until typed sub-tables land in v1.1+. For
+        # those, no typed-branch cross-check is possible (or needed).
+        typed_branch = {"PIC": "pic", "MHD": "mhd", "hybrid": "hybrid"}.get(
+            self.model.type
+        )
+        if typed_branch is None:
+            return
+        other_branches = {"pic", "mhd", "hybrid"} - {typed_branch}
         for branch in other_branches:
             if getattr(self.physics, branch) is not None:
                 raise ValueError(
                     f"model.type = '{self.model.type}' but "
                     f"[physics.{branch}] is set; only "
-                    f"[physics.{expected}] is permitted for this model"
+                    f"[physics.{typed_branch}] is permitted for this model"
                 )
 
     def _check_reference_species_exists(self) -> None:

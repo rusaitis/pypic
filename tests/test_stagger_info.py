@@ -56,6 +56,51 @@ class TestStaggerInfoConstruction:
         assert si.convention == "node"
 
 
+class TestStaggerInfoPosition:
+    """Per-component openPMD-style ``position`` array provenance."""
+
+    def test_position_preserved(self):
+        si = StaggerInfo(
+            convention="staggered",
+            position={"B1": (0.5, 0.0, 0.0), "E1": (0.0, 0.5, 0.5)},
+        )
+        assert si.position is not None
+        assert si.position["B1"] == (0.5, 0.0, 0.0)
+        assert si.position["E1"] == (0.0, 0.5, 0.5)
+
+    def test_position_frozen_to_mapping_proxy(self):
+        si = StaggerInfo(
+            convention="staggered",
+            position={"B1": (0.5, 0.0, 0.0)},
+        )
+        assert isinstance(si.position, MappingProxyType)
+
+    def test_position_coerced_to_tuple_of_floats(self):
+        # input is a list of mixed types; __post_init__ coerces to tuple[float, ...].
+        si = StaggerInfo(
+            convention="staggered",
+            position={"B1": [0.5, 0, 0]},  # type: ignore[dict-item]
+        )
+        assert si.position is not None
+        offsets = si.position["B1"]
+        assert isinstance(offsets, tuple)
+        assert all(isinstance(x, float) for x in offsets)
+
+    def test_position_rejects_out_of_range(self):
+        with pytest.raises(ValueError, match=r"\[0\.0, 1\.0\)"):
+            StaggerInfo(
+                convention="staggered",
+                position={"B1": (1.5, 0.0, 0.0)},
+            )
+
+    def test_position_rejects_negative(self):
+        with pytest.raises(ValueError, match=r"\[0\.0, 1\.0\)"):
+            StaggerInfo(
+                convention="staggered",
+                position={"B1": (-0.1, 0.0, 0.0)},
+            )
+
+
 class TestStaggerInFieldDataset:
     """StaggerInfo round-trips through FieldDataset.metadata."""
 

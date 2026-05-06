@@ -251,7 +251,12 @@ def _from_schema(schema: SimulationSchema) -> SimulationConfig:
 
 
 def _build_geometry(coords: Coordinates) -> CoordinateGeometry:
-    geometry = GEOMETRY_BY_NAME[coords.geometry]
+    # ``thetaMode`` (FBPIC azimuthal-mode RZ decomposition) describes the
+    # *storage* layout; the post-reconstruction physical grid is cylindrical.
+    # Mode metadata travels separately on ``[coordinates.modes]`` and is
+    # consumed by code-specific readers.
+    geometry_key = "cylindrical" if coords.geometry == "thetaMode" else coords.geometry
+    geometry = GEOMETRY_BY_NAME[geometry_key]
     if coords.axis_labels is not None:
         # Length-3 invariant is enforced by the Pydantic Coordinates model.
         labels: tuple[str, str, str] = (

@@ -509,3 +509,357 @@ class TestProbeFrame:
         """)
         s = validate_simulation_toml(doc)
         assert s.probes[0].frame == "GSM"
+
+
+# ---------------------------------------------------------------------------
+# v1.0.x additive batch coverage
+# ---------------------------------------------------------------------------
+
+
+class TestModelTypeAdditions:
+    """``vlasov`` and ``gyrokinetic`` admitted as model types."""
+
+    def test_vlasov_accepted(self) -> None:
+        doc = _minimal_doc(**{'type = "PIC"': 'type = "vlasov"'})
+        s = validate_simulation_toml(doc)
+        assert s.model.type == "vlasov"
+
+    def test_gyrokinetic_accepted(self) -> None:
+        doc = _minimal_doc(**{'type = "PIC"': 'type = "gyrokinetic"'})
+        s = validate_simulation_toml(doc)
+        assert s.model.type == "gyrokinetic"
+
+    def test_vlasov_skips_typed_branch_check(self) -> None:
+        doc = _minimal_doc(**{'type = "PIC"': 'type = "vlasov"'})
+        # No typed [physics.vlasov] sub-table at v1.0; vocabulary lives in
+        # extras. A bare [physics] block must validate.
+        s = validate_simulation_toml(doc + "\n[physics]\nrelativistic = false\n")
+        assert s.physics is not None
+
+
+class TestPICSolverVocabulary:
+    """ED-PIC vocabulary additions on PICSolver."""
+
+    @pytest.mark.parametrize(
+        "field_solver",
+        ["psatd", "spectral-azimuthal", "lehe", "ck", "ckc", "pstd", "gpstd"],
+    )
+    def test_field_solver_literals(self, field_solver: str) -> None:
+        doc = _minimal_doc() + dedent(f"""
+            [physics]
+            [physics.pic.solver]
+            scheme = "explicit"
+            field_solver = "{field_solver}"
+        """)
+        s = validate_simulation_toml(doc)
+        assert s.physics is not None
+        assert s.physics.pic is not None
+        assert s.physics.pic.solver is not None
+        assert s.physics.pic.solver.field_solver == field_solver
+
+    @pytest.mark.parametrize("pusher", ["llrk4", "free-streaming"])
+    def test_pusher_literals(self, pusher: str) -> None:
+        doc = _minimal_doc() + dedent(f"""
+            [physics]
+            [physics.pic.solver]
+            scheme = "explicit"
+            pusher = "{pusher}"
+        """)
+        s = validate_simulation_toml(doc)
+        assert s.physics is not None
+        assert s.physics.pic is not None
+        assert s.physics.pic.solver is not None
+        assert s.physics.pic.solver.pusher == pusher
+
+    def test_smoothing_knobs(self) -> None:
+        doc = _minimal_doc() + dedent("""
+            [physics]
+            [physics.pic.solver]
+            scheme = "explicit"
+            current_smoothing = 4
+            charge_smoothing = 2
+        """)
+        s = validate_simulation_toml(doc)
+        assert s.physics is not None
+        assert s.physics.pic is not None
+        assert s.physics.pic.solver is not None
+        assert s.physics.pic.solver.current_smoothing == 4
+        assert s.physics.pic.solver.charge_smoothing == 2
+
+    def test_charge_correction_and_deposition(self) -> None:
+        doc = _minimal_doc() + dedent("""
+            [physics]
+            [physics.pic.solver]
+            scheme = "explicit"
+            charge_correction = "marder"
+            current_deposition = "esirkepov"
+        """)
+        s = validate_simulation_toml(doc)
+        assert s.physics is not None
+        assert s.physics.pic is not None
+        assert s.physics.pic.solver is not None
+        assert s.physics.pic.solver.charge_correction == "marder"
+        assert s.physics.pic.solver.current_deposition == "esirkepov"
+
+
+class TestSpeciesAdditions:
+    """``shape`` and ``tracer`` flags on ``[[species]]``."""
+
+    @pytest.mark.parametrize("shape", ["ngp", "cic", "tsc", "pqs"])
+    def test_particle_shape_literals(self, shape: str) -> None:
+        doc = _minimal_doc(
+            **{
+                "charge = -1.0\nmass = 1.0": (
+                    f'charge = -1.0\nmass = 1.0\nshape = "{shape}"'
+                )
+            }
+        )
+        s = validate_simulation_toml(doc)
+        assert s.species[0].shape == shape
+
+    def test_tracer_default_false(self) -> None:
+        s = validate_simulation_toml(_minimal_doc())
+        assert s.species[0].tracer is False
+
+    def test_tracer_true(self) -> None:
+        doc = _minimal_doc(
+            **{
+                "charge = -1.0\nmass = 1.0": (
+                    "charge = -1.0\nmass = 1.0\ntracer = true"
+                )
+            }
+        )
+        s = validate_simulation_toml(doc)
+        assert s.species[0].tracer is True
+
+
+class TestTimeSchemeAdditions:
+    """RK-family + IMEX schemes and ``splitting`` on ``[time]``."""
+
+    @pytest.mark.parametrize(
+        "scheme",
+        ["rk2", "rk3", "rk4", "vl2", "ssprk2", "ssprk3", "imex-rk2", "imex-rk3"],
+    )
+    def test_rk_imex_schemes(self, scheme: str) -> None:
+        doc = _minimal_doc(**{'scheme = "fixed"': f'scheme = "{scheme}"'})
+        s = validate_simulation_toml(doc)
+        assert s.time.scheme == scheme
+
+    @pytest.mark.parametrize("splitting", ["strang", "lie", "godunov"])
+    def test_splitting_literal(self, splitting: str) -> None:
+        doc = _minimal_doc().replace(
+            "n_steps = 10\n", f'n_steps = 10\nsplitting = "{splitting}"\n'
+        )
+        s = validate_simulation_toml(doc)
+        assert s.time.splitting == splitting
+
+    def test_rk_scheme_requires_dt(self) -> None:
+        doc = _minimal_doc(**{'scheme = "fixed"': 'scheme = "rk3"'}).replace(
+            "dt = 0.1", "dt = 0.0"
+        )
+        with pytest.raises(ValidationError, match="rk3"):
+            validate_simulation_toml(doc)
+
+
+class TestRunEnsemble:
+    """``random_seed`` and ``ensemble`` on ``[run]``."""
+
+    def test_random_seed(self) -> None:
+        doc = _minimal_doc().replace('name = "r0"\n', 'name = "r0"\nrandom_seed = 42\n')
+        s = validate_simulation_toml(doc)
+        assert s.run.random_seed == 42
+
+    def test_ensemble(self) -> None:
+        doc = _minimal_doc() + dedent("""
+            [run.ensemble]
+            member_id = 3
+            total = 16
+        """)
+        s = validate_simulation_toml(doc)
+        assert s.run.ensemble is not None
+        assert s.run.ensemble.member_id == 3
+        assert s.run.ensemble.total == 16
+
+    def test_ensemble_member_out_of_range_rejected(self) -> None:
+        doc = _minimal_doc() + dedent("""
+            [run.ensemble]
+            member_id = 17
+            total = 16
+        """)
+        with pytest.raises(ValidationError, match="member_id"):
+            validate_simulation_toml(doc)
+
+
+class TestGridAdditions:
+    """``ghost_cells`` and ``[grid.amr]`` discriminator + subcycling."""
+
+    def test_ghost_cells_axis_match(self) -> None:
+        doc = _minimal_doc().replace(
+            "upper = [4.0, 4.0, 4.0]",
+            "upper = [4.0, 4.0, 4.0]\nghost_cells = [2, 2, 2]",
+        )
+        s = validate_simulation_toml(doc)
+        assert s.grid.ghost_cells == [2, 2, 2]
+
+    def test_ghost_cells_axis_mismatch_rejected(self) -> None:
+        doc = _minimal_doc().replace(
+            "upper = [4.0, 4.0, 4.0]",
+            "upper = [4.0, 4.0, 4.0]\nghost_cells = [2, 2]",
+        )
+        with pytest.raises(ValidationError, match="ghost_cells"):
+            validate_simulation_toml(doc)
+
+    @pytest.mark.parametrize("kind", ["block", "patch", "octree"])
+    def test_amr_kind_literals(self, kind: str) -> None:
+        doc = _minimal_doc() + dedent(f"""
+            [grid.amr]
+            max_level = 4
+            amr_kind = "{kind}"
+        """)
+        s = validate_simulation_toml(doc)
+        assert s.grid.amr is not None
+        assert s.grid.amr.amr_kind == kind
+
+    def test_amr_kind_default_block(self) -> None:
+        doc = _minimal_doc() + dedent("""
+            [grid.amr]
+            max_level = 4
+        """)
+        s = validate_simulation_toml(doc)
+        assert s.grid.amr is not None
+        assert s.grid.amr.amr_kind == "block"
+        assert s.grid.amr.level_subcycling is False
+
+    def test_amr_level_subcycling(self) -> None:
+        doc = _minimal_doc() + dedent("""
+            [grid.amr]
+            max_level = 4
+            level_subcycling = true
+        """)
+        s = validate_simulation_toml(doc)
+        assert s.grid.amr is not None
+        assert s.grid.amr.level_subcycling is True
+
+
+class TestClosureAdditions:
+    """Anisotropic closure literals: cgl, 10moment, 14moment."""
+
+    @pytest.mark.parametrize("closure", ["cgl", "10moment", "14moment"])
+    def test_anisotropic_closure_literals(self, closure: str) -> None:
+        doc = _minimal_doc(
+            **{
+                "charge = -1.0\nmass = 1.0": (
+                    f'charge = -1.0\nmass = 1.0\nclosure = "{closure}"'
+                )
+            }
+        )
+        s = validate_simulation_toml(doc)
+        assert s.species[0].closure == closure
+
+
+class TestRestartGranularity:
+    """``restore`` and ``mode`` additive fields on ``[restart]``."""
+
+    def test_restore_partial(self) -> None:
+        doc = _minimal_doc() + dedent("""
+            [restart]
+            from = "./checkpoints/last.h5"
+            restore = ["fields", "auxiliary"]
+            mode = "hot"
+        """)
+        s = validate_simulation_toml(doc)
+        assert s.restart is not None
+        assert s.restart.restore == ["fields", "auxiliary"]
+        assert s.restart.mode == "hot"
+
+    def test_restore_duplicates_rejected(self) -> None:
+        doc = _minimal_doc() + dedent("""
+            [restart]
+            from = "./chk.h5"
+            restore = ["fields", "fields"]
+        """)
+        with pytest.raises(ValidationError, match="distinct"):
+            validate_simulation_toml(doc)
+
+    def test_restore_empty_rejected(self) -> None:
+        doc = _minimal_doc() + dedent("""
+            [restart]
+            from = "./chk.h5"
+            restore = []
+        """)
+        with pytest.raises(ValidationError, match="non-empty"):
+            validate_simulation_toml(doc)
+
+
+class TestThetaModeGeometry:
+    """``thetaMode`` geometry + required ``[coordinates.modes]`` block."""
+
+    def test_thetamode_with_modes(self) -> None:
+        doc = _minimal_doc(
+            **{'geometry = "cartesian"': 'geometry = "thetaMode"'}
+        ) + dedent("""
+            [coordinates.modes]
+            n_modes = 3
+            mode_indices = [0, 1, 2]
+        """)
+        s = validate_simulation_toml(doc)
+        assert s.coordinates.geometry == "thetaMode"
+        assert s.coordinates.modes is not None
+        assert s.coordinates.modes.n_modes == 3
+        assert s.coordinates.modes.mode_indices == [0, 1, 2]
+
+    def test_thetamode_without_modes_rejected(self) -> None:
+        doc = _minimal_doc(**{'geometry = "cartesian"': 'geometry = "thetaMode"'})
+        with pytest.raises(ValidationError, match="modes"):
+            validate_simulation_toml(doc)
+
+    def test_modes_without_thetamode_rejected(self) -> None:
+        doc = _minimal_doc() + dedent("""
+            [coordinates.modes]
+            n_modes = 3
+        """)
+        with pytest.raises(ValidationError, match="thetaMode"):
+            validate_simulation_toml(doc)
+
+    def test_mode_indices_count_mismatch_rejected(self) -> None:
+        doc = _minimal_doc(
+            **{'geometry = "cartesian"': 'geometry = "thetaMode"'}
+        ) + dedent("""
+            [coordinates.modes]
+            n_modes = 3
+            mode_indices = [0, 1]
+        """)
+        with pytest.raises(ValidationError, match="mode_indices"):
+            validate_simulation_toml(doc)
+
+
+class TestOutputMultiFileLayout:
+    """Per-rank / multi-file output layout fields on ``_OutputBase``."""
+
+    def test_multi_file_layout(self) -> None:
+        doc = _minimal_doc() + dedent("""
+            [output.fields]
+            step_interval = 50
+            quantities = ["B"]
+            dir = "./fields"
+            file_pattern = "step_{step:06d}/rank_{rank:05d}.h5"
+            files_per_step = 64
+            partition = "by_rank"
+        """)
+        s = validate_simulation_toml(doc)
+        assert s.output is not None
+        assert s.output.fields is not None
+        assert s.output.fields.partition == "by_rank"
+        assert s.output.fields.files_per_step == 64
+        assert s.output.fields.file_pattern == "step_{step:06d}/rank_{rank:05d}.h5"
+
+    def test_partition_literal_rejection(self) -> None:
+        doc = _minimal_doc() + dedent("""
+            [output.fields]
+            step_interval = 50
+            quantities = ["B"]
+            dir = "./fields"
+            partition = "ad-hoc"
+        """)
+        with pytest.raises(ValidationError, match="partition"):
+            validate_simulation_toml(doc)
