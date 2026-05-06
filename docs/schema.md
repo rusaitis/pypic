@@ -665,7 +665,10 @@ hybrid).
 ### [velocity_mesh]
 
 Continuum-Vlasov velocity-grid metadata (Vlasiator, Gkeyll Vlasov-Maxwell).
-Required when ``[model].type = "vlasov"`` and the run writes VDFs.
+Recommended when ``[model].type = "vlasov"`` and the run writes VDFs;
+optional for moment-only output. Validators don't enforce its
+presence — the schema can't tell from TOML alone whether VDFs are
+emitted.
 
 ```toml
 [velocity_mesh]
@@ -704,6 +707,17 @@ coordinate_system = "guiding-center"   # optional — "cartesian" (default) |
                                        #   "guiding-center" | "field-aligned" |
                                        #   "spherical-velocity"
 ```
+
+**Relationship to ``[velocity_mesh]``.** ``[velocity_mesh]`` describes
+the *storage layout* of the velocity grid (sparse-block structure,
+sparsity threshold, on-disk axis count) for continuum-Vlasov codes.
+``[phase_space]`` describes the *coordinate-system identity* of the
+augmented phase space (Cartesian vs guiding-center vs field-aligned).
+They are orthogonal: a sparse-block continuum-Vlasov run (Vlasiator-
+style) typically declares both — ``[velocity_mesh]`` for I/O metadata,
+``[phase_space]`` to record the coordinate frame. Gyrokinetic codes
+(5-D guiding-center) use only ``[phase_space]`` because their velocity
+representation is not a Cartesian mesh.
 
 ### [[collisions]]
 

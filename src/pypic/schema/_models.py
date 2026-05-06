@@ -341,7 +341,10 @@ class GridStretched(_StrictBase):
     consumers that need them should guard explicitly.
     """
 
-    axis_widths: dict[str, list[PositiveFloat]] = Field(default_factory=dict)
+    # Required; the section is meaningful only when at least one axis is
+    # declared stretched. The validator additionally enforces non-empty
+    # so an explicit ``axis_widths = {}`` is rejected with a clear message.
+    axis_widths: dict[str, list[PositiveFloat]]
     # Relative-tolerance for the cell-width sum vs (upper - lower) check.
     # Defaults are intentionally loose to accommodate float drift in
     # hand-written TOML; tighten via this knob when authoring tests.
@@ -352,6 +355,10 @@ class GridStretched(_StrictBase):
         # Keys must be parseable as small non-negative integers in
         # [0, 2]. The full axis-count cross-check (against
         # ``Grid.dimensions``) lives on ``Grid``.
+        if not self.axis_widths:
+            raise ValueError(
+                "grid.stretched.axis_widths must contain at least one axis"
+            )
         for raw_key in self.axis_widths:
             try:
                 idx = int(raw_key)
@@ -364,10 +371,6 @@ class GridStretched(_StrictBase):
                 raise ValueError(
                     f"grid.stretched.axis_widths key {raw_key!r} is out of range [0, 2]"
                 )
-        if not self.axis_widths:
-            raise ValueError(
-                "grid.stretched.axis_widths must contain at least one axis"
-            )
         return self
 
 
@@ -1121,10 +1124,18 @@ class VelocityMesh(_StrictBase):
     for adaptive memory use; ``sparsity_threshold`` records the
     density floor below which blocks are dropped from disk.
 
-    Required when ``[model].type = "vlasov"`` and the run writes VDFs;
-    optional for moment-only output. The validator only enforces shape
-    consistency; the spatial / phase-space coupling check lives on the
-    root model.
+    Recommended when ``[model].type = "vlasov"`` and the run writes
+    VDFs; optional for moment-only output. The schema cannot tell from
+    the TOML alone whether VDFs are emitted, so this is advisory rather
+    than enforced. The validator only checks shape consistency; the
+    spatial / phase-space coupling check lives on the root model.
+
+    Relationship to ``[phase_space]``: ``[velocity_mesh]`` describes
+    the *storage layout* of the velocity grid (sparse-block structure,
+    sparsity threshold), while ``[phase_space]`` describes the
+    *coordinate-system identity* of the augmented grid (Cartesian vs
+    guiding-center vs field-aligned). Both can coexist for sparse-block
+    continuum-Vlasov runs.
     """
 
     dimensions: list[PositiveInt] = Field(..., min_length=1, max_length=3)
@@ -1217,7 +1228,7 @@ class PhaseSpace(_StrictBase):
         return self
 
 
-class Collision(_StrictBase):
+class Collision(_ExtensibleBase):
     r"""One entry in ``[[collisions]]`` — inter-species collision model.
 
     Collisional PIC codes (Smilei, EPOCH, OSIRIS-collisional, PIConGPU)
@@ -1228,6 +1239,13 @@ class Collision(_StrictBase):
     ``species_pair`` lists the two species names participating; the
     root validator enforces that both names exist in ``[[species]]``.
     Self-collisions (same species twice) are permitted.
+
+    Extra keys are accepted (``_ExtensibleBase``) so code-specific
+    knobs — cross-section table paths, BGK relaxation-rate models,
+    Monte-Carlo scattering-table identifiers — can land here without
+    forcing every collisional reader through the top-level ``x-``
+    namespace. Portable additions (when a vocabulary stabilises across
+    codes) become typed fields in a future version.
     """
 
     species_pair: list[str] = Field(..., min_length=2, max_length=2)
@@ -1470,11 +1488,12 @@ class SimulationSchema(_ExtensibleBase):
         if self.phase_space is None:
             return
         ps_dims = self.phase_space.dimensions
-        if len(ps_dims) < n:
+        if len(ps_dims) <= n:
             raise ValueError(
                 f"phase_space.dimensions has {len(ps_dims)} axes but "
-                f"grid.dimensions has {n} (phase space must extend, not "
-                f"replace, the spatial grid)"
+                f"grid.dimensions has {n} (phase space must strictly "
+                f"extend the spatial grid; declare velocity / extra-D "
+                f"dimensions beyond the {n} spatial ones)"
             )
         for i in range(n):
             if ps_dims[i] != self.grid.dimensions[i]:

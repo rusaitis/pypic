@@ -1111,6 +1111,16 @@ class TestPhaseSpace:
         with pytest.raises(ValidationError, match="extend"):
             validate_simulation_toml(doc)
 
+    def test_no_extension_rejected(self) -> None:
+        # dimensions match the spatial grid exactly — no velocity / extra-D
+        # axes declared. Must be rejected: phase_space exists to extend.
+        doc = _minimal_doc(**{'type = "PIC"': 'type = "gyrokinetic"'}) + dedent("""
+            [phase_space]
+            dimensions = [4, 4, 4]
+        """)
+        with pytest.raises(ValidationError, match="strictly extend"):
+            validate_simulation_toml(doc)
+
     def test_extents_axis_count_must_match(self) -> None:
         doc = _minimal_doc(**{'type = "PIC"': 'type = "gyrokinetic"'}) + dedent("""
             [phase_space]
