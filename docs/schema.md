@@ -1107,12 +1107,21 @@ not simulation — restart regeneration is out of scope.
 
 ---
 
-## 4. HDF5 Output Layout
+## 4. Output Layouts
 
-The standard layout for simulation output files. Each timestep is a
-separate file (or group within a file). Field datasets use the
-**numbered canonical names** (`B1`, `B2`, `B3`), which are
-geometry-agnostic.
+Two on-disk layouts are defined: **HDF5 (§4.1)** is the canonical
+cross-tool layout — what the Rust simulation code emits and what every
+file-based reader translates *into*.  **Zarr (§4.2)** is what the
+Python writer (`pypic.io.to_zarr` / `to_zarr_timeseries`) produces;
+it is xarray-flavored and deliberately not byte-compatible with §4.1.
+Both use the same **numbered canonical field names** (`B1`, `B2`,
+`B3`); they differ in how metadata is grouped on disk.
+
+### 4.1 HDF5 Output Layout
+
+The cross-tool reference layout.  Each timestep is a separate file
+(or group within a file).  Field datasets use the **numbered canonical
+names** (`B1`, `B2`, `B3`), which are geometry-agnostic.
 
 ```
 output_{step:06d}.h5
@@ -1160,6 +1169,80 @@ names; `geometry` drives alias registration in the reader (`Bx → B1`
 for cartesian, `Br → B1` for spherical, etc). Existing readers (iPIC3D,
 BATSRUS, ...) translate native layouts; the Rust code writes this
 layout directly.
+
+### 4.2 Zarr Output Layout
+
+What `pypic.io.to_zarr` and `to_zarr_timeseries` produce today.  This
+is an xarray-conventional Zarr v3 store, **not** a 1:1 translation of
+§4.1 — kept lossless for pypic-internal round-trips
+(`to_zarr → from_zarr` reconstructs the exact `FieldDataset`) but
+diverges from the HDF5 grouping in three ways noted below.
+
+```
+my_store.zarr/                         # Zarr v3 group root
+│
+├── B1, B2, B3, ...                    # field arrays at root,
+├── E1, E2, E3, ...                    #   not under `/fields/`
+├── rho_c, rho_m, J1, ..., u1, u2, u3
+│
+└── attrs:
+    ├── pypic:                         # all pypic metadata under this one
+    │   ├── pypic_version              #   key (a single JSON dict)
+    │   ├── grid:
+    │   │   ├── dimensions, spacing, origin, dt
+    │   │   ├── boundary, surviving_axes
+    │   │   └── geometry: { type, axis_names, axis_units }
+    │   ├── normalization:             # 8 scalar refs (length, time,
+    │   │   ├── length_ref, time_ref   #   velocity, b_field, e_field,
+    │   │   ├── velocity_ref           #   density, mass, charge)
+    │   │   ├── b_field_ref, e_field_ref
+    │   │   ├── density_ref, mass_ref, charge_ref
+    │   ├── species:    [ ... per-species dicts ... ]
+    │   ├── physics:    { gamma, c, relativistic }
+    │   ├── frame:      "simulation"
+    │   ├── transforms: { <name>: { origin, rotation, scale, ... }, ... }
+    │   └── metadata:   { ... reader-specific scalars,
+    │                       StaggerInfo as tagged dict ... }
+    └── (no other top-level keys)
+```
+
+**Multi-step (timeseries).**  `to_zarr_timeseries` writes a single
+store with an additional `time` dimension on every field array,
+shape `(nt, n1, n2, n3)`.  `mode="a", append_dim="time"` appends one
+timestep per call; the writer enforces a constant field set and
+constant identity attrs (grid, normalization, species, physics,
+frame, transforms) across appends and intersects per-step
+`metadata` to keys whose values are stable across steps.
+
+**Codecs.**  Default is `BloscCodec(cname="zstd", clevel=5,
+shuffle="bitshuffle")` per-variable.  `dtype="float32"` downcasts on
+write; user-supplied `encoding=` overrides per variable.
+
+**Differences from §4.1 (HDF5 layout).**
+
+| Aspect | §4.1 HDF5 | §4.2 Zarr |
+|---|---|---|
+| Field path | `/fields/B1` | `/B1` (root) |
+| Grid metadata | `/grid/` group with attrs | `attrs.pypic.grid` (JSON) |
+| Normalization | `/normalization/` group | `attrs.pypic.normalization` |
+| `time` / `step` | top-level scalar attrs | `time` dim (multi-step), no `step` attr |
+| Files per write | one per timestep | one store, all steps |
+| Field set | enumerated standard set | whatever's in `data_vars` |
+
+**Cross-language consumer note.**  Tools that read pypic Zarr stores
+without going through `from_zarr` (a JS WebGPU viewer, a Rust
+`zarrs`-based pipeline, ...) need to know the metadata lives in
+`attrs.pypic.<section>` as JSON, not in distinct groups.  Aligning
+§4.2 with §4.1's grouping is tracked as future work — it would let
+the same consumer code service both formats — and remains deferred
+until a Zarr-only consumer actually arrives.  Until then, treat
+§4.1 as the canonical cross-tool contract and §4.2 as the pypic
+serialization format.
+
+**Field naming invariant (both layouts).**  Stored arrays use the
+numbered canonical names (`B1`, `B2`, `B3`).  Geometry- and
+species-aliases are read-time conveniences resolved by
+`FieldDataset`; they never appear on disk.
 
 ---
 
