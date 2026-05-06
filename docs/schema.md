@@ -966,7 +966,7 @@ ion pressure tensor components `P11_s1`..`P33_s1`.
 | `e_th_trace` | — | Thermal energy density ($\frac{1}{2}\mathrm{Tr}(\mathbf{P})$, $\gamma$-free) | PIC, multi-moment MHD |
 | `e_th_s0`, `e_th_s1`, ... | `e_th_e`, `e_th_i` | Thermal energy density (per-species) | PIC (derived) |
 | `rho_m_s0`, `rho_m_s1`, ... | `rho_m_e`, `rho_m_i` | Mass density (per-species) | PIC (derived) |
-| `\|V\|_s0`, `\|V\|_s1`, ... | `\|Vi\|` | Velocity magnitude (per-species) | PIC (derived) |
+| `\|V\|_s0`, `\|V\|_s1`, ... | `\|Ve\|`, `\|Vi\|` | Velocity magnitude (per-species) | PIC (derived) |
 
 ### Pressure tensor
 
@@ -1034,9 +1034,9 @@ for the full list of `e`/`i` shorthand names.
 | `vort1`, `vort2`, `vort3` | `vort_x`, ... | Fluid vorticity | V1, V2, V3, grid |
 | `\|vort\|` | — | Vorticity magnitude | vort1, vort2, vort3 |
 | `J_dot_E` | — | Energy conversion rate | J1-J3, E1-E3 |
-| `E_prime_1/2/3` | — | Non-ideal electric field | E1-E3, V1-V3, B1-B3 |
-| `E_ideal_1/2/3` | — | Ideal electric field | V1-V3, B1-B3 |
-| `E_Hall_1/2/3` | — | Hall electric field | J1-J3, B1-B3, n\_s0, species |
+| `E_prime_1`, `E_prime_2`, `E_prime_3` | `E_prime_x`, `E_prime_y`, `E_prime_z` | Non-ideal electric field | E1-E3, V1-V3, B1-B3 |
+| `E_ideal_1`, `E_ideal_2`, `E_ideal_3` | `E_ideal_x`, `E_ideal_y`, `E_ideal_z` | Ideal electric field | V1-V3, B1-B3 |
+| `E_Hall_1`, `E_Hall_2`, `E_Hall_3` | `E_Hall_x`, `E_Hall_y`, `E_Hall_z` | Hall electric field | J1-J3, B1-B3, n\_s0, species |
 | `psi` | — | Magnetic flux function (2D) | B2, grid |
 | `firehose` | — | Firehose instability parameter | P\_par, P\_perp, \|B\| |
 | `mirror` | — | Mirror instability parameter | P\_par, P\_perp, \|B\| |
