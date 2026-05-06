@@ -110,6 +110,16 @@ OutputPartition = Literal["by_rank", "by_field", "monolithic"]
 RestartMode = Literal["hot", "cold"]
 RestoreKind = Literal["fields", "particles", "auxiliary"]
 AMRKind = Literal["block", "patch", "octree"]
+# Collisional PIC models (Smilei, EPOCH, OSIRIS-collisional, PIConGPU).
+CollisionModel = Literal["coulomb", "bgk", "monte-carlo"]
+# Phase-space coordinate system (gyrokinetic vs continuum-Vlasov).
+PhaseSpaceCoordSystem = Literal[
+    "cartesian", "guiding-center", "field-aligned", "spherical-velocity"
+]
+# Per-field BC scope. Drivers can supply boundary values per face per field.
+BCFieldGroup = Literal["E", "B", "particles"]
+# Region selection for multi-cadence / ROI output streams.
+RegionKind = Literal["box", "plane"]
 PhysicalExtentUnit = Literal[
     "m", "km", "R_E", "R_S", "R_sun", "R_M", "R_J", "AU", "d_i"
 ]
@@ -315,12 +325,65 @@ class GridRefinementBox(_StrictBase):
     box: list[list[float]] = Field(..., min_length=2, max_length=2)
 
 
+class GridStretched(_StrictBase):
+    """``[grid.stretched]`` — non-uniform per-axis cell widths.
+
+    Sparse, keyed by axis index as a string (``"0"`` / ``"1"`` / ``"2"``).
+    Only stretched axes appear; uniform axes inherit ``Grid.spacing``.
+    Per-axis cell widths must sum to ``upper[i] - lower[i]`` and the
+    list length must equal ``dimensions[i]``; both invariants are
+    enforced by ``Grid._check_axis_consistency``.
+
+    Adopted to describe ARMS spherical-r stretches, PLUTO log-radial
+    grids, Athena++ stretched grids, and FLASH per-block-non-uniform
+    layouts losslessly. Kept additive so uniform documents validate
+    unchanged. Metric-aware operators are out of scope for v1.0.x —
+    consumers that need them should guard explicitly.
+    """
+
+    axis_widths: dict[str, list[PositiveFloat]] = Field(default_factory=dict)
+    # Relative-tolerance for the cell-width sum vs (upper - lower) check.
+    # Defaults are intentionally loose to accommodate float drift in
+    # hand-written TOML; tighten via this knob when authoring tests.
+    sum_rtol: NonNegativeFloat = 1.0e-9
+
+    @model_validator(mode="after")
+    def _check_axis_keys(self) -> GridStretched:
+        # Keys must be parseable as small non-negative integers in
+        # [0, 2]. The full axis-count cross-check (against
+        # ``Grid.dimensions``) lives on ``Grid``.
+        for raw_key in self.axis_widths:
+            try:
+                idx = int(raw_key)
+            except ValueError as exc:
+                raise ValueError(
+                    f"grid.stretched.axis_widths key {raw_key!r} is not a "
+                    f"non-negative integer"
+                ) from exc
+            if idx < 0 or idx > 2:
+                raise ValueError(
+                    f"grid.stretched.axis_widths key {raw_key!r} is out of range [0, 2]"
+                )
+        if not self.axis_widths:
+            raise ValueError(
+                "grid.stretched.axis_widths must contain at least one axis"
+            )
+        return self
+
+
 class Grid(_StrictBase):
     """``[grid]`` — computational grid in code units.
 
     ``ghost_cells`` records the number of ghost cells per axis used by the
     code's halo exchange. Optional metadata for downstream edge-derivative
     analysis; readers strip ghosts before populating ``FieldDataset``.
+
+    ``stretched`` describes per-axis non-uniform cell widths. Sparse —
+    only axes with non-uniform spacing appear in
+    ``[grid.stretched.axis_widths]``; the remaining axes inherit
+    ``spacing``. The validator enforces that any listed axis widths sum
+    to ``upper[i] - lower[i]`` and that the list length equals
+    ``dimensions[i]``.
     """
 
     dimensions: AxisInt
@@ -335,6 +398,7 @@ class Grid(_StrictBase):
     source_format: str | None = None
     amr: GridAMR | None = None
     refinement: list[GridRefinementBox] = Field(default_factory=list)
+    stretched: GridStretched | None = None
 
     @model_validator(mode="after")
     def _check_axis_consistency(self) -> Grid:
@@ -353,22 +417,105 @@ class Grid(_StrictBase):
                 f"ghost_cells has {len(self.ghost_cells)} entries but "
                 f"dimensions has {n}"
             )
+        if self.stretched is not None:
+            for raw_key, widths in self.stretched.axis_widths.items():
+                idx = int(raw_key)
+                if idx >= n:
+                    raise ValueError(
+                        f"grid.stretched.axis_widths['{raw_key}'] references "
+                        f"axis {idx}, but grid.dimensions has {n} axes"
+                    )
+                if len(widths) != self.dimensions[idx]:
+                    raise ValueError(
+                        f"grid.stretched.axis_widths['{raw_key}'] has "
+                        f"{len(widths)} entries, expected dimensions[{idx}]"
+                        f" = {self.dimensions[idx]}"
+                    )
+                expected_extent = self.upper[idx] - self.lower[idx]
+                actual_extent = float(sum(widths))
+                tol = self.stretched.sum_rtol * max(abs(expected_extent), 1.0)
+                if abs(actual_extent - expected_extent) > tol:
+                    raise ValueError(
+                        f"grid.stretched.axis_widths['{raw_key}'] sums to "
+                        f"{actual_extent}, expected upper - lower = "
+                        f"{expected_extent} (within rtol "
+                        f"{self.stretched.sum_rtol})"
+                    )
         return self
 
 
-class BoundaryConditions(_StrictBase):
-    """``[boundary_conditions]`` — per-face tag arrays."""
+class BoundaryConditionsBase(_StrictBase):
+    """Reusable per-face BC vector + optional driver foreign keys.
+
+    ``lower`` / ``upper`` carry one tag per axis (``"periodic"``,
+    ``"reflecting"``, ``"open"``, ``"driven"``, ...). The vocabulary is
+    free-form: validators don't constrain the strings, so different code
+    families coexist without an upstream enum cut.
+
+    ``drivers_lower`` / ``drivers_upper`` link individual faces to a
+    declared ``[[drivers]].name`` entry. Each is sparse: a dict keyed by
+    axis index as a string (``"0"``, ``"1"``, ``"2"``), valued with the
+    driver name. Faces without a driver simply don't appear. The root
+    validator enforces foreign-key resolution against ``[[drivers]]``
+    and the axis-index range against ``grid.dimensions``.
+    """
 
     lower: list[str] = Field(..., min_length=1, max_length=3)
     upper: list[str] = Field(..., min_length=1, max_length=3)
+    drivers_lower: dict[str, str] | None = None
+    drivers_upper: dict[str, str] | None = None
 
     @model_validator(mode="after")
-    def _check_same_length(self) -> BoundaryConditions:
+    def _check_face_alignment(self) -> BoundaryConditionsBase:
         if len(self.lower) != len(self.upper):
             raise ValueError(
                 f"boundary_conditions.lower ({len(self.lower)}) and .upper "
                 f"({len(self.upper)}) must have equal length"
             )
+        for face_name in ("drivers_lower", "drivers_upper"):
+            drivers = getattr(self, face_name)
+            if drivers is None:
+                continue
+            for raw_key in drivers:
+                try:
+                    idx = int(raw_key)
+                except ValueError as exc:
+                    raise ValueError(
+                        f"boundary_conditions.{face_name} key {raw_key!r} "
+                        f"is not a non-negative integer"
+                    ) from exc
+                if idx < 0 or idx >= len(self.lower):
+                    raise ValueError(
+                        f"boundary_conditions.{face_name} key {raw_key!r} "
+                        f"out of range for {len(self.lower)} axes"
+                    )
+        return self
+
+
+class BoundaryConditions(BoundaryConditionsBase):
+    """``[boundary_conditions]`` — per-face tag arrays.
+
+    The default form: one tag per face per axis applied uniformly to
+    every field. ``field_overrides`` lets PIC PML simulations and
+    solar-wind-driven runs declare *different* BCs for E (PML), B (PML),
+    and particles (reflecting / absorbing / thermal-bath) at the same
+    face. Each entry is a :class:`BoundaryConditionsBase` matching the
+    same axis count as the default.
+    """
+
+    field_overrides: dict[BCFieldGroup, BoundaryConditionsBase] | None = None
+
+    @model_validator(mode="after")
+    def _check_overrides_axis_count(self) -> BoundaryConditions:
+        if self.field_overrides is None:
+            return self
+        n = len(self.lower)
+        for field_group, override in self.field_overrides.items():
+            if len(override.lower) != n:
+                raise ValueError(
+                    f"boundary_conditions.field_overrides[{field_group!r}] "
+                    f"has {len(override.lower)} axes but the default has {n}"
+                )
         return self
 
 
@@ -658,6 +805,12 @@ class Restart(_StrictBase):
     setup-restart that re-applies initial conditions on top of the
     saved geometry (``"cold"``). Both optional; a missing ``restore``
     means the full state is restored.
+
+    ``from_files`` carries an explicit per-rank file list for codes that
+    write one checkpoint per MPI rank (VPIC, certain AMReX builds). When
+    present, ``from`` typically points at a manifest while ``from_files``
+    enumerates the actual files; readers may consult either or both.
+    Validator: distinct & non-empty when present.
     """
 
     from_: str = Field(..., alias="from")
@@ -665,6 +818,7 @@ class Restart(_StrictBase):
     time: NonNegativeFloat | None = None
     restore: list[RestoreKind] | None = None
     mode: RestartMode | None = None
+    from_files: list[str] | None = None
 
     @model_validator(mode="after")
     def _check_restore_distinct(self) -> Restart:
@@ -674,6 +828,14 @@ class Restart(_StrictBase):
             )
         if self.restore is not None and not self.restore:
             raise ValueError("restart.restore must be non-empty when present")
+        if self.from_files is not None:
+            if not self.from_files:
+                raise ValueError("restart.from_files must be non-empty when present")
+            if len(set(self.from_files)) != len(self.from_files):
+                raise ValueError(
+                    f"restart.from_files entries must be distinct, got "
+                    f"{self.from_files}"
+                )
         return self
 
 
@@ -705,6 +867,13 @@ class Species(_StrictBase):
     density: NonNegativeFloat | None = None
     closure: Closure | None = None
     gamma_eos: PositiveFloat | None = None
+    # Anisotropic adiabatic indices for two-fluid + 10-moment hybrids
+    # (Gkeyll, Hakim) where the species pressure splits into parallel
+    # and perpendicular channels. Both must be set together; cannot
+    # combine with the scalar ``gamma_eos``. Validators below enforce
+    # the (par AND perp) XOR (gamma_eos) discipline.
+    gamma_eos_par: PositiveFloat | None = None
+    gamma_eos_perp: PositiveFloat | None = None
     inertia: NonNegativeFloat | None = None
     # Particle shape factor (NGP / CIC / TSC / PQS) per ED-PIC. Optional —
     # codes that pin a global default leave this unset; codes that vary the
@@ -730,6 +899,18 @@ class Species(_StrictBase):
             raise ValueError(
                 f"species '{self.name}' has both (charge + mass) and "
                 f"charge_to_mass — choose one"
+            )
+        has_par = self.gamma_eos_par is not None
+        has_perp = self.gamma_eos_perp is not None
+        if has_par != has_perp:
+            raise ValueError(
+                f"species '{self.name}': gamma_eos_par and gamma_eos_perp "
+                f"must both be present or both absent"
+            )
+        if has_par and self.gamma_eos is not None:
+            raise ValueError(
+                f"species '{self.name}': cannot set scalar gamma_eos and "
+                f"anisotropic (gamma_eos_par, gamma_eos_perp) simultaneously"
             )
         return self
 
@@ -801,6 +982,83 @@ class OutputDiagnostics(_OutputBase):
     quantities: list[str]
 
 
+class BoxRegion(_StrictBase):
+    """``[output.streams.<n>.region]`` — axis-aligned box selection.
+
+    Coordinates in code units (matches ``[grid].lower`` / ``[grid].upper``
+    convention). ``upper`` must be strictly greater than ``lower`` per
+    axis; the per-axis count must align with ``[grid].dimensions`` —
+    enforced at the root level.
+    """
+
+    kind: Literal["box"] = "box"
+    lower: AxisFloat
+    upper: AxisFloat
+
+    @model_validator(mode="after")
+    def _check_box(self) -> BoxRegion:
+        if len(self.lower) != len(self.upper):
+            raise ValueError(
+                f"output stream box region: lower ({len(self.lower)}) and "
+                f"upper ({len(self.upper)}) must align"
+            )
+        for i, (lo, up) in enumerate(zip(self.lower, self.upper, strict=True)):
+            if up <= lo:
+                raise ValueError(
+                    f"output stream box region: upper[{i}] ({up}) must be > "
+                    f"lower[{i}] ({lo})"
+                )
+        return self
+
+
+class PlaneRegion(_StrictBase):
+    """``[output.streams.<n>.region]`` — single-axis plane slice.
+
+    ``axis`` selects a coordinate axis (``0``/``1``/``2``).
+    ``value`` is the plane position in code units; the reader is
+    responsible for resolving it to the nearest grid index.
+    """
+
+    kind: Literal["plane"] = "plane"
+    axis: NonNegativeInt = Field(..., le=2)
+    value: float
+
+
+# Tagged union: TOML doesn't carry the tag itself, so the validator
+# discriminates on the ``kind`` literal. Either shape works.
+Region = Annotated[BoxRegion | PlaneRegion, Field(discriminator="kind")]
+
+
+class OutputStream(_OutputBase):
+    """One entry in ``[[output.streams]]`` — multi-cadence / ROI output.
+
+    The repeatable form alongside the existing singleton ``[output.fields]``.
+    Use this for runs that write moments at 10x the cadence of full
+    distributions, or ROI slabs at 10x the cadence of the global volume,
+    or that simply need named output groups for downstream pipelines.
+
+    ``name`` is required and must be unique across streams. ``region``
+    optionally restricts the write to a sub-volume or plane;
+    ``precision_overrides`` re-uses the ``[output.fields]`` semantics
+    (per-field-name dtype overrides; names must appear in ``quantities``).
+    """
+
+    name: str
+    quantities: list[str]
+    region: Region | None = None
+    precision_overrides: dict[str, Precision] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def _check_overrides_subset(self) -> OutputStream:
+        unknown = set(self.precision_overrides).difference(self.quantities)
+        if unknown:
+            raise ValueError(
+                f"output.streams[{self.name!r}].precision_overrides names "
+                f"not in quantities: {sorted(unknown)}"
+            )
+        return self
+
+
 class Output(_StrictBase):
     """``[output]`` — umbrella for all write-side configuration."""
 
@@ -809,6 +1067,18 @@ class Output(_StrictBase):
     particles: OutputParticles | None = None
     probes: OutputProbes | None = None
     diagnostics: OutputDiagnostics | None = None
+    streams: list[OutputStream] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _check_stream_names_unique(self) -> Output:
+        names = [s.name for s in self.streams]
+        if len(set(names)) != len(names):
+            duplicates = sorted({n for n in names if names.count(n) > 1})
+            raise ValueError(
+                f"output.streams entries must have distinct names; "
+                f"duplicates: {duplicates}"
+            )
+        return self
 
 
 class Probe(_StrictBase):
@@ -839,6 +1109,132 @@ class Probe(_StrictBase):
                 f"`trajectory` (fixed probes inherit [coordinates].frame)"
             )
         return self
+
+
+class VelocityMesh(_StrictBase):
+    r"""``[velocity_mesh]`` — continuum-Vlasov velocity-grid metadata.
+
+    Vlasiator stores per-cell distribution functions on a 3-D Cartesian
+    velocity grid with sparse-block storage. ``dimensions`` and
+    ``extent`` describe the velocity-space mesh; ``block_size`` records
+    the sparse-block factor for codes that subdivide the velocity grid
+    for adaptive memory use; ``sparsity_threshold`` records the
+    density floor below which blocks are dropped from disk.
+
+    Required when ``[model].type = "vlasov"`` and the run writes VDFs;
+    optional for moment-only output. The validator only enforces shape
+    consistency; the spatial / phase-space coupling check lives on the
+    root model.
+    """
+
+    dimensions: list[PositiveInt] = Field(..., min_length=1, max_length=3)
+    extent: list[list[float]] = Field(..., min_length=1, max_length=3)
+    block_size: list[PositiveInt] | None = None
+    sparsity_threshold: NonNegativeFloat | None = None
+    coordinate_system: Literal["cartesian", "spherical-velocity"] = "cartesian"
+
+    @model_validator(mode="after")
+    def _check_extent_shape(self) -> VelocityMesh:
+        if len(self.extent) != len(self.dimensions):
+            raise ValueError(
+                f"velocity_mesh.extent has {len(self.extent)} axes but "
+                f"dimensions has {len(self.dimensions)}"
+            )
+        for i, axis_extent in enumerate(self.extent):
+            if len(axis_extent) != 2:
+                raise ValueError(
+                    f"velocity_mesh.extent[{i}] must have 2 entries "
+                    f"[v_min, v_max], got {len(axis_extent)}"
+                )
+            v_min, v_max = axis_extent
+            if v_max <= v_min:
+                raise ValueError(
+                    f"velocity_mesh.extent[{i}]: v_max ({v_max}) must be > "
+                    f"v_min ({v_min})"
+                )
+        if self.block_size is not None:
+            if len(self.block_size) != len(self.dimensions):
+                raise ValueError(
+                    f"velocity_mesh.block_size has {len(self.block_size)} "
+                    f"axes but dimensions has {len(self.dimensions)}"
+                )
+            for i, (block, dim) in enumerate(
+                zip(self.block_size, self.dimensions, strict=True)
+            ):
+                if dim % block != 0:
+                    raise ValueError(
+                        f"velocity_mesh.block_size[{i}] ({block}) must "
+                        f"divide dimensions[{i}] ({dim}) evenly"
+                    )
+        return self
+
+
+class PhaseSpace(_StrictBase):
+    r"""``[phase_space]`` — kinetic phase-space dimensions for >3D codes.
+
+    Gyrokinetic codes (GENE, GS2, GX, Gkeyll-GK) run on 5-D grids
+    (3 spatial + 2 velocity); continuum-Vlasov codes use 6-D phase
+    space (3 spatial + 3 velocity). This block describes the
+    *augmented* phase-space dimensionality without lifting the
+    ``Grid.dimensions`` cap on the spatial side.
+
+    Required when the simulation operates on a phase-space grid larger
+    than ``[grid].dimensions``. Optional otherwise. The root validator
+    enforces consistency: ``[phase_space].dimensions[:n_spatial]``
+    must match ``[grid].dimensions`` when both are present.
+    """
+
+    dimensions: list[PositiveInt] = Field(..., min_length=2, max_length=6)
+    axis_labels: list[str] | None = None
+    extents: list[list[float]] | None = None
+    coordinate_system: PhaseSpaceCoordSystem = "cartesian"
+
+    @model_validator(mode="after")
+    def _check_axis_labels_and_extents(self) -> PhaseSpace:
+        n = len(self.dimensions)
+        if self.axis_labels is not None and len(self.axis_labels) != n:
+            raise ValueError(
+                f"phase_space.axis_labels has {len(self.axis_labels)} "
+                f"entries but dimensions has {n}"
+            )
+        if self.extents is not None:
+            if len(self.extents) != n:
+                raise ValueError(
+                    f"phase_space.extents has {len(self.extents)} axes but "
+                    f"dimensions has {n}"
+                )
+            for i, axis_extent in enumerate(self.extents):
+                if len(axis_extent) != 2:
+                    raise ValueError(
+                        f"phase_space.extents[{i}] must have 2 entries "
+                        f"[lower, upper], got {len(axis_extent)}"
+                    )
+                lo, up = axis_extent
+                if up <= lo:
+                    raise ValueError(
+                        f"phase_space.extents[{i}]: upper ({up}) must be > lower ({lo})"
+                    )
+        return self
+
+
+class Collision(_StrictBase):
+    r"""One entry in ``[[collisions]]`` — inter-species collision model.
+
+    Collisional PIC codes (Smilei, EPOCH, OSIRIS-collisional, PIConGPU)
+    declare per-pair Coulomb collisions, BGK relaxation, or
+    Monte-Carlo scattering. The schema captures the *declaration* of
+    each pair; numerical parameters live on the entry.
+
+    ``species_pair`` lists the two species names participating; the
+    root validator enforces that both names exist in ``[[species]]``.
+    Self-collisions (same species twice) are permitted.
+    """
+
+    species_pair: list[str] = Field(..., min_length=2, max_length=2)
+    model: CollisionModel
+    coulomb_log: PositiveFloat | None = None
+    temperature_ref: PositiveFloat | None = None
+    description: str | None = None
 
 
 class SchemaMeta(_StrictBase):
@@ -888,6 +1284,9 @@ class SimulationSchema(_ExtensibleBase):
     restart: Restart | None = None
     output: Output | None = None
     probes: list[Probe] = Field(default_factory=list)
+    velocity_mesh: VelocityMesh | None = None
+    phase_space: PhaseSpace | None = None
+    collisions: list[Collision] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def _check_root_invariants(self) -> SimulationSchema:
@@ -923,6 +1322,10 @@ class SimulationSchema(_ExtensibleBase):
             self._check_physics_matches_model_type()
         self._check_reference_species_exists()
         self._check_driver_body_references()
+        self._check_collision_species_references()
+        self._check_bc_driver_references()
+        self._check_output_stream_axis_count(n)
+        self._check_phase_space_consistency(n)
         self._check_extras_are_extensions()
         return self
 
@@ -980,6 +1383,104 @@ class SimulationSchema(_ExtensibleBase):
                     f"driver '{driver.name}': body = '{driver.body}' does "
                     f"not match any [[bodies]].name entry: "
                     f"{sorted(body_names) or '(none declared)'}"
+                )
+
+    def _check_collision_species_references(self) -> None:
+        """Ensure every ``[[collisions]].species_pair`` resolves.
+
+        Both species names in each pair must match a declared
+        ``[[species]].name`` entry. Self-collisions (same species twice)
+        are permitted — codes that need them include them as
+        ``species_pair = ["e", "e"]``.
+        """
+        if not self.collisions:
+            return
+        names = {s.name for s in self.species}
+        for collision in self.collisions:
+            for species_name in collision.species_pair:
+                if species_name not in names:
+                    raise ValueError(
+                        f"collisions.species_pair references unknown species "
+                        f"'{species_name}'; declared species: {sorted(names)}"
+                    )
+
+    def _check_bc_driver_references(self) -> None:
+        """Ensure every ``boundary_conditions.drivers_*`` resolves.
+
+        Per-face driver names (in the default ``BoundaryConditions`` and
+        in any ``field_overrides`` entry) must match a declared
+        ``[[drivers]].name`` entry. ``None`` slots are allowed and mean
+        "no driver supplies this face."
+        """
+        if self.boundary_conditions is None:
+            return
+        driver_names = {d.name for d in self.drivers}
+
+        def _check_block(block: BoundaryConditionsBase, scope: str) -> None:
+            for face_name in ("drivers_lower", "drivers_upper"):
+                drivers = getattr(block, face_name)
+                if drivers is None:
+                    continue
+                for axis_key, name in drivers.items():
+                    if name not in driver_names:
+                        raise ValueError(
+                            f"{scope}.{face_name}['{axis_key}'] = '{name}' "
+                            f"does not match any [[drivers]].name entry: "
+                            f"{sorted(driver_names) or '(none declared)'}"
+                        )
+
+        _check_block(self.boundary_conditions, "boundary_conditions")
+        if self.boundary_conditions.field_overrides is not None:
+            for group, override in self.boundary_conditions.field_overrides.items():
+                _check_block(
+                    override, f"boundary_conditions.field_overrides[{group!r}]"
+                )
+
+    def _check_output_stream_axis_count(self, n: int) -> None:
+        """Ensure each ``[[output.streams]].region`` aligns with the grid."""
+        if self.output is None or not self.output.streams:
+            return
+        for stream in self.output.streams:
+            region = stream.region
+            if region is None:
+                continue
+            if isinstance(region, BoxRegion):
+                if len(region.lower) != n:
+                    raise ValueError(
+                        f"output.streams[{stream.name!r}].region (box) has "
+                        f"{len(region.lower)} axes but grid.dimensions has {n}"
+                    )
+            elif isinstance(region, PlaneRegion) and region.axis >= n:
+                raise ValueError(
+                    f"output.streams[{stream.name!r}].region (plane) "
+                    f"axis {region.axis} out of range for grid.dimensions"
+                    f" ({n} axes)"
+                )
+
+    def _check_phase_space_consistency(self, n: int) -> None:
+        """Ensure ``[phase_space]`` agrees with ``[grid]`` on the spatial part.
+
+        When ``[phase_space]`` is present, its first ``n`` dimensions must
+        match ``[grid].dimensions`` exactly — the spatial sub-grid is
+        owned by ``[grid]``; the velocity / extra-D extension lives in
+        ``[phase_space]``. The remaining ``len(phase_space.dimensions) - n``
+        entries describe the kinetic side (e.g. 2 velocity dims for
+        gyrokinetic, 3 for full Vlasov phase space).
+        """
+        if self.phase_space is None:
+            return
+        ps_dims = self.phase_space.dimensions
+        if len(ps_dims) < n:
+            raise ValueError(
+                f"phase_space.dimensions has {len(ps_dims)} axes but "
+                f"grid.dimensions has {n} (phase space must extend, not "
+                f"replace, the spatial grid)"
+            )
+        for i in range(n):
+            if ps_dims[i] != self.grid.dimensions[i]:
+                raise ValueError(
+                    f"phase_space.dimensions[{i}] ({ps_dims[i]}) must match "
+                    f"grid.dimensions[{i}] ({self.grid.dimensions[i]})"
                 )
 
     def _check_extras_are_extensions(self) -> None:

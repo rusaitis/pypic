@@ -2,10 +2,11 @@
 
 Readiness review for popular MHD / PIC / hybrid codes against the v1.0
 Pydantic validator (`src/pypic/schema/_models.py`). Organized as a
-release plan: a **v1.0.x additive batch** that lands now (no v1.0
-documents invalidated), a **v1.1 shape-change batch** bundled with the
-readers that demand it, and **Tier 3 deferred** items. Pointers cite
-line numbers in `_models.py` after the v1.0 refactor (commit `8030876`).
+release plan: two **v1.0.x additive batches** that land without
+invalidating any v1.0 document, a **deferred v1.1 set** of two
+genuinely-niche items, and **Tier 3 deferred** items. Pointers cite
+line numbers in `_models.py` relative to the v1.0 refactor (commit
+`8030876`).
 
 **Two surfaces, one document.** Items affect either the **TOML schema**
 (`pypic.schema._models`, versioned via `schema_version`) or **runtime
@@ -144,114 +145,121 @@ TOML-schema additions above.
   Yee-mesh PIC, BATSRUS face-centered B, and the openPMD reader
   (TASKS.md Step 42).
 
-## v1.1 — shape-change batch (ship with readers)
+## v1.0.x — additive batch round 2 (ship now)
 
-Each item restructures an existing model, retypes an existing field,
-or introduces a sub-model that reshapes the surface. Once any v1.1
-change lands, all v1.0 documents need re-validation against the new
-shape, so amortize the disruption: bundle into one cut tied to a
-specific reader rollout.
+Re-evaluation of the original v1.1 batch found that every item could
+be expressed in a purely additive form by adding new optional fields
+or sub-tables alongside the existing ones rather than retyping or
+restructuring in place. This second round pulls 8 of the 10 v1.1
+items forward so Vlasiator, VPIC, ARMS, and adjacent codes can
+onboard without waiting on a v1.1 cut. The two genuinely-niche items
+(ionization chains, QED) stay deferred — neither has a reader on the
+immediate roadmap.
 
-Recommended pairing of shape work to reader rollouts:
+Recommended pairing of round-2 work to reader rollouts:
 
-| Reader trigger | v1.1 items unlocked |
+| Reader trigger | Round-2 items unlocked |
 |---|---|
-| Vlasiator (Step 23) — lossless VDFs | `[velocity_mesh]` |
-| ARMS spherical (Step 36) | stretched / non-uniform grids |
-| Smilei collisional / EPOCH | `[[collisions]]`, `[[ionization_chains]]` |
-| EPOCH-QED / Smilei-QED / Zeltron | QED / radiation reaction |
-| PIC PML on E + B; thermal-bath particles | per-field BCs + driver linkage |
-| Multi-cadence runs in production | repeatable `[[output.fields]]` |
-| Gkeyll, Hakim two-fluid 10-moment (full anisotropy) | `gamma_eos` tuple form |
-| VPIC (Step 35) per-rank restart manifest | restart `from_` widening |
-| GENE, GS2, GX, Gkeyll-GK | high-D grids |
+| Vlasiator (Step 23) — lossless VDFs | `[velocity_mesh]`, `[phase_space]` |
+| ARMS spherical (Step 36) | `[grid.stretched]` |
+| VPIC (Step 35) per-rank restart manifest | `Restart.from_files` |
+| Gkeyll, Hakim two-fluid 10-moment (full anisotropy) | `Species.gamma_eos_par` / `gamma_eos_perp` |
+| Smilei collisional / EPOCH / OSIRIS-collisional | `[[collisions]]` |
+| GENE, GS2, GX, Gkeyll-GK | `[phase_space]` (5D guiding-center) |
+| PIC PML on E + B; thermal-bath particles | per-field BC overrides + per-face driver foreign keys |
+| Multi-cadence / ROI runs (production cross-cutting) | `[[output.streams]]` |
 
-- [ ] **`[velocity_mesh]` for continuum-Vlasov codes.**
-  Vlasiator stores per-cell distribution functions on a 3-D Cartesian
-  velocity grid with sparse-block storage. The schema currently has no
-  way to describe the v-grid extent (`vmin/vmax`), block size, or
-  sparsity policy. Blocks `vlasiator` reader (TASKS.md Step 23) from
-  ever describing VDF data losslessly — only fluid moments work today.
+- [x] **`[velocity_mesh]` for continuum-Vlasov codes.** Shipped: new
+  optional top-level section. `VelocityMesh` model with
+  `dimensions: list[PositiveInt]` (1..3), `extent: list[list[float]]`
+  (per-axis `[v_min, v_max]`), optional `block_size` (must evenly
+  divide each `dimensions[i]`), optional `sparsity_threshold`,
+  `coordinate_system: "cartesian" | "spherical-velocity"`. Validator
+  enforces extent shape and block-size divisibility. Unblocks the
+  Vlasiator reader's lossless-VDF mode (TASKS.md Step 23).
 
-- [ ] **Stretched / non-uniform grids.**
-  `Grid.spacing` (`_models.py:228`) is a single scalar per axis. PLUTO
-  log-radial, Athena++ stretched, FLASH per-block-non-uniform, ARMS
-  spherical with stretched-r cannot be described losslessly. The
-  external-mesh escape hatch (`source = "grids/mesh.h5"`,
-  `_models.py:230`) defers but the in-schema fields claim uniform
-  spacing the data won't satisfy.
-  Sketch: discriminate `kind: "uniform" | "stretched" | "external"`;
-  for `stretched`, allow `spacing: list[list[float]]` (per-axis cell
-  widths) or a `stretch_factor: float` for geometric grids.
-  **Bites ARMS in spherical mode immediately (Step 36).**
+- [x] **Stretched / non-uniform grids.** Shipped: new optional
+  `[grid.stretched]` sub-table. `GridStretched.axis_widths: dict[str,
+  list[PositiveFloat]]`, sparse — only stretched axes appear, keyed by
+  axis index as a string. The `Grid` validator enforces that listed
+  cell widths sum to `upper[i] - lower[i]` (within `sum_rtol`) and
+  that the list length equals `dimensions[i]`. Uniform grids
+  validate unchanged; metric-aware operators are out of scope until
+  Step 19b. Unblocks ARMS spherical-r (TASKS.md Step 36).
 
-- [ ] **`[[collisions]]` table for collisional PIC.**
-  Smilei, EPOCH, OSIRIS-collisional, PIConGPU collisions all need
-  per-pair Coulomb collision coefficients (and BGK or Monte-Carlo
-  variants). No current shape. CLAUDE.md's v1.1 placeholder
-  `physics.collisional` is just a flag.
-  Sketch: `[[collisions]]` entries keyed by `species_pair = ["e", "i"]`,
-  with `model: "coulomb" | "bgk" | "monte-carlo"`, `coulomb_log: float`,
-  `temperature_ref: float | None`.
+- [x] **`Restart.from_files` widening.** Shipped: new optional
+  `from_files: list[str] | None` field on `Restart`. Validator:
+  distinct & non-empty when present. The existing `from` field stays
+  required (typically a manifest path or canonical checkpoint).
+  Unblocks VPIC per-rank restart manifest (TASKS.md Step 35).
+
+- [x] **Anisotropic `gamma_eos` on `[[species]]`.** Shipped: new
+  optional `Species.gamma_eos_par`, `Species.gamma_eos_perp` fields.
+  Validator: par and perp must both be present or both absent;
+  cannot mix with the scalar `gamma_eos`. Unblocks Gkeyll / Hakim
+  two-fluid 10-moment hybrids without retyping the existing scalar.
+
+- [x] **`[[collisions]]` table for collisional PIC.** Shipped: new
+  optional repeatable section. `Collision` model with
+  `species_pair: list[str]` (length 2), `model: 'coulomb' | 'bgk' |
+  'monte-carlo'`, optional `coulomb_log`, `temperature_ref`,
+  `description`. Root validator enforces that both species names
+  resolve against `[[species]].name`; self-collisions (same species
+  twice) are permitted. Unblocks Smilei collisional, EPOCH,
+  OSIRIS-collisional, PIConGPU.
+
+- [x] **Multi-cadence / region-of-interest output.** Shipped: new
+  optional repeatable `[[output.streams]]` section, alongside the
+  existing singleton `[output.fields]`. `OutputStream` extends
+  `_OutputBase` with required `name`, `quantities`, optional
+  `region: BoxRegion | PlaneRegion` (discriminated by `kind = "box" |
+  "plane"`), and `precision_overrides`. Output validator enforces
+  unique stream names; the root validator cross-checks region axis
+  counts against `[grid].dimensions`. Cross-cutting production-run
+  benefit; works for any reader.
+
+- [x] **Per-field boundary conditions + BC ↔ driver linkage.**
+  Shipped: refactored `BoundaryConditions` into
+  `BoundaryConditionsBase` (carries `lower`/`upper`/`drivers_lower`/
+  `drivers_upper`) and `BoundaryConditions(BoundaryConditionsBase)`
+  with optional `field_overrides: dict['E' | 'B' | 'particles',
+  BoundaryConditionsBase]`. The driver foreign keys are sparse dicts
+  keyed by axis index (TOML can't represent `null` inside lists).
+  Root validator enforces that every driver name resolves against
+  `[[drivers]].name`. Unblocks PIC PML and solar-wind-driven runs.
+
+- [x] **`[phase_space]` for >3D kinetic codes.** Shipped: new
+  optional top-level `PhaseSpace` model with
+  `dimensions: list[PositiveInt]` (2..6), optional `axis_labels`,
+  `extents`, and `coordinate_system: 'cartesian' | 'guiding-center'
+  | 'field-aligned' | 'spherical-velocity'`. Root validator enforces
+  that the first `n` dimensions match `[grid].dimensions` exactly —
+  the spatial sub-grid stays owned by `[grid]`; phase space extends
+  it. Unblocks gyrokinetic codes (GENE, GS2, GX, Gkeyll-GK) and full
+  6D Vlasov phase space without lifting the `AxisInt` cap on
+  `Grid.dimensions`.
+
+## v1.1 — deferred items
+
+Two genuinely-niche additions remain deferred: each only matters for
+*one specific subset* of one reader family, and neither blocks any
+reader currently on the TASKS.md roadmap. Both can land additively
+later without disturbing v1.0.x consumers.
 
 - [ ] **`[[ionization_chains]]` for atomic-physics PIC.**
   EPOCH, Smilei, OSIRIS support BSI / ADK / multi-photon ionization.
   Need to express that He⁺ and He²⁺ are charge states of the same atom
   (the schema currently says "treat as separate `[[species]]`", losing
   the parent linkage). Sketch: `[[ionization_chains]]` with
-  `parent: "He"`, `states: ["He0", "He+", "He2+"]`, `model: "adk" | "bsi" | ...`.
+  `parent: "He"`, `states: ["He0", "He+", "He2+"]`, `model: "adk" |
+  "bsi" | ...`. Defer until an ionization-capable reader lands.
 
 - [ ] **QED / radiation-reaction module.**
   EPOCH-QED, Smilei-QED, OSIRIS, Zeltron support synchrotron radiation
   reaction, Breit-Wheeler pair production, Compton scattering. Needs
   photon species + cross-section table identifiers. CLAUDE.md mentions
   `radiative` as a future top-level flag; here is the actual shape
-  needed.
-
-- [ ] **Per-field boundary conditions + BC ↔ driver linkage.**
-  `BoundaryConditions` (`_models.py:252`) carries one tag per face. PIC
-  needs *different* BCs for E (PML), B (PML), and particles (reflecting/
-  absorbing/thermal-bath) at the same face. Solar-wind-driven
-  magnetosphere runs need an inflow E-profile that an enum tag can't
-  describe. Drivers exist (`[[drivers]]` with `coupling="boundary"`,
-  `_models.py:444`) but there's no link from a BC face to the driver
-  that supplies its values.
-  Sketch: `BoundaryConditions` becomes a list of face-keyed entries
-  with `field: "E" | "B" | "particles"` and optional
-  `driver: "<name>"` foreign key. Restructures the existing type —
-  v1.1.
-
-- [ ] **Multi-cadence / region-of-interest output.**
-  Each `[output.fields]`-style sub-table carries a single
-  `step_interval`. Real runs write moments at 10× the cadence of full
-  distributions, or ROI slabs at 10× the cadence of the global volume.
-  Sketch: allow `[[output.fields]]` (repeatable) keyed by `name`, each
-  with optional `region: BoxSelection | PlaneSelection`,
-  `quantities`, `step_interval`. Singleton → repeatable is shape-
-  changing — v1.1.
-
-- [ ] **Anisotropic `gamma_eos` tuple form `(γ_par, γ_perp)`.**
-  Two-fluid + 10-moment hybrids (Gkeyll, Hakim) need
-  `Species.gamma_eos = (γ_par, γ_perp)` instead of the v1.0 scalar.
-  Type-changing on an existing field — must wait for v1.1. The
-  enum-only additions (CGL / 10-moment / 14-moment as `Closure`
-  values) land in v1.0.x.
-
-- [ ] **Restart `from_` type widening.**
-  `Restart.from_` (`_models.py:492`) widens from `str` to `str | list[str]`
-  to express VPIC-style multi-file restart manifests (one chk per rank).
-  Type-changing on an existing field; v1.0.x adds the orthogonal
-  `restore` / `mode` fields additively.
-
-- [ ] **High-dimensional grids (>3D).**
-  `Grid.dimensions` is `AxisInt` (1..3 entries). Gyrokinetic codes
-  (GENE, GS2, GX, Gkeyll-GK) run on 5D grids; continuum-Vlasov
-  (Vlasiator, Gkeyll Vlasov-Maxwell) is intrinsically 6D phase space.
-  The v1.1 `[velocity_mesh]` entry separates spatial from velocity
-  grids cleanly for Vlasiator, but the gyrokinetic case (3 spatial +
-  2 velocity, mixed) doesn't decompose the same way. Decision needed:
-  lift the `AxisInt` cap to 6, or treat gyrokinetic as a separate
-  top-level `[phase_space]` block. Either route is shape-changing.
+  needed. Defer until a QED-capable reader lands.
 
 ## Documentation backlog (no model changes)
 
@@ -341,31 +349,34 @@ separately so they neither gate nor are gated by v1.1 shape work.
 ## Reader → blocker matrix
 
 What each pending reader needs from this backlog before it can ship a
-faithful description of its native data. Items in the v1.0.x batch
-have shipped (✅); the v1.1 batch awaits its paired reader rollout.
+faithful description of its native data. Items shipped in the v1.0.x
+batches (round 1 + round 2) are checked (✅). The two deferred v1.1
+items are noted; neither blocks a reader currently on TASKS.md.
 
-| Reader (TASKS.md step) | Blockers | Batch |
+| Reader (TASKS.md step) | Blockers | Status |
 |---|---|---|
-| Vlasiator (Step 23) — fluid moments only | ✅ `ModelType += "vlasov"` | v1.0.x |
-| Vlasiator (Step 23) — lossless VDFs | `[velocity_mesh]` | v1.1 |
-| VPIC (Step 35) — basic | ✅ per-rank file layout; restart `restore`/`mode` | v1.0.x |
-| VPIC (Step 35) — full per-rank restart | restart `from_` widening | v1.1 |
-| ARMS (Step 36) | stretched grids (spherical-r) | v1.1 |
+| Vlasiator (Step 23) — fluid moments only | ✅ `ModelType += "vlasov"` | v1.0.x ✅ |
+| Vlasiator (Step 23) — lossless VDFs | ✅ `[velocity_mesh]`; ✅ `[phase_space]` | v1.0.x ✅ |
+| VPIC (Step 35) — basic | ✅ per-rank file layout; ✅ restart `restore`/`mode` | v1.0.x ✅ |
+| VPIC (Step 35) — full per-rank restart manifest | ✅ `Restart.from_files` | v1.0.x ✅ |
+| ARMS (Step 36) | ✅ `[grid.stretched]` (spherical-r) | v1.0.x ✅ |
 | WarpX, PIConGPU, Smilei (openPMD reader, Phase 1) | ✅ ED-PIC vocabulary; ✅ per-component stagger; ✅ `unitDimension`; openPMD docs mapping | v1.0.x ✅; Docs |
 | FBPIC (openPMD reader, Phase 2) | above + ✅ `thetaMode` geometry | v1.0.x ✅ |
-| Smilei, EPOCH, OSIRIS-collisional | `[[collisions]]`; `[[ionization_chains]]`; QED | v1.1 |
+| Smilei collisional, EPOCH, OSIRIS-collisional, PIConGPU | ✅ `[[collisions]]` | v1.0.x ✅ |
+| EPOCH-QED, Smilei-QED, OSIRIS-QED, Zeltron | QED / radiation reaction | v1.1 (deferred) |
+| EPOCH, Smilei, OSIRIS — atomic ionization | `[[ionization_chains]]` | v1.1 (deferred) |
 | Gkeyll, Hakim two-fluid 10-moment — vocabulary | ✅ anisotropic `Closure` enum values | v1.0.x ✅ |
-| Gkeyll, Hakim — full anisotropic `gamma_eos` | `gamma_eos` tuple form | v1.1 |
+| Gkeyll, Hakim — full anisotropic `gamma_eos` | ✅ `gamma_eos_par` / `gamma_eos_perp` | v1.0.x ✅ |
 | RAMSES, MPI-AMRVAC | ✅ AMR-kind discriminator (octree) | v1.0.x ✅ |
-| GENE, GS2, GX, Gkeyll-GK | ✅ `ModelType += "gyrokinetic"`; high-D grids | v1.0.x ✅; v1.1 |
+| GENE, GS2, GX, Gkeyll-GK | ✅ `ModelType += "gyrokinetic"`; ✅ `[phase_space]` | v1.0.x ✅ |
+| PIC PML, solar-wind-driven runs | ✅ per-field BC overrides + driver foreign keys | v1.0.x ✅ |
+| Multi-cadence / ROI output (cross-cutting) | ✅ `[[output.streams]]` | v1.0.x ✅ |
 | All production PIC | ✅ current/charge smoothing on `PICSolver` | v1.0.x ✅ |
 
-Cross-cutting items with no concrete reader on the hook: per-field
-BCs, multi-cadence output. Tracer-particle flag and ensemble metadata
-shipped in the v1.0.x batch.
-
 **v1.0 contract is intact** for the iPIC3D / BATSRUS / OpenGGCM /
-SimpleHDF5 readers shipping today. The v1.0.x batch above is purely
-additive — v1.0 documents continue to validate against the upgraded
-validator. Only the v1.1 batch breaks the contract; bundle it tied to
-a reader rollout to amortize the disruption.
+SimpleHDF5 readers shipping today. Both v1.0.x batches (round 1 and
+round 2) are purely additive — every v1.0 document continues to
+validate against the upgraded validator, and `schema_version = "1.0"`
+remains the canonical version string. The two deferred v1.1 items
+(ionization chains, QED) will land additively later when a concrete
+reader needs them.

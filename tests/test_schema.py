@@ -863,3 +863,528 @@ class TestOutputMultiFileLayout:
         """)
         with pytest.raises(ValidationError, match="partition"):
             validate_simulation_toml(doc)
+
+
+# ---------------------------------------------------------------------------
+# v1.0.x round 2 — additive batch (Vlasiator/VPIC/ARMS unblock)
+# ---------------------------------------------------------------------------
+
+
+class TestVelocityMesh:
+    """``[velocity_mesh]`` — continuum-Vlasov VDF grid metadata."""
+
+    def test_minimal_velocity_mesh(self) -> None:
+        doc = _minimal_doc(**{'type = "PIC"': 'type = "vlasov"'}) + dedent("""
+            [velocity_mesh]
+            dimensions = [50, 50, 50]
+            extent = [[-2.0e6, 2.0e6], [-2.0e6, 2.0e6], [-2.0e6, 2.0e6]]
+        """)
+        s = validate_simulation_toml(doc)
+        assert s.velocity_mesh is not None
+        assert s.velocity_mesh.dimensions == [50, 50, 50]
+        assert s.velocity_mesh.coordinate_system == "cartesian"
+
+    def test_full_velocity_mesh(self) -> None:
+        doc = _minimal_doc(**{'type = "PIC"': 'type = "vlasov"'}) + dedent("""
+            [velocity_mesh]
+            dimensions = [50, 50, 50]
+            extent = [[-2e6, 2e6], [-2e6, 2e6], [-2e6, 2e6]]
+            block_size = [10, 10, 10]
+            sparsity_threshold = 1.0e-15
+            coordinate_system = "spherical-velocity"
+        """)
+        s = validate_simulation_toml(doc)
+        assert s.velocity_mesh is not None
+        assert s.velocity_mesh.block_size == [10, 10, 10]
+        assert s.velocity_mesh.sparsity_threshold == 1.0e-15
+        assert s.velocity_mesh.coordinate_system == "spherical-velocity"
+
+    def test_extent_axis_count_mismatch_rejected(self) -> None:
+        doc = _minimal_doc(**{'type = "PIC"': 'type = "vlasov"'}) + dedent("""
+            [velocity_mesh]
+            dimensions = [50, 50, 50]
+            extent = [[-2e6, 2e6], [-2e6, 2e6]]
+        """)
+        with pytest.raises(ValidationError, match=r"velocity_mesh\.extent"):
+            validate_simulation_toml(doc)
+
+    def test_extent_inverted_rejected(self) -> None:
+        doc = _minimal_doc(**{'type = "PIC"': 'type = "vlasov"'}) + dedent("""
+            [velocity_mesh]
+            dimensions = [50, 50, 50]
+            extent = [[-2e6, 2e6], [2e6, -2e6], [-2e6, 2e6]]
+        """)
+        with pytest.raises(ValidationError, match="v_max"):
+            validate_simulation_toml(doc)
+
+    def test_block_size_must_divide_dimensions(self) -> None:
+        doc = _minimal_doc(**{'type = "PIC"': 'type = "vlasov"'}) + dedent("""
+            [velocity_mesh]
+            dimensions = [50, 50, 50]
+            extent = [[-2e6, 2e6], [-2e6, 2e6], [-2e6, 2e6]]
+            block_size = [7, 10, 10]
+        """)
+        with pytest.raises(ValidationError, match="block_size"):
+            validate_simulation_toml(doc)
+
+
+class TestRestartFromFiles:
+    """``Restart.from_files`` — VPIC per-rank manifest support."""
+
+    def test_from_files_accepted(self) -> None:
+        doc = _minimal_doc() + dedent("""
+            [restart]
+            from = "./checkpoints/manifest.txt"
+            from_files = ["chk_00000.h5", "chk_00001.h5", "chk_00002.h5"]
+        """)
+        s = validate_simulation_toml(doc)
+        assert s.restart is not None
+        assert s.restart.from_files == [
+            "chk_00000.h5",
+            "chk_00001.h5",
+            "chk_00002.h5",
+        ]
+
+    def test_from_files_empty_rejected(self) -> None:
+        doc = _minimal_doc() + dedent("""
+            [restart]
+            from = "./chk.h5"
+            from_files = []
+        """)
+        with pytest.raises(ValidationError, match="from_files"):
+            validate_simulation_toml(doc)
+
+    def test_from_files_duplicates_rejected(self) -> None:
+        doc = _minimal_doc() + dedent("""
+            [restart]
+            from = "./chk.h5"
+            from_files = ["a.h5", "a.h5"]
+        """)
+        with pytest.raises(ValidationError, match="distinct"):
+            validate_simulation_toml(doc)
+
+
+class TestAnisotropicGammaEOS:
+    """``Species.gamma_eos_par`` / ``gamma_eos_perp`` for 10-moment hybrids."""
+
+    def test_par_perp_pair_accepted(self) -> None:
+        doc = _minimal_doc(
+            **{
+                "charge = -1.0\nmass = 1.0": (
+                    "charge = -1.0\nmass = 1.0\n"
+                    "gamma_eos_par = 3.0\ngamma_eos_perp = 2.0"
+                )
+            }
+        )
+        s = validate_simulation_toml(doc)
+        assert s.species[0].gamma_eos_par == 3.0
+        assert s.species[0].gamma_eos_perp == 2.0
+        assert s.species[0].gamma_eos is None
+
+    def test_par_alone_rejected(self) -> None:
+        doc = _minimal_doc(
+            **{
+                "charge = -1.0\nmass = 1.0": (
+                    "charge = -1.0\nmass = 1.0\ngamma_eos_par = 3.0"
+                )
+            }
+        )
+        with pytest.raises(ValidationError, match="gamma_eos_par"):
+            validate_simulation_toml(doc)
+
+    def test_scalar_plus_anisotropic_rejected(self) -> None:
+        doc = _minimal_doc(
+            **{
+                "charge = -1.0\nmass = 1.0": (
+                    "charge = -1.0\nmass = 1.0\n"
+                    "gamma_eos = 1.6667\n"
+                    "gamma_eos_par = 3.0\n"
+                    "gamma_eos_perp = 2.0"
+                )
+            }
+        )
+        with pytest.raises(ValidationError, match="anisotropic"):
+            validate_simulation_toml(doc)
+
+
+class TestCollisions:
+    """``[[collisions]]`` — per-pair collision declarations."""
+
+    def test_minimal_collision_pair(self) -> None:
+        doc = _minimal_doc() + dedent("""
+            [[species]]
+            name = "ions"
+            charge = 1.0
+            mass = 1836.0
+
+            [[collisions]]
+            species_pair = ["electrons", "ions"]
+            model = "coulomb"
+            coulomb_log = 10.0
+        """)
+        s = validate_simulation_toml(doc)
+        assert len(s.collisions) == 1
+        assert s.collisions[0].species_pair == ["electrons", "ions"]
+        assert s.collisions[0].model == "coulomb"
+        assert s.collisions[0].coulomb_log == 10.0
+
+    @pytest.mark.parametrize("model", ["coulomb", "bgk", "monte-carlo"])
+    def test_collision_model_literals(self, model: str) -> None:
+        doc = _minimal_doc() + dedent(f"""
+            [[collisions]]
+            species_pair = ["electrons", "electrons"]
+            model = "{model}"
+        """)
+        s = validate_simulation_toml(doc)
+        assert s.collisions[0].model == model
+
+    def test_self_collisions_permitted(self) -> None:
+        doc = _minimal_doc() + dedent("""
+            [[collisions]]
+            species_pair = ["electrons", "electrons"]
+            model = "bgk"
+        """)
+        s = validate_simulation_toml(doc)
+        assert s.collisions[0].species_pair == ["electrons", "electrons"]
+
+    def test_unknown_species_rejected(self) -> None:
+        doc = _minimal_doc() + dedent("""
+            [[collisions]]
+            species_pair = ["electrons", "ghost"]
+            model = "coulomb"
+        """)
+        with pytest.raises(ValidationError, match="ghost"):
+            validate_simulation_toml(doc)
+
+    def test_pair_size_strict(self) -> None:
+        doc = _minimal_doc() + dedent("""
+            [[collisions]]
+            species_pair = ["electrons"]
+            model = "coulomb"
+        """)
+        with pytest.raises(ValidationError, match="species_pair"):
+            validate_simulation_toml(doc)
+
+
+class TestPhaseSpace:
+    """``[phase_space]`` — kinetic phase-space dimensions for >3D codes."""
+
+    def test_5d_gyrokinetic(self) -> None:
+        doc = _minimal_doc(**{'type = "PIC"': 'type = "gyrokinetic"'}) + dedent("""
+            [phase_space]
+            dimensions = [4, 4, 4, 16, 8]
+            axis_labels = ["x", "y", "z", "vpar", "mu"]
+            coordinate_system = "guiding-center"
+        """)
+        s = validate_simulation_toml(doc)
+        assert s.phase_space is not None
+        assert s.phase_space.dimensions == [4, 4, 4, 16, 8]
+        assert s.phase_space.coordinate_system == "guiding-center"
+
+    def test_6d_full_vlasov(self) -> None:
+        doc = _minimal_doc(**{'type = "PIC"': 'type = "vlasov"'}) + dedent("""
+            [phase_space]
+            dimensions = [4, 4, 4, 32, 32, 32]
+            extents = [
+                [0, 4], [0, 4], [0, 4],
+                [-2e6, 2e6], [-2e6, 2e6], [-2e6, 2e6],
+            ]
+        """)
+        s = validate_simulation_toml(doc)
+        assert s.phase_space is not None
+        assert len(s.phase_space.dimensions) == 6
+
+    def test_spatial_mismatch_rejected(self) -> None:
+        # phase_space.dimensions[:3] must equal grid.dimensions
+        doc = _minimal_doc(**{'type = "PIC"': 'type = "gyrokinetic"'}) + dedent("""
+            [phase_space]
+            dimensions = [8, 8, 8, 16, 8]
+        """)
+        with pytest.raises(ValidationError, match=r"phase_space\.dimensions"):
+            validate_simulation_toml(doc)
+
+    def test_must_extend_grid(self) -> None:
+        doc = _minimal_doc(**{'type = "PIC"': 'type = "gyrokinetic"'}) + dedent("""
+            [phase_space]
+            dimensions = [4, 4]
+        """)
+        with pytest.raises(ValidationError, match="extend"):
+            validate_simulation_toml(doc)
+
+    def test_extents_axis_count_must_match(self) -> None:
+        doc = _minimal_doc(**{'type = "PIC"': 'type = "gyrokinetic"'}) + dedent("""
+            [phase_space]
+            dimensions = [4, 4, 4, 16, 8]
+            extents = [[0, 4], [0, 4], [0, 4]]
+        """)
+        with pytest.raises(ValidationError, match=r"phase_space\.extents"):
+            validate_simulation_toml(doc)
+
+
+class TestGridStretched:
+    """``[grid.stretched]`` — non-uniform per-axis cell widths (ARMS)."""
+
+    def test_single_stretched_axis(self) -> None:
+        # Cell widths: 4 entries summing to 4.0 to match upper-lower.
+        doc = _minimal_doc() + dedent("""
+            [grid.stretched.axis_widths]
+            0 = [0.4, 0.8, 1.2, 1.6]
+        """)
+        s = validate_simulation_toml(doc)
+        assert s.grid.stretched is not None
+        assert "0" in s.grid.stretched.axis_widths
+        assert s.grid.stretched.axis_widths["0"] == [0.4, 0.8, 1.2, 1.6]
+
+    def test_widths_count_mismatch_rejected(self) -> None:
+        # dimensions[0] = 4 but only 3 widths.
+        doc = _minimal_doc() + dedent("""
+            [grid.stretched.axis_widths]
+            0 = [0.5, 1.0, 2.5]
+        """)
+        with pytest.raises(ValidationError, match="dimensions"):
+            validate_simulation_toml(doc)
+
+    def test_widths_sum_mismatch_rejected(self) -> None:
+        # extent = upper - lower = 4.0, sum = 5.0.
+        doc = _minimal_doc() + dedent("""
+            [grid.stretched.axis_widths]
+            0 = [0.5, 1.0, 1.5, 2.0]
+        """)
+        with pytest.raises(ValidationError, match="sums"):
+            validate_simulation_toml(doc)
+
+    def test_axis_index_out_of_range_rejected(self) -> None:
+        doc = _minimal_doc() + dedent("""
+            [grid.stretched.axis_widths]
+            5 = [1.0, 1.0, 1.0, 1.0]
+        """)
+        with pytest.raises(ValidationError, match="axis_widths"):
+            validate_simulation_toml(doc)
+
+    def test_empty_axis_widths_rejected(self) -> None:
+        doc = _minimal_doc() + dedent("""
+            [grid.stretched]
+            axis_widths = {}
+        """)
+        with pytest.raises(ValidationError, match="at least one axis"):
+            validate_simulation_toml(doc)
+
+
+class TestOutputStreams:
+    """``[[output.streams]]`` — multi-cadence / ROI output."""
+
+    def test_basic_stream(self) -> None:
+        doc = _minimal_doc() + dedent("""
+            [[output.streams]]
+            step_interval = 10
+            dir = "./moments"
+            name = "moments"
+            quantities = ["B", "rho_c"]
+        """)
+        s = validate_simulation_toml(doc)
+        assert s.output is not None
+        assert len(s.output.streams) == 1
+        assert s.output.streams[0].name == "moments"
+        assert s.output.streams[0].region is None
+
+    def test_box_region(self) -> None:
+        doc = _minimal_doc() + dedent("""
+            [[output.streams]]
+            step_interval = 5
+            dir = "./roi"
+            name = "current_sheet"
+            quantities = ["B", "E", "J"]
+            [output.streams.region]
+            kind = "box"
+            lower = [1.0, 1.0, 1.0]
+            upper = [3.0, 3.0, 3.0]
+        """)
+        s = validate_simulation_toml(doc)
+        stream = s.output.streams[0]
+        assert stream.region is not None
+        # Pydantic discriminator yields the concrete BoxRegion.
+        assert stream.region.kind == "box"
+
+    def test_plane_region(self) -> None:
+        doc = _minimal_doc() + dedent("""
+            [[output.streams]]
+            step_interval = 1
+            dir = "./midplane"
+            name = "midplane"
+            quantities = ["B"]
+            [output.streams.region]
+            kind = "plane"
+            axis = 2
+            value = 2.0
+        """)
+        s = validate_simulation_toml(doc)
+        stream = s.output.streams[0]
+        assert stream.region is not None
+        assert stream.region.kind == "plane"
+
+    def test_duplicate_stream_names_rejected(self) -> None:
+        doc = _minimal_doc() + dedent("""
+            [[output.streams]]
+            step_interval = 10
+            dir = "./a"
+            name = "fast"
+            quantities = ["B"]
+
+            [[output.streams]]
+            step_interval = 100
+            dir = "./b"
+            name = "fast"
+            quantities = ["E"]
+        """)
+        with pytest.raises(ValidationError, match="distinct names"):
+            validate_simulation_toml(doc)
+
+    def test_box_region_axis_mismatch_rejected(self) -> None:
+        doc = _minimal_doc() + dedent("""
+            [[output.streams]]
+            step_interval = 5
+            dir = "./roi"
+            name = "bad"
+            quantities = ["B"]
+            [output.streams.region]
+            kind = "box"
+            lower = [1.0, 1.0]
+            upper = [3.0, 3.0]
+        """)
+        with pytest.raises(ValidationError, match="axes"):
+            validate_simulation_toml(doc)
+
+    def test_plane_region_axis_out_of_range_rejected(self) -> None:
+        # PlaneRegion.axis bound is 0..2 at the model level, but
+        # cross-check against grid.dimensions runs at root.
+        doc = _minimal_doc(**{"dimensions = [4, 4, 4]": "dimensions = [4, 4]"})
+        doc = doc.replace("spacing = [1.0, 1.0, 1.0]", "spacing = [1.0, 1.0]")
+        doc = doc.replace("lower = [0.0, 0.0, 0.0]", "lower = [0.0, 0.0]")
+        doc = doc.replace("upper = [4.0, 4.0, 4.0]", "upper = [4.0, 4.0]")
+        doc += dedent("""
+            [[output.streams]]
+            step_interval = 5
+            dir = "./roi"
+            name = "bad"
+            quantities = ["B"]
+            [output.streams.region]
+            kind = "plane"
+            axis = 2
+            value = 1.0
+        """)
+        with pytest.raises(ValidationError, match="plane"):
+            validate_simulation_toml(doc)
+
+    def test_precision_overrides_subset(self) -> None:
+        doc = _minimal_doc() + dedent("""
+            [[output.streams]]
+            step_interval = 10
+            dir = "./moments"
+            name = "moments"
+            quantities = ["B"]
+            [output.streams.precision_overrides]
+            E = "f64"
+        """)
+        with pytest.raises(ValidationError, match="precision_overrides"):
+            validate_simulation_toml(doc)
+
+
+class TestPerFieldBoundaryConditions:
+    """``BoundaryConditions.field_overrides`` and ``drivers_*`` foreign keys."""
+
+    def test_default_unchanged(self) -> None:
+        # Existing BC docs without overrides keep working.
+        doc = _minimal_doc() + dedent("""
+            [boundary_conditions]
+            lower = ["periodic", "periodic", "periodic"]
+            upper = ["periodic", "periodic", "periodic"]
+        """)
+        s = validate_simulation_toml(doc)
+        assert s.boundary_conditions is not None
+        assert s.boundary_conditions.field_overrides is None
+
+    def test_field_overrides(self) -> None:
+        doc = _minimal_doc() + dedent("""
+            [boundary_conditions]
+            lower = ["periodic", "periodic", "open"]
+            upper = ["periodic", "periodic", "open"]
+            [boundary_conditions.field_overrides.E]
+            lower = ["periodic", "periodic", "pml"]
+            upper = ["periodic", "periodic", "pml"]
+            [boundary_conditions.field_overrides.particles]
+            lower = ["periodic", "periodic", "absorbing"]
+            upper = ["periodic", "periodic", "absorbing"]
+        """)
+        s = validate_simulation_toml(doc)
+        bcs = s.boundary_conditions
+        assert bcs is not None
+        assert bcs.field_overrides is not None
+        assert bcs.field_overrides["E"].lower[2] == "pml"
+        assert bcs.field_overrides["particles"].lower[2] == "absorbing"
+
+    def test_field_override_axis_mismatch_rejected(self) -> None:
+        doc = _minimal_doc() + dedent("""
+            [boundary_conditions]
+            lower = ["periodic", "periodic", "periodic"]
+            upper = ["periodic", "periodic", "periodic"]
+            [boundary_conditions.field_overrides.E]
+            lower = ["periodic", "periodic"]
+            upper = ["periodic", "periodic"]
+        """)
+        with pytest.raises(ValidationError, match="field_overrides"):
+            validate_simulation_toml(doc)
+
+    def test_field_override_unknown_group_rejected(self) -> None:
+        doc = _minimal_doc() + dedent("""
+            [boundary_conditions]
+            lower = ["periodic", "periodic", "periodic"]
+            upper = ["periodic", "periodic", "periodic"]
+            [boundary_conditions.field_overrides.bogus]
+            lower = ["periodic", "periodic", "periodic"]
+            upper = ["periodic", "periodic", "periodic"]
+        """)
+        with pytest.raises(ValidationError, match="bogus"):
+            validate_simulation_toml(doc)
+
+    def test_driver_foreign_keys(self) -> None:
+        doc = _minimal_doc() + dedent("""
+            [[drivers]]
+            name = "solar_wind_inflow"
+            type = "solar_wind_timeseries"
+            coupling = "boundary"
+
+            [boundary_conditions]
+            lower = ["driven", "periodic", "periodic"]
+            upper = ["open", "periodic", "periodic"]
+            drivers_lower = { 0 = "solar_wind_inflow" }
+        """)
+        s = validate_simulation_toml(doc)
+        bcs = s.boundary_conditions
+        assert bcs is not None
+        assert bcs.drivers_lower == {"0": "solar_wind_inflow"}
+        assert bcs.drivers_upper is None
+
+    def test_driver_foreign_key_unknown_rejected(self) -> None:
+        doc = _minimal_doc() + dedent("""
+            [boundary_conditions]
+            lower = ["driven", "periodic", "periodic"]
+            upper = ["periodic", "periodic", "periodic"]
+            drivers_lower = { 0 = "does_not_exist" }
+        """)
+        with pytest.raises(ValidationError, match="does_not_exist"):
+            validate_simulation_toml(doc)
+
+    def test_drivers_axis_index_out_of_range_rejected(self) -> None:
+        doc = _minimal_doc() + dedent("""
+            [[drivers]]
+            name = "x"
+            type = "x"
+            coupling = "boundary"
+
+            [boundary_conditions]
+            lower = ["periodic", "periodic", "periodic"]
+            upper = ["periodic", "periodic", "periodic"]
+            drivers_lower = { 5 = "x" }
+        """)
+        with pytest.raises(ValidationError, match="drivers_lower"):
+            validate_simulation_toml(doc)

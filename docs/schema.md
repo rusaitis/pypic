@@ -49,18 +49,22 @@ schema_version = "1.0"   # top-level bare key — lets a streaming parser
 ### Optional sections
 
 ```toml
-[boundary_conditions]    # per-axis BC tags (lower/upper)
+[boundary_conditions]    # per-axis BC tags (lower/upper) + per-field overrides
 [physics]                # model-agnostic flags + .{pic,mhd,hybrid} sub-tables
 [[bodies]]               # registry of physical objects (planets, coils, ...)
 [initial_conditions]     # flat table: setup type + type-specific keys
 [[drivers]]              # ongoing external coupling (magnetograms, SW inflow, ...)
-[restart]                # continuation pointer
+[restart]                # continuation pointer (incl. multi-file from_files)
 [output.checkpoints]     # lossless full-state dumps
 [output.fields]          # field output cadence + quantities
 [output.particles]       # particle output cadence + selection
 [output.probes]          # probe time-series cadence
 [output.diagnostics]     # on-the-fly derived quantities
+[[output.streams]]       # multi-cadence / region-of-interest output groups
 [[probes]]               # fixed or trajectory samplers
+[velocity_mesh]          # continuum-Vlasov VDF grid metadata
+[phase_space]            # >3D phase-space grid for gyrokinetic / full Vlasov
+[[collisions]]           # per-pair collision declarations (Smilei, EPOCH, ...)
 ```
 
 ### Extensions
@@ -215,6 +219,14 @@ refinement_threshold = 0.1
 [[grid.refinement]]
 level = 2
 box   = [[-60.0, -60.0, -60.0], [60.0, 60.0, 60.0]]
+
+# Non-uniform per-axis cell widths (optional, sparse).
+# Only stretched axes appear; uniform axes inherit `[grid].spacing`.
+# Length must match `[grid].dimensions[i]` and the widths must sum to
+# `upper[i] - lower[i]` within `sum_rtol`.
+[grid.stretched.axis_widths]
+0 = [0.5, 0.6, 0.8, 1.0, 1.3]      # x stretched
+2 = [0.1, 0.1, 0.2, 0.4, 0.8]      # z log-radial (ARMS, PLUTO style)
 ```
 
 ### [boundary_conditions]
@@ -223,14 +235,31 @@ Per-axis BC tags. Array length must match `grid.dimensions` length.
 
 ```toml
 [boundary_conditions]
-lower = ["periodic", "periodic", "periodic"]
-upper = ["periodic", "periodic", "periodic"]
+lower = ["periodic", "periodic", "open"]
+upper = ["periodic", "periodic", "open"]
+
+# Per-face driver foreign keys (optional, sparse).
+# Keys are axis indices ("0"/"1"/"2"); values must match a declared
+# [[drivers]].name entry. Faces without a driver simply don't appear.
+drivers_lower = { 2 = "solar_wind_inflow" }
+
+# Per-field BC overrides (optional). Apply only to "E", "B", or
+# "particles"; each entry is a full BoundaryConditions block matching
+# the same axis count as the default.
+[boundary_conditions.field_overrides.E]
+lower = ["periodic", "periodic", "pml"]
+upper = ["periodic", "periodic", "pml"]
+
+[boundary_conditions.field_overrides.particles]
+lower = ["periodic", "periodic", "absorbing"]
+upper = ["periodic", "periodic", "absorbing"]
 ```
 
 The tag vocabulary is free-form string — it's consumed by the reader,
 not constrained by the schema (different codes use different vocabularies:
 `periodic` / `reflecting` / `conducting` / `open` / `driven` / `inflow` /
-`outflow` / `pole` / `inner` / `outer`).
+`outflow` / `pole` / `inner` / `outer` / `pml` / `absorbing` /
+`thermal-bath`).
 
 ### [units]
 
@@ -375,6 +404,10 @@ closure = "adiabatic"              # optional (fluid species) — "isothermal" |
                                    #                           | "polytropic" | "braginskii"
                                    #                           | "cgl" | "10moment" | "14moment"
 gamma_eos = 1.6666667              # optional (fluid species) — per-species adiabatic index
+gamma_eos_par = 3.0                # optional (10-moment hybrids: Gkeyll, Hakim) — parallel
+gamma_eos_perp = 2.0               # optional (10-moment hybrids) — perpendicular
+                                   # par/perp must be present together; cannot mix with
+                                   # the scalar `gamma_eos`.
 inertia = 0.0                      # optional (hybrid fluid electrons) — me/mi; 0 = massless
 shape = "cic"                      # optional (PIC) — "ngp" | "cic" | "tsc" | "pqs"
                                    #   (NGP=order 0, CIC=1, TSC=2, PQS=3; ED-PIC vocabulary)
@@ -535,6 +568,11 @@ restore = ["fields", "particles"]       # optional — partial restart selector
                                         #   must be distinct. Omitting it restores everything.
 mode = "hot"                            # optional — "hot" (full state reload) | "cold"
                                         #   (re-apply IC on saved geometry)
+from_files = [                          # optional — per-rank manifest for codes that
+    "chk_000030_rank_00000.h5",         #   write one checkpoint per MPI rank (VPIC,
+    "chk_000030_rank_00001.h5",         #   AMReX). When present, `from` typically points
+    "chk_000030_rank_00002.h5",         #   to a manifest while `from_files` enumerates
+]                                       #   the actual files. Distinct & non-empty.
 ```
 
 ### [output.*]
@@ -585,12 +623,102 @@ quantities    = ["div_B", "div_E", "|J|", "e_B", "e_E"]
 dir           = "./diagnostics"
 format        = "hdf5"
 precision     = "f32"
+
+# Multi-cadence / region-of-interest output (optional, repeatable).
+# Each stream has a unique name. `region` optionally restricts the
+# write to a sub-volume (`kind = "box"`) or plane slice
+# (`kind = "plane"`).
+[[output.streams]]
+name          = "moments"              # unique across streams
+step_interval = 10                     # 10x cadence relative to [output.fields]
+quantities    = ["B", "rho_c", "V_s0"]
+dir           = "./moments"
+format        = "hdf5"
+precision     = "f32"
+
+[[output.streams]]
+name          = "current_sheet_roi"
+step_interval = 5
+quantities    = ["B", "E", "J"]
+dir           = "./roi"
+[output.streams.region]
+kind  = "box"
+lower = [-1.0, -1.0, -0.5]            # code units, must align with grid axes
+upper = [ 1.0,  1.0,  0.5]
+
+[[output.streams]]
+name          = "midplane"
+step_interval = 1
+quantities    = ["B", "E"]
+dir           = "./midplane"
+[output.streams.region]
+kind  = "plane"
+axis  = 2                              # 0/1/2 — must be < grid.dimensions length
+value = 0.0
 ```
 
 See `examples/ipic3d-double-harris.toml` for a complete mapping from
 iPIC3D input to this schema, and `pypic.simulation.toml` at the repo
 root for the annotated reference template (three scenarios: PIC, MHD,
 hybrid).
+
+### [velocity_mesh]
+
+Continuum-Vlasov velocity-grid metadata (Vlasiator, Gkeyll Vlasov-Maxwell).
+Required when ``[model].type = "vlasov"`` and the run writes VDFs.
+
+```toml
+[velocity_mesh]
+dimensions = [50, 50, 50]              # cells per velocity-axis (1..3 entries)
+extent     = [                          # [v_min, v_max] per axis (m/s in SI)
+    [-2.0e6, 2.0e6],
+    [-2.0e6, 2.0e6],
+    [-2.0e6, 2.0e6],
+]
+block_size = [10, 10, 10]              # optional — sparse-block factor; must
+                                       #   evenly divide each `dimensions` entry
+sparsity_threshold = 1.0e-15           # optional — density floor below which
+                                       #   blocks are dropped from disk
+coordinate_system  = "cartesian"       # optional — "cartesian" (default) |
+                                       #   "spherical-velocity"
+```
+
+### [phase_space]
+
+Augmented phase-space dimensionality for >3D kinetic codes — gyrokinetic
+(GENE, GS2, GX, Gkeyll-GK: 5D = 3 spatial + 2 velocity), full continuum
+Vlasov (6D phase space). The first ``n`` dimensions must match
+``[grid].dimensions`` exactly: ``[grid]`` owns the spatial sub-grid;
+``[phase_space]`` extends it with velocity / extra-D axes.
+
+```toml
+[phase_space]
+dimensions  = [4, 4, 4, 16, 8]         # 5D: 3 spatial + 2 velocity
+                                       # First 3 must match [grid].dimensions.
+axis_labels = ["x", "y", "z", "vpar", "mu"]
+extents     = [                         # optional — per-axis [lower, upper]
+    [0.0, 4.0], [0.0, 4.0], [0.0, 4.0],
+    [-3.0, 3.0], [0.0, 5.0],
+]
+coordinate_system = "guiding-center"   # optional — "cartesian" (default) |
+                                       #   "guiding-center" | "field-aligned" |
+                                       #   "spherical-velocity"
+```
+
+### [[collisions]]
+
+Per-pair collision declaration for collisional PIC codes (Smilei,
+EPOCH, OSIRIS-collisional, PIConGPU). Repeatable. Both species in
+``species_pair`` must match a declared ``[[species]].name``;
+self-collisions (same species twice) are permitted.
+
+```toml
+[[collisions]]
+species_pair    = ["electrons", "ions"]
+model           = "coulomb"            # "coulomb" | "bgk" | "monte-carlo"
+coulomb_log     = 10.0                 # optional — Λ for Coulomb collisions
+temperature_ref = 1.0                  # optional — reference T for the rate scale
+description     = "..."                # optional
 
 ### [[probes]]
 
