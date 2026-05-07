@@ -915,20 +915,17 @@ groups work the same way: `"EF_s0"` expands to
 `EF1_s0, EF2_s0, EF3_s0`. The e/i convenience forms (`"EFe"`,
 `"EFi"`, `"KEFe"`, `"HFi"`, ...) resolve to the corresponding
 per-species prefix and then expand. Derived quantities expand to
-their dependencies: `"Pi"` loads the ion pressure tensor components
-`P11_s1`..`P33_s1`.
+their dependencies: `"Pi"` loads the six ion pressure tensor
+components, `"P_par"` loads the six total-pressure tensor
+components plus `B1`..`B3`.
 
-Two non-obvious rules of the expansion:
-
-- **Diagonal tensor pickup.** Requesting any diagonal pressure
-  component (`P11` / `P22` / `P33`, with or without an `_sN`
-  suffix) auto-includes the other five components of the same
-  tensor. This keeps a single `read()` enough to compute
-  `P_par` / `P_perp` / `agyrotropy` later.
-- **What does *not* expand.** Already-resolved single-component
-  aliases (`"Bx"`, `"Br"`, `"E_phi"`) and names whose prefix
-  already ends in a digit (`"B1"`, `"P11_s1"`) are passed through
-  as scalars.
+What does *not* expand: already-resolved single-component aliases
+(`"Bx"`, `"Br"`, `"E_phi"`) and names whose prefix already ends in
+a digit (`"B1"`, `"P11_s1"`) are passed through as scalars. In
+particular, requesting `"P11"` alone loads only `P11` — if a later
+`compute("P_par")` / `"P_perp"` / `"agyrotropy"` needs the full
+tensor, request the tensor explicitly via `"Pi"` / `"Pe"` /
+`"P_sN"`, or request the derived quantity itself.
 
 The same expansion rules apply to `[output.fields].quantities` —
 listing `"B"` writes `B1`, `B2`, `B3`; listing `"Pi"` writes the six

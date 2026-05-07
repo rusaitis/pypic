@@ -372,21 +372,13 @@ class Simulation:
                     if not prefix[-1:].isdigit():
                         for c in ("1", "2", "3"):
                             expanded.add(f"{prefix}{c}{species}")
-                # Expand compute dependencies: "Pi" → "P11_s1","P22_s1","P33_s1"
+                # Expand compute dependencies: "Pi" → all six P_s1 tensor
+                # components; "P_par" → all six P tensor components + B.
+                # Asking for P11 alone *does not* implicitly load the
+                # off-diagonals — request "Pi"/"Pe"/"P_sN"/"P_par"
+                # explicitly when downstream P_par/P_perp/agyrotropy
+                # need the full tensor.
                 expanded |= field_dependencies(resolved)
-
-            # If any diagonal tensor components were requested (P11, P22, P33
-            # or P11_sN etc.), also include the off-diagonals so that
-            # P_par/P_perp/agyrotropy can be computed from the same load.
-            _diag_re = re.compile(r"^P(11|22|33)(_s\d+)?$")
-            suffixes: set[str] = set()
-            for f in list(expanded):
-                m = _diag_re.match(f)
-                if m:
-                    suffixes.add(m.group(2) or "")
-            for s in suffixes:
-                for ij in ("11", "12", "13", "22", "23", "33"):
-                    expanded.add(f"P{ij}{s}")
 
             canonical = expanded
 
