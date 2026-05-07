@@ -13,7 +13,6 @@ from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
-from pypic import __version__
 from pypic.coordinates.geometry import GEOMETRY_BY_NAME
 from pypic.coordinates.transforms import FrameTransform
 from pypic.grid import GridInfo
@@ -336,30 +335,40 @@ def _from_json_native(obj: Any) -> Any:  # noqa: ANN401
     return obj
 
 
-# Zarr layout discriminator.  ``"v1"`` is the DataTree-based layout
-# (fields under ``/fields``, metadata flat at the root group's attrs).
-# ``"v0"`` was the original layout (fields at root, metadata nested
-# under ``attrs["pypic"]``); read-only support is retained so stores
-# written by older pypic versions still load.
-LAYOUT_VERSION = "v1"
+# Storage layout discriminator.  Mirrors ``schema_version`` from
+# ``simulation.toml`` — the storage layout (Zarr DataTree with fields
+# under ``/fields`` and metadata flat at root) is part of the schema
+# v1.0 contract documented in schema.md §4.2.  Bumping the schema
+# version is the single coordinated way to evolve both vocabulary and
+# storage shape together.
+SCHEMA_VERSION = "1.0"
+
+# Read-time discriminators recognised on root attrs.  ``schema_version``
+# is the current discriminator; ``pypic_layout`` was the brief
+# transitional name used between yesterday's flat-attrs work and the
+# rename to schema_version (read-only support so stores written in that
+# window still load).  ``pypic`` is the original v0 umbrella key.
+_FLAT_LAYOUT_KEYS = ("schema_version", "pypic_layout")
+_LEGACY_UMBRELLA_KEY = "pypic"
 
 
 def encode_pypic_attrs(fds: FieldDataset) -> dict[str, Any]:
-    """Assemble FieldDataset metadata into the v1 root-group attrs dict.
+    """Assemble FieldDataset metadata into the schema-v1.0 root-group attrs dict.
 
     The returned dict is stamped as ``xr.DataTree.attrs`` (which writes
     it onto the Zarr root group's attrs) when writing.  Each section is
     a top-level key so cross-language consumers can read e.g.
-    ``store.attrs["grid"]`` without going through a ``pypic`` umbrella.
+    ``store.attrs["grid"]`` without going through any pypic-specific
+    umbrella.
 
-    The ``pypic_layout`` key discriminates layout versions; the
-    ``pypic_version`` key records the writer.  Other keys are the same
-    section dicts produced by the per-section encoders (``grid_to_dict``,
-    ``normalization_to_dict``, ...).
+    The single ``schema_version`` key carries the same value as
+    ``simulation.toml``'s top-level ``schema_version`` and discriminates
+    both vocabulary and storage layout in one go (see schema.md §4.2).
+    Other keys are the same section dicts produced by the per-section
+    encoders (``grid_to_dict``, ``normalization_to_dict``, ...).
     """
     return {
-        "pypic_layout": LAYOUT_VERSION,
-        "pypic_version": __version__,
+        "schema_version": SCHEMA_VERSION,
         "grid": grid_to_dict(fds.grid),
         "normalization": normalization_to_dict(fds.normalization),
         "species": species_to_list(fds.species),
@@ -383,29 +392,30 @@ def decode_pypic_attrs(
 ]:
     """Unpack root-group attrs into the components needed by FieldDataset.
 
-    Accepts both layouts:
+    Accepts three layouts on read so older stores keep loading:
 
-    * **v1** — flat keys at the top level with a ``pypic_layout``
-      discriminator (current writers).
-    * **v0** — nested ``d["pypic"] = {...}`` form (legacy writers
-      pre-2026.05).  Decoded transparently for back-compat.
+    * **schema-v1.0** — flat keys at the top level with a
+      ``schema_version`` discriminator (current writers).
+    * **transitional flat** — same shape but with the brief
+      ``pypic_layout`` discriminator from the day-1 flatten work.
+    * **v0 umbrella** — nested ``d["pypic"] = {...}`` form (pre-flatten
+      writers).  Inner dict has the same section keys as the flat
+      layouts minus the discriminator.
 
     Returns
     -------
     tuple
         (grid, normalization, species, physics, metadata, frame, transforms)
     """
-    if "pypic_layout" in d:
+    if any(k in d for k in _FLAT_LAYOUT_KEYS):
         attrs = d
-    elif "pypic" in d:
-        # v0 legacy: unwrap.  Pre-2026.05 writers nested everything under
-        # an ``attrs["pypic"]`` umbrella; the inner dict has the same
-        # section keys as v1 minus ``pypic_layout``.
-        attrs = d["pypic"]
+    elif _LEGACY_UMBRELLA_KEY in d:
+        attrs = d[_LEGACY_UMBRELLA_KEY]
     else:
         msg = (
             "No pypic metadata found in store attrs (expected "
-            "``pypic_layout`` for v1 stores or ``pypic`` for legacy v0)"
+            "``schema_version`` for current stores, ``pypic_layout`` "
+            "for transitional stores, or ``pypic`` for legacy v0)"
         )
         raise ValueError(msg)
     grid = dict_to_grid(attrs["grid"])

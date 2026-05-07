@@ -38,10 +38,13 @@ _log = logging.getLogger(__name__)
 
 # Root-attrs keys reserved for pypic metadata.  Stripped from any
 # Dataset before it is handed to ``FieldDataset`` so layout-bookkeeping
-# attrs don't leak as user-visible.  Both v0 (``pypic`` umbrella) and
-# v1 (flat) keys are listed.
+# attrs don't leak as user-visible.  Includes the current
+# ``schema_version`` discriminator, both transitional and v0 keys
+# (``pypic_layout``, ``pypic``, ``pypic_version``) for back-compat,
+# and the section dicts.
 _PYPIC_ROOT_ATTR_KEYS = frozenset(
     {
+        "schema_version",
         "pypic",
         "pypic_layout",
         "pypic_version",
@@ -104,21 +107,27 @@ def _open_v1_or_v0(
 
     Auto-detects layout:
 
-    * **v1** — root group has ``pypic_layout`` attr; open ``/fields``
-      child as the data Dataset.
-    * **v0** — root group carries ``attrs["pypic"]``; field arrays sit
-      at the root, so the root Dataset *is* the fields Dataset.
+    * **schema-v1.0 (current)** — root group has ``schema_version``
+      attr; open ``/fields`` child as the data Dataset.
+    * **transitional** — root group has ``pypic_layout`` attr (the
+      brief day-1 name); same shape as the current layout.
+    * **v0 umbrella (legacy)** — root group carries ``attrs["pypic"]``;
+      field arrays sit at the root, so the root Dataset *is* the
+      fields Dataset.
 
     Uses ``consolidated="auto"`` so consolidated stores get the
     one-shot metadata read while non-consolidated stores still load.
     """
     tree = xr.open_datatree(store, engine="zarr", consolidated="auto")
     root_attrs = dict(tree.attrs)
-    if root_attrs.get("pypic_layout"):
+    has_flat_discriminator = "schema_version" in root_attrs or root_attrs.get(
+        "pypic_layout"
+    )
+    if has_flat_discriminator:
         if "fields" not in tree.children:
             msg = (
-                f"{source_label}: pypic_layout declared but no /fields "
-                f"group present"
+                f"{source_label}: schema_version/pypic_layout declared "
+                f"but no /fields group present"
             )
             raise ValueError(msg)
         return tree["fields"].to_dataset(), root_attrs
@@ -128,13 +137,14 @@ def _open_v1_or_v0(
         if tree.has_data:
             return tree.to_dataset(), root_attrs
         # An empty root with a stray ``pypic`` attr is a corrupt v0
-        # store, but treat it the same as an empty v1: build an empty
-        # Dataset so the caller's metadata decode is the only failure
-        # mode the user sees.
+        # store, but treat it the same as an empty current store: build
+        # an empty Dataset so the caller's metadata decode is the only
+        # failure mode the user sees.
         return xr.Dataset(), root_attrs
     msg = (
         f"{source_label}: no pypic metadata found (expected "
-        f"``pypic_layout`` for v1 stores or ``pypic`` for legacy v0)"
+        f"``schema_version`` for current stores, ``pypic_layout`` for "
+        f"transitional stores, or ``pypic`` for legacy v0)"
     )
     raise ValueError(msg)
 
@@ -368,8 +378,10 @@ def to_zarr(
     r"""Write a FieldDataset to a Zarr v3 store.
 
     All pypic metadata (grid, normalization, species, physics, frame,
-    transforms) is serialized into ``xr.Dataset.attrs["pypic"]`` so
-    that ``from_zarr`` can reconstruct the full object.
+    transforms) is serialized as flat keys on the root group's attrs
+    alongside a ``schema_version`` discriminator (see schema.md §4.2),
+    so that ``from_zarr`` — and any non-pypic consumer — can
+    reconstruct the full object straight from the store.
 
     Parameters
     ----------

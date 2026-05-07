@@ -1114,7 +1114,8 @@ cross-tool layout — what the Rust simulation code emits and what every
 file-based reader translates *into*.  **Zarr (§4.2)** is what the
 Python writer (`pypic.io.to_zarr` / `to_zarr_timeseries`) produces:
 fields under `/fields`, metadata as flat keys on the root group's
-attrs, with a `pypic_layout` discriminator.  Both use the same
+attrs, discriminated by the same `schema_version` value that
+`simulation.toml` carries at its top level.  Both use the same
 **numbered canonical field names** (`B1`, `B2`, `B3`) and the same
 section-level metadata vocabulary; the difference is the storage
 container's group conventions (HDF5 groups vs Zarr DataTree).
@@ -1178,17 +1179,18 @@ layout directly.
 laid out as an xarray `DataTree`: the field arrays live under a
 `/fields` child group (mirroring §4.1's `/fields/` HDF5 group); the
 metadata sections sit as flat keys on the root group's attrs, with a
-`pypic_layout` discriminator naming the layout version.  Consolidated
-metadata is enabled — readers go through `consolidated="auto"` for
-the one-shot metadata fetch when the writer left a consolidated
-index, and fall back to listing for non-consolidated stores.
+`schema_version` value that mirrors `simulation.toml`'s top-level
+`schema_version` and discriminates both the on-disk shape and the
+metadata vocabulary in one go.  Consolidated metadata is enabled —
+readers go through `consolidated="auto"` for the one-shot metadata
+fetch when the writer left a consolidated index, and fall back to
+listing for non-consolidated stores.
 
 ```
 my_store.zarr/                         # Zarr v3 group root
 │
 ├── attrs (flat root metadata):
-│   ├── pypic_layout:  "v1"            # layout discriminator
-│   ├── pypic_version: "0.x.y"         # writing pypic version
+│   ├── schema_version: "1.0"          # mirrors simulation.toml
 │   ├── grid:          { dimensions, spacing, origin, dt,
 │   │                    boundary, surviving_axes,
 │   │                    geometry: { type, axis_names, axis_units } }
@@ -1231,7 +1233,7 @@ write; user-supplied `encoding=` overrides per variable.
 
 **Mapping to §4.1 (HDF5).**
 
-| Aspect | §4.1 HDF5 | §4.2 Zarr (v1) |
+| Aspect | §4.1 HDF5 | §4.2 Zarr |
 |---|---|---|
 | Field path | `/fields/B1` | `/fields/B1` |
 | Grid metadata | `/grid/` group with attrs | root `attrs.grid` (JSON) |
@@ -1239,7 +1241,7 @@ write; user-supplied `encoding=` overrides per variable.
 | Coord arrays | from grid attrs | `/fields/{x,y,z}` (1-D) |
 | `time` / `step` | top-level scalar attrs | `time` dim (multi-step) |
 | Files per write | one per timestep | one store, all steps |
-| Layout discriminator | (none) | root `attrs.pypic_layout = "v1"` |
+| Schema version | (implicit; per file) | root `attrs.schema_version = "1.0"` |
 
 **Reading without pypic.**  A non-pypic consumer (JS WebGPU viewer,
 Rust `zarrs` pipeline) opens the root group, reads the section dicts
@@ -1248,11 +1250,16 @@ field arrays from `/fields/<name>`.  No Python or pypic library
 required.  Coordinate arrays under `/fields` make the data
 self-describing in CF/COARDS terms.
 
-**Backward compatibility (v0).**  Stores written by pypic before the
-layout change carry an `attrs["pypic"]` umbrella dict with field
-arrays at the root group.  `from_zarr` auto-detects this layout via
-the absence of `pypic_layout` and the presence of `pypic`, and
-decodes transparently.  Writers always emit v1.
+**Backward compatibility.**  `from_zarr` recognises three layouts:
+
+* `schema_version` at root (current writers, mirrors
+  `simulation.toml`).
+* `pypic_layout` at root (transitional flat-attrs writers from the
+  schema-version rename window).
+* `pypic` umbrella dict at root with field arrays alongside it
+  (legacy v0 writers, pre-flatten).
+
+Writers always emit `schema_version`.
 
 **Field naming invariant (both layouts).**  Stored arrays use the
 numbered canonical names (`B1`, `B2`, `B3`).  Geometry- and

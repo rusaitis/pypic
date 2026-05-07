@@ -402,14 +402,53 @@ class TestToZarrFromZarr:
         store = tmp_path / "v1.zarr"
         to_zarr(fds, store)
         root = zarr.open_group(str(store), mode="r")
-        assert root.attrs["pypic_layout"] == "v1"
+        # ``schema_version`` mirrors ``simulation.toml`` and is the
+        # single discriminator for both vocabulary and storage shape.
+        assert root.attrs["schema_version"] == "1.0"
+        # No legacy/transitional discriminators or writer-trace fields.
+        assert "pypic_layout" not in root.attrs
+        assert "pypic_version" not in root.attrs
+        assert "pypic" not in root.attrs
         # Field arrays under /fields, not at the root.
         assert list(root.array_keys()) == []
         assert "fields" in list(root.group_keys())
-        # Metadata sections flat at root, not nested under "pypic".
+        # Metadata sections flat at root.
         for key in ("grid", "normalization", "physics", "frame", "transforms"):
             assert key in root.attrs, f"missing root attr {key!r}"
-        assert "pypic" not in root.attrs
+
+    def test_transitional_pypic_layout_read(self, tmp_path):
+        # Stores written during the brief day-1 flat-attrs window
+        # carry ``pypic_layout = "v1"`` instead of ``schema_version``.
+        # ``from_zarr`` must keep loading them.
+        import xarray as xr
+
+        from pypic.io._serialize import (
+            grid_to_dict,
+            normalization_to_dict,
+            physics_to_dict,
+            species_to_list,
+            transforms_to_dict,
+        )
+
+        fds = make_test_dataset({"B1": np.full((4, 3, 2), 2.5)})
+        ds = fds.xr.copy(deep=False)
+        store = tmp_path / "transitional.zarr"
+        tree = xr.DataTree.from_dict({"fields": ds})
+        tree.attrs = {
+            "pypic_layout": "v1",
+            "pypic_version": "transitional-test",
+            "grid": grid_to_dict(fds.grid),
+            "normalization": normalization_to_dict(fds.normalization),
+            "species": species_to_list(fds.species),
+            "physics": physics_to_dict(fds.physics),
+            "metadata": {},
+            "frame": fds.frame,
+            "transforms": transforms_to_dict(dict(fds.transforms)),
+        }
+        tree.to_zarr(str(store), mode="w", consolidated=True, zarr_format=3)
+
+        loaded = from_zarr(store)
+        np.testing.assert_array_equal(loaded["B1"], 2.5)
 
     def test_v0_legacy_read(self, tmp_path):
         # A store hand-built in the pre-2026.05 layout (fields at root,
