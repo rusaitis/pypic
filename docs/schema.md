@@ -1112,10 +1112,12 @@ not simulation — restart regeneration is out of scope.
 Two on-disk layouts are defined: **HDF5 (§4.1)** is the canonical
 cross-tool layout — what the Rust simulation code emits and what every
 file-based reader translates *into*.  **Zarr (§4.2)** is what the
-Python writer (`pypic.io.to_zarr` / `to_zarr_timeseries`) produces;
-it is xarray-flavored and deliberately not byte-compatible with §4.1.
-Both use the same **numbered canonical field names** (`B1`, `B2`,
-`B3`); they differ in how metadata is grouped on disk.
+Python writer (`pypic.io.to_zarr` / `to_zarr_timeseries`) produces:
+fields under `/fields`, metadata as flat keys on the root group's
+attrs, with a `pypic_layout` discriminator.  Both use the same
+**numbered canonical field names** (`B1`, `B2`, `B3`) and the same
+section-level metadata vocabulary; the difference is the storage
+container's group conventions (HDF5 groups vs Zarr DataTree).
 
 ### 4.1 HDF5 Output Layout
 
@@ -1172,72 +1174,85 @@ layout directly.
 
 ### 4.2 Zarr Output Layout
 
-What `pypic.io.to_zarr` and `to_zarr_timeseries` produce today.  This
-is an xarray-conventional Zarr v3 store, **not** a 1:1 translation of
-§4.1 — kept lossless for pypic-internal round-trips
-(`to_zarr → from_zarr` reconstructs the exact `FieldDataset`) but
-diverges from the HDF5 grouping in three ways noted below.
+`pypic.io.to_zarr` and `to_zarr_timeseries` produce a Zarr v3 store
+laid out as an xarray `DataTree`: the field arrays live under a
+`/fields` child group (mirroring §4.1's `/fields/` HDF5 group); the
+metadata sections sit as flat keys on the root group's attrs, with a
+`pypic_layout` discriminator naming the layout version.  Consolidated
+metadata is enabled — readers go through `consolidated="auto"` for
+the one-shot metadata fetch when the writer left a consolidated
+index, and fall back to listing for non-consolidated stores.
 
 ```
 my_store.zarr/                         # Zarr v3 group root
 │
-├── B1, B2, B3, ...                    # field arrays at root,
-├── E1, E2, E3, ...                    #   not under `/fields/`
-├── rho_c, rho_m, J1, ..., u1, u2, u3
+├── attrs (flat root metadata):
+│   ├── pypic_layout:  "v1"            # layout discriminator
+│   ├── pypic_version: "0.x.y"         # writing pypic version
+│   ├── grid:          { dimensions, spacing, origin, dt,
+│   │                    boundary, surviving_axes,
+│   │                    geometry: { type, axis_names, axis_units } }
+│   ├── normalization: { length_ref, time_ref, velocity_ref,
+│   │                    b_field_ref, e_field_ref, density_ref,
+│   │                    mass_ref, charge_ref }
+│   ├── species:       [ { name, charge, mass, ... }, ... ]
+│   ├── physics:       { gamma, c, relativistic }
+│   ├── frame:         "simulation"
+│   ├── transforms:    { <name>: { origin, rotation, scale, ... }, ... }
+│   └── metadata:      { ... reader-specific scalars,
+│                         StaggerInfo as tagged dict ... }
 │
-└── attrs:
-    ├── pypic:                         # all pypic metadata under this one
-    │   ├── pypic_version              #   key (a single JSON dict)
-    │   ├── grid:
-    │   │   ├── dimensions, spacing, origin, dt
-    │   │   ├── boundary, surviving_axes
-    │   │   └── geometry: { type, axis_names, axis_units }
-    │   ├── normalization:             # 8 scalar refs (length, time,
-    │   │   ├── length_ref, time_ref   #   velocity, b_field, e_field,
-    │   │   ├── velocity_ref           #   density, mass, charge)
-    │   │   ├── b_field_ref, e_field_ref
-    │   │   ├── density_ref, mass_ref, charge_ref
-    │   ├── species:    [ ... per-species dicts ... ]
-    │   ├── physics:    { gamma, c, relativistic }
-    │   ├── frame:      "simulation"
-    │   ├── transforms: { <name>: { origin, rotation, scale, ... }, ... }
-    │   └── metadata:   { ... reader-specific scalars,
-    │                       StaggerInfo as tagged dict ... }
-    └── (no other top-level keys)
+└── fields/                             # /fields child group
+    ├── B1, B2, B3, ...                 # field arrays
+    ├── E1, E2, E3, ..., rho_c, rho_m, J1, ..., u1, u2, u3
+    ├── x, y, z                         # 1-D coordinate arrays
+    │                                   #   (axis names match geometry)
+    └── time                            # only for multi-step writes
 ```
 
-**Multi-step (timeseries).**  `to_zarr_timeseries` writes a single
-store with an additional `time` dimension on every field array,
-shape `(nt, n1, n2, n3)`.  `mode="a", append_dim="time"` appends one
-timestep per call; the writer enforces a constant field set and
-constant identity attrs (grid, normalization, species, physics,
-frame, transforms) across appends and intersects per-step
-`metadata` to keys whose values are stable across steps.
+**Per-array attrs.**  Each field array under `/fields/` carries
+xarray-style metadata: `long_name`, `units`, `quantity_type`,
+`si_unit`, `latex`, and the openPMD-style `unit_dimension` 7-tuple
+when the field has a registered SI dimension.
 
-**Codecs.**  Default is `BloscCodec(cname="zstd", clevel=5,
-shuffle="bitshuffle")` per-variable.  `dtype="float32"` downcasts on
+**Multi-step (timeseries).**  `to_zarr_timeseries` extends every
+field array with a leading `time` dimension, shape `(nt, n1, n2, n3)`,
+chunked so reading one timestep is O(1).  Step 1 writes the
+`DataTree` with `mode="w"` (stamps root attrs); steps 2..N append
+directly to `/fields` via `mode="a", append_dim="time"`.  The writer
+enforces a constant field set and constant identity attrs (grid,
+normalization, species, physics, frame, transforms) across appends,
+and intersects per-step `metadata` to the keys whose values are
+stable across all timesteps.
+
+**Codecs.**  Default per-variable codec: `BloscCodec(cname="zstd",
+clevel=5, shuffle="bitshuffle")`.  `dtype="float32"` downcasts on
 write; user-supplied `encoding=` overrides per variable.
 
-**Differences from §4.1 (HDF5 layout).**
+**Mapping to §4.1 (HDF5).**
 
-| Aspect | §4.1 HDF5 | §4.2 Zarr |
+| Aspect | §4.1 HDF5 | §4.2 Zarr (v1) |
 |---|---|---|
-| Field path | `/fields/B1` | `/B1` (root) |
-| Grid metadata | `/grid/` group with attrs | `attrs.pypic.grid` (JSON) |
-| Normalization | `/normalization/` group | `attrs.pypic.normalization` |
-| `time` / `step` | top-level scalar attrs | `time` dim (multi-step), no `step` attr |
+| Field path | `/fields/B1` | `/fields/B1` |
+| Grid metadata | `/grid/` group with attrs | root `attrs.grid` (JSON) |
+| Normalization | `/normalization/` group | root `attrs.normalization` |
+| Coord arrays | from grid attrs | `/fields/{x,y,z}` (1-D) |
+| `time` / `step` | top-level scalar attrs | `time` dim (multi-step) |
 | Files per write | one per timestep | one store, all steps |
-| Field set | enumerated standard set | whatever's in `data_vars` |
+| Layout discriminator | (none) | root `attrs.pypic_layout = "v1"` |
 
-**Cross-language consumer note.**  Tools that read pypic Zarr stores
-without going through `from_zarr` (a JS WebGPU viewer, a Rust
-`zarrs`-based pipeline, ...) need to know the metadata lives in
-`attrs.pypic.<section>` as JSON, not in distinct groups.  Aligning
-§4.2 with §4.1's grouping is tracked as future work — it would let
-the same consumer code service both formats — and remains deferred
-until a Zarr-only consumer actually arrives.  Until then, treat
-§4.1 as the canonical cross-tool contract and §4.2 as the pypic
-serialization format.
+**Reading without pypic.**  A non-pypic consumer (JS WebGPU viewer,
+Rust `zarrs` pipeline) opens the root group, reads the section dicts
+straight from `attrs.grid` / `attrs.normalization` / etc., and reads
+field arrays from `/fields/<name>`.  No Python or pypic library
+required.  Coordinate arrays under `/fields` make the data
+self-describing in CF/COARDS terms.
+
+**Backward compatibility (v0).**  Stores written by pypic before the
+layout change carry an `attrs["pypic"]` umbrella dict with field
+arrays at the root group.  `from_zarr` auto-detects this layout via
+the absence of `pypic_layout` and the presence of `pypic`, and
+decodes transparently.  Writers always emit v1.
 
 **Field naming invariant (both layouts).**  Stored arrays use the
 numbered canonical names (`B1`, `B2`, `B3`).  Geometry- and

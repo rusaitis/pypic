@@ -19,7 +19,9 @@ from pypic.io._guard import ensure_icechunk
 from pypic.io._serialize import encode_pypic_attrs
 from pypic.io.zarr import (
     _build_encoding,
+    _datatree_encoding,
     _ds_to_field_dataset,
+    _open_v1_or_v0,
     _resolve_timeseries_pairs,
     _write_timeseries_steps,
 )
@@ -194,14 +196,19 @@ def to_zarr_icechunk(
         session = repo.writable_session(branch)
 
         ds = fds.xr.copy(deep=False)
-        ds.attrs["pypic"] = encode_pypic_attrs(fds)
+        tree = xr.DataTree.from_dict({"fields": ds})
+        tree.attrs = encode_pypic_attrs(fds)
 
-        ds.to_zarr(
+        # Icechunk doesn't support Zarr's consolidated metadata
+        # (snapshots already act as the equivalent index), so leave it
+        # off here even though plain-Zarr writes use ``consolidated=True``.
+        ds_encoding = _build_encoding(ds, dtype, encoding)
+        tree.to_zarr(
             session.store,
-            zarr_format=3,
-            consolidated=False,
             mode="w",
-            encoding=_build_encoding(ds, dtype, encoding),
+            consolidated=False,
+            encoding=_datatree_encoding(ds_encoding),
+            zarr_format=3,
         )
 
         n_fields = len(ds.data_vars)
@@ -267,8 +274,8 @@ def from_zarr_icechunk(
     else:
         session = repo.readonly_session(branch=branch or "main")
 
-    ds = xr.open_zarr(session.store, consolidated=False)
-    return _ds_to_field_dataset(ds, f"Icechunk store at {path}")
+    ds, root_attrs = _open_v1_or_v0(session.store, f"Icechunk store at {path}")
+    return _ds_to_field_dataset(ds, root_attrs, f"Icechunk store at {path}")
 
 
 def to_zarr_timeseries_icechunk(
@@ -338,14 +345,24 @@ def to_zarr_timeseries_icechunk(
 
     try:
         pypic_attrs = _write_timeseries_steps(
-            pairs, session.store, dtype=dtype, encoding=encoding
+            pairs,
+            session.store,
+            dtype=dtype,
+            encoding=encoding,
+            consolidated=False,
         )
         if pypic_attrs is None:
             msg = "No timesteps to write — source yielded zero items."
             raise ValueError(msg)
 
-        store = zarr.open_group(session.store, mode="r+")
-        store.attrs["pypic"] = pypic_attrs
+        # Restamp the cross-step metadata intersection on the root group;
+        # ``_write_timeseries_steps`` wrote step-1's metadata via the
+        # DataTree but the running intersection is the only set true at
+        # every step.  Icechunk persists attribute writes within the
+        # same writable session, so the commit below picks them up.
+        root = zarr.open_group(session.store, mode="r+")
+        for key, value in pypic_attrs.items():
+            root.attrs[key] = value
 
         if message is None:
             message = "pypic: write timeseries"

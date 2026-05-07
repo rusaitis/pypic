@@ -43,8 +43,18 @@ Each step produces something testable. No step starts until the previous step's 
 ## Phase 8: Modern I/O Formats
 
 - [x] **Step 24: `pypic.io` — Zarr export/import for FieldDataset**
-  Zarr v3 + xarray for chunked, self-describing field data storage. Two write modes:
-  - `to_zarr(fds, path)` — single timestep. Leverages `xr.Dataset.to_zarr()` with pypic metadata (grid, normalization, species, physics, frame) serialized to `xr.Dataset.attrs` as JSON-compatible dicts. Writes with `zarr_format=3, consolidated=False`.
+  Zarr v3 + xarray DataTree for chunked, self-describing field data
+  storage.  Layout v1 (post-2026.05): fields under ``/fields`` (mirroring
+  schema.md §4.1's HDF5 grouping), pypic metadata as flat keys at the root
+  group's attrs (``grid``, ``normalization``, ``physics``, ...), with a
+  ``pypic_layout: "v1"`` discriminator.  Cross-language consumers
+  (JS/Rust) can read the layout without going through pypic.
+  Consolidated metadata (``consolidated=True`` on writes,
+  ``consolidated="auto"`` on reads) gives a one-shot metadata fetch.
+  Two write modes:
+  - `to_zarr(fds, path)` — single timestep. Builds an `xr.DataTree`
+    from `{"fields": fds.xr}`, stamps root attrs from
+    `encode_pypic_attrs(fds)`, calls `tree.to_zarr(...)`.
   - `to_zarr_timeseries(simulation, path, *, steps, fields)` — multi-timestep store with `time` as a dimension. Each field becomes `(nt, nx, ny, nz)`, chunked along `time` so reading one step is O(1). Enables time-series analysis without scanning separate files.
   `from_zarr(path) -> FieldDataset` reconstructs everything including per-field metadata. Returns lazy-loading dataset by default (`xr.open_zarr` is lazy — reading one field doesn't touch others). For multi-variable stores, async concurrent metadata fetching via `zarr.config.set({'async.concurrency': 128})` delivers up to 14× speedup.
   **Naming:** Canonical numbered names (`B1`, `B2`, `B3`) in the stored format, not geometry-specific (`Bx`, `Br`). Geometry is in metadata; aliases resolve on load. Consistent with HDF5 layout (schema.md § 4).

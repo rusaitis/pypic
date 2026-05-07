@@ -361,7 +361,7 @@ class TestToZarrFromZarr:
         ds = xr.Dataset({"B1": xr.DataArray(np.ones(4))})
         store = tmp_path / "no_meta.zarr"
         ds.to_zarr(str(store), zarr_format=3, consolidated=False)
-        with pytest.raises(ValueError, match="No 'pypic' metadata"):
+        with pytest.raises(ValueError, match="no pypic metadata found"):
             from_zarr(store)
 
     def test_failed_write_cleans_up_fresh_store(self, tmp_path):
@@ -393,6 +393,58 @@ class TestToZarrFromZarr:
         loaded = from_zarr(store)
         assert loaded.xr["B1"].attrs["unit_dimension"] == [0, 1, -2, -1, 0, 0, 0]
         assert loaded.xr["rho_m"].attrs["unit_dimension"] == [-3, 1, 0, 0, 0, 0, 0]
+
+    def test_layout_v1_structure(self, tmp_path):
+        # Validate the on-disk shape — the contract a non-pypic Zarr
+        # consumer (a JS WebGPU viewer, a Rust zarrs pipeline) reads
+        # against — not just that ``from_zarr`` round-trips.
+        fds = make_test_dataset({"B1": np.ones((4, 3, 2))})
+        store = tmp_path / "v1.zarr"
+        to_zarr(fds, store)
+        root = zarr.open_group(str(store), mode="r")
+        assert root.attrs["pypic_layout"] == "v1"
+        # Field arrays under /fields, not at the root.
+        assert list(root.array_keys()) == []
+        assert "fields" in list(root.group_keys())
+        # Metadata sections flat at root, not nested under "pypic".
+        for key in ("grid", "normalization", "physics", "frame", "transforms"):
+            assert key in root.attrs, f"missing root attr {key!r}"
+        assert "pypic" not in root.attrs
+
+    def test_v0_legacy_read(self, tmp_path):
+        # A store hand-built in the pre-2026.05 layout (fields at root,
+        # ``attrs["pypic"]`` umbrella) must still load via ``from_zarr``.
+        # Synthesize it directly via xarray; assert decode picks the
+        # right components without going through ``to_zarr``.
+        from pypic.io._serialize import (
+            grid_to_dict,
+            normalization_to_dict,
+            physics_to_dict,
+            species_to_list,
+            transforms_to_dict,
+        )
+
+        fds = make_test_dataset(
+            {"B1": np.full((4, 3, 2), 1.5), "rho_m": np.full((4, 3, 2), 0.7)},
+        )
+        ds = fds.xr.copy(deep=False)
+        ds.attrs["pypic"] = {
+            "pypic_version": "legacy-test",
+            "grid": grid_to_dict(fds.grid),
+            "normalization": normalization_to_dict(fds.normalization),
+            "species": species_to_list(fds.species),
+            "physics": physics_to_dict(fds.physics),
+            "metadata": {},
+            "frame": fds.frame,
+            "transforms": transforms_to_dict(dict(fds.transforms)),
+        }
+        store = tmp_path / "legacy.zarr"
+        ds.to_zarr(str(store), zarr_format=3, consolidated=False)
+
+        loaded = from_zarr(store)
+        np.testing.assert_array_equal(loaded["B1"], 1.5)
+        np.testing.assert_array_equal(loaded["rho_m"], 0.7)
+        assert loaded.grid.dimensions == fds.grid.dimensions
 
 
 class TestToZarrTimeseries:
@@ -431,7 +483,8 @@ class TestToZarrTimeseries:
 
         import xarray as xr
 
-        ds = xr.open_zarr(str(store), consolidated=False)
+        # v1 layout: fields live under /fields, not at the root.
+        ds = xr.open_zarr(str(store), group="fields", consolidated="auto")
         assert "time" in ds.dims
         assert ds.sizes["time"] == 3
         np.testing.assert_allclose(ds["B1"].sel(time=0.0).values, 1.0)

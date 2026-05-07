@@ -336,14 +336,29 @@ def _from_json_native(obj: Any) -> Any:  # noqa: ANN401
     return obj
 
 
-def encode_pypic_attrs(fds: FieldDataset) -> dict[str, Any]:
-    """Assemble all FieldDataset metadata into a JSON-compatible dict.
+# Zarr layout discriminator.  ``"v1"`` is the DataTree-based layout
+# (fields under ``/fields``, metadata flat at the root group's attrs).
+# ``"v0"`` was the original layout (fields at root, metadata nested
+# under ``attrs["pypic"]``); read-only support is retained so stores
+# written by older pypic versions still load.
+LAYOUT_VERSION = "v1"
 
-    The returned dict is stored as ``xr.Dataset.attrs["pypic"]`` when
-    writing to Zarr, preserving everything needed to reconstruct the
-    FieldDataset on read.
+
+def encode_pypic_attrs(fds: FieldDataset) -> dict[str, Any]:
+    """Assemble FieldDataset metadata into the v1 root-group attrs dict.
+
+    The returned dict is stamped as ``xr.DataTree.attrs`` (which writes
+    it onto the Zarr root group's attrs) when writing.  Each section is
+    a top-level key so cross-language consumers can read e.g.
+    ``store.attrs["grid"]`` without going through a ``pypic`` umbrella.
+
+    The ``pypic_layout`` key discriminates layout versions; the
+    ``pypic_version`` key records the writer.  Other keys are the same
+    section dicts produced by the per-section encoders (``grid_to_dict``,
+    ``normalization_to_dict``, ...).
     """
     return {
+        "pypic_layout": LAYOUT_VERSION,
         "pypic_version": __version__,
         "grid": grid_to_dict(fds.grid),
         "normalization": normalization_to_dict(fds.normalization),
@@ -366,18 +381,38 @@ def decode_pypic_attrs(
     str,
     dict[str, FrameTransform],
 ]:
-    """Unpack a pypic attrs dict into the components needed by FieldDataset.
+    """Unpack root-group attrs into the components needed by FieldDataset.
+
+    Accepts both layouts:
+
+    * **v1** — flat keys at the top level with a ``pypic_layout``
+      discriminator (current writers).
+    * **v0** — nested ``d["pypic"] = {...}`` form (legacy writers
+      pre-2026.05).  Decoded transparently for back-compat.
 
     Returns
     -------
     tuple
         (grid, normalization, species, physics, metadata, frame, transforms)
     """
-    grid = dict_to_grid(d["grid"])
-    normalization = dict_to_normalization(d["normalization"])
-    species = list_to_species(d.get("species", []))
-    physics = dict_to_physics(d["physics"])
-    metadata = _from_json_native(d.get("metadata", {}))
-    frame = d.get("frame", "simulation")
-    transforms = dict_to_transforms(d.get("transforms", {}))
+    if "pypic_layout" in d:
+        attrs = d
+    elif "pypic" in d:
+        # v0 legacy: unwrap.  Pre-2026.05 writers nested everything under
+        # an ``attrs["pypic"]`` umbrella; the inner dict has the same
+        # section keys as v1 minus ``pypic_layout``.
+        attrs = d["pypic"]
+    else:
+        msg = (
+            "No pypic metadata found in store attrs (expected "
+            "``pypic_layout`` for v1 stores or ``pypic`` for legacy v0)"
+        )
+        raise ValueError(msg)
+    grid = dict_to_grid(attrs["grid"])
+    normalization = dict_to_normalization(attrs["normalization"])
+    species = list_to_species(attrs.get("species", []))
+    physics = dict_to_physics(attrs["physics"])
+    metadata = _from_json_native(attrs.get("metadata", {}))
+    frame = attrs.get("frame", "simulation")
+    transforms = dict_to_transforms(attrs.get("transforms", {}))
     return grid, normalization, species, physics, metadata, frame, transforms

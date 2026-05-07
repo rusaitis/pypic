@@ -36,28 +36,56 @@ __all__ = ["from_zarr", "to_zarr", "to_zarr_timeseries"]
 _log = logging.getLogger(__name__)
 
 
-def _ds_to_field_dataset(ds: xr.Dataset, source_label: str) -> FieldDataset:
-    """Decode pypic metadata from an xarray Dataset and construct a FieldDataset.
+# Root-attrs keys reserved for pypic metadata.  Stripped from any
+# Dataset before it is handed to ``FieldDataset`` so layout-bookkeeping
+# attrs don't leak as user-visible.  Both v0 (``pypic`` umbrella) and
+# v1 (flat) keys are listed.
+_PYPIC_ROOT_ATTR_KEYS = frozenset(
+    {
+        "pypic",
+        "pypic_layout",
+        "pypic_version",
+        "grid",
+        "normalization",
+        "species",
+        "physics",
+        "frame",
+        "transforms",
+        "metadata",
+    }
+)
 
-    Shared by ``from_zarr`` (plain Zarr) and ``from_zarr_icechunk``.
+
+def _strip_pypic_attrs(ds: xr.Dataset) -> xr.Dataset:
+    """Return *ds* with pypic-internal attrs removed.
+
+    Mutates ``ds.attrs`` in place and returns the same object — caller
+    typically passes a fresh Dataset reference (the result of
+    ``open_datatree(...)["fields"].to_dataset()``).
     """
-    pypic_attrs = ds.attrs.get("pypic")
-    if pypic_attrs is None:
-        msg = f"No 'pypic' metadata found in {source_label}"
-        raise ValueError(msg)
+    ds.attrs = {k: v for k, v in ds.attrs.items() if k not in _PYPIC_ROOT_ATTR_KEYS}
+    return ds
 
-    grid, normalization, species, physics, metadata, frame, transforms = (
-        decode_pypic_attrs(pypic_attrs)
-    )
 
-    # Strip the pypic key so it doesn't leak into the user-facing dataset.
-    # Work on a copy to avoid mutating the cached store attrs.
-    ds_attrs = dict(ds.attrs)
-    ds_attrs.pop("pypic", None)
-    ds.attrs = ds_attrs
+def _ds_to_field_dataset(
+    ds: xr.Dataset, root_attrs: dict[str, Any], source_label: str
+) -> FieldDataset:
+    """Build a FieldDataset from a fields Dataset and root attrs.
 
+    *ds* must already be the field-bearing Dataset (under ``/fields``
+    for v1, root for v0).  *root_attrs* is the dict from the root
+    group's attrs; ``decode_pypic_attrs`` accepts both v0 (``pypic``
+    umbrella) and v1 (flat) shapes transparently.
+    """
+    try:
+        grid, normalization, species, physics, metadata, frame, transforms = (
+            decode_pypic_attrs(root_attrs)
+        )
+    except ValueError as exc:
+        msg = f"No pypic metadata found in {source_label}: {exc}"
+        raise ValueError(msg) from None
     return FieldDataset(
-        ds,
+        _strip_pypic_attrs(ds),
         grid,
         normalization,
         species=species,
@@ -66,6 +94,49 @@ def _ds_to_field_dataset(ds: xr.Dataset, source_label: str) -> FieldDataset:
         frame=frame,
         transforms=transforms,
     )
+
+
+def _open_v1_or_v0(
+    store: Any,  # noqa: ANN401  # zarr accepts str/path/store object
+    source_label: str,
+) -> tuple[xr.Dataset, dict[str, Any]]:
+    """Open a Zarr store at *store*; return (fields_dataset, root_attrs).
+
+    Auto-detects layout:
+
+    * **v1** — root group has ``pypic_layout`` attr; open ``/fields``
+      child as the data Dataset.
+    * **v0** — root group carries ``attrs["pypic"]``; field arrays sit
+      at the root, so the root Dataset *is* the fields Dataset.
+
+    Uses ``consolidated="auto"`` so consolidated stores get the
+    one-shot metadata read while non-consolidated stores still load.
+    """
+    tree = xr.open_datatree(store, engine="zarr", consolidated="auto")
+    root_attrs = dict(tree.attrs)
+    if root_attrs.get("pypic_layout"):
+        if "fields" not in tree.children:
+            msg = (
+                f"{source_label}: pypic_layout declared but no /fields "
+                f"group present"
+            )
+            raise ValueError(msg)
+        return tree["fields"].to_dataset(), root_attrs
+    if "pypic" in root_attrs:
+        # v0: root has both data and the umbrella attr.  ``has_data``
+        # is True iff the root group holds data variables.
+        if tree.has_data:
+            return tree.to_dataset(), root_attrs
+        # An empty root with a stray ``pypic`` attr is a corrupt v0
+        # store, but treat it the same as an empty v1: build an empty
+        # Dataset so the caller's metadata decode is the only failure
+        # mode the user sees.
+        return xr.Dataset(), root_attrs
+    msg = (
+        f"{source_label}: no pypic metadata found (expected "
+        f"``pypic_layout`` for v1 stores or ``pypic`` for legacy v0)"
+    )
+    raise ValueError(msg)
 
 
 def _resolve_timeseries_pairs(
@@ -100,6 +171,20 @@ def _default_encoding(ds: xr.Dataset) -> dict[str, dict[str, Any]]:
 
     compressor = BloscCodec(cname="zstd", clevel=5, shuffle="bitshuffle")
     return {str(name): {"compressors": compressor} for name in ds.data_vars}
+
+
+def _datatree_encoding(
+    ds_encoding: dict[str, dict[str, Any]],
+) -> dict[str, dict[str, dict[str, Any]]]:
+    """Wrap a Dataset-level encoding under the ``/fields`` group key.
+
+    ``DataTree.to_zarr`` validates encoding keys against the tree's
+    group paths exactly (``"/"``, ``"/fields"``, ...), so the leading
+    slash is required.  Plain ``Dataset.to_zarr`` takes the flat
+    ``{var_name: {options}}`` form.  This helper bridges the two so
+    callers can build the per-variable encoding once.
+    """
+    return {"/fields": dict(ds_encoding)}
 
 
 def _check_timeseries_fields(
@@ -207,19 +292,23 @@ def _write_timeseries_steps(
     *,
     dtype: str | None,
     encoding: dict[str, dict[str, Any]] | None,
+    consolidated: bool = True,
 ) -> dict[str, Any] | None:
     """Append timeseries pairs into *store*; return the final pypic attrs.
 
-    Iterates *pairs*, writing each as one timestep along a new ``time``
-    dimension (``mode='w'`` for the first, ``mode='a'`` append for the
-    rest).  Validates each step's field set and structural identity
-    against the first; intersects per-step metadata to a cross-step
-    common ground.
+    Step 1 is written through ``DataTree.to_zarr`` so the root group's
+    flat v1 attrs land in one shot and the field arrays live under
+    ``/fields``.  Subsequent steps drop to
+    ``Dataset.to_zarr(group="fields", mode="a", append_dim="time")``
+    — DataTree currently has no ``append_dim`` parameter, but the child
+    Dataset already lives at the same on-disk path so a flat append
+    extends the same arrays.
 
-    Returns the pypic attrs dict (with ``metadata`` set to the
-    intersection) for callers to stamp onto ``store.attrs["pypic"]``,
-    or ``None`` if *pairs* yielded nothing.  Callers handle the empty
-    case (zarr raises after the try; icechunk inside it for cleanup).
+    Validates each step's field set and structural identity against
+    the first; intersects per-step metadata to a cross-step common
+    ground.  Returns the pypic attrs dict (with ``metadata`` set to
+    the intersection) for callers to stamp back onto root after all
+    appends settle, or ``None`` if *pairs* yielded nothing.
     """
     first = True
     pypic_attrs: dict[str, Any] | None = None
@@ -234,12 +323,15 @@ def _write_timeseries_steps(
             first_fds = fds
             running_meta = dict(pypic_attrs.get("metadata", {}))
             expected_fields = current_fields
-            ds.to_zarr(
+            tree = xr.DataTree.from_dict({"fields": ds})
+            tree.attrs = pypic_attrs
+            ds_encoding = _build_encoding(ds, dtype, encoding)
+            tree.to_zarr(
                 store,
-                zarr_format=3,
-                consolidated=False,
                 mode="w",
-                encoding=_build_encoding(ds, dtype, encoding),
+                consolidated=consolidated,
+                encoding=_datatree_encoding(ds_encoding),
+                zarr_format=3,
             )
             first = False
         else:
@@ -249,7 +341,13 @@ def _write_timeseries_steps(
             running_meta = _intersect_encoded_metadata(
                 running_meta, _to_json_native(dict(fds.metadata))
             )
-            ds.to_zarr(store, consolidated=False, mode="a", append_dim="time")
+            ds.to_zarr(
+                store,
+                group="fields",
+                consolidated=False,
+                mode="a",
+                append_dim="time",
+            )
     if first:
         return None
     assert pypic_attrs is not None
@@ -333,29 +431,30 @@ def to_zarr(
     import shutil
     from pathlib import Path as _Path
 
-    # Same cleanup gating as the Icechunk writers: ``ds.to_zarr`` in
-    # ``mode='w'`` materializes a partial store (``zarr.json`` and any
-    # chunks written before the failure) into the destination before
-    # attribute serialization can reject, say, non-serializable
-    # metadata.  Without cleanup a later ``from_zarr`` on that path
-    # surfaces "No 'pypic' metadata found" instead of the actual
-    # underlying write error, misleading operators.  A pre-existing
-    # non-empty directory is left alone — that is the user's data.
+    # Cleanup gating: ``DataTree.to_zarr(mode="w")`` materializes a
+    # partial store (``zarr.json``, any chunks written before failure)
+    # into the destination before attribute serialization can reject
+    # — say — non-serializable metadata.  Without cleanup a later
+    # ``from_zarr`` on that path surfaces "No pypic metadata found"
+    # instead of the actual write error, misleading operators.  A
+    # pre-existing non-empty directory is left alone — user data.
     path_obj = _Path(path)
     created_new = not path_obj.exists() or (
         path_obj.is_dir() and not any(path_obj.iterdir())
     )
 
     ds = fds.xr.copy(deep=False)
-    ds.attrs["pypic"] = encode_pypic_attrs(fds)
+    tree = xr.DataTree.from_dict({"fields": ds})
+    tree.attrs = encode_pypic_attrs(fds)
 
+    ds_encoding = _build_encoding(ds, dtype, encoding)
     try:
-        ds.to_zarr(
+        tree.to_zarr(
             str(path),
-            zarr_format=3,
-            consolidated=False,
             mode="w",
-            encoding=_build_encoding(ds, dtype, encoding),
+            consolidated=True,
+            encoding=_datatree_encoding(ds_encoding),
+            zarr_format=3,
         )
     except BaseException:
         if created_new:
@@ -418,8 +517,8 @@ def from_zarr(
         return from_zarr_icechunk(path)
 
     ensure_zarr()
-    ds = xr.open_zarr(str(path), consolidated=False)
-    return _ds_to_field_dataset(ds, f"Zarr store at {path}")
+    ds, root_attrs = _open_v1_or_v0(str(path), f"Zarr store at {path}")
+    return _ds_to_field_dataset(ds, root_attrs, f"Zarr store at {path}")
 
 
 def to_zarr_timeseries(
@@ -539,14 +638,18 @@ def to_zarr_timeseries(
         msg = "No timesteps to write — source yielded zero items."
         raise ValueError(msg)
 
-    # Stamp pypic metadata after all appends — xarray's append mode
-    # clears dataset-level attrs.  The pypic attrs already carry the
-    # cross-step metadata intersection so the stored attrs describe
-    # what is actually true for every timestep.
+    # Restamp the cross-step metadata intersection on the root group.
+    # ``_write_timeseries_steps`` already wrote step-1's pypic_attrs
+    # via the DataTree, but those carried step-1's metadata only.
+    # After all appends, the running intersection (computed during the
+    # loop) is the only set of values true at every timestep, so reset
+    # the metadata key — and re-consolidate so the root attrs change
+    # is visible to ``consolidated="auto"`` readers.
     import zarr
 
-    store = zarr.open_group(path_str, mode="r+")
-    store.attrs["pypic"] = pypic_attrs
+    root = zarr.open_group(path_str, mode="r+")
+    root.attrs.update(pypic_attrs)
+    zarr.consolidate_metadata(root.store)
 
     _log.info("Wrote timeseries to %s", path)
     return None
