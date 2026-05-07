@@ -938,10 +938,12 @@ ion pressure tensor components.
   total pressure explicitly:
   `P = sum(data.compute(f"P_s{i}") for i in range(n_species))`.
   See `examples/advanced_calculations.py`.
-- **Split-B naming.** The background field prefix `B0` ends in a digit,
-  so its components use an underscore separator: `B0_1`, `B0_2`, `B0_3`
-  (aliases: `B0x`, `B0y`, `B0z`). This is the only field prefix where
-  the underscore is needed to avoid ambiguity with component indices.
+- **Split-B naming.** `B0` is the universal plasma-physics name for the
+  background/asymptotic magnetic field, so we preserve it. Because the
+  prefix already ends in a digit, components use an underscore separator:
+  `B0_1`, `B0_2`, `B0_3` (Cartesian aliases: `B0x`, `B0y`, `B0z`). The
+  underscore-after-digit rule generalizes to any future canonical whose
+  prefix ends in a digit; `B0` is the only current customer.
 
 ### Fluid / moment quantities — velocities, currents, pressure
 
