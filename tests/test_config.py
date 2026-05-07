@@ -670,9 +670,9 @@ class TestBodiesDriversRestart:
 class TestForwardedSections:
     """Sections previously dropped at the translator boundary now survive.
 
-    Probes, collisions, velocity_mesh, phase_space, and the full ``[run]``
-    provenance record reach ``SimulationConfig`` as raw schema objects —
-    same pattern as bodies/drivers/restart.
+    Probes, collisions, phase_space, and the full ``[run]`` provenance
+    record reach ``SimulationConfig`` as raw schema objects — same
+    pattern as bodies/drivers/restart.
     """
 
     def test_run_provenance_typed(self, tmp_path: Path) -> None:
@@ -720,8 +720,6 @@ class TestForwardedSections:
         assert cfg.collisions[0].coulomb_log == 10.0
 
     def test_phase_space_storage_typed(self, tmp_path: Path) -> None:
-        # [phase_space.storage] is the v1.0.x replacement for the dropped
-        # [velocity_mesh] section.
         ps = (
             "[phase_space]\n"
             "dimensions = [2, 2, 2, 50, 50, 50]\n"

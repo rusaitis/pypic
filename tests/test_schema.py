@@ -963,10 +963,9 @@ class TestOutputMultiFileLayout:
 class TestPhaseSpaceStorage:
     """``[phase_space.storage]`` — sparse-block velocity-grid storage.
 
-    Replaces the v1.0 ``[velocity_mesh]`` section. ``block_size`` is
-    validated against the velocity sub-axes of ``phase_space.dimensions``
-    by the root validator (it needs to know how many spatial axes
-    ``[grid]`` claims first).
+    ``block_size`` is validated against the velocity sub-axes of
+    ``phase_space.dimensions`` by the root validator (it needs to know
+    how many spatial axes ``[grid]`` claims first).
     """
 
     @staticmethod
@@ -1023,17 +1022,6 @@ class TestPhaseSpaceStorage:
         """)
         with pytest.raises(ValidationError, match="block_size"):
             validate_simulation_toml(doc)
-
-    def test_velocity_mesh_section_now_rejected(self) -> None:
-        # The merged schema rejects the legacy section name as an unknown
-        # top-level key.
-        doc = _minimal_doc() + dedent("""
-            [velocity_mesh]
-            dimensions = [50, 50, 50]
-        """)
-        with pytest.raises(ValidationError):
-            validate_simulation_toml(doc)
-
 
 class TestRestartFromFiles:
     """``Restart.from_files`` — VPIC per-rank manifest support."""

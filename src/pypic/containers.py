@@ -156,8 +156,7 @@ class SimulationConfig:
     phase_space : PhaseSpace | None
         Validated ``[phase_space]`` block for >3D kinetic codes.
         Continuum-Vlasov sparse-block storage knobs live under
-        ``phase_space.storage`` (replaces the v1.0 ``[velocity_mesh]``
-        section).
+        ``phase_space.storage``.
     metadata : dict[str, Any]
         Free-form annotations from readers (stagger, scaling, version,
         description, ...). Schema-typed sections live on dedicated

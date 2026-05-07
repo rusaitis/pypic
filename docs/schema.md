@@ -28,6 +28,32 @@ a strictly typed `SimulationSchema`, and `load_config()` builds the
 internal `SimulationConfig` from that. An annotated reference template
 lives at `pypic.simulation.toml` at the repo root.
 
+### Versioning
+
+The `schema_version` bare key (and the matching `[schema].version`) is
+the single discriminator for both `simulation.toml` and the on-disk
+output stores (HDF5 §4.1, Zarr §4.2). v1.x commits to:
+
+- **Additive only.** Future v1.x releases may add optional sections,
+  optional keys, canonical field names, and enum values. They will
+  not rename or remove existing canonical names, and will not move
+  required keys.
+- **Reordering `[[species]]` is breaking.** Per-species canonical
+  names (`_s0`, `_s1`, ...) bind to declaration order; reordering
+  changes the meaning of every per-species field on disk.
+- **Pre-v1 reads, no pre-v1 writes.** Legacy Zarr layouts
+  (`pypic_layout` transitional, `pypic` umbrella) load with a
+  `DeprecationWarning` and are slated for removal in v2. Writers
+  always emit `schema_version`.
+- **`x-*` extensions are unconstrained.** Code-specific knobs under
+  `x-<code>.*` (or unknown sub-tables under `[physics.{pic,mhd,
+  hybrid,vlasov}]`) are accepted by the validator without
+  enforcement; v1.x will not break them, but also makes no
+  promises about their portability.
+
+Anything stricter than this — e.g., a removal or rename — bumps
+`schema_version` to `2.0`.
+
 ### Required sections
 
 A valid v1.0 document must declare:
@@ -57,13 +83,16 @@ Listed in the order §2 walks them.
 [initial_conditions]     # flat table: setup type + type-specific keys
 [[drivers]]              # ongoing external coupling (magnetograms, SW inflow, ...)
 [restart]                # continuation pointer (incl. multi-file from_files)
-[output.*]               # five sub-sections walked together in §2:
+[output.*]               # five independent sub-sections plus the
+                         # repeatable [[output.streams]] array, all
+                         # walked together in §2:
                          #   [output.checkpoints]   lossless full-state dumps
                          #   [output.fields]        field output cadence + quantities
                          #   [output.particles]     particle output cadence + selection
                          #   [output.probes]        probe time-series cadence
                          #   [output.diagnostics]   on-the-fly derived quantities
                          #   [[output.streams]]     multi-cadence / ROI output groups
+                         #                          (repeatable, optional)
 [phase_space]            # >3D phase-space grid for gyrokinetic / full Vlasov
                          #   (continuum-Vlasov sparse-block storage lives in
                          #   the [phase_space.storage] sub-table)
@@ -158,6 +187,14 @@ hardware = "AMD EPYC Milan 7763"
 count    = 8192
 hours    = 393216
 ```
+
+`[run]` is **config-only provenance** in v1.0: the validator reads it
+when ``simulation.toml`` is loaded, but the data-file writers
+(`pypic.io.to_zarr`, the HDF5 §4.1 layout) do not currently round-trip
+its keys. Tools that need `git_sha` / `host` / `funding` to survive
+into derived data files should ship the original ``simulation.toml``
+alongside the output store. Persisting `[run]` through `attrs.run` is
+a candidate v1.x extension.
 
 ### [time]
 
@@ -456,6 +493,14 @@ The validator enforces `(charge + mass)` XOR `charge_to_mass`: provide
 exactly one form. Species are indexed in declaration order — `_s0`
 binds to the first entry, `_s1` to the second, etc. Reordering is a
 breaking change to downstream field-name references.
+
+`temperature` and any thermal-related quantities are stored in **energy
+units**, not Kelvin. The conversion to SI gives Joules (`T = P/n` with
+no $k_B$ factor); divide by `scipy.constants.k` for Kelvin or by
+`scipy.constants.eV` for electron-volts at display time. Plasma
+formulas (sound speed, Debye length, β, gyroradii) stay $k_B$-free as
+a result. See [conventions.md § Temperature in Energy
+Units](conventions.md#temperature-in-energy-units).
 
 Relationship: $v_{th} = \sqrt{T/m}$ (see thermal speed convention in
 [Conventions](conventions.md)).
@@ -757,17 +802,6 @@ For 6D Vlasiator runs: the spatial part of ``dimensions`` matches
 ``[phase_space.storage]`` carries the sparse-block knobs. Gyrokinetic
 codes omit ``[phase_space.storage]`` because their 5-D grid is dense.
 
-**Migration note.** v1.0 had a separate top-level ``[velocity_mesh]``
-section that overlapped with ``[phase_space]`` on axis identity. v1.0.x
-removes ``[velocity_mesh]`` and folds its ``block_size`` /
-``sparsity_threshold`` into ``[phase_space.storage]``; the redundant
-``dimensions``, ``extent``, and ``coordinate_system`` fields are
-retired in favor of the ``[phase_space]`` versions. If a config still
-contains ``[velocity_mesh]``, move ``block_size`` and ``sparsity_threshold``
-to ``[phase_space.storage]`` and drop the rest — ``[phase_space]`` already
-carries equivalent ``dimensions``, ``extents``, and ``coordinate_system``
-keys.
-
 ### [[collisions]]
 
 Per-pair collision declaration for collisional PIC codes (Smilei,
@@ -831,17 +865,24 @@ Vector field components use **numbered indices** (`B1`, `B2`, `B3`) as
 the general canonical form. The coordinate geometry determines what
 each index means:
 
-| Index | Cartesian | Spherical | Cylindrical |
-|-------|-----------|-----------|-------------|
-| 1 | x | r | r |
-| 2 | y | θ | φ |
-| 3 | z | φ | z |
+| Index | Cartesian | Spherical | Cylindrical | thetaMode |
+|-------|-----------|-----------|-------------|-----------|
+| 1 | x | r | r | r |
+| 2 | y | θ | φ | z |
+| 3 | z | φ | z | mode index |
 
 For Cartesian data, letter aliases (`Bx`, `By`, `Bz`) are preferred for
 readability and access the same data as `B1`, `B2`, `B3`. For non-Cartesian
 data, only the numbered form is canonical; the reader registers
 geometry-appropriate aliases (e.g., `Br` → `B1` for spherical). The
 `[coordinates] geometry` field determines which aliases are active.
+
+For `geometry = "thetaMode"` (FBPIC azimuthal-mode RZ decomposition),
+the spatial grid is two-dimensional `(r, z)` and the third index is
+the openPMD mode number from `[coordinates.modes].mode_indices`.
+Field arrays therefore have shape `(n_r, n_z, n_modes)`; the per-mode
+complex amplitude is stored as a complex dtype, not as separate real
+and imaginary axes.
 
 ### Electromagnetic fields
 
@@ -1181,13 +1222,16 @@ output_{step:06d}.h5
 │
 ├── time            [attr: float64, code units]
 ├── step            [attr: int]
-└── model           [attr: "PIC"]
+├── model           [attr: "PIC"]
+└── schema_version  [attr: "1.0"]   # mirrors simulation.toml; same value as Zarr §4.2
 ```
 
 Every file contains enough metadata to convert back to SI without the
-original `simulation.toml`. The HDF5 file itself always uses numbered
-names; `geometry` drives alias registration in the reader (`Bx → B1`
-for cartesian, `Br → B1` for spherical, etc). Existing readers (iPIC3D,
+original `simulation.toml`, and `schema_version` lets a streaming
+consumer dispatch on layout vocabulary without sniffing the rest of
+the file. The HDF5 file itself always uses numbered names;
+`geometry` drives alias registration in the reader (`Bx → B1` for
+cartesian, `Br → B1` for spherical, etc). Existing readers (iPIC3D,
 BATSRUS, ...) translate native layouts; the Rust code writes this
 layout directly.
 
@@ -1235,6 +1279,13 @@ xarray-style metadata: `long_name`, `units`, `quantity_type`,
 `si_unit`, `latex`, and the openPMD-style `unit_dimension` 7-tuple
 when the field has a registered SI dimension.
 
+**`surviving_axes`.**  The integer tuple of grid axes still present
+after any in-pypic slicing — `(0, 1, 2)` for a full 3D dataset,
+`(0, 2)` for a `y`-slice produced by `PlaneSelection`, `(2,)` for
+a 1-D line-out.  Indices are the original axis numbers (so a `y`-slice
+preserves `0` and `2`, not `0` and `1`).  A reader can reconstruct
+the full embedding by combining `surviving_axes` with `geometry.axis_names`.
+
 **Multi-step (timeseries).**  `to_zarr_timeseries` extends every
 field array with a leading `time` dimension, shape `(nt, n1, n2, n3)`,
 chunked so reading one timestep is O(1).  Step 1 writes the
@@ -1259,7 +1310,7 @@ write; user-supplied `encoding=` overrides per variable.
 | Coord arrays | from grid attrs | `/fields/{x,y,z}` (1-D) |
 | `time` / `step` | top-level scalar attrs | `time` dim (multi-step) |
 | Files per write | one per timestep | one store, all steps |
-| Schema version | (implicit; per file) | root `attrs.schema_version = "1.0"` |
+| Schema version | top-level `schema_version` attr | root `attrs.schema_version = "1.0"` |
 
 **Reading without pypic.**  A non-pypic consumer (JS WebGPU viewer,
 Rust `zarrs` pipeline) opens the root group, reads the section dicts

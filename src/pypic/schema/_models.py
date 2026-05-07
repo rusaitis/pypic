@@ -1268,8 +1268,7 @@ class PhaseSpace(_StrictBase):
     must match ``[grid].dimensions`` when both are present.
 
     ``storage`` is the sparse-block sub-table for continuum-Vlasov
-    codes (replaces the v1.0 ``[velocity_mesh]`` section).  Gyrokinetic
-    runs omit it.
+    codes.  Gyrokinetic runs omit it.
     """
 
     dimensions: list[PositiveInt] = Field(..., min_length=2, max_length=6)
