@@ -39,15 +39,12 @@ _log = logging.getLogger(__name__)
 # Root-attrs keys reserved for pypic metadata.  Stripped from any
 # Dataset before it is handed to ``FieldDataset`` so layout-bookkeeping
 # attrs don't leak as user-visible.  Includes the current
-# ``schema_version`` discriminator, both transitional and v0 keys
-# (``pypic_layout``, ``pypic``, ``pypic_version``) for back-compat,
-# and the section dicts.
+# ``schema_version`` discriminator, the v0 umbrella key (``pypic``)
+# for legacy reads, and the section dicts.
 _PYPIC_ROOT_ATTR_KEYS = frozenset(
     {
         "schema_version",
         "pypic",
-        "pypic_layout",
-        "pypic_version",
         "grid",
         "normalization",
         "species",
@@ -109,8 +106,6 @@ def _open_v1_or_v0(
 
     * **schema-v1.0 (current)** — root group has ``schema_version``
       attr; open ``/fields`` child as the data Dataset.
-    * **transitional** — root group has ``pypic_layout`` attr (the
-      brief day-1 name); same shape as the current layout.
     * **v0 umbrella (legacy)** — root group carries ``attrs["pypic"]``;
       field arrays sit at the root, so the root Dataset *is* the
       fields Dataset.
@@ -120,14 +115,10 @@ def _open_v1_or_v0(
     """
     tree = xr.open_datatree(store, engine="zarr", consolidated="auto")
     root_attrs = dict(tree.attrs)
-    has_flat_discriminator = "schema_version" in root_attrs or root_attrs.get(
-        "pypic_layout"
-    )
-    if has_flat_discriminator:
+    if "schema_version" in root_attrs:
         if "fields" not in tree.children:
             msg = (
-                f"{source_label}: schema_version/pypic_layout declared "
-                f"but no /fields group present"
+                f"{source_label}: schema_version declared but no /fields group present"
             )
             raise ValueError(msg)
         return tree["fields"].to_dataset(), root_attrs
@@ -143,8 +134,8 @@ def _open_v1_or_v0(
         return xr.Dataset(), root_attrs
     msg = (
         f"{source_label}: no pypic metadata found (expected "
-        f"``schema_version`` for current stores, ``pypic_layout`` for "
-        f"transitional stores, or ``pypic`` for legacy v0)"
+        f"``schema_version`` for current stores or ``pypic`` for "
+        f"legacy v0)"
     )
     raise ValueError(msg)
 

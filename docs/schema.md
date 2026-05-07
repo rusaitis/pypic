@@ -41,9 +41,9 @@ output stores (HDF5 §4.1, Zarr §4.2). v1.x commits to:
 - **Reordering `[[species]]` is breaking.** Per-species canonical
   names (`_s0`, `_s1`, ...) bind to declaration order; reordering
   changes the meaning of every per-species field on disk.
-- **Pre-v1 reads, no pre-v1 writes.** Legacy Zarr layouts
-  (`pypic_layout` transitional, `pypic` umbrella) load with a
-  `DeprecationWarning` and are slated for removal in v2. Writers
+- **Pre-v1 reads, no pre-v1 writes.** The legacy v0 Zarr layout
+  (`pypic` umbrella attr at root) still loads with a
+  `DeprecationWarning` and is slated for removal in v2. Writers
   always emit `schema_version`.
 - **`x-*` extensions are unconstrained.** Code-specific knobs under
   `x-<code>.*` (or unknown sub-tables under `[physics.{pic,mhd,
@@ -291,6 +291,24 @@ B2 = [0.0, 0.5, 0.0]               # B_y on the y-face
 B3 = [0.0, 0.0, 0.5]               # B_z on the z-face
 E1 = [0.0, 0.5, 0.5]               # E_x on the x-edge
 ```
+
+**Stagger layering.** Three tiers, all optional, all additive — same
+fact, increasing precision:
+
+- **Tier 1** — `stagger` is a one-word summary for human readers and
+  downstream UIs ("cell-centered", "node-centered", "Yee mesh").
+  Informational only; readers always destagger to a co-located grid
+  on load.
+- **Tier 2** — `[grid.stagger_fields]` records per-group locations
+  (`B` on faces, `E` on edges) for readers that consume the
+  field-group hint when destaggering.
+- **Tier 3** — `[grid.stagger_position]` is the openPMD-precise
+  truth: per component, the offset inside the local cell on a
+  $[0.0, 1.0)$ scale.  Round-trips through `StaggerInfo.position`.
+
+The validator does **not** cross-check between tiers — a writer may
+populate any subset, and a reader that consumes only Tier 1 still
+works.  Readers that need ED-PIC-precise destagger reach for Tier 3.
 
 ### [boundary_conditions]
 
@@ -1051,13 +1069,26 @@ decomposed from the **total** pressure tensor (`P11..P33`). Per-species
 decomposition (`P_par_s0`, `P_perp_s0`) uses the per-species tensors
 (`P11_s0..P33_s0`).
 
-**Storage vs derived.** Only the six tensor components (`Pij`,
-`Pij_s{N}`) are storage-primitive in the canonical HDF5/Zarr layout;
-`P` (trace/3), `P_par`, `P_perp`, and `agyrotropy` are derived on
-demand by `compute()`. Listing `Pij` (or `Pi`/`Pe`) in
-`[output.fields].quantities` auto-expands to the six components;
-listing `P_par` writes the derived scalar — note that the post-hoc
-decomposition is then locked to the snapshot's $\hat{b}$.
+**Storage vs derived.** Two tiers, in preference order:
+
+1. **Preferred** — store the six tensor components (`Pij`,
+   `Pij_s{N}`).  `P` (trace/3), `P_par`, `P_perp`, and `agyrotropy`
+   are then derived on demand by `compute()` and stay
+   $\hat{b}$-fresh under frame transforms (the decomposition follows
+   whatever $\mathbf{B}$ is in the current frame).  Listing `Pij`
+   (or `Pi`/`Pe`) in `[output.fields].quantities` auto-expands to
+   the six components.
+2. **Acceptable** — codes that evolve only the CGL/double-adiabatic
+   decomposition (BATSRUS `MhdAnisoP`, GRMHD with anisotropic
+   closure) may store `P_par` and `P_perp` directly without the
+   tensor.  Frame transforms then cannot re-decompose; the stored
+   values lock to the snapshot's $\hat{b}$.  Listing `P_par` in
+   `[output.fields].quantities` writes the derived scalar with the
+   same lock-in caveat.
+
+`P_par`, `P_perp`, and `agyrotropy` carry no marker on disk
+distinguishing "computed by the code" from "derived by `compute()`" —
+the consumer treats them identically.
 
 ### Characteristic scales (derived)
 
@@ -1168,22 +1199,36 @@ not simulation — restart regeneration is out of scope.
 
 ## 4. Output Layouts
 
-Two on-disk layouts are defined: **HDF5 (§4.1)** is the canonical
-cross-tool layout — what the Rust simulation code emits and what every
-file-based reader translates *into*.  **Zarr (§4.2)** is what the
-Python writer (`pypic.io.to_zarr` / `to_zarr_timeseries`) produces:
-fields under `/fields`, metadata as flat keys on the root group's
-attrs, discriminated by the same `schema_version` value that
-`simulation.toml` carries at its top level.  Both use the same
-**numbered canonical field names** (`B1`, `B2`, `B3`) and the same
-section-level metadata vocabulary; the difference is the storage
-container's group conventions (HDF5 groups vs Zarr DataTree).
+Two on-disk layouts are defined, with deliberately asymmetric roles:
+
+- **§4.1 HDF5** is the canonical **read contract** for HDF5-emitting
+  codes — the Rust simulation code, iPIC3D, BATSRUS, ARMS, OpenGGCM —
+  and what every file-based reader in `pypic.readers` translates
+  *into*.  pypic itself does not write this layout; there is no
+  `to_hdf5` in `pypic.io`.
+- **§4.2 Zarr** is what pypic itself produces via
+  `pypic.io.to_zarr` / `to_zarr_timeseries`.  Fields under
+  `/fields`, metadata as flat keys on the root group's attrs.
+
+Both layouts share the same **numbered canonical field names** (`B1`,
+`B2`, `B3`) and the same section-level metadata vocabulary, and both
+carry the same `schema_version` value that `simulation.toml` declares
+at its top level — a single discriminator across config and on-disk
+storage.  The difference is the storage container's group conventions
+(HDF5 groups vs Zarr DataTree).
 
 ### 4.1 HDF5 Output Layout
 
-The cross-tool reference layout.  Each timestep is a separate file
-(or group within a file).  Field datasets use the **numbered canonical
-names** (`B1`, `B2`, `B3`), which are geometry-agnostic.
+The cross-tool **read contract** for HDF5-emitting codes.  pypic does
+not write this layout — its readers translate native HDF5 (and IDL,
+H5hut, Fortran-binary, ...) sources *into* a `FieldDataset` that
+conforms to the same canonical naming and metadata shape described
+here.  The Rust simulation code writes this layout directly, so the
+section doubles as its output specification.
+
+Each timestep is a separate file (or group within a file).  Field
+datasets use the **numbered canonical names** (`B1`, `B2`, `B3`),
+which are geometry-agnostic.
 
 ```
 output_{step:06d}.h5
@@ -1237,16 +1282,17 @@ layout directly.
 
 ### 4.2 Zarr Output Layout
 
-`pypic.io.to_zarr` and `to_zarr_timeseries` produce a Zarr v3 store
-laid out as an xarray `DataTree`: the field arrays live under a
-`/fields` child group (mirroring §4.1's `/fields/` HDF5 group); the
-metadata sections sit as flat keys on the root group's attrs, with a
-`schema_version` value that mirrors `simulation.toml`'s top-level
-`schema_version` and discriminates both the on-disk shape and the
-metadata vocabulary in one go.  Consolidated metadata is enabled —
-readers go through `consolidated="auto"` for the one-shot metadata
-fetch when the writer left a consolidated index, and fall back to
-listing for non-consolidated stores.
+The native pypic write format.  `pypic.io.to_zarr` and
+`to_zarr_timeseries` produce a Zarr v3 store laid out as an xarray
+`DataTree`: the field arrays live under a `/fields` child group
+(mirroring §4.1's `/fields/` HDF5 group); the metadata sections sit
+as flat keys on the root group's attrs, with a `schema_version` value
+that mirrors `simulation.toml`'s top-level `schema_version` and
+discriminates both the on-disk shape and the metadata vocabulary in
+one go.  Consolidated metadata is enabled — readers go through
+`consolidated="auto"` for the one-shot metadata fetch when the writer
+left a consolidated index, and fall back to listing for
+non-consolidated stores.
 
 ```
 my_store.zarr/                         # Zarr v3 group root
@@ -1308,7 +1354,7 @@ write; user-supplied `encoding=` overrides per variable.
 | Grid metadata | `/grid/` group with attrs | root `attrs.grid` (JSON) |
 | Normalization | `/normalization/` group | root `attrs.normalization` |
 | Coord arrays | from grid attrs | `/fields/{x,y,z}` (1-D) |
-| `time` / `step` | top-level scalar attrs | `time` dim (multi-step) |
+| `time` / `step` | top-level scalar attrs | `time` dim (multi-step) / `metadata.time` scalar (single-step) |
 | Files per write | one per timestep | one store, all steps |
 | Schema version | top-level `schema_version` attr | root `attrs.schema_version = "1.0"` |
 
@@ -1319,12 +1365,10 @@ field arrays from `/fields/<name>`.  No Python or pypic library
 required.  Coordinate arrays under `/fields` make the data
 self-describing in CF/COARDS terms.
 
-**Backward compatibility.**  `from_zarr` recognises three layouts:
+**Backward compatibility.**  `from_zarr` recognises two layouts:
 
 * `schema_version` at root (current writers, mirrors
   `simulation.toml`).
-* `pypic_layout` at root (transitional flat-attrs writers from the
-  schema-version rename window).
 * `pypic` umbrella dict at root with field arrays alongside it
   (legacy v0 writers, pre-flatten).
 
