@@ -586,7 +586,7 @@ created = 2026-04-23
 # [physics.mhd]
 # # Physics-model knobs: what the code is solving. Discretization knobs
 # # (scheme, Riemann solver, limiter) live under [physics.mhd.solver].
-# gamma       = 1.05                     # nearly isothermal corona (some ARMS runs use 1.0 or 5/3)
+# gamma_eos   = 1.05                     # nearly isothermal corona (some ARMS runs use 1.0 or 5/3)
 # resistivity = 1.0e-5                   # physical η — reconnection is mostly numerical here
 # hall_term   = false
 #
@@ -674,7 +674,7 @@ created = 2026-04-23
 # [[species]]
 # # Single-fluid MHD — entry present so per-species derived aliases (Pi, n_i)
 # # resolve. particles_per_cell = 0 marks a fluid, not kinetic. closure and
-# # gamma_eos are optional here (for single-fluid runs, [physics.mhd].gamma
+# # gamma_eos are optional here (for single-fluid runs, [physics.mhd].gamma_eos
 # # is the default); they're useful for multi-fluid MHD where different fluid
 # # species have different adiabatic indices.
 # name                = "protons"
@@ -683,7 +683,7 @@ created = 2026-04-23
 # particles_per_cell  = 0
 # density             = 1.0
 # closure             = "adiabatic"      # optional — overrides [physics.mhd] defaults per species
-# gamma_eos           = 1.6666667        # optional — default inherits from [physics.mhd].gamma
+# gamma_eos           = 1.6666667        # optional — default inherits from [physics.mhd].gamma_eos
 #
 # [output.checkpoints]
 # step_interval = 2000

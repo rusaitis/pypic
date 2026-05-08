@@ -784,7 +784,7 @@ class TestPhysicsBranches:
         )
         physics = (
             "[physics]\nrelativistic = false\n"
-            "[physics.mhd]\ngamma = 1.4\nresistivity = 1.0e-5\nhall_term = true\n"
+            "[physics.mhd]\ngamma_eos = 1.4\nresistivity = 1.0e-5\nhall_term = true\n"
             '[physics.mhd.solver]\nscheme = "godunov"\nlimiter = "minmod"'
         )
         cfg = load_config(

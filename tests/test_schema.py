@@ -221,14 +221,14 @@ class TestMinimalDoc:
 
 class TestCrossSectionInvariants:
     def test_model_type_pic_forbids_mhd_block(self) -> None:
-        doc = _minimal_doc() + "\n[physics]\n[physics.mhd]\ngamma = 1.5\n"
+        doc = _minimal_doc() + "\n[physics]\n[physics.mhd]\ngamma_eos = 1.5\n"
         with pytest.raises(ValidationError, match=r"model\.type"):
             validate_simulation_toml(doc)
 
     def test_model_type_mhd_permits_only_mhd_block(self) -> None:
         doc = (
             _minimal_doc(**{'type = "PIC"': 'type = "MHD"'})
-            + "\n[physics]\n[physics.mhd]\ngamma = 1.5\n"
+            + "\n[physics]\n[physics.mhd]\ngamma_eos = 1.5\n"
         )
         s = validate_simulation_toml(doc)
         assert s.physics is not None

@@ -275,7 +275,11 @@ box   = [[-60.0, -60.0, -60.0], [60.0, 60.0, 60.0]]
 # Non-uniform per-axis cell widths (optional, sparse).
 # Only stretched axes appear; uniform axes inherit `[grid].spacing`.
 # Length must match `[grid].dimensions[i]` and the widths must sum to
-# `upper[i] - lower[i]` within `sum_rtol`.
+# `upper[i] - lower[i]` within `sum_rtol` (relative tolerance, default
+# 1.0e-9; tighten via the knob below for tests).
+[grid.stretched]
+sum_rtol = 1.0e-9                  # optional — float drift tolerance on
+                                   #   per-axis-width sum vs (upper - lower)
 [grid.stretched.axis_widths]
 0 = [0.5, 0.6, 0.8, 1.0, 1.3]      # x stretched
 2 = [0.1, 0.1, 0.2, 0.4, 0.8]      # z log-radial (ARMS, PLUTO style)
@@ -573,7 +577,12 @@ current_deposition = "esirkepov"      # optional — "esirkepov" | "zigzag" |
                                       #   "direct-morse-nielson" | "none"
 
 [physics.mhd]
-gamma       = 1.6667
+gamma_eos   = 1.6667                # adiabatic index ($c_p / c_v$); name
+                                    #   matches the per-species form on
+                                    #   [[species]] and disambiguates from
+                                    #   the canonical `gamma_L` (bulk Lorentz
+                                    #   factor) field used in relativistic
+                                    #   contexts.
 resistivity = 0.0
 hall_term   = false
 
@@ -1018,7 +1027,12 @@ six second-species pressure tensor components.
 | `s_s{N}` | Per-species specific entropy | PIC, multi-fluid MHD |
 | `s_gyro_s{N}` | Per-species gyrotropic entropy | PIC (anisotropic) |
 | `e_int` | Specific internal energy | MHD |
-| `gamma_eos` | Adiabatic index | MHD (from physics config) |
+
+Adiabatic index `γ` is a config scalar, not a per-cell field — it
+lives in `[physics.mhd].gamma_eos` (single-fluid) or
+`[[species]].gamma_eos` (multi-fluid / hybrid). `compute("h")`,
+`compute("e_int")`, and the relativistic enthalpy resolve it from
+the dataset's physics config.
 
 ### Energy and flux quantities
 
@@ -1220,52 +1234,76 @@ which are geometry-agnostic.
 ```
 output_{step:06d}.h5
 │
-├── fields/                       # group: field data
-│   ├── B1    [dataset, float64, shape (n1, n2, n3)]
-│   ├── B2    [dataset, float64, shape (n1, n2, n3)]
-│   ├── B3    [dataset, float64, shape (n1, n2, n3)]
-│   ├── E1    [dataset, float64, shape (n1, n2, n3)]
-│   ├── E2    [dataset, float64, shape (n1, n2, n3)]
-│   ├── E3    [dataset, float64, shape (n1, n2, n3)]
-│   ├── rho_c [dataset, float64, shape (n1, n2, n3)]  # PIC: charge density
-│   ├── rho_m [dataset, float64, shape (n1, n2, n3)]  # MHD: mass density
-│   ├── J1    [dataset, float64, shape (n1, n2, n3)]
-│   ├── ...
-│   ├── u1    [dataset, float64, shape (n1, n2, n3)]  # optional: four-velocity (rel. PIC)
-│   ├── u2    [dataset, float64, shape (n1, n2, n3)]
-│   ├── u3    [dataset, float64, shape (n1, n2, n3)]
+├── fields/                            # group: field data (numbered canonical names)
+│   ├── B1, B2, B3                     # [dataset, float64, shape (n1, n2, n3)]
+│   ├── E1, E2, E3
+│   ├── J1, J2, J3
+│   ├── rho_c                          # PIC: charge density (omit for MHD-only output)
+│   ├── rho_m                          # MHD: mass density   (PIC may also write derived)
+│   ├── n_s0, n_s1, ...                # per-species number densities
+│   ├── V1_s0, V2_s0, V3_s0, ...       # per-species bulk velocities
+│   ├── P11_s0, P12_s0, ..., P33_s0    # per-species pressure tensor (6 components)
+│   └── u1, u2, u3                     # optional — four-velocity (relativistic PIC)
 │
-├── grid/                         # group: grid metadata
-│   ├── dimensions  [attr: (n1, n2, n3)]
-│   ├── spacing     [attr: (d1, d2, d3)]
-│   ├── origin      [attr: (min1, min2, min3)]
-│   ├── dt          [attr: float64, code units]
-│   ├── boundary    [attr: ("periodic", "periodic", "periodic")]
-│   ├── geometry    [attr: "cartesian"]  # determines index interpretation
-│   └── stagger     [attr: "cell"]      # original grid stagger type (provenance)
+├── grid/                              # group: grid metadata
+│   ├── dimensions      [attr: (n1, n2, n3)]
+│   ├── spacing         [attr: (d1, d2, d3)]
+│   ├── origin          [attr: (min1, min2, min3)]
+│   ├── dt              [attr: float64, code units]
+│   ├── boundary_lower  [attr: ("periodic", "periodic", "open")]
+│   ├── boundary_upper  [attr: ("periodic", "periodic", "open")]
+│   ├── geometry        [attr: "cartesian"]   # drives alias registration
+│   └── stagger/                              # group — three optional tiers (§2 [grid.stagger])
+│       ├── convention [attr: "cell"]         # Tier 1 — "cell" | "node" | "staggered"
+│       ├── fields     [attr: {"B": "face", "E": "edge", "J": "edge"}]   # Tier 2
+│       └── position   [attr: {"B1": (0.5, 0.0, 0.0), "B2": (0.0, 0.5, 0.0), ...}]  # Tier 3 (ED-PIC)
 │
-├── normalization/                # group: unit conversion metadata
-│   ├── system      [attr: "PIC"]
-│   ├── length_ref  [attr: float64, meters]
-│   ├── time_ref    [attr: float64, seconds]
-│   ├── b_field_ref [attr: float64, Tesla]
-│   ├── velocity_ref [attr: float64, m/s]
-│   └── density_ref [attr: float64, m⁻³]
+├── normalization/                     # group: unit conversion metadata
+│   ├── system        [attr: "PIC"]    # "PIC" | "MHD" | "SI" | "custom"
+│   ├── length_ref    [attr: float64, meters]
+│   ├── time_ref      [attr: float64, seconds]
+│   ├── velocity_ref  [attr: float64, m/s]
+│   ├── b_field_ref   [attr: float64, Tesla]
+│   ├── e_field_ref   [attr: float64, V/m]
+│   ├── density_ref   [attr: float64, m⁻³]
+│   ├── mass_ref      [attr: float64, kg]
+│   └── charge_ref    [attr: float64, C]
 │
-├── time            [attr: float64, code units]
-├── step            [attr: int]
-├── model           [attr: "PIC"]
-└── schema_version  [attr: "1.0"]   # mirrors simulation.toml [schema].version; same value as Zarr §4.2
+├── species/                           # group — one sub-group per declared [[species]] entry, in order
+│   ├── s0/    {name: "electrons", charge: -1.0, mass: 1.0, ...}
+│   ├── s1/    {name: "ions",       charge:  1.0, mass: 256.0, ...}
+│   └── ...
+│
+├── physics/                           # group: model-agnostic flags
+│   ├── relativistic  [attr: bool]
+│   └── (model-specific sub-groups: pic/, mhd/, hybrid/, ...)
+│
+├── frame             [attr: "simulation"]   # native frame name
+├── transforms/                        # optional group — one sub-group per coordinates.transforms entry
+│   └── GSM/          {origin: (...), rotation: ((...), (...), (...)), scale: 1.0, from_frame: "GSE"}
+│
+├── time              [attr: float64, code units]
+├── step              [attr: int]
+├── model_name        [attr: "iPIC3D"]    # [model].name — code identity
+├── model_type        [attr: "PIC"]       # [model].type — drives default vocabulary
+└── schema_version    [attr: "1.0"]       # mirrors simulation.toml [schema].version; same value as Zarr §4.2
 ```
 
 Every file contains enough metadata to convert back to SI without the
-original `simulation.toml`, and `schema_version` lets a streaming
+original `simulation.toml` and to interpret per-species field names
+(`n_s0`, `V1_s1`, ...) without it.  `schema_version` lets a streaming
 consumer dispatch on layout vocabulary without sniffing the rest of
 the file. The HDF5 file itself always uses numbered names;
 `geometry` drives alias registration in the reader (`Bx → B1` for
 cartesian, `Br → B1` for spherical, etc). Existing readers (iPIC3D,
 BATSRUS, ...) translate native layouts; the Rust code writes this
 layout directly.
+
+Optional groups (`species/`, `transforms/`, `physics/<model>/`) are
+omitted when the corresponding TOML section is absent — single-fluid
+MHD with no transforms produces a smaller file with no `species/` or
+`transforms/`.  Stagger Tiers 2 and 3 (`stagger/fields`, `stagger/
+position`) are likewise omitted when the writer only knows Tier 1.
 
 ### 4.2 Zarr Output Layout
 

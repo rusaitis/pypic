@@ -740,7 +740,7 @@ class MHDSolver(_ExtensibleBase):
 class PhysicsMHD(_ExtensibleBase):
     """``[physics.mhd]`` — MHD physics-model knobs. Extra keys accepted."""
 
-    gamma: PositiveFloat | None = None
+    gamma_eos: PositiveFloat | None = None
     resistivity: NonNegativeFloat | None = None
     hall_term: bool | None = None
     solver: MHDSolver | None = None

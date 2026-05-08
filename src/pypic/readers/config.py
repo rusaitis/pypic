@@ -388,11 +388,11 @@ def _build_physics(physics: Physics | None) -> PhysicsParams:
     extra: dict[str, Any] = {}
     relativistic = bool(physics.relativistic)
 
-    # `gamma` is only a typed field on PhysicsMHD. Reading it from a stray
-    # `[physics.pic]` extra would silently let a misplaced key win.
+    # `gamma_eos` is only a typed field on PhysicsMHD. Reading it from a
+    # stray `[physics.pic]` extra would silently let a misplaced key win.
     gamma = (
-        float(physics.mhd.gamma)
-        if physics.mhd is not None and physics.mhd.gamma is not None
+        float(physics.mhd.gamma_eos)
+        if physics.mhd is not None and physics.mhd.gamma_eos is not None
         else 5.0 / 3.0
     )
 
