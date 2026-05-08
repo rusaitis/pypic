@@ -38,13 +38,10 @@ _log = logging.getLogger(__name__)
 
 # Root-attrs keys reserved for pypic metadata.  Stripped from any
 # Dataset before it is handed to ``FieldDataset`` so layout-bookkeeping
-# attrs don't leak as user-visible.  Includes the current
-# ``schema_version`` discriminator, the v0 umbrella key (``pypic``)
-# for legacy reads, and the section dicts.
+# attrs don't leak as user-visible.
 _PYPIC_ROOT_ATTR_KEYS = frozenset(
     {
         "schema_version",
-        "pypic",
         "grid",
         "normalization",
         "species",
@@ -72,10 +69,8 @@ def _ds_to_field_dataset(
 ) -> FieldDataset:
     """Build a FieldDataset from a fields Dataset and root attrs.
 
-    *ds* must already be the field-bearing Dataset (under ``/fields``
-    for v1, root for v0).  *root_attrs* is the dict from the root
-    group's attrs; ``decode_pypic_attrs`` accepts both v0 (``pypic``
-    umbrella) and v1 (flat) shapes transparently.
+    *ds* must already be the field-bearing Dataset under ``/fields``.
+    *root_attrs* is the dict from the root group's attrs.
     """
     try:
         grid, normalization, species, physics, metadata, frame, transforms = (
@@ -96,48 +91,31 @@ def _ds_to_field_dataset(
     )
 
 
-def _open_v1_or_v0(
+def _open_store(
     store: Any,  # noqa: ANN401  # zarr accepts str/path/store object
     source_label: str,
 ) -> tuple[xr.Dataset, dict[str, Any]]:
-    """Open a Zarr store at *store*; return (fields_dataset, root_attrs).
+    """Open a schema-v1.0 Zarr store; return (fields_dataset, root_attrs).
 
-    Auto-detects layout:
-
-    * **schema-v1.0 (current)** — root group has ``schema_version``
-      attr; open ``/fields`` child as the data Dataset.
-    * **v0 umbrella (legacy)** — root group carries ``attrs["pypic"]``;
-      field arrays sit at the root, so the root Dataset *is* the
-      fields Dataset.
-
-    Uses ``consolidated="auto"`` so consolidated stores get the
-    one-shot metadata read while non-consolidated stores still load.
+    Root group must carry the ``schema_version`` discriminator and a
+    ``/fields`` child group with the field arrays.  Uses
+    ``consolidated="auto"`` so consolidated stores get the one-shot
+    metadata read while non-consolidated stores still load.
     """
     tree = xr.open_datatree(store, engine="zarr", consolidated="auto")
     root_attrs = dict(tree.attrs)
-    if "schema_version" in root_attrs:
-        if "fields" not in tree.children:
-            msg = (
-                f"{source_label}: schema_version declared but no /fields group present"
-            )
-            raise ValueError(msg)
-        return tree["fields"].to_dataset(), root_attrs
-    if "pypic" in root_attrs:
-        # v0: root has both data and the umbrella attr.  ``has_data``
-        # is True iff the root group holds data variables.
-        if tree.has_data:
-            return tree.to_dataset(), root_attrs
-        # An empty root with a stray ``pypic`` attr is a corrupt v0
-        # store, but treat it the same as an empty current store: build
-        # an empty Dataset so the caller's metadata decode is the only
-        # failure mode the user sees.
-        return xr.Dataset(), root_attrs
-    msg = (
-        f"{source_label}: no pypic metadata found (expected "
-        f"``schema_version`` for current stores or ``pypic`` for "
-        f"legacy v0)"
-    )
-    raise ValueError(msg)
+    if "schema_version" not in root_attrs:
+        msg = (
+            f"{source_label}: no pypic metadata found "
+            f"(expected ``schema_version`` discriminator)"
+        )
+        raise ValueError(msg)
+    if "fields" not in tree.children:
+        msg = (
+            f"{source_label}: schema_version declared but no /fields group present"
+        )
+        raise ValueError(msg)
+    return tree["fields"].to_dataset(), root_attrs
 
 
 def _resolve_timeseries_pairs(
@@ -520,7 +498,7 @@ def from_zarr(
         return from_zarr_icechunk(path)
 
     ensure_zarr()
-    ds, root_attrs = _open_v1_or_v0(str(path), f"Zarr store at {path}")
+    ds, root_attrs = _open_store(str(path), f"Zarr store at {path}")
     return _ds_to_field_dataset(ds, root_attrs, f"Zarr store at {path}")
 
 

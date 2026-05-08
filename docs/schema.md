@@ -37,14 +37,11 @@ each carrying `schema_version` as a flat root attr). v1.x commits to:
 - **Additive only.** Future v1.x releases may add optional sections,
   optional keys, canonical field names, and enum values. They will
   not rename or remove existing canonical names, and will not move
-  required keys.
+  required keys. (For reference, the v0 → v1.0 rename list:
+  `omega_pe_over_omega_ce` → `omega_p_over_omega_c`.)
 - **Reordering `[[species]]` is breaking.** Per-species canonical
   names (`_s0`, `_s1`, ...) bind to declaration order; reordering
   changes the meaning of every per-species field on disk.
-- **Pre-v1 reads, no pre-v1 writes.** The legacy v0 Zarr layout
-  (`pypic` umbrella attr at root) still loads with a
-  `DeprecationWarning` and is slated for removal in v2. Writers
-  always emit the v1 layout.
 - **`x-*` extensions are unconstrained.** Code-specific knobs under
   `x-<code>.*` (or unknown sub-tables under `[physics.{pic,mhd,
   hybrid,vlasov}]`) are accepted by the validator without
@@ -105,6 +102,27 @@ Non-portable code-specific knobs live under an `x-<code>.*` namespace
 `[physics.{pic,mhd,hybrid,vlasov}]` and their `.solver` sub-tables are
 also accepted — the solver vocabulary is explicitly reserved for
 evolution in v1.1+.
+
+### Strict vs open string vocabularies
+
+Two flavours of string-valued field appear throughout §2:
+
+- **Strict** (closed enum) — bounded structural / format primitives.
+  The vocabulary is fixed by the data model itself (e.g. `geometry`,
+  `precision`, `format`, stagger locations, AMR kinds, restart
+  modes). Adding a value is a v1.x schema bump.
+- **Open** (canonical list, unenforced) — numerical-method,
+  algorithm, and closure vocabularies (e.g. `[time].scheme`,
+  `[physics.*.solver].scheme`, `pusher`, `field_solver`, `limiter`,
+  `riemann`, `[[species]].closure`, `[[collisions]].model`,
+  `[boundary_conditions]` tags). Research codes invent new schemes
+  faster than the schema can enumerate them, so unknown strings
+  pass validation. The lists shown next to each field are the
+  v1.0 canonical values — guidance for tooling and human readers,
+  not validation gates. pypic records the value as provenance
+  metadata; it does not dispatch on it. Cross-field rules
+  (e.g. `scheme = "subcycled"` requires `field_substeps`) still
+  fire — openness applies to *value*, not *semantics*.
 
 ---
 
@@ -200,9 +218,9 @@ Temporal integration controls.
 
 ```toml
 [time]
-scheme  = "fixed"                  # "fixed" (default) | "adaptive" | "subcycled"
-                                   #   | "rk2" | "rk3" | "rk4" | "vl2"
-                                   #   | "ssprk2" | "ssprk3"
+scheme  = "fixed"                  # open string. Canonical: "fixed" (default)
+                                   #   | "adaptive" | "subcycled" | "rk2" | "rk3"
+                                   #   | "rk4" | "vl2" | "ssprk2" | "ssprk3"
                                    #   | "imex-rk2" | "imex-rk3"
 dt      = 0.05                     # timestep in code units; required for every
                                    #   scheme except "adaptive" (the runtime
@@ -262,26 +280,17 @@ box   = [[-60.0, -60.0, -60.0], [60.0, 60.0, 60.0]]
 0 = [0.5, 0.6, 0.8, 1.0, 1.3]      # x stretched
 2 = [0.1, 0.1, 0.2, 0.4, 0.8]      # z log-radial (ARMS, PLUTO style)
 
-# Stagger consolidates three tiers under one sub-table. All optional
-# and additive; readers destagger to co-located grids on load.
+# Stagger — three optional tiers (convention, fields, position).
+# See "Stagger layering" below; readers destagger to co-located grids on load.
 [grid.stagger]
-convention = "staggered"           # Tier 1: one-word summary
-                                   #   "cell" (default) | "node" | "staggered"
+convention = "staggered"           # Tier 1 — "cell" (default) | "node" | "staggered"
 
-# Tier 2: per-field-group locations. Captures the Yee-mesh truth that
-# the single-string convention cannot — B sits on faces, E on edges.
-# Free-form keys (canonical field-group names); values "cell" | "node"
-# | "face" | "edge".
-[grid.stagger.fields]
-B = "face"
+[grid.stagger.fields]              # Tier 2 — per-field-group locations
+B = "face"                         #   values: "cell" | "node" | "face" | "edge"
 E = "edge"
 J = "edge"
 
-# Tier 3: per-component openPMD ED-PIC offsets. Each value is a vector
-# in [0.0, 1.0) giving the position of that field component inside
-# the local cell along each axis. Lossless representation of the
-# source mesh; round-trips through StaggerInfo.position.
-[grid.stagger.position]
+[grid.stagger.position]            # Tier 3 — per-component ED-PIC offsets in [0.0, 1.0)
 B1 = [0.5, 0.0, 0.0]               # B_x on the x-face
 B2 = [0.0, 0.5, 0.0]               # B_y on the y-face
 B3 = [0.0, 0.0, 0.5]               # B_z on the z-face
@@ -298,13 +307,13 @@ fact, increasing precision:
 - **Tier 2** — `fields` records per-group locations (`B` on faces,
   `E` on edges) for readers that consume the field-group hint when
   destaggering.
-- **Tier 3** — `position` is the openPMD-precise truth: per
-  component, the offset inside the local cell on a $[0.0, 1.0)$
-  scale.  Round-trips through `StaggerInfo.position`.
+- **Tier 3** — `position` records the ED-PIC per-component offset
+  inside the local cell on a $[0.0, 1.0)$ scale (the openPMD
+  `position` array).  Round-trips through `StaggerInfo.position`.
 
 The validator does **not** cross-check between tiers — a writer may
 populate any subset, and a reader that consumes only Tier 1 still
-works.  Readers that need ED-PIC-precise destagger reach for Tier 3.
+works.  Readers that need an ED-PIC-precise destagger reach for Tier 3.
 
 ### [boundary_conditions]
 
@@ -474,50 +483,53 @@ from_frame = "GSE"                 # chains: simulation → GSE → GSM
 
 ### [[species]]
 
-Describes particle species (PIC and hybrid models) or fluid species
-(multi-fluid MHD). Repeatable — any number of species.
+Describes a kinetic species (PIC / hybrid kinetic) or a fluid species
+(MHD / hybrid fluid). Repeatable — any number of species, any mix of
+modes.
 
 ```toml
 [[species]]
 name = "string"                    # REQUIRED
-charge = 0.0                       # code units — REQUIRED together with mass ...
-mass = 0.0                         # code units — ... OR ...
-charge_to_mass = 0.0               # ... REQUIRED alone (XOR with charge+mass)
-particles_per_cell = [5, 5, 1]     # optional — scalar OR [nx, ny, nz]; 0 or absent = fluid
+
+# Identity (REQUIRED — pick one form)
+charge = 0.0                       # code units — REQUIRED if mass is set (XOR with charge_to_mass)
+mass = 0.0                         # code units — REQUIRED if charge is set (XOR with charge_to_mass)
+charge_to_mass = 0.0               # code units — REQUIRED if charge+mass are omitted
+
+# Shared moments / initial-condition state
 temperature = 0.0                  # optional — scalar isotropic temperature (code units)
-thermal_velocity = [0.0, 0.0, 0.0] # optional — per-component thermal velocity
-drift_velocity = [0.0, 0.0, 0.0]   # optional — bulk drift (code units)
 density = 1.0                      # optional — number density (code units)
-closure = "adiabatic"              # optional (fluid species) — "isothermal" | "adiabatic"
-                                   #                           | "polytropic" | "braginskii"
-                                   #                           | "cgl" | "10moment" | "14moment"
-gamma_eos = 1.6666667              # optional (fluid species) — per-species adiabatic index
+drift_velocity = [0.0, 0.0, 0.0]   # optional — bulk drift (code units)
+thermal_velocity = [0.0, 0.0, 0.0] # optional — per-component thermal velocity
+
+# Kinetic-only (PIC / hybrid kinetic species)
+particles_per_cell = [5, 5, 1]     # optional — scalar OR [nx, ny, nz]; 0 or absent = fluid
+shape = "cic"                      # optional — "ngp" | "cic" | "tsc" | "pqs"
+                                   #   (NGP=order 0, CIC=1, TSC=2, PQS=3; ED-PIC vocabulary)
+tracer = false                     # optional — tagged subset for trajectory tracking;
+                                   # readers propagate the hint to particle analysis
+
+# Fluid-only (MHD / hybrid fluid species)
+closure = "adiabatic"              # optional, open string. Canonical: "isothermal"
+                                   #   | "adiabatic" | "polytropic" | "braginskii"
+                                   #   | "cgl" | "10moment" | "14moment"
+gamma_eos = 1.6666667              # optional — per-species adiabatic index
 gamma_eos_par = 3.0                # optional (10-moment hybrids: Gkeyll, Hakim) — parallel
 gamma_eos_perp = 2.0               # optional (10-moment hybrids) — perpendicular
                                    # par/perp must be present together; cannot mix with
                                    # the scalar `gamma_eos`.
 inertia = 0.0                      # optional (hybrid fluid electrons) — me/mi; 0 = massless
-shape = "cic"                      # optional (PIC) — "ngp" | "cic" | "tsc" | "pqs"
-                                   #   (NGP=order 0, CIC=1, TSC=2, PQS=3; ED-PIC vocabulary)
-tracer = false                     # optional (PIC) — tagged subset for trajectory tracking;
-                                   # readers propagate the hint to particle analysis
 ```
 
 The validator enforces `(charge + mass)` XOR `charge_to_mass`: provide
-exactly one form. Species are indexed in declaration order — `_s0`
-binds to the first entry, `_s1` to the second, etc. Reordering is a
-breaking change to downstream field-name references.
+exactly one form. Species are 0-indexed in declaration order — the
+binding is part of the schema contract; see §1 *Versioning*.
 
-`temperature` and any thermal-related quantities are stored in **energy
-units**, not Kelvin. The conversion to SI gives Joules (`T = P/n` with
-no $k_B$ factor); divide by `scipy.constants.k` for Kelvin or by
-`scipy.constants.eV` for electron-volts at display time. Plasma
-formulas (sound speed, Debye length, β, gyroradii) stay $k_B$-free as
-a result. See [conventions.md § Temperature in Energy
-Units](conventions.md#temperature-in-energy-units).
-
-Relationship: $v_{th} = \sqrt{T/m}$ (see thermal speed convention in
-[Conventions](conventions.md)).
+Temperatures are stored in **energy units** (J in SI), not Kelvin —
+`T = P/n` carries no $k_B$ factor, and $v_{th} = \sqrt{T/m}$. See
+[conventions.md § Temperature in Energy
+Units](conventions.md#temperature-in-energy-units) for conversion to
+eV/K and the openPMD impedance note.
 
 ### [physics]
 
@@ -527,6 +539,12 @@ sub-tables matching `[model].type`. v1.0 enumerates only
 to leave room for v1.1+ portable additions (anticipated:
 `collisional`, `radiative`, `[physics.vlasov]`). Code-specific knobs
 go under `[physics.<model>.x-<code>.*]`.
+
+All `scheme`, `pusher`, `field_solver`, `reconstruction`, `limiter`,
+`riemann`, `divergence_cleaning`, `preconditioner`, `charge_correction`,
+and `current_deposition` values below are open strings — research
+methods that don't appear in the canonical list still validate.
+See §1 *Strict vs open string vocabularies*.
 
 ```toml
 [physics]
@@ -569,8 +587,9 @@ preconditioner      = "ilu"        # optional — implicit MHD: "none" | "jacobi
 # riemann = "hlld"                 # Godunov family: "roe" | "hll" | "hlle" | "hlld" | "lax-friedrichs"
 
 [physics.hybrid]
-# (physics-model knobs — currently minimal; hybrid fluid-species properties
-# live on the corresponding [[species]] entry, not here.)
+# Reserved for v1.1+ hybrid physics-model knobs. Empty in v1.0 —
+# hybrid fluid-species properties live on the corresponding [[species]]
+# entry; code-specific knobs go under [physics.hybrid.x-<code>.*].
 
 [physics.hybrid.solver]
 scheme            = "predictor-corrector"  # "predictor-corrector" | "current-advance-method"
@@ -583,9 +602,8 @@ preconditioner    = "block-jacobi"         # optional — for "implicit" field_p
                                            #   "ilu" | "amg" | "additive-schwarz"
 ```
 
-Key rename: `omega_pe_over_omega_ce` (v0) → `omega_p_over_omega_c`
-(v1.0) — species-agnostic, applies to whichever species is declared
-in `[units].reference_species`. Unknown keys under
+`omega_p_over_omega_c` is species-agnostic — it applies to whichever
+species is declared in `[units].reference_species`. Unknown keys under
 `[physics.{pic,mhd,hybrid}]` and their `.solver` sub-tables are
 accepted without validation (vocabulary evolves in v1.1+).
 
@@ -601,7 +619,8 @@ name                 = "mercury"
 center               = [0.0, 0.0, 0.0]    # code units
 radius               = 60.0
 shape                = "sphere"           # "sphere" | "torus" | "cuboid" | "mesh"
-intrinsic_dipole     = [0.0, 0.0, -190.0] # split-B analytic background
+intrinsic_dipole     = [0.0, 0.0, -190.0] # split-B analytic background; surfaces on disk as B0_*
+                                          #   (see § Canonical Field Names → Electromagnetic fields)
 dipole_center_offset = [0.0, 0.0, 11.8]
 rotation_axis        = [0.0, 0.0, 1.0]
 rotation_period      = 5067360.0          # seconds
@@ -709,7 +728,10 @@ partition     = "by_rank"              # optional — "by_rank" | "by_field" | "
 
 [output.fields]                        # field output
 step_interval = 50
-quantities    = ["B", "E", "J", "rho_c", "V_s0"]  # vector/tensor groups auto-expand
+quantities    = ["B", "E", "J", "rho_c", "V_s0"]  # PIC-flavored example; vector/tensor groups
+                                                  # auto-expand. MHD substitutes rho_m for rho_c
+                                                  # and V for V_s0 — see pypic.simulation.toml
+                                                  # Scenario B for a single-fluid MHD block.
 dir           = "./fields"
 format        = "hdf5"
 precision     = "f32"
@@ -830,7 +852,8 @@ species twice) are permitted.
 ```toml
 [[collisions]]
 species_pair    = ["electrons", "ions"] # REQUIRED — both names must match [[species]]
-model           = "coulomb"            # REQUIRED — "coulomb" | "bgk" | "monte-carlo"
+model           = "coulomb"            # REQUIRED, open string. Canonical:
+                                       #   "coulomb" | "bgk" | "monte-carlo"
 coulomb_log     = 10.0                 # optional — Λ for Coulomb collisions
 temperature_ref = 1.0                  # optional — reference T for the rate scale
 description     = "..."                # optional
@@ -1328,19 +1351,10 @@ field arrays from `/fields/<name>`.  No Python or pypic library
 required.  Coordinate arrays under `/fields` make the data
 self-describing in CF/COARDS terms.
 
-**Backward compatibility.**  `from_zarr` recognises two layouts:
-
-* `schema_version` at root (current writers, mirrors
-  `simulation.toml`).
-* `pypic` umbrella dict at root with field arrays alongside it
-  (legacy v0 writers, pre-flatten).
-
-Writers always emit `schema_version`.
-
-**Field naming invariant (both layouts).**  Stored arrays use the
-numbered canonical names (`B1`, `B2`, `B3`).  Geometry- and
-species-aliases are read-time conveniences resolved by
-`FieldDataset`; they never appear on disk.
+**Field naming invariant.**  Stored arrays use the numbered
+canonical names (`B1`, `B2`, `B3`).  Geometry- and species-aliases
+are read-time conveniences resolved by `FieldDataset`; they never
+appear on disk.
 
 ---
 

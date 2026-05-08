@@ -21,7 +21,7 @@ from pypic.io.zarr import (
     _build_encoding,
     _datatree_encoding,
     _ds_to_field_dataset,
-    _open_v1_or_v0,
+    _open_store,
     _resolve_timeseries_pairs,
     _write_timeseries_steps,
 )
@@ -274,7 +274,7 @@ def from_zarr_icechunk(
     else:
         session = repo.readonly_session(branch=branch or "main")
 
-    ds, root_attrs = _open_v1_or_v0(session.store, f"Icechunk store at {path}")
+    ds, root_attrs = _open_store(session.store, f"Icechunk store at {path}")
     return _ds_to_field_dataset(ds, root_attrs, f"Icechunk store at {path}")
 
 

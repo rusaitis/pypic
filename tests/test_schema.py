@@ -694,6 +694,63 @@ class TestTimeSchemeAdditions:
             validate_simulation_toml(doc)
 
 
+class TestOpenVocabularies:
+    """Algorithm/method/closure fields accept research-extensible strings.
+
+    The canonical v1.0 vocabularies (see ``_models.py``) are guidance, not
+    enforcement: pypic records these values as provenance and does not
+    dispatch on them, so unknown strings — typical for in-progress
+    research methods — must validate cleanly.
+    """
+
+    def test_custom_time_scheme(self) -> None:
+        doc = _minimal_doc(
+            **{'scheme = "fixed"': 'scheme = "amortized-imex-rk4"'}
+        )
+        s = validate_simulation_toml(doc)
+        assert s.time.scheme == "amortized-imex-rk4"
+
+    def test_custom_pic_pusher_and_field_solver(self) -> None:
+        doc = _minimal_doc() + dedent("""
+            [physics]
+            [physics.pic.solver]
+            scheme = "explicit"
+            pusher = "novel-symplectic-2026"
+            field_solver = "fourier-hermite-mixed"
+        """)
+        s = validate_simulation_toml(doc)
+        assert s.physics is not None
+        assert s.physics.pic is not None
+        assert s.physics.pic.solver is not None
+        assert s.physics.pic.solver.pusher == "novel-symplectic-2026"
+        assert s.physics.pic.solver.field_solver == "fourier-hermite-mixed"
+
+    def test_custom_mhd_solver_scheme(self) -> None:
+        doc = _minimal_doc(**{'type = "PIC"': 'type = "MHD"'}) + dedent("""
+            [physics]
+            [physics.mhd.solver]
+            scheme = "in-house-positivity-preserving"
+            limiter = "custom-tvd-3"
+        """)
+        s = validate_simulation_toml(doc)
+        assert s.physics is not None
+        assert s.physics.mhd is not None
+        assert s.physics.mhd.solver is not None
+        assert s.physics.mhd.solver.scheme == "in-house-positivity-preserving"
+        assert s.physics.mhd.solver.limiter == "custom-tvd-3"
+
+    def test_custom_closure(self) -> None:
+        doc = _minimal_doc(
+            **{
+                "charge = -1.0\nmass = 1.0": (
+                    'charge = -1.0\nmass = 1.0\nclosure = "kinetic-bgk-2026"'
+                )
+            }
+        )
+        s = validate_simulation_toml(doc)
+        assert s.species[0].closure == "kinetic-bgk-2026"
+
+
 class TestRunEnsemble:
     """``random_seed`` and ``ensemble`` on ``[run]``."""
 

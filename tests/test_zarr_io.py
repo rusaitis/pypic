@@ -405,49 +405,12 @@ class TestToZarrFromZarr:
         # ``schema_version`` mirrors ``simulation.toml`` and is the
         # single discriminator for both vocabulary and storage shape.
         assert root.attrs["schema_version"] == "1.0"
-        # The v0 umbrella key must not appear in fresh writes.
-        assert "pypic" not in root.attrs
         # Field arrays under /fields, not at the root.
         assert list(root.array_keys()) == []
         assert "fields" in list(root.group_keys())
         # Metadata sections flat at root.
         for key in ("grid", "normalization", "physics", "frame", "transforms"):
             assert key in root.attrs, f"missing root attr {key!r}"
-
-    def test_v0_legacy_read(self, tmp_path):
-        # A store hand-built in the pre-2026.05 layout (fields at root,
-        # ``attrs["pypic"]`` umbrella) must still load via ``from_zarr``.
-        # Synthesize it directly via xarray; assert decode picks the
-        # right components without going through ``to_zarr``.
-        from pypic.io._serialize import (
-            grid_to_dict,
-            normalization_to_dict,
-            physics_to_dict,
-            species_to_list,
-            transforms_to_dict,
-        )
-
-        fds = make_test_dataset(
-            {"B1": np.full((4, 3, 2), 1.5), "rho_m": np.full((4, 3, 2), 0.7)},
-        )
-        ds = fds.xr.copy(deep=False)
-        ds.attrs["pypic"] = {
-            "pypic_version": "legacy-test",
-            "grid": grid_to_dict(fds.grid),
-            "normalization": normalization_to_dict(fds.normalization),
-            "species": species_to_list(fds.species),
-            "physics": physics_to_dict(fds.physics),
-            "metadata": {},
-            "frame": fds.frame,
-            "transforms": transforms_to_dict(dict(fds.transforms)),
-        }
-        store = tmp_path / "legacy.zarr"
-        ds.to_zarr(str(store), zarr_format=3, consolidated=False)
-
-        loaded = from_zarr(store)
-        np.testing.assert_array_equal(loaded["B1"], 1.5)
-        np.testing.assert_array_equal(loaded["rho_m"], 0.7)
-        assert loaded.grid.dimensions == fds.grid.dimensions
 
 
 class TestToZarrTimeseries:

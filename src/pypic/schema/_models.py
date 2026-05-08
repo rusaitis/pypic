@@ -33,6 +33,21 @@ from pydantic import (
     model_validator,
 )
 
+# Two flavours of string-typed fields:
+#
+#   * **Strict** (``Literal[...]``) — bounded structural / format
+#     primitives. The vocabulary is fixed by the data model itself
+#     (Yee-mesh positions, IEEE precisions, on-disk container formats,
+#     coordinate geometries). Adding a value is a v1.x schema bump.
+#
+#   * **Open** (plain ``str`` with a documented canonical list) —
+#     numerical-method, algorithm, and closure vocabularies. Research
+#     codes invent new schemes faster than the schema can enumerate
+#     them, so unknown strings pass validation. The canonical lists
+#     below are guidance for tooling and human readers; pypic does
+#     not dispatch on these values, it records them as provenance.
+
+# --- Strict (structural / format primitives) ---------------------------------
 Precision = Literal["f32", "f64"]
 ModelType = Literal["PIC", "MHD", "hybrid", "vlasov", "gyrokinetic"]
 Geometry = Literal["cartesian", "spherical", "cylindrical", "thetaMode"]
@@ -41,85 +56,14 @@ StaggerKind = Literal["cell", "node", "staggered"]
 # Yee-mesh positions (B on faces, E on edges); ``"cell"`` and ``"node"``
 # carry the same meaning as the top-level ``StaggerKind`` summary tag.
 StaggerLocation = Literal["cell", "node", "face", "edge"]
-TimeScheme = Literal[
-    "fixed",
-    "adaptive",
-    "subcycled",
-    # RK substages and SSP-RK schemes (Athena++, PLUTO, FLASH, AMReX).
-    "rk2",
-    "rk3",
-    "rk4",
-    "vl2",
-    "ssprk2",
-    "ssprk3",
-    # IMEX-RK for stiff source terms (radiation, cooling, chemistry).
-    "imex-rk2",
-    "imex-rk3",
-]
-TimeSplitting = Literal["strang", "lie", "godunov"]
 DriverCoupling = Literal["boundary", "volume", "source", "sink"]
 DriverDirection = Literal["one_way", "two_way"]
-Closure = Literal[
-    "isothermal",
-    "adiabatic",
-    "polytropic",
-    "braginskii",
-    # Anisotropic / multi-moment closures.
-    "cgl",
-    "10moment",
-    "14moment",
-]
-PICSolverScheme = Literal["explicit", "semi-implicit", "implicit"]
-# Pusher: Boris and friends + ED-PIC additions (Lobatto-IIIA RK4, free-streaming).
-PICPusher = Literal["boris", "vay", "higuera-cary", "llrk4", "free-streaming"]
-# Field solver: FDTD-Yee + pseudo-spectral family + ED-PIC stencils (Lehe,
-# Cole-Karkkainen, PSTD, GPSTD, FBPIC's spectral-azimuthal RZ-mode).
-PICFieldSolver = Literal[
-    "fdtd-yee",
-    "pseudo-spectral",
-    "psatd",
-    "spectral-azimuthal",
-    "lehe",
-    "ck",
-    "ckc",
-    "pstd",
-    "gpstd",
-    "implicit-moment",
-    "implicit-gmres",
-]
-# ED-PIC charge-correction and current-deposition vocabularies.
-ChargeCorrection = Literal[
-    "marder", "langdon", "boris", "hyperbolic", "spectral", "none"
-]
-CurrentDeposition = Literal[
-    "esirkepov",
-    "zigzag",
-    "villabune",
-    "direct-boris",
-    "direct-morse-nielson",
-    "none",
-]
-# Particle shape factor (NGP=0, CIC=1, TSC=2, PQS=3).
-ParticleShape = Literal["ngp", "cic", "tsc", "pqs"]
-Preconditioner = Literal[
-    "none", "jacobi", "block-jacobi", "ilu", "amg", "additive-schwarz"
-]
-MHDSolverScheme = Literal["fct", "godunov", "muscl-hancock", "ppm", "weno"]
-MHDReconstruction = Literal["linear", "plm", "ppm", "weno5", "mp5"]
-MHDLimiter = Literal["zalesak", "minmod", "mc", "van-leer", "superbee"]
-DivergenceCleaning = Literal["ct", "powell", "dedner-glm", "projection", "none"]
-MHDRiemann = Literal["roe", "hll", "hlle", "hlld", "lax-friedrichs"]
-HybridSolverScheme = Literal["predictor-corrector", "current-advance-method"]
-HybridFieldPusher = Literal["cyclic-leapfrog", "implicit"]
 FormatLiteral = Literal["hdf5", "zarr", "adios2", "netcdf"]
 ShapeLiteral = Literal["sphere", "torus", "cuboid", "mesh"]
 OutputPartition = Literal["by_rank", "by_field", "monolithic"]
 RestartMode = Literal["hot", "cold"]
 RestoreKind = Literal["fields", "particles", "auxiliary"]
 AMRKind = Literal["block", "patch", "octree"]
-# Collisional PIC models (Smilei, EPOCH, OSIRIS-collisional, PIConGPU).
-CollisionModel = Literal["coulomb", "bgk", "monte-carlo"]
-# Phase-space coordinate system (gyrokinetic vs continuum-Vlasov).
 PhaseSpaceCoordSystem = Literal[
     "cartesian", "guiding-center", "field-aligned", "spherical-velocity"
 ]
@@ -130,6 +74,59 @@ RegionKind = Literal["box", "plane"]
 PhysicalExtentUnit = Literal[
     "m", "km", "R_E", "R_S", "R_sun", "R_M", "R_J", "AU", "d_i"
 ]
+
+# --- Open (algorithm / method / closure vocabularies) ------------------------
+# Aliased to ``str`` so research methods pass validation. Canonical v1.0
+# values listed in comments for tooling and documentation. Cross-field
+# rules (e.g. ``scheme = "subcycled"`` requires ``field_substeps``) still
+# fire via model validators below — the openness is on *value*, not on
+# *semantics*.
+#
+# Time integrator: "fixed", "adaptive", "subcycled", "rk2", "rk3", "rk4",
+#   "vl2", "ssprk2", "ssprk3", "imex-rk2", "imex-rk3"
+TimeScheme = str
+# Operator splitting: "strang", "lie", "godunov"
+TimeSplitting = str
+# Fluid closure: "isothermal", "adiabatic", "polytropic", "braginskii",
+#   "cgl", "10moment", "14moment"
+Closure = str
+# PIC time-integration class: "explicit", "semi-implicit", "implicit"
+PICSolverScheme = str
+# PIC pusher (Boris and friends + ED-PIC additions): "boris", "vay",
+#   "higuera-cary", "llrk4", "free-streaming"
+PICPusher = str
+# PIC field solver (FDTD-Yee + pseudo-spectral family + ED-PIC stencils):
+#   "fdtd-yee", "pseudo-spectral", "psatd", "spectral-azimuthal", "lehe",
+#   "ck", "ckc", "pstd", "gpstd", "implicit-moment", "implicit-gmres"
+PICFieldSolver = str
+# ED-PIC charge correction: "marder", "langdon", "boris", "hyperbolic",
+#   "spectral", "none"
+ChargeCorrection = str
+# ED-PIC current deposition: "esirkepov", "zigzag", "villabune",
+#   "direct-boris", "direct-morse-nielson", "none"
+CurrentDeposition = str
+# Particle shape factor: "ngp" (order 0), "cic" (1), "tsc" (2), "pqs" (3)
+ParticleShape = str
+# Preconditioner family: "none", "jacobi", "block-jacobi", "ilu", "amg",
+#   "additive-schwarz"
+Preconditioner = str
+# MHD solver scheme: "fct", "godunov", "muscl-hancock", "ppm", "weno"
+MHDSolverScheme = str
+# MHD reconstruction: "linear", "plm", "ppm", "weno5", "mp5"
+MHDReconstruction = str
+# MHD slope limiter: "zalesak", "minmod", "mc", "van-leer", "superbee"
+MHDLimiter = str
+# Divergence cleaning: "ct", "powell", "dedner-glm", "projection", "none"
+DivergenceCleaning = str
+# MHD Riemann solver: "roe", "hll", "hlle", "hlld", "lax-friedrichs"
+MHDRiemann = str
+# Hybrid solver scheme: "predictor-corrector", "current-advance-method"
+HybridSolverScheme = str
+# Hybrid field pusher: "cyclic-leapfrog", "implicit"
+HybridFieldPusher = str
+# Collision model (Smilei, EPOCH, OSIRIS-collisional, PIConGPU):
+#   "coulomb", "bgk", "monte-carlo"
+CollisionModel = str
 
 # Length-constrained list aliases used by every shape-checked vector field.
 # `Vec3*` = strictly 3D. `Axis*` = 1..3 axes (axis count is enforced against

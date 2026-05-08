@@ -343,12 +343,7 @@ def _from_json_native(obj: Any) -> Any:  # noqa: ANN401
 # storage shape together.
 SCHEMA_VERSION = "1.0"
 
-# Read-time discriminators recognised on root attrs.  ``schema_version``
-# is the current flat-attrs discriminator; ``pypic`` is the original
-# v0 umbrella key (legacy reads only — writers always emit
-# ``schema_version``).
 _FLAT_LAYOUT_KEY = "schema_version"
-_LEGACY_UMBRELLA_KEY = "pypic"
 
 
 def encode_pypic_attrs(fds: FieldDataset) -> dict[str, Any]:
@@ -393,35 +388,25 @@ def decode_pypic_attrs(
 ]:
     """Unpack root-group attrs into the components needed by FieldDataset.
 
-    Accepts two layouts on read so older stores keep loading:
-
-    * **schema-v1.0** — flat keys at the top level with a
-      ``schema_version`` discriminator (current writers).
-    * **v0 umbrella** — nested ``d["pypic"] = {...}`` form (pre-flatten
-      writers).  Inner dict has the same section keys as the flat
-      layout minus the discriminator.
+    Expects schema-v1.0 flat keys at the top level with a
+    ``schema_version`` discriminator.
 
     Returns
     -------
     tuple
         (grid, normalization, species, physics, metadata, frame, transforms)
     """
-    if _FLAT_LAYOUT_KEY in d:
-        attrs = d
-    elif _LEGACY_UMBRELLA_KEY in d:
-        attrs = d[_LEGACY_UMBRELLA_KEY]
-    else:
+    if _FLAT_LAYOUT_KEY not in d:
         msg = (
-            "No pypic metadata found in store attrs (expected "
-            "``schema_version`` for current stores or ``pypic`` for "
-            "legacy v0)"
+            "No pypic metadata found in store attrs "
+            f"(expected ``{_FLAT_LAYOUT_KEY}`` discriminator)"
         )
         raise ValueError(msg)
-    grid = dict_to_grid(attrs["grid"])
-    normalization = dict_to_normalization(attrs["normalization"])
-    species = list_to_species(attrs.get("species", []))
-    physics = dict_to_physics(attrs["physics"])
-    metadata = _from_json_native(attrs.get("metadata", {}))
-    frame = attrs.get("frame", "simulation")
-    transforms = dict_to_transforms(attrs.get("transforms", {}))
+    grid = dict_to_grid(d["grid"])
+    normalization = dict_to_normalization(d["normalization"])
+    species = list_to_species(d.get("species", []))
+    physics = dict_to_physics(d["physics"])
+    metadata = _from_json_native(d.get("metadata", {}))
+    frame = d.get("frame", "simulation")
+    transforms = dict_to_transforms(d.get("transforms", {}))
     return grid, normalization, species, physics, metadata, frame, transforms
