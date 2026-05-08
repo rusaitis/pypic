@@ -25,7 +25,6 @@ def _minimal_doc(**overrides: str) -> str:
     base = (
         dedent(
             """
-        schema_version = "1.0"
         [schema]
         version = "1.0"
         [model]
@@ -97,8 +96,7 @@ def _extract_scenario_toml(full_text: str, scenario: str) -> str:
             extracted.append("")
         else:
             extracted.append(ln)
-    # Scenarios B/C lack the bare `schema_version` top-level key.
-    return 'schema_version = "1.0"\n' + "\n".join(extracted) + "\n"
+    return "\n".join(extracted) + "\n"
 
 
 class TestLiveTemplate:
@@ -112,7 +110,7 @@ class TestLiveTemplate:
         s = validate_simulation_toml(LIVE_TEMPLATE)
         assert s.model.name == "iPIC3D"
         assert s.model.type == "PIC"
-        assert s.schema_version == "1.0"
+        assert s.schema_.version == "1.0"
 
     def test_scenario_a_species_order(self) -> None:
         s = validate_simulation_toml(LIVE_TEMPLATE)
@@ -188,14 +186,8 @@ class TestMinimalDoc:
         doc = _minimal_doc() + "\n[x_custom]\nfoo = 1\n"
         validate_simulation_toml(doc)
 
-    def test_schema_version_mismatch(self) -> None:
-        doc = _minimal_doc().replace('schema_version = "1.0"', 'schema_version = "1.1"')
-        with pytest.raises(ValidationError, match="must match"):
-            validate_simulation_toml(doc)
-
     def test_rejects_non_v1_schema(self) -> None:
         doc = dedent("""
-            schema_version = "2.0"
             [schema]
             version = "2.0"
             [model]
@@ -306,7 +298,6 @@ class TestSpecies:
 
     def test_missing_species_rejected(self) -> None:
         doc = dedent("""
-            schema_version = "1.0"
             [schema]
             version = "1.0"
             [model]
@@ -773,32 +764,46 @@ class TestGridAdditions:
         assert s.grid.amr.level_subcycling is False
 
 
-class TestGridStaggerFields:
-    """``[grid.stagger_fields]`` and ``[grid.stagger_position]`` sub-tables."""
+class TestGridStagger:
+    """``[grid.stagger]`` sub-table — convention/fields/position tiers."""
+
+    def test_stagger_default_convention(self) -> None:
+        s = validate_simulation_toml(_minimal_doc())
+        assert s.grid.stagger.convention == "cell"
+        assert s.grid.stagger.fields is None
+        assert s.grid.stagger.position is None
+
+    def test_stagger_convention_explicit(self) -> None:
+        doc = _minimal_doc() + dedent("""
+            [grid.stagger]
+            convention = "node"
+        """)
+        s = validate_simulation_toml(doc)
+        assert s.grid.stagger.convention == "node"
 
     def test_stagger_fields_per_group(self) -> None:
         doc = _minimal_doc() + dedent("""
-            [grid.stagger_fields]
+            [grid.stagger.fields]
             B = "face"
             E = "edge"
             J = "edge"
         """)
         s = validate_simulation_toml(doc)
-        assert s.grid.stagger_fields == {"B": "face", "E": "edge", "J": "edge"}
+        assert s.grid.stagger.fields == {"B": "face", "E": "edge", "J": "edge"}
 
     def test_stagger_position_offsets(self) -> None:
         doc = _minimal_doc() + dedent("""
-            [grid.stagger_position]
+            [grid.stagger.position]
             B1 = [0.5, 0.0, 0.0]
             E1 = [0.0, 0.5, 0.5]
         """)
         s = validate_simulation_toml(doc)
-        assert s.grid.stagger_position is not None
-        assert s.grid.stagger_position["B1"] == [0.5, 0.0, 0.0]
+        assert s.grid.stagger.position is not None
+        assert s.grid.stagger.position["B1"] == [0.5, 0.0, 0.0]
 
     def test_stagger_position_offset_out_of_range_rejected(self) -> None:
         doc = _minimal_doc() + dedent("""
-            [grid.stagger_position]
+            [grid.stagger.position]
             B1 = [1.0, 0.0, 0.0]
         """)
         with pytest.raises(ValidationError, match=r"\[0.0, 1.0\)"):
@@ -806,7 +811,7 @@ class TestGridStaggerFields:
 
     def test_stagger_position_axis_count_mismatch_rejected(self) -> None:
         doc = _minimal_doc() + dedent("""
-            [grid.stagger_position]
+            [grid.stagger.position]
             B1 = [0.5, 0.0]
         """)
         with pytest.raises(ValidationError, match="dimensions has 3"):
@@ -814,7 +819,7 @@ class TestGridStaggerFields:
 
     def test_stagger_field_invalid_location_rejected(self) -> None:
         doc = _minimal_doc() + dedent("""
-            [grid.stagger_fields]
+            [grid.stagger.fields]
             B = "centroid"
         """)
         with pytest.raises(ValidationError):
@@ -1023,62 +1028,49 @@ class TestPhaseSpaceStorage:
         with pytest.raises(ValidationError, match="block_size"):
             validate_simulation_toml(doc)
 
-class TestRestartFromFiles:
-    """``Restart.from_files`` — VPIC per-rank manifest support."""
 
-    def test_from_files_accepted(self) -> None:
+class TestRestartFromList:
+    """``Restart.from`` accepts either a string or a list of per-rank files."""
+
+    def test_from_string_accepted(self) -> None:
         doc = _minimal_doc() + dedent("""
             [restart]
-            from = "./checkpoints/manifest.txt"
-            from_files = ["chk_00000.h5", "chk_00001.h5", "chk_00002.h5"]
+            from = "./chk.h5"
         """)
         s = validate_simulation_toml(doc)
         assert s.restart is not None
-        assert s.restart.from_files == [
+        assert s.restart.from_ == "./chk.h5"
+
+    def test_from_list_accepted(self) -> None:
+        # Escape-hatch shape: explicit per-rank file list for runs whose
+        # filenames don't follow the source code's convention.
+        doc = _minimal_doc() + dedent("""
+            [restart]
+            from = ["chk_00000.h5", "chk_00001.h5", "chk_00002.h5"]
+        """)
+        s = validate_simulation_toml(doc)
+        assert s.restart is not None
+        assert s.restart.from_ == [
             "chk_00000.h5",
             "chk_00001.h5",
             "chk_00002.h5",
         ]
 
-    def test_from_files_empty_rejected(self) -> None:
+    def test_from_list_empty_rejected(self) -> None:
         doc = _minimal_doc() + dedent("""
             [restart]
-            from = "./chk.h5"
-            from_files = []
+            from = []
         """)
-        with pytest.raises(ValidationError, match="from_files"):
+        with pytest.raises(ValidationError, match="non-empty"):
             validate_simulation_toml(doc)
 
-    def test_from_files_duplicates_rejected(self) -> None:
+    def test_from_list_duplicates_rejected(self) -> None:
         doc = _minimal_doc() + dedent("""
             [restart]
-            from = "./chk.h5"
-            from_files = ["a.h5", "a.h5"]
+            from = ["a.h5", "a.h5"]
         """)
         with pytest.raises(ValidationError, match="distinct"):
             validate_simulation_toml(doc)
-
-    def test_single_file_from_with_from_files_rejected(self) -> None:
-        # When `from_files` enumerates per-rank checkpoints, `from` must
-        # point at a directory or glob — not a single-file path. Soft
-        # check via known single-file extensions.
-        doc = _minimal_doc() + dedent("""
-            [restart]
-            from = "./chk.h5"
-            from_files = ["a.h5", "b.h5"]
-        """)
-        with pytest.raises(ValidationError, match="looks like a single"):
-            validate_simulation_toml(doc)
-
-    def test_directory_from_with_from_files_accepted(self) -> None:
-        doc = _minimal_doc() + dedent("""
-            [restart]
-            from = "./restart_30000/"
-            from_files = ["chk_00000.h5", "chk_00001.h5"]
-        """)
-        s = validate_simulation_toml(doc)
-        assert s.restart is not None
-        assert s.restart.from_ == "./restart_30000/"
 
 
 class TestAnisotropicGammaEOS:

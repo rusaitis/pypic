@@ -38,6 +38,12 @@ class FieldDataset:
     Wraps an ``xr.Dataset`` with grid metadata, normalization info, species
     definitions, and geometry-aware field aliases (e.g. ``"Bx"`` → ``"B1"``).
 
+    The full alias hierarchy — geometry/Cartesian aliases, species-name
+    aliases (``n_electrons``→``n_s0``), and the e/i library-convenience
+    forms (``Pe``↔``P_s0``) — is documented at ``docs/aliases.md``. The
+    e/i shortcuts are pypic-only ergonomics and are **not** part of the
+    cross-tool schema contract in ``docs/schema.md``.
+
     Use `from_arrays` to construct from raw NumPy arrays.
 
     Parameters

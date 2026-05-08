@@ -447,24 +447,22 @@ def _build_metadata(schema: SimulationSchema) -> dict[str, Any]:
         metadata["version"] = schema.model.version
     if schema.model.description is not None:
         metadata["description"] = schema.model.description
-    if schema.grid.stagger is not None:
-        # ``stagger_fields`` and ``stagger_position`` are optional per-component
-        # promotions of the single-string summary. They round-trip through
-        # ``StaggerInfo`` so consumers see one shape regardless of how the
-        # source TOML expressed it.
-        position: dict[str, tuple[float, ...]] | None = None
-        if schema.grid.stagger_position is not None:
-            position = {
-                name: tuple(float(x) for x in offsets)
-                for name, offsets in schema.grid.stagger_position.items()
-            }
-        metadata["stagger"] = StaggerInfo(
-            convention=str(schema.grid.stagger),
-            field_locations=dict(schema.grid.stagger_fields)
-            if schema.grid.stagger_fields is not None
-            else None,
-            position=position,
-        )
+    # ``[grid.stagger]`` consolidates the three Tier 1/2/3 keys
+    # (``convention``, ``fields``, ``position``) under one sub-table.
+    # All three round-trip through ``StaggerInfo`` so consumers see one
+    # shape regardless of which tiers the source TOML populated.
+    stagger = schema.grid.stagger
+    position: dict[str, tuple[float, ...]] | None = None
+    if stagger.position is not None:
+        position = {
+            name: tuple(float(x) for x in offsets)
+            for name, offsets in stagger.position.items()
+        }
+    metadata["stagger"] = StaggerInfo(
+        convention=str(stagger.convention),
+        field_locations=dict(stagger.fields) if stagger.fields is not None else None,
+        position=position,
+    )
     scaling: dict[str, Any] = {}
     scaling_factor = getattr(schema.units, "scaling_factor", None)
     if scaling_factor is not None:

@@ -382,6 +382,33 @@ class GridStretched(_StrictBase):
         return self
 
 
+class GridStagger(_StrictBase):
+    """``[grid.stagger]`` — where fields live inside each cell.
+
+    Three tiers, all optional and additive — same fact at increasing
+    precision:
+
+    1. ``convention`` — single-string summary (``"cell"`` / ``"node"``
+       / ``"staggered"``). Defaults to ``"cell"``.
+    2. ``fields`` — per-field-group location map, e.g.
+       ``{B = "face", E = "edge"}``. Captures the Yee-mesh truth that
+       a single string cannot.
+    3. ``position`` — per-component openPMD ED-PIC offsets in
+       ``[0, 1)`` along each axis, e.g. ``{B1 = [0.5, 0.0, 0.0]}``.
+       Lossless representation of the source mesh; consumed by readers
+       that need ED-PIC-precise destaggering.
+
+    All three are informational — readers destagger to co-located grids
+    on load. They round-trip through :class:`StaggerInfo` in
+    ``pypic.containers``. The validator does not cross-check between
+    tiers; a writer may populate any subset.
+    """
+
+    convention: StaggerKind = "cell"
+    fields: dict[str, StaggerLocation] | None = None
+    position: dict[str, list[float]] | None = None
+
+
 class Grid(_StrictBase):
     """``[grid]`` — computational grid in code units.
 
@@ -396,30 +423,16 @@ class Grid(_StrictBase):
     to ``upper[i] - lower[i]`` and that the list length equals
     ``dimensions[i]``.
 
-    Stagger surfaces three layers of detail, all optional and additive:
-
-    1. ``stagger`` — single-string summary (``"cell"`` / ``"node"`` /
-       ``"staggered"``). Always present, defaults to ``"cell"``.
-    2. ``stagger_fields`` — per-field-group location map, e.g.
-       ``{B = "face", E = "edge"}``. Captures the Yee-mesh truth that
-       a single string cannot.
-    3. ``stagger_position`` — per-component openPMD ED-PIC offsets in
-       ``[0, 1)`` along each axis, e.g. ``{B1 = [0.5, 0.0, 0.0]}``.
-       Lossless representation of the source mesh; consumed by readers
-       that need to destagger or reconstruct the native layout.
-
-    All three are informational — readers destagger to co-located grids
-    on load. They round-trip through :class:`StaggerInfo` in
-    ``pypic.containers``.
+    ``stagger`` consolidates the three field-placement-inside-cell
+    tiers (``convention``, ``fields``, ``position``) under a single
+    sub-table — see :class:`GridStagger`.
     """
 
     dimensions: AxisInt
     spacing: AxisPosFloat
     lower: AxisFloat
     upper: AxisFloat
-    stagger: StaggerKind = "cell"
-    stagger_fields: dict[str, StaggerLocation] | None = None
-    stagger_position: dict[str, list[float]] | None = None
+    stagger: GridStagger = Field(default_factory=GridStagger)
     ghost_cells: (
         Annotated[list[NonNegativeInt], Field(min_length=1, max_length=3)] | None
     ) = None
@@ -470,17 +483,17 @@ class Grid(_StrictBase):
                         f"{expected_extent} (within rtol "
                         f"{self.stretched.sum_rtol})"
                     )
-        if self.stagger_position is not None:
-            for name, offsets in self.stagger_position.items():
+        if self.stagger.position is not None:
+            for name, offsets in self.stagger.position.items():
                 if len(offsets) != n:
                     raise ValueError(
-                        f"grid.stagger_position['{name}'] has {len(offsets)} "
+                        f"grid.stagger.position['{name}'] has {len(offsets)} "
                         f"entries, expected dimensions has {n}"
                     )
                 for offset in offsets:
                     if not 0.0 <= offset < 1.0:
                         raise ValueError(
-                            f"grid.stagger_position['{name}'] = {offsets} — "
+                            f"grid.stagger.position['{name}'] = {offsets} — "
                             f"each offset must be in [0.0, 1.0)"
                         )
         return self
@@ -840,19 +853,17 @@ class Driver(_ExtensibleBase):
 class Restart(_StrictBase):
     """``[restart]`` — continuation pointer from a prior run.
 
-    ``from`` is the path to the restart artifact: a single file
-    (``./chk_000030.h5``), a directory of per-rank checkpoints
-    (``./restart_30000/``), or a glob pattern. Whether the path
-    resolves to one file or many is determined at read time by the
-    filesystem and the code, not by the schema.
+    ``from`` is the path (or paths) to the restart artifact:
 
-    ``from_files`` is a rarely-needed escape hatch: an explicit list
-    of per-rank files for runs whose names don't follow the source
-    code's convention (e.g. reruns with relocated files). When set,
-    ``from`` should point at a directory or glob — not a single-file
-    path — and the validator soft-checks this by rejecting common
-    single-file extensions (``.h5``, ``.hdf5``, ``.bp``, ``.zarr``,
-    ``.nc``) on ``from``.
+    * a single file (``./chk_000030.h5``),
+    * a directory of per-rank checkpoints (``./restart_30000/``),
+    * a glob pattern, or
+    * an explicit list of per-rank files for runs whose names don't
+      follow the source code's convention (relocated reruns, mixed
+      naming schemes).
+
+    Whether the path resolves to one file or many is determined at
+    read time by the filesystem and the code, not by the schema.
 
     ``restore`` enables partial restart — restarting only the listed
     state categories rather than all of them (e.g., fields-only
@@ -863,42 +874,26 @@ class Restart(_StrictBase):
     optional; a missing ``restore`` means the full state is restored.
     """
 
-    from_: str = Field(..., alias="from")
+    from_: str | list[str] = Field(..., alias="from")
     step: NonNegativeInt | None = None
     time: NonNegativeFloat | None = None
     restore: list[RestoreKind] | None = None
     mode: RestartMode | None = None
-    from_files: list[str] | None = None
 
     @model_validator(mode="after")
-    def _check_restore_distinct(self) -> Restart:
+    def _check_restart(self) -> Restart:
         if self.restore is not None and len(set(self.restore)) != len(self.restore):
             raise ValueError(
                 f"restart.restore entries must be distinct, got {self.restore}"
             )
         if self.restore is not None and not self.restore:
             raise ValueError("restart.restore must be non-empty when present")
-        if self.from_files is not None:
-            if not self.from_files:
-                raise ValueError("restart.from_files must be non-empty when present")
-            if len(set(self.from_files)) != len(self.from_files):
+        if isinstance(self.from_, list):
+            if not self.from_:
+                raise ValueError("restart.from must be non-empty when given as a list")
+            if len(set(self.from_)) != len(self.from_):
                 raise ValueError(
-                    f"restart.from_files entries must be distinct, got "
-                    f"{self.from_files}"
-                )
-            # When `from_files` enumerates per-rank checkpoints, `from`
-            # should point at a directory or glob — a single-file path
-            # contradicts the explicit list. Heuristic: reject common
-            # single-file checkpoint extensions.
-            single_file_exts = (".h5", ".hdf5", ".bp", ".zarr", ".nc")
-            from_lower = self.from_.lower()
-            if any(from_lower.endswith(ext) for ext in single_file_exts):
-                raise ValueError(
-                    f"restart.from = {self.from_!r} looks like a single "
-                    f"checkpoint file, but restart.from_files is also set "
-                    f"(explicit per-rank list). When from_files is "
-                    f"present, from should point at a directory or glob "
-                    f"pattern, not a single file."
+                    f"restart.from entries must be distinct, got {self.from_}"
                 )
         return self
 
@@ -1352,16 +1347,11 @@ class SimulationSchema(_ExtensibleBase):
     ``x_``. Known optional sections that are present are strictly
     validated.
 
-    Note on ``schema_version`` vs ``[schema].version``: both are
-    required and ``_check_root_invariants`` enforces that they match.
-    The duplication is intentional — the bare top-level
-    ``schema_version`` lets a streaming parser identify the schema
-    version without descending into any table, while ``[schema]``
-    is the structured home for related metadata (``created`` date,
-    future provenance keys).
+    ``[schema].version`` is the single discriminator for both the
+    TOML config and the on-disk vocabulary it describes; v1.x is
+    additive-only per ``schema.md`` §1 *Versioning*.
     """
 
-    schema_version: str
     schema_: SchemaMeta = Field(..., alias="schema")
     model: Model
     run: Run
@@ -1384,14 +1374,9 @@ class SimulationSchema(_ExtensibleBase):
 
     @model_validator(mode="after")
     def _check_root_invariants(self) -> SimulationSchema:
-        if self.schema_version != self.schema_.version:
+        if not self.schema_.version.startswith("1."):
             raise ValueError(
-                f"schema_version bare key ('{self.schema_version}') and "
-                f"[schema].version ('{self.schema_.version}') must match"
-            )
-        if not self.schema_version.startswith("1."):
-            raise ValueError(
-                f"this validator implements schema v1.x; got '{self.schema_version}'"
+                f"this validator implements schema v1.x; got '{self.schema_.version}'"
             )
         n = len(self.grid.dimensions)
         if (

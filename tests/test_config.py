@@ -38,7 +38,6 @@ def _shell(
     return (
         "\n\n".join(
             [
-                'schema_version = "1.0"',
                 '[schema]\nversion = "1.0"',
                 model,
                 '[run]\nname = "r0"',
@@ -749,18 +748,20 @@ class TestForwardedSections:
     def test_stagger_per_component_round_trips_into_stagger_info(
         self, tmp_path: Path
     ) -> None:
-        # ``[grid.stagger_fields]`` and ``[grid.stagger_position]`` survive
-        # translation as ``StaggerInfo.field_locations`` and
-        # ``StaggerInfo.position`` on ``cfg.metadata['stagger']``.
+        # ``[grid.stagger]`` consolidates the convention/fields/position
+        # tiers; all three survive translation as
+        # ``StaggerInfo.{convention, field_locations, position}`` on
+        # ``cfg.metadata['stagger']``.
         grid_with_stagger = (
             "[grid]\n"
             "dimensions = [2, 2, 2]\nspacing = [1.0, 1.0, 1.0]\n"
             "lower = [0.0, 0.0, 0.0]\nupper = [2.0, 2.0, 2.0]\n"
-            'stagger = "staggered"\n'
-            "[grid.stagger_fields]\n"
+            "[grid.stagger]\n"
+            'convention = "staggered"\n'
+            "[grid.stagger.fields]\n"
             'B = "face"\n'
             'E = "edge"\n'
-            "[grid.stagger_position]\n"
+            "[grid.stagger.position]\n"
             "B1 = [0.5, 0.0, 0.0]\n"
             "E1 = [0.0, 0.5, 0.5]\n"
         )

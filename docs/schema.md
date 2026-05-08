@@ -30,9 +30,9 @@ lives at `pypic.simulation.toml` at the repo root.
 
 ### Versioning
 
-The `schema_version` bare key (and the matching `[schema].version`) is
-the single discriminator for both `simulation.toml` and the on-disk
-output stores (HDF5 §4.1, Zarr §4.2). v1.x commits to:
+`[schema].version` is the single discriminator for both
+`simulation.toml` and the on-disk output stores (HDF5 §4.1, Zarr §4.2,
+each carrying `schema_version` as a flat root attr). v1.x commits to:
 
 - **Additive only.** Future v1.x releases may add optional sections,
   optional keys, canonical field names, and enum values. They will
@@ -44,7 +44,7 @@ output stores (HDF5 §4.1, Zarr §4.2). v1.x commits to:
 - **Pre-v1 reads, no pre-v1 writes.** The legacy v0 Zarr layout
   (`pypic` umbrella attr at root) still loads with a
   `DeprecationWarning` and is slated for removal in v2. Writers
-  always emit `schema_version`.
+  always emit the v1 layout.
 - **`x-*` extensions are unconstrained.** Code-specific knobs under
   `x-<code>.*` (or unknown sub-tables under `[physics.{pic,mhd,
   hybrid,vlasov}]`) are accepted by the validator without
@@ -52,17 +52,14 @@ output stores (HDF5 §4.1, Zarr §4.2). v1.x commits to:
   promises about their portability.
 
 Anything stricter than this — e.g., a removal or rename — bumps
-`schema_version` to `2.0`.
+`[schema].version` to `2.0`.
 
 ### Required sections
 
 A valid v1.0 document must declare:
 
 ```toml
-schema_version = "1.0"   # top-level bare key — lets a streaming parser
-                         # identify the schema without reading everything
-
-[schema]                 # [schema].version must match schema_version
+[schema]                 # version = "1.0" (REQUIRED)
 [model]                  # code identity (name, type)
 [run]                    # THIS run's identity + provenance
 [time]                   # dt, t_start, t_end, n_steps, scheme
@@ -82,7 +79,7 @@ Listed in the order §2 walks them.
 [[bodies]]               # registry of physical objects (planets, coils, ...)
 [initial_conditions]     # flat table: setup type + type-specific keys
 [[drivers]]              # ongoing external coupling (magnetograms, SW inflow, ...)
-[restart]                # continuation pointer (incl. multi-file from_files)
+[restart]                # continuation pointer (single file, glob, or list)
 [output.*]               # five independent sub-sections plus the
                          # repeatable [[output.streams]] array, all
                          # walked together in §2:
@@ -119,7 +116,8 @@ Schema version tag and creation date.
 
 ```toml
 [schema]
-version = "1.0"                    # REQUIRED — must equal schema_version bare key
+version = "1.0"                    # REQUIRED — single discriminator for the
+                                   #            TOML config and on-disk stores
 created = 2026-04-23               # optional TOML date literal
 ```
 
@@ -233,14 +231,6 @@ dimensions = [nx, ny, nz]          # REQUIRED — cells per axis
 spacing    = [dx, dy, dz]          # REQUIRED — cell sizes
 lower      = [x_min, y_min, z_min] # REQUIRED — lower corner
 upper      = [x_max, y_max, z_max] # REQUIRED — upper corner (must exceed lower)
-stagger    = "cell"                # optional: "cell" (default) | "node" | "staggered"
-                                   #   "cell"       — fields at cell centers
-                                   #   "node"       — fields at cell vertices (iPIC3D)
-                                   #   "staggered"  — Yee mesh (B faces, E edges, ...)
-                                   # Single-string summary; per-component truth lives
-                                   # in [grid.stagger_fields] / [grid.stagger_position]
-                                   # below. Informational only — readers destagger to
-                                   # co-located grids on load.
 ghost_cells   = [2, 2, 2]          # optional — halo width per axis (matches dimensions)
 source        = "grids/mesh.h5"    # optional — external file for complex meshes
 source_format = "hdf5"             # optional
@@ -272,20 +262,26 @@ box   = [[-60.0, -60.0, -60.0], [60.0, 60.0, 60.0]]
 0 = [0.5, 0.6, 0.8, 1.0, 1.3]      # x stretched
 2 = [0.1, 0.1, 0.2, 0.4, 0.8]      # z log-radial (ARMS, PLUTO style)
 
-# Per-field-group stagger locations (optional). Captures the Yee-mesh
-# truth that the single-string `stagger` cannot — B sits on faces,
-# E sits on edges, etc. Free-form keys (canonical field-group names);
-# values are "cell" | "node" | "face" | "edge".
-[grid.stagger_fields]
+# Stagger consolidates three tiers under one sub-table. All optional
+# and additive; readers destagger to co-located grids on load.
+[grid.stagger]
+convention = "staggered"           # Tier 1: one-word summary
+                                   #   "cell" (default) | "node" | "staggered"
+
+# Tier 2: per-field-group locations. Captures the Yee-mesh truth that
+# the single-string convention cannot — B sits on faces, E on edges.
+# Free-form keys (canonical field-group names); values "cell" | "node"
+# | "face" | "edge".
+[grid.stagger.fields]
 B = "face"
 E = "edge"
 J = "edge"
 
-# Per-component openPMD ED-PIC offsets (optional). Each value is a
-# vector in [0.0, 1.0) giving the position of that field component
-# inside the local cell along each axis. The most precise stagger
-# representation; round-trips through StaggerInfo.position.
-[grid.stagger_position]
+# Tier 3: per-component openPMD ED-PIC offsets. Each value is a vector
+# in [0.0, 1.0) giving the position of that field component inside
+# the local cell along each axis. Lossless representation of the
+# source mesh; round-trips through StaggerInfo.position.
+[grid.stagger.position]
 B1 = [0.5, 0.0, 0.0]               # B_x on the x-face
 B2 = [0.0, 0.5, 0.0]               # B_y on the y-face
 B3 = [0.0, 0.0, 0.5]               # B_z on the z-face
@@ -295,16 +291,16 @@ E1 = [0.0, 0.5, 0.5]               # E_x on the x-edge
 **Stagger layering.** Three tiers, all optional, all additive — same
 fact, increasing precision:
 
-- **Tier 1** — `stagger` is a one-word summary for human readers and
-  downstream UIs ("cell-centered", "node-centered", "Yee mesh").
+- **Tier 1** — `convention` is a one-word summary for human readers
+  and downstream UIs ("cell-centered", "node-centered", "Yee mesh").
   Informational only; readers always destagger to a co-located grid
   on load.
-- **Tier 2** — `[grid.stagger_fields]` records per-group locations
-  (`B` on faces, `E` on edges) for readers that consume the
-  field-group hint when destaggering.
-- **Tier 3** — `[grid.stagger_position]` is the openPMD-precise
-  truth: per component, the offset inside the local cell on a
-  $[0.0, 1.0)$ scale.  Round-trips through `StaggerInfo.position`.
+- **Tier 2** — `fields` records per-group locations (`B` on faces,
+  `E` on edges) for readers that consume the field-group hint when
+  destaggering.
+- **Tier 3** — `position` is the openPMD-precise truth: per
+  component, the offset inside the local cell on a $[0.0, 1.0)$
+  scale.  Round-trips through `StaggerInfo.position`.
 
 The validator does **not** cross-check between tiers — a writer may
 populate any subset, and a reader that consumes only Tier 1 still
@@ -661,18 +657,22 @@ accepted beyond the core vocabulary above.
 
 ### [restart]
 
-Continuation pointer from a prior run. ``from`` is the path to the
-restart artifact: a single file, a directory of per-rank checkpoints,
-or a glob pattern. Whether it resolves to one file or many is
-determined at read time by the filesystem and the code, not by the
-schema. ``from_files`` is a rarely-needed escape hatch for runs whose
-filenames don't follow the source code's convention.
+Continuation pointer from a prior run. ``from`` is the path (or
+paths) to the restart artifact:
+
+- a single file (``./chk_000030.h5``),
+- a directory of per-rank checkpoints (``./restart_30000/``),
+- a glob pattern, or
+- an explicit list of per-rank files for runs whose filenames don't
+  follow the source code's convention (relocated reruns, mixed
+  naming schemes).
+
+Whether the path resolves to one file or many is determined at read
+time by the filesystem and the code, not by the schema.
 
 ```toml
 [restart]
-from = "./checkpoints/chk_000030.h5"   # REQUIRED — path to the restart artifact.
-                                        #   Single file, directory of per-rank
-                                        #   files, or glob — code-determined.
+from = "./checkpoints/chk_000030.h5"   # REQUIRED — string OR list of strings.
                                         #   (Aliased — `from` is a Python keyword.)
 step = 30000                            # optional
 time = 1500.0                           # optional
@@ -682,14 +682,13 @@ restore = ["fields", "particles"]       # optional — partial restart selector
                                         #   restores everything.
 mode = "hot"                            # optional — "hot" (full state reload) |
                                         #   "cold" (re-apply IC on saved geometry)
-from_files = [                          # optional escape hatch — explicit list
-    "chk_000030_rank_00000.h5",         #   for runs whose per-rank filenames
-    "chk_000030_rank_00001.h5",         #   don't follow the source code's
-    "chk_000030_rank_00002.h5",         #   convention (e.g. relocated reruns).
-]                                       #   Distinct & non-empty. When present,
-                                        #   `from` should point at a directory or
-                                        #   glob — not a single .h5/.bp/.zarr/.nc
-                                        #   file.
+
+# Escape-hatch shape — explicit per-rank file list (distinct, non-empty):
+# from = [
+#     "chk_000030_rank_00000.h5",
+#     "chk_000030_rank_00001.h5",
+#     "chk_000030_rank_00002.h5",
+# ]
 ```
 
 ### [output.*]
@@ -918,9 +917,7 @@ and imaginary axes.
 | `rho_c` | Total charge density | PIC |
 | `rho_m` | Total mass density | MHD, PIC (derived) |
 
-`rho_c` and `rho_m` are unambiguous — no overloaded `rho`. `n_e` and
-`n_i` are accepted as aliases for `n_s0` and `n_s1` (see convenience
-aliases table below).
+`rho_c` and `rho_m` are unambiguous — no overloaded `rho`.
 
 **Per-species naming:** Append `_s` plus the 0-based species index
 (`rho_c_s0`, `J1_s1`, `n_s3`); the component index comes before the
@@ -940,63 +937,34 @@ For multi-species runs (H⁺ + He²⁺ + O⁺), the species-name form is the
 unambiguous way to reference per-species quantities — the integer index
 depends on declaration order.
 
-**Electron/ion convenience aliases:** For the common two-species case
-(species 0 = electrons, 1 = ions), `e`/`i` suffixed names alias the
-canonical `_s0`/`_s1` forms:
-
-| Alias | Canonical | Meaning |
-|-------|-----------|---------|
-| `n_e`, `n_i` | `n_s0`, `n_s1` | Number density |
-| `Pe`, `Pi` | `P_s0`, `P_s1` | Scalar pressure (or Tr(tensor)/3) |
-| `Te`, `Ti` | `T_s0`, `T_s1` | Temperature |
-| `Ve1`..`Ve3` | `V1_s0`..`V3_s0` | Electron bulk velocity |
-| `Vi1`..`Vi3` | `V1_s1`..`V3_s1` | Ion bulk velocity |
-| `EFe`, `EFi` | `EF_s0`, `EF_s1` | Energy flux (vector group) |
-| `s_e`, `s_i` | `s_s0`, `s_s1` | Per-species entropy |
-| `beta_e`, `beta_i` | `beta_s0`, `beta_s1` | Per-species plasma beta |
-| `P_par_e`, `P_par_i` | `P_par_s0`, `P_par_s1` | Per-species parallel pressure |
-| `P_perp_e`, `P_perp_i` | `P_perp_s0`, `P_perp_s1` | Per-species perpendicular pressure |
-| `agyrotropy_e`, `agyrotropy_i` | `agyrotropy_s0`, `agyrotropy_s1` | Per-species agyrotropy |
-| `s_gyro_e`, `s_gyro_i` | `s_gyro_s0`, `s_gyro_s1` | Per-species gyrotropic entropy |
-
-The dataset's alias resolver is bidirectional for these e/i ↔ `_sN` pairs:
-a reader that emits `Pe` (e.g. iPIC3D) satisfies a recipe asking for `P_s0`,
-and vice versa. Storage is the same data either way; the canonical form
-is a documentation choice.
-
-This convention assumes species 0 = electrons, 1 = ions (standard in
-PIC codes). For multi-species simulations (e.g. H⁺ + He²⁺ + O⁺), use
-the explicit `_sN` form.
-
 **Vector group shorthand in `read()`:** Passing a bare prefix like
 `"B"` to `read(fields=...)` expands to `B1, B2, B3`. Per-species
 groups work the same way: `"EF_s0"` expands to
-`EF1_s0, EF2_s0, EF3_s0`. The e/i convenience forms (`"EFe"`,
-`"EFi"`, `"KEFe"`, `"HFi"`, ...) resolve to the corresponding
-per-species prefix and then expand. Derived quantities expand to
-their dependencies: `"Pi"` loads the six ion pressure tensor
-components, `"P_par"` loads the six total-pressure tensor
-components plus `B1`..`B3`.
+`EF1_s0, EF2_s0, EF3_s0`. Derived quantities expand to their
+dependencies: `"P_s1"` loads the six ion pressure tensor components,
+`"P_par"` loads the six total-pressure tensor components plus
+`B1`..`B3`.
+
+pypic also ships **library-side convenience aliases** for the common
+two-species electron/ion case (`Pe ↔ P_s0`, `n_i ↔ n_s1`,
+`beta_e ↔ beta_s0`, ...) — see [Aliases](aliases.md). Those forms
+are not part of the cross-tool schema contract; non-pypic consumers
+(Rust, JS) only need the canonical names listed here.
 
 What does *not* expand: already-resolved single-component aliases
 (`"Bx"`, `"Br"`, `"E_phi"`) and names whose prefix already ends in
 a digit (`"B1"`, `"P11_s1"`) are passed through as scalars. In
 particular, requesting `"P11"` alone loads only `P11` — if a later
 `compute("P_par")` / `"P_perp"` / `"agyrotropy"` needs the full
-tensor, request the tensor explicitly via `"Pi"` / `"Pe"` /
+tensor, request the tensor explicitly via `"P_s0"` / `"P_s1"` /
 `"P_sN"`, or request the derived quantity itself.
 
 The same expansion rules apply to `[output.fields].quantities` —
-listing `"B"` writes `B1`, `B2`, `B3`; listing `"Pi"` writes the six
-ion pressure tensor components.
+listing `"B"` writes `B1`, `B2`, `B3`; listing `"P_s1"` writes the
+six second-species pressure tensor components.
 
 **Current limitations:**
 
-- **Two-species assumption.** `P = Pe + Pi` and the `e`/`i` aliases
-  hardcode species 0 = electrons, 1 = ions. For 3+ species, compute
-  total pressure explicitly:
-  `P = sum(data.compute(f"P_s{i}") for i in range(n_species))`.
-  See `examples/advanced_calculations.py`.
 - **Split-B naming.** `B0` is the universal plasma-physics name for the
   background/asymptotic magnetic field, so we preserve it. Because the
   prefix already ends in a digit, components use an underscore separator:
@@ -1009,15 +977,13 @@ ion pressure tensor components.
 | Canonical | Cartesian alias | Meaning | Present in |
 |-----------|----------------|---------|------------|
 | `J1`, `J2`, `J3` | `Jx`, `Jy`, `Jz` | Current density | PIC (deposited), MHD (∇×B) |
-| `V1`, `V2`, `V3` | `Vx`, `Vy`, `Vz` | Ion bulk velocity / fluid velocity | PIC (moments), MHD |
-| `Ve1`, `Ve2`, `Ve3` | `Vex`, `Vey`, `Vez` | Electron bulk velocity | PIC |
+| `V1`, `V2`, `V3` | `Vx`, `Vy`, `Vz` | Fluid bulk velocity (single-fluid MHD) | MHD |
+| `V1_s{N}`, `V2_s{N}`, `V3_s{N}` | — | Per-species bulk velocity | PIC, multi-fluid MHD |
 | `u1`, `u2`, `u3` | `ux`, `uy`, `uz` | Four-velocity spatial components ($\gamma v^i$) | Relativistic PIC |
 | `gamma_L` | — | Bulk Lorentz factor | Rel. PIC, Rel. MHD (derived) |
 | `P` | — | Total scalar pressure | MHD, PIC (moments) |
-| `Pe` | — | Electron scalar pressure | PIC, two-fluid MHD |
-| `Pi` | — | Ion scalar pressure | PIC, two-fluid MHD |
-| `Te` | — | Electron temperature (energy units) | PIC, two-fluid MHD |
-| `Ti` | — | Ion temperature (energy units) | PIC, two-fluid MHD |
+| `P_s{N}` | — | Per-species scalar pressure | PIC, multi-fluid MHD |
+| `T_s{N}` | — | Per-species temperature (energy units) | PIC, multi-fluid MHD |
 
 ### Thermodynamic quantities
 
@@ -1025,11 +991,9 @@ ion pressure tensor components.
 |-----------|---------|------------|
 | `h` | Specific enthalpy (ideal gas) | MHD |
 | `h_rel` | Relativistic specific enthalpy | Rel. MHD |
-| `s` | Specific entropy (isotropic) | MHD, PIC |
-| `s_e` | Electron entropy | PIC |
-| `s_i` | Ion entropy | PIC |
-| `s_gyro_e` | Electron gyrotropic entropy | PIC (anisotropic) |
-| `s_gyro_i` | Ion gyrotropic entropy | PIC (anisotropic) |
+| `s` | Specific entropy (isotropic, single-fluid) | MHD, PIC |
+| `s_s{N}` | Per-species specific entropy | PIC, multi-fluid MHD |
+| `s_gyro_s{N}` | Per-species gyrotropic entropy | PIC (anisotropic) |
 | `e_int` | Specific internal energy | MHD |
 | `gamma_eos` | Adiabatic index | MHD (from physics config) |
 
@@ -1038,21 +1002,21 @@ ion pressure tensor components.
 | Canonical | Cartesian alias | Meaning | Present in |
 |-----------|----------------|---------|------------|
 | `S1`, `S2`, `S3` | `Sx`, `Sy`, `Sz` | Poynting flux | PIC, MHD |
-| `EF1_s0`, `EF2_s0`, ... | `EFe`, `EFi` (vector groups) | Per-species total energy flux (3rd moment) | PIC, multi-moment MHD |
-| `KEF1_s0`, `KEF2_s0`, ... | `KEFe`, `KEFi` | Kinetic energy flux (bulk flow) | PIC, MHD (derived) |
-| `HF1_s0`, `HF2_s0`, ... | `HFe`, `HFi` | Total thermal flux (EF − KEF) | PIC, multi-moment MHD |
+| `EF1_s{N}`, `EF2_s{N}`, `EF3_s{N}` | — | Per-species total energy flux (3rd moment) | PIC, multi-moment MHD |
+| `KEF1_s{N}`, `KEF2_s{N}`, `KEF3_s{N}` | — | Per-species kinetic energy flux (bulk flow) | PIC, MHD (derived) |
+| `HF1_s{N}`, `HF2_s{N}`, `HF3_s{N}` | — | Per-species total thermal flux (EF − KEF) | PIC, multi-moment MHD |
 | `EHF1`, `EHF2`, `EHF3` | — | Enthalpy flux (total, fluid) | MHD, PIC (derived) |
-| `EHF1_s0`, `EHF2_s0`, ... | `EHFe`, `EHFi` | Enthalpy flux (per-species) | PIC, MHD (derived) |
-| `q1_s0`, `q2_s0`, ... | `qe`, `qi` | Conductive heat flux (HF − EHF) | PIC, multi-moment MHD |
+| `EHF1_s{N}`, `EHF2_s{N}`, `EHF3_s{N}` | — | Per-species enthalpy flux | PIC, MHD (derived) |
+| `q1_s{N}`, `q2_s{N}`, `q3_s{N}` | — | Per-species conductive heat flux (HF − EHF) | PIC, multi-moment MHD |
 | `e_B` | — | Magnetic energy density | PIC, MHD |
 | `e_E` | — | Electric energy density | PIC |
 | `e_k` | — | Kinetic energy density (total) | MHD, PIC (moments) |
-| `e_k_s0`, `e_k_s1`, ... | `e_k_e`, `e_k_i` | Kinetic energy density (per-species) | PIC (derived) |
+| `e_k_s{N}` | — | Per-species kinetic energy density | PIC (derived) |
 | `e_th` | — | Thermal energy density ($P/(\gamma-1)$) | MHD, PIC (moments) |
 | `e_th_trace` | — | Thermal energy density ($\frac{1}{2}\mathrm{Tr}(\mathbf{P})$, $\gamma$-free) | PIC, multi-moment MHD |
-| `e_th_s0`, `e_th_s1`, ... | `e_th_e`, `e_th_i` | Thermal energy density (per-species) | PIC (derived) |
-| `rho_m_s0`, `rho_m_s1`, ... | `rho_m_e`, `rho_m_i` | Mass density (per-species) | PIC (derived) |
-| `\|V\|_s0`, `\|V\|_s1`, ... | `\|Ve\|`, `\|Vi\|` | Velocity magnitude (per-species) | PIC (derived) |
+| `e_th_s{N}` | — | Per-species thermal energy density | PIC (derived) |
+| `rho_m_s{N}` | — | Per-species mass density | PIC (derived) |
+| `\|V\|_s{N}` | — | Per-species velocity magnitude | PIC (derived) |
 
 ### Pressure tensor
 
@@ -1076,8 +1040,8 @@ decomposition (`P_par_s0`, `P_perp_s0`) uses the per-species tensors
    are then derived on demand by `compute()` and stay
    $\hat{b}$-fresh under frame transforms (the decomposition follows
    whatever $\mathbf{B}$ is in the current frame).  Listing `Pij`
-   (or `Pi`/`Pe`) in `[output.fields].quantities` auto-expands to
-   the six components.
+   (or per-species `Pij_s0`, `Pij_s1`) in
+   `[output.fields].quantities` auto-expands to the six components.
 2. **Acceptable** — codes that evolve only the CGL/double-adiabatic
    decomposition (BATSRUS `MhdAnisoP`, GRMHD with anisotropic
    closure) may store `P_par` and `P_perp` directly without the
@@ -1096,27 +1060,27 @@ the consumer treats them identically.
 |-----------|---------|---------------|
 | `d_e` | Electron skin depth | `n_s0`, species |
 | `d_i` | Ion skin depth | `n_s1`, species |
-| `r_e` | Electron thermal gyroradius | `Te`, `|B|`, species |
-| `r_i` | Ion thermal gyroradius | `Ti`, `|B|`, species |
+| `r_e` | Electron thermal gyroradius | `T_s0`, `|B|`, species |
+| `r_i` | Ion thermal gyroradius | `T_s1`, `|B|`, species |
 | `omega_pe` | Electron plasma frequency | `n_s0`, species |
 | `omega_pi` | Ion plasma frequency | `n_s1`, species |
 | `omega_ce` | Electron cyclotron frequency (positive by convention) | `|B|`, species |
 | `omega_ci` | Ion cyclotron frequency (positive by convention) | `|B|`, species |
-| `lambda_D` | Electron Debye length | `n_s0`, `Te`, species |
+| `lambda_D` | Electron Debye length | `n_s0`, `T_s0`, species |
 | `v_A` | Alfvén speed | `|B|`, `rho_m` |
-| `v_th_e` | Electron thermal speed (NRL convention) | `Te`, species |
-| `v_th_i` | Ion thermal speed (NRL convention) | `Ti`, species |
+| `v_th_e` | Electron thermal speed (NRL convention) | `T_s0`, species |
+| `v_th_i` | Ion thermal speed (NRL convention) | `T_s1`, species |
 | `c_s` | Sound speed (MHD) | `P`, `rho_m`, `gamma_eos` |
 | `v_ms` | Fast magnetosonic speed (perpendicular propagation) | `v_A`, `c_s` |
 | `M_A` | Alfvén Mach number | `|V|`, `v_A` |
 | `M_ms` | Magnetosonic Mach number | `|V|`, `v_ms` |
-| `beta` | Plasma beta | `P`, `|B|` |
-| `beta_e` | Electron beta | `Pe`, `|B|` |
-| `beta_i` | Ion beta | `Pi`, `|B|` |
+| `beta` | Plasma beta (auto-expands to `beta_s{N}` per species) | `P` (or `P_s{N}`), `|B|` |
 | `sigma` | Magnetization parameter | `|B|`, `rho_m`, `c` |
 
-See the electron/ion convenience aliases table in the Densities section
-for the full list of `e`/`i` shorthand names.
+These names follow the NRL Plasma Formulary convention (`omega_ce`,
+`lambda_D`, `d_i`, ...) and are the canonical compute-recipe names
+in pypic. The corresponding `_sN` forms (e.g. `omega_c_s0`,
+`d_s0`, `v_thermal_s1`) resolve as aliases.
 
 ### Other derived quantities
 
@@ -1126,7 +1090,7 @@ for the full list of `e`/`i` shorthand names.
 | `\|E\|` | — | Electric field magnitude | E1, E2, E3 |
 | `\|J\|` | — | Current density magnitude | J1, J2, J3 |
 | `\|V\|` | — | Bulk velocity magnitude | V1, V2, V3 |
-| `\|Ve\|` | — | Electron velocity magnitude | Ve1, Ve2, Ve3 |
+| `\|V\|_s{N}` | — | Per-species velocity magnitude | V1_s{N}, V2_s{N}, V3_s{N} |
 | `div_B` | — | Divergence of B (should be ~0) | B1, B2, B3, grid |
 | `div_E` | — | Divergence of E | E1, E2, E3, grid |
 | `curl_B1`, `curl_B2`, `curl_B3` | `curl_Bx`, ... | Curl of B | B1, B2, B3, grid |
@@ -1140,8 +1104,8 @@ for the full list of `e`/`i` shorthand names.
 | `firehose` | — | Firehose instability parameter | P\_par, P\_perp, \|B\| |
 | `mirror` | — | Mirror instability parameter | P\_par, P\_perp, \|B\| |
 
-Scalar quantities (`n_s0`, `rho_m`, `P`, `Te`, `beta`, ...) use the same
-name regardless of geometry.
+Scalar quantities (`n_s0`, `rho_m`, `P`, `T_s0`, `beta`, ...) use the
+same name regardless of geometry.
 
 See CLAUDE.md for naming conventions (functions, parameters, class names).
 
@@ -1212,10 +1176,10 @@ Two on-disk layouts are defined, with deliberately asymmetric roles:
 
 Both layouts share the same **numbered canonical field names** (`B1`,
 `B2`, `B3`) and the same section-level metadata vocabulary, and both
-carry the same `schema_version` value that `simulation.toml` declares
-at its top level — a single discriminator across config and on-disk
-storage.  The difference is the storage container's group conventions
-(HDF5 groups vs Zarr DataTree).
+carry a `schema_version` flat root attr whose value equals
+`simulation.toml`'s `[schema].version` — a single discriminator across
+config and on-disk storage.  The difference is the storage container's
+group conventions (HDF5 groups vs Zarr DataTree).
 
 ### 4.1 HDF5 Output Layout
 
@@ -1268,7 +1232,7 @@ output_{step:06d}.h5
 ├── time            [attr: float64, code units]
 ├── step            [attr: int]
 ├── model           [attr: "PIC"]
-└── schema_version  [attr: "1.0"]   # mirrors simulation.toml; same value as Zarr §4.2
+└── schema_version  [attr: "1.0"]   # mirrors simulation.toml [schema].version; same value as Zarr §4.2
 ```
 
 Every file contains enough metadata to convert back to SI without the
@@ -1287,9 +1251,8 @@ The native pypic write format.  `pypic.io.to_zarr` and
 `DataTree`: the field arrays live under a `/fields` child group
 (mirroring §4.1's `/fields/` HDF5 group); the metadata sections sit
 as flat keys on the root group's attrs, with a `schema_version` value
-that mirrors `simulation.toml`'s top-level `schema_version` and
-discriminates both the on-disk shape and the metadata vocabulary in
-one go.  Consolidated metadata is enabled — readers go through
+that mirrors `simulation.toml`'s `[schema].version` and discriminates
+both the on-disk shape and the metadata vocabulary in one go.  Consolidated metadata is enabled — readers go through
 `consolidated="auto"` for the one-shot metadata fetch when the writer
 left a consolidated index, and fall back to listing for
 non-consolidated stores.

@@ -44,7 +44,6 @@ def validate_simulation_toml(
     Examples
     --------
     >>> doc = '''
-    ... schema_version = "1.0"
     ... [schema]
     ... version = "1.0"
     ... [model]

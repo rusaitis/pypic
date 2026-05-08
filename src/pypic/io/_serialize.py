@@ -360,12 +360,12 @@ def encode_pypic_attrs(fds: FieldDataset) -> dict[str, Any]:
     ``store.attrs["grid"]`` without going through any pypic-specific
     umbrella.
 
-    The single ``schema_version`` key carries the same value as
-    ``simulation.toml``'s top-level ``schema_version`` and discriminates
-    both vocabulary and storage layout in one go.  See schema.md §1
-    *Versioning* for the additive-only policy and §4.2 for the on-disk
-    mapping table that this dict materialises.  Other keys are the
-    section dicts produced by the per-section encoders
+    The single ``schema_version`` flat root attr carries the same
+    value as ``simulation.toml``'s ``[schema].version`` and
+    discriminates both vocabulary and storage layout in one go.  See
+    schema.md §1 *Versioning* for the additive-only policy and §4.2
+    for the on-disk mapping table that this dict materialises.  Other
+    keys are the section dicts produced by the per-section encoders
     (``grid_to_dict``, ``normalization_to_dict``, ...).
     """
     return {

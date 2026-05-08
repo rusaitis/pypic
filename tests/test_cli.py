@@ -33,8 +33,6 @@ runner = CliRunner()
 
 # Minimal simulation.toml for a SimpleReader-compatible dataset (schema v1.0).
 _TOML = """\
-schema_version = "1.0"
-
 [schema]
 version = "1.0"
 
@@ -915,8 +913,6 @@ class TestPlotAnimate:
 # -- 2D dataset edge case ---------------------------------------------------
 
 _TOML_2D = """\
-schema_version = "1.0"
-
 [schema]
 version = "1.0"
 

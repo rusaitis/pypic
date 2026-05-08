@@ -50,6 +50,7 @@ nav:
     - Equations: equations.md
     - Conventions: conventions.md
     - Schema: schema.md
+    - Aliases (library): aliases.md
   - API Reference:
     - Derived Quantities: api/derived.md
     - Diagnostics: api/diagnostics.md

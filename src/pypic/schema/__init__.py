@@ -12,7 +12,6 @@ Examples
 --------
 >>> from pypic.schema import validate_simulation_toml
 >>> doc = '''
-... schema_version = "1.0"
 ... [schema]
 ... version = "1.0"
 ... [model]

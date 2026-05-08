@@ -427,7 +427,6 @@ class TestOpenSimple:
             _make_fields(),
         )
         toml_content = """\
-schema_version = "1.0"
 [schema]
 version = "1.0"
 [model]
@@ -475,7 +474,6 @@ mass = 1.0
         _write_h5(data_dir / "output_000000.h5", _make_fields())
 
         toml_content = """\
-schema_version = "1.0"
 [schema]
 version = "1.0"
 [model]

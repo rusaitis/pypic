@@ -509,9 +509,7 @@ def to_toml(cfg: IPic3DConfig) -> str:
         :func:`pypic.schema.validate_simulation_toml`.
     """
     sim_config = to_simulation_config(cfg)
-    lines: list[str] = ['schema_version = "1.0"', ""]
-
-    lines.extend(["[schema]", 'version = "1.0"', ""])
+    lines: list[str] = ["[schema]", 'version = "1.0"', ""]
 
     lines.append("[model]")
     lines.append('name = "iPIC3D"')

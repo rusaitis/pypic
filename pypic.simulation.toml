@@ -148,12 +148,6 @@
 # Scenario A — PIC run (active)
 # =======================================================================
 
-# Top-level bare key — lets a streaming parser / a simple `head -n 20` tell
-# you the schema version before seeing any section. The [schema] table at
-# the bottom still carries the creation date (and anything else v1.1 adds
-# there); `schema_version` here is the canonical version reference.
-schema_version = "1.0"
-
 [model]
 # Identity of the CODE that produced the data. Distinct from [run] which
 # identifies THIS particular run. The model description + url + doi let
@@ -221,9 +215,11 @@ dimensions = [256, 128, 64]            # cells along each axis
 spacing    = [0.2, 0.2, 0.2]           # dx, dy, dz
 lower      = [-25.6, -12.8, -6.4]      # lower corner, per axis
 upper      = [25.6, 12.8, 6.4]         # upper corner; verified: upper - lower = dimensions × spacing
-stagger    = "node"                    # "cell" (default) | "node" | "staggered"
-                                       # iPIC3D writes fields on nodes
 # No [grid.amr] — uniform Harris-sheet run.
+
+[grid.stagger]
+convention = "node"                    # "cell" (default) | "node" | "staggered"
+                                       # iPIC3D writes fields on nodes
 # No [grid].source — grid is fully described inline. source/source_format
 # are for static mesh topology that can't be expressed here (unstructured,
 # curvilinear, composite, or 50+ static refinement boxes). See Scenario B.
@@ -530,7 +526,6 @@ created = 2026-04-23
 # spacing    = [0.1, 0.018, 0.018]       # [dr (R_sun), dθ (rad), dφ (rad) ≈ 1°]
 # lower      = [1.0, 0.87, -0.87]        # [r_min = 1 R_sun, θ_min ≈ 50° from N pole, φ_min = -50°]
 # upper      = [21.0, 2.60, 0.87]        # [r_max = 21 R_sun, θ_max ≈ 149°, φ_max = +50°]
-# stagger    = "cell"
 # # External file carrying the STATIC mesh topology — in this case, the
 # # curvilinear spherical-polar mapping with pole-region treatment and the
 # # full static refinement hierarchy (the [[grid.refinement]] entry below
@@ -803,8 +798,10 @@ created = 2026-04-23
 # spacing    = [1.0, 1.0, 1.0]           # dx, dy, dz
 # lower      = [-192.0, -96.0, -96.0]    # box reaches ~±3 R_M tailward
 # upper      = [192.0, 96.0, 96.0]       # and ~±1.5 R_M cross-tail / north-south
-# stagger    = "staggered"               # hybrid codes typically use Yee mesh for B
 # # No [grid].source — simple Cartesian AMR is fully described inline.
+#
+# [grid.stagger]
+# convention = "staggered"               # hybrid codes typically use Yee mesh for B
 #
 # [grid.amr]
 # # Refine the dayside magnetopause and cusp regions where d_i-scale
