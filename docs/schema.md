@@ -108,21 +108,32 @@ evolution in v1.1+.
 Two flavours of string-valued field appear throughout §2:
 
 - **Strict** (closed enum) — bounded structural / format primitives.
-  The vocabulary is fixed by the data model itself (e.g. `geometry`,
-  `precision`, `format`, stagger locations, AMR kinds, restart
-  modes). Adding a value is a v1.x schema bump.
+  The vocabulary is fixed by the data model itself: `[schema].version`,
+  `[model].type`, `[coordinates].geometry`, `[coordinates].physical_extent_unit`,
+  `[grid.amr].amr_kind`, `[grid.stagger].convention`,
+  `[grid.stagger].fields` location values, `[output.*].format`,
+  `[output.*].precision`, `[output.streams.region].kind`,
+  `[restart].mode`, `[[drivers]].coupling`, `[[drivers]].direction`,
+  `[[bodies]].shape`, `[time].splitting`,
+  `[phase_space].coordinate_system`. Adding a value is a v1.x
+  schema bump.
 - **Open** (canonical list, unenforced) — numerical-method,
-  algorithm, and closure vocabularies (e.g. `[time].scheme`,
+  algorithm, and closure vocabularies: `[time].scheme`,
   `[physics.*.solver].scheme`, `pusher`, `field_solver`, `limiter`,
-  `riemann`, `[[species]].closure`, `[[collisions]].model`,
-  `[boundary_conditions]` tags). Research codes invent new schemes
-  faster than the schema can enumerate them, so unknown strings
-  pass validation. The lists shown next to each field are the
-  v1.0 canonical values — guidance for tooling and human readers,
-  not validation gates. pypic records the value as provenance
-  metadata; it does not dispatch on it. Cross-field rules
-  (e.g. `scheme = "subcycled"` requires `field_substeps`) still
-  fire — openness applies to *value*, not *semantics*.
+  `riemann`, `reconstruction`, `divergence_cleaning`,
+  `preconditioner`, `charge_correction`, `current_deposition`,
+  `[[species]].closure`, `[[species]].shape` (PIC shape factor),
+  `[[collisions]].model`, `[[drivers]].type`,
+  `[boundary_conditions]` tag values. Research codes invent new
+  schemes faster than the schema can enumerate them, so unknown
+  strings pass validation. The lists shown next to each field are
+  the v1.0 canonical values — guidance for tooling and human
+  readers, not validation gates. pypic records the value as
+  provenance metadata; it does not dispatch on it. Cross-field
+  rules (e.g. `scheme = "subcycled"` requires `field_substeps`)
+  still fire — openness applies to *value*, not *semantics*.
+
+Per-field annotation in §2 marks each enum's category inline.
 
 ---
 
@@ -275,8 +286,12 @@ box   = [[-60.0, -60.0, -60.0], [60.0, 60.0, 60.0]]
 # Non-uniform per-axis cell widths (optional, sparse).
 # Only stretched axes appear; uniform axes inherit `[grid].spacing`.
 # Length must match `[grid].dimensions[i]` and the widths must sum to
-# `upper[i] - lower[i]` within `sum_rtol` (relative tolerance, default
-# 1.0e-9; tighten via the knob below for tests).
+# `upper[i] - lower[i]` within `sum_rtol`. The check is the relative
+# form  `abs(sum - extent) <= sum_rtol * max(abs(extent), 1.0)`, with
+# `sum_rtol` defaulting to 1.0e-9. Rounding direction (toward zero,
+# nearest, etc.) is intentionally unspecified — pick `sum_rtol` to
+# absorb the writer's float drift, or pre-snap the widths so the sum
+# matches `extent` bit-exactly.
 [grid.stretched]
 sum_rtol = 1.0e-9                  # optional — float drift tolerance on
                                    #   per-axis-width sum vs (upper - lower)
@@ -377,6 +392,13 @@ scaling_description = "c/v_A reduced by 10x; mass ratio mi/me = 256 (real: 1836)
 For **ion-normalized PIC** (e.g. iPIC3D large-scale runs), set
 `reference_species = "ions"` and use proton mass/density values.
 
+The string `reference_species` resolves against `[[species]].name`
+when one matches; the three builtins `"electrons"`, `"ions"`,
+`"protons"` are accepted as a fallback when no matching `[[species]]`
+entry exists. This keeps legacy decks (iPIC3D bare runs that never
+declare an `"ions"` species, hybrid configs that omit electrons)
+parseable without forcing a downstream rename.
+
 ```toml
 [units]
 system = "MHD"
@@ -471,6 +493,18 @@ from_frame = "string"              # for chaining: transform from this frame ins
 Transforms can chain: if transform A goes from "simulation" to "GSM" and
 transform B goes from "GSM" to "GSE", requesting "GSE" from "simulation"
 data chains both automatically.
+
+**Chain resolution.** The reader builds a directed graph from
+`from_frame → frame_name` for every entry under
+`[coordinates.transforms.*]` (entries without `from_frame` source
+from `[coordinates].frame`). Resolving a target frame is a
+breadth-first search from `[coordinates].frame`, returning the
+shortest path; a cycle in the graph (`A → B → A`) raises a
+validation error at apply time. When two paths share the same
+length, the one declared first in the TOML wins — a stable
+deterministic tie-breaker. The schema layer doesn't enforce
+acyclicity (transforms are stored as a flat dict); the cycle check
+fires when `transform_to()` is invoked.
 
 **Time-dependent transforms.** Frames like GSE↔GSM depend on the
 dipole tilt angle, which varies per timestep. A `parameter` field
@@ -679,6 +713,20 @@ body          = "mercury"          # optional — inherits body bounding box.
 1. `body` — defaults to that body's bounding box.
 2. `target_lower` / `target_upper` — explicit box; narrows `body` when both present.
 3. Neither — whole domain.
+
+**`[boundary_conditions]` ↔ `[[drivers]]` interaction.** A face listed
+in `boundary_conditions.drivers_lower` / `drivers_upper` is sourced
+from the named driver entry; the BC tag at that face (e.g.
+`"driven"`, `"inflow"`) is the *category*, the driver is the
+*supplier*. Driver geometry composes on top of the BC face:
+`coupling = "boundary"` always means "values applied at the face
+identified by `drivers_lower/upper`"; `target_lower / target_upper`
+on the driver further narrows the face's spatial extent (e.g. only
+the dayside hemisphere of an inflow face); a `body` reference on
+the driver narrows again (constrains to the body's footprint on
+that face). Volume / source / sink couplings ignore the face entry
+in `drivers_lower/upper` and use `target_lower / target_upper` (or
+`body`) to define their domain.
 
 Driver-type-specific keys (`production_rate`, `fields`, etc.) are
 accepted beyond the core vocabulary above.
@@ -926,6 +974,14 @@ data, only the numbered form is canonical; the reader registers
 geometry-appropriate aliases (e.g., `Br` → `B1` for spherical). The
 `[coordinates] geometry` field determines which aliases are active.
 
+**Alias-on-disk policy.** Aliases are read-time conveniences, derived
+from `[coordinates].geometry` after the file is opened. Writers MUST
+emit only the numbered canonical form (`B1` / `B2` / `B3`,
+`B0_1` / `B0_2` / `B0_3`, `n_s0`, `V1_s1`, `P11_s0`, …). Storing
+both `B1` and `Bx` for the same data is redundant and not part of
+the v1.0 contract — readers that encounter both should treat the
+numbered form as authoritative and ignore the duplicate.
+
 For `geometry = "thetaMode"` (FBPIC azimuthal-mode RZ decomposition),
 the spatial grid is two-dimensional `(r, z)` and the third index is
 the openPMD mode number from `[coordinates.modes].mode_indices`.
@@ -1090,6 +1146,19 @@ decomposition (`P_par_s0`, `P_perp_s0`) uses the per-species tensors
 `P_par`, `P_perp`, and `agyrotropy` carry no marker on disk
 distinguishing "computed by the code" from "derived by `compute()`" —
 the consumer treats them identically.
+
+**Canonical interchange form.** Cross-tool readers MUST accept either
+tier without negotiation. When the six-component tensor is on disk,
+the reader exposes `P_par` / `P_perp` / `agyrotropy` via on-the-fly
+decomposition; when only `P_par` / `P_perp` are stored, the reader
+exposes them as primitives and the tensor-derived quantities are
+unavailable. Writers SHOULD emit the six-component form whenever the
+code's data model carries it (preferred tier) — `compute()` then
+stays $\hat{b}$-fresh under frame transforms. The HDF5 layout (§4.1)
+and the Zarr layout (§4.2) both show the six-component form as the
+canonical naming because that's the higher-fidelity tier; the
+acceptable-tier shape is the same store with `P_par` / `P_perp`
+arrays in place of `P11..P33`.
 
 ### Characteristic scales (derived)
 
@@ -1376,11 +1445,23 @@ write; user-supplied `encoding=` overrides per variable.
 |---|---|---|
 | Field path | `/fields/B1` | `/fields/B1` |
 | Grid metadata | `/grid/` group with attrs | root `attrs.grid` (JSON) |
+| Stagger metadata | `/grid/stagger/` sub-group (`convention`, `fields`, `position`) | root `attrs.grid.stagger` |
 | Normalization | `/normalization/` group | root `attrs.normalization` |
+| Species | `/species/{s0,s1,...}/` sub-groups | root `attrs.species` (list) |
+| Physics | `/physics/` group + sub-groups | root `attrs.physics` |
+| Frame / transforms | top-level `frame` attr + `/transforms/<name>/` | root `attrs.frame` + `attrs.transforms` |
 | Coord arrays | from grid attrs | `/fields/{x,y,z}` (1-D) |
 | `time` / `step` | top-level scalar attrs | `time` dim (multi-step) / `metadata.time` scalar (single-step) |
 | Files per write | one per timestep | one store, all steps |
-| Schema version | top-level `schema_version` attr | root `attrs.schema_version = "1.0"` |
+| Schema version | top-level `schema_version` attr | root `attrs.schema_version` (mirrors `[schema].version`) |
+
+`schema_version` is the on-disk layout discriminator. It carries the
+**writing library's** layout version — pypic v1.0 stamps `"1.0"`,
+pypic v1.1 will stamp `"1.1"`. Within a major version, it agrees
+with `simulation.toml`'s `[schema].version` because v1.x library
+and v1.x decks ship in lockstep. The flat root attr lets non-pypic
+consumers (Three.js viewer, Rust `zarrs` pipelines) dispatch on
+layout vocabulary without parsing the TOML.
 
 **Reading without pypic.**  A non-pypic consumer (JS WebGPU viewer,
 Rust `zarrs` pipeline) opens the root group, reads the section dicts

@@ -22,11 +22,17 @@
 #                            [[run.resources.allocations]] for heterogeneous hardware
 #   [time]                 — dt, t_start, t_end, n_steps, scheme
 #   [grid]                 — dimensions, spacing, lower/upper; .amr + .source optional
+#   [grid.stretched]       — per-axis non-uniform cell widths (sparse; see Scenario B)
 #   [[grid.refinement]]    — static nested refinement boxes
-#   [boundary_conditions]  — per-face lower/upper tag arrays
-#   [units]                — normalization system + reference values
+#   [grid.stagger]         — three tiers: convention / fields / position (ED-PIC)
+#   [boundary_conditions]  — per-face lower/upper tag arrays;
+#                            .field_overrides for per-field BC (E/B/particles)
+#   [units]                — normalization system + reference values;
+#                            Approach B: [units.reference] for explicit-SI overrides
 #   [coordinates]          — geometry, frame, physical_extent, transforms.*
-#   [physics]              — model-agnostic flags + .{pic,mhd,hybrid} sub-tables
+#   [coordinates.modes]    — required for geometry = "thetaMode" (FBPIC RZ-modes)
+#   [physics]              — model-agnostic flags + .{pic,mhd,hybrid} sub-tables;
+#                            [x-<code>.*] for non-portable code-specific knobs
 #   [[bodies]]             — registry of physical objects (planets, stars, coils);
 #                            home for split-B analytic dipoles referenced by name
 #   [initial_conditions]   — setup type + setup-specific keys (flat — no .parameters)
@@ -38,7 +44,12 @@
 #   [output.particles]     — cadence + sampling + extras
 #   [output.probes]        — cadence for probe time series
 #   [output.diagnostics]   — cadence + quantities for on-the-fly derived data
+#   [[output.streams]]     — multi-cadence / region-of-interest output groups
+#                            (kind = "box" sub-volume, kind = "plane" slice)
 #   [[probes]]             — fixed-point or trajectory samplers
+#   [phase_space]          — augmented dimensions for gyrokinetic (5D) and
+#                            continuum-Vlasov (6D + sparse blocks) codes
+#   [[collisions]]         — per-pair collision declarations (Smilei, EPOCH, ...)
 #
 # Required vs optional:
 #   REQUIRED — [schema], [model], [run], [time], [grid], [units], [coordinates],
@@ -233,14 +244,39 @@ lower = ["periodic", "periodic", "periodic"]
 upper = ["periodic", "periodic", "periodic"]
 
 [units]
+# Approach A — named normalization. system ∈ {"PIC", "MHD", "SI"} sets a
+# reference convention; the values below derive the SI scale factors.
+# `reference_species` ∈ {"electrons" (default), "ions", "protons"} or any
+# declared [[species]].name. The validator allows the three builtins as a
+# fallback when no matching [[species]] entry exists, so legacy iPIC3D
+# decks that never declare a "protons" entry still validate.
 system            = "PIC"
-reference_species = "ions"             # "electrons" (default) | "ions" | species name
+reference_species = "ions"             # builtin — works even without an "ions" [[species]]
 reference_density = 1.0e6              # m⁻³ (ion density)
 reference_mass    = 1.673e-27          # kg — proton mass (optional; defaults to m_e)
 reference_charge  = 1.602e-19          # C  (optional; defaults to |e|)
 speed_of_light    = 2.998e8            # m/s (optional; defaults to scipy.constants.c)
 scaling_factor      = 1.0              # informational "shrink" factor (no compute effect)
 scaling_description = "real mass ratio mi/me = 1836; no artificial rescaling"
+
+# Approach B — explicit-SI reference values. Use system = "custom" when
+# the run doesn't fit a named normalization (e.g. laser-plasma where
+# length references the plasma wavelength, time the laser period). Every
+# unit conversion routes through these references; missing entries
+# default to scipy.constants. Pick A or B per run, never both.
+#
+# [units]
+# system = "custom"
+#
+# [units.reference]
+# length   = 5.31e-3                   # meters
+# time     = 1.77e-11                  # seconds
+# velocity = 2.998e8                   # m/s
+# b_field  = 1.07e-3                   # Tesla
+# e_field  = 3.21e5                    # V/m
+# density  = 1.0e18                    # m⁻³
+# mass     = 9.109e-31                 # kg
+# charge   = 1.602e-19                 # C
 
 [coordinates]
 geometry             = "cartesian"     # "cartesian" | "spherical" | "cylindrical"
@@ -311,6 +347,17 @@ preconditioner = "block-jacobi"        # for implicit/semi-implicit Newton-Krylo
                                        # "ilu" | "amg" | "additive-schwarz"
                                        # (ignored when scheme = "explicit")
 
+# Code-specific knobs that don't yet have a v1.0 canonical form park
+# under an [x-<code>.*] namespace. Validators accept any `x-*` / `x_*`
+# table without enforcement, so future canonicalization is a rename,
+# not a breaking removal. Prefer the hyphenated `x-` spelling — matches
+# the JSON Schema, OpenAPI, and openPMD extension conventions.
+[physics.pic.x-ipic3d]
+moments_strategy   = "node-centered"  # iPIC3D-specific moment deposition
+gmres_max_iter     = 50
+gmres_rel_tol      = 1.0e-5
+particle_subcycles = 1                 # implicit-moment particle Newton-Krylov
+
 # No [[bodies]] — pure-plasma reconnection setup, no planets or structures.
 # See Scenario C for a body-aware run.
 
@@ -324,12 +371,33 @@ current_sheet_thickness = 0.5                # half-thickness in code units
 # [drivers] — optional, ongoing external coupling. Not needed for this run
 # (Harris equilibrium is self-contained). See Scenario B for an example.
 
-# [restart] — optional, continuation from a prior run. `from` is the
-# provenance pointer: which checkpoint file THIS run resumed from.
+[restart]
+# Continuation pointer from a prior run. `from` is provenance: the
+# checkpoint THIS run resumed from. The path may be a single file, a
+# directory of per-rank dumps, a glob, or an explicit list (see escape-
+# hatch shape below). v1.0 doesn't dictate which — the filesystem and
+# the code agree at read time. `mode = "hot"` is a full-state reload
+# (RNG, solver state, all species); `mode = "cold"` re-applies the
+# initial conditions on top of the saved geometry. `restore` enables
+# partial restart (e.g. fields-only continuation that re-seeds particles).
+from    = "./checkpoints/chk_000030.h5"
+step    = 30000
+time    = 1500.0
+mode    = "hot"                        # "hot" (default — full state) | "cold"
+restore = ["fields", "particles"]      # optional; default = restore everything
+
+# Escape hatch — explicit per-rank file list. Use when filenames don't
+# follow the source code's convention (relocated reruns, mixed naming).
+# Entries must be distinct and non-empty. Mutually exclusive with the
+# single-string form above; uncomment one shape at a time.
+#
 # [restart]
-# from = "./checkpoints/chk_000030.h5"
+# from = [
+#     "chk_000030_rank_00000.h5",
+#     "chk_000030_rank_00001.h5",
+#     "chk_000030_rank_00002.h5",
+# ]
 # step = 30000
-# time = 1500.0
 
 # Species are indexed in DECLARATION ORDER — this is part of the v1.0 schema
 # contract, not a convenience. `_s0` always binds to the first [[species]]
@@ -375,8 +443,14 @@ keep_last     = 3                      # rolling retention (optional)
 step_interval = 50                     # write every 50 steps
 quantities    = ["B", "E", "J", "rho_c",
                  "V_s0", "V_s1",
-                 "P_s0", "P_s1"]       # vector/tensor groups auto-expand
-                                       # (B -> B1,B2,B3; P_s0 -> P11_s0..P33_s0)
+                 "P_s0", "P_s1"]
+# `quantities` shorthand expansion (read- and write-side both):
+#   "B"    -> B1, B2, B3                                  (vector group)
+#   "V_s0" -> V1_s0, V2_s0, V3_s0                         (per-species vector)
+#   "P_s0" -> P11_s0, P12_s0, P13_s0, P22_s0, P23_s0, P33_s0   (per-species tensor)
+# Already-resolved single-component aliases ("Bx", "Br", "P11", "P11_s0")
+# are passed through unexpanded; request the tensor explicitly when a
+# downstream `compute("P_par")` / `agyrotropy` needs it.
 dir           = "./fields"
 format        = "hdf5"                 # "hdf5" | "zarr" | "adios2"
 precision     = "f32"                  # default for every quantity; "f32" | "f64"
@@ -415,6 +489,54 @@ dir           = "./diagnostics"
 format        = "hdf5"
 precision     = "f32"
 
+# [[output.streams]] — multi-cadence and region-of-interest output groups,
+# orthogonal to the singleton [output.fields]. Use streams for runs that
+# write moments at 10× the cadence of full distributions, ROI slabs at
+# higher cadence than the global volume, or named output groups consumed
+# by downstream pipelines. `name` is required and must be unique across
+# all streams. The optional `region` block crops each write spatially —
+# `kind = "box"` for a sub-volume, `kind = "plane"` for a single-axis
+# slice (faster I/O, useful for animation timelines).
+
+[[output.streams]]
+# Cheap moments at 10× cadence so animations stay smooth without
+# blowing up the disk budget on full pressure tensors.
+name          = "moments"
+step_interval = 10                     # 10× faster than [output.fields]
+quantities    = ["B", "rho_c", "V_s0", "V_s1"]
+dir           = "./moments"
+format        = "hdf5"
+precision     = "f32"
+
+[[output.streams]]
+# High-cadence ROI around the central current sheet. The box must lie
+# inside [grid] lower/upper; the validator enforces upper > lower per axis.
+name          = "current_sheet_roi"
+step_interval = 5                      # 10× cadence for reconnection diagnostics
+quantities    = ["B", "E", "J"]
+dir           = "./roi"
+format        = "hdf5"
+precision     = "f64"                  # full precision in the ROI
+
+[output.streams.region]
+kind  = "box"
+lower = [-2.0, -2.0, -1.0]             # code units; aligns with [grid] axes
+upper = [ 2.0,  2.0,  1.0]
+
+[[output.streams]]
+# Midplane slice every step — cheap 2D timeseries for live monitoring.
+name          = "midplane"
+step_interval = 1
+quantities    = ["B", "E"]
+dir           = "./midplane"
+format        = "hdf5"
+precision     = "f32"
+
+[output.streams.region]
+kind  = "plane"
+axis  = 2                              # 0/1/2 — z-midplane here
+value = 0.0
+
 [[probes]]
 name     = "reconnection_line"
 position = [0.0, 0.0, 0.0]
@@ -424,6 +546,57 @@ fields   = ["B1", "B2", "B3", "E1", "E2", "E3", "J_dot_E"]
 name       = "virtual_MMS1"
 trajectory = "orbits/mms1_synthetic.csv"   # columns: t, x, y, z (code units)
 frame      = "simulation"
+
+# -----------------------------------------------------------------------
+# v1.0 features that don't apply to this iPIC3D run but ship in v1.0.
+# Shown commented for reference; uncomment under the appropriate code.
+# -----------------------------------------------------------------------
+
+# [[collisions]] — per-pair declarations for collisional kinetic codes
+# (Smilei, EPOCH, OSIRIS-collisional, PIConGPU). iPIC3D is collisionless
+# so this block is omitted from the live run. Both names in `species_pair`
+# must match a declared [[species]].name; self-collisions are permitted.
+# `model` is open-string — canonical: "coulomb" | "bgk" | "monte-carlo".
+#
+# [[collisions]]
+# species_pair    = ["electrons", "ions"]
+# model           = "coulomb"
+# coulomb_log     = 10.0
+# temperature_ref = 1.0
+# description     = "Spitzer-Harm electron-ion Coulomb collisions"
+#
+# [[collisions]]
+# species_pair = ["electrons", "electrons"]
+# model        = "coulomb"
+# coulomb_log  = 10.0
+# description  = "Self-collisions (intra-species relaxation)"
+
+# [phase_space] — augmented dimensionality for >3D kinetic codes.
+# Gyrokinetic codes (GENE, GS2, GX, Gkeyll-GK) run dense 5-D grids;
+# continuum-Vlasov codes (Vlasiator, Gkeyll-Vlasov-Maxwell) use 6-D
+# grids with sparse-block storage. The first n entries of `dimensions`
+# must match [grid].dimensions exactly — [grid] owns the spatial sub-
+# grid, [phase_space] extends it.
+#
+# Example A — 5-D gyrokinetic (3 spatial + vpar + mu):
+# [phase_space]
+# dimensions        = [256, 128, 64, 16, 8]   # first 3 == [grid].dimensions
+# axis_labels       = ["x", "y", "z", "vpar", "mu"]
+# extents           = [
+#     [-25.6, 25.6], [-12.8, 12.8], [-6.4, 6.4],
+#     [-3.0, 3.0], [0.0, 5.0],
+# ]
+# coordinate_system = "guiding-center"
+#
+# Example B — 6-D continuum-Vlasov with sparse-block storage:
+# [phase_space]
+# dimensions        = [256, 128, 64, 50, 50, 50]   # 3 spatial + 3 velocity
+# axis_labels       = ["x", "y", "z", "vx", "vy", "vz"]
+# coordinate_system = "cartesian"
+#
+# [phase_space.storage]
+# block_size         = [10, 10, 10]            # one entry per velocity axis
+# sparsity_threshold = 1.0e-15                 # density floor; blocks below drop
 
 [schema]
 version = "1.0"
@@ -548,6 +721,23 @@ created = 2026-04-23
 # level = 3
 # box   = [[1.0, 1.2, -0.3], [2.0, 1.9, 0.3]]
 #
+# # [grid.stretched] — sparse, keyed by axis index ("0"=r, "1"=θ, "2"=φ);
+# # only stretched axes appear, uniform axes inherit [grid].spacing.
+# # Per-axis widths must sum to upper[i] - lower[i] within `sum_rtol`,
+# # and the list length must equal [grid].dimensions[i]; both invariants
+# # are enforced at validation time. Coronal-MHD codes (ARMS, PLUTO,
+# # MPI-AMRVAC) commonly stretch r as a log-radial mesh: fine cells at
+# # the photosphere where Alfvén speed and density gradients are steepest,
+# # coarsening outward. With dimensions[0] = 200, lower[0] = 1.0,
+# # upper[0] = 21.0 R_sun, generate the widths from
+# # `np.diff(np.geomspace(1.0, 21.0, 201))` (200 entries, sum 20.0):
+# #
+# #     [grid.stretched]
+# #     sum_rtol = 1.0e-9
+# #
+# #     [grid.stretched.axis_widths]
+# #     0 = [<200 floats summing to 20.0>]
+#
 # [boundary_conditions]
 # # Spherical boundaries in [r, θ, φ] order. "driven" = values sourced
 # # from the [[drivers]] magnetogram table. The θ/φ wedge edges are "open"
@@ -555,6 +745,21 @@ created = 2026-04-23
 # # θ axis and "periodic" for φ.
 # lower = ["driven",  "open", "open"]    # r_inner = photosphere, θ/φ = wedge edges
 # upper = ["open",    "open", "open"]    # r_outer = outflow, θ/φ = wedge edges
+#
+# # Per-face driver foreign keys (sparse). Keys are axis indices ("0"/"1"/
+# # "2"); values must match a declared [[drivers]].name. Faces without a
+# # driver simply don't appear. Unresolved names raise a validation error.
+# drivers_lower = { 0 = "photospheric_magnetogram" }
+#
+# # Per-field BC overrides — apply only to "E", "B", or "particles". Each
+# # override is a full BoundaryConditions block with the same axis count
+# # as the default. Useful for PML on E (laser-plasma), absorbing particles
+# # at the photosphere while letting fields convect through, etc.
+# [boundary_conditions.field_overrides.particles]
+# # Hypothetical: a kinetic test-particle population riding atop the MHD
+# # solution would absorb at r_inner and outflow at r_outer.
+# lower = ["absorbing", "open", "open"]
+# upper = ["outflow",   "open", "open"]
 #
 # [units]
 # system            = "MHD"

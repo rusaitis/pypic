@@ -1564,3 +1564,115 @@ class TestPerFieldBoundaryConditions:
         """)
         with pytest.raises(ValidationError, match="drivers_lower"):
             validate_simulation_toml(doc)
+
+
+class TestBodyNameUniqueness:
+    """``[[bodies]].name`` entries must be distinct (foreign-key target)."""
+
+    def test_distinct_body_names_accepted(self) -> None:
+        doc = _minimal_doc() + dedent("""
+            [[bodies]]
+            name = "earth"
+            center = [0.0, 0.0, 0.0]
+            radius = 1.0
+
+            [[bodies]]
+            name = "moon"
+            center = [10.0, 0.0, 0.0]
+            radius = 0.27
+        """)
+        s = validate_simulation_toml(doc)
+        assert {b.name for b in s.bodies} == {"earth", "moon"}
+
+    def test_duplicate_body_names_rejected(self) -> None:
+        doc = _minimal_doc() + dedent("""
+            [[bodies]]
+            name = "earth"
+            center = [0.0, 0.0, 0.0]
+            radius = 1.0
+
+            [[bodies]]
+            name = "earth"
+            center = [10.0, 0.0, 0.0]
+            radius = 1.0
+        """)
+        with pytest.raises(ValidationError, match="distinct names"):
+            validate_simulation_toml(doc)
+
+
+class TestOutputParticlesSpeciesReference:
+    """``[output.particles].species`` must resolve to declared ``[[species]]``."""
+
+    def test_known_species_accepted(self) -> None:
+        doc = _minimal_doc() + dedent("""
+            [output.particles]
+            step_interval = 100
+            species       = ["electrons"]
+            dir           = "./p"
+            format        = "hdf5"
+            precision     = "f32"
+        """)
+        s = validate_simulation_toml(doc)
+        assert s.output is not None
+        assert s.output.particles is not None
+        assert s.output.particles.species == ["electrons"]
+
+    def test_unknown_species_rejected(self) -> None:
+        doc = _minimal_doc() + dedent("""
+            [output.particles]
+            step_interval = 100
+            species       = ["electron"]
+            dir           = "./p"
+            format        = "hdf5"
+            precision     = "f32"
+        """)
+        with pytest.raises(
+            ValidationError, match=r"output\.particles\.species"
+        ):
+            validate_simulation_toml(doc)
+
+    def test_empty_species_list_accepted(self) -> None:
+        # An empty list opts out of all species — no name to resolve.
+        doc = _minimal_doc() + dedent("""
+            [output.particles]
+            step_interval = 100
+            species       = []
+            dir           = "./p"
+            format        = "hdf5"
+            precision     = "f32"
+        """)
+        s = validate_simulation_toml(doc)
+        assert s.output is not None
+        assert s.output.particles is not None
+        assert s.output.particles.species == []
+
+
+class TestReferenceSpeciesBuiltins:
+    """``[units].reference_species`` falls back to PIC builtins."""
+
+    @pytest.mark.parametrize("builtin", ["electrons", "ions", "protons"])
+    def test_builtin_accepted_without_declaration(self, builtin: str) -> None:
+        # The reference_species names "electrons", "ions", "protons" must
+        # validate even when no [[species]] entry of that name exists —
+        # the Approach-A fallback for legacy decks. The minimal doc declares
+        # only "electrons" as a [[species]]; "ions"/"protons" are pure
+        # builtin fallback resolutions.
+        doc = _minimal_doc().replace(
+            'system = "SI"',
+            f'system = "PIC"\n'
+            f'reference_species = "{builtin}"\n'
+            f"reference_density = 1.0e6",
+        )
+        s = validate_simulation_toml(doc)
+        assert isinstance(s.units, UnitsPIC)
+        assert s.units.reference_species == builtin
+
+    def test_unknown_reference_species_rejected(self) -> None:
+        doc = _minimal_doc().replace(
+            'system = "SI"',
+            'system = "PIC"\n'
+            'reference_species = "muons"\n'
+            "reference_density = 1.0e6",
+        )
+        with pytest.raises(ValidationError, match="reference_species"):
+            validate_simulation_toml(doc)

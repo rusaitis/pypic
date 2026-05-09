@@ -1397,9 +1397,11 @@ class SimulationSchema(_ExtensibleBase):
         if self.physics is not None:
             self._check_physics_matches_model_type()
         self._check_reference_species_exists()
+        self._check_body_names_unique()
         self._check_driver_body_references()
         self._check_collision_species_references()
         self._check_bc_driver_references()
+        self._check_output_particles_species_references()
         self._check_output_stream_axis_count(n)
         self._check_phase_space_consistency(n)
         self._check_extras_are_extensions()
@@ -1445,6 +1447,23 @@ class SimulationSchema(_ExtensibleBase):
                 f"[[species]].name entry: {sorted(names)}"
             )
 
+    def _check_body_names_unique(self) -> None:
+        """Ensure ``[[bodies]].name`` entries are distinct.
+
+        Drivers and initial-condition entries reference bodies by name
+        (``[[drivers]].body``, ``[initial_conditions].dipole_bodies``).
+        Duplicate names would silently route the foreign key to whichever
+        entry the reader happens to encounter first. Catching it at
+        validation time keeps body-name reference resolution unambiguous.
+        """
+        names = [b.name for b in self.bodies]
+        if len(set(names)) != len(names):
+            duplicates = sorted({n for n in names if names.count(n) > 1})
+            raise ValueError(
+                f"bodies entries must have distinct names; "
+                f"duplicates: {duplicates}"
+            )
+
     def _check_driver_body_references(self) -> None:
         """Ensure every ``[[drivers]].body`` references a declared body.
 
@@ -1479,6 +1498,29 @@ class SimulationSchema(_ExtensibleBase):
                         f"collisions.species_pair references unknown species "
                         f"'{species_name}'; declared species: {sorted(names)}"
                     )
+
+    def _check_output_particles_species_references(self) -> None:
+        """Ensure every ``[output.particles].species`` resolves.
+
+        Each name in the ``[output.particles].species`` list must match a
+        declared ``[[species]].name`` entry. Without this check, a typo
+        (``species = ["electron"]``) is silently accepted by the schema
+        layer and only surfaces as an empty-write or KeyError at output
+        time. Mirrors the foreign-key discipline used by
+        ``[[collisions]].species_pair`` and ``[[drivers]].body``.
+        """
+        if self.output is None or self.output.particles is None:
+            return
+        requested = self.output.particles.species
+        if not requested:
+            return
+        names = {s.name for s in self.species}
+        for species_name in requested:
+            if species_name not in names:
+                raise ValueError(
+                    f"output.particles.species references unknown species "
+                    f"'{species_name}'; declared species: {sorted(names)}"
+                )
 
     def _check_bc_driver_references(self) -> None:
         """Ensure every ``boundary_conditions.drivers_*`` resolves.
