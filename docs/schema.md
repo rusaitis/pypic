@@ -32,7 +32,8 @@ lives at `pypic.simulation.toml` at the repo root.
 
 `[schema].version` is the single discriminator for both
 `simulation.toml` and the on-disk output stores (HDF5 §4.1, Zarr §4.2,
-each carrying `schema_version` as a flat root attr). v1.x commits to:
+each carrying the value at the root attr path `schema.version` —
+the on-disk path mirrors the TOML form). v1.x commits to:
 
 - **Additive only.** Future v1.x releases may add optional sections,
   optional keys, canonical field names, and enum values. They will
@@ -146,7 +147,11 @@ Schema version tag and creation date.
 ```toml
 [schema]
 version = "1.0"                    # REQUIRED — single discriminator for the
-                                   #            TOML config and on-disk stores
+                                   #            TOML config and on-disk stores.
+                                   #            On disk the value lives at
+                                   #            attrs.schema.version (Zarr §4.2)
+                                   #            and /schema/version (HDF5 §4.1),
+                                   #            mirroring this TOML key path.
 created = 2026-04-23               # optional TOML date literal
 ```
 
@@ -1118,7 +1123,7 @@ the dataset's physics config.
 | `P_par` | Pressure parallel to B | PIC, multi-moment MHD (from tensor) |
 | `P_perp` | Pressure perpendicular to B | PIC, multi-moment MHD (from tensor) |
 | `Pij` | Full pressure tensor (6 independent components: P11, P12, P13, P22, P23, P33) | PIC, multi-moment MHD |
-| `agyrotropy` | Agyrotropy measure (deviation from gyrotropic symmetry) | PIC, multi-moment MHD (derived) |
+| `agyrotropy` | Swisdak $Q$ — see [equations.md § Pressure Tensor](equations.md#4-pressure-tensor) for the closed form $Q = \sqrt{1 - 4 I_2 / [(I_1 - P_\parallel)(I_1 + 3 P_\parallel)]}$, bounded $[0, 1]$ | PIC, multi-moment MHD (derived) |
 
 Any code that evolves the full pressure tensor — PIC, hybrid, 10-moment
 MHD, CGL — can populate these fields. `P_par` and `P_perp` are
@@ -1282,10 +1287,12 @@ Two on-disk layouts are defined, with deliberately asymmetric roles:
 
 Both layouts share the same **numbered canonical field names** (`B1`,
 `B2`, `B3`) and the same section-level metadata vocabulary, and both
-carry a `schema_version` flat root attr whose value equals
-`simulation.toml`'s `[schema].version` — a single discriminator across
-config and on-disk storage.  The difference is the storage container's
-group conventions (HDF5 groups vs Zarr DataTree).
+carry the schema version at the root attr path `schema.version`
+(`/schema/version` for HDF5, `attrs.schema.version` for Zarr) whose
+value equals `simulation.toml`'s `[schema].version` — a single
+discriminator across config and on-disk storage.  The difference is
+the storage container's group conventions (HDF5 groups vs Zarr
+DataTree).
 
 ### 4.1 HDF5 Output Layout
 
@@ -1355,14 +1362,15 @@ output_{step:06d}.h5
 ├── step              [attr: int]
 ├── model_name        [attr: "iPIC3D"]    # [model].name — code identity
 ├── model_type        [attr: "PIC"]       # [model].type — drives default vocabulary
-└── schema_version    [attr: "1.0"]       # mirrors simulation.toml [schema].version; same value as Zarr §4.2
+└── schema/                               # group — schema discriminator (mirrors simulation.toml [schema])
+    └── version       [attr: "1.0"]       # same value as Zarr §4.2 attrs.schema.version
 ```
 
 Every file contains enough metadata to convert back to SI without the
 original `simulation.toml` and to interpret per-species field names
-(`n_s0`, `V1_s1`, ...) without it.  `schema_version` lets a streaming
-consumer dispatch on layout vocabulary without sniffing the rest of
-the file. The HDF5 file itself always uses numbered names;
+(`n_s0`, `V1_s1`, ...) without it.  The `schema/version` attr lets a
+streaming consumer dispatch on layout vocabulary without sniffing the
+rest of the file. The HDF5 file itself always uses numbered names;
 `geometry` drives alias registration in the reader (`Bx → B1` for
 cartesian, `Br → B1` for spherical, etc). Existing readers (iPIC3D,
 BATSRUS, ...) translate native layouts; the Rust code writes this
@@ -1380,18 +1388,19 @@ The native pypic write format.  `pypic.io.to_zarr` and
 `to_zarr_timeseries` produce a Zarr v3 store laid out as an xarray
 `DataTree`: the field arrays live under a `/fields` child group
 (mirroring §4.1's `/fields/` HDF5 group); the metadata sections sit
-as flat keys on the root group's attrs, with a `schema_version` value
-that mirrors `simulation.toml`'s `[schema].version` and discriminates
-both the on-disk shape and the metadata vocabulary in one go.  Consolidated metadata is enabled — readers go through
-`consolidated="auto"` for the one-shot metadata fetch when the writer
-left a consolidated index, and fall back to listing for
-non-consolidated stores.
+as flat keys on the root group's attrs, with the schema discriminator
+at the root attr path `schema.version` mirroring
+`simulation.toml`'s `[schema].version` and discriminating both the
+on-disk shape and the metadata vocabulary in one go.  Consolidated
+metadata is enabled — readers go through `consolidated="auto"` for
+the one-shot metadata fetch when the writer left a consolidated index,
+and fall back to listing for non-consolidated stores.
 
 ```
 my_store.zarr/                         # Zarr v3 group root
 │
 ├── attrs (flat root metadata):
-│   ├── schema_version: "1.0"          # mirrors simulation.toml
+│   ├── schema:        { version: "1.0" }   # mirrors simulation.toml [schema].version
 │   ├── grid:          { dimensions, spacing, origin, dt,
 │   │                    boundary, surviving_axes,
 │   │                    geometry: { type, axis_names, axis_units } }
@@ -1445,7 +1454,7 @@ write; user-supplied `encoding=` overrides per variable.
 |---|---|---|
 | Field path | `/fields/B1` | `/fields/B1` |
 | Grid metadata | `/grid/` group with attrs | root `attrs.grid` (JSON) |
-| Stagger metadata | `/grid/stagger/` sub-group (`convention`, `fields`, `position`) | root `attrs.grid.stagger` |
+| Stagger metadata | `/grid/stagger/` sub-group (`convention`, `fields`, `position`) | root `attrs.metadata` (StaggerInfo as tagged dict) |
 | Normalization | `/normalization/` group | root `attrs.normalization` |
 | Species | `/species/{s0,s1,...}/` sub-groups | root `attrs.species` (list) |
 | Physics | `/physics/` group + sub-groups | root `attrs.physics` |
@@ -1453,14 +1462,16 @@ write; user-supplied `encoding=` overrides per variable.
 | Coord arrays | from grid attrs | `/fields/{x,y,z}` (1-D) |
 | `time` / `step` | top-level scalar attrs | `time` dim (multi-step) / `metadata.time` scalar (single-step) |
 | Files per write | one per timestep | one store, all steps |
-| Schema version | top-level `schema_version` attr | root `attrs.schema_version` (mirrors `[schema].version`) |
+| Schema version | `/schema/version` attr | root `attrs.schema.version` (mirrors `[schema].version`) |
 
-`schema_version` is the on-disk layout discriminator. It carries the
+`schema.version` is the on-disk layout discriminator. It carries the
 **writing library's** layout version — pypic v1.0 stamps `"1.0"`,
 pypic v1.1 will stamp `"1.1"`. Within a major version, it agrees
 with `simulation.toml`'s `[schema].version` because v1.x library
-and v1.x decks ship in lockstep. The flat root attr lets non-pypic
-consumers (Three.js viewer, Rust `zarrs` pipelines) dispatch on
+and v1.x decks ship in lockstep. Readers reject stores whose
+`schema.version` does not match the library's expected major
+version. The nested root attr lets non-pypic consumers (Three.js
+viewer, Rust `zarrs` pipelines) dispatch on
 layout vocabulary without parsing the TOML.
 
 **Reading without pypic.**  A non-pypic consumer (JS WebGPU viewer,

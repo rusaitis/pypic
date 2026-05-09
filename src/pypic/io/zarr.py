@@ -20,6 +20,7 @@ import xarray as xr
 from pypic.dataset import FieldDataset
 from pypic.io._guard import ensure_zarr
 from pypic.io._serialize import (
+    SCHEMA_VERSION,
     _to_json_native,
     decode_pypic_attrs,
     encode_pypic_attrs,
@@ -41,7 +42,7 @@ _log = logging.getLogger(__name__)
 # attrs don't leak as user-visible.
 _PYPIC_ROOT_ATTR_KEYS = frozenset(
     {
-        "schema_version",
+        "schema",
         "grid",
         "normalization",
         "species",
@@ -97,22 +98,30 @@ def _open_store(
 ) -> tuple[xr.Dataset, dict[str, Any]]:
     """Open a schema-v1.0 Zarr store; return (fields_dataset, root_attrs).
 
-    Root group must carry the ``schema_version`` discriminator and a
+    Root group must carry the ``schema.version`` discriminator and a
     ``/fields`` child group with the field arrays.  Uses
     ``consolidated="auto"`` so consolidated stores get the one-shot
     metadata read while non-consolidated stores still load.
     """
     tree = xr.open_datatree(store, engine="zarr", consolidated="auto")
     root_attrs = dict(tree.attrs)
-    if "schema_version" not in root_attrs:
+    schema_attrs = root_attrs.get("schema")
+    if not isinstance(schema_attrs, dict) or "version" not in schema_attrs:
         msg = (
             f"{source_label}: no pypic metadata found "
-            f"(expected ``schema_version`` discriminator)"
+            f"(expected ``schema.version`` discriminator)"
+        )
+        raise ValueError(msg)
+    version = schema_attrs["version"]
+    if version != SCHEMA_VERSION:
+        msg = (
+            f"{source_label}: schema.version={version!r} but this pypic "
+            f"build expects {SCHEMA_VERSION!r}; cannot decode safely"
         )
         raise ValueError(msg)
     if "fields" not in tree.children:
         msg = (
-            f"{source_label}: schema_version declared but no /fields group present"
+            f"{source_label}: schema.version declared but no /fields group present"
         )
         raise ValueError(msg)
     return tree["fields"].to_dataset(), root_attrs
@@ -348,7 +357,7 @@ def to_zarr(
 
     All pypic metadata (grid, normalization, species, physics, frame,
     transforms) is serialized as flat keys on the root group's attrs
-    alongside a ``schema_version`` discriminator (see schema.md §4.2),
+    alongside a ``schema.version`` discriminator (see schema.md §4.2),
     so that ``from_zarr`` — and any non-pypic consumer — can
     reconstruct the full object straight from the store.
 

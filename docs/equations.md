@@ -26,7 +26,7 @@ custom). Compound factors are built from these:
 | `velocity` | $v_{ref}$ | m/s | $V$, $v_A$, $v_{th}$ |
 | `b_field` | $B_{ref}$ | T | $B$ |
 | `e_field` | $E_{ref}$ | V/m | $E$ |
-| `pressure` | $n_{ref} m_{ref} v_{ref}^2$ | Pa | $P$, $P_e$, $P_i$ |
+| `pressure` | $n_{ref} m_{ref} v_{ref}^2$ | Pa | $P$, $P_e$, $P_i$ [^aliases] |
 | `temperature` | $m_{ref} v_{ref}^2$ | J | $T$ (energy units) |
 | `energy_density` | $n_{ref} m_{ref} v_{ref}^2$ | J/m$^3$ | $e_k$, $e_{th}$, $e_B$ |
 | `specific_energy` | $v_{ref}^2$ | J/kg | $h$, $e_{int}$ |
@@ -45,6 +45,12 @@ $\mu_0$ separates them.
 
 ## 1. Densities and Moments
 
+Per-species symbols `Pe`, `Pi`, `Ve`, `Te`, `Ti`, `n_e`, `n_i` shown
+below are pypic library-side aliases [^aliases]. The cross-tool
+canonical form uses 0-based species indices: `P_s{N}`, `V_s{N}`,
+`T_s{N}`, `n_s{N}` (see [schema.md § Per-species
+naming](schema.md#fluid--moment-quantities--densities)).
+
 | Name | Description | Normalized | SI |
 |------|-------------|------------|-----|
 | `n_s` | Number density (species $s$) | $n_s / n_{ref}$ | -- |
@@ -59,6 +65,14 @@ $\mu_0$ separates them.
 | `T` | Temperature (generic) | $T = P / n$ | $T^{SI} = T \cdot m_{ref} v_{ref}^2$ |
 | `Te` | Electron temperature | $T_e = P_e / n_e$ | $T_e^{SI} = T_e \cdot m_{ref} v_{ref}^2$ |
 | `Ti` | Ion temperature | $T_i = P_i / n_i$ | $T_i^{SI} = T_i \cdot m_{ref} v_{ref}^2$ |
+
+[^aliases]: pypic library-side convenience aliases bound to the
+    canonical `_s{N}` names at `FieldDataset` construction time
+    (`Pe ↔ P_s0`, `Pi ↔ P_s1`, `Ve ↔ V_s0`, …) for the common
+    two-species electron/ion case. They are **not** part of the
+    cross-tool v1.0 contract — non-pypic consumers (Rust, JS) read
+    only the numbered canonical names from disk. See
+    [Aliases](aliases.md) for the full registration list.
 
 
 ## 2. Thermodynamic Quantities
@@ -133,15 +147,29 @@ $$\mathbf{EF}_s = \underbrace{\tfrac{1}{2} n_s m_s |\mathbf{V}_s|^2 \mathbf{V}_s
 | `P_par` | Parallel pressure | $P_\parallel = \hat{b} \cdot \mathbf{P} \cdot \hat{b}$ | -- |
 | `P_perp` | Perpendicular pressure | $P_\perp = (\mathrm{Tr}(\mathbf{P}) - P_\parallel) / 2$ | -- |
 | `Pij` | Full pressure tensor | 6 independent components: P11, P12, P13, P22, P23, P33 | -- |
-| `agyrotropy` | Agyrotropy measure | $Q$ (deviation from gyrotropic symmetry) | -- |
+| `agyrotropy` | Agyrotropy measure[^Q] | $Q = \sqrt{1 - 4 I_2 / [(I_1 - P_\parallel)(I_1 + 3 P_\parallel)]}$ | -- |
+
+[^Q]: Swisdak's gyrotropy measure [@Swisdak2016], computed from the
+    first two invariants of the pressure tensor:
+    $I_1 = \mathrm{Tr}(\mathbf{P}) = P_{11} + P_{22} + P_{33}$ and
+    $I_2 = P_{11}P_{22} + P_{11}P_{33} + P_{22}P_{33} - P_{12}^2 -
+    P_{13}^2 - P_{23}^2$. Bounded $Q \in [0, 1]$: $Q = 0$ for a
+    perfectly gyrotropic plasma, $Q \to 1$ at maximal agyrotropy.
+    Frame-invariant (built from tensor invariants and the magnetic-
+    field-aligned scalar $P_\parallel = \hat{b} \cdot \mathbf{P}
+    \cdot \hat{b}$), so the value follows whatever $\hat{b}$ is in
+    the current frame. Alternatives in the literature: Scudder's
+    $A\phi$ [@Scudder2008] and Aunai's $D_{ng}$ [@Aunai2013] —
+    pypic standardizes on $Q$ for its closed form and bounded range.
 
 [^9]: The trace $\mathrm{Tr}(\mathbf{P})$ is a coordinate invariant (first
     invariant of the symmetric tensor), so $P = \mathrm{Tr}(\mathbf{P})/3$
     gives the same scalar regardless of axis orientation. Identity:
     $P = (P_\parallel + 2\,P_\perp)/3$. When `P` is not directly available
     in the dataset but the pressure tensor is, `compute("P")` falls back to
-    this definition. Per-species scalar pressures (`Pe`, `Pi`, `P_s{N}`)
-    use the same trace formula on the per-species tensor.
+    this definition. Per-species scalar pressures (canonical
+    `P_s{N}`; pypic aliases `Pe`, `Pi`) use the same trace formula
+    on the per-species tensor.
 
 
 ## 5. Characteristic Scales

@@ -402,15 +402,44 @@ class TestToZarrFromZarr:
         store = tmp_path / "v1.zarr"
         to_zarr(fds, store)
         root = zarr.open_group(str(store), mode="r")
-        # ``schema_version`` mirrors ``simulation.toml`` and is the
-        # single discriminator for both vocabulary and storage shape.
-        assert root.attrs["schema_version"] == "1.0"
+        # ``schema.version`` mirrors ``simulation.toml`` ``[schema].version``
+        # and is the single discriminator for both vocabulary and
+        # storage shape.  The on-disk path nests under ``schema`` to
+        # mirror the TOML form rather than a flat ``schema_version``.
+        assert root.attrs["schema"] == {"version": "1.0"}
+        assert "schema_version" not in root.attrs
         # Field arrays under /fields, not at the root.
         assert list(root.array_keys()) == []
         assert "fields" in list(root.group_keys())
         # Metadata sections flat at root.
         for key in ("grid", "normalization", "physics", "frame", "transforms"):
             assert key in root.attrs, f"missing root attr {key!r}"
+
+    def test_from_zarr_rejects_unknown_schema_version(self, tmp_path):
+        # A v2.0 store must not silently decode through the v1.0 path —
+        # see schema.md §1 *Versioning* (single-discriminator promise).
+        fds = make_test_dataset({"B1": np.ones((4, 3, 2))})
+        store = tmp_path / "future.zarr"
+        to_zarr(fds, store)
+        root = zarr.open_group(str(store), mode="a")
+        root.attrs["schema"] = {"version": "2.0"}
+        if hasattr(zarr, "consolidate_metadata"):
+            zarr.consolidate_metadata(str(store))
+        with pytest.raises(ValueError, match=r"schema\.version"):
+            from_zarr(store)
+
+    def test_from_zarr_rejects_missing_schema_attr(self, tmp_path):
+        # Missing ``schema`` root attr is rejected with the discriminator
+        # error rather than a downstream KeyError on ``grid`` / etc.
+        fds = make_test_dataset({"B1": np.ones((4, 3, 2))})
+        store = tmp_path / "no_schema.zarr"
+        to_zarr(fds, store)
+        root = zarr.open_group(str(store), mode="a")
+        del root.attrs["schema"]
+        if hasattr(zarr, "consolidate_metadata"):
+            zarr.consolidate_metadata(str(store))
+        with pytest.raises(ValueError, match=r"schema\.version"):
+            from_zarr(store)
 
 
 class TestToZarrTimeseries:

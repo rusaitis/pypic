@@ -335,15 +335,14 @@ def _from_json_native(obj: Any) -> Any:  # noqa: ANN401
     return obj
 
 
-# Storage layout discriminator.  Mirrors ``schema_version`` from
+# Storage layout discriminator.  Mirrors ``[schema].version`` from
 # ``simulation.toml`` — the storage layout (Zarr DataTree with fields
 # under ``/fields`` and metadata flat at root) is part of the schema
 # v1.0 contract documented in schema.md §4.2.  Bumping the schema
 # version is the single coordinated way to evolve both vocabulary and
-# storage shape together.
+# storage shape together.  On disk the value sits at the root attr
+# path ``schema.version`` so the key path mirrors the TOML form.
 SCHEMA_VERSION = "1.0"
-
-_FLAT_LAYOUT_KEY = "schema_version"
 
 
 def encode_pypic_attrs(fds: FieldDataset) -> dict[str, Any]:
@@ -355,8 +354,8 @@ def encode_pypic_attrs(fds: FieldDataset) -> dict[str, Any]:
     ``store.attrs["grid"]`` without going through any pypic-specific
     umbrella.
 
-    The single ``schema_version`` flat root attr carries the same
-    value as ``simulation.toml``'s ``[schema].version`` and
+    The ``schema`` root attr carries the version at ``schema.version``,
+    matching ``simulation.toml``'s ``[schema].version`` form, and
     discriminates both vocabulary and storage layout in one go.  See
     schema.md §1 *Versioning* for the additive-only policy and §4.2
     for the on-disk mapping table that this dict materialises.  Other
@@ -364,7 +363,7 @@ def encode_pypic_attrs(fds: FieldDataset) -> dict[str, Any]:
     (``grid_to_dict``, ``normalization_to_dict``, ...).
     """
     return {
-        "schema_version": SCHEMA_VERSION,
+        "schema": {"version": SCHEMA_VERSION},
         "grid": grid_to_dict(fds.grid),
         "normalization": normalization_to_dict(fds.normalization),
         "species": species_to_list(fds.species),
@@ -389,17 +388,25 @@ def decode_pypic_attrs(
     """Unpack root-group attrs into the components needed by FieldDataset.
 
     Expects schema-v1.0 flat keys at the top level with a
-    ``schema_version`` discriminator.
+    ``schema.version`` discriminator at ``d["schema"]["version"]``.
 
     Returns
     -------
     tuple
         (grid, normalization, species, physics, metadata, frame, transforms)
     """
-    if _FLAT_LAYOUT_KEY not in d:
+    schema_attrs = d.get("schema")
+    if not isinstance(schema_attrs, dict) or "version" not in schema_attrs:
         msg = (
             "No pypic metadata found in store attrs "
-            f"(expected ``{_FLAT_LAYOUT_KEY}`` discriminator)"
+            "(expected ``schema.version`` discriminator)"
+        )
+        raise ValueError(msg)
+    version = schema_attrs["version"]
+    if version != SCHEMA_VERSION:
+        msg = (
+            f"schema.version={version!r} but this pypic build expects "
+            f"{SCHEMA_VERSION!r}; cannot decode safely"
         )
         raise ValueError(msg)
     grid = dict_to_grid(d["grid"])
