@@ -1,12 +1,12 @@
 # Source: docs/schema.md § "Vector group shorthand in ``read()``":
 #           "Passing a bare prefix like ``'B'`` to ``read(fields=...)``
-#            expands to ``B1, B2, B3``. Per-species groups also work:
-#            ``'EF_s0'`` expands to ``EF1_s0, EF2_s0, EF3_s0``."
+#            expands to ``B_1, B_2, B_3``. Per-species groups also work:
+#            ``'EF_s0'`` expands to ``EF_s0_1, EF_s0_2, EF_s0_3``."
 #         + src/pypic/readers/_registry.py:353 (expansion loop).
 # Claim: (a) ``read(fields=["B"])`` loads the same field set as
-#            ``read(fields=["B1","B2","B3"])``.
+#            ``read(fields=["B_1","B_2","B_3"])``.
 #        (b) Adding explicit components to the bare prefix is a no-op
-#            (idempotence): ``read(fields=["B","B1","B2","B3"])`` loads
+#            (idempotence): ``read(fields=["B","B_1","B_2","B_3"])`` loads
 #            the same set as ``read(fields=["B"])``.
 #        (c) Per-species shorthand ``"EF_s0"`` expands to the three
 #            ``EFk_s0`` components.
@@ -62,16 +62,16 @@ class _RecordingReader:
         fields: dict[str, FloatArray] = {
             name: np.ones((4, 3, 2))
             for name in (
-                "B1",
-                "B2",
-                "B3",
-                "E1",
-                "E2",
-                "E3",
+                "B_1",
+                "B_2",
+                "B_3",
+                "E_1",
+                "E_2",
+                "E_3",
                 "rho_c",
-                "EF1_s0",
-                "EF2_s0",
-                "EF3_s0",
+                "EF_s0_1",
+                "EF_s0_2",
+                "EF_s0_3",
             )
         }
         return FieldDataset.from_arrays(fields, grid, Normalization.identity())
@@ -90,15 +90,15 @@ def _make_sim() -> Simulation:
 
 
 def test_explicit_components_match_bare_prefix() -> None:
-    """``fields=["B"]`` and ``fields=["B1","B2","B3"]`` load the same set.
+    """``fields=["B"]`` and ``fields=["B_1","B_2","B_3"]`` load the same set.
 
     This is the primary equivalence claim from schema.md § 3 — the
     shorthand is a pure convenience wrapper, never a different result.
     """
     sim = _make_sim()
     from_group = set(sim.read(0, fields=["B"]).field_names())
-    from_explicit = set(sim.read(0, fields=["B1", "B2", "B3"]).field_names())
-    assert from_group == from_explicit == {"B1", "B2", "B3"}
+    from_explicit = set(sim.read(0, fields=["B_1", "B_2", "B_3"]).field_names())
+    assert from_group == from_explicit == {"B_1", "B_2", "B_3"}
 
 
 def test_shorthand_is_idempotent() -> None:
@@ -107,12 +107,12 @@ def test_shorthand_is_idempotent() -> None:
     """
     sim = _make_sim()
     once = set(sim.read(0, fields=["B"]).field_names())
-    twice = set(sim.read(0, fields=["B", "B1", "B2", "B3"]).field_names())
+    twice = set(sim.read(0, fields=["B", "B_1", "B_2", "B_3"]).field_names())
     assert once == twice
 
 
 def test_per_species_shorthand_expands() -> None:
-    """``"EF_s0"`` → ``{EF1_s0, EF2_s0, EF3_s0}``.
+    """``"EF_s0"`` → ``{EF_s0_1, EF_s0_2, EF_s0_3}``.
 
     Per schema.md: "component index comes before the species suffix",
     so the expansion injects the axis index between the prefix and the
@@ -120,11 +120,11 @@ def test_per_species_shorthand_expands() -> None:
     """
     sim = _make_sim()
     ds = sim.read(0, fields=["EF_s0"])
-    assert set(ds.field_names()) == {"EF1_s0", "EF2_s0", "EF3_s0"}
+    assert set(ds.field_names()) == {"EF_s0_1", "EF_s0_2", "EF_s0_3"}
 
 
 def test_cartesian_alias_loads_single_component() -> None:
-    """``fields=["Bx"]`` loads ``{B1}``, not the whole group — the
+    """``fields=["Bx"]`` loads ``{B_1}``, not the whole group — the
     Cartesian alias names a single axis, so group expansion must be
     suppressed when the input is already alias-resolved.
 
@@ -133,7 +133,7 @@ def test_cartesian_alias_loads_single_component() -> None:
     """
     sim = _make_sim()
     ds = sim.read(0, fields=["Bx"])
-    assert set(ds.field_names()) == {"B1"}
+    assert set(ds.field_names()) == {"B_1"}
 
 
 def test_unknown_prefix_with_strict_raises() -> None:

@@ -200,7 +200,7 @@ class TestDivB:
         a2 = np.sin(zz)
         a3 = np.sin(xx)
 
-        # B = curl(A): B1 = dA3/dy - dA2/dz, etc.
+        # B = curl(A): B_1 = dA3/dy - dA2/dz, etc.
         b1 = np.gradient(a3, dy, axis=1) - np.gradient(a2, dz, axis=2)
         b2 = np.gradient(a1, dz, axis=2) - np.gradient(a3, dx, axis=0)
         b3 = np.gradient(a2, dx, axis=0) - np.gradient(a1, dy, axis=1)

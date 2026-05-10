@@ -1,17 +1,17 @@
 # Source: docs/equations.md § 1 (Densities and Moments table):
 #   "P: Total scalar pressure = P_e + P_i or Tr(P)/3 or fluid P"
 # + src/pypic/derived.py:1288 (total_pressure: P = P_e + P_i)
-# + src/pypic/derived.py:1314 (isotropic_pressure: P = (P11+P22+P33)/3)
+# + src/pypic/derived.py:1314 (isotropic_pressure: P = (P_11+P_22+P_33)/3)
 # + src/pypic/compute.py:279-281
 #   (``"P": (total_pressure, ("Pe", "Pi"))``,
-#    ``"Pe": (isotropic_pressure, ("P11_s0", "P22_s0", "P33_s0"))``,
-#    ``"Pi": (isotropic_pressure, ("P11_s1", "P22_s1", "P33_s1"))``).
+#    ``"Pe": (isotropic_pressure, ("P_s0_11", "P_s0_22", "P_s0_33"))``,
+#    ``"Pi": (isotropic_pressure, ("P_s1_11", "P_s1_22", "P_s1_33"))``).
 # Claim: the two independent paths to total pressure give identical
 # results up to float64 summation roundoff:
 #   path_a = total_pressure(Pe, Pi)
-#          = isotropic(P11_s0, P22_s0, P33_s0)
-#          + isotropic(P11_s1, P22_s1, P33_s1)
-#   path_b = isotropic(P11_s0 + P11_s1, P22_s0 + P22_s1, P33_s0 + P33_s1)
+#          = isotropic(P_s0_11, P_s0_22, P_s0_33)
+#          + isotropic(P_s1_11, P_s1_22, P_s1_33)
+#   path_b = isotropic(P_s0_11 + P_s1_11, P_s0_22 + P_s1_22, P_s0_33 + P_s1_33)
 #
 # Both reduce to (Tr(P_s0) + Tr(P_s1))/3. The split-then-add vs
 # add-then-divide paths must agree: any factor-of-3 or sign bug in
@@ -79,9 +79,9 @@ def test_total_pressure_from_per_species_tensors_two_paths(
     r"""Two paths to total pressure must agree:
 
         Path A: total_pressure(Pe, Pi)
-                where Pe = isotropic(P11_s0, P22_s0, P33_s0), etc.
-        Path B: isotropic(P11_s0 + P11_s1, P22_s0 + P22_s1,
-                          P33_s0 + P33_s1)
+                where Pe = isotropic(P_s0_11, P_s0_22, P_s0_33), etc.
+        Path B: isotropic(P_s0_11 + P_s1_11, P_s0_22 + P_s1_22,
+                          P_s0_33 + P_s1_33)
 
     Both equal (Tr(P_s0) + Tr(P_s1)) / 3 algebraically. Float64
     summation associativity gives the result bit-exact on this input

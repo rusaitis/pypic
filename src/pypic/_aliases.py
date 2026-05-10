@@ -14,23 +14,26 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence
 
-# Matches the canonical ``_s<index>`` species suffix; captures the
-# integer index so the reverse lookup is unambiguous.
-_SPECIES_SUFFIX = re.compile(r"_s(\d+)$")
+# Matches the canonical ``_s<index>`` species qualifier in either
+# scalar position (end of name, e.g. ``P_s0``, ``T_s1``) or Tier-3
+# vector/tensor position (followed by a component suffix, e.g.
+# ``V_s0_1``, ``P_s0_11``). Captures (species, suffix) where suffix is
+# the trailing ``_<component>`` or empty for scalars.
+_SPECIES_SUFFIX = re.compile(r"_s(\d+)(?P<suffix>_\d+)?$")
 
 _COMPUTE_ALIASES: dict[str, str] = {
-    "curl_Bx": "curl_B1",
-    "curl_By": "curl_B2",
-    "curl_Bz": "curl_B3",
-    "vort_x": "vort1",
-    "vort_y": "vort2",
-    "vort_z": "vort3",
-    "Sx": "S1",
-    "Sy": "S2",
-    "Sz": "S3",
-    "poynting_flux_x": "S1",
-    "poynting_flux_y": "S2",
-    "poynting_flux_z": "S3",
+    "curl_Bx": "curl_B_1",
+    "curl_By": "curl_B_2",
+    "curl_Bz": "curl_B_3",
+    "vort_x": "vort_1",
+    "vort_y": "vort_2",
+    "vort_z": "vort_3",
+    "Sx": "S_1",
+    "Sy": "S_2",
+    "Sz": "S_3",
+    "poynting_flux_x": "S_1",
+    "poynting_flux_y": "S_2",
+    "poynting_flux_z": "S_3",
     # Magnitude aliases (_mag suffix)
     "B_mag": "|B|",
     "Bmag": "|B|",
@@ -139,22 +142,15 @@ _COMPUTE_ALIASES: dict[str, str] = {
     "r_s1": "r_i",
     # Structured lambda_D aliases
     "lambda_D_s0": "lambda_D",
-    # Underscore-separated operator/component aliases
-    "curl_B_1": "curl_B1",
-    "curl_B_2": "curl_B2",
-    "curl_B_3": "curl_B3",
-    "curl_B_x": "curl_B1",
-    "curl_B_y": "curl_B2",
-    "curl_B_z": "curl_B3",
-    "vort_1": "vort1",
-    "vort_2": "vort2",
-    "vort_3": "vort3",
-    "S_1": "S1",
-    "S_2": "S2",
-    "S_3": "S3",
-    "S_x": "S1",
-    "S_y": "S2",
-    "S_z": "S3",
+    # Cartesian aliases for differential / EM-derived component names.
+    # Numbered forms (curl_B_1 etc.) are the canonical names; only the
+    # x/y/z spellings need an alias entry.
+    "curl_B_x": "curl_B_1",
+    "curl_B_y": "curl_B_2",
+    "curl_B_z": "curl_B_3",
+    "S_x": "S_1",
+    "S_y": "S_2",
+    "S_z": "S_3",
     "E_prime_x": "E_prime_1",
     "E_prime_y": "E_prime_2",
     "E_prime_z": "E_prime_3",
@@ -165,12 +161,12 @@ _COMPUTE_ALIASES: dict[str, str] = {
     "E_Hall_y": "E_Hall_2",
     "E_Hall_z": "E_Hall_3",
     # Per-species velocity aliases
-    "Ve1": "V1_s0",
-    "Ve2": "V2_s0",
-    "Ve3": "V3_s0",
-    "Vi1": "V1_s1",
-    "Vi2": "V2_s1",
-    "Vi3": "V3_s1",
+    "Ve1": "V_s0_1",
+    "Ve2": "V_s0_2",
+    "Ve3": "V_s0_3",
+    "Vi1": "V_s1_1",
+    "Vi2": "V_s1_2",
+    "Vi3": "V_s1_3",
     "|Vi|": "|V|_s1",
     # Per-species mass density aliases
     "rho_m_e": "rho_m_s0",
@@ -188,44 +184,44 @@ _COMPUTE_ALIASES: dict[str, str] = {
     # The bare-prefix forms (EFe, EFi, KEFe, ...) live in _GROUP_ALIASES
     # below because they expand to *three* names at read time, which is
     # a different contract than scalar compute-time aliases.
-    "EFe1": "EF1_s0",
-    "EFe2": "EF2_s0",
-    "EFe3": "EF3_s0",
-    "EFi1": "EF1_s1",
-    "EFi2": "EF2_s1",
-    "EFi3": "EF3_s1",
-    "energy_flux_x": "EF1",
-    "energy_flux_y": "EF2",
-    "energy_flux_z": "EF3",
-    "KEFe1": "KEF1_s0",
-    "KEFe2": "KEF2_s0",
-    "KEFe3": "KEF3_s0",
-    "KEFi1": "KEF1_s1",
-    "KEFi2": "KEF2_s1",
-    "KEFi3": "KEF3_s1",
-    "HFe1": "HF1_s0",
-    "HFe2": "HF2_s0",
-    "HFe3": "HF3_s0",
-    "HFi1": "HF1_s1",
-    "HFi2": "HF2_s1",
-    "HFi3": "HF3_s1",
-    "EHFe1": "EHF1_s0",
-    "EHFe2": "EHF2_s0",
-    "EHFe3": "EHF3_s0",
-    "EHFi1": "EHF1_s1",
-    "EHFi2": "EHF2_s1",
-    "EHFi3": "EHF3_s1",
-    "qe1": "q1_s0",
-    "qe2": "q2_s0",
-    "qe3": "q3_s0",
-    "qi1": "q1_s1",
-    "qi2": "q2_s1",
-    "qi3": "q3_s1",
+    "EFe1": "EF_s0_1",
+    "EFe2": "EF_s0_2",
+    "EFe3": "EF_s0_3",
+    "EFi1": "EF_s1_1",
+    "EFi2": "EF_s1_2",
+    "EFi3": "EF_s1_3",
+    "energy_flux_x": "EF_1",
+    "energy_flux_y": "EF_2",
+    "energy_flux_z": "EF_3",
+    "KEFe1": "KEF_s0_1",
+    "KEFe2": "KEF_s0_2",
+    "KEFe3": "KEF_s0_3",
+    "KEFi1": "KEF_s1_1",
+    "KEFi2": "KEF_s1_2",
+    "KEFi3": "KEF_s1_3",
+    "HFe1": "HF_s0_1",
+    "HFe2": "HF_s0_2",
+    "HFe3": "HF_s0_3",
+    "HFi1": "HF_s1_1",
+    "HFi2": "HF_s1_2",
+    "HFi3": "HF_s1_3",
+    "EHFe1": "EHF_s0_1",
+    "EHFe2": "EHF_s0_2",
+    "EHFe3": "EHF_s0_3",
+    "EHFi1": "EHF_s1_1",
+    "EHFi2": "EHF_s1_2",
+    "EHFi3": "EHF_s1_3",
+    "q_e1": "q_s0_1",
+    "q_e2": "q_s0_2",
+    "q_e3": "q_s0_3",
+    "q_i1": "q_s1_1",
+    "q_i2": "q_s1_2",
+    "q_i3": "q_s1_3",
 }
 
 
 # Vector-group shorthand: aliases that expand to a three-component group
-# at read time (``read(fields=["EFe"]) → EF1_s0, EF2_s0, EF3_s0``). These
+# at read time (``read(fields=["EFe"]) → EF_s0_1, EF_s0_2, EF_s0_3``). These
 # are deliberately separate from ``_COMPUTE_ALIASES`` because their target
 # is a *prefix*, not a single computable quantity — feeding ``EF_s0`` to
 # ``compute()`` would fail. Reader code consults this map after the
@@ -239,8 +235,8 @@ _GROUP_ALIASES: dict[str, str] = {
     "HFi": "HF_s1",
     "EHFe": "EHF_s0",
     "EHFi": "EHF_s1",
-    "qe": "q_s0",
-    "qi": "q_s1",
+    "q_e": "q_s0",
+    "q_i": "q_s1",
 }
 
 
@@ -256,7 +252,7 @@ def _build_field_alias_fallback() -> dict[str, str]:
         _CARTESIAN_UNDERSCORE_ALIASES,
         _CYLINDRICAL_ALIASES,
         _CYLINDRICAL_UNDERSCORE_ALIASES,
-        _NUMBERED_UNDERSCORE_ALIASES,
+        _LEGACY_NUMBERED_ALIASES,
         _SCALAR_UNDERSCORE_ALIASES,
         _SPECIES_ALIASES,
         _SPHERICAL_ALIASES,
@@ -270,7 +266,7 @@ def _build_field_alias_fallback() -> dict[str, str]:
     merged.update(_CARTESIAN_UNDERSCORE_ALIASES)
     merged.update(_SPHERICAL_UNDERSCORE_ALIASES)
     merged.update(_CYLINDRICAL_UNDERSCORE_ALIASES)
-    merged.update(_NUMBERED_UNDERSCORE_ALIASES)
+    merged.update(_LEGACY_NUMBERED_ALIASES)
     merged.update(_SCALAR_UNDERSCORE_ALIASES)
     merged.update(_SPECIES_ALIASES)
     return merged
@@ -286,13 +282,17 @@ def species_name_aliases(
     species_names: Sequence[str],
     available: Iterable[str],
 ) -> dict[str, str]:
-    """Build ``<prefix>_<species_name>`` → ``<prefix>_s<index>`` aliases.
+    """Build species-name-explicit aliases.
 
-    Resolves every canonical name in ``available`` that ends in the
-    ``_s<i>`` suffix to a species-name-explicit alias.  ``P_s0`` becomes
-    ``P_electrons`` when ``species_names[0] == "electrons"``;
-    ``EF1_s1`` becomes ``EF1_protons`` when ``species_names[1] ==
-    "protons"``.  Unrelated names pass through untouched.
+    Resolves every canonical name in ``available`` carrying the
+    ``_s<i>`` qualifier to an alias that names the species explicitly.
+    Three shapes:
+
+    - Scalar per-species: ``P_s0`` → ``P_electrons``.
+    - Vector per-species: ``V_s0_1`` → ``V_electrons_1``.
+    - Tensor per-species: ``P_s0_11`` → ``P_electrons_11``.
+
+    Unrelated names pass through untouched.
 
     Parameters
     ----------
@@ -331,7 +331,12 @@ def species_name_aliases(
         if not species_name:
             continue
         base = canonical[: match.start()]
-        alias = f"{base}_{species_name}"
+        # Tier-3 form: ``<base>_<species_name><component_suffix>``.
+        # Scalars (``P_s0``) land as ``P_electrons``; vectors
+        # (``V_s0_1``) as ``V_electrons_1``; tensors (``P_s0_11``)
+        # as ``P_electrons_11``.
+        component_suffix = match.group("suffix") or ""
+        alias = f"{base}_{species_name}{component_suffix}"
         # Don't shadow an existing canonical or earlier alias.
         if alias in available_set or alias in aliases:
             continue

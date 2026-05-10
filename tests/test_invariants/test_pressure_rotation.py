@@ -1,7 +1,7 @@
 # Source: src/pypic/derived.py:1362 ("P_par = b̂·P·b̂" — a double
 #         contraction is a scalar, hence frame-invariant by construction)
 #         + src/pypic/coordinates/transforms.py:457 ("The trace
-#         P11 + P22 + P33 is invariant [under rotation]")
+#         P_11 + P_22 + P_33 is invariant [under rotation]")
 #         + docs/equations.md § 4 footnote [^9]
 #         ("$P = (P_\parallel + 2 P_\perp)/3$").
 # Claims tested here:
@@ -54,7 +54,7 @@ def _symmetric_tensor_component() -> st.SearchStrategy[np.ndarray]:
 
 def _nonzero_b_component() -> st.SearchStrategy[np.ndarray]:
     """``parallel_pressure`` divides by ``|B|``; bound B away from zero
-    on at least one component (via B3 below) to avoid 0/0 NaNs that are
+    on at least one component (via B_3 below) to avoid 0/0 NaNs that are
     physically meaningful but test the arithmetic pipeline rather than
     the rotation-invariance claim.
     """

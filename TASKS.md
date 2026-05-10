@@ -57,12 +57,12 @@ Each step produces something testable. No step starts until the previous step's 
     `encode_pypic_attrs(fds)`, calls `tree.to_zarr(...)`.
   - `to_zarr_timeseries(simulation, path, *, steps, fields)` — multi-timestep store with `time` as a dimension. Each field becomes `(nt, nx, ny, nz)`, chunked along `time` so reading one step is O(1). Enables time-series analysis without scanning separate files.
   `from_zarr(path) -> FieldDataset` reconstructs everything including per-field metadata. Returns lazy-loading dataset by default (`xr.open_zarr` is lazy — reading one field doesn't touch others). For multi-variable stores, async concurrent metadata fetching via `zarr.config.set({'async.concurrency': 128})` delivers up to 14× speedup.
-  **Naming:** Canonical numbered names (`B1`, `B2`, `B3`) in the stored format, not geometry-specific (`Bx`, `Br`). Geometry is in metadata; aliases resolve on load. Consistent with HDF5 layout (schema.md § 4).
+  **Naming:** Canonical numbered names (`B_1`, `B_2`, `B_3`) in the stored format, not geometry-specific (`Bx`, `Br`). Geometry is in metadata; aliases resolve on load. Consistent with HDF5 layout (schema.md § 4).
   **Field metadata:** Already self-describing via xarray DataArray attrs (`quantity_type`, `si_unit`, `long_name`, `latex`, `units`), set by `from_arrays()` and `with_field()`. `xr.Dataset.to_zarr()` serializes attrs automatically. `from_zarr()` reconstructs `FieldDataset` including per-field metadata. No CF vocabulary (CF has no plasma physics coverage).
   **FrameTransforms:** Serialize origin, rotation matrix, and scale as arrays in metadata. Skip callable-based transforms; reconstruct on load.
   **Precision:** `dtype="float32"` kwarg on `to_zarr()` / `to_zarr_timeseries()` downcasts all field arrays to single precision on write (halves storage). Most PIC codes write single-precision dumps anyway; float64→float32 loses ~7 decimal digits, well below PIC numerical accuracy. Default: preserve source dtype. Implemented via xarray's `encoding` dict — user can also pass `encoding=` directly for per-field control.
   **Compression:** Default `BloscCodec(cname='zstd', clevel=5, shuffle='bitshuffle')` — the standalone `ZstdCodec` lacks shuffle pre-filtering and compresses floats poorly. Blosc2 + zstd + bitshuffle achieves 10–300× on smooth electromagnetic field data due to high spatial correlation. The newer bytedelta filter (Blosc2 2.8+) is an emerging improvement over bitshuffle (37% better on pressure-type data) — expose as an option once stable. User-configurable via `encoding=` passthrough to xarray.
-  **Sharding (cloud):** For cloud-hosted stores (S3, GCS, R2), enable sharding to group chunks into single storage objects, avoiding the small-files problem. Shards are the minimum write unit — the entire shard must fit in memory. Dask chunks must align with shard boundaries. Expose via `shards=` kwarg.
+  **Sharding (cloud):** For cloud-hosted stores (S_3, GCS, R2), enable sharding to group chunks into single storage objects, avoiding the small-files problem. Shards are the minimum write unit — the entire shard must fit in memory. Dask chunks must align with shard boundaries. Expose via `shards=` kwarg.
   **Version pinning:** `zarr>=3.1.0,<4` — versions 3.0.0–3.0.7 were yanked from PyPI due to a data-loss bug (append mode silently deleted data). v3.0.8 is the first safe release; v3.1+ is recommended. Requires `numcodecs>=0.16.0` (fixes BloscCodec defaulting to `typesize=1`, which produced 10–20× larger chunks). Optional deps under `zarr` extra.
 
 - [x] **Step 24b: `pypic.io` — VirtualiZarr for legacy HDF5**
@@ -133,8 +133,8 @@ Each step produces something testable. No step starts until the previous step's 
 
   **`pypic convert fields <path> --output DIR`**
   - `--step SPEC` — forwarded to `parse_steps`. Default `all`.
-  - `--fields B,E3,rho_c` — forwarded to `Simulation.read(fields=...)`;
-    supports vector-group shorthand (`"B"` → `B1,B2,B3`) and aliases.
+  - `--fields B,E_3,rho_c` — forwarded to `Simulation.read(fields=...)`;
+    supports vector-group shorthand (`"B"` → `B_1,B_2,B_3`) and aliases.
   - `--box x=0:64,y=0:64,z=32:64` — `BoxSelection.apply()` at convert
     time to crop spatial extent.
   - `--plane z=mid` — `PlaneSelection.apply()` for 2D slabs (reuses the
@@ -217,10 +217,10 @@ Each step produces something testable. No step starts until the previous step's 
 
 - [ ] **Step 23: `pypic.readers.vlasiator` — VLSV reader via analysator**
   `VLasiatorReader` implementing `SimulationReader`. Two-grid strategy: FSgrid fields (`fg_b`, `fg_e`) read directly as uniform arrays; DCCRG fields (`proton/vg_rho`, `proton/vg_v`, `proton/vg_p`) regridded to uniform at `target_resolution` (default: FSgrid resolution). DCCRG cell IDs encode position + refinement level — decode to (x, y, z, dx) then block-average/NN-repeat (like BATSRUS AMR pattern, not `pypic.regrid` which is for uniform→uniform).
-  Field mapping: `fg_b` → `B1/B2/B3`, `fg_e` → `E1/E2/E3`, `proton/vg_rho` → `n_s0`, `proton/vg_v` → `V1/V2/V3`, `proton/vg_p` (6 components) → pressure tensor. Species auto-detected from VLSV population names. Auto-detection: `.vlsv` extension + file signature. `open_vlasiator()` convenience function. Optional dep: `analysator` under `vlasiator` extra. All tests mock analysator.
+  Field mapping: `fg_b` → `B_1/B_2/B_3`, `fg_e` → `E_1/E_2/E_3`, `proton/vg_rho` → `n_s0`, `proton/vg_v` → `V_1/V_2/V_3`, `proton/vg_p` (6 components) → pressure tensor. Species auto-detected from VLSV population names. Auto-detection: `.vlsv` extension + file signature. `open_vlasiator()` convenience function. Optional dep: `analysator` under `vlasiator` extra. All tests mock analysator.
 
 - [ ] **Step 35: `pypic.readers.vpic` — VPIC reader**
-  `VPICReader` implementing `SimulationReader`. VPIC writes per-rank binary files (band-interleaved by field) or HDF5 via `vpic_decks`. Field mapping: `cbx/cby/cbz` → `B1/B2/B3` (cell-centered B), `ex/ey/ez` → `E1/E2/E3` (Yee edge), `jfx/jfy/jfz` → `J1/J2/J3`, `rhob` → `rho_c`, per-species hydro files → density, velocity, pressure tensor. Yee mesh destaggering to co-located grid (linear interpolation, `StaggerInfo(convention="staggered")`). Metadata from `info` dumps or deck header. Auto-detection: `global.vpc` or `info` file presence. `open_vpic()` convenience function. All tests use synthetic fixtures.
+  `VPICReader` implementing `SimulationReader`. VPIC writes per-rank binary files (band-interleaved by field) or HDF5 via `vpic_decks`. Field mapping: `cbx/cby/cbz` → `B_1/B_2/B_3` (cell-centered B), `ex/ey/ez` → `E_1/E_2/E_3` (Yee edge), `jfx/jfy/jfz` → `J_1/J_2/J_3`, `rhob` → `rho_c`, per-species hydro files → density, velocity, pressure tensor. Yee mesh destaggering to co-located grid (linear interpolation, `StaggerInfo(convention="staggered")`). Metadata from `info` dumps or deck header. Auto-detection: `global.vpc` or `info` file presence. `open_vpic()` convenience function. All tests use synthetic fixtures.
 
 - [ ] **Step 36: `pypic.readers.arms` — ARMS reader**
   `ARMSReader` implementing `SimulationReader`. ARMS (Adaptively Refined MHD Solver) outputs HDF5 with block-structured AMR. Regrid to uniform grid at `target_resolution` (like BATSRUS pattern). Field mapping from ARMS native names to canonical schema. Spherical geometry support (ARMS is commonly run in spherical coordinates for coronal/heliospheric simulations). `StaggerInfo(convention="staggered")` — ARMS uses a staggered mesh (CT for divergence-free B). Auto-detection: ARMS-specific HDF5 group structure. `open_arms()` convenience function. All tests use synthetic fixtures.
@@ -228,7 +228,7 @@ Each step produces something testable. No step starts until the previous step's 
 - [ ] **Step 42: `pypic.readers.openpmd` — openPMD reader (WarpX, PIConGPU, Smilei, FBPIC)**
   `OpenPMDReader` implementing `SimulationReader`. One reader covers four of the most-used modern PIC codes since they all emit the openPMD standard natively (HDF5 + ADIOS2 backends). High leverage compared to one reader per code.
   **Iteration encoding:** support both `groupBased` (single file, `/data/<step>/`) and `fileBased` (one file per step, `%T` placeholder pattern). `variableBased` (ADIOS2 streaming) is out of scope for v1.
-  **Field mapping:** `meshes/B/{x,y,z}` → `B1/B2/B3`, `meshes/E/{x,y,z}` → `E1/E2/E3`, `meshes/J/{x,y,z}` → `J1/J2/J3`, `meshes/rho` → `rho_c`. Per-species moments where the code emits them.
+  **Field mapping:** `meshes/B/{x,y,z}` → `B_1/B_2/B_3`, `meshes/E/{x,y,z}` → `E_1/E_2/E_3`, `meshes/J/{x,y,z}` → `J_1/J_2/J_3`, `meshes/rho` → `rho_c`. Per-species moments where the code emits them.
   **Stagger:** read the per-record `position` array (0.0–1.0 offset) directly into `StaggerInfo` (depends on Tier 2 per-component stagger work). Destagger to co-located grid for the canonical `FieldDataset`.
   **Units:** read `unitDimension` 7-tuple + `unitSI` per record; preserve as field metadata. The simulation-level `[units]` block is reconstructed from ED-PIC particle records (`charge`, `mass`, `weighting`) plus reference density derivable from species moments. Codes that don't write enough metadata to reconstruct fall back to `Normalization.identity()` (treat as SI).
   **Particles:** read `particles/<species>/{position,positionOffset,momentum,charge,mass,weighting,id}` and translate to canonical `ParticleData`. Honor `macroWeighted` + `weightingPower` semantics from ED-PIC when reading; always emit canonical form (per-particle `weight` + scalar `species_charge`/`species_mass`) per Step 25b.
@@ -282,7 +282,7 @@ Each step produces something testable. No step starts until the previous step's 
   `Probe` frozen dataclass: a named point `(x, y, z)` in the simulation domain. `ProbeArray`: collection of probes (detector arrays, virtual satellite constellations). `ProbeTrajectory`: time-varying position as `(t, x, y, z)` array — a spacecraft orbit or moving detector path. A fixed probe is a degenerate trajectory (constant position).
   Core functions:
   - `sample(probe, dataset) -> dict[str, float]` — interpolate all fields at the probe position for one timestep. Reuses `RegularGridInterpolator` from `traces/_sampling.py`.
-  - `sample_timeseries(probe, simulation, steps) -> TabularData` — sample across timesteps, producing time-series columns (time, B1, B2, B3, ...). Output is `TabularData` (already exists).
+  - `sample_timeseries(probe, simulation, steps) -> TabularData` — sample across timesteps, producing time-series columns (time, B_1, B_2, B_3, ...). Output is `TabularData` (already exists).
   - `sample_trajectory(trajectory, simulation) -> TabularData` — sample along a moving path, one position per timestep.
   - `sample_array(probes, dataset) -> TabularData` — sample all probes at one timestep, one row per probe.
   Schema: `[[probes]]` section in simulation.toml (see schema.md § 8). Probes defined in config are available via `Simulation.probes`. CLI: `pypic probe <path> --name NAME --step all --field FIELD` for quick time-series extraction.
@@ -296,6 +296,15 @@ Each step produces something testable. No step starts until the previous step's 
 ---
 
 ## Phase 13: Cross-Project Integration
+
+> **Tier-3 canonical names (locked in pre-v1.0).** Cross-tool work
+> below adopts the Tier-3 canonical name shape: `<field>[_s<N>][_<i>]`
+> with the species qualifier between the field name and the index
+> (`B_1`, `V_s0_1`, `P_s0_11`, `q_s0_1`). HDF5 §4.1 and Zarr §4.2
+> stores must use these names — `B1`, `V1_s0`, `P11_s0` are not
+> emitted by any pypic-aware tool. rustpic and webpic should wire
+> directly to Tier-3 names; no migration shim needed since neither
+> has shipped.
 
 - [ ] **Step 37: `pypic.server` — Arrow IPC streaming via Starlette/FastAPI**
   Zero-copy field data serving to webpic (Three.js/WebGPU viewer). Arrow IPC over WebSocket — **not** Arrow Flight (no Flight JS client exists for browsers; gRPC-Web requires an Envoy proxy and eliminates Flight's advantages). Pipeline: `pyarrow RecordBatch → IPC stream bytes → WebSocket → tableFromIPC() → Float32Array → Three.js BufferAttribute → GPU`. WebSocket provides persistent bidirectional connections ideal for continuous simulation streaming and time-series animation.

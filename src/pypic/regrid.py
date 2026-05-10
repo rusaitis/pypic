@@ -18,13 +18,13 @@ Examples
 >>> grid_a = GridInfo(dimensions=(4,), spacing=(1.0,), origin=(0.0,))
 >>> grid_b = GridInfo(dimensions=(8,), spacing=(0.5,), origin=(0.0,))
 >>> ds = FieldDataset.from_arrays(
-...     {"B1": np.array([1.0, 2.0, 3.0, 4.0])},
+...     {"B_1": np.array([1.0, 2.0, 3.0, 4.0])},
 ...     grid_a, Normalization.identity(),
 ... )
 >>> result = regrid(ds, grid_b)
 >>> result.grid.dimensions
 (8,)
->>> result["B1"].shape
+>>> result["B_1"].shape
 (8,)
 """
 
@@ -242,7 +242,7 @@ def regrid(
     >>> coarse = GridInfo(dimensions=(4,), spacing=(1.0,), origin=(0.0,))
     >>> fine = GridInfo(dimensions=(8,), spacing=(0.5,), origin=(0.0,))
     >>> ds = FieldDataset.from_arrays(
-    ...     {"B1": np.array([1.0, 2.0, 3.0, 4.0])},
+    ...     {"B_1": np.array([1.0, 2.0, 3.0, 4.0])},
     ...     coarse, Normalization.identity(),
     ... )
     >>> result = regrid(ds, fine)
@@ -349,7 +349,7 @@ def align_grids(
         matches the historical behavior. Pass a subset to skip wasted
         interpolation — each name is resolved through **both** source
         alias tables independently, so ``"Bx"`` works even when one side
-        only exposes the canonical ``"B1"``.
+        only exposes the canonical ``"B_1"``.
     method : str
         Interpolation method (default ``"linear"``).
     **kwargs
@@ -378,10 +378,10 @@ def align_grids(
     >>> g1 = GridInfo(dimensions=(10,), spacing=(1.0,), origin=(0.0,))
     >>> g2 = GridInfo(dimensions=(20,), spacing=(0.5,), origin=(0.0,))
     >>> ds1 = FieldDataset.from_arrays(
-    ...     {"B1": np.ones(10)}, g1, Normalization.identity(),
+    ...     {"B_1": np.ones(10)}, g1, Normalization.identity(),
     ... )
     >>> ds2 = FieldDataset.from_arrays(
-    ...     {"B1": np.ones(20)}, g2, Normalization.identity(),
+    ...     {"B_1": np.ones(20)}, g2, Normalization.identity(),
     ... )
     >>> a_new, b_new = align_grids(ds1, ds2)
     >>> a_new.grid.spacing == b_new.grid.spacing

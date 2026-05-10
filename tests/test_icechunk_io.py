@@ -32,15 +32,15 @@ class TestToZarrIcechunk:
 
     def test_round_trip_basic(self, tmp_path):
         fds = make_test_dataset(
-            {"B1": np.ones((4, 3, 2)), "B2": np.zeros((4, 3, 2))},
+            {"B_1": np.ones((4, 3, 2)), "B_2": np.zeros((4, 3, 2))},
         )
         store = tmp_path / "test.icechunk"
         to_zarr(fds, store, backend="icechunk")
         loaded = from_zarr(store)
 
-        assert sorted(loaded.field_names()) == ["B1", "B2"]
-        np.testing.assert_allclose(loaded["B1"], fds["B1"])
-        np.testing.assert_allclose(loaded["B2"], fds["B2"])
+        assert sorted(loaded.field_names()) == ["B_1", "B_2"]
+        np.testing.assert_allclose(loaded["B_1"], fds["B_1"])
+        np.testing.assert_allclose(loaded["B_2"], fds["B_2"])
         assert loaded.grid.dimensions == fds.grid.dimensions
         assert loaded.normalization.is_identity
 
@@ -71,7 +71,7 @@ class TestToZarrIcechunk:
             boundary=("periodic", "open", "periodic"),
         )
         fds = FieldDataset.from_arrays(
-            {"B1": np.ones((4, 3, 2)), "rho_m": np.full((4, 3, 2), 2.0)},
+            {"B_1": np.ones((4, 3, 2)), "rho_m": np.full((4, 3, 2), 2.0)},
             grid,
             Normalization.pic_electron(1e18),
             species=[ELECTRONS, IONS],
@@ -92,18 +92,18 @@ class TestToZarrIcechunk:
         assert loaded.physics.relativistic is True
         assert loaded.frame == "GSM"
         assert "GSM" in loaded.transforms
-        np.testing.assert_allclose(loaded["B1"], 1.0)
+        np.testing.assert_allclose(loaded["B_1"], 1.0)
         np.testing.assert_allclose(loaded["rho_m"], 2.0)
 
     def test_returns_snapshot_id(self, tmp_path):
-        fds = make_test_dataset({"B1": np.ones((4, 3, 2))})
+        fds = make_test_dataset({"B_1": np.ones((4, 3, 2))})
         store = tmp_path / "snap.icechunk"
         result = to_zarr(fds, store, backend="icechunk")
         assert isinstance(result, str)
         assert len(result) > 0
 
     def test_custom_message(self, tmp_path):
-        fds = make_test_dataset({"B1": np.ones((4, 3, 2))})
+        fds = make_test_dataset({"B_1": np.ones((4, 3, 2))})
         store = tmp_path / "msg.icechunk"
         to_zarr(fds, store, backend="icechunk", message="initial data")
         history = icechunk_ancestry(store)
@@ -112,22 +112,22 @@ class TestToZarrIcechunk:
 
     def test_dtype_downcast(self, tmp_path):
         fds = make_test_dataset(
-            {"B1": np.ones((4, 3, 2), dtype=np.float64)},
+            {"B_1": np.ones((4, 3, 2), dtype=np.float64)},
         )
         store = tmp_path / "f32.icechunk"
         to_zarr(fds, store, backend="icechunk", dtype="float32")
         loaded = from_zarr(store)
-        assert loaded["B1"].dtype == np.float32
-        np.testing.assert_allclose(loaded["B1"], 1.0, rtol=1e-6)
+        assert loaded["B_1"].dtype == np.float32
+        np.testing.assert_allclose(loaded["B_1"], 1.0, rtol=1e-6)
 
     def test_plain_zarr_returns_none(self, tmp_path):
-        fds = make_test_dataset({"B1": np.ones((4, 3, 2))})
+        fds = make_test_dataset({"B_1": np.ones((4, 3, 2))})
         store = tmp_path / "plain.zarr"
         result = to_zarr(fds, store)
         assert result is None
 
     def test_unknown_backend_raises(self, tmp_path):
-        fds = make_test_dataset({"B1": np.ones((4, 3, 2))})
+        fds = make_test_dataset({"B_1": np.ones((4, 3, 2))})
         store = tmp_path / "bad.zarr"
         with pytest.raises(ValueError, match="Unknown backend"):
             to_zarr(fds, store, backend="nosql")
@@ -141,7 +141,7 @@ class TestToZarrIcechunk:
         # raises during ``ds.to_zarr`` and the cleanup branch fires.
         grid = make_uniform_grid(4, 3, 2)
         fds = FieldDataset.from_arrays(
-            {"B1": np.ones((4, 3, 2))},
+            {"B_1": np.ones((4, 3, 2))},
             grid,
             Normalization.identity(),
             metadata={"bad": {1, 2, 3}},
@@ -156,12 +156,12 @@ class TestToZarrIcechunk:
         # The cleanup must only fire on freshly-created repos: a repo
         # with prior successful commits stays intact even if a later
         # write attempt aborts before commit.
-        good = make_test_dataset({"B1": np.full((4, 3, 2), 7.0)})
+        good = make_test_dataset({"B_1": np.full((4, 3, 2), 7.0)})
         store = tmp_path / "existing.icechunk"
         to_zarr(good, store, backend="icechunk")
         grid = make_uniform_grid(4, 3, 2)
         bad = FieldDataset.from_arrays(
-            {"B1": np.ones((4, 3, 2))},
+            {"B_1": np.ones((4, 3, 2))},
             grid,
             Normalization.identity(),
             metadata={"bad": {1, 2, 3}},
@@ -170,58 +170,58 @@ class TestToZarrIcechunk:
             to_zarr(bad, store, backend="icechunk", branch="nightly")
         assert is_icechunk_store(store)
         loaded = from_zarr(store, branch="main")
-        np.testing.assert_allclose(loaded["B1"], 7.0)
+        np.testing.assert_allclose(loaded["B_1"], 7.0)
 
 
 class TestFromZarrIcechunk:
     """Tests for from_zarr with Icechunk auto-detection and ref parameters."""
 
     def test_auto_detect(self, tmp_path):
-        fds = make_test_dataset({"B1": np.ones((4, 3, 2))})
+        fds = make_test_dataset({"B_1": np.ones((4, 3, 2))})
         store = tmp_path / "auto.icechunk"
         to_zarr(fds, store, backend="icechunk")
         loaded = from_zarr(store)
-        np.testing.assert_allclose(loaded["B1"], 1.0)
+        np.testing.assert_allclose(loaded["B_1"], 1.0)
 
     def test_read_by_tag(self, tmp_path):
-        fds = make_test_dataset({"B1": np.ones((4, 3, 2))})
+        fds = make_test_dataset({"B_1": np.ones((4, 3, 2))})
         store = tmp_path / "tag.icechunk"
         to_zarr(fds, store, backend="icechunk")
         icechunk_create_tag(store, "v1.0")
 
         loaded = from_zarr(store, tag="v1.0")
-        np.testing.assert_allclose(loaded["B1"], 1.0)
+        np.testing.assert_allclose(loaded["B_1"], 1.0)
 
     def test_read_by_snapshot(self, tmp_path):
-        fds = make_test_dataset({"B1": np.ones((4, 3, 2))})
+        fds = make_test_dataset({"B_1": np.ones((4, 3, 2))})
         store = tmp_path / "snap.icechunk"
         snap_id = to_zarr(fds, store, backend="icechunk")
         assert snap_id is not None
 
         loaded = from_zarr(store, snapshot_id=snap_id)
-        np.testing.assert_allclose(loaded["B1"], 1.0)
+        np.testing.assert_allclose(loaded["B_1"], 1.0)
 
     def test_read_by_branch(self, tmp_path):
-        fds = make_test_dataset({"B1": np.ones((4, 3, 2))})
+        fds = make_test_dataset({"B_1": np.ones((4, 3, 2))})
         store = tmp_path / "branch.icechunk"
         to_zarr(fds, store, backend="icechunk", branch="main")
 
         loaded = from_zarr(store, branch="main")
-        np.testing.assert_allclose(loaded["B1"], 1.0)
+        np.testing.assert_allclose(loaded["B_1"], 1.0)
 
     def test_write_creates_non_main_branch(self, tmp_path):
         # Fresh repos only have `main`; writable_session(other) would
         # otherwise raise `ref not found`.  The writer must fork the
         # branch off main's tip before opening the session.
-        fds = make_test_dataset({"B1": np.full((4, 3, 2), 7.0)})
+        fds = make_test_dataset({"B_1": np.full((4, 3, 2), 7.0)})
         store = tmp_path / "nonmain.icechunk"
         snap = to_zarr(fds, store, backend="icechunk", branch="analysis")
         assert snap is not None
         loaded = from_zarr(store, branch="analysis")
-        np.testing.assert_allclose(loaded["B1"], 7.0)
+        np.testing.assert_allclose(loaded["B_1"], 7.0)
 
     def test_multiple_refs_raises(self, tmp_path):
-        fds = make_test_dataset({"B1": np.ones((4, 3, 2))})
+        fds = make_test_dataset({"B_1": np.ones((4, 3, 2))})
         store = tmp_path / "multi.icechunk"
         to_zarr(fds, store, backend="icechunk")
         with pytest.raises(ValueError, match="at most one"):
@@ -237,7 +237,7 @@ class TestTimeseriesIcechunk:
             (
                 0.0,
                 FieldDataset.from_arrays(
-                    {"B1": np.full((4, 3, 2), 1.0)},
+                    {"B_1": np.full((4, 3, 2), 1.0)},
                     grid,
                     Normalization.identity(),
                 ),
@@ -245,7 +245,7 @@ class TestTimeseriesIcechunk:
             (
                 1.0,
                 FieldDataset.from_arrays(
-                    {"B1": np.full((4, 3, 2), 2.0)},
+                    {"B_1": np.full((4, 3, 2), 2.0)},
                     grid,
                     Normalization.identity(),
                 ),
@@ -262,17 +262,17 @@ class TestTimeseriesIcechunk:
     def test_timeseries_rejects_field_drift(self, tmp_path):
         grid = make_uniform_grid(4, 3, 2)
         step0 = FieldDataset.from_arrays(
-            {"B1": np.ones((4, 3, 2))},
+            {"B_1": np.ones((4, 3, 2))},
             grid,
             Normalization.identity(),
         )
         step1 = FieldDataset.from_arrays(
-            {"B1": np.ones((4, 3, 2)), "B2": np.zeros((4, 3, 2))},
+            {"B_1": np.ones((4, 3, 2)), "B_2": np.zeros((4, 3, 2))},
             grid,
             Normalization.identity(),
         )
         store = tmp_path / "drift.icechunk"
-        with pytest.raises(ValueError, match=r"field set.*differs.*B2"):
+        with pytest.raises(ValueError, match=r"field set.*differs.*B_2"):
             to_zarr_timeseries([(0.0, step0), (1.0, step1)], store, backend="icechunk")
         # The fresh repo must not survive a pre-commit failure —
         # ``open_icechunk_repo(create=True)`` persists an initial
@@ -308,12 +308,12 @@ class TestTimeseriesIcechunk:
         grid_small = make_uniform_grid(2, 2, 2)
         grid_big = make_uniform_grid(3, 2, 2)
         step0 = FieldDataset.from_arrays(
-            {"B1": np.ones((2, 2, 2))},
+            {"B_1": np.ones((2, 2, 2))},
             grid_small,
             Normalization.identity(),
         )
         step1 = FieldDataset.from_arrays(
-            {"B1": np.ones((3, 2, 2))},
+            {"B_1": np.ones((3, 2, 2))},
             grid_big,
             Normalization.identity(),
         )
@@ -332,7 +332,7 @@ class TestTimeseriesIcechunk:
         # freshly-created repos are cleaned up.
         grid = make_uniform_grid(4, 3, 2)
         good = FieldDataset.from_arrays(
-            {"B1": np.full((4, 3, 2), 5.0)},
+            {"B_1": np.full((4, 3, 2), 5.0)},
             grid,
             Normalization.identity(),
         )
@@ -345,12 +345,12 @@ class TestTimeseriesIcechunk:
             to_zarr_timeseries([], store, backend="icechunk", branch="nightly")
         # Pre-existing data on main must still be readable.
         loaded = from_zarr(store, branch="main")
-        np.testing.assert_allclose(loaded["B1"], 5.0)
+        np.testing.assert_allclose(loaded["B_1"], 5.0)
 
     def test_timeseries_branch_created(self, tmp_path):
         grid = make_uniform_grid(4, 3, 2)
         fds = FieldDataset.from_arrays(
-            {"B1": np.ones((4, 3, 2))},
+            {"B_1": np.ones((4, 3, 2))},
             grid,
             Normalization.identity(),
         )
@@ -368,7 +368,7 @@ class TestTimeseriesIcechunk:
     def test_timeseries_metadata_preserved(self, tmp_path):
         grid = make_uniform_grid(4, 3, 2)
         fds = FieldDataset.from_arrays(
-            {"B1": np.ones((4, 3, 2))},
+            {"B_1": np.ones((4, 3, 2))},
             grid,
             Normalization.identity(),
             species=[ELECTRONS],
@@ -390,7 +390,7 @@ class TestIcechunkHelpers:
     """Tests for repository helper functions."""
 
     def test_create_tag(self, tmp_path):
-        fds = make_test_dataset({"B1": np.ones((4, 3, 2))})
+        fds = make_test_dataset({"B_1": np.ones((4, 3, 2))})
         store = tmp_path / "tagged.icechunk"
         to_zarr(fds, store, backend="icechunk")
         icechunk_create_tag(store, "release-1")
@@ -402,7 +402,7 @@ class TestIcechunkHelpers:
         assert "release-1" in tags
 
     def test_ancestry(self, tmp_path):
-        fds = make_test_dataset({"B1": np.ones((4, 3, 2))})
+        fds = make_test_dataset({"B_1": np.ones((4, 3, 2))})
         store = tmp_path / "hist.icechunk"
         to_zarr(fds, store, backend="icechunk", message="first")
         to_zarr(fds, store, backend="icechunk", message="second")
@@ -413,7 +413,7 @@ class TestIcechunkHelpers:
         assert "first" in messages
 
     def test_is_icechunk_store_positive(self, tmp_path):
-        fds = make_test_dataset({"B1": np.ones((4, 3, 2))})
+        fds = make_test_dataset({"B_1": np.ones((4, 3, 2))})
         store = tmp_path / "ic.icechunk"
         to_zarr(fds, store, backend="icechunk")
         assert is_icechunk_store(store) is True
@@ -422,7 +422,7 @@ class TestIcechunkHelpers:
         assert is_icechunk_store(tmp_path / "nonexistent") is False
 
     def test_is_icechunk_store_plain_zarr(self, tmp_path):
-        fds = make_test_dataset({"B1": np.ones((4, 3, 2))})
+        fds = make_test_dataset({"B_1": np.ones((4, 3, 2))})
         store = tmp_path / "plain.zarr"
         to_zarr(fds, store)
         assert is_icechunk_store(store) is False

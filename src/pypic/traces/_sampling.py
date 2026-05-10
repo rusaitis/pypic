@@ -139,7 +139,7 @@ def sample_fields(
     The nearest-index lookup (``method="nearest"``) or interpolator
     construction (``method="linear"``) is performed once and reused
     across all requested fields — the common case for trace workflows
-    that sample ``B1/B2/B3`` or several diagnostics at the same points.
+    that sample ``B_1/B_2/B_3`` or several diagnostics at the same points.
 
     Parameters
     ----------

@@ -50,8 +50,8 @@ class StaggerInfo:
         ``MappingProxyType`` after construction.
     position : dict[str, tuple[float, ...]] | None
         Per-component stagger offsets in ``[0.0, 1.0)``, one tuple per
-        canonical field component (e.g. ``{"B1": (0.5, 0.0, 0.0),
-        "E1": (0.0, 0.5, 0.5)}``).  Adopts the openPMD ED-PIC
+        canonical field component (e.g. ``{"B_1": (0.5, 0.0, 0.0),
+        "E_1": (0.0, 0.5, 0.5)}``).  Adopts the openPMD ED-PIC
         ``position`` semantics so Yee-mesh PIC, BATSRUS face-centered B,
         and any future co-located write-out can describe their native
         stagger losslessly even after the reader has destaggered.
@@ -82,9 +82,9 @@ class StaggerInfo:
 
     >>> si = StaggerInfo(
     ...     convention="staggered",
-    ...     position={"B1": (0.5, 0.0, 0.0), "E1": (0.0, 0.5, 0.5)},
+    ...     position={"B_1": (0.5, 0.0, 0.0), "E_1": (0.0, 0.5, 0.5)},
     ... )
-    >>> si.position["B1"]
+    >>> si.position["B_1"]
     (0.5, 0.0, 0.0)
     """
 

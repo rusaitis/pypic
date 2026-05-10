@@ -24,6 +24,7 @@ from pypic.readers.ipic3d._field_map import (
     infer_total_fields,
     per_species_canonical,
     per_species_eflux_canonical,
+    per_species_pressure_canonical,
 )
 from pypic.readers.ipic3d._particles import detect_particle_steps, read_phdf5_particles
 
@@ -129,9 +130,11 @@ class IPic3DParallelReader:
             if p_path.exists():
                 with h5py.File(p_path, "r") as f:
                     group = f[f"Moments/species_{s}"]
-                    for phdf5_name, canon_base in _PHDF5_PRESSURE_MAP.items():
+                    for phdf5_name in _PHDF5_PRESSURE_MAP:
                         if phdf5_name in group:
-                            mapping[f"{canon_base}_s{s}"] = phdf5_name
+                            mapping[per_species_pressure_canonical(phdf5_name, s)] = (
+                                phdf5_name
+                            )
 
             ef_path = path / f"Moments_{step_str}" / f"E_flux_species_{s}_{step_str}.h5"
             if ef_path.exists():
@@ -197,7 +200,7 @@ class IPic3DParallelReader:
         field_data: dict[str, FloatArray] = {}
 
         # Electromagnetic fields — skip file open if none wanted
-        want_b = expanded is None or any(f"B{i}" in expanded for i in range(1, 4))
+        want_b = expanded is None or any(f"B_{i}" in expanded for i in range(1, 4))
         if want_b:
             b_path = path / f"Fields_{step_str}" / f"B_{step_str}.h5"
             with h5py.File(b_path, "r") as f:
@@ -209,7 +212,7 @@ class IPic3DParallelReader:
                     ):
                         field_data[canon_name] = np.array(f["Fields"][ipic_name])
 
-        want_e = expanded is None or any(f"E{i}" in expanded for i in range(1, 4))
+        want_e = expanded is None or any(f"E_{i}" in expanded for i in range(1, 4))
         if want_e:
             e_path = path / f"Fields_{step_str}" / f"E_{step_str}.h5"
             with h5py.File(e_path, "r") as f:
@@ -252,8 +255,11 @@ class IPic3DParallelReader:
                     )
 
             # Pressure tensor (optional)
+            # Tier-3 per-species tensor: ``P_s<N>_<ij>`` (species before
+            # ij pair); convert ``canon_base`` (``P_11``) accordingly.
             want_p_s = expanded is None or any(
-                f"{cb}_s{s}" in expanded for cb in _PHDF5_PRESSURE_MAP.values()
+                per_species_pressure_canonical(phdf5_name, s) in expanded
+                for phdf5_name in _PHDF5_PRESSURE_MAP
             )
             if want_p_s:
                 p_path = (
@@ -263,7 +269,7 @@ class IPic3DParallelReader:
                     with h5py.File(p_path, "r") as f:
                         group = f[f"Moments/species_{s}"]
                         for phdf5_name, canon_base in _PHDF5_PRESSURE_MAP.items():
-                            canon = f"{canon_base}_s{s}"
+                            canon = per_species_pressure_canonical(phdf5_name, s)
                             if expanded is not None and canon not in expanded:
                                 continue
                             if phdf5_name in group:
@@ -275,7 +281,8 @@ class IPic3DParallelReader:
 
             # Energy flux (optional)
             want_ef_s = expanded is None or any(
-                f"{cb}_s{s}" in expanded for cb in _EFLUX_MAP.values()
+                per_species_eflux_canonical(phdf5_name, s) in expanded
+                for phdf5_name in _EFLUX_MAP
             )
             if want_ef_s:
                 ef_path = (

@@ -52,7 +52,7 @@ class VectorFieldInterpolator:
     def from_dataset(
         cls,
         data: FieldDataset,
-        components: tuple[str, str, str] = ("B1", "B2", "B3"),
+        components: tuple[str, str, str] = ("B_1", "B_2", "B_3"),
     ) -> Self:
         """Build from a FieldDataset.
 
@@ -343,7 +343,7 @@ def trace_field_line(
     step_size: float = 0.5,
     max_steps: int = 10_000,
     direction: str = "both",
-    field_components: tuple[str, str, str] = ("B1", "B2", "B3"),
+    field_components: tuple[str, str, str] = ("B_1", "B_2", "B_3"),
     null_threshold: float = 1e-12,
     terminate: Callable[[FloatArray], bool] | None = None,
     interpolator: VectorFieldInterpolator | None = None,
@@ -392,9 +392,9 @@ def trace_field_line(
     >>> grid = GridInfo(dimensions=(8, 8, 8), spacing=(1.0, 1.0, 1.0))
     >>> data = FieldDataset.from_arrays(
     ...     {
-    ...         "B1": np.ones((8, 8, 8)),
-    ...         "B2": np.zeros((8, 8, 8)),
-    ...         "B3": np.zeros((8, 8, 8)),
+    ...         "B_1": np.ones((8, 8, 8)),
+    ...         "B_2": np.zeros((8, 8, 8)),
+    ...         "B_3": np.zeros((8, 8, 8)),
     ...     },
     ...     grid,
     ...     Normalization.identity(),
@@ -475,7 +475,7 @@ def trace_field_line_adaptive(
     max_step: float = 2.0,
     max_steps: int = 10_000,
     direction: str = "both",
-    field_components: tuple[str, str, str] = ("B1", "B2", "B3"),
+    field_components: tuple[str, str, str] = ("B_1", "B_2", "B_3"),
     null_threshold: float = 1e-12,
     terminate: Callable[[FloatArray], bool] | None = None,
     interpolator: VectorFieldInterpolator | None = None,
@@ -532,9 +532,9 @@ def trace_field_line_adaptive(
     >>> grid = GridInfo(dimensions=(8, 8, 8), spacing=(1.0, 1.0, 1.0))
     >>> data = FieldDataset.from_arrays(
     ...     {
-    ...         "B1": np.ones((8, 8, 8)),
-    ...         "B2": np.zeros((8, 8, 8)),
-    ...         "B3": np.zeros((8, 8, 8)),
+    ...         "B_1": np.ones((8, 8, 8)),
+    ...         "B_2": np.zeros((8, 8, 8)),
+    ...         "B_3": np.zeros((8, 8, 8)),
     ...     },
     ...     grid,
     ...     Normalization.identity(),
@@ -629,7 +629,7 @@ def estimate_tracing_error(
     field_line: FieldLine,
     data: FieldDataset,
     *,
-    field_components: tuple[str, str, str] = ("B1", "B2", "B3"),
+    field_components: tuple[str, str, str] = ("B_1", "B_2", "B_3"),
     interpolator: VectorFieldInterpolator | None = None,
 ) -> float:
     r"""Estimate tracing error via Richardson extrapolation.
@@ -666,9 +666,9 @@ def estimate_tracing_error(
     >>> grid = GridInfo(dimensions=(8, 8, 8), spacing=(1.0, 1.0, 1.0))
     >>> data = FieldDataset.from_arrays(
     ...     {
-    ...         "B1": np.ones((8, 8, 8)),
-    ...         "B2": np.zeros((8, 8, 8)),
-    ...         "B3": np.zeros((8, 8, 8)),
+    ...         "B_1": np.ones((8, 8, 8)),
+    ...         "B_2": np.zeros((8, 8, 8)),
+    ...         "B_3": np.zeros((8, 8, 8)),
     ...     },
     ...     grid,
     ...     Normalization.identity(),
@@ -723,11 +723,12 @@ def _validate_seed(
 def _field_name_from_components(
     components: tuple[str, str, str],
 ) -> str:
-    """Infer a field name like ``'B'`` from ``('B1', 'B2', 'B3')``.
+    """Infer a field name like ``'B'`` from ``('B_1', 'B_2', 'B_3')``.
 
-    Validates that all components share the same prefix.
+    Validates that all components share the same prefix. Strips the
+    Tier-3 trailing ``_<digit>`` suffix.
     """
-    names = {c.rstrip("0123456789") for c in components}
+    names = {c.rstrip("0123456789").rstrip("_") for c in components}
     if len(names) != 1:
         msg = f"Components must belong to the same field, got {components}"
         raise ValueError(msg)

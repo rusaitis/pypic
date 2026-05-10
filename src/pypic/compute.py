@@ -68,13 +68,15 @@ class _Recipe:
     supports_relativistic: bool = False
 
 
-_PRESSURE_TENSOR_FIELDS = ("P11", "P22", "P33", "P12", "P13", "P23")
-_PRESSURE_TENSOR_AND_B = (*_PRESSURE_TENSOR_FIELDS, "B1", "B2", "B3")
+_PRESSURE_TENSOR_FIELDS = ("P_11", "P_22", "P_33", "P_12", "P_13", "P_23")
+_PRESSURE_TENSOR_AND_B = (*_PRESSURE_TENSOR_FIELDS, "B_1", "B_2", "B_3")
+# Per-species tensor names follow the Tier-3 template ``<field>_s<N>_<ij>``,
+# so ``P_11`` becomes ``P_s{N}_11``.
 _SPECIES_PRESSURE_TENSOR_AND_B = (
-    *(f"{f}_s{{N}}" for f in _PRESSURE_TENSOR_FIELDS),
-    "B1",
-    "B2",
-    "B3",
+    *(f.replace("P_", "P_s{N}_") for f in _PRESSURE_TENSOR_FIELDS),
+    "B_1",
+    "B_2",
+    "B_3",
 )
 
 
@@ -88,7 +90,7 @@ def _vector_recipes(
 
     The same ``(func, fields)`` is shared across the three; only
     ``component`` varies.  ``name_tmpl`` uses ``{c}`` for the component
-    digit (e.g. ``"S{c}"``, ``"curl_B{c}"``).
+    digit (e.g. ``"S_{c}"``, ``"curl_B_{c}"``).
     """
     return {
         name_tmpl.format(c=c + 1): _Recipe(func, fields, component=c, **kwargs)
@@ -120,10 +122,10 @@ def _scalar_component_recipes(
 
 _REGISTRY: dict[str, _Recipe] = {
     # Magnitudes
-    "|B|": _Recipe(derived.magnetic_field_magnitude, ("B1", "B2", "B3")),
-    "|E|": _Recipe(derived.electric_field_magnitude, ("E1", "E2", "E3")),
-    "|J|": _Recipe(derived.current_density_magnitude, ("J1", "J2", "J3")),
-    "|V|": _Recipe(derived.velocity_magnitude, ("V1", "V2", "V3")),
+    "|B|": _Recipe(derived.magnetic_field_magnitude, ("B_1", "B_2", "B_3")),
+    "|E|": _Recipe(derived.electric_field_magnitude, ("E_1", "E_2", "E_3")),
+    "|J|": _Recipe(derived.current_density_magnitude, ("J_1", "J_2", "J_3")),
+    "|V|": _Recipe(derived.velocity_magnitude, ("V_1", "V_2", "V_3")),
     "|Ve|": _Recipe(derived.velocity_magnitude, ("Ve1", "Ve2", "Ve3")),
     # Plasma parameters.  Per-species ``beta_e``/``beta_i`` are produced by
     # the species template ``"beta"`` (resolves ``beta_s0``/``beta_s1``);
@@ -160,7 +162,7 @@ _REGISTRY: dict[str, _Recipe] = {
     "e_th": _Recipe(derived.thermal_energy_density, ("P",), needs_gamma=True),
     "e_th_trace": _Recipe(
         derived.thermal_energy_density_trace,
-        ("P11", "P22", "P33"),
+        ("P_11", "P_22", "P_33"),
     ),
     # Thermodynamic
     "h": _Recipe(
@@ -183,15 +185,15 @@ _REGISTRY: dict[str, _Recipe] = {
     # come from the ``"s"`` and ``"s_gyro"`` species templates below.
     # Poynting flux (tuple return — component selects)
     **_vector_recipes(
-        "S{c}",
+        "S_{c}",
         derived.poynting_flux,
-        ("E1", "E2", "E3", "B1", "B2", "B3"),
+        ("E_1", "E_2", "E_3", "B_1", "B_2", "B_3"),
     ),
     # Enthalpy flux (total, MHD): EHF_i = (gamma/(gamma-1)) P V_i
     **_scalar_component_recipes(
-        "EHF{c}",
+        "EHF_{c}",
         derived.enthalpy_flux_component,
-        ("P", "V{c}"),
+        ("P", "V_{c}"),
         needs_gamma=True,
     ),
     # Species-dependent: electrons (species 0)
@@ -279,53 +281,53 @@ _REGISTRY: dict[str, _Recipe] = {
     # Grid-dependent diagnostics
     "div_B": _Recipe(
         diagnostics.div_b,
-        ("B1", "B2", "B3"),
+        ("B_1", "B_2", "B_3"),
         needs_grid=True,
         passes_geometry=True,
     ),
     "div_E": _Recipe(
         diagnostics.div_e,
-        ("E1", "E2", "E3"),
+        ("E_1", "E_2", "E_3"),
         needs_grid=True,
         passes_geometry=True,
     ),
     # Curl of B (tuple return — component selects)
     **_vector_recipes(
-        "curl_B{c}",
+        "curl_B_{c}",
         operators.curl,
-        ("B1", "B2", "B3"),
+        ("B_1", "B_2", "B_3"),
         needs_grid=True,
         passes_geometry=True,
     ),
     # Vorticity (tuple return — component selects)
     **_vector_recipes(
-        "vort{c}",
+        "vort_{c}",
         operators.curl,
-        ("V1", "V2", "V3"),
+        ("V_1", "V_2", "V_3"),
         needs_grid=True,
         passes_geometry=True,
     ),
-    # Vorticity magnitude — depends on vort1/2/3
-    "|vort|": _Recipe(derived.velocity_magnitude, ("vort1", "vort2", "vort3")),
+    # Vorticity magnitude — depends on vort_1/2/3
+    "|vort|": _Recipe(derived.velocity_magnitude, ("vort_1", "vort_2", "vort_3")),
     # Reconnection diagnostics
-    "J_dot_E": _Recipe(derived.j_dot_e, ("J1", "J2", "J3", "E1", "E2", "E3")),
+    "J_dot_E": _Recipe(derived.j_dot_e, ("J_1", "J_2", "J_3", "E_1", "E_2", "E_3")),
     # Non-ideal electric field E' = E + VxB (component selects)
     **_vector_recipes(
         "E_prime_{c}",
         derived.non_ideal_electric_field,
-        ("E1", "E2", "E3", "V1", "V2", "V3", "B1", "B2", "B3"),
+        ("E_1", "E_2", "E_3", "V_1", "V_2", "V_3", "B_1", "B_2", "B_3"),
     ),
     # Ideal electric field E_ideal = -VxB (component selects)
     **_vector_recipes(
         "E_ideal_{c}",
         derived.ideal_electric_field,
-        ("V1", "V2", "V3", "B1", "B2", "B3"),
+        ("V_1", "V_2", "V_3", "B_1", "B_2", "B_3"),
     ),
     # Hall electric field E_Hall = JxB/(nq) (component selects)
     **_vector_recipes(
         "E_Hall_{c}",
         derived.hall_electric_field,
-        ("J1", "J2", "J3", "B1", "B2", "B3", "n_s0"),
+        ("J_1", "J_2", "J_3", "B_1", "B_2", "B_3", "n_s0"),
         species_index=0,
         species_args=_SpeciesArgs.CHARGE_ONLY,
     ),
@@ -333,7 +335,7 @@ _REGISTRY: dict[str, _Recipe] = {
     "firehose": _Recipe(derived.firehose_parameter, ("P_par", "P_perp", "|B|")),
     "mirror": _Recipe(derived.mirror_parameter, ("P_par", "P_perp", "|B|")),
     # Magnetic flux function (2D only)
-    "psi": _Recipe(derived.magnetic_flux_function, ("B2",), needs_grid=True),
+    "psi": _Recipe(derived.magnetic_flux_function, ("B_2",), needs_grid=True),
 }
 
 
@@ -398,21 +400,21 @@ _SPECIES_TEMPLATES: dict[str, _SpeciesTemplate] = {
     "T": _SpeciesTemplate(derived.temperature, ("P_s{N}", "n_s{N}"), _SpeciesArgs.NONE),
     "P": _SpeciesTemplate(
         derived.isotropic_pressure,
-        ("P11_s{N}", "P22_s{N}", "P33_s{N}"),
+        ("P_s{N}_11", "P_s{N}_22", "P_s{N}_33"),
         _SpeciesArgs.NONE,
     ),
-    "V1": _SpeciesTemplate(
-        derived.bulk_velocity, ("J1_s{N}", "rho_c_s{N}"), _SpeciesArgs.NONE
+    "V_1": _SpeciesTemplate(
+        derived.bulk_velocity, ("J_s{N}_1", "rho_c_s{N}"), _SpeciesArgs.NONE
     ),
-    "V2": _SpeciesTemplate(
-        derived.bulk_velocity, ("J2_s{N}", "rho_c_s{N}"), _SpeciesArgs.NONE
+    "V_2": _SpeciesTemplate(
+        derived.bulk_velocity, ("J_s{N}_2", "rho_c_s{N}"), _SpeciesArgs.NONE
     ),
-    "V3": _SpeciesTemplate(
-        derived.bulk_velocity, ("J3_s{N}", "rho_c_s{N}"), _SpeciesArgs.NONE
+    "V_3": _SpeciesTemplate(
+        derived.bulk_velocity, ("J_s{N}_3", "rho_c_s{N}"), _SpeciesArgs.NONE
     ),
     "|V|": _SpeciesTemplate(
         derived.velocity_magnitude,
-        ("V1_s{N}", "V2_s{N}", "V3_s{N}"),
+        ("V_s{N}_1", "V_s{N}_2", "V_s{N}_3"),
         _SpeciesArgs.NONE,
     ),
     # Per-species mass density: rho_m_s = |rho_c_s| * m / |q|
@@ -431,7 +433,7 @@ _SPECIES_TEMPLATES: dict[str, _SpeciesTemplate] = {
     ),
     "e_th_trace": _SpeciesTemplate(
         derived.thermal_energy_density_trace,
-        ("P11_s{N}", "P22_s{N}", "P33_s{N}"),
+        ("P_s{N}_11", "P_s{N}_22", "P_s{N}_33"),
         _SpeciesArgs.NONE,
     ),
     "e_int": _SpeciesTemplate(
@@ -447,69 +449,75 @@ _SPECIES_TEMPLATES: dict[str, _SpeciesTemplate] = {
         needs_gamma=True,
     ),
     # Kinetic energy flux: KEF_i = (1/2) n m |V|² V_i
-    "KEF1": _SpeciesTemplate(
+    "KEF_1": _SpeciesTemplate(
         derived.kinetic_energy_flux_component,
-        ("V1_s{N}", "V1_s{N}", "V2_s{N}", "V3_s{N}", "rho_c_s{N}"),
+        ("V_s{N}_1", "V_s{N}_1", "V_s{N}_2", "V_s{N}_3", "rho_c_s{N}"),
         _SpeciesArgs.CHARGE_MASS,
     ),
-    "KEF2": _SpeciesTemplate(
+    "KEF_2": _SpeciesTemplate(
         derived.kinetic_energy_flux_component,
-        ("V2_s{N}", "V1_s{N}", "V2_s{N}", "V3_s{N}", "rho_c_s{N}"),
+        ("V_s{N}_2", "V_s{N}_1", "V_s{N}_2", "V_s{N}_3", "rho_c_s{N}"),
         _SpeciesArgs.CHARGE_MASS,
     ),
-    "KEF3": _SpeciesTemplate(
+    "KEF_3": _SpeciesTemplate(
         derived.kinetic_energy_flux_component,
-        ("V3_s{N}", "V1_s{N}", "V2_s{N}", "V3_s{N}", "rho_c_s{N}"),
+        ("V_s{N}_3", "V_s{N}_1", "V_s{N}_2", "V_s{N}_3", "rho_c_s{N}"),
         _SpeciesArgs.CHARGE_MASS,
     ),
     # Heat flux: HF_i = EF_i - KEF_i (thermal + heat flux residual)
-    "HF1": _SpeciesTemplate(
-        derived.heat_flux_component, ("EF1_s{N}", "KEF1_s{N}"), _SpeciesArgs.NONE
+    "HF_1": _SpeciesTemplate(
+        derived.heat_flux_component, ("EF_s{N}_1", "KEF_s{N}_1"), _SpeciesArgs.NONE
     ),
-    "HF2": _SpeciesTemplate(
-        derived.heat_flux_component, ("EF2_s{N}", "KEF2_s{N}"), _SpeciesArgs.NONE
+    "HF_2": _SpeciesTemplate(
+        derived.heat_flux_component, ("EF_s{N}_2", "KEF_s{N}_2"), _SpeciesArgs.NONE
     ),
-    "HF3": _SpeciesTemplate(
-        derived.heat_flux_component, ("EF3_s{N}", "KEF3_s{N}"), _SpeciesArgs.NONE
+    "HF_3": _SpeciesTemplate(
+        derived.heat_flux_component, ("EF_s{N}_3", "KEF_s{N}_3"), _SpeciesArgs.NONE
     ),
     # Enthalpy flux (per-species): EHF_i = (gamma/(gamma-1)) P_s V_i_s
-    "EHF1": _SpeciesTemplate(
+    "EHF_1": _SpeciesTemplate(
         derived.enthalpy_flux_component,
-        ("P_s{N}", "V1_s{N}"),
+        ("P_s{N}", "V_s{N}_1"),
         _SpeciesArgs.NONE,
         needs_gamma=True,
     ),
-    "EHF2": _SpeciesTemplate(
+    "EHF_2": _SpeciesTemplate(
         derived.enthalpy_flux_component,
-        ("P_s{N}", "V2_s{N}"),
+        ("P_s{N}", "V_s{N}_2"),
         _SpeciesArgs.NONE,
         needs_gamma=True,
     ),
-    "EHF3": _SpeciesTemplate(
+    "EHF_3": _SpeciesTemplate(
         derived.enthalpy_flux_component,
-        ("P_s{N}", "V3_s{N}"),
+        ("P_s{N}", "V_s{N}_3"),
         _SpeciesArgs.NONE,
         needs_gamma=True,
     ),
     # Conductive heat flux: q_i = HF_i - EHF_i (non-adiabatic residual)
-    "q1": _SpeciesTemplate(
+    "q_1": _SpeciesTemplate(
         derived.conductive_heat_flux_component,
-        ("HF1_s{N}", "EHF1_s{N}"),
+        ("HF_s{N}_1", "EHF_s{N}_1"),
         _SpeciesArgs.NONE,
     ),
-    "q2": _SpeciesTemplate(
+    "q_2": _SpeciesTemplate(
         derived.conductive_heat_flux_component,
-        ("HF2_s{N}", "EHF2_s{N}"),
+        ("HF_s{N}_2", "EHF_s{N}_2"),
         _SpeciesArgs.NONE,
     ),
-    "q3": _SpeciesTemplate(
+    "q_3": _SpeciesTemplate(
         derived.conductive_heat_flux_component,
-        ("HF3_s{N}", "EHF3_s{N}"),
+        ("HF_s{N}_3", "EHF_s{N}_3"),
         _SpeciesArgs.NONE,
     ),
 }
 
-_SPECIES_SUFFIX_RE = re.compile(r"^(.+)_s(\d+)$")
+# Match the species qualifier ``_s<N>`` either at the end (scalar
+# per-species like ``omega_p_s2``, ``P_s0``, ``T_s1``) or in the middle
+# followed by a component suffix (vector/tensor per-species under the
+# Tier-3 canonical, like ``V_s0_1``, ``q_s0_1``, ``P_s0_11``). The
+# template lookup key is ``<prefix><suffix>`` — for ``V_s0_1`` that's
+# ``"V_1"``, matching the Tier-3 template-key form.
+_SPECIES_SUFFIX_RE = re.compile(r"^(?P<prefix>.+?)_s(?P<idx>\d+)(?P<suffix>(?:_.+)?)$")
 
 
 def _try_species_recipe(name: str) -> _Recipe | None:
@@ -520,7 +528,8 @@ def _try_species_recipe(name: str) -> _Recipe | None:
     m = _SPECIES_SUFFIX_RE.match(name)
     if m is None:
         return None
-    prefix, idx_str = m.group(1), m.group(2)
+    prefix = m.group("prefix") + m.group("suffix")
+    idx_str = m.group("idx")
     species_index = int(idx_str)
     template = _SPECIES_TEMPLATES.get(prefix)
     if template is None:
@@ -850,13 +859,13 @@ def field_si_factor(name: str, normalization: Normalization) -> float:
     canonical = _resolve_name(name)
     info = _FIELD_INFO.get(canonical)
     if info is None:
-        # Resolve field aliases (Bx→B1, B_x→B1, P_e→Pe, etc.)
+        # Resolve field aliases (Bx→B_1, B_x→B_1, P_e→Pe, etc.)
         fallback = _get_field_alias_fallback()
         canonical = fallback.get(canonical, canonical)
         info = _FIELD_INFO.get(canonical)
     quantity_type: str | None = info.quantity_type if info is not None else None
     if quantity_type is None:
-        # Try regex patterns for per-species fields (n_s2, J1_s3, etc.)
+        # Try regex patterns for per-species fields (n_s2, J_s3_1, etc.)
         for pattern, qtype in _SPECIES_QUANTITY_PATTERNS:
             if pattern.match(canonical):
                 quantity_type = qtype
@@ -947,7 +956,7 @@ def _find_sibling_components(name: str) -> dict[str, int]:
     r"""Find all recipes sharing the same func/fields as *name*.
 
     Returns a ``{name: component_index}`` dict for component-based
-    recipes (e.g. ``S1/S2/S3``, ``curl_B1/2/3``). Returns an empty
+    recipes (e.g. ``S_1/S_2/S_3``, ``curl_B_1/2/3``). Returns an empty
     dict if *name* has no ``component``.
     """
     canonical = _resolve_name(name)

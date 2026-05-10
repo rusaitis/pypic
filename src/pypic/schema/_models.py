@@ -391,7 +391,7 @@ class GridStagger(_StrictBase):
        ``{B = "face", E = "edge"}``. Captures the Yee-mesh truth that
        a single string cannot.
     3. ``position`` — per-component openPMD ED-PIC offsets in
-       ``[0, 1)`` along each axis, e.g. ``{B1 = [0.5, 0.0, 0.0]}``.
+       ``[0, 1)`` along each axis, e.g. ``{B_1 = [0.5, 0.0, 0.0]}``.
        Lossless representation of the source mesh; consumed by readers
        that need ED-PIC-precise destaggering.
 
@@ -629,14 +629,56 @@ Units = Annotated[
 
 
 class CoordinateTransform(_StrictBase):
-    """One entry under ``[coordinates.transforms.<frame>]``."""
+    """One entry under ``[coordinates.transforms.<frame>]``.
+
+    ``rotation``, when present, must be a 3×3 *signed permutation*
+    matrix: exactly one ±1 per row and per column with every other
+    entry zero. That covers all axis-relabeling / handedness flips
+    pypic's frame transforms support today (GSE↔GSM-style rotations
+    with continuous angles are time-dependent and route through
+    ``parameter`` instead — see ``coordinates.transforms``). Catching
+    a malformed matrix here is cheaper than letting it slip into
+    ``pypic.coordinates._frames`` and surface as a runtime error at
+    apply time.
+    """
 
     origin: AxisFloat | None = None
-    rotation: list[list[float]] | None = None
+    rotation: list[Vec3Float] | None = None
     scale: float | None = None
     from_frame: str | None = None
     parameter: str | None = None
     axis_labels: Vec3Str | None = None
+
+    @model_validator(mode="after")
+    def _check_rotation_signed_permutation(self) -> CoordinateTransform:
+        if self.rotation is None:
+            return self
+        rows = self.rotation
+        if len(rows) != 3:
+            raise ValueError(
+                f"coordinates.transforms.rotation must be a 3x3 matrix; "
+                f"got {len(rows)} rows"
+            )
+        # Signed permutation: each row and each column has exactly one
+        # entry equal to +/-1, all others zero. Equivalent statement —
+        # R R^T == I with entries drawn from {-1, 0, +1}.
+        col_used = [False, False, False]
+        for i, row in enumerate(rows):
+            nonzero = [(j, v) for j, v in enumerate(row) if v != 0.0]
+            if len(nonzero) != 1 or nonzero[0][1] not in (1.0, -1.0):
+                raise ValueError(
+                    f"coordinates.transforms.rotation row {i} = {row} is "
+                    f"not a signed unit vector (need exactly one +/-1 entry, "
+                    f"all others 0)"
+                )
+            j = nonzero[0][0]
+            if col_used[j]:
+                raise ValueError(
+                    f"coordinates.transforms.rotation column {j} is used "
+                    f"twice; matrix is not a permutation"
+                )
+            col_used[j] = True
+        return self
 
 
 class CoordinatesModes(_StrictBase):
@@ -1170,7 +1212,7 @@ class Probe(_StrictBase):
     """
 
     name: str
-    position: list[float] | None = None
+    position: Vec3Float | None = None
     trajectory: str | None = None
     fields: list[str] | None = None
     frame: str | None = None
@@ -1394,6 +1436,12 @@ class SimulationSchema(_ExtensibleBase):
                 f"{len(self.coordinates.physical_extent)} entries but "
                 f"grid.dimensions has {n}"
             )
+        for body in self.bodies:
+            if len(body.center) != n:
+                raise ValueError(
+                    f"body '{body.name}': center has {len(body.center)} "
+                    f"entries but grid.dimensions has {n}"
+                )
         if self.physics is not None:
             self._check_physics_matches_model_type()
         self._check_reference_species_exists()

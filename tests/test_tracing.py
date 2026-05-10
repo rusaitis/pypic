@@ -31,9 +31,9 @@ def _make_uniform_field(
     shape = (n, n, n)
     return FieldDataset.from_arrays(
         {
-            "B1": np.full(shape, b_vec[0]),
-            "B2": np.full(shape, b_vec[1]),
-            "B3": np.full(shape, b_vec[2]),
+            "B_1": np.full(shape, b_vec[0]),
+            "B_2": np.full(shape, b_vec[1]),
+            "B_3": np.full(shape, b_vec[2]),
         },
         grid,
     )
@@ -57,7 +57,7 @@ def _make_circular_field(
     by = xx - center
     bz = np.zeros_like(bx)
     return FieldDataset.from_arrays(
-        {"B1": bx, "B2": by, "B3": bz},
+        {"B_1": bx, "B_2": by, "B_3": bz},
         grid,
     )
 
@@ -80,7 +80,7 @@ def _make_helical_field(
     by = xx - center
     bz = np.ones_like(bx)
     return FieldDataset.from_arrays(
-        {"B1": bx, "B2": by, "B3": bz},
+        {"B_1": bx, "B_2": by, "B_3": bz},
         grid,
     )
 
@@ -103,7 +103,7 @@ def _make_null_field(
     by = -(yy - center)
     bz = -(zz - center)
     return FieldDataset.from_arrays(
-        {"B1": bx, "B2": by, "B3": bz},
+        {"B_1": bx, "B_2": by, "B_3": bz},
         grid,
     )
 
@@ -135,9 +135,9 @@ class TestVectorFieldInterpolator:
         xx, _, _ = np.meshgrid(x1d, x1d, x1d, indexing="ij")
         data = FieldDataset.from_arrays(
             {
-                "B1": xx,
-                "B2": np.zeros_like(xx),
-                "B3": np.zeros_like(xx),
+                "B_1": xx,
+                "B_2": np.zeros_like(xx),
+                "B_3": np.zeros_like(xx),
             },
             grid,
         )
@@ -166,7 +166,7 @@ class TestVectorFieldInterpolator:
                 bounds_error=False,
                 fill_value=np.nan,
             )
-            for c in ("B1", "B2", "B3")
+            for c in ("B_1", "B_2", "B_3")
         ]
         interp = VectorFieldInterpolator.from_dataset(data)
 

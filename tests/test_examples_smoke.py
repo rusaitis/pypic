@@ -188,8 +188,8 @@ class TestSmoke:
 
     def test_has_em_fields(self, sim_dir: Path) -> None:
         ds = self._read(sim_dir)
-        has_b = ds.has_field("B1") or ds.has_field("Bx")
-        has_e = ds.has_field("E1") or ds.has_field("Ex")
+        has_b = ds.has_field("B_1") or ds.has_field("Bx")
+        has_e = ds.has_field("E_1") or ds.has_field("Ex")
         assert has_b or has_e, f"No EM fields found in {sim_dir.name}"
 
     def test_field_shapes_consistent(self, sim_dir: Path) -> None:
@@ -205,10 +205,10 @@ class TestSmoke:
 
     def test_no_all_zero_b_field(self, sim_dir: Path) -> None:
         ds = self._read(sim_dir)
-        if not ds.has_field("B1"):
-            pytest.skip("No B1 field")
-        b1 = ds["B1"]
-        assert not np.all(b1 == 0.0), "B1 is all zeros — missed correction?"
+        if not ds.has_field("B_1"):
+            pytest.skip("No B_1 field")
+        b1 = ds["B_1"]
+        assert not np.all(b1 == 0.0), "B_1 is all zeros — missed correction?"
 
     def test_grid_matches_fields(self, sim_dir: Path) -> None:
         result = self._get_opened(sim_dir)
@@ -263,22 +263,22 @@ class TestMHDUCLAPhysics:
 
     def test_mhducla_velocity(self, sim_dir: Path) -> None:
         ds, _ = self._setup(sim_dir)
-        v1 = ds["V1"][0, :, :]
+        v1 = ds["V_1"][0, :, :]
         expected_v = 530e3 / constants.c
         assert_allclose(np.mean(np.abs(v1)), expected_v, rtol=0.05)
 
     def test_mhducla_imf_magnitude(self, sim_dir: Path) -> None:
         ds, norm = self._setup(sim_dir)
-        b1 = ds["B1"][0, :, :]
-        b2 = ds["B2"][0, :, :]
-        b3 = ds["B3"][0, :, :]
+        b1 = ds["B_1"][0, :, :]
+        b2 = ds["B_2"][0, :, :]
+        b3 = ds["B_3"][0, :, :]
         b_mag = np.sqrt(b1**2 + b2**2 + b3**2)
         expected_b = 8e-9 / norm.b_field_ref
         assert_allclose(np.mean(b_mag), expected_b, rtol=0.05)
 
     def test_mhducla_dipole_dominance(self, sim_dir: Path) -> None:
         ds, norm = self._setup(sim_dir)
-        b1, b2, b3 = ds["B1"], ds["B2"], ds["B3"]
+        b1, b2, b3 = ds["B_1"], ds["B_2"], ds["B_3"]
         max_b = np.max(np.sqrt(b1**2 + b2**2 + b3**2))
         imf_code = 8e-9 / norm.b_field_ref
         assert max_b > 100 * imf_code

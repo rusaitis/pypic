@@ -69,9 +69,9 @@ class TestFieldInfoLookup:
         [
             ("B_mag", "|B|"),
             ("plasma_beta", "beta"),
-            ("Bx", "B1"),
+            ("Bx", "B_1"),
             ("P_e", "Pe"),
-            ("B_1", "B1"),
+            ("B_1", "B_1"),
         ],
     )
     def test_alias_resolution(self, alias: str, canonical: str) -> None:
@@ -84,7 +84,7 @@ class TestFieldInfoLookup:
             ("omega_p_s3", "frequency", "Plasma frequency (species 3)"),
             ("v_th_s2", "velocity", "Thermal speed (species 2)"),
             ("T_s4", "temperature", "Temperature (species 4)"),
-            ("J1_s2", "current_density", "Current density component 1 (species 2)"),
+            ("J_s2_1", "current_density", "Current density component 1 (species 2)"),
         ],
     )
     def test_species_patterns(
@@ -102,8 +102,8 @@ class TestFieldInfoLookup:
 @pytest.mark.parametrize(
     ("name", "si", "expected"),
     [
-        ("B1", True, "T"),
-        ("B1", False, "normalized"),
+        ("B_1", True, "T"),
+        ("B_1", False, "normalized"),
         ("beta", True, ""),
         ("beta", False, ""),
         ("v_A", True, "m/s"),
@@ -126,7 +126,7 @@ class TestQuantityUnits:
 
 class TestFieldDatasetFieldInfo:
     def test_resolves_canonical_and_alias(self) -> None:
-        ds = _make_dataset({"B1": np.ones((4, 3, 2))})
+        ds = _make_dataset({"B_1": np.ones((4, 3, 2))})
         assert ds.field_info("beta").latex == r"$\beta$"
         info = ds.field_info("Bx")
         assert info.long_name == "Magnetic field x-component"
@@ -137,11 +137,11 @@ class TestXarrayAttrs:
     def test_known_field_has_attrs(self) -> None:
         ds = _make_dataset(
             {
-                "B1": np.ones((4, 3, 2)),
+                "B_1": np.ones((4, 3, 2)),
                 "rho_m": np.ones((4, 3, 2)),
             }
         )
-        b1_attrs = ds.xr["B1"].attrs
+        b1_attrs = ds.xr["B_1"].attrs
         assert b1_attrs["long_name"] == "Magnetic field x-component"
         assert b1_attrs["units"] == "normalized"
         assert ds.xr["rho_m"].attrs["long_name"] == "Mass density"
@@ -163,7 +163,7 @@ class TestFieldSiFactorRegression:
 
     def test_alias_matches_canonical(self) -> None:
         norm = Normalization.identity()
-        assert field_si_factor("Bx", norm) == field_si_factor("B1", norm)
+        assert field_si_factor("Bx", norm) == field_si_factor("B_1", norm)
 
     def test_species_pattern(self) -> None:
         norm = Normalization.identity()
@@ -181,17 +181,17 @@ class TestGeometryAwareLabels:
     @pytest.mark.parametrize(
         ("name", "axes", "expected_long", "expected_latex"),
         [
-            ("B1", ("x", "y", "z"), "Magnetic field x-component", r"$B_x$"),
-            ("B2", ("x", "y", "z"), "Magnetic field y-component", r"$B_y$"),
-            ("B1", ("r", "θ", "φ"), "Magnetic field r-component", r"$B_r$"),
+            ("B_1", ("x", "y", "z"), "Magnetic field x-component", r"$B_x$"),
+            ("B_2", ("x", "y", "z"), "Magnetic field y-component", r"$B_y$"),
+            ("B_1", ("r", "θ", "φ"), "Magnetic field r-component", r"$B_r$"),
             (
-                "B2",
+                "B_2",
                 ("r", "θ", "φ"),
                 "Magnetic field θ-component",
                 r"$B_{\theta}$",
             ),
             (
-                "V2",
+                "V_2",
                 ("r", "φ", "z"),
                 "Bulk velocity φ-component",
                 r"$V_{\phi}$",
@@ -210,7 +210,7 @@ class TestGeometryAwareLabels:
         assert info.latex == expected_latex
 
     def test_electron_velocity(self) -> None:
-        info = field_info("Ve1", axis_names=self.CARTESIAN)
+        info = field_info("Ve_1", axis_names=self.CARTESIAN)
         assert info.long_name == "Electron velocity x-component"
         assert info.latex == r"$V_{e,x}$"
 
@@ -220,17 +220,17 @@ class TestGeometryAwareLabels:
         assert info.latex == r"$B_{0,x}$"
 
     def test_curl_component(self) -> None:
-        info = field_info("curl_B1", axis_names=self.CARTESIAN)
+        info = field_info("curl_B_1", axis_names=self.CARTESIAN)
         assert info.long_name == "Curl of B x-component"
         assert info.latex == r"$(\nabla \times B)_x$"
 
     def test_species_component(self) -> None:
-        info = field_info("J1_s2", axis_names=self.CARTESIAN)
+        info = field_info("J_s2_1", axis_names=self.CARTESIAN)
         assert info.long_name == "Current density x-component (species 2)"
         assert info.latex == r"$J_{x,s2}$"
 
     def test_no_geometry_unchanged(self) -> None:
-        info = field_info("B1")
+        info = field_info("B_1")
         assert info.long_name == "Magnetic field component 1"
         assert info.latex == r"$B_1$"
 
@@ -240,17 +240,17 @@ class TestGeometryAwareLabels:
         assert field_info("rho_m", axis_names=self.CARTESIAN) == field_info("rho_m")
 
     def test_vorticity_component(self) -> None:
-        info = field_info("vort1", axis_names=self.CARTESIAN)
+        info = field_info("vort_1", axis_names=self.CARTESIAN)
         assert info.long_name == "Vorticity x-component"
         assert info.latex == r"$\omega_x$"
 
     def test_poynting_flux_spherical(self) -> None:
-        info = field_info("S2", axis_names=self.SPHERICAL)
+        info = field_info("S_2", axis_names=self.SPHERICAL)
         assert info.long_name == "Poynting flux θ-component"
         assert info.latex == r"$S_{\theta}$"
 
     def test_species_electron_velocity_component(self) -> None:
-        info = field_info("Ve2_s1", axis_names=self.CARTESIAN)
+        info = field_info("Ve_s1_2", axis_names=self.CARTESIAN)
         assert info.long_name == "Electron velocity y-component (species 1)"
         assert info.latex == r"$V_{e,y,s1}$"
 
@@ -297,7 +297,7 @@ class TestNewFieldEntries:
         assert info.latex == r"$P_{s3}$"
 
     def test_pressure_tensor_species(self) -> None:
-        info = field_info("P11_s2")
+        info = field_info("P_s2_11")
         assert info.quantity_type == "pressure"
         assert info.long_name == "Pressure 11 (species 2)"
         assert info.latex == r"$P_{11,s2}$"
@@ -445,8 +445,8 @@ class TestUnitDimension:
         assert quantity_dimension("pressure") == quantity_dimension("energy_density")
 
     def test_canonical_field_attrs_carry_dimension(self) -> None:
-        ds = _make_dataset({"B1": np.ones((4, 3, 2))})
-        assert ds.xr["B1"].attrs["unit_dimension"] == [0, 1, -2, -1, 0, 0, 0]
+        ds = _make_dataset({"B_1": np.ones((4, 3, 2))})
+        assert ds.xr["B_1"].attrs["unit_dimension"] == [0, 1, -2, -1, 0, 0, 0]
 
     def test_register_field_default_dimension(self) -> None:
         name = "_test_ud_default"
@@ -506,7 +506,7 @@ class TestWithField:
     """FieldDataset.with_field() — attach custom fields with metadata."""
 
     def test_basic(self) -> None:
-        ds = _make_dataset({"B1": np.ones((4, 3, 2))})
+        ds = _make_dataset({"B_1": np.ones((4, 3, 2))})
         data = np.full((4, 3, 2), 0.42)
         ds2 = ds.with_field("R_rec", data, QuantityType.DIMENSIONLESS)
         np.testing.assert_array_equal(ds2["R_rec"], data)
@@ -514,7 +514,7 @@ class TestWithField:
     def test_in_si_via_attrs(self) -> None:
         norm = Normalization.pic_electron(n_e=1.0e18)
         grid = GridInfo(dimensions=(2,), spacing=(1.0,))
-        ds = FieldDataset.from_arrays({"B1": np.array([1.0, 2.0])}, grid, norm)
+        ds = FieldDataset.from_arrays({"B_1": np.array([1.0, 2.0])}, grid, norm)
         data = np.array([3.0, 4.0])
         ds2 = ds.with_field("custom_v", data, QuantityType.VELOCITY)
         si_vals = ds2.in_si("custom_v")
@@ -522,7 +522,7 @@ class TestWithField:
         np.testing.assert_allclose(si_vals, data * expected_factor)
 
     def test_field_info_from_attrs(self) -> None:
-        ds = _make_dataset({"B1": np.ones((4, 3, 2))})
+        ds = _make_dataset({"B_1": np.ones((4, 3, 2))})
         ds2 = ds.with_field(
             "R_rec",
             np.ones((4, 3, 2)),
@@ -537,7 +537,7 @@ class TestWithField:
         assert info.latex == r"$R_{rec}$"
 
     def test_survives_isel(self) -> None:
-        ds = _make_dataset({"B1": np.ones((4, 3, 2))})
+        ds = _make_dataset({"B_1": np.ones((4, 3, 2))})
         ds2 = ds.with_field("diag", np.ones((4, 3, 2)), QuantityType.PRESSURE)
         sliced = ds2.isel(z=0)
         info = sliced.field_info("diag")
@@ -545,7 +545,7 @@ class TestWithField:
         assert info.si_unit == "Pa"
 
     def test_survives_plane_selection(self) -> None:
-        ds = _make_dataset({"B1": np.ones((4, 3, 2))})
+        ds = _make_dataset({"B_1": np.ones((4, 3, 2))})
         ds2 = ds.with_field(
             "diag",
             np.ones((4, 3, 2)),
@@ -558,18 +558,18 @@ class TestWithField:
         assert info.long_name == "My diagnostic"
 
     def test_invalid_quantity_type(self) -> None:
-        ds = _make_dataset({"B1": np.ones((4, 3, 2))})
+        ds = _make_dataset({"B_1": np.ones((4, 3, 2))})
         with pytest.raises(ValueError, match="Unknown quantity_type"):
             ds.with_field("bad", np.ones((4, 3, 2)), "nonexistent_type")
 
     def test_immutable_original(self) -> None:
-        ds = _make_dataset({"B1": np.ones((4, 3, 2))})
+        ds = _make_dataset({"B_1": np.ones((4, 3, 2))})
         original_names = ds.field_names()
         ds.with_field("extra", np.ones((4, 3, 2)), QuantityType.DENSITY)
         assert ds.field_names() == original_names
 
     def test_string_quantity_type(self) -> None:
-        ds = _make_dataset({"B1": np.ones((4, 3, 2))})
+        ds = _make_dataset({"B_1": np.ones((4, 3, 2))})
         ds2 = ds.with_field("test_f", np.ones((4, 3, 2)), "b_field")
         info = ds2.field_info("test_f")
         assert info.quantity_type == "b_field"
@@ -581,16 +581,16 @@ class TestAttrsOverrideRegistry:
 
     def test_field_info_uses_attrs_over_registry(self) -> None:
         """with_field() attrs override global _FIELD_INFO for same name."""
-        ds = _make_dataset({"B1": np.ones((4, 3, 2))})
-        # Override B1 as if it were a pressure field
+        ds = _make_dataset({"B_1": np.ones((4, 3, 2))})
+        # Override B_1 as if it were a pressure field
         ds2 = ds.with_field(
-            "B1",
+            "B_1",
             np.full((4, 3, 2), 2.0),
             QuantityType.PRESSURE,
             long_name="Custom pressure",
             latex=r"$P_{custom}$",
         )
-        info = ds2.field_info("B1")
+        info = ds2.field_info("B_1")
         assert info.quantity_type == "pressure"
         assert info.long_name == "Custom pressure"
         assert info.latex == r"$P_{custom}$"
@@ -599,10 +599,10 @@ class TestAttrsOverrideRegistry:
         """in_si() picks quantity_type from attrs, not global registry."""
         norm = Normalization.pic_electron(n_e=1.0e18)
         grid = GridInfo(dimensions=(2,), spacing=(1.0,))
-        ds = FieldDataset.from_arrays({"B1": np.array([1.0, 2.0])}, grid, norm)
-        # Attach "B1" with velocity quantity_type (overriding b_field)
-        ds2 = ds.with_field("B1", np.array([5.0, 6.0]), QuantityType.VELOCITY)
-        si = ds2.in_si("B1")
+        ds = FieldDataset.from_arrays({"B_1": np.array([1.0, 2.0])}, grid, norm)
+        # Attach "B_1" with velocity quantity_type (overriding b_field)
+        ds2 = ds.with_field("B_1", np.array([5.0, 6.0]), QuantityType.VELOCITY)
+        si = ds2.in_si("B_1")
         expected = np.array([5.0, 6.0]) * norm.si_factor("velocity")
         np.testing.assert_allclose(si, expected)
 
@@ -611,9 +611,9 @@ class TestFromArraysQuantityTypeAttr:
     """from_arrays() stores quantity_type in DataArray attrs."""
 
     def test_canonical_field_has_quantity_type(self) -> None:
-        ds = _make_dataset({"B1": np.ones((4, 3, 2)), "rho_m": np.ones((4, 3, 2))})
-        assert ds.xr["B1"].attrs["quantity_type"] == "b_field"
-        assert ds.xr["B1"].attrs["si_unit"] == "T"
+        ds = _make_dataset({"B_1": np.ones((4, 3, 2)), "rho_m": np.ones((4, 3, 2))})
+        assert ds.xr["B_1"].attrs["quantity_type"] == "b_field"
+        assert ds.xr["B_1"].attrs["si_unit"] == "T"
         assert ds.xr["rho_m"].attrs["quantity_type"] == "mass_density"
         assert ds.xr["rho_m"].attrs["si_unit"] == "kg/m^3"
 

@@ -17,12 +17,12 @@ from pypic.compute import _REGISTRY
 from tests._helpers import make_test_dataset
 
 MAGNITUDE_RECIPES: tuple[tuple[str, tuple[str, str, str]], ...] = (
-    ("|B|", ("B1", "B2", "B3")),
-    ("|E|", ("E1", "E2", "E3")),
-    ("|J|", ("J1", "J2", "J3")),
-    ("|V|", ("V1", "V2", "V3")),
+    ("|B|", ("B_1", "B_2", "B_3")),
+    ("|E|", ("E_1", "E_2", "E_3")),
+    ("|J|", ("J_1", "J_2", "J_3")),
+    ("|V|", ("V_1", "V_2", "V_3")),
     ("|Ve|", ("Ve1", "Ve2", "Ve3")),
-    ("|vort|", ("vort1", "vort2", "vort3")),
+    ("|vort|", ("vort_1", "vort_2", "vort_3")),
 )
 
 

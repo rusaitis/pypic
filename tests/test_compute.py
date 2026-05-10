@@ -34,17 +34,17 @@ class TestRegistryIntegrity:
             "Ti",
             "Pe",
             "Pi",
-            "EF1",
-            "EF2",
-            "EF3",
+            "EF_1",
+            "EF_2",
+            "EF_3",
             "EF_s0",
             "EF_s1",
-            "EF1_s0",
-            "EF2_s0",
-            "EF3_s0",
-            "EF1_s1",
-            "EF2_s1",
-            "EF3_s1",
+            "EF_s0_1",
+            "EF_s0_2",
+            "EF_s0_3",
+            "EF_s1_1",
+            "EF_s1_2",
+            "EF_s1_3",
             "KEF_s0",
             "KEF_s1",
             "HF_s0",
@@ -89,10 +89,10 @@ class TestMagnitudes:
     @pytest.mark.parametrize(
         ("name", "fields"),
         [
-            ("|B|", ("B1", "B2", "B3")),
-            ("|E|", ("E1", "E2", "E3")),
-            ("|J|", ("J1", "J2", "J3")),
-            ("|V|", ("V1", "V2", "V3")),
+            ("|B|", ("B_1", "B_2", "B_3")),
+            ("|E|", ("E_1", "E_2", "E_3")),
+            ("|J|", ("J_1", "J_2", "J_3")),
+            ("|V|", ("V_1", "V_2", "V_3")),
         ],
     )
     def test_345_triangle(self, name, fields):
@@ -109,12 +109,12 @@ class TestMagnitudes:
 
 class TestDependencyChains:
     def test_beta_auto_computes_bmag(self):
-        """beta needs |B|, which should be auto-computed from B1/B2/B3."""
+        """beta needs |B|, which should be auto-computed from B_1/B_2/B_3."""
         shape = (2, 2, 2)
         data = {
-            "B1": np.full(shape, 3.0),
-            "B2": np.full(shape, 4.0),
-            "B3": np.zeros(shape),
+            "B_1": np.full(shape, 3.0),
+            "B_2": np.full(shape, 4.0),
+            "B_3": np.zeros(shape),
             "P": np.full(shape, 25.0),
         }
         ds = make_test_dataset(data, shape=shape)
@@ -126,12 +126,12 @@ class TestDependencyChains:
         """P = Pe + Pi, each from per-species tensor trace."""
         shape = (2, 2, 2)
         data = {
-            "P11_s0": np.full(shape, 3.0),
-            "P22_s0": np.full(shape, 3.0),
-            "P33_s0": np.full(shape, 3.0),
-            "P11_s1": np.full(shape, 6.0),
-            "P22_s1": np.full(shape, 6.0),
-            "P33_s1": np.full(shape, 6.0),
+            "P_s0_11": np.full(shape, 3.0),
+            "P_s0_22": np.full(shape, 3.0),
+            "P_s0_33": np.full(shape, 3.0),
+            "P_s1_11": np.full(shape, 6.0),
+            "P_s1_22": np.full(shape, 6.0),
+            "P_s1_33": np.full(shape, 6.0),
         }
         ds = make_test_dataset(data, shape=shape)
         result = compute_field("P", ds)
@@ -143,12 +143,12 @@ class TestDependencyChains:
         shape = (2, 2, 2)
         data = {
             "P": np.full(shape, 42.0),
-            "P11_s0": np.full(shape, 1.0),
-            "P22_s0": np.full(shape, 1.0),
-            "P33_s0": np.full(shape, 1.0),
-            "P11_s1": np.full(shape, 1.0),
-            "P22_s1": np.full(shape, 1.0),
-            "P33_s1": np.full(shape, 1.0),
+            "P_s0_11": np.full(shape, 1.0),
+            "P_s0_22": np.full(shape, 1.0),
+            "P_s0_33": np.full(shape, 1.0),
+            "P_s1_11": np.full(shape, 1.0),
+            "P_s1_22": np.full(shape, 1.0),
+            "P_s1_33": np.full(shape, 1.0),
         }
         ds = make_test_dataset(data, shape=shape)
         result = compute_field("P", ds)
@@ -158,15 +158,15 @@ class TestDependencyChains:
         """beta chains through P → Pe + Pi → per-species tensor traces."""
         shape = (2, 2, 2)
         data = {
-            "P11_s0": np.full(shape, 5.0),
-            "P22_s0": np.full(shape, 5.0),
-            "P33_s0": np.full(shape, 5.0),
-            "P11_s1": np.full(shape, 5.0),
-            "P22_s1": np.full(shape, 5.0),
-            "P33_s1": np.full(shape, 5.0),
-            "B1": np.full(shape, 3.0),
-            "B2": np.full(shape, 4.0),
-            "B3": np.zeros(shape),
+            "P_s0_11": np.full(shape, 5.0),
+            "P_s0_22": np.full(shape, 5.0),
+            "P_s0_33": np.full(shape, 5.0),
+            "P_s1_11": np.full(shape, 5.0),
+            "P_s1_22": np.full(shape, 5.0),
+            "P_s1_33": np.full(shape, 5.0),
+            "B_1": np.full(shape, 3.0),
+            "B_2": np.full(shape, 4.0),
+            "B_3": np.zeros(shape),
         }
         ds = make_test_dataset(data, shape=shape)
         result = compute_field("beta", ds)
@@ -177,9 +177,9 @@ class TestDependencyChains:
         """Pe falls back to Tr(electron tensor)/3."""
         shape = (2, 2, 2)
         data = {
-            "P11_s0": np.full(shape, 3.0),
-            "P22_s0": np.full(shape, 6.0),
-            "P33_s0": np.full(shape, 9.0),
+            "P_s0_11": np.full(shape, 3.0),
+            "P_s0_22": np.full(shape, 6.0),
+            "P_s0_33": np.full(shape, 9.0),
         }
         ds = make_test_dataset(data, shape=shape)
         result = compute_field("Pe", ds)
@@ -189,9 +189,9 @@ class TestDependencyChains:
         """Pi falls back to Tr(ion tensor)/3."""
         shape = (2, 2, 2)
         data = {
-            "P11_s1": np.full(shape, 6.0),
-            "P22_s1": np.full(shape, 12.0),
-            "P33_s1": np.full(shape, 18.0),
+            "P_s1_11": np.full(shape, 6.0),
+            "P_s1_22": np.full(shape, 12.0),
+            "P_s1_33": np.full(shape, 18.0),
         }
         ds = make_test_dataset(data, shape=shape)
         result = compute_field("Pi", ds)
@@ -201,12 +201,12 @@ class TestDependencyChains:
         """M_A chains through |V| and v_A (which needs |B| and rho_m)."""
         shape = (2, 2, 2)
         data = {
-            "V1": np.full(shape, 3.0),
-            "V2": np.full(shape, 4.0),
-            "V3": np.zeros(shape),
-            "B1": np.full(shape, 1.0),
-            "B2": np.zeros(shape),
-            "B3": np.zeros(shape),
+            "V_1": np.full(shape, 3.0),
+            "V_2": np.full(shape, 4.0),
+            "V_3": np.zeros(shape),
+            "B_1": np.full(shape, 1.0),
+            "B_2": np.zeros(shape),
+            "B_3": np.zeros(shape),
             "rho_m": np.full(shape, 1.0),
         }
         ds = make_test_dataset(data, shape=shape)
@@ -215,12 +215,12 @@ class TestDependencyChains:
         np.testing.assert_allclose(result, 5.0, rtol=1e-15)
 
     def test_vorticity_magnitude_chain(self):
-        """ "|vort|" needs vort1/2/3, each computed via curl."""
+        """ "|vort|" needs vort_1/2/3, each computed via curl."""
         shape = (4, 4, 4)
         data = {
-            "V1": np.ones(shape),
-            "V2": np.ones(shape),
-            "V3": np.ones(shape),
+            "V_1": np.ones(shape),
+            "V_2": np.ones(shape),
+            "V_3": np.ones(shape),
         }
         ds = make_test_dataset(data, shape=shape)
         result = compute_field("|vort|", ds)
@@ -230,8 +230,8 @@ class TestDependencyChains:
     def test_existing_field_returned_directly(self):
         shape = (2, 2, 2)
         b1 = np.full(shape, 42.0)
-        ds = make_test_dataset({"B1": b1}, shape=shape)
-        result = compute_field("B1", ds)
+        ds = make_test_dataset({"B_1": b1}, shape=shape)
+        result = compute_field("B_1", ds)
         np.testing.assert_array_equal(result, b1)
 
 
@@ -251,9 +251,9 @@ class TestSpeciesDependent:
     def test_omega_ci(self):
         shape = (2, 2, 2)
         data = {
-            "B1": np.full(shape, 2.0),
-            "B2": np.zeros(shape),
-            "B3": np.zeros(shape),
+            "B_1": np.full(shape, 2.0),
+            "B_2": np.zeros(shape),
+            "B_3": np.zeros(shape),
         }
         ds = make_test_dataset(
             data,
@@ -293,9 +293,9 @@ class TestSpeciesDependent:
         shape = (2, 2, 2)
         data = {
             "Ti": np.full(shape, 1.0),
-            "B1": np.full(shape, 1.0),
-            "B2": np.zeros(shape),
-            "B3": np.zeros(shape),
+            "B_1": np.full(shape, 1.0),
+            "B_2": np.zeros(shape),
+            "B_3": np.zeros(shape),
         }
         ds = make_test_dataset(
             data,
@@ -333,9 +333,9 @@ class TestGridDependent:
     def test_div_b_uniform(self):
         shape = (4, 4, 4)
         data = {
-            "B1": np.ones(shape),
-            "B2": np.ones(shape),
-            "B3": np.ones(shape),
+            "B_1": np.ones(shape),
+            "B_2": np.ones(shape),
+            "B_3": np.ones(shape),
         }
         ds = make_test_dataset(data, shape=shape)
         result = compute_field("div_B", ds)
@@ -344,12 +344,12 @@ class TestGridDependent:
     def test_curl_component(self):
         shape = (4, 4, 4)
         data = {
-            "B1": np.ones(shape),
-            "B2": np.ones(shape),
-            "B3": np.ones(shape),
+            "B_1": np.ones(shape),
+            "B_2": np.ones(shape),
+            "B_3": np.ones(shape),
         }
         ds = make_test_dataset(data, shape=shape)
-        result = compute_field("curl_B1", ds)
+        result = compute_field("curl_B_1", ds)
         np.testing.assert_allclose(result, 0.0, atol=1e-15)
 
 
@@ -381,29 +381,29 @@ class TestMultiComponent:
     def test_poynting_components(self):
         shape = (2, 2, 2)
         data = {
-            "E1": np.full(shape, 1.0),
-            "E2": np.zeros(shape),
-            "E3": np.zeros(shape),
-            "B1": np.zeros(shape),
-            "B2": np.full(shape, 1.0),
-            "B3": np.zeros(shape),
+            "E_1": np.full(shape, 1.0),
+            "E_2": np.zeros(shape),
+            "E_3": np.zeros(shape),
+            "B_1": np.zeros(shape),
+            "B_2": np.full(shape, 1.0),
+            "B_3": np.zeros(shape),
         }
         ds = make_test_dataset(data, shape=shape)
-        s3 = compute_field("S3", ds)
+        s3 = compute_field("S_3", ds)
         np.testing.assert_allclose(s3, 1.0, rtol=1e-15)
 
-        s1 = compute_field("S1", ds)
+        s1 = compute_field("S_1", ds)
         np.testing.assert_allclose(s1, 0.0, atol=1e-15)
 
     def test_vorticity_component(self):
         shape = (4, 4, 4)
         data = {
-            "V1": np.ones(shape),
-            "V2": np.ones(shape),
-            "V3": np.ones(shape),
+            "V_1": np.ones(shape),
+            "V_2": np.ones(shape),
+            "V_3": np.ones(shape),
         }
         ds = make_test_dataset(data, shape=shape)
-        result = compute_field("vort2", ds)
+        result = compute_field("vort_2", ds)
         np.testing.assert_allclose(result, 0.0, atol=1e-15)
 
 
@@ -411,9 +411,9 @@ class TestFieldDatasetMethods:
     def test_compute_method(self):
         shape = (2, 2, 2)
         data = {
-            "B1": np.full(shape, 3.0),
-            "B2": np.full(shape, 4.0),
-            "B3": np.zeros(shape),
+            "B_1": np.full(shape, 3.0),
+            "B_2": np.full(shape, 4.0),
+            "B_3": np.zeros(shape),
         }
         ds = make_test_dataset(data, shape=shape)
         result = ds.compute("|B|")
@@ -421,9 +421,9 @@ class TestFieldDatasetMethods:
 
     def test_in_si_with_identity(self):
         shape = (2, 2, 2)
-        data = {"B1": np.full(shape, 5.0)}
+        data = {"B_1": np.full(shape, 5.0)}
         ds = make_test_dataset(data, shape=shape)
-        result = ds.in_si("B1")
+        result = ds.in_si("B_1")
         np.testing.assert_allclose(result, 5.0, rtol=1e-15)
 
     def test_in_si_with_normalization(self):
@@ -439,9 +439,9 @@ class TestFieldDatasetMethods:
             mass_ref=1.0,
             charge_ref=1.0,
         )
-        data = {"B1": np.full(shape, 3.0)}
+        data = {"B_1": np.full(shape, 3.0)}
         ds = make_test_dataset(data, shape=shape, normalization=norm)
-        result = ds.in_si("B1")
+        result = ds.in_si("B_1")
         np.testing.assert_allclose(result, 3.0 * b_ref, rtol=1e-15)
 
     def test_in_si_dimensionless(self):
@@ -449,9 +449,9 @@ class TestFieldDatasetMethods:
         norm = Normalization.pic_electron(1e18)
         data = {
             "P": np.full(shape, 1.0),
-            "B1": np.full(shape, 1.0),
-            "B2": np.zeros(shape),
-            "B3": np.zeros(shape),
+            "B_1": np.full(shape, 1.0),
+            "B_2": np.zeros(shape),
+            "B_3": np.zeros(shape),
         }
         ds = make_test_dataset(data, shape=shape, normalization=norm)
         beta = ds.in_si("beta")
@@ -472,16 +472,16 @@ class TestFieldDatasetMethods:
             mass_ref=1.0,
             charge_ref=1.0,
         )
-        data = {"B1": np.full(shape, 5.0)}
+        data = {"B_1": np.full(shape, 5.0)}
         ds = make_test_dataset(data, shape=shape, normalization=norm)
-        result = ds.in_units("B1", "nT")
+        result = ds.in_units("B_1", "nT")
         # 5 code * 1e-6 T / 1e-9 = 5000 nT
         np.testing.assert_allclose(result, 5000.0, rtol=1e-15)
 
     def test_in_units_unknown_raises(self):
-        ds = make_test_dataset({"B1": np.ones((2, 2, 2))}, shape=(2, 2, 2))
+        ds = make_test_dataset({"B_1": np.ones((2, 2, 2))}, shape=(2, 2, 2))
         with pytest.raises(ValueError, match="Unknown unit"):
-            ds.in_units("B1", "furlongs")
+            ds.in_units("B_1", "furlongs")
 
     def test_in_units_temperature_eV_and_K(self):
         # pypic stores T in energy units (J).  in_units must convert to
@@ -508,10 +508,10 @@ class TestFieldDatasetMethods:
 
     def test_cartesian_compute_aliases(self):
         shape = (4, 4, 4)
-        data = {"B1": np.ones(shape), "B2": np.ones(shape), "B3": np.ones(shape)}
+        data = {"B_1": np.ones(shape), "B_2": np.ones(shape), "B_3": np.ones(shape)}
         ds = make_test_dataset(data, shape=shape)
         result_alias = compute_field("curl_Bx", ds)
-        result_canonical = compute_field("curl_B1", ds)
+        result_canonical = compute_field("curl_B_1", ds)
         np.testing.assert_array_equal(result_alias, result_canonical)
 
 
@@ -528,12 +528,12 @@ class TestSIFactors:
             # Species density uses density_ref
             ("n_s2", {"density_ref": 5.0}, 5.0),
             # Pressure tensor = same as pressure
-            ("P11", {"velocity_ref": 3.0, "density_ref": 2.0, "mass_ref": 5.0}, 90.0),
+            ("P_11", {"velocity_ref": 3.0, "density_ref": 2.0, "mass_ref": 5.0}, 90.0),
             # Dimensionless quantities
             ("gamma_L", {}, 1.0),
             ("sigma", {}, 1.0),
             # Vorticity = velocity_per_length = velocity_ref / length_ref
-            ("vort1", {"velocity_ref": 4.0, "length_ref": 2.0}, 2.0),
+            ("vort_1", {"velocity_ref": 4.0, "length_ref": 2.0}, 2.0),
             # Specific energy = velocity_ref^2 (NOT mass_ref * velocity_ref^2)
             ("h", {"velocity_ref": 3.0, "mass_ref": 5.0}, 9.0),
         ],
@@ -542,10 +542,10 @@ class TestSIFactors:
             "frequency",
             "B0",
             "n_s2",
-            "P11",
+            "P_11",
             "gamma_L",
             "sigma",
-            "vort1",
+            "vort_1",
             "enthalpy",
         ],
     )
@@ -606,12 +606,12 @@ class TestDisplayUnits:
 
 class TestErrorMessages:
     def test_unknown_name_suggests(self):
-        ds = make_test_dataset({"B1": np.ones((2, 2, 2))}, shape=(2, 2, 2))
+        ds = make_test_dataset({"B_1": np.ones((2, 2, 2))}, shape=(2, 2, 2))
         with pytest.raises(KeyError, match="Did you mean"):
             compute_field("bta", ds)
 
     def test_missing_dependency_lists_available(self):
-        ds = make_test_dataset({"B1": np.ones((2, 2, 2))}, shape=(2, 2, 2))
+        ds = make_test_dataset({"B_1": np.ones((2, 2, 2))}, shape=(2, 2, 2))
         with pytest.raises(KeyError, match="requires"):
             compute_field("|B|", ds)
 
@@ -673,15 +673,15 @@ class TestSpeciesAliases:
     def test_s_gyro_i_uses_per_species_pressure(self):
         shape = (2, 2, 2)
         data = {
-            "P11_s1": np.full(shape, 1.0),
-            "P22_s1": np.full(shape, 1.0),
-            "P33_s1": np.full(shape, 3.0),
-            "P12_s1": np.zeros(shape),
-            "P13_s1": np.zeros(shape),
-            "P23_s1": np.zeros(shape),
-            "B1": np.zeros(shape),
-            "B2": np.zeros(shape),
-            "B3": np.ones(shape),
+            "P_s1_11": np.full(shape, 1.0),
+            "P_s1_22": np.full(shape, 1.0),
+            "P_s1_33": np.full(shape, 3.0),
+            "P_s1_12": np.zeros(shape),
+            "P_s1_13": np.zeros(shape),
+            "P_s1_23": np.zeros(shape),
+            "B_1": np.zeros(shape),
+            "B_2": np.zeros(shape),
+            "B_3": np.ones(shape),
             "n_s1": np.full(shape, 2.0),
         }
         ds = make_test_dataset(data, shape=shape)
@@ -695,15 +695,15 @@ class TestSpeciesAliases:
         """Bare s_gyro is an error — must specify s_gyro_e or s_gyro_i."""
         shape = (2, 2, 2)
         data = {
-            "P11_s0": np.full(shape, 1.0),
-            "P22_s0": np.full(shape, 1.0),
-            "P33_s0": np.full(shape, 3.0),
-            "P12_s0": np.zeros(shape),
-            "P13_s0": np.zeros(shape),
-            "P23_s0": np.zeros(shape),
-            "B1": np.zeros(shape),
-            "B2": np.zeros(shape),
-            "B3": np.ones(shape),
+            "P_s0_11": np.full(shape, 1.0),
+            "P_s0_22": np.full(shape, 1.0),
+            "P_s0_33": np.full(shape, 3.0),
+            "P_s0_12": np.zeros(shape),
+            "P_s0_13": np.zeros(shape),
+            "P_s0_23": np.zeros(shape),
+            "B_1": np.zeros(shape),
+            "B_2": np.zeros(shape),
+            "B_3": np.ones(shape),
             "n_s0": np.full(shape, 1.0),
         }
         ds = make_test_dataset(data, shape=shape)
@@ -714,9 +714,9 @@ class TestSpeciesAliases:
         """ux/uy/uz field aliases work through FieldDataset."""
         shape = (2, 2, 2)
         data = {
-            "u1": np.full(shape, 0.5),
-            "u2": np.full(shape, 0.3),
-            "u3": np.full(shape, 0.1),
+            "u_1": np.full(shape, 0.5),
+            "u_2": np.full(shape, 0.3),
+            "u_3": np.full(shape, 0.1),
         }
         ds = make_test_dataset(data, shape=shape)
         np.testing.assert_allclose(ds["ux"], 0.5)
@@ -728,18 +728,18 @@ class TestPressureTensor:
     def test_parallel_and_perpendicular_pressure(self):
         shape = (2, 2, 2)
         data = {
-            "P11": np.full(shape, 1.0),
-            "P22": np.full(shape, 2.0),
-            "P33": np.full(shape, 3.0),
-            "P12": np.zeros(shape),
-            "P13": np.zeros(shape),
-            "P23": np.zeros(shape),
-            "B1": np.zeros(shape),
-            "B2": np.zeros(shape),
-            "B3": np.ones(shape),
+            "P_11": np.full(shape, 1.0),
+            "P_22": np.full(shape, 2.0),
+            "P_33": np.full(shape, 3.0),
+            "P_12": np.zeros(shape),
+            "P_13": np.zeros(shape),
+            "P_23": np.zeros(shape),
+            "B_1": np.zeros(shape),
+            "B_2": np.zeros(shape),
+            "B_3": np.ones(shape),
         }
         ds = make_test_dataset(data, shape=shape)
-        # B along z → P_par = P33 = 3
+        # B along z → P_par = P_33 = 3
         np.testing.assert_allclose(compute_field("P_par", ds), 3.0, rtol=1e-15)
         # P_perp = (Tr(P) - P_par) / 2 = (6 - 3) / 2 = 1.5
         np.testing.assert_allclose(compute_field("P_perp", ds), 1.5, rtol=1e-15)
@@ -753,35 +753,35 @@ class TestPerSpeciesPressureDecomposition:
         shape = (2, 2, 2)
         data = {
             # Species 0 (electrons): P_diag = (1, 1, 3)
-            "P11_s0": np.full(shape, 1.0),
-            "P22_s0": np.full(shape, 1.0),
-            "P33_s0": np.full(shape, 3.0),
-            "P12_s0": np.zeros(shape),
-            "P13_s0": np.zeros(shape),
-            "P23_s0": np.zeros(shape),
+            "P_s0_11": np.full(shape, 1.0),
+            "P_s0_22": np.full(shape, 1.0),
+            "P_s0_33": np.full(shape, 3.0),
+            "P_s0_12": np.zeros(shape),
+            "P_s0_13": np.zeros(shape),
+            "P_s0_23": np.zeros(shape),
             # Species 1 (ions): P_diag = (2, 4, 6)
-            "P11_s1": np.full(shape, 2.0),
-            "P22_s1": np.full(shape, 4.0),
-            "P33_s1": np.full(shape, 6.0),
-            "P12_s1": np.zeros(shape),
-            "P13_s1": np.zeros(shape),
-            "P23_s1": np.zeros(shape),
+            "P_s1_11": np.full(shape, 2.0),
+            "P_s1_22": np.full(shape, 4.0),
+            "P_s1_33": np.full(shape, 6.0),
+            "P_s1_12": np.zeros(shape),
+            "P_s1_13": np.zeros(shape),
+            "P_s1_23": np.zeros(shape),
             # Total tensor = sum of per-species
-            "P11": np.full(shape, 3.0),
-            "P22": np.full(shape, 5.0),
-            "P33": np.full(shape, 9.0),
-            "P12": np.zeros(shape),
-            "P13": np.zeros(shape),
-            "P23": np.zeros(shape),
-            "B1": np.zeros(shape),
-            "B2": np.zeros(shape),
-            "B3": np.ones(shape),
+            "P_11": np.full(shape, 3.0),
+            "P_22": np.full(shape, 5.0),
+            "P_33": np.full(shape, 9.0),
+            "P_12": np.zeros(shape),
+            "P_13": np.zeros(shape),
+            "P_23": np.zeros(shape),
+            "B_1": np.zeros(shape),
+            "B_2": np.zeros(shape),
+            "B_3": np.ones(shape),
         }
         return make_test_dataset(data, shape=shape)
 
     def test_per_species_parallel_pressure(self):
         ds = self._make_species_tensor_dataset()
-        # B along z → P_par = P33
+        # B along z → P_par = P_33
         np.testing.assert_allclose(compute_field("P_par_e", ds), 3.0, rtol=1e-15)
         np.testing.assert_allclose(compute_field("P_par_i", ds), 6.0, rtol=1e-15)
 
@@ -797,15 +797,15 @@ class TestPerSpeciesPressureDecomposition:
         shape = (2, 2, 2)
         p = np.full(shape, 2.0)
         data = {
-            "P11_s0": p,
-            "P22_s0": p,
-            "P33_s0": p,
-            "P12_s0": np.zeros(shape),
-            "P13_s0": np.zeros(shape),
-            "P23_s0": np.zeros(shape),
-            "B1": np.zeros(shape),
-            "B2": np.zeros(shape),
-            "B3": np.ones(shape),
+            "P_s0_11": p,
+            "P_s0_22": p,
+            "P_s0_33": p,
+            "P_s0_12": np.zeros(shape),
+            "P_s0_13": np.zeros(shape),
+            "P_s0_23": np.zeros(shape),
+            "B_1": np.zeros(shape),
+            "B_2": np.zeros(shape),
+            "B_3": np.ones(shape),
         }
         ds = make_test_dataset(data, shape=shape)
         # Isotropic tensor → Q = 0
@@ -833,18 +833,18 @@ class TestPerSpeciesPressureDecomposition:
         """P_par_s2 works when tensor fields exist but species[2] is not."""
         shape = (2, 2, 2)
         data = {
-            "P11_s2": np.full(shape, 1.0),
-            "P22_s2": np.full(shape, 2.0),
-            "P33_s2": np.full(shape, 4.0),
-            "P12_s2": np.zeros(shape),
-            "P13_s2": np.zeros(shape),
-            "P23_s2": np.zeros(shape),
-            "B1": np.zeros(shape),
-            "B2": np.zeros(shape),
-            "B3": np.ones(shape),
+            "P_s2_11": np.full(shape, 1.0),
+            "P_s2_22": np.full(shape, 2.0),
+            "P_s2_33": np.full(shape, 4.0),
+            "P_s2_12": np.zeros(shape),
+            "P_s2_13": np.zeros(shape),
+            "P_s2_23": np.zeros(shape),
+            "B_1": np.zeros(shape),
+            "B_2": np.zeros(shape),
+            "B_3": np.ones(shape),
         }
         ds = make_test_dataset(data, shape=shape)
-        # B along z → P_par = P33 = 4
+        # B along z → P_par = P_33 = 4
         np.testing.assert_allclose(compute_field("P_par_s2", ds), 4.0, rtol=1e-15)
 
 
@@ -852,8 +852,8 @@ class TestGeometryGuard:
     @pytest.mark.parametrize(
         ("field", "components"),
         [
-            ("div_B", {"B1", "B2", "B3"}),
-            ("vort1", {"V1", "V2", "V3"}),
+            ("div_B", {"B_1", "B_2", "B_3"}),
+            ("vort_1", {"V_1", "V_2", "V_3"}),
         ],
     )
     def test_compute_rejects_spherical(self, field, components):
@@ -878,12 +878,12 @@ class TestRegisterRecipe:
         try:
             ds = make_test_dataset(
                 {
-                    "B1": np.ones((4, 3, 2)),
-                    "B2": np.zeros((4, 3, 2)),
-                    "B3": np.zeros((4, 3, 2)),
-                    "E1": np.ones((4, 3, 2)),
-                    "E2": np.zeros((4, 3, 2)),
-                    "E3": np.zeros((4, 3, 2)),
+                    "B_1": np.ones((4, 3, 2)),
+                    "B_2": np.zeros((4, 3, 2)),
+                    "B_3": np.zeros((4, 3, 2)),
+                    "E_1": np.ones((4, 3, 2)),
+                    "E_2": np.zeros((4, 3, 2)),
+                    "E_3": np.zeros((4, 3, 2)),
                 },
             )
             result = compute_field("e_mag_ratio", ds)

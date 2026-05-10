@@ -256,7 +256,7 @@ class IPic3DH5hutReader:
             # Track which native keys are consumed by known-field logic
             consumed: set[str] = set()
 
-            # Electromagnetic fields (Bx→B1, Ex→E1, etc.)
+            # Electromagnetic fields (Bx→B_1, Ex→E_1, etc.)
             for ipic_name, canon_name in _FIELD_NAME_MAP.items():
                 if ipic_name in available:
                     consumed.add(ipic_name)
@@ -264,7 +264,7 @@ class IPic3DH5hutReader:
                         continue
                     field_data[canon_name] = _read_field(block, ipic_name)
 
-            # H5hut-specific fields (Vfx→V1, divB→div_B)
+            # H5hut-specific fields (Vfx→V_1, divB→div_B)
             for ipic_name, canon_name in _H5HUT_FIELD_MAP.items():
                 if ipic_name in available:
                     consumed.add(ipic_name)

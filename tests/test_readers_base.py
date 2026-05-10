@@ -24,16 +24,16 @@ def sample_grid():
 def sample_fields():
     rng = np.random.default_rng(42)
     return {
-        "B1": rng.standard_normal((8, 6, 4)),
-        "B2": rng.standard_normal((8, 6, 4)),
-        "B3": rng.standard_normal((8, 6, 4)),
+        "B_1": rng.standard_normal((8, 6, 4)),
+        "B_2": rng.standard_normal((8, 6, 4)),
+        "B_3": rng.standard_normal((8, 6, 4)),
         "rho_c": rng.standard_normal((8, 6, 4)),
     }
 
 
 @pytest.fixture
 def sample_dataset(sample_grid):
-    return make_synthetic_fielddataset(sample_grid, ("B1", "B2", "B3", "rho_c"))
+    return make_synthetic_fielddataset(sample_grid, ("B_1", "B_2", "B_3", "rho_c"))
 
 
 class TestGridInfo:
@@ -128,23 +128,23 @@ class TestGridInfo:
 
 class TestFieldDatasetAccess:
     def test_getitem_returns_ndarray(self, sample_dataset):
-        result = sample_dataset["B1"]
+        result = sample_dataset["B_1"]
         assert isinstance(result, np.ndarray)
 
     def test_zero_copy(self, sample_fields, sample_grid):
-        original = sample_fields["B1"]
+        original = sample_fields["B_1"]
         ds = FieldDataset.from_arrays(
             sample_fields, sample_grid, Normalization.identity()
         )
-        assert np.shares_memory(ds["B1"], original)
+        assert np.shares_memory(ds["B_1"], original)
 
     def test_alias_access_cartesian(self, sample_dataset, sample_fields):
-        assert_allclose(sample_dataset["Bx"], sample_fields["B1"])
-        assert_allclose(sample_dataset["By"], sample_fields["B2"])
-        assert_allclose(sample_dataset["Bz"], sample_fields["B3"])
+        assert_allclose(sample_dataset["Bx"], sample_fields["B_1"])
+        assert_allclose(sample_dataset["By"], sample_fields["B_2"])
+        assert_allclose(sample_dataset["Bz"], sample_fields["B_3"])
 
     def test_has_field(self, sample_dataset):
-        assert sample_dataset.has_field("B1")
+        assert sample_dataset.has_field("B_1")
         assert sample_dataset.has_field("rho_c")
         assert sample_dataset.has_field("Bx")
         assert sample_dataset.has_field("By")
@@ -152,7 +152,7 @@ class TestFieldDatasetAccess:
 
     def test_field_names_canonical_only(self, sample_dataset):
         names = sample_dataset.field_names()
-        assert sorted(names) == ["B1", "B2", "B3", "rho_c"]
+        assert sorted(names) == ["B_1", "B_2", "B_3", "rho_c"]
         assert "Bx" not in names
 
     def test_xr_returns_dataset(self, sample_dataset):
@@ -173,12 +173,12 @@ class TestFieldDatasetAccess:
             dimensions=(2,), spacing=(1.0,), origin=(0.0,), geometry=CARTESIAN
         )
         ds = FieldDataset.from_arrays(
-            {"B1": np.array([1.0, 2.0])}, grid, Normalization.identity()
+            {"B_1": np.array([1.0, 2.0])}, grid, Normalization.identity()
         )
         with pytest.raises(KeyError, match="Did you mean") as exc_info:
             ds["Bx1"]
         msg = str(exc_info.value)
-        assert "Bx" in msg or "B1" in msg
+        assert "Bx" in msg or "B_1" in msg
 
     def test_no_suggestion_for_unrelated_key(self, sample_dataset):
         with pytest.raises(KeyError) as exc_info:
@@ -189,24 +189,24 @@ class TestFieldDatasetAccess:
 class TestFieldDatasetSlicing:
     def test_isel_scalar_reduces_dim(self, sample_dataset):
         sliced = sample_dataset.isel(z=0)
-        assert sliced["B1"].ndim == 2
-        assert sliced["B1"].shape == (8, 6)
+        assert sliced["B_1"].ndim == 2
+        assert sliced["B_1"].shape == (8, 6)
         assert len(sliced.grid.dimensions) == 2
 
     def test_isel_slice_keeps_dim(self, sample_dataset):
         sliced = sample_dataset.isel(z=slice(0, 2))
-        assert sliced["B1"].shape == (8, 6, 2)
+        assert sliced["B_1"].shape == (8, 6, 2)
         assert sliced.grid.dimensions == (8, 6, 2)
 
     def test_sel_scalar_drops_dim(self, sample_dataset):
         z_coord = sample_dataset.xr.coords["z"].values[1]
         sliced = sample_dataset.sel(z=z_coord)
-        assert sliced["B1"].ndim == 2
+        assert sliced["B_1"].ndim == 2
         assert len(sliced.grid.dimensions) == 2
 
     def test_sel_method_nearest(self, sample_dataset):
         sliced = sample_dataset.sel(z=0.3, method="nearest")
-        assert sliced["B1"].ndim == 2
+        assert sliced["B_1"].ndim == 2
 
     def test_metadata_preserved(self, sample_grid, sample_fields):
         species = (SpeciesInfo(name="e", charge=-1.0, mass=1.0),)
@@ -232,10 +232,10 @@ class TestFieldDatasetSlicing:
             origin=(1.0, 0.0, 0.0),
             geometry=SPHERICAL,
         )
-        fields = {"B1": np.ones((4, 3, 2))}
+        fields = {"B_1": np.ones((4, 3, 2))}
         ds = FieldDataset.from_arrays(fields, grid, Normalization.identity())
         sliced = ds.isel({"θ": 0})
-        assert sliced["B1"].shape == (4, 2)
+        assert sliced["B_1"].shape == (4, 2)
 
     def test_grid_origin_updated_after_slice(self, sample_dataset):
         sliced = sample_dataset.isel(x=slice(2, 6))
@@ -248,9 +248,9 @@ class TestAliases:
     @pytest.mark.parametrize(
         ("geometry", "checks"),
         [
-            (CARTESIAN, {"Bx": "B1", "By": "B2", "Ez": "E3"}),
-            (SPHERICAL, {"Br": "B1", "Btheta": "B2", "Bphi": "B3"}),
-            (CYLINDRICAL, {"Br": "B1", "Bphi": "B2", "Bz": "B3"}),
+            (CARTESIAN, {"Bx": "B_1", "By": "B_2", "Ez": "E_3"}),
+            (SPHERICAL, {"Br": "B_1", "Btheta": "B_2", "Bphi": "B_3"}),
+            (CYLINDRICAL, {"Br": "B_1", "Bphi": "B_2", "Bz": "B_3"}),
         ],
         ids=["cartesian", "spherical", "cylindrical"],
     )
@@ -264,21 +264,21 @@ class TestAliases:
             sample_fields,
             sample_grid,
             Normalization.identity(),
-            aliases={"Bperp": "B1", "Bx": "B2"},
+            aliases={"Bperp": "B_1", "Bx": "B_2"},
         )
         # Custom alias overrides geometry default
-        assert_allclose(ds["Bx"], sample_fields["B2"])
-        assert_allclose(ds["Bperp"], sample_fields["B1"])
+        assert_allclose(ds["Bx"], sample_fields["B_2"])
+        assert_allclose(ds["Bperp"], sample_fields["B_1"])
 
     def test_aliases_only_for_existing_fields(self, sample_grid):
         """Aliases for fields not in the dataset are silently dropped."""
         ds = FieldDataset.from_arrays(
-            {"B1": np.ones((8, 6, 4))},
+            {"B_1": np.ones((8, 6, 4))},
             sample_grid,
             Normalization.identity(),
         )
         assert ds.has_field("Bx")
-        assert not ds.has_field("By")  # B2 doesn't exist
+        assert not ds.has_field("By")  # B_2 doesn't exist
 
     def test_n_e_n_i_aliases(self, sample_grid):
         """n_e and n_i resolve to n_s0 and n_s1."""
@@ -294,23 +294,23 @@ class TestAliases:
 
     def test_n_e_alias_inactive_without_n_s0(self, sample_grid):
         ds = FieldDataset.from_arrays(
-            {"B1": np.ones((8, 6, 4))}, sample_grid, Normalization.identity()
+            {"B_1": np.ones((8, 6, 4))}, sample_grid, Normalization.identity()
         )
         assert not ds.has_field("n_e")
 
     def test_four_velocity_aliases(self, sample_grid):
-        """ux/uy/uz resolve to u1/u2/u3."""
+        """ux/uy/uz resolve to u_1/u_2/u_3."""
         fields = {
-            "u1": np.ones((8, 6, 4)),
-            "u2": np.full((8, 6, 4), 2.0),
-            "u3": np.full((8, 6, 4), 3.0),
+            "u_1": np.ones((8, 6, 4)),
+            "u_2": np.full((8, 6, 4), 2.0),
+            "u_3": np.full((8, 6, 4), 3.0),
         }
         ds = FieldDataset.from_arrays(fields, sample_grid, Normalization.identity())
         assert ds.has_field("ux")
         assert ds.has_field("uy")
         assert ds.has_field("uz")
-        assert_allclose(ds["ux"], fields["u1"])
-        assert_allclose(ds["uz"], fields["u3"])
+        assert_allclose(ds["ux"], fields["u_1"])
+        assert_allclose(ds["uz"], fields["u_3"])
 
 
 class TestSimulationReader:
@@ -399,9 +399,9 @@ class TestWithDerived:
         ds = sample_dataset.with_derived("|B|")
         assert ds.has_field("|B|")
         expected = np.sqrt(
-            sample_dataset["B1"] ** 2
-            + sample_dataset["B2"] ** 2
-            + sample_dataset["B3"] ** 2
+            sample_dataset["B_1"] ** 2
+            + sample_dataset["B_2"] ** 2
+            + sample_dataset["B_3"] ** 2
         )
         assert_allclose(ds["|B|"], expected)
 
@@ -412,9 +412,9 @@ class TestWithDerived:
 
     def test_idempotent_for_existing_fields(self, sample_dataset):
         """Fields already in the dataset are not recomputed."""
-        ds = sample_dataset.with_derived("B1")
-        assert ds.has_field("B1")
-        assert_allclose(ds["B1"], sample_dataset["B1"])
+        ds = sample_dataset.with_derived("B_1")
+        assert ds.has_field("B_1")
+        assert_allclose(ds["B_1"], sample_dataset["B_1"])
 
     def test_survives_isel(self, sample_dataset):
         ds = sample_dataset.with_derived("|B|")
@@ -443,7 +443,7 @@ class TestWithDerived:
         """with_derived("|B|", "e_B") should compute |B| once."""
         shape = (4, 3, 2)
         ds = FieldDataset.from_arrays(
-            {"B1": np.ones(shape), "B2": np.zeros(shape), "B3": np.zeros(shape)},
+            {"B_1": np.ones(shape), "B_2": np.zeros(shape), "B_3": np.zeros(shape)},
             GridInfo(dimensions=shape, spacing=(1.0, 1.0, 1.0)),
             Normalization.identity(),
         )
@@ -459,21 +459,21 @@ class TestWithDerived:
         shape = (4, 3, 2)
         ds = FieldDataset.from_arrays(
             {
-                "E1": np.ones(shape),
-                "E2": np.zeros(shape),
-                "E3": np.zeros(shape),
-                "B1": np.zeros(shape),
-                "B2": np.zeros(shape),
-                "B3": np.ones(shape),
+                "E_1": np.ones(shape),
+                "E_2": np.zeros(shape),
+                "E_3": np.zeros(shape),
+                "B_1": np.zeros(shape),
+                "B_2": np.zeros(shape),
+                "B_3": np.ones(shape),
             },
             GridInfo(dimensions=shape, spacing=(1.0, 1.0, 1.0)),
             Normalization.identity(),
         )
-        ds = ds.with_derived("S1")
-        # Poynting flux siblings S2, S3 should also be stored
-        assert ds.has_field("S1")
-        assert ds.has_field("S2")
-        assert ds.has_field("S3")
+        ds = ds.with_derived("S_1")
+        # Poynting flux siblings S_2, S_3 should also be stored
+        assert ds.has_field("S_1")
+        assert ds.has_field("S_2")
+        assert ds.has_field("S_3")
 
 
 class TestWithFieldAutoFill:

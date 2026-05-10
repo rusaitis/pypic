@@ -25,6 +25,23 @@ ELECTRONS = SpeciesInfo(name="electrons", charge=-1.0, mass=1 / 256)
 IONS = SpeciesInfo(name="ions", charge=1.0, mass=1.0)
 
 
+def per_species(canonical: str, species_index: int) -> str:
+    """Build a Tier-3 per-species canonical name from a bare component name.
+
+    Use in tests that loop over component spellings to generate the
+    species-qualified form. ``per_species("J_1", 0) == "J_s0_1"``;
+    ``per_species("P_11", 1) == "P_s1_11"``;
+    ``per_species("rho_c", 0) == "rho_c_s0"`` (scalars get the suffix
+    appended).
+    """
+    base, sep, comp = canonical.partition("_")
+    if sep and comp[:1].isdigit():
+        # Vector / tensor component → species sits between base and component.
+        return f"{base}_s{species_index}_{comp}"
+    # Scalar → ``rho_c`` becomes ``rho_c_s0``.
+    return f"{canonical}_s{species_index}"
+
+
 def make_test_dataset(
     fields: dict[str, np.ndarray],
     *,
@@ -73,7 +90,7 @@ def make_uniform_grid(
 
 def make_synthetic_fielddataset(
     grid: GridInfo,
-    field_names: Iterable[str] = ("B1", "B2", "B3"),
+    field_names: Iterable[str] = ("B_1", "B_2", "B_3"),
     *,
     seed: int = 42,
     species: list[SpeciesInfo] | None = None,
@@ -88,7 +105,7 @@ def make_synthetic_fielddataset(
     --------
     >>> ds = make_synthetic_fielddataset(make_uniform_grid(4, 3, 2))
     >>> sorted(ds.field_names())
-    ['B1', 'B2', 'B3']
+    ['B_1', 'B_2', 'B_3']
     """
     rng = np.random.default_rng(seed)
     fields = {name: rng.standard_normal(grid.dimensions) for name in field_names}
@@ -112,7 +129,7 @@ def make_harris_dataset(y_center: float = 7.5) -> FieldDataset:
     Examples
     --------
     >>> ds = make_harris_dataset()
-    >>> ds.has_field("B1") and ds.has_field("rho_m")
+    >>> ds.has_field("B_1") and ds.has_field("rho_m")
     True
     """
     x, y, z = np.meshgrid(
@@ -123,15 +140,15 @@ def make_harris_dataset(y_center: float = 7.5) -> FieldDataset:
     )
     cosh_sq = np.cosh((y - y_center) / 2.0) ** 2
     fields = {
-        "B1": np.tanh((y - y_center) / 2.0),
-        "B2": 0.1 * np.sin(2 * np.pi * x / 20.0),
-        "B3": 0.05 * np.cos(2 * np.pi * z / 10.0),
-        "E1": 0.01 * np.sin(np.pi * y / 15.0),
-        "E2": -0.02 * np.cos(np.pi * x / 20.0),
-        "E3": 0.005 * np.ones_like(x),
-        "V1": 0.1 * np.tanh((y - y_center) / 3.0),
-        "V2": 0.05 * np.sin(2 * np.pi * x / 20.0),
-        "V3": 0.02 * np.cos(np.pi * z / 10.0),
+        "B_1": np.tanh((y - y_center) / 2.0),
+        "B_2": 0.1 * np.sin(2 * np.pi * x / 20.0),
+        "B_3": 0.05 * np.cos(2 * np.pi * z / 10.0),
+        "E_1": 0.01 * np.sin(np.pi * y / 15.0),
+        "E_2": -0.02 * np.cos(np.pi * x / 20.0),
+        "E_3": 0.005 * np.ones_like(x),
+        "V_1": 0.1 * np.tanh((y - y_center) / 3.0),
+        "V_2": 0.05 * np.sin(2 * np.pi * x / 20.0),
+        "V_3": 0.02 * np.cos(np.pi * z / 10.0),
         "rho_m": 1.0 + 0.5 / cosh_sq,
         "P": 0.5 + 0.3 / cosh_sq,
     }
@@ -179,5 +196,5 @@ def make_dipole_dataset(
     by[inside] = 0.0
     bz[inside] = 0.0
     return FieldDataset.from_arrays(
-        {"B1": bx, "B2": by, "B3": bz}, grid, Normalization.identity()
+        {"B_1": bx, "B_2": by, "B_3": bz}, grid, Normalization.identity()
     )

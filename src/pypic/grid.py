@@ -164,44 +164,48 @@ def _build_aliases(
 ) -> dict[str, str]:
     """Generate field name aliases for a coordinate system.
 
+    The canonical RHS is always the Tier-3 form ``<prefix>_<component>``
+    (`B_1`, `V_2`, `B0_1`). The alias LHS uses *separator* between
+    prefix and coordinate suffix: ``""`` gives the legacy short form
+    ``Bx`` (kept for migration), ``"_"`` gives the Tier-3 form ``B_x``.
+
     Parameters
     ----------
     suffixes : tuple[str, str, str]
         Coordinate suffixes (e.g. ``("x", "y", "z")``).
     separator : str
-        Separator between prefix and suffix. ``""`` gives ``Bx``,
-        ``"_"`` gives ``B_x``.
+        Separator between alias prefix and suffix.
     """
     aliases: dict[str, str] = {}
     for alias_prefix, canonical_prefix in _FIELD_PREFIX_PAIRS:
-        # Canonical prefixes ending in a digit (e.g. "B0") need an
-        # underscore separator before the component index to stay
-        # unambiguous per schema.md § "Split-B naming": canonical is
-        # "B0_1", not "B01".
-        canonical_sep = "_" if canonical_prefix[-1].isdigit() else ""
         for i, suffix in enumerate(suffixes, 1):
             aliases[f"{alias_prefix}{separator}{suffix}"] = (
-                f"{canonical_prefix}{canonical_sep}{i}"
+                f"{canonical_prefix}_{i}"
             )
     return aliases
 
 
+# Legacy short-form geometry aliases (``Bx → B_1``). Kept for the
+# v0→v1 migration window; the Tier-3 underscored form below is the
+# documented primary spelling.
 _CARTESIAN_ALIASES = _build_aliases(("x", "y", "z"))
 _SPHERICAL_ALIASES = _build_aliases(("r", "theta", "phi"))
 _CYLINDRICAL_ALIASES = _build_aliases(("r", "phi", "z"))
 
+# Tier-3 underscored geometry aliases (``B_x → B_1``).
 _CARTESIAN_UNDERSCORE_ALIASES = _build_aliases(("x", "y", "z"), separator="_")
 _SPHERICAL_UNDERSCORE_ALIASES = _build_aliases(("r", "theta", "phi"), separator="_")
 _CYLINDRICAL_UNDERSCORE_ALIASES = _build_aliases(("r", "phi", "z"), separator="_")
 
-# Numbered underscore aliases (B_1→B1, E_2→E2, etc.) — geometry-independent
-_NUMBERED_UNDERSCORE_ALIASES: dict[str, str] = {}
+# Legacy no-underscore numbered aliases (``B1 → B_1``). Pre-Tier-3
+# canonical names that survive as deprecated aliases.
+_LEGACY_NUMBERED_ALIASES: dict[str, str] = {}
 for _alias_pfx, _canon_pfx in _FIELD_PREFIX_PAIRS:
-    _canon_sep = "_" if _canon_pfx[-1].isdigit() else ""
+    if _canon_pfx[-1].isdigit():
+        # B0 was already underscored pre-Tier-3 (B0_1); no legacy form.
+        continue
     for _i in (1, 2, 3):
-        _NUMBERED_UNDERSCORE_ALIASES[f"{_alias_pfx}_{_i}"] = (
-            f"{_canon_pfx}{_canon_sep}{_i}"
-        )
+        _LEGACY_NUMBERED_ALIASES[f"{_alias_pfx}{_i}"] = f"{_canon_pfx}_{_i}"
 
 # Scalar underscore aliases (e.g. ``P_e`` is an alternate spelling of
 # ``Pe``).  The e/i form is what carries the rich electron/ion-specific
@@ -214,12 +218,12 @@ _SCALAR_UNDERSCORE_ALIASES: dict[str, str] = {
     "P_i": "Pi",
     "T_e": "Te",
     "T_i": "Ti",
-    "P_11": "P11",
-    "P_12": "P12",
-    "P_13": "P13",
-    "P_22": "P22",
-    "P_23": "P23",
-    "P_33": "P33",
+    "P_11": "P_11",
+    "P_12": "P_12",
+    "P_13": "P_13",
+    "P_22": "P_22",
+    "P_23": "P_23",
+    "P_33": "P_33",
 }
 
 # Species-convenience aliases (geometry-independent).
@@ -251,7 +255,7 @@ def _default_aliases(geometry: CoordinateGeometry) -> dict[str, str]:
             aliases.update(_CYLINDRICAL_UNDERSCORE_ALIASES)
         case _ as unreachable:
             assert_never(unreachable)
-    aliases.update(_NUMBERED_UNDERSCORE_ALIASES)
+    aliases.update(_LEGACY_NUMBERED_ALIASES)
     aliases.update(_SCALAR_UNDERSCORE_ALIASES)
     aliases.update(_SPECIES_ALIASES)
     return aliases

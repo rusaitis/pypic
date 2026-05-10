@@ -66,15 +66,15 @@ class TestOpenVirtual:
 
     def test_basic_round_trip(self, tmp_path):
         grid = make_uniform_grid(4, 3, 2)
-        fields = {"B1": np.ones((4, 3, 2)), "B2": np.full((4, 3, 2), 0.5)}
+        fields = {"B_1": np.ones((4, 3, 2)), "B_2": np.full((4, 3, 2), 0.5)}
         h5path = tmp_path / "test.h5"
         _write_canonical_h5(h5path, fields, grid)
 
         fds = open_virtual(h5path)
 
-        assert sorted(fds.field_names()) == ["B1", "B2"]
-        np.testing.assert_allclose(fds["B1"], 1.0)
-        np.testing.assert_allclose(fds["B2"], 0.5)
+        assert sorted(fds.field_names()) == ["B_1", "B_2"]
+        np.testing.assert_allclose(fds["B_1"], 1.0)
+        np.testing.assert_allclose(fds["B_2"], 0.5)
 
     def test_grid_metadata_preserved(self, tmp_path):
         grid = GridInfo(
@@ -84,7 +84,7 @@ class TestOpenVirtual:
             dt=0.01,
         )
         h5path = tmp_path / "grid.h5"
-        _write_canonical_h5(h5path, {"B1": np.ones((4, 3, 2))}, grid)
+        _write_canonical_h5(h5path, {"B_1": np.ones((4, 3, 2))}, grid)
 
         fds = open_virtual(h5path)
 
@@ -99,7 +99,7 @@ class TestOpenVirtual:
         h5path = tmp_path / "norm.h5"
         _write_canonical_h5(
             h5path,
-            {"B1": np.ones((4, 3, 2))},
+            {"B_1": np.ones((4, 3, 2))},
             grid,
             normalization=norm,
         )
@@ -112,7 +112,7 @@ class TestOpenVirtual:
     def test_identity_normalization_when_missing(self, tmp_path):
         grid = make_uniform_grid(4, 3, 2)
         h5path = tmp_path / "no_norm.h5"
-        _write_canonical_h5(h5path, {"B1": np.ones((4, 3, 2))}, grid)
+        _write_canonical_h5(h5path, {"B_1": np.ones((4, 3, 2))}, grid)
 
         fds = open_virtual(h5path)
 
@@ -122,7 +122,7 @@ class TestOpenVirtual:
         h5path = tmp_path / "no_grid.h5"
         with h5py.File(h5path, "w") as f:
             g = f.create_group("fields")
-            g.create_dataset("B1", data=np.ones((4, 3, 2)))
+            g.create_dataset("B_1", data=np.ones((4, 3, 2)))
 
         with pytest.raises(ValueError, match="No 'grid' group"):
             open_virtual(h5path)
@@ -130,7 +130,7 @@ class TestOpenVirtual:
     def test_explicit_config_overrides_h5(self, tmp_path):
         grid_h5 = make_uniform_grid(4, 3, 2, spacing=1.0)
         h5path = tmp_path / "config.h5"
-        _write_canonical_h5(h5path, {"B1": np.ones((4, 3, 2))}, grid_h5)
+        _write_canonical_h5(h5path, {"B_1": np.ones((4, 3, 2))}, grid_h5)
 
         grid_cfg = make_uniform_grid(4, 3, 2, spacing=2.0)
         config = SimulationConfig(
@@ -150,19 +150,19 @@ class TestOpenVirtual:
         h5path = tmp_path / "drop.h5"
         _write_canonical_h5(
             h5path,
-            {"B1": np.ones((4, 3, 2)), "B2": np.ones((4, 3, 2))},
+            {"B_1": np.ones((4, 3, 2)), "B_2": np.ones((4, 3, 2))},
             grid,
         )
 
-        fds = open_virtual(h5path, drop_variables=["B2"])
+        fds = open_virtual(h5path, drop_variables=["B_2"])
 
-        assert fds.has_field("B1")
-        assert not fds.has_field("B2")
+        assert fds.has_field("B_1")
+        assert not fds.has_field("B_2")
 
     def test_root_group(self, tmp_path):
         h5path = tmp_path / "root.h5"
         with h5py.File(h5path, "w") as f:
-            f.create_dataset("B1", data=np.ones((4, 3)))
+            f.create_dataset("B_1", data=np.ones((4, 3)))
             grd = f.create_group("grid")
             grd.attrs["dimensions"] = [4, 3]
             grd.attrs["spacing"] = [1.0, 1.0]
@@ -172,7 +172,7 @@ class TestOpenVirtual:
         # are not datasets, so VirtualiZarr ignores them automatically.
         fds = open_virtual(h5path, fields_group=None)
 
-        assert fds.has_field("B1")
+        assert fds.has_field("B_1")
 
     def test_constant_field_round_trip(self, tmp_path):
         # Regression: the old Kerchunk fallback returned the fill value
@@ -183,11 +183,11 @@ class TestOpenVirtual:
         grid = make_uniform_grid(4, 3, 2)
         const = 0.0  # the fill-value-collision case
         h5path = tmp_path / "const.h5"
-        _write_canonical_h5(h5path, {"B1": np.full((4, 3, 2), const)}, grid)
+        _write_canonical_h5(h5path, {"B_1": np.full((4, 3, 2), const)}, grid)
 
         fds = open_virtual(h5path)
 
-        np.testing.assert_array_equal(np.asarray(fds["B1"]), const)
+        np.testing.assert_array_equal(np.asarray(fds["B_1"]), const)
 
     def test_byte_string_attrs_decoded(self, tmp_path):
         # HDF5 writers commonly store string attrs as bytes (h5py's
@@ -197,7 +197,7 @@ class TestOpenVirtual:
         grid = make_uniform_grid(4, 3, 2)
         h5path = tmp_path / "bytes_attrs.h5"
         with h5py.File(h5path, "w") as f:
-            f.create_group("fields").create_dataset("B1", data=np.ones((4, 3, 2)))
+            f.create_group("fields").create_dataset("B_1", data=np.ones((4, 3, 2)))
             g = f.create_group("grid")
             g.attrs["dimensions"] = list(grid.dimensions)
             g.attrs["spacing"] = list(grid.spacing)
@@ -222,7 +222,7 @@ class TestOpenVirtual:
             origin=(0.0, 0.0, 0.0),
         )
         h5path = tmp_path / "coords.h5"
-        _write_canonical_h5(h5path, {"B1": np.ones((4, 3, 2))}, grid)
+        _write_canonical_h5(h5path, {"B_1": np.ones((4, 3, 2))}, grid)
 
         fds = open_virtual(h5path)
 
@@ -243,8 +243,8 @@ class TestToIcechunkVirtualVersioning:
         grid = make_uniform_grid(4, 3, 2)
         h5a = tmp_path / "a.h5"
         h5b = tmp_path / "b.h5"
-        _write_canonical_h5(h5a, {"B1": np.ones((4, 3, 2))}, grid)
-        _write_canonical_h5(h5b, {"B1": np.full((4, 3, 2), 2.0)}, grid)
+        _write_canonical_h5(h5a, {"B_1": np.ones((4, 3, 2))}, grid)
+        _write_canonical_h5(h5b, {"B_1": np.full((4, 3, 2), 2.0)}, grid)
 
         output = tmp_path / "repo"
         snap_a = to_icechunk_virtual(h5a, output, message="first")
@@ -257,14 +257,14 @@ class TestToIcechunkVirtualVersioning:
         assert len(ancestry) >= 3
 
         loaded = from_zarr(output)
-        np.testing.assert_allclose(loaded["B1"], 2.0)
+        np.testing.assert_allclose(loaded["B_1"], 2.0)
 
     def test_new_branch_fork_from_populated_main(self, tmp_path):
         grid = make_uniform_grid(4, 3, 2)
         h5a = tmp_path / "a.h5"
         h5b = tmp_path / "b.h5"
-        _write_canonical_h5(h5a, {"B1": np.ones((4, 3, 2))}, grid)
-        _write_canonical_h5(h5b, {"B1": np.full((4, 3, 2), 3.0)}, grid)
+        _write_canonical_h5(h5a, {"B_1": np.ones((4, 3, 2))}, grid)
+        _write_canonical_h5(h5b, {"B_1": np.full((4, 3, 2), 3.0)}, grid)
 
         output = tmp_path / "repo"
         to_icechunk_virtual(h5a, output, branch="main", message="main write")
@@ -276,8 +276,8 @@ class TestToIcechunkVirtualVersioning:
 
         loaded_main = from_zarr(output, branch="main")
         loaded_alt = from_zarr(output, branch="alt")
-        np.testing.assert_allclose(loaded_main["B1"], 1.0)
-        np.testing.assert_allclose(loaded_alt["B1"], 3.0)
+        np.testing.assert_allclose(loaded_main["B_1"], 1.0)
+        np.testing.assert_allclose(loaded_alt["B_1"], 3.0)
 
     def test_sources_in_different_directories(self, tmp_path):
         # Reviewer regression: commits from different parent dirs must
@@ -293,8 +293,8 @@ class TestToIcechunkVirtualVersioning:
         grid = make_uniform_grid(4, 3, 2)
         h5a = dir_a / "a.h5"
         h5b = dir_b / "b.h5"
-        _write_canonical_h5(h5a, {"B1": np.ones((4, 3, 2))}, grid)
-        _write_canonical_h5(h5b, {"B1": np.full((4, 3, 2), 2.0)}, grid)
+        _write_canonical_h5(h5a, {"B_1": np.ones((4, 3, 2))}, grid)
+        _write_canonical_h5(h5b, {"B_1": np.full((4, 3, 2), 2.0)}, grid)
 
         output = tmp_path / "repo"
         snap_a = to_icechunk_virtual(h5a, output, message="a")
@@ -302,9 +302,9 @@ class TestToIcechunkVirtualVersioning:
 
         # Tip reads current (b); snapshot A still resolves via the
         # merged container set.
-        np.testing.assert_allclose(from_zarr(output)["B1"], 2.0)
-        np.testing.assert_allclose(from_zarr(output, snapshot_id=snap_a)["B1"], 1.0)
-        np.testing.assert_allclose(from_zarr(output, snapshot_id=snap_b)["B1"], 2.0)
+        np.testing.assert_allclose(from_zarr(output)["B_1"], 2.0)
+        np.testing.assert_allclose(from_zarr(output, snapshot_id=snap_a)["B_1"], 1.0)
+        np.testing.assert_allclose(from_zarr(output, snapshot_id=snap_b)["B_1"], 2.0)
 
     def test_numpy_scalar_root_attrs(self, tmp_path):
         # Reviewer regression: h5py returns scalar HDF5 attrs as
@@ -315,7 +315,7 @@ class TestToIcechunkVirtualVersioning:
         grid = make_uniform_grid(4, 3, 2)
         h5path = tmp_path / "numpy_attrs.h5"
         with h5py.File(h5path, "w") as f:
-            f.create_group("fields").create_dataset("B1", data=np.ones((4, 3, 2)))
+            f.create_group("fields").create_dataset("B_1", data=np.ones((4, 3, 2)))
             g = f.create_group("grid")
             g.attrs["dimensions"] = list(grid.dimensions)
             g.attrs["spacing"] = list(grid.spacing)
@@ -343,7 +343,7 @@ class TestToIcechunkVirtualVersioning:
         # report True while ``from_zarr`` raised ``GroupNotFoundError``.
         h5path = tmp_path / "no_grid.h5"
         with h5py.File(h5path, "w") as f:
-            f.create_group("fields").create_dataset("B1", data=np.ones((4, 3, 2)))
+            f.create_group("fields").create_dataset("B_1", data=np.ones((4, 3, 2)))
             # Intentionally omit the ``grid/`` group.
 
         output = tmp_path / "broken_virtual"

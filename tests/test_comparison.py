@@ -27,12 +27,12 @@ from tests._helpers import make_uniform_grid
 def _make_1d(
     n: int, dx: float, origin: float, func=None, *, normalization=None
 ) -> FieldDataset:
-    """1D dataset with ``f(x) = 2x + 1`` and ``B1 = sin(pi x / 5)`` by default."""
+    """1D dataset with ``f(x) = 2x + 1`` and ``B_1 = sin(pi x / 5)`` by default."""
     grid = make_uniform_grid(n, spacing=dx, origin=origin)
     (x,) = grid.coordinate_arrays()
     f = 2.0 * x + 1.0 if func is None else func(x)
     return FieldDataset.from_arrays(
-        {"B1": f},
+        {"B_1": f},
         grid,
         normalization if normalization is not None else Normalization.identity(),
     )
@@ -46,12 +46,12 @@ def _make_2d(
     origin: tuple[float, float] = (0.0, 0.0),
     offset: float = 0.0,
 ) -> FieldDataset:
-    """2D dataset: ``B1 = x + 2y + offset`` and ``rho_m = 1 + 0.1 x``."""
+    """2D dataset: ``B_1 = x + 2y + offset`` and ``rho_m = 1 + 0.1 x``."""
     grid = make_uniform_grid(nx, ny, spacing=dx, origin=origin)
     gx, gy = np.meshgrid(*grid.coordinate_arrays(), indexing="ij")
     return FieldDataset.from_arrays(
         {
-            "B1": gx + 2.0 * gy + offset,
+            "B_1": gx + 2.0 * gy + offset,
             "rho_m": 1.0 + 0.1 * gx,
         },
         grid,
@@ -69,16 +69,16 @@ class TestCompareFields:
 
     def test_identical_datasets_l2_zero(self) -> None:
         ds = _make_1d(10, 1.0, 0.0)
-        assert compare_fields(ds, ds, "B1", metric="l2") == 0.0
+        assert compare_fields(ds, ds, "B_1", metric="l2") == 0.0
 
     def test_identical_datasets_linf_zero(self) -> None:
         ds = _make_1d(10, 1.0, 0.0)
-        assert compare_fields(ds, ds, "B1", metric="linf") == 0.0
+        assert compare_fields(ds, ds, "B_1", metric="linf") == 0.0
 
     def test_uniform_offset_linf_matches(self) -> None:
         a = _make_2d(8, 8)
         b = _make_2d(8, 8, offset=0.5)
-        result = compare_fields(a, b, "B1", metric="linf")
+        result = compare_fields(a, b, "B_1", metric="linf")
         assert_allclose(result, 0.5, atol=1e-12)
 
     def test_matches_manual_alignment(self) -> None:
@@ -86,19 +86,19 @@ class TestCompareFields:
         coarse = _make_2d(6, 6, dx=2.0)
         fine = _make_2d(12, 12, dx=1.0, origin=(1.0, 1.0))
         a_aligned, b_aligned = align_grids(coarse, fine)
-        expected = float(l2_relative_error(a_aligned["B1"], b_aligned["B1"]))
-        result = compare_fields(coarse, fine, "B1", metric="l2")
+        expected = float(l2_relative_error(a_aligned["B_1"], b_aligned["B_1"]))
+        result = compare_fields(coarse, fine, "B_1", metric="l2")
         assert_allclose(result, expected, rtol=1e-12)
 
     def test_unknown_metric_raises(self) -> None:
         ds = _make_1d(4, 1.0, 0.0)
         with pytest.raises(ValueError, match="metric"):
-            compare_fields(ds, ds, "B1", metric="rmse")
+            compare_fields(ds, ds, "B_1", metric="rmse")
 
     def test_unknown_units_raises(self) -> None:
         ds = _make_1d(4, 1.0, 0.0)
         with pytest.raises(ValueError, match="units"):
-            compare_fields(ds, ds, "B1", units="normalized")
+            compare_fields(ds, ds, "B_1", units="normalized")
 
     def test_unknown_field_raises(self) -> None:
         ds = _make_1d(4, 1.0, 0.0)
@@ -106,11 +106,11 @@ class TestCompareFields:
             compare_fields(ds, ds, "missing_field")
 
     def test_alias_roundtrip(self) -> None:
-        """Passing ``"Bx"`` equals passing the canonical ``"B1"``."""
+        """Passing ``"Bx"`` equals passing the canonical ``"B_1"``."""
         ds = _make_2d(6, 6)
         assert ds.has_field("Bx")  # Cartesian alias active
         via_alias = compare_fields(ds, ds, "Bx", metric="l2")
-        via_canonical = compare_fields(ds, ds, "B1", metric="l2")
+        via_canonical = compare_fields(ds, ds, "B_1", metric="l2")
         assert via_alias == via_canonical == 0.0
 
     def test_si_vs_code_units_scale_linearly(self) -> None:
@@ -118,11 +118,11 @@ class TestCompareFields:
         norm = Normalization.pic_electron(1e18)
         grid = make_uniform_grid(8, spacing=1.0)
         (x,) = grid.coordinate_arrays()
-        a = FieldDataset.from_arrays({"B1": np.sin(x)}, grid, norm)
-        b = FieldDataset.from_arrays({"B1": np.cos(x)}, grid, norm)
+        a = FieldDataset.from_arrays({"B_1": np.sin(x)}, grid, norm)
+        b = FieldDataset.from_arrays({"B_1": np.cos(x)}, grid, norm)
 
-        linf_code = compare_fields(a, b, "B1", metric="linf", units="code")
-        linf_si = compare_fields(a, b, "B1", metric="linf", units="si")
+        linf_code = compare_fields(a, b, "B_1", metric="linf", units="code")
+        linf_si = compare_fields(a, b, "B_1", metric="linf", units="si")
         factor = norm.si_factor("b_field")
         assert_allclose(linf_si, linf_code * factor, rtol=1e-12)
 
@@ -131,10 +131,10 @@ class TestCompareFields:
         norm = Normalization.pic_electron(1e18)
         grid = make_uniform_grid(8, spacing=1.0)
         (x,) = grid.coordinate_arrays()
-        a = FieldDataset.from_arrays({"B1": np.sin(x)}, grid, norm)
-        b = FieldDataset.from_arrays({"B1": np.cos(x)}, grid, norm)
-        l2_code = compare_fields(a, b, "B1", metric="l2", units="code")
-        l2_si = compare_fields(a, b, "B1", metric="l2", units="si")
+        a = FieldDataset.from_arrays({"B_1": np.sin(x)}, grid, norm)
+        b = FieldDataset.from_arrays({"B_1": np.cos(x)}, grid, norm)
+        l2_code = compare_fields(a, b, "B_1", metric="l2", units="code")
+        l2_si = compare_fields(a, b, "B_1", metric="l2", units="si")
         assert_allclose(l2_si, l2_code, rtol=1e-12)
 
     def test_code_units_mismatched_normalization_raises(self) -> None:
@@ -142,28 +142,28 @@ class TestCompareFields:
 
         Comparing PIC code values to MHD code values is physically
         meaningless even though the arithmetic succeeds — the value
-        of ``B1=1.0`` means very different SI quantities under each
+        of ``B_1=1.0`` means very different SI quantities under each
         normalization. The contract is that ``units='code'`` requires
         matching normalizations; ``units='si'`` is the safe default.
         """
         grid = make_uniform_grid(4, spacing=1.0)
         a = FieldDataset.from_arrays(
-            {"B1": np.ones(4)}, grid, Normalization.pic_electron(1e18)
+            {"B_1": np.ones(4)}, grid, Normalization.pic_electron(1e18)
         )
         b = FieldDataset.from_arrays(
-            {"B1": np.ones(4)}, grid, Normalization.mhd_standard(1e6, 1e-20, 1e-9)
+            {"B_1": np.ones(4)}, grid, Normalization.mhd_standard(1e6, 1e-20, 1e-9)
         )
         with pytest.raises(ValueError, match="share a normalization"):
-            compare_fields(a, b, "B1", units="code")
+            compare_fields(a, b, "B_1", units="code")
 
     def test_code_units_same_normalization_still_works(self) -> None:
         """No regression: same normalization + ``units='code'`` is allowed."""
         norm = Normalization.pic_electron(1e18)
         grid = make_uniform_grid(4, spacing=1.0)
-        a = FieldDataset.from_arrays({"B1": np.ones(4)}, grid, norm)
-        b = FieldDataset.from_arrays({"B1": np.ones(4)}, grid, norm)
+        a = FieldDataset.from_arrays({"B_1": np.ones(4)}, grid, norm)
+        b = FieldDataset.from_arrays({"B_1": np.ones(4)}, grid, norm)
         # Identical data + same normalization → zero, no error.
-        assert compare_fields(a, b, "B1", units="code") == 0.0
+        assert compare_fields(a, b, "B_1", units="code") == 0.0
 
     def test_alias_survives_frame_alignment(self) -> None:
         """Custom alias resolves through compare_fields on the frame-aligned path.
@@ -174,17 +174,17 @@ class TestCompareFields:
         grid = make_uniform_grid(6, 6, spacing=1.0)
         arr = np.ones((6, 6))
         a = FieldDataset.from_arrays(
-            {"B1": arr},
+            {"B_1": arr},
             grid,
             Normalization.identity(),
-            aliases={"my_alias": "B1"},
+            aliases={"my_alias": "B_1"},
             frame="GSM",
         )
         b = FieldDataset.from_arrays(
-            {"B1": arr},
+            {"B_1": arr},
             grid,
             Normalization.identity(),
-            aliases={"my_alias": "B1"},
+            aliases={"my_alias": "B_1"},
             frame="GSE",
             transforms={"GSM": FrameTransform("GSE", "GSM")},
         )
@@ -194,16 +194,16 @@ class TestCompareFields:
         """Alias resolving to different canonicals across datasets fails loud."""
         grid = make_uniform_grid(4, spacing=1.0)
         a = FieldDataset.from_arrays(
-            {"B1": np.ones(4), "B2": np.zeros(4)},
+            {"B_1": np.ones(4), "B_2": np.zeros(4)},
             grid,
             Normalization.identity(),
-            aliases={"shared": "B1"},
+            aliases={"shared": "B_1"},
         )
         b = FieldDataset.from_arrays(
-            {"B1": np.ones(4), "B2": np.zeros(4)},
+            {"B_1": np.ones(4), "B_2": np.zeros(4)},
             grid,
             Normalization.identity(),
-            aliases={"shared": "B2"},
+            aliases={"shared": "B_2"},
         )
         with pytest.raises(ValueError, match="different canonical names"):
             compare_fields(a, b, "shared")
@@ -212,13 +212,13 @@ class TestCompareFields:
         """Same-grid smoke test still validates ``method``.
 
         Regression: the ``regrid`` no-op shortcut used to bypass method
-        validation, so ``compare_fields(ds, ds, "B1", method="bogus")``
+        validation, so ``compare_fields(ds, ds, "B_1", method="bogus")``
         silently used linear interpolation. Now the typo raises at
         :func:`pypic.regrid.regrid` before any alignment happens.
         """
         ds = _make_1d(4, 1.0, 0.0)
         with pytest.raises(ValueError, match="Unknown interpolation method"):
-            compare_fields(ds, ds, "B1", method="not_a_real_method")
+            compare_fields(ds, ds, "B_1", method="not_a_real_method")
 
 
 # ---------------------------------------------------------------------------
@@ -233,20 +233,20 @@ class TestFieldComparisonReport:
         grid = make_uniform_grid(6, 6, spacing=1.0)
         a = FieldDataset.from_arrays(
             {
-                "B1": np.ones((6, 6)),
-                "B2": np.ones((6, 6)),
+                "B_1": np.ones((6, 6)),
+                "B_2": np.ones((6, 6)),
                 "rho_m": np.ones((6, 6)),
             },
             grid,
             Normalization.identity(),
         )
         b = FieldDataset.from_arrays(
-            {"B1": np.ones((6, 6)), "rho_m": np.ones((6, 6))},
+            {"B_1": np.ones((6, 6)), "rho_m": np.ones((6, 6))},
             grid,
             Normalization.identity(),
         )
         report = field_comparison_report(a, b)
-        assert set(report["fields"].keys()) == {"B1", "rho_m"}
+        assert set(report["fields"].keys()) == {"B_1", "rho_m"}
         for entry in report["fields"].values():
             assert entry["l2"] == 0.0
             assert entry["linf"] == 0.0
@@ -273,7 +273,9 @@ class TestFieldComparisonReport:
 
     def test_no_common_fields_raises(self) -> None:
         grid = make_uniform_grid(4, spacing=1.0)
-        a = FieldDataset.from_arrays({"B1": np.ones(4)}, grid, Normalization.identity())
+        a = FieldDataset.from_arrays(
+            {"B_1": np.ones(4)}, grid, Normalization.identity()
+        )
         b = FieldDataset.from_arrays(
             {"rho_m": np.ones(4)}, grid, Normalization.identity()
         )
@@ -298,19 +300,19 @@ class TestFieldComparisonReport:
         grid_a = make_uniform_grid(6, 6, spacing=1.0)
         grid_b = make_uniform_grid(12, 12, spacing=0.5)
         a = FieldDataset.from_arrays(
-            {"B1": np.ones((6, 6))},
+            {"B_1": np.ones((6, 6))},
             grid_a,
             Normalization.identity(),
-            aliases={"my_alias": "B1"},
+            aliases={"my_alias": "B_1"},
         )
         b = FieldDataset.from_arrays(
-            {"B1": np.ones((12, 12))},
+            {"B_1": np.ones((12, 12))},
             grid_b,
             Normalization.identity(),
-            aliases={"my_alias": "B1"},
+            aliases={"my_alias": "B_1"},
         )
         report = field_comparison_report(a, b, fields=["my_alias"])
-        assert "B1" in report["fields"]
+        assert "B_1" in report["fields"]
 
     def test_bad_field_raises_before_alignment(self) -> None:
         """Bad field name raises KeyError before paying align_grids cost."""
@@ -330,31 +332,31 @@ class TestFieldComparisonReport:
         grid = make_uniform_grid(6, 6, spacing=1.0)
         arr = np.ones((6, 6))
         a = FieldDataset.from_arrays(
-            {"B1": arr},
+            {"B_1": arr},
             grid,
             Normalization.identity(),
-            aliases={"my_alias": "B1"},
+            aliases={"my_alias": "B_1"},
             frame="GSM",
         )
         b = FieldDataset.from_arrays(
-            {"B1": arr},
+            {"B_1": arr},
             grid,
             Normalization.identity(),
-            aliases={"my_alias": "B1"},
+            aliases={"my_alias": "B_1"},
             frame="GSE",
             transforms={"GSM": FrameTransform("GSE", "GSM")},
         )
         report = field_comparison_report(a, b, fields=["my_alias"])
-        assert "B1" in report["fields"]
+        assert "B_1" in report["fields"]
 
     def test_code_units_mismatched_normalization_raises(self) -> None:
         """``units='code'`` refuses cross-normalization reports."""
         grid = make_uniform_grid(4, spacing=1.0)
         a = FieldDataset.from_arrays(
-            {"B1": np.ones(4)}, grid, Normalization.pic_electron(1e18)
+            {"B_1": np.ones(4)}, grid, Normalization.pic_electron(1e18)
         )
         b = FieldDataset.from_arrays(
-            {"B1": np.ones(4)}, grid, Normalization.mhd_standard(1e6, 1e-20, 1e-9)
+            {"B_1": np.ones(4)}, grid, Normalization.mhd_standard(1e6, 1e-20, 1e-9)
         )
         with pytest.raises(ValueError, match="share a normalization"):
             field_comparison_report(a, b, units="code")
@@ -392,13 +394,13 @@ class TestFieldDifferenceDataset:
     def test_canonical_field_names(self) -> None:
         ds = _make_2d(6, 6)
         diff = field_difference_dataset(ds, ds)
-        # Full intersection: B1 and rho_m, no aliases in the keys.
-        assert set(diff.field_names()) == {"B1", "rho_m"}
+        # Full intersection: B_1 and rho_m, no aliases in the keys.
+        assert set(diff.field_names()) == {"B_1", "rho_m"}
 
     def test_field_info_preserved(self) -> None:
         ds = _make_2d(6, 6)
         diff = field_difference_dataset(ds, ds)
-        assert diff.field_info("B1").quantity_type == "b_field"
+        assert diff.field_info("B_1").quantity_type == "b_field"
 
     def test_metadata_records_units(self) -> None:
         ds = _make_2d(6, 6)
@@ -410,13 +412,13 @@ class TestFieldDifferenceDataset:
         grid = make_uniform_grid(6, 6, spacing=1.0)
         arr = np.ones((6, 6))
         a = FieldDataset.from_arrays(
-            {"B1": arr}, grid, Normalization.identity(), frame="GSM"
+            {"B_1": arr}, grid, Normalization.identity(), frame="GSM"
         )
         # Identity GSE→GSM transform: enough to satisfy the frame check
         # without rotating the fields (the rotation math itself is tested
         # in test_transforms.py).
         b = FieldDataset.from_arrays(
-            {"B1": arr},
+            {"B_1": arr},
             grid,
             Normalization.identity(),
             frame="GSE",
@@ -429,8 +431,8 @@ class TestFieldDifferenceDataset:
         """Code-units path records the units choice in metadata."""
         norm = Normalization.pic_electron(1e18)
         grid = make_uniform_grid(6, spacing=1.0)
-        a = FieldDataset.from_arrays({"B1": np.ones(6)}, grid, norm)
-        b = FieldDataset.from_arrays({"B1": 0.5 * np.ones(6)}, grid, norm)
+        a = FieldDataset.from_arrays({"B_1": np.ones(6)}, grid, norm)
+        b = FieldDataset.from_arrays({"B_1": 0.5 * np.ones(6)}, grid, norm)
         diff = field_difference_dataset(a, b, units="code")
         assert diff.metadata["comparison"]["units"] == "code"
 
@@ -438,31 +440,31 @@ class TestFieldDifferenceDataset:
         """``units='si'`` result must not double-convert when ``in_si`` runs.
 
         Pre-fix the result kept ``a.normalization`` (PIC, code units) but
-        stored SI values, so ``diff.in_si("B1")`` re-applied the SI factor
+        stored SI values, so ``diff.in_si("B_1")`` re-applied the SI factor
         and silently squared it. Now the result is given identity
-        normalization so ``diff.in_si("B1")`` round-trips to ``diff["B1"]``.
+        normalization so ``diff.in_si("B_1")`` round-trips to ``diff["B_1"]``.
         """
         norm = Normalization.pic_electron(1e18)
         grid = make_uniform_grid(6, spacing=1.0)
-        a = FieldDataset.from_arrays({"B1": np.ones(6)}, grid, norm)
-        b = FieldDataset.from_arrays({"B1": 0.5 * np.ones(6)}, grid, norm)
+        a = FieldDataset.from_arrays({"B_1": np.ones(6)}, grid, norm)
+        b = FieldDataset.from_arrays({"B_1": 0.5 * np.ones(6)}, grid, norm)
         diff = field_difference_dataset(a, b, units="si")
         # Identity normalization → in_si() and __getitem__ agree.
-        assert_allclose(diff.in_si("B1"), diff["B1"], rtol=1e-12)
+        assert_allclose(diff.in_si("B_1"), diff["B_1"], rtol=1e-12)
         # And the stored values equal the SI difference of the inputs.
-        expected_si_diff = a.in_si("B1") - b.in_si("B1")
-        assert_allclose(diff["B1"], expected_si_diff, rtol=1e-12)
+        expected_si_diff = a.in_si("B_1") - b.in_si("B_1")
+        assert_allclose(diff["B_1"], expected_si_diff, rtol=1e-12)
 
     def test_code_units_keeps_source_normalization(self) -> None:
         """``units='code'`` preserves *a*'s normalization (no identity swap)."""
         norm = Normalization.pic_electron(1e18)
         grid = make_uniform_grid(6, spacing=1.0)
-        a = FieldDataset.from_arrays({"B1": np.ones(6)}, grid, norm)
-        b = FieldDataset.from_arrays({"B1": 0.5 * np.ones(6)}, grid, norm)
+        a = FieldDataset.from_arrays({"B_1": np.ones(6)}, grid, norm)
+        b = FieldDataset.from_arrays({"B_1": 0.5 * np.ones(6)}, grid, norm)
         diff = field_difference_dataset(a, b, units="code")
         # Same normalization as the inputs → in_si applies the factor.
         assert diff.normalization == norm
-        assert_allclose(diff.in_si("B1"), 0.5 * norm.si_factor("b_field"), rtol=1e-12)
+        assert_allclose(diff.in_si("B_1"), 0.5 * norm.si_factor("b_field"), rtol=1e-12)
 
     def test_plottable_via_plot_field_slice(self) -> None:
         pytest.importorskip("matplotlib")
@@ -474,46 +476,46 @@ class TestFieldDifferenceDataset:
         a = _make_2d(10, 10)
         b = _make_2d(10, 10, offset=0.3)
         diff = field_difference_dataset(a, b)
-        fig, _ = plot_field_slice(diff, "B1")
+        fig, _ = plot_field_slice(diff, "B_1")
         import matplotlib.pyplot as plt
 
         plt.close(fig)
 
     def test_explicit_field_list(self) -> None:
         ds = _make_2d(6, 6)
-        diff = field_difference_dataset(ds, ds, fields=["B1"])
-        assert diff.field_names() == ["B1"]
+        diff = field_difference_dataset(ds, ds, fields=["B_1"])
+        assert diff.field_names() == ["B_1"]
 
     def test_alias_survives_frame_alignment(self) -> None:
         """Custom alias resolves through field_difference_dataset on the frame path."""
         grid = make_uniform_grid(6, 6, spacing=1.0)
         arr = np.ones((6, 6))
         a = FieldDataset.from_arrays(
-            {"B1": arr},
+            {"B_1": arr},
             grid,
             Normalization.identity(),
-            aliases={"my_alias": "B1"},
+            aliases={"my_alias": "B_1"},
             frame="GSM",
         )
         b = FieldDataset.from_arrays(
-            {"B1": arr},
+            {"B_1": arr},
             grid,
             Normalization.identity(),
-            aliases={"my_alias": "B1"},
+            aliases={"my_alias": "B_1"},
             frame="GSE",
             transforms={"GSM": FrameTransform("GSE", "GSM")},
         )
         diff = field_difference_dataset(a, b, fields=["my_alias"])
-        assert diff.field_names() == ["B1"]
+        assert diff.field_names() == ["B_1"]
 
     def test_code_units_mismatched_normalization_raises(self) -> None:
         """``units='code'`` refuses cross-normalization differences."""
         grid = make_uniform_grid(4, spacing=1.0)
         a = FieldDataset.from_arrays(
-            {"B1": np.ones(4)}, grid, Normalization.pic_electron(1e18)
+            {"B_1": np.ones(4)}, grid, Normalization.pic_electron(1e18)
         )
         b = FieldDataset.from_arrays(
-            {"B1": np.ones(4)}, grid, Normalization.mhd_standard(1e6, 1e-20, 1e-9)
+            {"B_1": np.ones(4)}, grid, Normalization.mhd_standard(1e6, 1e-20, 1e-9)
         )
         with pytest.raises(ValueError, match="share a normalization"):
             field_difference_dataset(a, b, units="code")
@@ -544,7 +546,7 @@ class TestFrameAlignment:
     def _gsm_dataset(value: float = 1.0) -> FieldDataset:
         grid = make_uniform_grid(6, 6, spacing=1.0)
         return FieldDataset.from_arrays(
-            {"B1": np.full((6, 6), value)},
+            {"B_1": np.full((6, 6), value)},
             grid,
             Normalization.identity(),
             frame="GSM",
@@ -554,7 +556,7 @@ class TestFrameAlignment:
     def _gse_dataset_with_transform(value: float = 1.0) -> FieldDataset:
         grid = make_uniform_grid(6, 6, spacing=1.0)
         return FieldDataset.from_arrays(
-            {"B1": np.full((6, 6), value)},
+            {"B_1": np.full((6, 6), value)},
             grid,
             Normalization.identity(),
             frame="GSE",
@@ -566,20 +568,20 @@ class TestFrameAlignment:
         a = self._gsm_dataset()
         b = self._gse_dataset_with_transform()
         # Identity transform → fields equal → zero L2.
-        assert compare_fields(a, b, "B1") == 0.0
+        assert compare_fields(a, b, "B_1") == 0.0
 
     def test_no_transform_raises_value_error(self) -> None:
         """Different frames + no transform → ValueError naming both frames."""
         a = self._gsm_dataset()
         grid = make_uniform_grid(6, 6, spacing=1.0)
         b = FieldDataset.from_arrays(
-            {"B1": np.ones((6, 6))},
+            {"B_1": np.ones((6, 6))},
             grid,
             Normalization.identity(),
             frame="GSE",  # no transforms registered
         )
         with pytest.raises(ValueError, match=r"dataset B.*'GSE'.*'GSM'"):
-            compare_fields(a, b, "B1")
+            compare_fields(a, b, "B_1")
 
     def test_explicit_frame_transforms_both(self) -> None:
         """``frame=...`` transforms *both* inputs to a third frame."""
@@ -588,20 +590,20 @@ class TestFrameAlignment:
         grid = make_uniform_grid(6, 6, spacing=1.0)
         arr = np.ones((6, 6))
         a = FieldDataset.from_arrays(
-            {"B1": arr},
+            {"B_1": arr},
             grid,
             Normalization.identity(),
             frame="GSM",
             transforms={"GSE": FrameTransform("GSM", "GSE")},
         )
         b = FieldDataset.from_arrays(
-            {"B1": arr},
+            {"B_1": arr},
             grid,
             Normalization.identity(),
             frame="GSE",
         )
         # Identity transforms → fields unchanged → zero L2.
-        assert compare_fields(a, b, "B1", frame="GSE") == 0.0
+        assert compare_fields(a, b, "B_1", frame="GSE") == 0.0
 
     def test_explicit_frame_missing_transform_on_a_raises(self) -> None:
         """``frame=...`` raises ValueError naming A if A lacks the transform."""
@@ -610,13 +612,13 @@ class TestFrameAlignment:
         a = self._gsm_dataset()
         grid = make_uniform_grid(6, 6, spacing=1.0)
         b = FieldDataset.from_arrays(
-            {"B1": np.ones((6, 6))},
+            {"B_1": np.ones((6, 6))},
             grid,
             Normalization.identity(),
             frame="GSE",
         )
         with pytest.raises(ValueError, match=r"dataset A.*'GSM'.*'GSE'"):
-            compare_fields(a, b, "B1", frame="GSE")
+            compare_fields(a, b, "B_1", frame="GSE")
 
     def test_explicit_frame_missing_transform_on_b_raises(self) -> None:
         """``frame=...`` raises ValueError naming B if B lacks the transform."""
@@ -625,27 +627,27 @@ class TestFrameAlignment:
         grid = make_uniform_grid(6, 6, spacing=1.0)
         arr = np.ones((6, 6))
         a = FieldDataset.from_arrays(
-            {"B1": arr},
+            {"B_1": arr},
             grid,
             Normalization.identity(),
             frame="GSM",
             transforms={"GSE": FrameTransform("GSM", "GSE")},
         )
         b = FieldDataset.from_arrays(
-            {"B1": arr},
+            {"B_1": arr},
             grid,
             Normalization.identity(),
             frame="HEE",
         )
         with pytest.raises(ValueError, match=r"dataset B.*'HEE'.*'GSE'"):
-            compare_fields(a, b, "B1", frame="GSE")
+            compare_fields(a, b, "B_1", frame="GSE")
 
     def test_empty_frame_string_raises(self) -> None:
         """``frame=''`` is rejected at the boundary, not deep in transform_to."""
         a = self._gsm_dataset()
         b = self._gsm_dataset()
         with pytest.raises(ValueError, match="non-empty string"):
-            compare_fields(a, b, "B1", frame="")
+            compare_fields(a, b, "B_1", frame="")
 
     def test_explicit_frame_already_native_is_noop(self) -> None:
         """``frame=`` matching A's frame behaves like the default path."""
@@ -653,21 +655,21 @@ class TestFrameAlignment:
         b = self._gse_dataset_with_transform()
         # Both default and explicit "GSM" should give the same result
         # without requiring any transform on A.
-        assert compare_fields(a, b, "B1") == compare_fields(a, b, "B1", frame="GSM")
+        assert compare_fields(a, b, "B_1") == compare_fields(a, b, "B_1", frame="GSM")
 
     def test_field_difference_dataset_explicit_frame(self) -> None:
         """``field_difference_dataset(frame=...)`` puts the result in that frame."""
         grid = make_uniform_grid(6, 6, spacing=1.0)
         arr = np.ones((6, 6))
         a = FieldDataset.from_arrays(
-            {"B1": arr},
+            {"B_1": arr},
             grid,
             Normalization.identity(),
             frame="GSM",
             transforms={"GSE": FrameTransform("GSM", "GSE")},
         )
         b = FieldDataset.from_arrays(
-            {"B1": arr},
+            {"B_1": arr},
             grid,
             Normalization.identity(),
             frame="GSE",
@@ -689,7 +691,7 @@ class TestFrameAlignment:
         a = self._gsm_dataset()
         b = self._gse_dataset_with_transform()
         report = field_comparison_report(a, b)
-        assert report["fields"]["B1"]["l2"] == 0.0
+        assert report["fields"]["B_1"]["l2"] == 0.0
 
     def test_same_frame_skips_transform(self) -> None:
         """Identical frames → no transform attempted (no transforms registered)."""
@@ -699,7 +701,7 @@ class TestFrameAlignment:
         a = _make_2d(6, 6)
         b = _make_2d(6, 6)
         assert a.frame == b.frame  # sanity
-        compare_fields(a, b, "B1")  # must not raise
+        compare_fields(a, b, "B_1")  # must not raise
 
 
 # ---------------------------------------------------------------------------
@@ -717,7 +719,7 @@ class TestCoarseMismatchWarning:
         b = _make_2d(20, 20, dx=0.5)  # ratio 2x
         with warnings.catch_warnings(record=True) as record:
             warnings.simplefilter("always")
-            compare_fields(a, b, "B1")
+            compare_fields(a, b, "B_1")
         mismatches = [w for w in record if "cross-scale" in str(w.message)]
         assert not mismatches
 
@@ -725,13 +727,13 @@ class TestCoarseMismatchWarning:
         a = _make_2d(10, 10, dx=1.0)
         b = _make_2d(200, 200, dx=0.05)  # ratio 20x
         with pytest.warns(UserWarning, match="cross-scale"):
-            compare_fields(a, b, "B1")
+            compare_fields(a, b, "B_1")
 
     def test_warns_once_per_report(self) -> None:
         """A report over many fields still warns exactly once."""
         grid_a = make_uniform_grid(10, 10, spacing=1.0)
         grid_b = make_uniform_grid(200, 200, spacing=0.05)
-        names = ["B1", "B2", "B3", "rho_m"]
+        names = ["B_1", "B_2", "B_3", "rho_m"]
         a = FieldDataset.from_arrays(
             cast(
                 "dict[str, FloatArray]",
@@ -781,12 +783,12 @@ class TestNaNHandling:
         # inclusive sample bounds → target samples land in [1..9], all
         # valid in both sources, no synthetic NaN.
         a = FieldDataset.from_arrays(
-            {"B1": np.full(10, 7.0)},
+            {"B_1": np.full(10, 7.0)},
             make_uniform_grid(10, spacing=1.0, origin=0.0),
             Normalization.identity(),
         )
         b = FieldDataset.from_arrays(
-            {"B1": np.full(5, 7.0)},
+            {"B_1": np.full(5, 7.0)},
             make_uniform_grid(5, spacing=2.0, origin=0.0),
             Normalization.identity(),
         )
@@ -794,8 +796,8 @@ class TestNaNHandling:
 
         with _w.catch_warnings(record=True) as record:
             _w.simplefilter("always")
-            l2 = compare_fields(a, b, "B1", metric="l2")
-            linf = compare_fields(a, b, "B1", metric="linf")
+            l2 = compare_fields(a, b, "B_1", metric="l2")
+            linf = compare_fields(a, b, "B_1", metric="linf")
         assert l2 == 0.0
         assert linf == 0.0
         # No NaN-handling warning fired — the tight common_grid prevented
@@ -811,11 +813,11 @@ class TestNaNHandling:
         grid = make_uniform_grid(10, spacing=1.0)
         values_a = np.array([1.0, 2.0, 3.0, np.nan, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0])
         values_b = np.array([1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, np.nan, 9.0, 10.0])
-        a = FieldDataset.from_arrays({"B1": values_a}, grid, Normalization.identity())
-        b = FieldDataset.from_arrays({"B1": values_b}, grid, Normalization.identity())
+        a = FieldDataset.from_arrays({"B_1": values_a}, grid, Normalization.identity())
+        b = FieldDataset.from_arrays({"B_1": values_b}, grid, Normalization.identity())
 
         with pytest.warns(UserWarning, match=r"ignored 2 NaN") as record:
-            l2 = compare_fields(a, b, "B1", metric="l2")
+            l2 = compare_fields(a, b, "B_1", metric="l2")
         # 8 valid cells, all identical → exact zero.
         assert l2 == 0.0
         # Exactly one warning per call (not one per cell).
@@ -823,7 +825,7 @@ class TestNaNHandling:
         assert len(nan_warnings) == 1
 
         with pytest.warns(UserWarning, match=r"ignored 2 NaN"):
-            linf = compare_fields(a, b, "B1", metric="linf")
+            linf = compare_fields(a, b, "B_1", metric="linf")
         assert linf == 0.0
 
     def test_real_nan_propagate_policy_returns_nan(self) -> None:
@@ -832,9 +834,9 @@ class TestNaNHandling:
         values_a = np.ones(10)
         values_a[3] = np.nan
         values_b = np.ones(10)
-        a = FieldDataset.from_arrays({"B1": values_a}, grid, Normalization.identity())
-        b = FieldDataset.from_arrays({"B1": values_b}, grid, Normalization.identity())
-        result = compare_fields(a, b, "B1", nan_policy="propagate")
+        a = FieldDataset.from_arrays({"B_1": values_a}, grid, Normalization.identity())
+        b = FieldDataset.from_arrays({"B_1": values_b}, grid, Normalization.identity())
+        result = compare_fields(a, b, "B_1", nan_policy="propagate")
         assert np.isnan(result)
 
 
@@ -856,11 +858,13 @@ class TestMethodPassthrough:
         (cx,) = coarse.coordinate_arrays()
         (fx,) = fine.coordinate_arrays()
         a = FieldDataset.from_arrays(
-            {"B1": np.sin(cx)}, coarse, Normalization.identity()
+            {"B_1": np.sin(cx)}, coarse, Normalization.identity()
         )
-        b = FieldDataset.from_arrays({"B1": np.sin(fx)}, fine, Normalization.identity())
-        l2_linear = compare_fields(a, b, "B1", method="linear")
-        l2_cubic = compare_fields(a, b, "B1", method="cubic")
+        b = FieldDataset.from_arrays(
+            {"B_1": np.sin(fx)}, fine, Normalization.identity()
+        )
+        l2_linear = compare_fields(a, b, "B_1", method="linear")
+        l2_cubic = compare_fields(a, b, "B_1", method="cubic")
         # Both nonzero (10-cell vs 40-cell sin(x) — interpolation error
         # is real), and cubic is materially smaller than linear.
         assert l2_linear > 0.0
@@ -872,13 +876,13 @@ class TestMethodPassthrough:
         coarse = make_uniform_grid(6, spacing=1.0)
         fine = make_uniform_grid(12, spacing=0.5)
         a = FieldDataset.from_arrays(
-            {"B1": np.ones(6)}, coarse, Normalization.identity()
+            {"B_1": np.ones(6)}, coarse, Normalization.identity()
         )
         b = FieldDataset.from_arrays(
-            {"B1": np.ones(12)}, fine, Normalization.identity()
+            {"B_1": np.ones(12)}, fine, Normalization.identity()
         )
         with pytest.raises(ValueError, match="method"):
-            compare_fields(a, b, "B1", method="not_a_real_method")
+            compare_fields(a, b, "B_1", method="not_a_real_method")
 
 
 # ---------------------------------------------------------------------------
@@ -902,7 +906,7 @@ def test_compare_fields_equivalent_to_align_plus_pure(
     a = _make_2d(*grid_a_params, dx=1.0, origin=(0.0, 0.0))
     b = _make_2d(*grid_b_params, dx=1.0, origin=(0.5, 0.5))
     a_aligned, b_aligned = align_grids(a, b)
-    expected_l2 = float(l2_relative_error(a_aligned["B1"], b_aligned["B1"]))
-    expected_linf = float(linf_error(a_aligned["B1"], b_aligned["B1"]))
-    assert compare_fields(a, b, "B1", metric="l2") == expected_l2
-    assert compare_fields(a, b, "B1", metric="linf") == expected_linf
+    expected_l2 = float(l2_relative_error(a_aligned["B_1"], b_aligned["B_1"]))
+    expected_linf = float(linf_error(a_aligned["B_1"], b_aligned["B_1"]))
+    assert compare_fields(a, b, "B_1", metric="l2") == expected_l2
+    assert compare_fields(a, b, "B_1", metric="linf") == expected_linf

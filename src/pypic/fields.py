@@ -227,7 +227,7 @@ def _vec_three(
 _FIELD_INFO: dict[str, FieldInfo] = {
     # Electromagnetic fields
     **_vec_three(
-        "B{c}",
+        "B_{c}",
         "b_field",
         "Magnetic field component {c}",
         "T",
@@ -242,7 +242,7 @@ _FIELD_INFO: dict[str, FieldInfo] = {
         r"$B_{{0,{c}}}$",
     ),
     **_vec_three(
-        "E{c}",
+        "E_{c}",
         "e_field",
         "Electric field component {c}",
         "V/m",
@@ -251,7 +251,7 @@ _FIELD_INFO: dict[str, FieldInfo] = {
     ),
     # Current density
     **_vec_three(
-        "J{c}",
+        "J_{c}",
         "current_density",
         "Current density component {c}",
         "A/m^2",
@@ -260,7 +260,7 @@ _FIELD_INFO: dict[str, FieldInfo] = {
     ),
     # Velocities
     **_vec_three(
-        "V{c}",
+        "V_{c}",
         "velocity",
         "Bulk velocity component {c}",
         "m/s",
@@ -268,7 +268,7 @@ _FIELD_INFO: dict[str, FieldInfo] = {
         mag=("|V|", "Bulk velocity magnitude", r"$|V|$"),
     ),
     **_vec_three(
-        "Ve{c}",
+        "Ve_{c}",
         "velocity",
         "Electron velocity component {c}",
         "m/s",
@@ -283,7 +283,7 @@ _FIELD_INFO: dict[str, FieldInfo] = {
     "v_th_i": _FI("velocity", "Ion thermal speed", "m/s", r"$v_{th,i}$"),
     # Four-velocity
     **_vec_three(
-        "u{c}",
+        "u_{c}",
         "four_velocity",
         "Four-velocity component {c}",
         "m/s",
@@ -310,12 +310,12 @@ _FIELD_INFO: dict[str, FieldInfo] = {
         "pressure", "Electron perpendicular pressure", "Pa", r"$P_{\perp,e}$"
     ),
     "P_perp_i": _FI("pressure", "Ion perpendicular pressure", "Pa", r"$P_{\perp,i}$"),
-    "P11": _FI("pressure", "Pressure tensor P11", "Pa", r"$P_{11}$"),
-    "P22": _FI("pressure", "Pressure tensor P22", "Pa", r"$P_{22}$"),
-    "P33": _FI("pressure", "Pressure tensor P33", "Pa", r"$P_{33}$"),
-    "P12": _FI("pressure", "Pressure tensor P12", "Pa", r"$P_{12}$"),
-    "P13": _FI("pressure", "Pressure tensor P13", "Pa", r"$P_{13}$"),
-    "P23": _FI("pressure", "Pressure tensor P23", "Pa", r"$P_{23}$"),
+    "P_11": _FI("pressure", "Pressure tensor P_11", "Pa", r"$P_{11}$"),
+    "P_22": _FI("pressure", "Pressure tensor P_22", "Pa", r"$P_{22}$"),
+    "P_33": _FI("pressure", "Pressure tensor P_33", "Pa", r"$P_{33}$"),
+    "P_12": _FI("pressure", "Pressure tensor P_12", "Pa", r"$P_{12}$"),
+    "P_13": _FI("pressure", "Pressure tensor P_13", "Pa", r"$P_{13}$"),
+    "P_23": _FI("pressure", "Pressure tensor P_23", "Pa", r"$P_{23}$"),
     # Temperature
     "Te": _FI("temperature", "Electron temperature", "J", r"$T_e$"),
     "Ti": _FI("temperature", "Ion temperature", "J", r"$T_i$"),
@@ -377,21 +377,21 @@ _FIELD_INFO: dict[str, FieldInfo] = {
     "lambda_D": _FI("length", "Electron Debye length", "m", r"$\lambda_D$"),
     # Poynting flux / energy flux
     **_vec_three(
-        "S{c}",
+        "S_{c}",
         "poynting_flux",
         "Poynting flux component {c}",
         "W/m^2",
         r"$S_{c}$",
     ),
     **_vec_three(
-        "EF{c}",
+        "EF_{c}",
         "energy_flux",
         "Energy flux component {c}",
         "W/m^2",
         r"$EF_{c}$",
     ),
     **_vec_three(
-        "EHF{c}",
+        "EHF_{c}",
         "energy_flux",
         "Enthalpy flux component {c}",
         "W/m^2",
@@ -420,14 +420,14 @@ _FIELD_INFO: dict[str, FieldInfo] = {
         r"$\nabla \cdot E$",
     ),
     **_vec_three(
-        "curl_B{c}",
+        "curl_B_{c}",
         "b_field_per_length",
         "Curl of B component {c}",
         "T/m",
         r"$(\nabla \times B)_{c}$",
     ),
     **_vec_three(
-        "vort{c}",
+        "vort_{c}",
         "velocity_per_length",
         "Vorticity component {c}",
         "1/s",
@@ -576,13 +576,14 @@ def unregister_field(name: str) -> None:
 
 
 # Per-species field metadata built from a compact (prefix, qtype, long, latex)
-# table.  The *prefix* is the part of the regex before the trailing ``_s(\d+)``
-# — when it contains a capture group (e.g. ``J([123])``), the templates use
-# ``{C}`` for the component index and ``{N}`` for the species index.  LaTeX
-# templates must double any literal braces.  ``P(\d{0,2})`` is the one entry
-# that also matches the scalar form (``P_s0``) alongside tensor components
-# (``P11_s0``); the empty capture triggers the scalar branch in
-# :func:`_try_species_info`.
+# table.  Tier-3 canonical: ``<base>_s<N>[_<index>]``.  The *prefix* is the
+# regex's anchor — when it contains a component capture (e.g. ``J([123])``),
+# the resulting full pattern is ``^J_s(\d+)_([123])$`` (vector form with
+# species before component); when it has no component capture, the pattern is
+# ``^<prefix>_s(\d+)$`` (scalar form).  ``P(\d{0,2})`` is the one tensor entry,
+# producing ``^P_s(\d+)(?:_(\d{2}))?$`` — a single tensor pattern that also
+# matches the scalar ``P_s0`` (empty component capture).
+# Templates use ``{C}`` for component, ``{N}`` for species index.
 _SPECIES_PATTERN_SPECS: list[tuple[str, str, str, str]] = [
     ("n", "density", "Number density (species {N})", r"$n_{{s{N}}}$"),
     ("rho_c", "charge_density", "Charge density (species {N})", r"$\rho_{{c,s{N}}}$"),
@@ -634,7 +635,7 @@ _SPECIES_PATTERN_SPECS: list[tuple[str, str, str, str]] = [
         "Conductive heat flux component {C} (species {N})",
         r"$q_{{{C},s{N}}}$",
     ),
-    # \d{0,2} matches both P11_s0 (tensor) and P_s0 (scalar)
+    # \d{0,2} matches both P_s0_11 (tensor) and P_s0 (scalar)
     (r"P(\d{0,2})", "pressure", "Pressure {C} (species {N})", r"$P_{{{C},s{N}}}$"),
     ("rho_m", "mass_density", "Mass density (species {N})", r"$\rho_{{m,s{N}}}$"),
     (r"\|V\|", "velocity", "Velocity magnitude (species {N})", r"$|V_{{s{N}}}|$"),
@@ -693,8 +694,26 @@ _SPECIES_PATTERN_SPECS: list[tuple[str, str, str, str]] = [
     ("agyrotropy", "dimensionless", "Agyrotropy (species {N})", r"$Q_{{s{N}}}$"),
 ]
 
+def _build_species_info_pattern(prefix: str) -> re.Pattern[str]:
+    r"""Translate a Tier-3 prefix entry into its full species-name regex.
+
+    Three flavors:
+      - Vector with explicit ``([123])`` capture (e.g. ``J([123])``)
+        → ``^J_s(\d+)_([123])$``
+      - Tensor variant ``P(\d{0,2})`` → ``^P_s(\d+)(?:_(\d{2}))?$``
+        (matches both scalar ``P_s0`` and tensor ``P_s0_11``)
+      - Scalar (no capture, e.g. ``n``, ``T``, ``omega_p``) → ``^n_s(\d+)$``
+    """
+    if "([123])" in prefix:
+        base = prefix.replace("([123])", "")
+        return re.compile(rf"^{base}_s(\d+)_([123])$")
+    if r"P(\d{0,2})" in prefix:
+        return re.compile(r"^P_s(\d+)(?:_(\d{2}))?$")
+    return re.compile(rf"^{prefix}_s(\d+)$")
+
+
 _SPECIES_INFO_PATTERNS: list[tuple[re.Pattern[str], str, str, str]] = [
-    (re.compile(rf"^{prefix}_s(\d+)$"), qtype, long_tmpl, latex_tmpl)
+    (_build_species_info_pattern(prefix), qtype, long_tmpl, latex_tmpl)
     for prefix, qtype, long_tmpl, latex_tmpl in _SPECIES_PATTERN_SPECS
 ]
 
@@ -705,14 +724,19 @@ _SPECIES_QUANTITY_PATTERNS: list[tuple[re.Pattern[str], str]] = [
 
 
 def _try_species_info(name: str) -> FieldInfo | None:
-    """Try to build FieldInfo from species regex patterns."""
+    """Try to build FieldInfo from species regex patterns.
+
+    Tier-3 patterns capture (species, component) in that order — the
+    species qualifier sits between the field name and the component
+    suffix (``V_s0_1`` → species=0, component=1).
+    """
     for pattern, qtype, name_tmpl, latex_tmpl in _SPECIES_INFO_PATTERNS:
         m = pattern.match(name)
         if m is not None:
             groups = m.groups()
             if len(groups) == 2:
-                component, species_idx = groups
-                if component == "":
+                species_idx, component = groups
+                if not component:
                     # Scalar species field (e.g. P_s0 → "Pressure (species 0)")
                     long_name = f"Pressure (species {species_idx})"
                     latex = rf"$P_{{s{species_idx}}}$"
@@ -776,7 +800,7 @@ def field_info(
 
     1. Direct lookup in the registry
     2. Compute alias resolution (``"B_mag"`` -> ``"|B|"``)
-    3. Field alias fallback (``"Bx"`` -> ``"B1"``)
+    3. Field alias fallback (``"Bx"`` -> ``"B_1"``)
     4. Per-species regex patterns (``"n_s5"``, ``"omega_p_s3"``)
 
     Parameters
@@ -802,7 +826,7 @@ def field_info(
     'T'
     >>> field_info("beta").latex
     '$\\beta$'
-    >>> field_info("B1", axis_names=("x", "y", "z")).long_name
+    >>> field_info("B_1", axis_names=("x", "y", "z")).long_name
     'Magnetic field x-component'
     """
 
@@ -823,7 +847,7 @@ def field_info(
         if info is not None:
             return _maybe_localize(info)
 
-    # 3. Field alias fallback (Bx -> B1, P_e -> Pe, etc.)
+    # 3. Field alias fallback (Bx -> B_1, P_e -> Pe, etc.)
     fallback = _get_field_alias_fallback()
     target = canonical if canonical is not None else name
     resolved = fallback.get(target, name)
@@ -861,9 +885,9 @@ def unit_label(name: str, *, si: bool = False) -> str:
 
     Examples
     --------
-    >>> unit_label("B1", si=True)
+    >>> unit_label("B_1", si=True)
     'T'
-    >>> unit_label("B1")
+    >>> unit_label("B_1")
     'normalized'
     >>> unit_label("beta", si=True)
     ''

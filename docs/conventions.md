@@ -229,11 +229,11 @@ corresponding formulas.
 
 pypic supports two velocity representations:
 
-- **Three-velocity** `V1/V2/V3` ($v^i$): bounded by $c$, the standard
+- **Three-velocity** `V_1/V_2/V_3` ($v^i$): bounded by $c$, the standard
   output of non-relativistic and semi-relativistic codes. Directly
   interpretable as physical speed.
 
-- **Four-velocity** `u1/u2/u3` ($u^i = \gamma v^i$): unbounded, the
+- **Four-velocity** `u_1/u_2/u_3` ($u^i = \gamma v^i$): unbounded, the
   natural output of relativistic PIC codes (TRISTAN-MP, Zeltron, OSIRIS).
   Numerically well-behaved at all speeds because there is no artificial
   upper bound. The four-velocity is the spatial part of the 4-velocity

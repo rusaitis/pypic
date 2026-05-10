@@ -89,10 +89,10 @@ def test_vector_rotation_inverse_is_transpose(
     """
     r = np.asarray(rotation, dtype=np.float64)
     r1, r2, r3 = rotate_vector_components(v1, v2, v3, r)
-    u1, u2, u3 = rotate_vector_components(r1, r2, r3, r.T)
-    assert_allclose(u1, v1, rtol=1e-12, atol=1e-12)
-    assert_allclose(u2, v2, rtol=1e-12, atol=1e-12)
-    assert_allclose(u3, v3, rtol=1e-12, atol=1e-12)
+    u_1, u_2, u_3 = rotate_vector_components(r1, r2, r3, r.T)
+    assert_allclose(u_1, v1, rtol=1e-12, atol=1e-12)
+    assert_allclose(u_2, v2, rtol=1e-12, atol=1e-12)
+    assert_allclose(u_3, v3, rtol=1e-12, atol=1e-12)
 
 
 @given(

@@ -84,9 +84,9 @@ def _make_sim_dir(tmp_path: Path, *, n_steps: int = 1) -> Path:
     for i in range(n_steps):
         with h5py.File(d / f"output_{i:06d}.h5", "w") as f:
             grp = f.create_group("fields")
-            grp.create_dataset("B1", data=rng.standard_normal(shape))
-            grp.create_dataset("B2", data=rng.standard_normal(shape))
-            grp.create_dataset("B3", data=rng.standard_normal(shape))
+            grp.create_dataset("B_1", data=rng.standard_normal(shape))
+            grp.create_dataset("B_2", data=rng.standard_normal(shape))
+            grp.create_dataset("B_3", data=rng.standard_normal(shape))
             f.attrs["model"] = "test_sim"
             f.attrs["step"] = i
     return d
@@ -134,9 +134,9 @@ def test_fields_default(tmp_path):
     d = _make_sim_dir(tmp_path)
     result = runner.invoke(app, ["fields", str(d)])
     assert result.exit_code == 0, result.output
-    assert "B1" in result.output
-    assert "B2" in result.output
-    assert "B3" in result.output
+    assert "B_1" in result.output
+    assert "B_2" in result.output
+    assert "B_3" in result.output
 
 
 def test_fields_mapping(tmp_path):
@@ -145,7 +145,7 @@ def test_fields_mapping(tmp_path):
     assert result.exit_code == 0, result.output
     # Native on the left, → arrow, canonical on the right
     assert "\u2192" in result.output
-    assert "B1" in result.output
+    assert "B_1" in result.output
 
 
 def test_fields_mapping_json_preserves_null(tmp_path):
@@ -164,7 +164,7 @@ def test_fields_derived(tmp_path):
     d = _make_sim_dir(tmp_path)
     result = runner.invoke(app, ["fields", str(d), "--derived"])
     assert result.exit_code == 0, result.output
-    # |B| should be computable from B1, B2, B3
+    # |B| should be computable from B_1, B_2, B_3
     assert "|B|" in result.output
 
 
@@ -181,7 +181,7 @@ def test_fields_json(tmp_path):
     assert result.exit_code == 0, result.output
     data = json.loads(result.output)
     assert "fields" in data
-    assert "B1" in data["fields"]
+    assert "B_1" in data["fields"]
 
 
 def test_fields_all(tmp_path):
@@ -198,7 +198,7 @@ def test_fields_all(tmp_path):
 
 def test_stats_single_step(tmp_path):
     d = _make_sim_dir(tmp_path)
-    result = runner.invoke(app, ["stats", str(d), "--field", "B1"])
+    result = runner.invoke(app, ["stats", str(d), "--field", "B_1"])
     assert result.exit_code == 0, result.output
     assert "min:" in result.output
     assert "max:" in result.output
@@ -216,7 +216,7 @@ def test_stats_derived(tmp_path):
 
 def test_stats_json(tmp_path):
     d = _make_sim_dir(tmp_path)
-    result = runner.invoke(app, ["stats", str(d), "--field", "B1", "--json"])
+    result = runner.invoke(app, ["stats", str(d), "--field", "B_1", "--json"])
     assert result.exit_code == 0, result.output
     data = json.loads(result.output)
     assert "min" in data
@@ -229,7 +229,7 @@ def test_stats_json(tmp_path):
 
 def test_stats_multi_step(tmp_path):
     d = _make_sim_dir(tmp_path, n_steps=3)
-    result = runner.invoke(app, ["stats", str(d), "--field", "B1", "--step", "all"])
+    result = runner.invoke(app, ["stats", str(d), "--field", "B_1", "--step", "all"])
     assert result.exit_code == 0, result.output
     # Field-header + table-header + 3 data rows = 5 non-blank lines.
     # Pinning the exact count catches silent row-duplication / missing-row
@@ -242,7 +242,7 @@ def test_stats_multi_step_json(tmp_path):
     d = _make_sim_dir(tmp_path, n_steps=3)
     result = runner.invoke(
         app,
-        ["stats", str(d), "--field", "B1", "--step", "all", "--json"],
+        ["stats", str(d), "--field", "B_1", "--step", "all", "--json"],
     )
     assert result.exit_code == 0, result.output
     data = json.loads(result.output)
@@ -255,7 +255,7 @@ def test_stats_multi_step_json(tmp_path):
 
 def test_compare_single_field(tmp_path):
     d = _make_sim_dir(tmp_path)
-    result = runner.invoke(app, ["compare", str(d), str(d), "--field", "B1"])
+    result = runner.invoke(app, ["compare", str(d), str(d), "--field", "B_1"])
     assert result.exit_code == 0, result.output
     assert "L2 relative error:" in result.output
     assert "L-inf error:" in result.output
@@ -268,13 +268,13 @@ def test_compare_all_fields(tmp_path):
     d = _make_sim_dir(tmp_path)
     result = runner.invoke(app, ["compare", str(d), str(d)])
     assert result.exit_code == 0, result.output
-    assert "B1" in result.output
-    assert "B2" in result.output
+    assert "B_1" in result.output
+    assert "B_2" in result.output
     # Self-compare must yield exact zeros on every row — guards against a
     # silent drift in the compare pipeline (e.g. spurious float cast,
     # wrong normalization branch, or accidental rtol-based "close enough"
     # masking real non-zero differences).
-    for field in ("B1", "B2", "B3"):
+    for field in ("B_1", "B_2", "B_3"):
         row = next(
             ln for ln in result.output.splitlines() if ln.lstrip().startswith(field)
         )
@@ -288,13 +288,13 @@ def test_compare_json(tmp_path):
     d = _make_sim_dir(tmp_path)
     result = runner.invoke(
         app,
-        ["compare", str(d), str(d), "--field", "B1", "--json"],
+        ["compare", str(d), str(d), "--field", "B_1", "--json"],
     )
     assert result.exit_code == 0, result.output
     data = json.loads(result.output)
     assert "l2" in data
     assert "linf" in data
-    assert data["field"] == "B1"
+    assert data["field"] == "B_1"
 
 
 # -- error cases -------------------------------------------------------------
@@ -366,7 +366,7 @@ def test_bad_log_level(tmp_path):
 def test_bad_metric(tmp_path):
     d = _make_sim_dir(tmp_path)
     result = runner.invoke(
-        app, ["compare", str(d), str(d), "--field", "B1", "--metric", "oops"]
+        app, ["compare", str(d), str(d), "--field", "B_1", "--metric", "oops"]
     )
     assert result.exit_code != 0
     assert "Invalid --metric" in result.output
@@ -375,7 +375,7 @@ def test_bad_metric(tmp_path):
 def test_bad_units(tmp_path):
     d = _make_sim_dir(tmp_path)
     result = runner.invoke(
-        app, ["compare", str(d), str(d), "--field", "B1", "--units", "cgs"]
+        app, ["compare", str(d), str(d), "--field", "B_1", "--units", "cgs"]
     )
     assert result.exit_code != 0
     assert "Invalid --units" in result.output
@@ -385,7 +385,7 @@ def test_bad_nan_policy(tmp_path):
     d = _make_sim_dir(tmp_path)
     result = runner.invoke(
         app,
-        ["compare", str(d), str(d), "--field", "B1", "--nan-policy", "ignore"],
+        ["compare", str(d), str(d), "--field", "B_1", "--nan-policy", "ignore"],
     )
     assert result.exit_code != 0
     assert "Invalid --nan-policy" in result.output
@@ -434,15 +434,15 @@ def test_quiet_suppresses_warnings(tmp_path):
     data[0, 0, 0] = np.nan  # triggers NaN-omit warning in diagnostics
     with h5py.File(d / "output_000000.h5", "w") as f:
         grp = f.create_group("fields")
-        grp.create_dataset("B1", data=data)
-        grp.create_dataset("B2", data=data)
-        grp.create_dataset("B3", data=data)
+        grp.create_dataset("B_1", data=data)
+        grp.create_dataset("B_2", data=data)
+        grp.create_dataset("B_3", data=data)
         f.attrs["model"] = "test_sim"
         f.attrs["step"] = 0
     # Without -q, compare triggers NaN warnings from diagnostics
     result = runner.invoke(
         app,
-        ["-q", "compare", str(d), str(d), "--field", "B1"],
+        ["-q", "compare", str(d), str(d), "--field", "B_1"],
     )
     assert result.exit_code == 0, result.output
     assert "NaN" not in result.output
@@ -456,7 +456,7 @@ class TestPlot:
     def test_minimal(self, tmp_path: Path) -> None:
         d = _make_sim_dir(tmp_path)
         out = str(tmp_path / "out.png")
-        result = runner.invoke(app, ["plot", str(d), "--field", "B1", "--output", out])
+        result = runner.invoke(app, ["plot", str(d), "--field", "B_1", "--output", out])
         assert result.exit_code == 0, result.output
         assert (tmp_path / "out.png").exists()
 
@@ -464,7 +464,7 @@ class TestPlot:
         d = _make_sim_dir(tmp_path)
         out = str(tmp_path / "xy.png")
         result = runner.invoke(
-            app, ["plot", str(d), "--field", "B1", "--plane", "xy", "--output", out]
+            app, ["plot", str(d), "--field", "B_1", "--plane", "xy", "--output", out]
         )
         assert result.exit_code == 0, result.output
         # Guards against "exit 0 but no file written" regressions
@@ -475,7 +475,7 @@ class TestPlot:
         d = _make_sim_dir(tmp_path)
         out = str(tmp_path / "xz.png")
         result = runner.invoke(
-            app, ["plot", str(d), "--field", "B1", "--plane", "xz", "--output", out]
+            app, ["plot", str(d), "--field", "B_1", "--plane", "xz", "--output", out]
         )
         assert result.exit_code == 0, result.output
         assert (tmp_path / "xz.png").exists()
@@ -485,7 +485,7 @@ class TestPlot:
         d = _make_sim_dir(tmp_path)
         out = str(tmp_path / "norm.png")
         result = runner.invoke(
-            app, ["plot", str(d), "--field", "B1", "--plane", "z", "--output", out]
+            app, ["plot", str(d), "--field", "B_1", "--plane", "z", "--output", out]
         )
         assert result.exit_code == 0, result.output
         assert (tmp_path / "norm.png").exists()
@@ -494,7 +494,7 @@ class TestPlot:
         d = _make_sim_dir(tmp_path)
         out = str(tmp_path / "idx.png")
         result = runner.invoke(
-            app, ["plot", str(d), "--field", "B1", "--index", "2", "--output", out]
+            app, ["plot", str(d), "--field", "B_1", "--index", "2", "--output", out]
         )
         assert result.exit_code == 0, result.output
         assert (tmp_path / "idx.png").exists()
@@ -503,7 +503,7 @@ class TestPlot:
         d = _make_sim_dir(tmp_path)
         out = str(tmp_path / "coord.png")
         result = runner.invoke(
-            app, ["plot", str(d), "--field", "B1", "--coord", "1.5", "--output", out]
+            app, ["plot", str(d), "--field", "B_1", "--coord", "1.5", "--output", out]
         )
         assert result.exit_code == 0, result.output
         assert (tmp_path / "coord.png").exists()
@@ -517,7 +517,7 @@ class TestPlot:
                 "plot",
                 str(d),
                 "--field",
-                "B1",
+                "B_1",
                 "--index",
                 "2",
                 "--coord",
@@ -552,7 +552,8 @@ class TestPlot:
         d = _make_sim_dir(tmp_path)
         out = str(tmp_path / "sym.png")
         result = runner.invoke(
-            app, ["plot", str(d), "--field", "B1", "--scale", "symlog", "--output", out]
+            app,
+            ["plot", str(d), "--field", "B_1", "--scale", "symlog", "--output", out],
         )
         assert result.exit_code == 0, result.output
         assert (tmp_path / "sym.png").exists()
@@ -566,7 +567,7 @@ class TestPlot:
                 "plot",
                 str(d),
                 "--field",
-                "B1",
+                "B_1",
                 "--scale",
                 "symlog",
                 "--linthresh",
@@ -587,7 +588,7 @@ class TestPlot:
                 "plot",
                 str(d),
                 "--field",
-                "B1",
+                "B_1",
                 "--vmin",
                 "-1",
                 "--vmax",
@@ -604,7 +605,16 @@ class TestPlot:
         out = str(tmp_path / "cmap.png")
         result = runner.invoke(
             app,
-            ["plot", str(d), "--field", "B1", "--colormap", "viridis", "--output", out],
+            [
+                "plot",
+                str(d),
+                "--field",
+                "B_1",
+                "--colormap",
+                "viridis",
+                "--output",
+                out,
+            ],
         )
         assert result.exit_code == 0, result.output
         assert (tmp_path / "cmap.png").exists()
@@ -614,7 +624,7 @@ class TestPlot:
         out = str(tmp_path / "dpi.png")
         result = runner.invoke(
             app,
-            ["plot", str(d), "--field", "B1", "--dpi", "72", "--output", out],
+            ["plot", str(d), "--field", "B_1", "--dpi", "72", "--output", out],
         )
         assert result.exit_code == 0, result.output
         assert (tmp_path / "dpi.png").exists()
@@ -624,7 +634,7 @@ class TestPlot:
         out = str(tmp_path / "out.pdf")
         result = runner.invoke(
             app,
-            ["plot", str(d), "--field", "B1", "--format", "pdf", "--output", out],
+            ["plot", str(d), "--field", "B_1", "--format", "pdf", "--output", out],
         )
         assert result.exit_code == 0, result.output
         # Pins that --format pdf actually writes the pdf (catches a bug where
@@ -637,7 +647,7 @@ class TestPlot:
         out = str(tmp_path / "lo.png")
         result = runner.invoke(
             app,
-            ["plot", str(d), "--field", "B1", "--res", "2x2", "--output", out],
+            ["plot", str(d), "--field", "B_1", "--res", "2x2", "--output", out],
         )
         assert result.exit_code == 0, result.output
         assert (tmp_path / "lo.png").exists()
@@ -646,7 +656,7 @@ class TestPlot:
         d = _make_sim_dir(tmp_path, n_steps=3)
         tpl = str(tmp_path / "frames" / "B_{step:06d}.png")
         result = runner.invoke(
-            app, ["plot", str(d), "--field", "B1", "--step", "all", "--output", tpl]
+            app, ["plot", str(d), "--field", "B_1", "--step", "all", "--output", tpl]
         )
         assert result.exit_code == 0, result.output
         for i in range(3):
@@ -654,7 +664,7 @@ class TestPlot:
 
     def test_batch_no_output_error(self, tmp_path: Path) -> None:
         d = _make_sim_dir(tmp_path, n_steps=3)
-        result = runner.invoke(app, ["plot", str(d), "--field", "B1", "--step", "all"])
+        result = runner.invoke(app, ["plot", str(d), "--field", "B_1", "--step", "all"])
         assert result.exit_code != 0
         # Error must name --output so users know which flag to add —
         # guards against a generic "invalid input" that tells users nothing.
@@ -664,7 +674,8 @@ class TestPlot:
         d = _make_sim_dir(tmp_path)
         out = str(tmp_path / "err.png")
         result = runner.invoke(
-            app, ["plot", str(d), "--field", "B1", "--scale", "banana", "--output", out]
+            app,
+            ["plot", str(d), "--field", "B_1", "--scale", "banana", "--output", out],
         )
         assert result.exit_code != 0
         assert "Invalid --scale" in result.output
@@ -673,7 +684,7 @@ class TestPlot:
         d = _make_sim_dir(tmp_path)
         out = str(tmp_path / "err.png")
         result = runner.invoke(
-            app, ["plot", str(d), "--field", "B1", "--plane", "ab", "--output", out]
+            app, ["plot", str(d), "--field", "B_1", "--plane", "ab", "--output", out]
         )
         assert result.exit_code != 0
         assert "Invalid --plane" in result.output
@@ -698,7 +709,7 @@ class TestPlotCompare:
         out = str(tmp_path / "cmp.png")
         result = runner.invoke(
             app,
-            ["plot-compare", str(d), str(d), "--field", "B1", "--output", out],
+            ["plot-compare", str(d), str(d), "--field", "B_1", "--output", out],
         )
         assert result.exit_code == 0, result.output
         assert (tmp_path / "cmp.png").exists()
@@ -713,7 +724,7 @@ class TestPlotCompare:
                 str(d),
                 str(d),
                 "--field",
-                "B1",
+                "B_1",
                 "--plane",
                 "xz",
                 "--output",
@@ -733,7 +744,7 @@ class TestPlotCompare:
                 str(d),
                 str(d),
                 "--field",
-                "B1",
+                "B_1",
                 "--diff-vmin",
                 "-0.5",
                 "--diff-vmax",
@@ -755,7 +766,7 @@ class TestPlotCompare:
                 str(d),
                 str(d),
                 "--field",
-                "B1",
+                "B_1",
                 "--units",
                 "cgs",
                 "--output",
@@ -783,9 +794,9 @@ def test_stats_field_all(tmp_path: Path) -> None:
     d = _make_sim_dir(tmp_path)
     result = runner.invoke(app, ["stats", str(d), "--field", "all"])
     assert result.exit_code == 0, result.output
-    assert "B1" in result.output
-    assert "B2" in result.output
-    assert "B3" in result.output
+    assert "B_1" in result.output
+    assert "B_2" in result.output
+    assert "B_3" in result.output
 
 
 def test_stats_field_all_json(tmp_path: Path) -> None:
@@ -795,7 +806,7 @@ def test_stats_field_all_json(tmp_path: Path) -> None:
     data = json.loads(result.output)
     assert "fields" in data
     assert len(data["fields"]) >= 3
-    assert data["fields"][0]["field"] == "B1"
+    assert data["fields"][0]["field"] == "B_1"
 
 
 # -- validate ----------------------------------------------------------------
@@ -835,7 +846,7 @@ class TestPlotTheme:
         out = str(tmp_path / "dark.png")
         result = runner.invoke(
             app,
-            ["plot", str(d), "--field", "B1", "--theme", "dark", "--output", out],
+            ["plot", str(d), "--field", "B_1", "--theme", "dark", "--output", out],
         )
         assert result.exit_code == 0, result.output
         assert (tmp_path / "dark.png").exists()
@@ -855,9 +866,9 @@ class TestPlotContour:
                 "plot",
                 str(d),
                 "--field",
-                "B1",
+                "B_1",
                 "--contour",
-                "B2",
+                "B_2",
                 "--contour-levels",
                 "3",
                 "--output",
@@ -883,7 +894,7 @@ class TestPlotCompareTheme:
                 str(d),
                 str(d),
                 "--field",
-                "B1",
+                "B_1",
                 "--theme",
                 "dark",
                 "--output",
@@ -904,7 +915,7 @@ class TestPlotAnimate:
         out = str(tmp_path / "out.png")
         result = runner.invoke(
             app,
-            ["plot", str(d), "--field", "B1", "--output", out, "--animate", "out.mp4"],
+            ["plot", str(d), "--field", "B_1", "--output", out, "--animate", "out.mp4"],
         )
         assert result.exit_code != 0
         assert "multiple steps" in result.output
@@ -961,8 +972,8 @@ def _make_2d_sim(tmp_path: Path) -> Path:
     shape = (8, 6)
     with h5py.File(d / "output_000000.h5", "w") as f:
         grp = f.create_group("fields")
-        grp.create_dataset("B1", data=rng.standard_normal(shape))
-        grp.create_dataset("B2", data=rng.standard_normal(shape))
+        grp.create_dataset("B_1", data=rng.standard_normal(shape))
+        grp.create_dataset("B_2", data=rng.standard_normal(shape))
         f.attrs["model"] = "test_2d"
         f.attrs["step"] = 0
     return d
@@ -973,14 +984,14 @@ def test_plot_2d_dataset(tmp_path: Path) -> None:
     """plot works on already-2D data without --plane."""
     d = _make_2d_sim(tmp_path)
     out = str(tmp_path / "2d.png")
-    result = runner.invoke(app, ["plot", str(d), "--field", "B1", "--output", out])
+    result = runner.invoke(app, ["plot", str(d), "--field", "B_1", "--output", out])
     assert result.exit_code == 0, result.output
     assert (tmp_path / "2d.png").exists()
 
 
 def test_stats_2d_dataset(tmp_path: Path) -> None:
     d = _make_2d_sim(tmp_path)
-    result = runner.invoke(app, ["stats", str(d), "--field", "B1"])
+    result = runner.invoke(app, ["stats", str(d), "--field", "B_1"])
     assert result.exit_code == 0, result.output
 
 
@@ -990,7 +1001,7 @@ def test_stats_2d_dataset(tmp_path: Path) -> None:
 def test_compare_bad_method(tmp_path: Path) -> None:
     d = _make_sim_dir(tmp_path)
     result = runner.invoke(
-        app, ["compare", str(d), str(d), "--field", "B1", "--method", "banana"]
+        app, ["compare", str(d), str(d), "--field", "B_1", "--method", "banana"]
     )
     assert result.exit_code != 0
     assert "Error:" in result.output
@@ -999,7 +1010,7 @@ def test_compare_bad_method(tmp_path: Path) -> None:
 def test_compare_bad_frame(tmp_path: Path) -> None:
     d = _make_sim_dir(tmp_path)
     result = runner.invoke(
-        app, ["compare", str(d), str(d), "--field", "B1", "--frame", "banana"]
+        app, ["compare", str(d), str(d), "--field", "B_1", "--frame", "banana"]
     )
     assert result.exit_code != 0
     assert "Error:" in result.output
@@ -1016,7 +1027,7 @@ def test_plot_compare_bad_method(tmp_path: Path) -> None:
             str(d),
             str(d),
             "--field",
-            "B1",
+            "B_1",
             "--method",
             "banana",
             "--output",
@@ -1061,8 +1072,8 @@ def test_convert_fields_single_step_round_trip(tmp_path: Path) -> None:
     assert out.exists()
 
     fds = from_zarr(out)
-    assert set(fds.field_names()) >= {"B1", "B2", "B3"}
-    assert fds["B1"].shape == (4, 4, 4)
+    assert set(fds.field_names()) >= {"B_1", "B_2", "B_3"}
+    assert fds["B_1"].shape == (4, 4, 4)
 
 
 @zarr_required
@@ -1078,7 +1089,7 @@ def test_convert_fields_multi_step_timeseries(tmp_path: Path) -> None:
     assert result.exit_code == 0, result.output
     fds = from_zarr(out)
     # timeseries: arrays gain a leading time dim of length 3
-    assert fds["B1"].shape == (3, 4, 4, 4)
+    assert fds["B_1"].shape == (3, 4, 4, 4)
 
 
 @zarr_required
@@ -1098,14 +1109,14 @@ def test_convert_fields_subset(tmp_path: Path) -> None:
             "--step",
             "0",
             "--fields",
-            "B1,B2",
+            "B_1,B_2",
         ],
     )
     assert result.exit_code == 0, result.output
     fds = from_zarr(out)
-    assert "B1" in fds.field_names()
-    assert "B2" in fds.field_names()
-    assert "B3" not in fds.field_names()
+    assert "B_1" in fds.field_names()
+    assert "B_2" in fds.field_names()
+    assert "B_3" not in fds.field_names()
 
 
 @zarr_required
@@ -1130,7 +1141,7 @@ def test_convert_fields_box_crop(tmp_path: Path) -> None:
     )
     assert result.exit_code == 0, result.output
     fds = from_zarr(out)
-    assert fds["B1"].shape == (2, 2, 4)
+    assert fds["B_1"].shape == (2, 2, 4)
 
 
 @zarr_required
@@ -1309,7 +1320,7 @@ def test_convert_fields_plane_slice(tmp_path: Path) -> None:
     assert result.exit_code == 0, result.output
     fds = from_zarr(out)
     # xy plane → normal is z, so the z axis is sliced out
-    assert fds["B1"].shape == (4, 4)
+    assert fds["B_1"].shape == (4, 4)
 
 
 @zarr_required
@@ -1335,13 +1346,13 @@ def test_convert_fields_compression_zstd(tmp_path: Path) -> None:
     )
     assert result.exit_code == 0, result.output
     fds = from_zarr(out)
-    assert "B1" in fds.field_names()
+    assert "B_1" in fds.field_names()
     # Lossless round-trip: zstd is lossless, so the compressed roundtrip
     # must reproduce the source bit-exactly. Pins against a codec-level
     # regression that silently lossy-compresses floats (a real hazard
     # with codec-config typos like missing bit-shuffle).
-    src = open_simulation(d).read(step=0, fields=["B1"])
-    np.testing.assert_array_equal(np.asarray(fds["B1"]), np.asarray(src["B1"]))
+    src = open_simulation(d).read(step=0, fields=["B_1"])
+    np.testing.assert_array_equal(np.asarray(fds["B_1"]), np.asarray(src["B_1"]))
 
 
 @zarr_required
@@ -1375,9 +1386,9 @@ def test_convert_fields_virtual(tmp_path: Path) -> None:
     rng = np.random.default_rng(7)
     with h5py.File(h5_path, "w") as f:
         fields = f.create_group("fields")
-        fields.create_dataset("B1", data=rng.standard_normal((4, 4, 4)))
-        fields.create_dataset("B2", data=rng.standard_normal((4, 4, 4)))
-        fields.create_dataset("B3", data=rng.standard_normal((4, 4, 4)))
+        fields.create_dataset("B_1", data=rng.standard_normal((4, 4, 4)))
+        fields.create_dataset("B_2", data=rng.standard_normal((4, 4, 4)))
+        fields.create_dataset("B_3", data=rng.standard_normal((4, 4, 4)))
         grid = f.create_group("grid")
         grid.attrs["dimensions"] = [4, 4, 4]
         grid.attrs["spacing"] = [1.0, 1.0, 1.0]
@@ -1400,13 +1411,13 @@ def test_convert_fields_virtual(tmp_path: Path) -> None:
     )
     assert result.exit_code == 0, result.output
     fds = from_zarr(out)
-    assert set(fds.field_names()) >= {"B1", "B2", "B3"}
+    assert set(fds.field_names()) >= {"B_1", "B_2", "B_3"}
     # Virtual refs only — no materialised chunk files in the destination.
-    assert not list(out.rglob("B1/c/*"))
+    assert not list(out.rglob("B_1/c/*"))
     # Virtual refs must resolve to the source data bit-exactly (no
     # silent zero-fill regression, no axis transpose).
     with h5py.File(h5_path, "r") as f:
-        np.testing.assert_array_equal(np.asarray(fds["B1"]), f["fields/B1"][...])
+        np.testing.assert_array_equal(np.asarray(fds["B_1"]), f["fields/B_1"][...])
 
 
 @zarr_required
@@ -1432,7 +1443,7 @@ def test_convert_fields_virtual_rejects_directory(tmp_path: Path) -> None:
 
 def _write_min_h5(path: Path) -> None:
     with h5py.File(path, "w") as f:
-        f.create_group("fields").create_dataset("B1", data=np.zeros((4, 4, 4)))
+        f.create_group("fields").create_dataset("B_1", data=np.zeros((4, 4, 4)))
         grid = f.create_group("grid")
         grid.attrs["dimensions"] = [4, 4, 4]
         grid.attrs["spacing"] = [1.0, 1.0, 1.0]
@@ -1444,7 +1455,7 @@ def _write_min_h5(path: Path) -> None:
 @pytest.mark.parametrize(
     ("flag", "value", "expected"),
     [
-        ("--fields", "B1", "--fields"),
+        ("--fields", "B_1", "--fields"),
         ("--dtype", "float32", "--dtype"),
         ("--compression", "zstd:3", "--compression"),
     ],
@@ -1505,7 +1516,7 @@ def test_convert_fields_virtual_reflects_source_mutations(tmp_path: Path) -> Non
     # resolve at read time, not snapshots taken at write time).
     h5_path = tmp_path / "src.h5"
     with h5py.File(h5_path, "w") as f:
-        f.create_group("fields").create_dataset("B1", data=np.full((4, 4, 4), 7.0))
+        f.create_group("fields").create_dataset("B_1", data=np.full((4, 4, 4), 7.0))
         grid = f.create_group("grid")
         grid.attrs["dimensions"] = [4, 4, 4]
         grid.attrs["spacing"] = [1.0, 1.0, 1.0]
@@ -1529,12 +1540,12 @@ def test_convert_fields_virtual_reflects_source_mutations(tmp_path: Path) -> Non
     assert result.exit_code == 0, result.output
 
     # Pre-mutation read: original values.
-    np.testing.assert_array_equal(np.asarray(from_zarr(out)["B1"]), 7.0)
+    np.testing.assert_array_equal(np.asarray(from_zarr(out)["B_1"]), 7.0)
 
     # Mutate source HDF5; the virtual store must see the new value.
     with h5py.File(h5_path, "r+") as f:
-        f["fields"]["B1"][...] = 99.0
-    np.testing.assert_array_equal(np.asarray(from_zarr(out)["B1"]), 99.0)
+        f["fields"]["B_1"][...] = 99.0
+    np.testing.assert_array_equal(np.asarray(from_zarr(out)["B_1"]), 99.0)
 
 
 @zarr_required
@@ -1556,7 +1567,7 @@ def test_convert_fields_virtual_rejects_fields_filter(tmp_path: Path) -> None:
             "--backend",
             "icechunk",
             "--fields",
-            "B1",
+            "B_1",
         ],
     )
     assert result.exit_code != 0
@@ -1611,7 +1622,7 @@ def test_convert_all_fields_only(tmp_path: Path) -> None:
     # empty directory — guards against a `convert all` regression that
     # mkdir()s the target but never writes into it.
     fds = from_zarr(out / "fields.zarr")
-    assert "B1" in fds.field_names()
+    assert "B_1" in fds.field_names()
 
 
 @zarr_required

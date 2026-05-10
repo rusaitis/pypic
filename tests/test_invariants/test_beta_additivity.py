@@ -70,9 +70,9 @@ def test_beta_equals_sum_of_species_betas(
         {
             "Pe": pe,
             "Pi": pi,
-            "B1": b_mag,
-            "B2": np.zeros_like(b_mag),
-            "B3": np.zeros_like(b_mag),
+            "B_1": b_mag,
+            "B_2": np.zeros_like(b_mag),
+            "B_3": np.zeros_like(b_mag),
         },
         shape=SHAPE,
     )
@@ -106,9 +106,9 @@ def test_beta_is_linear_in_pressure_split(
         {
             "Pe": pe,
             "Pi": pi,
-            "B1": b_mag,
-            "B2": np.zeros_like(b_mag),
-            "B3": np.zeros_like(b_mag),
+            "B_1": b_mag,
+            "B_2": np.zeros_like(b_mag),
+            "B_3": np.zeros_like(b_mag),
         },
         shape=SHAPE,
     )
@@ -116,9 +116,9 @@ def test_beta_is_linear_in_pressure_split(
         {
             "Pe": alpha * pe,
             "Pi": pi,
-            "B1": b_mag,
-            "B2": np.zeros_like(b_mag),
-            "B3": np.zeros_like(b_mag),
+            "B_1": b_mag,
+            "B_2": np.zeros_like(b_mag),
+            "B_3": np.zeros_like(b_mag),
         },
         shape=SHAPE,
     )

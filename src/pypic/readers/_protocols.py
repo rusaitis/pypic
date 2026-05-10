@@ -88,7 +88,7 @@ class FieldListingReader(Protocol):
 
         Returns a dict keyed by canonical name. The value is the native
         name in the output file, or ``None`` for computed fields (e.g.
-        total ``J1`` summed from per-species ``Jx_0`` + ``Jx_1``).
+        total ``J_1`` summed from per-species ``Jx_0`` + ``Jx_1``).
         """
         ...
 

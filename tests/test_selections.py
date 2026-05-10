@@ -15,7 +15,7 @@ from pypic.units import Normalization
 
 @pytest.fixture
 def cartesian_3d() -> FieldDataset:
-    """8x6x4 Cartesian dataset with B1, B2, B3."""
+    """8x6x4 Cartesian dataset with B_1, B_2, B_3."""
     grid = GridInfo(
         dimensions=(8, 6, 4),
         spacing=(1.0, 1.0, 1.0),
@@ -24,16 +24,16 @@ def cartesian_3d() -> FieldDataset:
     )
     rng = np.random.default_rng(42)
     fields = {
-        "B1": rng.standard_normal((8, 6, 4)),
-        "B2": rng.standard_normal((8, 6, 4)),
-        "B3": rng.standard_normal((8, 6, 4)),
+        "B_1": rng.standard_normal((8, 6, 4)),
+        "B_2": rng.standard_normal((8, 6, 4)),
+        "B_3": rng.standard_normal((8, 6, 4)),
     }
     return FieldDataset.from_arrays(fields, grid, Normalization.identity())
 
 
 @pytest.fixture
 def spherical_3d() -> FieldDataset:
-    """4x3x2 spherical dataset with B1."""
+    """4x3x2 spherical dataset with B_1."""
     geom = CoordinateGeometry(
         type=GeometryType.SPHERICAL,
         axis_names=("r", "θ", "φ"),
@@ -45,7 +45,7 @@ def spherical_3d() -> FieldDataset:
         origin=(1.0, 0.0, 0.0),
         geometry=geom,
     )
-    fields = {"B1": np.arange(24, dtype=float).reshape(4, 3, 2)}
+    fields = {"B_1": np.arange(24, dtype=float).reshape(4, 3, 2)}
     return FieldDataset.from_arrays(fields, grid, Normalization.identity())
 
 
@@ -59,18 +59,18 @@ class TestPlaneSelection:
     ) -> None:
         idx = 0 if normal != "y" else 2
         result = PlaneSelection(normal=normal, index=idx).apply(cartesian_3d)
-        assert result["B1"].shape == expected_shape
+        assert result["B_1"].shape == expected_shape
 
     def test_midplane_default(self, cartesian_3d: FieldDataset) -> None:
         result = PlaneSelection(normal="z").apply(cartesian_3d)
         expected = cartesian_3d.isel({"z": 2})  # 4 // 2 = 2
-        assert_array_equal(result["B1"], expected["B1"])
+        assert_array_equal(result["B_1"], expected["B_1"])
 
     def test_data_matches_direct_isel(self, cartesian_3d: FieldDataset) -> None:
         idx = 3
         result = PlaneSelection(normal="y", index=idx).apply(cartesian_3d)
         expected = cartesian_3d.isel({"y": idx})
-        assert_array_equal(result["B2"], expected["B2"])
+        assert_array_equal(result["B_2"], expected["B_2"])
 
     def test_grid_updated_after_plane_slice(self, cartesian_3d: FieldDataset) -> None:
         result = PlaneSelection(normal="z", index=1).apply(cartesian_3d)
@@ -87,11 +87,11 @@ class TestPlaneSelection:
     def test_aliases_preserved(self, cartesian_3d: FieldDataset) -> None:
         result = PlaneSelection(normal="z", index=0).apply(cartesian_3d)
         assert result.has_field("Bx")
-        assert_array_equal(result["Bx"], result["B1"])
+        assert_array_equal(result["Bx"], result["B_1"])
 
     def test_spherical_axis(self, spherical_3d: FieldDataset) -> None:
         result = PlaneSelection(normal="θ", index=1).apply(spherical_3d)
-        assert result["B1"].shape == (4, 2)
+        assert result["B_1"].shape == (4, 2)
 
     @pytest.mark.parametrize(
         ("normal", "expected_names"),
@@ -128,30 +128,30 @@ class TestPlaneSelection:
 class TestBoxSelection:
     def test_subbox_shape_and_values(self, cartesian_3d: FieldDataset) -> None:
         result = BoxSelection(ranges={"x": (1, 5), "y": (0, 3)}).apply(cartesian_3d)
-        assert result["B1"].shape == (4, 3, 4)
+        assert result["B_1"].shape == (4, 3, 4)
         # Interior values must be preserved exactly (integer-index slice).
-        assert_array_equal(result["B1"], cartesian_3d["B1"][1:5, 0:3, :])
+        assert_array_equal(result["B_1"], cartesian_3d["B_1"][1:5, 0:3, :])
 
     def test_single_axis_range(self, cartesian_3d: FieldDataset) -> None:
         result = BoxSelection(ranges={"z": (1, 3)}).apply(cartesian_3d)
-        assert result["B1"].shape == (8, 6, 2)
-        assert_array_equal(result["B1"], cartesian_3d["B1"][:, :, 1:3])
+        assert result["B_1"].shape == (8, 6, 2)
+        assert_array_equal(result["B_1"], cartesian_3d["B_1"][:, :, 1:3])
 
     def test_all_axes_ranged(self, cartesian_3d: FieldDataset) -> None:
         result = BoxSelection(ranges={"x": (2, 6), "y": (1, 4), "z": (0, 2)}).apply(
             cartesian_3d
         )
-        assert result["B1"].shape == (4, 3, 2)
-        assert_array_equal(result["B1"], cartesian_3d["B1"][2:6, 1:4, 0:2])
+        assert result["B_1"].shape == (4, 3, 2)
+        assert_array_equal(result["B_1"], cartesian_3d["B_1"][2:6, 1:4, 0:2])
 
     def test_empty_ranges_noop(self, cartesian_3d: FieldDataset) -> None:
         result = BoxSelection(ranges={}).apply(cartesian_3d)
-        assert_array_equal(result["B1"], cartesian_3d["B1"])
+        assert_array_equal(result["B_1"], cartesian_3d["B_1"])
 
     def test_data_matches_direct_isel(self, cartesian_3d: FieldDataset) -> None:
         result = BoxSelection(ranges={"x": (2, 5)}).apply(cartesian_3d)
         expected = cartesian_3d.isel({"x": slice(2, 5)})
-        assert_array_equal(result["B3"], expected["B3"])
+        assert_array_equal(result["B_3"], expected["B_3"])
 
     def test_grid_dimensions_updated(self, cartesian_3d: FieldDataset) -> None:
         result = BoxSelection(ranges={"x": (1, 4), "z": (0, 2)}).apply(cartesian_3d)
@@ -175,7 +175,7 @@ class TestBoxSelection:
 
     def test_spherical_geometry(self, spherical_3d: FieldDataset) -> None:
         result = BoxSelection(ranges={"r": (1, 3), "φ": (0, 1)}).apply(spherical_3d)
-        assert result["B1"].shape == (2, 3, 1)
+        assert result["B_1"].shape == (2, 3, 1)
 
     def test_invalid_axis_raises(self, cartesian_3d: FieldDataset) -> None:
         with pytest.raises(ValueError, match="not found"):
@@ -191,26 +191,26 @@ class TestSphereSelection:
         sel = SphereSelection(center=(0.5, 0.5, 0.5), radius=1.0, keep="outside")
         result = sel.apply(cartesian_3d)
         # The point (0.5, 0.5, 0.5) is at distance 0 from center → should be NaN
-        assert np.isnan(result["B1"][0, 0, 0])
+        assert np.isnan(result["B_1"][0, 0, 0])
         # A distant point should be finite
-        assert np.isfinite(result["B1"][7, 5, 3])
+        assert np.isfinite(result["B_1"][7, 5, 3])
 
     def test_keep_inside(self, cartesian_3d: FieldDataset) -> None:
         """keep='inside' → points far from center are NaN."""
         sel = SphereSelection(center=(0.5, 0.5, 0.5), radius=1.0, keep="inside")
         result = sel.apply(cartesian_3d)
         # The center point → should be finite
-        assert np.isfinite(result["B1"][0, 0, 0])
+        assert np.isfinite(result["B_1"][0, 0, 0])
         # A distant point → should be NaN
-        assert np.isnan(result["B1"][7, 5, 3])
+        assert np.isnan(result["B_1"][7, 5, 3])
 
     def test_preserves_shape(self, cartesian_3d: FieldDataset) -> None:
         sel = SphereSelection(center=(4.0, 3.0, 2.0), radius=2.0, keep="outside")
         result = sel.apply(cartesian_3d)
-        assert result["B1"].shape == (8, 6, 4)
+        assert result["B_1"].shape == (8, 6, 4)
         assert result.grid.dimensions == (8, 6, 4)
         # Some points inside radius=2.0 must be NaN-masked.
-        assert np.any(np.isnan(result["B1"]))
+        assert np.any(np.isnan(result["B_1"]))
 
     def test_preserves_grid_metadata(self, cartesian_3d: FieldDataset) -> None:
         sel = SphereSelection(center=(4.0, 3.0, 2.0), radius=2.0, keep="inside")
@@ -229,9 +229,9 @@ class TestSphereSelection:
         sel = SphereSelection(center=(4.0, 3.0, 2.0), radius=2.0, keep="inside")
         result = sel.apply(cartesian_3d)
         assert result.has_field("Bx")
-        # Bx alias still resolves to B1 for non-NaN points
-        finite_mask = np.isfinite(result["B1"])
-        assert_array_equal(result["Bx"][finite_mask], result["B1"][finite_mask])
+        # Bx alias still resolves to B_1 for non-NaN points
+        finite_mask = np.isfinite(result["B_1"])
+        assert_array_equal(result["Bx"][finite_mask], result["B_1"][finite_mask])
 
     def test_center_dim_mismatch_raises(self, cartesian_3d: FieldDataset) -> None:
         with pytest.raises(ValueError, match=r"2 components.*3 dimensions"):
@@ -256,15 +256,15 @@ class TestSphereSelection:
         sliced = PlaneSelection(normal="z", index=0).apply(cartesian_3d)
         sel = SphereSelection(center=(4.0, 3.0), radius=1.5, keep="outside")
         result = sel.apply(sliced)
-        assert result["B1"].shape == (8, 6)
+        assert result["B_1"].shape == (8, 6)
         # Center of circle should be NaN
-        assert np.isnan(result["B1"][4, 3])
+        assert np.isnan(result["B_1"][4, 3])
 
     def test_large_radius_keeps_all(self, cartesian_3d: FieldDataset) -> None:
         """Radius encompassing all points → no NaN when keep='inside'."""
         sel = SphereSelection(center=(4.0, 3.0, 2.0), radius=100.0, keep="inside")
         result = sel.apply(cartesian_3d)
-        assert not np.any(np.isnan(result["B1"]))
+        assert not np.any(np.isnan(result["B_1"]))
 
     def test_all_fields_masked(self, cartesian_3d: FieldDataset) -> None:
         """Mask is applied to every field in the dataset."""
@@ -282,16 +282,16 @@ class TestFieldDatasetWhere:
         mask = np.ones(cartesian_3d.grid.dimensions, dtype=bool)
         mask[0, 0, 0] = False
         result = cartesian_3d.where(mask)
-        assert np.isnan(result["B1"][0, 0, 0])
-        assert np.isfinite(result["B1"][1, 0, 0])
+        assert np.isnan(result["B_1"][0, 0, 0])
+        assert np.isfinite(result["B_1"][1, 0, 0])
 
     def test_preserves_shape(self, cartesian_3d: FieldDataset) -> None:
         mask = np.ones(cartesian_3d.grid.dimensions, dtype=bool)
         result = cartesian_3d.where(mask)
-        assert result["B1"].shape == cartesian_3d["B1"].shape
+        assert result["B_1"].shape == cartesian_3d["B_1"].shape
 
     def test_custom_fill_value(self, cartesian_3d: FieldDataset) -> None:
         mask = np.ones(cartesian_3d.grid.dimensions, dtype=bool)
         mask[0, 0, 0] = False
         result = cartesian_3d.where(mask, other=-999.0)
-        assert result["B1"][0, 0, 0] == -999.0
+        assert result["B_1"][0, 0, 0] == -999.0

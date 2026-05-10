@@ -315,11 +315,9 @@ def resolve_transform(
 def _build_vector_triplet_regex() -> re.Pattern[str]:
     """Build regex from the canonical vector prefixes in readers.base.
 
-    Digit-ending canonical prefixes (e.g. ``B0``) require an underscore
-    before the component index (``B0_1``, not ``B01``) per
-    ``schema.md § "Split-B naming"``. The separator is folded into the
-    prefix alternation so the captured group includes it; callers strip
-    the trailing underscore.
+    Tier-3 canonical: ``<prefix>[_s<N>]_<component>`` — every semantic
+    boundary is an underscore, with optional species qualifier between
+    prefix and component (``B_1``, ``V_s0_1``, ``B0_1``, ``B0_s0_1``).
     """
     from pypic.grid import _FIELD_PREFIX_PAIRS
 
@@ -328,8 +326,10 @@ def _build_vector_triplet_regex() -> re.Pattern[str]:
         key=len,
         reverse=True,
     )
-    parts = [re.escape(p) + ("_" if p[-1].isdigit() else "") for p in prefixes]
-    return re.compile(rf"^({'|'.join(parts)})([123])(?:_s(\d+))?$")
+    parts = [re.escape(p) for p in prefixes]
+    return re.compile(
+        rf"^({'|'.join(parts)})(?:_s(\d+))?_([123])$"
+    )
 
 
 _VECTOR_TRIPLET_RE = _build_vector_triplet_regex()
@@ -341,8 +341,8 @@ def find_vector_triplets(
     """Group field names into vector triplets needing rotation.
 
     Returns a list of ``(name1, name2, name3)`` tuples for each
-    complete vector field. Handles both total fields (``B1, B2, B3``)
-    and per-species fields (``J1_s0, J2_s0, J3_s0``).
+    complete vector field. Handles both total fields (``B_1, B_2, B_3``)
+    and per-species fields (``J_s0_1, J_s0_2, J_s0_3``).
 
     Parameters
     ----------
@@ -356,25 +356,23 @@ def find_vector_triplets(
 
     Examples
     --------
-    >>> find_vector_triplets(["B1", "B2", "B3", "rho_c"])
-    [('B1', 'B2', 'B3')]
-    >>> find_vector_triplets(["J1_s0", "J2_s0", "J3_s0", "J1_s1"])
-    [('J1_s0', 'J2_s0', 'J3_s0')]
+    >>> find_vector_triplets(["B_1", "B_2", "B_3", "rho_c"])
+    [('B_1', 'B_2', 'B_3')]
+    >>> find_vector_triplets(["J_s0_1", "J_s0_2", "J_s0_3", "J_s1_1"])
+    [('J_s0_1', 'J_s0_2', 'J_s0_3')]
     """
     groups: dict[str, dict[int, str]] = {}
     for name in field_names:
         m = _VECTOR_TRIPLET_RE.match(name)
         if m:
-            prefix, component, species = m.groups()
-            # Digit-ending canonicals (e.g. "B0_") captured their
-            # underscore separator; strip it to form a stable key.
-            prefix = prefix.rstrip("_")
+            prefix, species, component = m.groups()
             key = f"{prefix}_s{species}" if species else prefix
             groups.setdefault(key, {})[int(component)] = name
     return [(g[1], g[2], g[3]) for g in groups.values() if 1 in g and 2 in g and 3 in g]
 
 
-_PRESSURE_RE = re.compile(r"^P(\d)(\d)(?:_s(\d+))?$")
+# Tier-3 pressure tensor: ``P_<ij>`` (bare) or ``P_s<N>_<ij>`` (per-species).
+_PRESSURE_RE = re.compile(r"^P(?:_s(\d+))?_(\d)(\d)$")
 
 
 def find_pressure_tensor_groups(
@@ -382,8 +380,8 @@ def find_pressure_tensor_groups(
 ) -> list[tuple[str, str, str, str, str, str]]:
     """Group pressure tensor fields into complete symmetric tensors.
 
-    Returns ``(P11, P22, P33, P12, P13, P23)`` tuples for each complete
-    set. Handles per-species tensors (``P11_s0`` etc.).
+    Returns ``(P_11, P_22, P_33, P_12, P_13, P_23)`` tuples for each complete
+    set. Handles per-species tensors (``P_s0_11`` etc.).
 
     Parameters
     ----------
@@ -396,15 +394,15 @@ def find_pressure_tensor_groups(
 
     Examples
     --------
-    >>> fields = ["P11", "P22", "P33", "P12", "P13", "P23"]
+    >>> fields = ["P_11", "P_22", "P_33", "P_12", "P_13", "P_23"]
     >>> find_pressure_tensor_groups(fields)
-    [('P11', 'P22', 'P33', 'P12', 'P13', 'P23')]
+    [('P_11', 'P_22', 'P_33', 'P_12', 'P_13', 'P_23')]
     """
     groups: dict[str, dict[str, str]] = {}
     for name in field_names:
         m = _PRESSURE_RE.match(name)
         if m:
-            i, j, species = m.groups()
+            species, i, j = m.groups()
             key = f"P_s{species}" if species else "P"
             groups.setdefault(key, {})[f"{i}{j}"] = name
     required = {"11", "22", "33", "12", "13", "23"}
@@ -477,7 +475,7 @@ def rotate_pressure_tensor(
     Returns
     -------
     tuple[FloatArray, ...]
-        ``(P11', P22', P33', P12', P13', P23')`` in the rotated frame.
+        ``(P_11', P_22', P_33', P_12', P_13', P_23')`` in the rotated frame.
 
     Examples
     --------
@@ -493,7 +491,7 @@ def rotate_pressure_tensor(
     r = rotation
     # Build the full 3×3 symmetric tensor per grid point, then rotate.
     # P'_ij = sum_kl R_ik R_jl P_kl
-    # Expand all 9 components (P is symmetric: P21=P12, P31=P13, P32=P23)
+    # Expand all 9 components (P is symmetric: P_21=P_12, P_31=P_13, P_32=P_23)
     p = [[p11, p12, p13], [p12, p22, p23], [p13, p23, p33]]
 
     def _component(i: int, j: int) -> FloatArray:

@@ -44,13 +44,13 @@ def test_beta_identity(
     name: str, pressure_field: str, p: np.ndarray, b_mag: np.ndarray
 ) -> None:
     """β = 2 P / B² — equations.md § 5, pypic normalization (μ₀ = 1)."""
-    # Seed |B| by giving B1 = b_mag and B2 = B3 = 0 so |B| = b_mag exactly.
+    # Seed |B| by giving B_1 = b_mag and B_2 = B_3 = 0 so |B| = b_mag exactly.
     ds = make_test_dataset(
         {
             pressure_field: p,
-            "B1": b_mag,
-            "B2": np.zeros_like(b_mag),
-            "B3": np.zeros_like(b_mag),
+            "B_1": b_mag,
+            "B_2": np.zeros_like(b_mag),
+            "B_3": np.zeros_like(b_mag),
         },
         shape=SHAPE,
     )
@@ -65,9 +65,9 @@ def test_alfven_speed_identity(b_mag: np.ndarray, rho_m: np.ndarray) -> None:
     """v_A = |B| / sqrt(ρ_m) — equations.md § 5 (non-relativistic branch)."""
     ds = make_test_dataset(
         {
-            "B1": b_mag,
-            "B2": np.zeros_like(b_mag),
-            "B3": np.zeros_like(b_mag),
+            "B_1": b_mag,
+            "B_2": np.zeros_like(b_mag),
+            "B_3": np.zeros_like(b_mag),
             "rho_m": rho_m,
         },
         shape=SHAPE,
@@ -85,12 +85,12 @@ def test_alfven_mach_identity(
     """M_A = |V| / v_A — composition of two registered recipes."""
     ds = make_test_dataset(
         {
-            "V1": v_mag,
-            "V2": np.zeros_like(v_mag),
-            "V3": np.zeros_like(v_mag),
-            "B1": b_mag,
-            "B2": np.zeros_like(b_mag),
-            "B3": np.zeros_like(b_mag),
+            "V_1": v_mag,
+            "V_2": np.zeros_like(v_mag),
+            "V_3": np.zeros_like(v_mag),
+            "B_1": b_mag,
+            "B_2": np.zeros_like(b_mag),
+            "B_3": np.zeros_like(b_mag),
             "rho_m": rho_m,
         },
         shape=SHAPE,

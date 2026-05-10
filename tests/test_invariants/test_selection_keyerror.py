@@ -50,7 +50,7 @@ def _make_dataset():
     """
     return make_test_dataset(
         {
-            "B1": np.ones((4, 3, 2)),
+            "B_1": np.ones((4, 3, 2)),
             "rho_c": np.ones((4, 3, 2)),
         }
     )
@@ -93,7 +93,7 @@ def test_select_fields_raises_keyerror(name: str) -> None:
     ds = _make_dataset()
     assume(not ds.has_field(name))
     with pytest.raises(KeyError):
-        ds.select_fields(["B1", name])
+        ds.select_fields(["B_1", name])
 
 
 @given(name=_unknown_names())

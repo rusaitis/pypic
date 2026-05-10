@@ -96,7 +96,7 @@ def generate(theme: PlotTheme) -> None:
     tabular = _make_tabular()
 
     # 1. Single slice — stored field + badge
-    fig, ax = plot_field_slice(ds_a, "B1", theme=theme, step=100, time=5.0)
+    fig, ax = plot_field_slice(ds_a, "B_1", theme=theme, step=100, time=5.0)
     add_badge(ax, step=100, time=5.0)
     _save(fig, "slice_B1", theme)
 
@@ -106,15 +106,15 @@ def generate(theme: PlotTheme) -> None:
 
     # 3. Comparison — three-panel A|B|diff + badge on first panel
     fig, axes = plot_comparison(
-        ds_a, ds_b, "B1", theme=theme, labels=("y₀=7.5", "y₀=8.0"), step=100
+        ds_a, ds_b, "B_1", theme=theme, labels=("y₀=7.5", "y₀=8.0"), step=100
     )
     add_badge(axes["a"], step=100, loc="upper left")
     _save(fig, "comparison", theme)
 
     # 4. Line overlay — B components along x
-    fig, ax = plot_line(ds_a, "B1", axis="x", theme=theme, label="$B_x$", color="C0")
-    plot_line(ds_a, "B2", axis="x", ax=ax, theme=theme, label="$B_y$", color="C1")
-    plot_line(ds_a, "B3", axis="x", ax=ax, theme=theme, label="$B_z$", color="C2")
+    fig, ax = plot_line(ds_a, "B_1", axis="x", theme=theme, label="$B_x$", color="C0")
+    plot_line(ds_a, "B_2", axis="x", ax=ax, theme=theme, label="$B_y$", color="C1")
+    plot_line(ds_a, "B_3", axis="x", ax=ax, theme=theme, label="$B_z$", color="C2")
     ax.set_title("Magnetic field components along x")
     _save(fig, "lines_overlay", theme)
 
@@ -130,7 +130,7 @@ def generate(theme: PlotTheme) -> None:
     _save(fig, "time_series", theme)
 
     # 6. Crowded 2x3 grid of slices + badges on each panel
-    slice_fields = ["B1", "|B|", "beta", "v_A", "e_B", "rho_m"]
+    slice_fields = ["B_1", "|B|", "beta", "v_A", "e_B", "rho_m"]
     with use_theme(theme):
         fig, axes = plt.subplots(2, 3, figsize=(14, 8))
         for i, (ax, field) in enumerate(zip(axes.flat, slice_fields, strict=True)):
@@ -155,7 +155,7 @@ def generate(theme: PlotTheme) -> None:
     with use_theme(theme):
         fig, axes = plt.subplots(2, 3, figsize=(14, 8))
         for ax in axes.flat:
-            plot_field_slice(ds_a, "B1", ax=ax, theme=theme)
+            plot_field_slice(ds_a, "B_1", ax=ax, theme=theme)
 
         add_badge(axes[0, 0], step=42, loc="upper left")
         add_badge(axes[0, 1], time=3.14, variant="lighter", loc="upper right")
@@ -257,7 +257,7 @@ def generate(theme: PlotTheme) -> None:
     _save(fig, "quiver_overlay", theme)
 
     # 17. Inset colorbar — single slice
-    fig, _ = plot_field_slice(ds_a, "B1", theme=theme, colorbar="inset", step=100)
+    fig, _ = plot_field_slice(ds_a, "B_1", theme=theme, colorbar="inset", step=100)
     _save(fig, "inset_colorbar_slice", theme)
 
     # 18. Inset colorbar + badge on same plot
@@ -268,9 +268,9 @@ def generate(theme: PlotTheme) -> None:
     # 19. Side colorbar vs inset colorbar comparison
     with use_theme(theme):
         fig, (ax_side, ax_inset) = plt.subplots(1, 2, figsize=(12, 5))
-        plot_field_slice(ds_a, "B1", ax=ax_side, theme=theme, colorbar=True)
+        plot_field_slice(ds_a, "B_1", ax=ax_side, theme=theme, colorbar=True)
         ax_side.set_title("Side colorbar")
-        plot_field_slice(ds_a, "B1", ax=ax_inset, theme=theme, colorbar="inset")
+        plot_field_slice(ds_a, "B_1", ax=ax_inset, theme=theme, colorbar="inset")
         ax_inset.set_title("Inset colorbar")
         fig.suptitle("Colorbar comparison", fontsize=13)
         fig.tight_layout()
@@ -324,7 +324,7 @@ def generate(theme: PlotTheme) -> None:
     _save(fig, "multi_entry_vector_legend", theme)
 
     # 22. Panel label grid (2x3 with a-f)
-    slice_labels = ["B1", "|B|", "beta", "v_A", "e_B", "rho_m"]
+    slice_labels = ["B_1", "|B|", "beta", "v_A", "e_B", "rho_m"]
     with use_theme(theme):
         fig, axes = plt.subplots(2, 3, figsize=(14, 8))
         for i, (ax, fld) in enumerate(zip(axes.flat, slice_labels, strict=True)):
@@ -392,7 +392,7 @@ def generate(theme: PlotTheme) -> None:
     # 26. Multi-panel field grid
     fig, _ = plot_field_grid(
         ds_a,
-        ["B1", "|B|", "beta", "v_A", "e_B", "rho_m"],
+        ["B_1", "|B|", "beta", "v_A", "e_B", "rho_m"],
         ncols=3,
         theme=theme,
         step=100,
@@ -400,10 +400,10 @@ def generate(theme: PlotTheme) -> None:
     )
     _save(fig, "field_grid", theme)
 
-    # 27. Cross-section — B1 with x-cut
+    # 27. Cross-section — B_1 with x-cut
     fig, _ = plot_cross_section(
         ds_a,
-        "B1",
+        "B_1",
         cut_axis="x",
         theme=theme,
         step=100,
@@ -429,7 +429,7 @@ def generate(theme: PlotTheme) -> None:
     # 30. Multi-field line overlay (plot_lines)
     fig, _ = plot_lines(
         ds_a,
-        ["B1", "B2", "B3"],
+        ["B_1", "B_2", "B_3"],
         axis="x",
         labels=["$B_x$", "$B_y$", "$B_z$"],
         theme=theme,
@@ -450,7 +450,7 @@ def generate(theme: PlotTheme) -> None:
     # 32. badge=True shortcut
     fig, _ = plot_field_slice(
         ds_a,
-        "B1",
+        "B_1",
         theme=theme,
         step=100,
         time=5.0,
@@ -466,7 +466,7 @@ def generate(theme: PlotTheme) -> None:
     # 34. coord_units as tuple
     fig, _ = plot_field_slice(
         ds_a,
-        "B1",
+        "B_1",
         theme=theme,
         coord_units=("$d_i$", "$d_i$"),
         step=100,
@@ -477,7 +477,7 @@ def generate(theme: PlotTheme) -> None:
     fig, _ = plot_comparison(
         ds_a,
         ds_b,
-        "B1",
+        "B_1",
         theme=theme,
         labels=("y₀=7.5", "y₀=8.0"),
         show_error=True,
@@ -506,7 +506,7 @@ def generate(theme: PlotTheme) -> None:
     )
     plot_field_slice(
         ds_a,
-        "B1",
+        "B_1",
         theme=theme,
         ax=ax,
         colorbar=False,
@@ -569,7 +569,7 @@ def generate(theme: PlotTheme) -> None:
     with use_theme(theme):
         fig, axes = plt.subplots(2, 3, figsize=(14, 8))
         for ax in axes.flat:
-            plot_field_slice(ds_a, "B1", ax=ax, theme=theme)
+            plot_field_slice(ds_a, "B_1", ax=ax, theme=theme)
         add_badge(axes[0, 0], step=42, loc="upper left")
         add_badge(axes[0, 1], step=102312, label="Cycle", loc="upper left")
         add_badge(axes[0, 2], time="13:34", loc="upper right")
@@ -627,8 +627,8 @@ def generate(theme: PlotTheme) -> None:
 
     fig, _ = plot_scatter(
         ds_a,
-        "B1",
-        "B2",
+        "B_1",
+        "B_2",
         color_field="|B|",
         plane=PlaneSelection(normal="z"),
         theme=theme,
@@ -651,7 +651,7 @@ def generate(theme: PlotTheme) -> None:
     # 43. Power spectrum — 1D Bx spectrum with reference slope
     from pypic.spectral import power_spectrum_1d
 
-    bx_profile = ds_a["B1"][:, 15, 10]
+    bx_profile = ds_a["B_1"][:, 15, 10]
     k, power = power_spectrum_1d(bx_profile, ds_a.grid.spacing[0])
     fig, _ = plot_power_spectrum(
         k,
@@ -666,7 +666,7 @@ def generate(theme: PlotTheme) -> None:
     # 44. Line comparison — two runs
     fig, _ = plot_line_comparison(
         [ds_a, ds_b],
-        "B1",
+        "B_1",
         axis="x",
         labels=["$y_0 = 7.5$", "$y_0 = 8.0$"],
         coord_units="$d_i$",

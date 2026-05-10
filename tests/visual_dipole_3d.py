@@ -222,9 +222,9 @@ class _InteractiveTracer:
             print(f"  Cannot trace from {self.seed}: {exc}")
             return
 
-        fl = attach_scalars(fl, self.ds, ["B1", "B2", "B3"])
+        fl = attach_scalars(fl, self.ds, ["B_1", "B_2", "B_3"])
         bmag = np.sqrt(
-            fl.scalars["B1"] ** 2 + fl.scalars["B2"] ** 2 + fl.scalars["B3"] ** 2
+            fl.scalars["B_1"] ** 2 + fl.scalars["B_2"] ** 2 + fl.scalars["B_3"] ** 2
         )
         fl = fl.with_scalars(**{"|B|": bmag})
 
@@ -298,9 +298,9 @@ def main() -> None:
     # Sample |B| along each line for coloring
     colored_lines = []
     for fl in lines:
-        fl = attach_scalars(fl, ds, ["B1", "B2", "B3"])
+        fl = attach_scalars(fl, ds, ["B_1", "B_2", "B_3"])
         bmag = np.sqrt(
-            fl.scalars["B1"] ** 2 + fl.scalars["B2"] ** 2 + fl.scalars["B3"] ** 2
+            fl.scalars["B_1"] ** 2 + fl.scalars["B_2"] ** 2 + fl.scalars["B_3"] ** 2
         )
         colored_lines.append(fl.with_scalars(**{"|B|": bmag}))
 

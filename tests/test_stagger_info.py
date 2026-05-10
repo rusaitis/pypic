@@ -62,16 +62,16 @@ class TestStaggerInfoPosition:
     def test_position_preserved(self):
         si = StaggerInfo(
             convention="staggered",
-            position={"B1": (0.5, 0.0, 0.0), "E1": (0.0, 0.5, 0.5)},
+            position={"B_1": (0.5, 0.0, 0.0), "E_1": (0.0, 0.5, 0.5)},
         )
         assert si.position is not None
-        assert si.position["B1"] == (0.5, 0.0, 0.0)
-        assert si.position["E1"] == (0.0, 0.5, 0.5)
+        assert si.position["B_1"] == (0.5, 0.0, 0.0)
+        assert si.position["E_1"] == (0.0, 0.5, 0.5)
 
     def test_position_frozen_to_mapping_proxy(self):
         si = StaggerInfo(
             convention="staggered",
-            position={"B1": (0.5, 0.0, 0.0)},
+            position={"B_1": (0.5, 0.0, 0.0)},
         )
         assert isinstance(si.position, MappingProxyType)
 
@@ -79,10 +79,10 @@ class TestStaggerInfoPosition:
         # input is a list of mixed types; __post_init__ coerces to tuple[float, ...].
         si = StaggerInfo(
             convention="staggered",
-            position={"B1": [0.5, 0, 0]},  # type: ignore[dict-item]
+            position={"B_1": [0.5, 0, 0]},  # type: ignore[dict-item]
         )
         assert si.position is not None
-        offsets = si.position["B1"]
+        offsets = si.position["B_1"]
         assert isinstance(offsets, tuple)
         assert all(isinstance(x, float) for x in offsets)
 
@@ -90,14 +90,14 @@ class TestStaggerInfoPosition:
         with pytest.raises(ValueError, match=r"\[0\.0, 1\.0\)"):
             StaggerInfo(
                 convention="staggered",
-                position={"B1": (1.5, 0.0, 0.0)},
+                position={"B_1": (1.5, 0.0, 0.0)},
             )
 
     def test_position_rejects_negative(self):
         with pytest.raises(ValueError, match=r"\[0\.0, 1\.0\)"):
             StaggerInfo(
                 convention="staggered",
-                position={"B1": (-0.1, 0.0, 0.0)},
+                position={"B_1": (-0.1, 0.0, 0.0)},
             )
 
 
@@ -109,7 +109,7 @@ class TestStaggerInFieldDataset:
         norm = Normalization.identity()
         stagger = StaggerInfo(convention="node")
         fds = FieldDataset.from_arrays(
-            {"B1": np.ones((4, 4))},
+            {"B_1": np.ones((4, 4))},
             grid,
             norm,
             metadata={"stagger": stagger},
@@ -123,7 +123,7 @@ class TestStaggerInFieldDataset:
         norm = Normalization.identity()
         stagger = StaggerInfo(convention="cell")
         fds = FieldDataset.from_arrays(
-            {"B1": np.ones((4, 4, 4))},
+            {"B_1": np.ones((4, 4, 4))},
             grid,
             norm,
             metadata={"stagger": stagger},

@@ -277,19 +277,23 @@ class Simulation:
         name: str, alias_map: dict[str, str], canonical: set[str]
     ) -> set[str]:
         """Return the canonical names that *name* could have expanded to."""
+        import re
+
         from pypic._aliases import _COMPUTE_ALIASES
 
         resolved = alias_map.get(name, _COMPUTE_ALIASES.get(name, name))
         candidates = {resolved}
-        # Vector expansion
-        import re
-
-        _sp = re.match(r"^(.+?)(_s\d+)$", resolved)
-        prefix = _sp.group(1) if _sp else resolved
-        species = _sp.group(2) if _sp else ""
-        if not prefix[-1:].isdigit():
+        # Tier-3 vector expansion: append ``_<component>`` to the resolved
+        # name. ``B`` → ``B_1``..``B_3``; ``J_s0`` → ``J_s0_1``..``J_s0_3``.
+        # Skip names ending in a component suffix (``_<digit>``);
+        # species-only suffixes (``_s<digit>``) are still expandable.
+        ends_with_species = re.search(r"_s\d+$", resolved) is not None
+        ends_with_component = (
+            re.search(r"_\d+$", resolved) is not None and not ends_with_species
+        )
+        if not ends_with_component:
             for c in ("1", "2", "3"):
-                candidates.add(f"{prefix}{c}{species}")
+                candidates.add(f"{resolved}_{c}")
         # Compute deps
         from pypic.compute import field_dependencies
 
@@ -312,7 +316,7 @@ class Simulation:
             Timestep index.
         fields : Iterable[str] | None
             When given, only these fields are read.  Accepts canonical
-            names (``"B1"``) and geometry aliases (``"Bx"``).  Readers
+            names (``"B_1"``) and geometry aliases (``"Bx"``).  Readers
             that support selective I/O skip unwanted datasets; others
             read all fields then filter.
         strict_fields : bool
@@ -351,8 +355,8 @@ class Simulation:
             alias_map = _default_aliases(self._config.grid.geometry)
             expanded: set[str] = set()
             for name in fields:
-                # Resolve geometry aliases (Bx→B1), then compute aliases
-                # (energy_flux_x→EF1), then vector-group aliases
+                # Resolve geometry aliases (Bx→B_1), then compute aliases
+                # (energy_flux_x→EF_1), then vector-group aliases
                 # (EFe→EF_s0). Group aliases are checked last because
                 # their target is a vector prefix, not a scalar name.
                 resolved = alias_map.get(
@@ -360,21 +364,25 @@ class Simulation:
                     _COMPUTE_ALIASES.get(name, _GROUP_ALIASES.get(name, name)),
                 )
                 expanded.add(resolved)
-                # Expand vector group shorthand:
-                #   "B"    → "B1","B2","B3"
-                #   "J_s0" → "J1_s0","J2_s0","J3_s0" (component before species)
+                # Tier-3 vector group shorthand:
+                #   "B"    → "B_1","B_2","B_3"
+                #   "J_s0" → "J_s0_1","J_s0_2","J_s0_3" (species before component)
                 # Skip names already resolved as aliases (e.g. "Bx") and
-                # names whose prefix already ends in a digit (e.g. "P11_s1").
-                if name not in alias_map:
-                    _sp = re.match(r"^(.+?)(_s\d+)$", resolved)
-                    prefix = _sp.group(1) if _sp else resolved
-                    species = _sp.group(2) if _sp else ""
-                    if not prefix[-1:].isdigit():
-                        for c in ("1", "2", "3"):
-                            expanded.add(f"{prefix}{c}{species}")
+                # names that end in a component suffix (``_<digit>``);
+                # species-only suffixes (``_s<digits>``) are still
+                # expandable. ``P_s0_11`` and ``B_1`` skip; ``EF_s0`` and
+                # ``B`` expand.
+                ends_with_species = re.search(r"_s\d+$", resolved) is not None
+                ends_with_component = (
+                    re.search(r"_\d+$", resolved) is not None
+                    and not ends_with_species
+                )
+                if name not in alias_map and not ends_with_component:
+                    for c in ("1", "2", "3"):
+                        expanded.add(f"{resolved}_{c}")
                 # Expand compute dependencies: "Pi" → all six P_s1 tensor
                 # components; "P_par" → all six P tensor components + B.
-                # Asking for P11 alone *does not* implicitly load the
+                # Asking for P_11 alone *does not* implicitly load the
                 # off-diagonals — request "Pi"/"Pe"/"P_sN"/"P_par"
                 # explicitly when downstream P_par/P_perp/agyrotropy
                 # need the full tensor.

@@ -177,7 +177,7 @@ class TestSerializationHelpers:
             "nested": {"inner": np.int32(7)},
         }
         fds = FieldDataset.from_arrays(
-            {"B1": np.ones((4, 3, 2))},
+            {"B_1": np.ones((4, 3, 2))},
             grid,
             Normalization.identity(),
             metadata=metadata,
@@ -210,7 +210,7 @@ class TestSerializationHelpers:
             notes="Yee mesh",
         )
         fds = FieldDataset.from_arrays(
-            {"B1": np.ones((4, 3, 2))},
+            {"B_1": np.ones((4, 3, 2))},
             grid,
             Normalization.identity(),
             metadata={"stagger": stagger, "run": "demo"},
@@ -232,15 +232,15 @@ class TestToZarrFromZarr:
 
     def test_round_trip_basic(self, tmp_path):
         fds = make_test_dataset(
-            {"B1": np.ones((4, 3, 2)), "B2": np.zeros((4, 3, 2))},
+            {"B_1": np.ones((4, 3, 2)), "B_2": np.zeros((4, 3, 2))},
         )
         store = tmp_path / "test.zarr"
         to_zarr(fds, store)
         loaded = from_zarr(store)
 
-        assert sorted(loaded.field_names()) == ["B1", "B2"]
-        np.testing.assert_allclose(loaded["B1"], fds["B1"])
-        np.testing.assert_allclose(loaded["B2"], fds["B2"])
+        assert sorted(loaded.field_names()) == ["B_1", "B_2"]
+        np.testing.assert_allclose(loaded["B_1"], fds["B_1"])
+        np.testing.assert_allclose(loaded["B_2"], fds["B_2"])
         assert loaded.grid.dimensions == fds.grid.dimensions
         assert loaded.grid.spacing == fds.grid.spacing
         assert loaded.grid.origin == fds.grid.origin
@@ -273,7 +273,7 @@ class TestToZarrFromZarr:
             boundary=("periodic", "open", "periodic"),
         )
         fds = FieldDataset.from_arrays(
-            {"B1": np.ones((4, 3, 2)), "rho_m": np.full((4, 3, 2), 2.0)},
+            {"B_1": np.ones((4, 3, 2)), "rho_m": np.full((4, 3, 2), 2.0)},
             grid,
             Normalization.pic_electron(1e18),
             species=[ELECTRONS, IONS],
@@ -296,18 +296,18 @@ class TestToZarrFromZarr:
         assert loaded.physics.extra["theta"] == 0.5
         assert loaded.frame == "GSM"
         assert "GSM" in loaded.transforms
-        np.testing.assert_allclose(loaded["B1"], 1.0)
+        np.testing.assert_allclose(loaded["B_1"], 1.0)
         np.testing.assert_allclose(loaded["rho_m"], 2.0)
 
     def test_dtype_float32_downcast(self, tmp_path):
         fds = make_test_dataset(
-            {"B1": np.ones((4, 3, 2), dtype=np.float64)},
+            {"B_1": np.ones((4, 3, 2), dtype=np.float64)},
         )
         store = tmp_path / "f32.zarr"
         to_zarr(fds, store, dtype="float32")
         loaded = from_zarr(store)
-        assert loaded["B1"].dtype == np.float32
-        np.testing.assert_allclose(loaded["B1"], 1.0, rtol=1e-6)
+        assert loaded["B_1"].dtype == np.float32
+        np.testing.assert_allclose(loaded["B_1"], 1.0, rtol=1e-6)
 
     def test_round_trip_2d_surviving_axes(self, tmp_path):
         grid = GridInfo(
@@ -317,7 +317,7 @@ class TestToZarrFromZarr:
             surviving_axes=(0, 2),
         )
         fds = FieldDataset.from_arrays(
-            {"B1": np.ones((4, 2))},
+            {"B_1": np.ones((4, 2))},
             grid,
             Normalization.identity(),
         )
@@ -329,11 +329,11 @@ class TestToZarrFromZarr:
         assert loaded.grid.surviving_axis_names == ("x", "z")
 
     def test_per_field_metadata_preserved(self, tmp_path):
-        fds = make_test_dataset({"B1": np.ones((4, 3, 2))})
+        fds = make_test_dataset({"B_1": np.ones((4, 3, 2))})
         store = tmp_path / "meta.zarr"
         to_zarr(fds, store)
         loaded = from_zarr(store)
-        b1_attrs = loaded.xr["B1"].attrs
+        b1_attrs = loaded.xr["B_1"].attrs
         assert b1_attrs["quantity_type"] == "b_field"
         assert "si_unit" in b1_attrs
 
@@ -345,7 +345,7 @@ class TestToZarrFromZarr:
             geometry=SPHERICAL,
         )
         fds = FieldDataset.from_arrays(
-            {"B1": np.ones((4, 3, 2))},
+            {"B_1": np.ones((4, 3, 2))},
             grid,
             Normalization.identity(),
         )
@@ -358,7 +358,7 @@ class TestToZarrFromZarr:
     def test_no_pypic_attrs_raises(self, tmp_path):
         import xarray as xr
 
-        ds = xr.Dataset({"B1": xr.DataArray(np.ones(4))})
+        ds = xr.Dataset({"B_1": xr.DataArray(np.ones(4))})
         store = tmp_path / "no_meta.zarr"
         ds.to_zarr(str(store), zarr_format=3, consolidated=False)
         with pytest.raises(ValueError, match="no pypic metadata found"):
@@ -373,7 +373,7 @@ class TestToZarrFromZarr:
         # instead of the real write error.  A set is not JSON-native.
         grid = make_uniform_grid(4, 3, 2)
         fds = FieldDataset.from_arrays(
-            {"B1": np.ones((4, 3, 2))},
+            {"B_1": np.ones((4, 3, 2))},
             grid,
             Normalization.identity(),
             metadata={"bad": {1, 2, 3}},
@@ -386,19 +386,19 @@ class TestToZarrFromZarr:
     def test_unit_dimension_round_trip(self, tmp_path):
         # openPMD-style 7-tuple survives Zarr write/read on canonical fields.
         fds = make_test_dataset(
-            {"B1": np.ones((4, 3, 2)), "rho_m": np.ones((4, 3, 2))},
+            {"B_1": np.ones((4, 3, 2)), "rho_m": np.ones((4, 3, 2))},
         )
         store = tmp_path / "ud.zarr"
         to_zarr(fds, store)
         loaded = from_zarr(store)
-        assert loaded.xr["B1"].attrs["unit_dimension"] == [0, 1, -2, -1, 0, 0, 0]
+        assert loaded.xr["B_1"].attrs["unit_dimension"] == [0, 1, -2, -1, 0, 0, 0]
         assert loaded.xr["rho_m"].attrs["unit_dimension"] == [-3, 1, 0, 0, 0, 0, 0]
 
     def test_layout_v1_structure(self, tmp_path):
         # Validate the on-disk shape — the contract a non-pypic Zarr
         # consumer (a JS WebGPU viewer, a Rust zarrs pipeline) reads
         # against — not just that ``from_zarr`` round-trips.
-        fds = make_test_dataset({"B1": np.ones((4, 3, 2))})
+        fds = make_test_dataset({"B_1": np.ones((4, 3, 2))})
         store = tmp_path / "v1.zarr"
         to_zarr(fds, store)
         root = zarr.open_group(str(store), mode="r")
@@ -418,7 +418,7 @@ class TestToZarrFromZarr:
     def test_from_zarr_rejects_unknown_schema_version(self, tmp_path):
         # A v2.0 store must not silently decode through the v1.0 path —
         # see schema.md §1 *Versioning* (single-discriminator promise).
-        fds = make_test_dataset({"B1": np.ones((4, 3, 2))})
+        fds = make_test_dataset({"B_1": np.ones((4, 3, 2))})
         store = tmp_path / "future.zarr"
         to_zarr(fds, store)
         root = zarr.open_group(str(store), mode="a")
@@ -431,7 +431,7 @@ class TestToZarrFromZarr:
     def test_from_zarr_rejects_missing_schema_attr(self, tmp_path):
         # Missing ``schema`` root attr is rejected with the discriminator
         # error rather than a downstream KeyError on ``grid`` / etc.
-        fds = make_test_dataset({"B1": np.ones((4, 3, 2))})
+        fds = make_test_dataset({"B_1": np.ones((4, 3, 2))})
         store = tmp_path / "no_schema.zarr"
         to_zarr(fds, store)
         root = zarr.open_group(str(store), mode="a")
@@ -451,7 +451,7 @@ class TestToZarrTimeseries:
             (
                 0.0,
                 FieldDataset.from_arrays(
-                    {"B1": np.full((4, 3, 2), 1.0)},
+                    {"B_1": np.full((4, 3, 2), 1.0)},
                     grid,
                     Normalization.identity(),
                 ),
@@ -459,7 +459,7 @@ class TestToZarrTimeseries:
             (
                 1.0,
                 FieldDataset.from_arrays(
-                    {"B1": np.full((4, 3, 2), 2.0)},
+                    {"B_1": np.full((4, 3, 2), 2.0)},
                     grid,
                     Normalization.identity(),
                 ),
@@ -467,7 +467,7 @@ class TestToZarrTimeseries:
             (
                 2.0,
                 FieldDataset.from_arrays(
-                    {"B1": np.full((4, 3, 2), 3.0)},
+                    {"B_1": np.full((4, 3, 2), 3.0)},
                     grid,
                     Normalization.identity(),
                 ),
@@ -482,8 +482,8 @@ class TestToZarrTimeseries:
         ds = xr.open_zarr(str(store), group="fields", consolidated="auto")
         assert "time" in ds.dims
         assert ds.sizes["time"] == 3
-        np.testing.assert_allclose(ds["B1"].sel(time=0.0).values, 1.0)
-        np.testing.assert_allclose(ds["B1"].sel(time=2.0).values, 3.0)
+        np.testing.assert_allclose(ds["B_1"].sel(time=0.0).values, 1.0)
+        np.testing.assert_allclose(ds["B_1"].sel(time=2.0).values, 3.0)
 
     def test_timeseries_rejects_field_drift(self, tmp_path):
         # xarray's to_zarr(mode="a", append_dim=...) doesn't enforce
@@ -492,17 +492,17 @@ class TestToZarrTimeseries:
         # (conflicting sizes on `time`).  Fail loud at write time.
         grid = make_uniform_grid(4, 3, 2)
         step0 = FieldDataset.from_arrays(
-            {"B1": np.ones((4, 3, 2))},
+            {"B_1": np.ones((4, 3, 2))},
             grid,
             Normalization.identity(),
         )
         step1 = FieldDataset.from_arrays(
-            {"B1": np.ones((4, 3, 2)), "B2": np.zeros((4, 3, 2))},
+            {"B_1": np.ones((4, 3, 2)), "B_2": np.zeros((4, 3, 2))},
             grid,
             Normalization.identity(),
         )
         store = tmp_path / "drift.zarr"
-        with pytest.raises(ValueError, match=r"field set.*differs.*B2"):
+        with pytest.raises(ValueError, match=r"field set.*differs.*B_2"):
             to_zarr_timeseries([(0.0, step0), (1.0, step1)], store)
         # And the partial store from step 0 must not survive — otherwise
         # it looks like a valid single-step export on retry.
@@ -515,12 +515,12 @@ class TestToZarrTimeseries:
         grid_small = make_uniform_grid(2, 2, 2)
         grid_big = make_uniform_grid(3, 2, 2)
         step0 = FieldDataset.from_arrays(
-            {"B1": np.ones((2, 2, 2))},
+            {"B_1": np.ones((2, 2, 2))},
             grid_small,
             Normalization.identity(),
         )
         step1 = FieldDataset.from_arrays(
-            {"B1": np.ones((3, 2, 2))},
+            {"B_1": np.ones((3, 2, 2))},
             grid_big,
             Normalization.identity(),
         )
@@ -542,7 +542,7 @@ class TestToZarrTimeseries:
         # metadata found" error instead of the real write failure.
         grid = make_uniform_grid(4, 3, 2)
         fds = FieldDataset.from_arrays(
-            {"B1": np.ones((4, 3, 2))},
+            {"B_1": np.ones((4, 3, 2))},
             grid,
             Normalization.identity(),
         )
@@ -551,14 +551,14 @@ class TestToZarrTimeseries:
             to_zarr_timeseries(
                 [(0.0, fds)],
                 store,
-                encoding={"B1": {"dtype": "not-a-real-dtype"}},
+                encoding={"B_1": {"dtype": "not-a-real-dtype"}},
             )
         assert not store.exists()
 
     def test_timeseries_preserves_metadata(self, tmp_path):
         grid = make_uniform_grid(4, 3, 2)
         fds = FieldDataset.from_arrays(
-            {"B1": np.ones((4, 3, 2))},
+            {"B_1": np.ones((4, 3, 2))},
             grid,
             Normalization.identity(),
             species=[ELECTRONS],
@@ -578,12 +578,12 @@ class TestToZarrTimeseries:
         # step 0 — succeeded but stored a misleading description of
         # the simulation.  The identity check now fails loud.
         step0 = FieldDataset.from_arrays(
-            {"B1": np.ones((4, 3, 2))},
+            {"B_1": np.ones((4, 3, 2))},
             make_uniform_grid(4, 3, 2, spacing=1.0, origin=0.0),
             Normalization.identity(),
         )
         step1 = FieldDataset.from_arrays(
-            {"B1": np.ones((4, 3, 2))},
+            {"B_1": np.ones((4, 3, 2))},
             make_uniform_grid(4, 3, 2, spacing=5.0, origin=10.0),
             Normalization.identity(),
         )
@@ -595,13 +595,13 @@ class TestToZarrTimeseries:
     def test_timeseries_rejects_frame_drift(self, tmp_path):
         grid = make_uniform_grid(4, 3, 2)
         step0 = FieldDataset.from_arrays(
-            {"B1": np.ones((4, 3, 2))},
+            {"B_1": np.ones((4, 3, 2))},
             grid,
             Normalization.identity(),
             frame="simulation",
         )
         step1 = FieldDataset.from_arrays(
-            {"B1": np.ones((4, 3, 2))},
+            {"B_1": np.ones((4, 3, 2))},
             grid,
             Normalization.identity(),
             frame="gsm",
@@ -618,13 +618,13 @@ class TestToZarrTimeseries:
         # rather than silently keeping step 0's snapshot.
         grid = make_uniform_grid(4, 3, 2)
         step0 = FieldDataset.from_arrays(
-            {"B1": np.ones((4, 3, 2))},
+            {"B_1": np.ones((4, 3, 2))},
             grid,
             Normalization.identity(),
             metadata={"shared": "ok", "step_meta": "a"},
         )
         step1 = FieldDataset.from_arrays(
-            {"B1": np.ones((4, 3, 2))},
+            {"B_1": np.ones((4, 3, 2))},
             grid,
             Normalization.identity(),
             metadata={"shared": "ok", "step_meta": "b"},
@@ -640,7 +640,7 @@ class TestToZarrTimeseries:
         # preserves the round-trip.
         grid = make_uniform_grid(4, 3, 2)
         fds = FieldDataset.from_arrays(
-            {"B1": np.ones((4, 3, 2))},
+            {"B_1": np.ones((4, 3, 2))},
             grid,
             Normalization.identity(),
             metadata={"tuple_val": (1, 2, 3), "list_val": [4, 5]},
@@ -659,7 +659,7 @@ class TestToZarrTimeseries:
         # Tagged ``keyed_dict`` preserves both key type and uniqueness.
         grid = make_uniform_grid(4, 3, 2)
         fds = FieldDataset.from_arrays(
-            {"B1": np.ones((4, 3, 2))},
+            {"B_1": np.ones((4, 3, 2))},
             grid,
             Normalization.identity(),
             metadata={"num_key_map": {1: "one", 2: "two"}},

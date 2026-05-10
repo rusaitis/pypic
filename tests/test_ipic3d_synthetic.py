@@ -27,6 +27,7 @@ from pypic.readers.ipic3d import (
     to_simulation_config,
 )
 from pypic.readers.ipic3d._conserved import load_ipic3d_auxiliary
+from tests._helpers import per_species
 
 DATA = Path("tests/data/ipic3d-synthetic")
 PHDF5_DIR = DATA / "phdf5"
@@ -52,7 +53,7 @@ RHO_INIT = (1.0, 1.0)
 
 
 def _expected_b1() -> np.ndarray:
-    """Analytical B1 field: B0x * tanh((y - Ly/2) / delta)."""
+    """Analytical B_1 field: B0x * tanh((y - Ly/2) / delta)."""
     x = np.linspace(0, LX, NX)
     y = np.linspace(0, LY, NY)
     z = np.linspace(0, LZ, NZ)
@@ -168,13 +169,13 @@ class TestPhdf5Reader:
         assert probed == sorted(ds.field_names())
 
     def test_field_shapes(self, ds):
-        assert ds["B1"].shape == (NX, NY, NZ)
+        assert ds["B_1"].shape == (NX, NY, NZ)
 
     def test_b_field_exact(self, ds):
-        assert_allclose(ds["B1"], _expected_b1(), atol=1e-14)
+        assert_allclose(ds["B_1"], _expected_b1(), atol=1e-14)
 
     def test_e_field_zero(self, ds):
-        for comp in ("E1", "E2", "E3"):
+        for comp in ("E_1", "E_2", "E_3"):
             assert_allclose(ds[comp], 0.0, atol=1e-14)
 
     def test_electron_density_exact(self, ds):
@@ -188,30 +189,30 @@ class TestPhdf5Reader:
         assert_allclose(ds["rho_c"], total)
 
     def test_total_current_is_sum(self, ds):
-        for comp in ("J1", "J2", "J3"):
-            total = ds[f"{comp}_s0"] + ds[f"{comp}_s1"]
+        for comp in ("J_1", "J_2", "J_3"):
+            total = ds[per_species(comp, 0)] + ds[per_species(comp, 1)]
             assert_allclose(ds[comp], total)
 
     @pytest.mark.parametrize("species", [0, 1])
     def test_diagonal_pressure_positive(self, ds, species):
-        for comp in ("P11", "P22", "P33"):
-            p = ds[f"{comp}_s{species}"]
+        for comp in ("P_11", "P_22", "P_33"):
+            p = ds[per_species(comp, species)]
             assert np.all(p >= 0), f"{comp}_s{species} has negative values"
 
     def test_pressure_values(self, ds):
-        """Exact P11 values: physical P = n·m·v_th² = |rho_c|·v_th²/|qom|."""
+        """Exact P_11 values: physical P = n·m·v_th² = |rho_c|·v_th²/|qom|."""
         for s, (rho, uth, qom) in enumerate(zip(RHO_INIT, UTH, QOM, strict=True)):
             expected = rho * uth**2 / abs(qom)
-            assert_allclose(ds[f"P11_s{s}"], expected, atol=1e-14)
-            p = ds[f"P11_s{s}"]
+            assert_allclose(ds[f"P_s{s}_11"], expected, atol=1e-14)
+            p = ds[f"P_s{s}_11"]
             rho_c = ds[f"rho_c_s{s}"]
             ratio = np.mean(p) / np.mean(np.abs(rho_c))
             assert_allclose(ratio, uth**2 / abs(qom), atol=1e-14)
 
     def test_off_diagonal_pressure_zero(self, ds):
         for s in range(2):
-            for comp in ("P12", "P13", "P23"):
-                assert_allclose(ds[f"{comp}_s{s}"], 0.0, atol=1e-12)
+            for comp in ("P_12", "P_13", "P_23"):
+                assert_allclose(ds[per_species(comp, s)], 0.0, atol=1e-12)
 
     def test_species_metadata(self, ds):
         # Count-only is weak: a reader that populated garbage species (wrong
@@ -249,10 +250,10 @@ class TestShdf5Reader:
         assert probed == sorted(ds.field_names())
 
     def test_field_shapes(self, ds):
-        assert ds["B1"].shape == (NX, NY, NZ)
+        assert ds["B_1"].shape == (NX, NY, NZ)
 
     def test_b_field_exact(self, ds):
-        assert_allclose(ds["B1"], _expected_b1(), atol=1e-14)
+        assert_allclose(ds["B_1"], _expected_b1(), atol=1e-14)
 
     def test_electron_density_exact(self, ds):
         assert_allclose(ds["rho_c_s0"], -RHO_INIT[0], atol=1e-12)
@@ -267,8 +268,8 @@ class TestShdf5Reader:
     def test_per_species_present(self, ds):
         for s in range(2):
             assert ds.has_field(f"rho_c_s{s}")
-            for comp in ("J1", "J2", "J3"):
-                assert ds.has_field(f"{comp}_s{s}")
+            for comp in ("J_1", "J_2", "J_3"):
+                assert ds.has_field(per_species(comp, s))
 
 
 class TestShdf5MatchesPhdf5:
@@ -287,11 +288,11 @@ class TestShdf5MatchesPhdf5:
         return reader.read_timestep(SHDF5_DIR, 0)
 
     def test_b_field_matches(self, phdf5_ds, shdf5_ds):
-        for comp in ("B1", "B2", "B3"):
+        for comp in ("B_1", "B_2", "B_3"):
             assert_allclose(shdf5_ds[comp], phdf5_ds[comp], atol=1e-14)
 
     def test_e_field_matches(self, phdf5_ds, shdf5_ds):
-        for comp in ("E1", "E2", "E3"):
+        for comp in ("E_1", "E_2", "E_3"):
             assert_allclose(shdf5_ds[comp], phdf5_ds[comp], atol=1e-14)
 
     def test_density_matches(self, phdf5_ds, shdf5_ds):
@@ -303,11 +304,11 @@ class TestShdf5MatchesPhdf5:
             )
 
     def test_current_matches(self, phdf5_ds, shdf5_ds):
-        for comp in ("J1", "J2", "J3"):
+        for comp in ("J_1", "J_2", "J_3"):
             for s in range(2):
                 assert_allclose(
-                    shdf5_ds[f"{comp}_s{s}"],
-                    phdf5_ds[f"{comp}_s{s}"],
+                    shdf5_ds[per_species(comp, s)],
+                    phdf5_ds[per_species(comp, s)],
                     atol=1e-12,
                 )
 
@@ -328,11 +329,11 @@ class TestH5hutMatchesPhdf5:
         return reader.read_timestep(H5HUT_DIR, 0)
 
     def test_b_field_matches(self, phdf5_ds, h5hut_ds):
-        for comp in ("B1", "B2", "B3"):
+        for comp in ("B_1", "B_2", "B_3"):
             assert_allclose(h5hut_ds[comp], phdf5_ds[comp], atol=1e-6)
 
     def test_e_field_matches(self, phdf5_ds, h5hut_ds):
-        for comp in ("E1", "E2", "E3"):
+        for comp in ("E_1", "E_2", "E_3"):
             assert_allclose(h5hut_ds[comp], phdf5_ds[comp], atol=1e-6)
 
     def test_density_matches(self, phdf5_ds, h5hut_ds):
@@ -344,11 +345,11 @@ class TestH5hutMatchesPhdf5:
             )
 
     def test_current_matches(self, phdf5_ds, h5hut_ds):
-        for comp in ("J1", "J2", "J3"):
+        for comp in ("J_1", "J_2", "J_3"):
             for s in range(2):
                 assert_allclose(
-                    h5hut_ds[f"{comp}_s{s}"],
-                    phdf5_ds[f"{comp}_s{s}"],
+                    h5hut_ds[per_species(comp, s)],
+                    phdf5_ds[per_species(comp, s)],
                     atol=1e-5,
                 )
 
@@ -373,12 +374,12 @@ class TestH5hutReader:
         assert probed == sorted(ds.field_names())
 
     def test_field_shapes(self, ds):
-        assert ds["B1"].shape == (NX, NY, NZ)
+        assert ds["B_1"].shape == (NX, NY, NZ)
 
     def test_float64_promotion(self, ds):
         """H5hut stores float32; reader must promote to float64.
 
-        Previously B1-only — a reader that promoted B1 but left B2/B3 (or E*,
+        Previously B_1-only — a reader that promoted B_1 but left B_2/B_3 (or E*,
         rho_c_*) as float32 still passed.  Check every loaded field: a dtype
         regression in a single branch of the promotion path is now visible.
         """
@@ -387,10 +388,10 @@ class TestH5hutReader:
 
     def test_b_field_after_transpose(self, ds):
         """ZYX→XYZ transpose + float32→float64 must recover correct values."""
-        assert_allclose(ds["B1"], _expected_b1(), atol=1e-6)
+        assert_allclose(ds["B_1"], _expected_b1(), atol=1e-6)
 
     def test_e_field_zero(self, ds):
-        for comp in ("E1", "E2", "E3"):
+        for comp in ("E_1", "E_2", "E_3"):
             assert_allclose(ds[comp], 0.0, atol=1e-6)
 
     def test_electron_density_4pi_corrected(self, ds):
@@ -404,8 +405,8 @@ class TestH5hutReader:
         assert_allclose(ds["rho_c"], total)
 
     def test_total_current_is_sum(self, ds):
-        for comp in ("J1", "J2", "J3"):
-            total = ds[f"{comp}_s0"] + ds[f"{comp}_s1"]
+        for comp in ("J_1", "J_2", "J_3"):
+            total = ds[per_species(comp, 0)] + ds[per_species(comp, 1)]
             assert_allclose(ds[comp], total)
 
     def test_diagonal_pressure_positive(self, ds):
@@ -415,15 +416,15 @@ class TestH5hutReader:
         # is the residual discriminator — extend to ions so a sign flip in
         # the ion-specific 4π correction branch is caught.
         for s in range(2):
-            for comp in ("P11", "P22", "P33"):
-                assert ds[f"{comp}_s{s}"].min() >= 0.0, (
+            for comp in ("P_11", "P_22", "P_33"):
+                assert ds[per_species(comp, s)].min() >= 0.0, (
                     f"{comp}_s{s} has negative values"
                 )
 
     def test_pressure_p_over_rho_consistency(self, ds):
         """Physical P/|rho_c| = v_th²/|qom| (mass-weighted pressure)."""
         for s, (uth, qom) in enumerate(zip(UTH, QOM, strict=True)):
-            p = ds[f"P11_s{s}"]
+            p = ds[f"P_s{s}_11"]
             rho = ds[f"rho_c_s{s}"]
             ratio = np.mean(p) / np.mean(np.abs(rho))
             assert_allclose(ratio, uth**2 / abs(qom), atol=1e-6)
@@ -616,15 +617,15 @@ class TestSelectiveReadPhdf5:
     def test_b_fields_only(self):
         cfg = parse_inp(PHDF5_DIR / "synthetic.inp")
         reader = IPic3DParallelReader(cfg)
-        ds = reader.read_timestep(PHDF5_DIR, 0, fields={"B1", "B2", "B3"})
-        assert sorted(ds.field_names()) == ["B1", "B2", "B3"]
+        ds = reader.read_timestep(PHDF5_DIR, 0, fields={"B_1", "B_2", "B_3"})
+        assert sorted(ds.field_names()) == ["B_1", "B_2", "B_3"]
 
     def test_values_match_full_read(self):
         cfg = parse_inp(PHDF5_DIR / "synthetic.inp")
         reader = IPic3DParallelReader(cfg)
         full = reader.read_timestep(PHDF5_DIR, 0)
-        sub = reader.read_timestep(PHDF5_DIR, 0, fields={"B1"})
-        assert_allclose(sub["B1"], full["B1"])
+        sub = reader.read_timestep(PHDF5_DIR, 0, fields={"B_1"})
+        assert_allclose(sub["B_1"], full["B_1"])
 
     def test_total_expands_dependencies(self):
         """Requesting rho_c reads per-species rho and computes total."""
@@ -650,10 +651,10 @@ class TestSelectiveReadPhdf5:
         ds = reader.read_timestep(
             PHDF5_DIR,
             0,
-            fields={"rho_c_s0", "B1"},
+            fields={"rho_c_s0", "B_1"},
         )
         assert ds.has_field("rho_c_s0")
-        assert ds.has_field("B1")
+        assert ds.has_field("B_1")
         assert not ds.has_field("rho_c")
 
 
@@ -661,23 +662,23 @@ class TestSelectiveReadShdf5:
     def test_b_fields_only(self):
         cfg = parse_inp(SHDF5_DIR / "synthetic_serial.inp")
         reader = IPic3DSerialReader(cfg)
-        ds = reader.read_timestep(SHDF5_DIR, 0, fields={"B1", "B2", "B3"})
-        assert sorted(ds.field_names()) == ["B1", "B2", "B3"]
+        ds = reader.read_timestep(SHDF5_DIR, 0, fields={"B_1", "B_2", "B_3"})
+        assert sorted(ds.field_names()) == ["B_1", "B_2", "B_3"]
 
     def test_total_value_correct(self):
         cfg = parse_inp(SHDF5_DIR / "synthetic_serial.inp")
         reader = IPic3DSerialReader(cfg)
         full = reader.read_timestep(SHDF5_DIR, 0)
-        sub = reader.read_timestep(SHDF5_DIR, 0, fields={"J1"})
-        assert_allclose(sub["J1"], full["J1"])
+        sub = reader.read_timestep(SHDF5_DIR, 0, fields={"J_1"})
+        assert_allclose(sub["J_1"], full["J_1"])
 
 
 class TestSelectiveReadH5hut:
     def test_b_fields_only(self):
         cfg = parse_inp(H5HUT_DIR / "SyntheticFixture.inp")
         reader = IPic3DH5hutReader(cfg)
-        ds = reader.read_timestep(H5HUT_DIR, 0, fields={"B1", "B2", "B3"})
-        assert sorted(ds.field_names()) == ["B1", "B2", "B3"]
+        ds = reader.read_timestep(H5HUT_DIR, 0, fields={"B_1", "B_2", "B_3"})
+        assert sorted(ds.field_names()) == ["B_1", "B_2", "B_3"]
 
     def test_total_expands_dependencies(self):
         cfg = parse_inp(H5HUT_DIR / "SyntheticFixture.inp")
@@ -699,9 +700,9 @@ class TestSelectiveReadH5hut:
         ds = reader.read_timestep(
             H5HUT_DIR,
             0,
-            fields={"B1", "rho_c_s0", "J1_s0"},
+            fields={"B_1", "rho_c_s0", "J_s0_1"},
         )
-        assert sorted(ds.field_names()) == ["B1", "J1_s0", "rho_c_s0"]
+        assert sorted(ds.field_names()) == ["B_1", "J_s0_1", "rho_c_s0"]
 
 
 class TestIPic3DAvailableAuxiliary:
@@ -765,17 +766,17 @@ class TestShdf5PressureTensor:
         reader = IPic3DParallelReader(cfg)
         ds_p = reader.read_timestep(PHDF5_DIR, 0)
         for s in range(2):
-            for comp in ("P11", "P22", "P33", "P12", "P13", "P23"):
+            for comp in ("P_11", "P_22", "P_33", "P_12", "P_13", "P_23"):
                 assert_allclose(
-                    ds[f"{comp}_s{s}"],
-                    ds_p[f"{comp}_s{s}"],
+                    ds[per_species(comp, s)],
+                    ds_p[per_species(comp, s)],
                     atol=1e-12,
                 )
 
     def test_off_diagonal_pressure_zero(self, ds):
         for s in range(2):
-            for comp in ("P12", "P13", "P23"):
-                assert_allclose(ds[f"{comp}_s{s}"], 0.0, atol=1e-12)
+            for comp in ("P_12", "P_13", "P_23"):
+                assert_allclose(ds[per_species(comp, s)], 0.0, atol=1e-12)
 
 
 class TestEnergyFluxPhdf5:
@@ -789,11 +790,11 @@ class TestEnergyFluxPhdf5:
 
     def test_eflux_present(self, ds):
         for s in range(2):
-            for comp in ("EF1", "EF2", "EF3"):
-                assert ds.has_field(f"{comp}_s{s}")
+            for comp in ("EF_1", "EF_2", "EF_3"):
+                assert ds.has_field(per_species(comp, s))
 
     def test_eflux_shape(self, ds):
-        assert ds["EF1_s0"].shape == (NX, NY, NZ)
+        assert ds["EF_s0_1"].shape == (NX, NY, NZ)
 
     def test_eflux_4pi_corrected(self, ds):
         """Energy flux should be 4π-corrected like other moments.
@@ -801,19 +802,19 @@ class TestEnergyFluxPhdf5:
         Fixture convention: per-species EF_i is a drifting Maxwellian's
         i-th energy-flux component, which for this fixture reduces to
         ``rho * u_i * th_i**2`` (with u_i the bulk drift and th_i the
-        thermal speed along axis i).  The pair (EF1, EF3) pins both
+        thermal speed along axis i).  The pair (EF_1, EF_3) pins both
         the vacuous-when-drift-zero branch (U0=0) *and* the 4π factor:
-        without the 4π correction, EF3 would differ by ~12.57×.
+        without the 4π correction, EF_3 would differ by ~12.57×.
         """
-        # EF1 vacuously zero (U0 = 0)
+        # EF_1 vacuously zero (U0 = 0)
         expected_ef1 = RHO_INIT[0] * U0[0] * UTH[0] ** 2
-        assert_allclose(ds["EF1_s0"], expected_ef1, atol=1e-12)
-        # EF3 non-trivial: W0=0.001, WTH=0.02 → 4e-7 (species 0)
+        assert_allclose(ds["EF_s0_1"], expected_ef1, atol=1e-12)
+        # EF_3 non-trivial: W0=0.001, WTH=0.02 → 4e-7 (species 0)
         expected_ef3_s0 = RHO_INIT[0] * W0[0] * WTH[0] ** 2
-        assert_allclose(ds["EF3_s0"], expected_ef3_s0, atol=1e-12)
-        # EF3_s1 negative drift (W0=-0.064) pins sign preservation
+        assert_allclose(ds["EF_s0_3"], expected_ef3_s0, atol=1e-12)
+        # EF_s1_3 negative drift (W0=-0.064) pins sign preservation
         expected_ef3_s1 = RHO_INIT[1] * W0[1] * WTH[1] ** 2
-        assert_allclose(ds["EF3_s1"], expected_ef3_s1, atol=1e-12)
+        assert_allclose(ds["EF_s1_3"], expected_ef3_s1, atol=1e-12)
 
 
 class TestEnergyFluxShdf5:
@@ -829,10 +830,10 @@ class TestEnergyFluxShdf5:
         ds_p = reader_p.read_timestep(PHDF5_DIR, 0)
 
         for s in range(2):
-            for comp in ("EF1", "EF2", "EF3"):
+            for comp in ("EF_1", "EF_2", "EF_3"):
                 assert_allclose(
-                    ds_s[f"{comp}_s{s}"],
-                    ds_p[f"{comp}_s{s}"],
+                    ds_s[per_species(comp, s)],
+                    ds_p[per_species(comp, s)],
                     atol=1e-12,
                 )
 
@@ -848,17 +849,17 @@ class TestEnergyFluxH5hut:
 
     def test_eflux_present(self, ds):
         for s in range(2):
-            assert ds.has_field(f"EF1_s{s}")
+            assert ds.has_field(f"EF_s{s}_1")
 
     def test_eflux_matches_phdf5(self, ds):
         cfg_p = parse_inp(PHDF5_DIR / "synthetic.inp")
         reader_p = IPic3DParallelReader(cfg_p)
         ds_p = reader_p.read_timestep(PHDF5_DIR, 0)
         for s in range(2):
-            for comp in ("EF1", "EF2", "EF3"):
+            for comp in ("EF_1", "EF_2", "EF_3"):
                 assert_allclose(
-                    ds[f"{comp}_s{s}"],
-                    ds_p[f"{comp}_s{s}"],
+                    ds[per_species(comp, s)],
+                    ds_p[per_species(comp, s)],
                     atol=1e-5,
                 )
 

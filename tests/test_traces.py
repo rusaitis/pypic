@@ -589,7 +589,7 @@ class TestSampleFieldsBatching:
             )
         )
         return FieldDataset.from_arrays(
-            {"B1": x, "B2": 2.0 * y, "B3": x + y + z},
+            {"B_1": x, "B_2": 2.0 * y, "B_3": x + y + z},
             grid,
             _identity(),
         )
@@ -614,7 +614,7 @@ class TestSampleFieldsBatching:
                 [100.0, 0.5, 0.5],
             ]
         )
-        names = ["B1", "B2", "B3"]
+        names = ["B_1", "B_2", "B_3"]
         batched = sample_fields(multi_field_dataset, pts, names, method=method)
         for name in names:
             per_field = sample_field(multi_field_dataset, pts, name, method=method)
@@ -680,7 +680,7 @@ def uniform_field_data() -> FieldDataset:
     ones = np.ones((20, 20, 20), dtype=np.float64)
     zeros = np.zeros((20, 20, 20), dtype=np.float64)
     return FieldDataset.from_arrays(
-        {"B1": ones, "B2": zeros, "B3": zeros},
+        {"B_1": ones, "B_2": zeros, "B_3": zeros},
         grid,
         Normalization.identity(),
     )
@@ -902,11 +902,11 @@ class TestFieldNameFromComponents:
     def test_valid(self) -> None:
         from pypic.traces._tracing import _field_name_from_components
 
-        assert _field_name_from_components(("B1", "B2", "B3")) == "B"
-        assert _field_name_from_components(("Ve1", "Ve2", "Ve3")) == "Ve"
+        assert _field_name_from_components(("B_1", "B_2", "B_3")) == "B"
+        assert _field_name_from_components(("Ve_1", "Ve_2", "Ve_3")) == "Ve"
 
     def test_mismatched_rejects(self) -> None:
         from pypic.traces._tracing import _field_name_from_components
 
         with pytest.raises(ValueError, match="same field"):
-            _field_name_from_components(("B1", "E2", "B3"))
+            _field_name_from_components(("B_1", "E_2", "B_3"))

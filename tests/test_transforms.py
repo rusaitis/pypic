@@ -211,7 +211,7 @@ class TestRotatePressureTensor:
         assert_allclose(trace_after, trace_before, rtol=1e-13)
 
     def test_yz_swap(self) -> None:
-        # Swap y↔z: P22↔P33, P12↔P13, P23 unchanged
+        # Swap y↔z: P_22↔P_33, P_12↔P_13, P_23 unchanged
         R = np.array([[1, 0, 0], [0, 0, 1], [0, 1, 0]], dtype=float)
         p11 = np.array([1.0])
         p22 = np.array([2.0])
@@ -220,12 +220,12 @@ class TestRotatePressureTensor:
         p13 = np.array([0.5])
         p23 = np.array([0.6])
         rp = rotate_pressure_tensor(p11, p22, p33, p12, p13, p23, R)
-        assert_allclose(rp[0], [1.0], atol=1e-14)  # P11 → P11
-        assert_allclose(rp[1], [3.0], atol=1e-14)  # P22 → old P33
-        assert_allclose(rp[2], [2.0], atol=1e-14)  # P33 → old P22
-        assert_allclose(rp[3], [0.5], atol=1e-14)  # P12 → old P13
-        assert_allclose(rp[4], [0.4], atol=1e-14)  # P13 → old P12
-        assert_allclose(rp[5], [0.6], atol=1e-14)  # P23 → old P23
+        assert_allclose(rp[0], [1.0], atol=1e-14)  # P_11 → P_11
+        assert_allclose(rp[1], [3.0], atol=1e-14)  # P_22 → old P_33
+        assert_allclose(rp[2], [2.0], atol=1e-14)  # P_33 → old P_22
+        assert_allclose(rp[3], [0.5], atol=1e-14)  # P_12 → old P_13
+        assert_allclose(rp[4], [0.4], atol=1e-14)  # P_13 → old P_12
+        assert_allclose(rp[5], [0.6], atol=1e-14)  # P_23 → old P_23
 
 
 # ---------------------------------------------------------------------------
@@ -312,22 +312,22 @@ class TestResolveTransform:
 
 class TestFindVectorTriplets:
     def test_basic_b_field(self) -> None:
-        result = find_vector_triplets(["B1", "B2", "B3", "rho_c"])
-        assert result == [("B1", "B2", "B3")]
+        result = find_vector_triplets(["B_1", "B_2", "B_3", "rho_c"])
+        assert result == [("B_1", "B_2", "B_3")]
 
     def test_per_species(self) -> None:
-        fields = ["J1_s0", "J2_s0", "J3_s0", "J1_s1", "J2_s1", "J3_s1"]
+        fields = ["J_s0_1", "J_s0_2", "J_s0_3", "J_s1_1", "J_s1_2", "J_s1_3"]
         result = find_vector_triplets(fields)
         assert len(result) == 2
-        assert ("J1_s0", "J2_s0", "J3_s0") in result
-        assert ("J1_s1", "J2_s1", "J3_s1") in result
+        assert ("J_s0_1", "J_s0_2", "J_s0_3") in result
+        assert ("J_s1_1", "J_s1_2", "J_s1_3") in result
 
     def test_incomplete_triplet_excluded(self) -> None:
-        result = find_vector_triplets(["B1", "B2"])
+        result = find_vector_triplets(["B_1", "B_2"])
         assert result == []
 
     def test_mixed_fields(self) -> None:
-        fields = ["B1", "B2", "B3", "E1", "E2", "E3", "rho_c", "P"]
+        fields = ["B_1", "B_2", "B_3", "E_1", "E_2", "E_3", "rho_c", "P"]
         result = find_vector_triplets(fields)
         assert len(result) == 2
 
@@ -343,28 +343,29 @@ class TestFindVectorTriplets:
         # Regression guard for the silent BATSRUS physics bug: frame
         # rotations used to skip B0_1/B0_2/B0_3 because the regex only
         # matched a phantom B01/B02/B03 form that no reader emits.
-        result = find_vector_triplets(["B1", "B2", "B3", "B0_1", "B0_2", "B0_3"])
+        result = find_vector_triplets(["B_1", "B_2", "B_3", "B0_1", "B0_2", "B0_3"])
         assert set(result) == {
-            ("B1", "B2", "B3"),
+            ("B_1", "B_2", "B_3"),
             ("B0_1", "B0_2", "B0_3"),
         }
 
 
 class TestFindPressureTensorGroups:
     def test_complete_tensor(self) -> None:
-        fields = ["P11", "P22", "P33", "P12", "P13", "P23"]
+        fields = ["P_11", "P_22", "P_33", "P_12", "P_13", "P_23"]
         result = find_pressure_tensor_groups(fields)
         assert len(result) == 1
-        assert result[0] == ("P11", "P22", "P33", "P12", "P13", "P23")
+        assert result[0] == ("P_11", "P_22", "P_33", "P_12", "P_13", "P_23")
 
     def test_per_species(self) -> None:
-        fields = [f"P{ij}_s0" for ij in ("11", "22", "33", "12", "13", "23")]
-        fields += [f"P{ij}_s1" for ij in ("11", "22", "33", "12", "13", "23")]
+        # Tier-3 per-species tensor: ``P_s<N>_<ij>``.
+        fields = [f"P_s0_{ij}" for ij in ("11", "22", "33", "12", "13", "23")]
+        fields += [f"P_s1_{ij}" for ij in ("11", "22", "33", "12", "13", "23")]
         result = find_pressure_tensor_groups(fields)
         assert len(result) == 2
 
     def test_incomplete_excluded(self) -> None:
-        result = find_pressure_tensor_groups(["P11", "P22", "P33"])
+        result = find_pressure_tensor_groups(["P_11", "P_22", "P_33"])
         assert result == []
 
 
@@ -402,38 +403,38 @@ def _make_dataset(
 
 class TestFieldDatasetTransformTo:
     def test_same_frame_returns_self(self) -> None:
-        ds = _make_dataset({"B1": np.ones((4, 3, 2))}, transforms={"GSM": _YZ_SWAP})
+        ds = _make_dataset({"B_1": np.ones((4, 3, 2))}, transforms={"GSM": _YZ_SWAP})
         result = ds.transform_to("sim")
         assert result is ds
 
     def test_no_transforms_raises(self) -> None:
-        ds = _make_dataset({"B1": np.ones((4, 3, 2))})
+        ds = _make_dataset({"B_1": np.ones((4, 3, 2))})
         with pytest.raises(KeyError, match="No transforms"):
             ds.transform_to("GSM")
 
     def test_unknown_target_raises(self) -> None:
-        ds = _make_dataset({"B1": np.ones((4, 3, 2))}, transforms={"GSM": _YZ_SWAP})
+        ds = _make_dataset({"B_1": np.ones((4, 3, 2))}, transforms={"GSM": _YZ_SWAP})
         with pytest.raises(ValueError, match="No transform path"):
             ds.transform_to("UNKNOWN")
 
     def test_vector_fields_rotated(self) -> None:
         fields = {
-            "B1": np.full((4, 3, 2), 1.0),
-            "B2": np.full((4, 3, 2), 2.0),
-            "B3": np.full((4, 3, 2), 3.0),
+            "B_1": np.full((4, 3, 2), 1.0),
+            "B_2": np.full((4, 3, 2), 2.0),
+            "B_3": np.full((4, 3, 2), 3.0),
         }
         ds = _make_dataset(fields, transforms={"GSM": _YZ_SWAP})
         result = ds.transform_to("GSM")
-        # y↔z swap: B1→B1, B2→B3_old=3, B3→B2_old=2
-        assert_allclose(result["B1"], 1.0)
-        assert_allclose(result["B2"], 3.0)
-        assert_allclose(result["B3"], 2.0)
+        # y↔z swap: B_1→B_1, B_2→B3_old=3, B_3→B2_old=2
+        assert_allclose(result["B_1"], 1.0)
+        assert_allclose(result["B_2"], 3.0)
+        assert_allclose(result["B_3"], 2.0)
 
     def test_scalar_fields_unchanged(self) -> None:
         fields = {
-            "B1": np.ones((4, 3, 2)),
-            "B2": np.ones((4, 3, 2)),
-            "B3": np.ones((4, 3, 2)),
+            "B_1": np.ones((4, 3, 2)),
+            "B_2": np.ones((4, 3, 2)),
+            "B_3": np.ones((4, 3, 2)),
             "rho_c": np.full((4, 3, 2), 42.0),
         }
         ds = _make_dataset(fields, transforms={"GSM": _YZ_SWAP})
@@ -443,9 +444,9 @@ class TestFieldDatasetTransformTo:
     def test_frame_label_updated(self) -> None:
         ds = _make_dataset(
             {
-                "B1": np.ones((4, 3, 2)),
-                "B2": np.ones((4, 3, 2)),
-                "B3": np.ones((4, 3, 2)),
+                "B_1": np.ones((4, 3, 2)),
+                "B_2": np.ones((4, 3, 2)),
+                "B_3": np.ones((4, 3, 2)),
             },
             transforms={"GSM": _YZ_SWAP},
         )
@@ -455,9 +456,9 @@ class TestFieldDatasetTransformTo:
     def test_axis_names_updated(self) -> None:
         ds = _make_dataset(
             {
-                "B1": np.ones((4, 3, 2)),
-                "B2": np.ones((4, 3, 2)),
-                "B3": np.ones((4, 3, 2)),
+                "B_1": np.ones((4, 3, 2)),
+                "B_2": np.ones((4, 3, 2)),
+                "B_3": np.ones((4, 3, 2)),
             },
             transforms={"GSM": _YZ_SWAP},
         )
@@ -468,9 +469,9 @@ class TestFieldDatasetTransformTo:
         t = FrameTransform("sim", "GSM", origin=(10.0, 5.0, 3.0))
         ds = _make_dataset(
             {
-                "B1": np.ones((4, 3, 2)),
-                "B2": np.ones((4, 3, 2)),
-                "B3": np.ones((4, 3, 2)),
+                "B_1": np.ones((4, 3, 2)),
+                "B_2": np.ones((4, 3, 2)),
+                "B_3": np.ones((4, 3, 2)),
             },
             transforms={"GSM": t},
         )
@@ -484,9 +485,9 @@ class TestFieldDatasetTransformTo:
         t = FrameTransform("sim", "GSM", scale=2.0)
         ds = _make_dataset(
             {
-                "B1": np.ones((4, 3, 2)),
-                "B2": np.ones((4, 3, 2)),
-                "B3": np.ones((4, 3, 2)),
+                "B_1": np.ones((4, 3, 2)),
+                "B_2": np.ones((4, 3, 2)),
+                "B_3": np.ones((4, 3, 2)),
             },
             transforms={"GSM": t},
         )
@@ -495,38 +496,38 @@ class TestFieldDatasetTransformTo:
 
     def test_per_species_vectors_rotated(self) -> None:
         fields = {
-            "J1_s0": np.full((4, 3, 2), 1.0),
-            "J2_s0": np.full((4, 3, 2), 2.0),
-            "J3_s0": np.full((4, 3, 2), 3.0),
+            "J_s0_1": np.full((4, 3, 2), 1.0),
+            "J_s0_2": np.full((4, 3, 2), 2.0),
+            "J_s0_3": np.full((4, 3, 2), 3.0),
         }
         ds = _make_dataset(fields, transforms={"GSM": _YZ_SWAP})
         result = ds.transform_to("GSM")
-        assert_allclose(result["J1_s0"], 1.0)
-        assert_allclose(result["J2_s0"], 3.0)
-        assert_allclose(result["J3_s0"], 2.0)
+        assert_allclose(result["J_s0_1"], 1.0)
+        assert_allclose(result["J_s0_2"], 3.0)
+        assert_allclose(result["J_s0_3"], 2.0)
 
     def test_pressure_tensor_rotated(self) -> None:
         fields = {
-            "P11": np.full((4, 3, 2), 1.0),
-            "P22": np.full((4, 3, 2), 2.0),
-            "P33": np.full((4, 3, 2), 3.0),
-            "P12": np.full((4, 3, 2), 0.0),
-            "P13": np.full((4, 3, 2), 0.0),
-            "P23": np.full((4, 3, 2), 0.0),
+            "P_11": np.full((4, 3, 2), 1.0),
+            "P_22": np.full((4, 3, 2), 2.0),
+            "P_33": np.full((4, 3, 2), 3.0),
+            "P_12": np.full((4, 3, 2), 0.0),
+            "P_13": np.full((4, 3, 2), 0.0),
+            "P_23": np.full((4, 3, 2), 0.0),
         }
         ds = _make_dataset(fields, transforms={"GSM": _YZ_SWAP})
         result = ds.transform_to("GSM")
-        # y↔z swap on diagonal tensor: P22↔P33
-        assert_allclose(result["P11"], 1.0)
-        assert_allclose(result["P22"], 3.0)
-        assert_allclose(result["P33"], 2.0)
+        # y↔z swap on diagonal tensor: P_22↔P_33
+        assert_allclose(result["P_11"], 1.0)
+        assert_allclose(result["P_22"], 3.0)
+        assert_allclose(result["P_33"], 2.0)
 
     def test_normalization_preserved(self) -> None:
         ds = _make_dataset(
             {
-                "B1": np.ones((4, 3, 2)),
-                "B2": np.ones((4, 3, 2)),
-                "B3": np.ones((4, 3, 2)),
+                "B_1": np.ones((4, 3, 2)),
+                "B_2": np.ones((4, 3, 2)),
+                "B_3": np.ones((4, 3, 2)),
             },
             transforms={"GSM": _YZ_SWAP},
         )
@@ -544,9 +545,9 @@ class TestFieldDatasetTransformTo:
         t = FrameTransform("sim", "rotated", rotation=r)
         ds = _make_dataset(
             {
-                "B1": np.ones((4, 3, 2)),
-                "B2": np.ones((4, 3, 2)),
-                "B3": np.ones((4, 3, 2)),
+                "B_1": np.ones((4, 3, 2)),
+                "B_2": np.ones((4, 3, 2)),
+                "B_3": np.ones((4, 3, 2)),
             },
             transforms={"rotated": t},
         )
@@ -556,12 +557,12 @@ class TestFieldDatasetTransformTo:
     def test_round_trip(self) -> None:
         rng = np.random.default_rng(42)
         fields = {
-            "B1": rng.standard_normal((4, 3, 2)),
-            "B2": rng.standard_normal((4, 3, 2)),
-            "B3": rng.standard_normal((4, 3, 2)),
+            "B_1": rng.standard_normal((4, 3, 2)),
+            "B_2": rng.standard_normal((4, 3, 2)),
+            "B_3": rng.standard_normal((4, 3, 2)),
         }
         ds = _make_dataset(fields, transforms={"GSM": _YZ_SWAP})
         result = ds.transform_to("GSM").transform_to("sim")
-        assert_allclose(result["B1"], fields["B1"], atol=1e-14)
-        assert_allclose(result["B2"], fields["B2"], atol=1e-14)
-        assert_allclose(result["B3"], fields["B3"], atol=1e-14)
+        assert_allclose(result["B_1"], fields["B_1"], atol=1e-14)
+        assert_allclose(result["B_2"], fields["B_2"], atol=1e-14)
+        assert_allclose(result["B_3"], fields["B_3"], atol=1e-14)

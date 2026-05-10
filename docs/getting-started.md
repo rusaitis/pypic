@@ -36,7 +36,7 @@ For selective loading (faster for large datasets):
 data = sim.read(step=0, fields=["B", "rho_m", "P"])
 ```
 
-Vector shorthand expands automatically: `"B"` loads `B1`, `B2`, `B3`.
+Vector shorthand expands automatically: `"B"` loads `B_1`, `B_2`, `B_3`.
 
 ## Computing derived quantities
 
@@ -62,11 +62,11 @@ All computation uses normalized code units. Convert at display boundaries:
 from pypic import field_info
 
 # SI conversion
-b_si = data.in_si("B1")          # Tesla
+b_si = data.in_si("B_1")          # Tesla
 v_si = data.in_si("v_A")         # m/s
 
 # Display units
-b_nt = data.in_units("B1", "nT")
+b_nt = data.in_units("B_1", "nT")
 v_kms = data.in_units("v_A", "km/s")
 
 # Check metadata

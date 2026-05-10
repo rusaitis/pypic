@@ -527,7 +527,7 @@ class TestProbeResolveFields:
             position = [0.0, 0.0, 0.0]
         """)
         s = validate_simulation_toml(doc)
-        primitives = ["B1", "B2", "B3", "rho_c", "n_s0"]
+        primitives = ["B_1", "B_2", "B_3", "rho_c", "n_s0"]
         assert s.probes[0].resolve_fields(primitives) == primitives
 
     def test_explicit_fields_pass_through(self) -> None:
@@ -535,13 +535,13 @@ class TestProbeResolveFields:
             [[probes]]
             name = "p1"
             position = [0.0, 0.0, 0.0]
-            fields = ["B1", "beta"]
+            fields = ["B_1", "beta"]
         """)
         s = validate_simulation_toml(doc)
         # Explicit list passes through verbatim — `beta` is derived, not
         # a primitive, but the schema doesn't reject it; the sampler
         # dispatches via `compute()`.
-        assert s.probes[0].resolve_fields(["B1", "B2"]) == ["B1", "beta"]
+        assert s.probes[0].resolve_fields(["B_1", "B_2"]) == ["B_1", "beta"]
 
 
 # ---------------------------------------------------------------------------
@@ -851,17 +851,17 @@ class TestGridStagger:
     def test_stagger_position_offsets(self) -> None:
         doc = _minimal_doc() + dedent("""
             [grid.stagger.position]
-            B1 = [0.5, 0.0, 0.0]
-            E1 = [0.0, 0.5, 0.5]
+            B_1 = [0.5, 0.0, 0.0]
+            E_1 = [0.0, 0.5, 0.5]
         """)
         s = validate_simulation_toml(doc)
         assert s.grid.stagger.position is not None
-        assert s.grid.stagger.position["B1"] == [0.5, 0.0, 0.0]
+        assert s.grid.stagger.position["B_1"] == [0.5, 0.0, 0.0]
 
     def test_stagger_position_offset_out_of_range_rejected(self) -> None:
         doc = _minimal_doc() + dedent("""
             [grid.stagger.position]
-            B1 = [1.0, 0.0, 0.0]
+            B_1 = [1.0, 0.0, 0.0]
         """)
         with pytest.raises(ValidationError, match=r"\[0.0, 1.0\)"):
             validate_simulation_toml(doc)
@@ -869,7 +869,7 @@ class TestGridStagger:
     def test_stagger_position_axis_count_mismatch_rejected(self) -> None:
         doc = _minimal_doc() + dedent("""
             [grid.stagger.position]
-            B1 = [0.5, 0.0]
+            B_1 = [0.5, 0.0]
         """)
         with pytest.raises(ValidationError, match="dimensions has 3"):
             validate_simulation_toml(doc)
@@ -1675,4 +1675,133 @@ class TestReferenceSpeciesBuiltins:
             "reference_density = 1.0e6",
         )
         with pytest.raises(ValidationError, match="reference_species"):
+            validate_simulation_toml(doc)
+
+
+class TestRotationMatrix:
+    """``coordinates.transforms.rotation`` must be a 3x3 signed permutation."""
+
+    def test_signed_permutation_accepted(self) -> None:
+        doc = _minimal_doc() + dedent("""
+            [coordinates.transforms.flipped]
+            rotation = [[1.0, 0.0, 0.0], [0.0, -1.0, 0.0], [0.0, 0.0, 1.0]]
+        """)
+        s = validate_simulation_toml(doc)
+        assert s.coordinates.transforms["flipped"].rotation == [
+            [1.0, 0.0, 0.0],
+            [0.0, -1.0, 0.0],
+            [0.0, 0.0, 1.0],
+        ]
+
+    def test_axis_swap_accepted(self) -> None:
+        # GSE↔GSM-style relabel: x and z swap with sign flips.
+        doc = _minimal_doc() + dedent("""
+            [coordinates.transforms.swapped]
+            rotation = [[0.0, 0.0, 1.0], [0.0, 1.0, 0.0], [-1.0, 0.0, 0.0]]
+        """)
+        s = validate_simulation_toml(doc)
+        assert s.coordinates.transforms["swapped"].rotation is not None
+
+    def test_wrong_row_count_rejected(self) -> None:
+        doc = _minimal_doc() + dedent("""
+            [coordinates.transforms.bad]
+            rotation = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0]]
+        """)
+        with pytest.raises(ValidationError, match="3x3"):
+            validate_simulation_toml(doc)
+
+    def test_wrong_column_count_rejected(self) -> None:
+        # Vec3Float catches the row width mismatch (min_length=3, max_length=3).
+        doc = _minimal_doc() + dedent("""
+            [coordinates.transforms.bad]
+            rotation = [[1.0, 0.0], [0.0, 1.0], [0.0, 0.0]]
+        """)
+        with pytest.raises(ValidationError):
+            validate_simulation_toml(doc)
+
+    def test_non_unit_entry_rejected(self) -> None:
+        doc = _minimal_doc() + dedent("""
+            [coordinates.transforms.bad]
+            rotation = [[0.5, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]
+        """)
+        with pytest.raises(ValidationError, match="signed unit"):
+            validate_simulation_toml(doc)
+
+    def test_two_nonzeros_in_row_rejected(self) -> None:
+        doc = _minimal_doc() + dedent("""
+            [coordinates.transforms.bad]
+            rotation = [[1.0, 1.0, 0.0], [0.0, 0.0, 1.0], [0.0, 1.0, 0.0]]
+        """)
+        with pytest.raises(ValidationError, match="signed unit"):
+            validate_simulation_toml(doc)
+
+    def test_repeated_column_rejected(self) -> None:
+        # Two rows pick the same column — not a permutation.
+        doc = _minimal_doc() + dedent("""
+            [coordinates.transforms.bad]
+            rotation = [[1.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]]
+        """)
+        with pytest.raises(ValidationError, match="not a permutation"):
+            validate_simulation_toml(doc)
+
+
+class TestProbePositionLength:
+    """``[[probes]].position`` must be 3D when present."""
+
+    def test_three_d_accepted(self) -> None:
+        doc = _minimal_doc() + dedent("""
+            [[probes]]
+            name = "p1"
+            position = [1.0, 2.0, 3.0]
+        """)
+        s = validate_simulation_toml(doc)
+        assert s.probes[0].position == [1.0, 2.0, 3.0]
+
+    def test_one_d_rejected(self) -> None:
+        # Schema commits to [x, y, z] regardless of grid dimensionality —
+        # probes live in physical 3-space, the embedding the trajectory CSV
+        # is also expressed in. Catching short positions here is cheaper
+        # than letting them break at sample time.
+        doc = _minimal_doc() + dedent("""
+            [[probes]]
+            name = "p1"
+            position = [1.0]
+        """)
+        with pytest.raises(ValidationError):
+            validate_simulation_toml(doc)
+
+    def test_four_d_rejected(self) -> None:
+        doc = _minimal_doc() + dedent("""
+            [[probes]]
+            name = "p1"
+            position = [1.0, 2.0, 3.0, 4.0]
+        """)
+        with pytest.raises(ValidationError):
+            validate_simulation_toml(doc)
+
+
+class TestBodyCenterAxisCount:
+    """``[[bodies]].center`` axis count must match ``grid.dimensions``."""
+
+    def test_matching_axis_count_accepted(self) -> None:
+        doc = _minimal_doc() + dedent("""
+            [[bodies]]
+            name = "earth"
+            center = [0.0, 0.0, 0.0]
+            radius = 1.0
+        """)
+        s = validate_simulation_toml(doc)
+        assert s.bodies[0].center == [0.0, 0.0, 0.0]
+
+    def test_axis_count_mismatch_rejected(self) -> None:
+        # Minimal doc declares a 3D grid; a 2-element center is the same
+        # alignment violation that boundary_conditions.lower and
+        # coordinates.physical_extent already catch.
+        doc = _minimal_doc() + dedent("""
+            [[bodies]]
+            name = "earth"
+            center = [0.0, 0.0]
+            radius = 1.0
+        """)
+        with pytest.raises(ValidationError, match=r"grid\.dimensions"):
             validate_simulation_toml(doc)

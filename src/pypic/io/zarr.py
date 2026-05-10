@@ -395,7 +395,7 @@ def to_zarr(
     >>> from pypic.units import Normalization
     >>> grid = GridInfo(dimensions=(4, 3, 2), spacing=(1.0, 1.0, 1.0))
     >>> fds = FieldDataset.from_arrays(
-    ...     {"B1": np.ones((4, 3, 2))}, grid, Normalization.identity(),
+    ...     {"B_1": np.ones((4, 3, 2))}, grid, Normalization.identity(),
     ... )
     >>> # to_zarr(fds, "/tmp/test.zarr")  # writes to disk
     """
@@ -568,9 +568,9 @@ def to_zarr_timeseries(
     >>> grid = GridInfo(dimensions=(4, 3), spacing=(1.0, 1.0))
     >>> pairs = [
     ...     (0.0, FieldDataset.from_arrays(
-    ...         {"B1": np.ones((4, 3))}, grid, Normalization.identity())),
+    ...         {"B_1": np.ones((4, 3))}, grid, Normalization.identity())),
     ...     (1.0, FieldDataset.from_arrays(
-    ...         {"B1": np.ones((4, 3)) * 2}, grid, Normalization.identity())),
+    ...         {"B_1": np.ones((4, 3)) * 2}, grid, Normalization.identity())),
     ... ]
     >>> # to_zarr_timeseries(pairs, "/tmp/ts.zarr")
     """

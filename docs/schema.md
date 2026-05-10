@@ -315,10 +315,10 @@ E = "edge"
 J = "edge"
 
 [grid.stagger.position]            # Tier 3 — per-component ED-PIC offsets in [0.0, 1.0)
-B1 = [0.5, 0.0, 0.0]               # B_x on the x-face
-B2 = [0.0, 0.5, 0.0]               # B_y on the y-face
-B3 = [0.0, 0.0, 0.5]               # B_z on the z-face
-E1 = [0.0, 0.5, 0.5]               # E_x on the x-edge
+B_1 = [0.5, 0.0, 0.0]               # B_x on the x-face
+B_2 = [0.0, 0.5, 0.0]               # B_y on the y-face
+B_3 = [0.0, 0.0, 0.5]               # B_z on the z-face
+E_1 = [0.0, 0.5, 0.5]               # E_x on the x-edge
 ```
 
 **Stagger layering.** Three tiers, all optional, all additive — same
@@ -932,7 +932,7 @@ locations. Each probe is either **fixed** (constant `position`) or a
 [[probes]]
 name = "magnetopause_monitor"      # REQUIRED — human-readable label
 position = [10.0, 0.0, 0.0]        # XOR with `trajectory` — fixed: [x, y, z] in code units
-fields = ["B1", "B2", "B3", "beta"]  # optional: fields to sample.
+fields = ["B_1", "B_2", "B_3", "beta"]  # optional: fields to sample.
                                      # Default (omitted): every
                                      # storage-primitive field present
                                      # in the dataset at probe time —
@@ -963,7 +963,7 @@ For physics equations and SI conversions, see
 
 ### Dual naming convention
 
-Vector field components use **numbered indices** (`B1`, `B2`, `B3`) as
+Vector field components use **numbered indices** (`B_1`, `B_2`, `B_3`) as
 the general canonical form. The coordinate geometry determines what
 each index means:
 
@@ -974,16 +974,16 @@ each index means:
 | 3 | z | φ | z | mode index |
 
 For Cartesian data, letter aliases (`Bx`, `By`, `Bz`) are preferred for
-readability and access the same data as `B1`, `B2`, `B3`. For non-Cartesian
+readability and access the same data as `B_1`, `B_2`, `B_3`. For non-Cartesian
 data, only the numbered form is canonical; the reader registers
-geometry-appropriate aliases (e.g., `Br` → `B1` for spherical). The
+geometry-appropriate aliases (e.g., `Br` → `B_1` for spherical). The
 `[coordinates] geometry` field determines which aliases are active.
 
 **Alias-on-disk policy.** Aliases are read-time conveniences, derived
 from `[coordinates].geometry` after the file is opened. Writers MUST
-emit only the numbered canonical form (`B1` / `B2` / `B3`,
-`B0_1` / `B0_2` / `B0_3`, `n_s0`, `V1_s1`, `P11_s0`, …). Storing
-both `B1` and `Bx` for the same data is redundant and not part of
+emit only the numbered canonical form (`B_1` / `B_2` / `B_3`,
+`B0_1` / `B0_2` / `B0_3`, `n_s0`, `V_s1_1`, `P_s0_11`, …). Storing
+both `B_1` and `Bx` for the same data is redundant and not part of
 the v1.0 contract — readers that encounter both should treat the
 numbered form as authoritative and ignore the duplicate.
 
@@ -998,9 +998,9 @@ and imaginary axes.
 
 | Canonical | Cartesian alias | Meaning | Present in |
 |-----------|----------------|---------|------------|
-| `B1`, `B2`, `B3` | `Bx`, `By`, `Bz` | Magnetic field components | PIC, MHD |
+| `B_1`, `B_2`, `B_3` | `Bx`, `By`, `Bz` | Magnetic field components | PIC, MHD |
 | `B0_1`, `B0_2`, `B0_3` | `B0x`, `B0y`, `B0z` | Background magnetic field (split-B) | MHD (optional) |
-| `E1`, `E2`, `E3` | `Ex`, `Ey`, `Ez` | Electric field components | PIC (MHD: derived) |
+| `E_1`, `E_2`, `E_3` | `Ex`, `Ey`, `Ez` | Electric field components | PIC (MHD: derived) |
 
 ### Fluid / moment quantities — densities
 
@@ -1013,14 +1013,14 @@ and imaginary axes.
 `rho_c` and `rho_m` are unambiguous — no overloaded `rho`.
 
 **Per-species naming:** Append `_s` plus the 0-based species index
-(`rho_c_s0`, `J1_s1`, `n_s3`); the component index comes before the
-species suffix (`J1_s0`, `EF2_s1`). The species *name* lives in
+(`rho_c_s0`, `J_s1_1`, `n_s3`); the component index comes before the
+species suffix (`J_s0_1`, `EF_s1_2`). The species *name* lives in
 `[[species]]`, not in the field name.
 
 **Species-name aliases:** For any species, the canonical `<prefix>_s<index>`
 form has an automatically-generated `<prefix>_<species_name>` alias when
 the species name is declared in `[[species]]`. `n_s0` becomes `n_electrons`
-when `species[0].name == "electrons"`; `EF1_s1` becomes `EF1_protons` when
+when `species[0].name == "electrons"`; `EF_s1_1` becomes `EF1_protons` when
 `species[1].name == "protons"`. The alias is added at `FieldDataset`
 construction time and only registered when the underlying canonical is
 actually present in the dataset, so missing data produces a clean
@@ -1031,12 +1031,12 @@ unambiguous way to reference per-species quantities — the integer index
 depends on declaration order.
 
 **Vector group shorthand in `read()`:** Passing a bare prefix like
-`"B"` to `read(fields=...)` expands to `B1, B2, B3`. Per-species
+`"B"` to `read(fields=...)` expands to `B_1, B_2, B_3`. Per-species
 groups work the same way: `"EF_s0"` expands to
-`EF1_s0, EF2_s0, EF3_s0`. Derived quantities expand to their
+`EF_s0_1, EF_s0_2, EF_s0_3`. Derived quantities expand to their
 dependencies: `"P_s1"` loads the six ion pressure tensor components,
 `"P_par"` loads the six total-pressure tensor components plus
-`B1`..`B3`.
+`B_1`..`B_3`.
 
 pypic also ships **library-side convenience aliases** for the common
 two-species electron/ion case (`Pe ↔ P_s0`, `n_i ↔ n_s1`,
@@ -1046,14 +1046,14 @@ are not part of the cross-tool schema contract; non-pypic consumers
 
 What does *not* expand: already-resolved single-component aliases
 (`"Bx"`, `"Br"`, `"E_phi"`) and names whose prefix already ends in
-a digit (`"B1"`, `"P11_s1"`) are passed through as scalars. In
-particular, requesting `"P11"` alone loads only `P11` — if a later
+a digit (`"B_1"`, `"P_s1_11"`) are passed through as scalars. In
+particular, requesting `"P_11"` alone loads only `P_11` — if a later
 `compute("P_par")` / `"P_perp"` / `"agyrotropy"` needs the full
 tensor, request the tensor explicitly via `"P_s0"` / `"P_s1"` /
 `"P_sN"`, or request the derived quantity itself.
 
 The same expansion rules apply to `[output.fields].quantities` —
-listing `"B"` writes `B1`, `B2`, `B3`; listing `"P_s1"` writes the
+listing `"B"` writes `B_1`, `B_2`, `B_3`; listing `"P_s1"` writes the
 six second-species pressure tensor components.
 
 **Current limitations:**
@@ -1069,10 +1069,10 @@ six second-species pressure tensor components.
 
 | Canonical | Cartesian alias | Meaning | Present in |
 |-----------|----------------|---------|------------|
-| `J1`, `J2`, `J3` | `Jx`, `Jy`, `Jz` | Current density | PIC (deposited), MHD (∇×B) |
-| `V1`, `V2`, `V3` | `Vx`, `Vy`, `Vz` | Fluid bulk velocity (single-fluid MHD) | MHD |
-| `V1_s{N}`, `V2_s{N}`, `V3_s{N}` | — | Per-species bulk velocity | PIC, multi-fluid MHD |
-| `u1`, `u2`, `u3` | `ux`, `uy`, `uz` | Four-velocity spatial components ($\gamma v^i$) | Relativistic PIC |
+| `J_1`, `J_2`, `J_3` | `Jx`, `Jy`, `Jz` | Current density | PIC (deposited), MHD (∇×B) |
+| `V_1`, `V_2`, `V_3` | `Vx`, `Vy`, `Vz` | Fluid bulk velocity (single-fluid MHD) | MHD |
+| `V_s{N}_1`, `V_s{N}_2`, `V_s{N}_3` | — | Per-species bulk velocity | PIC, multi-fluid MHD |
+| `u_1`, `u_2`, `u_3` | `ux`, `uy`, `uz` | Four-velocity spatial components ($\gamma v^i$) | Relativistic PIC |
 | `gamma_L` | — | Bulk Lorentz factor | Rel. PIC, Rel. MHD (derived) |
 | `P` | — | Total scalar pressure | MHD, PIC (moments) |
 | `P_s{N}` | — | Per-species scalar pressure | PIC, multi-fluid MHD |
@@ -1099,13 +1099,13 @@ the dataset's physics config.
 
 | Canonical | Cartesian alias | Meaning | Present in |
 |-----------|----------------|---------|------------|
-| `S1`, `S2`, `S3` | `Sx`, `Sy`, `Sz` | Poynting flux | PIC, MHD |
-| `EF1_s{N}`, `EF2_s{N}`, `EF3_s{N}` | — | Per-species total energy flux (3rd moment) | PIC, multi-moment MHD |
-| `KEF1_s{N}`, `KEF2_s{N}`, `KEF3_s{N}` | — | Per-species kinetic energy flux (bulk flow) | PIC, MHD (derived) |
-| `HF1_s{N}`, `HF2_s{N}`, `HF3_s{N}` | — | Per-species total thermal flux (EF − KEF) | PIC, multi-moment MHD |
-| `EHF1`, `EHF2`, `EHF3` | — | Enthalpy flux (total, fluid) | MHD, PIC (derived) |
-| `EHF1_s{N}`, `EHF2_s{N}`, `EHF3_s{N}` | — | Per-species enthalpy flux | PIC, MHD (derived) |
-| `q1_s{N}`, `q2_s{N}`, `q3_s{N}` | — | Per-species conductive heat flux (HF − EHF) | PIC, multi-moment MHD |
+| `S_1`, `S_2`, `S_3` | `Sx`, `Sy`, `Sz` | Poynting flux | PIC, MHD |
+| `EF_s{N}_1`, `EF_s{N}_2`, `EF_s{N}_3` | — | Per-species total energy flux (3rd moment) | PIC, multi-moment MHD |
+| `KEF_s{N}_1`, `KEF_s{N}_2`, `KEF_s{N}_3` | — | Per-species kinetic energy flux (bulk flow) | PIC, MHD (derived) |
+| `HF_s{N}_1`, `HF_s{N}_2`, `HF_s{N}_3` | — | Per-species total thermal flux (EF − KEF) | PIC, multi-moment MHD |
+| `EHF_1`, `EHF_2`, `EHF_3` | — | Enthalpy flux (total, fluid) | MHD, PIC (derived) |
+| `EHF_s{N}_1`, `EHF_s{N}_2`, `EHF_s{N}_3` | — | Per-species enthalpy flux | PIC, MHD (derived) |
+| `q_s{N}_1`, `q_s{N}_2`, `q_s{N}_3` | — | Per-species conductive heat flux (HF − EHF) | PIC, multi-moment MHD |
 | `e_B` | — | Magnetic energy density | PIC, MHD |
 | `e_E` | — | Electric energy density | PIC |
 | `e_k` | — | Kinetic energy density (total) | MHD, PIC (moments) |
@@ -1122,14 +1122,14 @@ the dataset's physics config.
 |-----------|---------|------------|
 | `P_par` | Pressure parallel to B | PIC, multi-moment MHD (from tensor) |
 | `P_perp` | Pressure perpendicular to B | PIC, multi-moment MHD (from tensor) |
-| `Pij` | Full pressure tensor (6 independent components: P11, P12, P13, P22, P23, P33) | PIC, multi-moment MHD |
+| `Pij` | Full pressure tensor (6 independent components: P_11, P_12, P_13, P_22, P_23, P_33) | PIC, multi-moment MHD |
 | `agyrotropy` | Swisdak $Q$ — see [equations.md § Pressure Tensor](equations.md#4-pressure-tensor) for the closed form $Q = \sqrt{1 - 4 I_2 / [(I_1 - P_\parallel)(I_1 + 3 P_\parallel)]}$, bounded $[0, 1]$ | PIC, multi-moment MHD (derived) |
 
 Any code that evolves the full pressure tensor — PIC, hybrid, 10-moment
 MHD, CGL — can populate these fields. `P_par` and `P_perp` are
-decomposed from the **total** pressure tensor (`P11..P33`). Per-species
+decomposed from the **total** pressure tensor (`P_11..P_33`). Per-species
 decomposition (`P_par_s0`, `P_perp_s0`) uses the per-species tensors
-(`P11_s0..P33_s0`).
+(`P_s0_11..P_s0_33`).
 
 **Storage vs derived.** Two tiers, in preference order:
 
@@ -1163,7 +1163,7 @@ stays $\hat{b}$-fresh under frame transforms. The HDF5 layout (§4.1)
 and the Zarr layout (§4.2) both show the six-component form as the
 canonical naming because that's the higher-fidelity tier; the
 acceptable-tier shape is the same store with `P_par` / `P_perp`
-arrays in place of `P11..P33`.
+arrays in place of `P_11..P_33`.
 
 ### Characteristic scales (derived)
 
@@ -1197,21 +1197,21 @@ in pypic. The corresponding `_sN` forms (e.g. `omega_c_s0`,
 
 | Canonical | Cartesian alias | Meaning | Computed from |
 |-----------|----------------|---------|---------------|
-| `\|B\|` | — | Magnetic field magnitude | B1, B2, B3 |
-| `\|E\|` | — | Electric field magnitude | E1, E2, E3 |
-| `\|J\|` | — | Current density magnitude | J1, J2, J3 |
-| `\|V\|` | — | Bulk velocity magnitude | V1, V2, V3 |
-| `\|V\|_s{N}` | — | Per-species velocity magnitude | V1_s{N}, V2_s{N}, V3_s{N} |
-| `div_B` | — | Divergence of B (should be ~0) | B1, B2, B3, grid |
-| `div_E` | — | Divergence of E | E1, E2, E3, grid |
-| `curl_B1`, `curl_B2`, `curl_B3` | `curl_Bx`, ... | Curl of B | B1, B2, B3, grid |
-| `vort1`, `vort2`, `vort3` | `vort_x`, ... | Fluid vorticity | V1, V2, V3, grid |
-| `\|vort\|` | — | Vorticity magnitude | vort1, vort2, vort3 |
-| `J_dot_E` | — | Energy conversion rate | J1-J3, E1-E3 |
-| `E_prime_1`, `E_prime_2`, `E_prime_3` | `E_prime_x`, `E_prime_y`, `E_prime_z` | Non-ideal electric field | E1-E3, V1-V3, B1-B3 |
-| `E_ideal_1`, `E_ideal_2`, `E_ideal_3` | `E_ideal_x`, `E_ideal_y`, `E_ideal_z` | Ideal electric field | V1-V3, B1-B3 |
-| `E_Hall_1`, `E_Hall_2`, `E_Hall_3` | `E_Hall_x`, `E_Hall_y`, `E_Hall_z` | Hall electric field | J1-J3, B1-B3, n\_s0, species |
-| `psi` | — | Magnetic flux function (2D) | B2, grid |
+| `\|B\|` | — | Magnetic field magnitude | B_1, B_2, B_3 |
+| `\|E\|` | — | Electric field magnitude | E_1, E_2, E_3 |
+| `\|J\|` | — | Current density magnitude | J_1, J_2, J_3 |
+| `\|V\|` | — | Bulk velocity magnitude | V_1, V_2, V_3 |
+| `\|V\|_s{N}` | — | Per-species velocity magnitude | V_s{N}_1, V_s{N}_2, V_s{N}_3 |
+| `div_B` | — | Divergence of B (should be ~0) | B_1, B_2, B_3, grid |
+| `div_E` | — | Divergence of E | E_1, E_2, E_3, grid |
+| `curl_B_1`, `curl_B_2`, `curl_B_3` | `curl_Bx`, ... | Curl of B | B_1, B_2, B_3, grid |
+| `vort_1`, `vort_2`, `vort_3` | `vort_x`, ... | Fluid vorticity | V_1, V_2, V_3, grid |
+| `\|vort\|` | — | Vorticity magnitude | vort_1, vort_2, vort_3 |
+| `J_dot_E` | — | Energy conversion rate | J_1-J_3, E_1-E_3 |
+| `E_prime_1`, `E_prime_2`, `E_prime_3` | `E_prime_x`, `E_prime_y`, `E_prime_z` | Non-ideal electric field | E_1-E_3, V_1-V_3, B_1-B_3 |
+| `E_ideal_1`, `E_ideal_2`, `E_ideal_3` | `E_ideal_x`, `E_ideal_y`, `E_ideal_z` | Ideal electric field | V_1-V_3, B_1-B_3 |
+| `E_Hall_1`, `E_Hall_2`, `E_Hall_3` | `E_Hall_x`, `E_Hall_y`, `E_Hall_z` | Hall electric field | J_1-J_3, B_1-B_3, n\_s0, species |
+| `psi` | — | Magnetic flux function (2D) | B_2, grid |
 | `firehose` | — | Firehose instability parameter | P\_par, P\_perp, \|B\| |
 | `mirror` | — | Mirror instability parameter | P\_par, P\_perp, \|B\| |
 
@@ -1285,8 +1285,8 @@ Two on-disk layouts are defined, with deliberately asymmetric roles:
   `pypic.io.to_zarr` / `to_zarr_timeseries`.  Fields under
   `/fields`, metadata as flat keys on the root group's attrs.
 
-Both layouts share the same **numbered canonical field names** (`B1`,
-`B2`, `B3`) and the same section-level metadata vocabulary, and both
+Both layouts share the same **numbered canonical field names** (`B_1`,
+`B_2`, `B_3`) and the same section-level metadata vocabulary, and both
 carry the schema version at the root attr path `schema.version`
 (`/schema/version` for HDF5, `attrs.schema.version` for Zarr) whose
 value equals `simulation.toml`'s `[schema].version` — a single
@@ -1304,22 +1304,22 @@ here.  The Rust simulation code writes this layout directly, so the
 section doubles as its output specification.
 
 Each timestep is a separate file (or group within a file).  Field
-datasets use the **numbered canonical names** (`B1`, `B2`, `B3`),
+datasets use the **numbered canonical names** (`B_1`, `B_2`, `B_3`),
 which are geometry-agnostic.
 
 ```
 output_{step:06d}.h5
 │
 ├── fields/                            # group: field data (numbered canonical names)
-│   ├── B1, B2, B3                     # [dataset, float64, shape (n1, n2, n3)]
-│   ├── E1, E2, E3
-│   ├── J1, J2, J3
+│   ├── B_1, B_2, B_3                     # [dataset, float64, shape (n1, n2, n3)]
+│   ├── E_1, E_2, E_3
+│   ├── J_1, J_2, J_3
 │   ├── rho_c                          # PIC: charge density (omit for MHD-only output)
 │   ├── rho_m                          # MHD: mass density   (PIC may also write derived)
 │   ├── n_s0, n_s1, ...                # per-species number densities
-│   ├── V1_s0, V2_s0, V3_s0, ...       # per-species bulk velocities
-│   ├── P11_s0, P12_s0, ..., P33_s0    # per-species pressure tensor (6 components)
-│   └── u1, u2, u3                     # optional — four-velocity (relativistic PIC)
+│   ├── V_s0_1, V_s0_2, V_s0_3, ...       # per-species bulk velocities
+│   ├── P_s0_11, P_s0_12, ..., P_s0_33    # per-species pressure tensor (6 components)
+│   └── u_1, u_2, u_3                     # optional — four-velocity (relativistic PIC)
 │
 ├── grid/                              # group: grid metadata
 │   ├── dimensions      [attr: (n1, n2, n3)]
@@ -1332,7 +1332,7 @@ output_{step:06d}.h5
 │   └── stagger/                              # group — three optional tiers (§2 [grid.stagger])
 │       ├── convention [attr: "cell"]         # Tier 1 — "cell" | "node" | "staggered"
 │       ├── fields     [attr: {"B": "face", "E": "edge", "J": "edge"}]   # Tier 2
-│       └── position   [attr: {"B1": (0.5, 0.0, 0.0), "B2": (0.0, 0.5, 0.0), ...}]  # Tier 3 (ED-PIC)
+│       └── position   [attr: {"B_1": (0.5, 0.0, 0.0), "B_2": (0.0, 0.5, 0.0), ...}]  # Tier 3 (ED-PIC)
 │
 ├── normalization/                     # group: unit conversion metadata
 │   ├── system        [attr: "PIC"]    # "PIC" | "MHD" | "SI" | "custom"
@@ -1368,11 +1368,11 @@ output_{step:06d}.h5
 
 Every file contains enough metadata to convert back to SI without the
 original `simulation.toml` and to interpret per-species field names
-(`n_s0`, `V1_s1`, ...) without it.  The `schema/version` attr lets a
+(`n_s0`, `V_s1_1`, ...) without it.  The `schema/version` attr lets a
 streaming consumer dispatch on layout vocabulary without sniffing the
 rest of the file. The HDF5 file itself always uses numbered names;
-`geometry` drives alias registration in the reader (`Bx → B1` for
-cartesian, `Br → B1` for spherical, etc). Existing readers (iPIC3D,
+`geometry` drives alias registration in the reader (`Bx → B_1` for
+cartesian, `Br → B_1` for spherical, etc). Existing readers (iPIC3D,
 BATSRUS, ...) translate native layouts; the Rust code writes this
 layout directly.
 
@@ -1415,8 +1415,8 @@ my_store.zarr/                         # Zarr v3 group root
 │                         StaggerInfo as tagged dict ... }
 │
 └── fields/                             # /fields child group
-    ├── B1, B2, B3, ...                 # field arrays
-    ├── E1, E2, E3, ..., rho_c, rho_m, J1, ..., u1, u2, u3
+    ├── B_1, B_2, B_3, ...                 # field arrays
+    ├── E_1, E_2, E_3, ..., rho_c, rho_m, J_1, ..., u_1, u_2, u_3
     ├── x, y, z                         # 1-D coordinate arrays
     │                                   #   (axis names match geometry)
     └── time                            # only for multi-step writes
@@ -1452,7 +1452,7 @@ write; user-supplied `encoding=` overrides per variable.
 
 | Aspect | §4.1 HDF5 | §4.2 Zarr |
 |---|---|---|
-| Field path | `/fields/B1` | `/fields/B1` |
+| Field path | `/fields/B_1` | `/fields/B_1` |
 | Grid metadata | `/grid/` group with attrs | root `attrs.grid` (JSON) |
 | Stagger metadata | `/grid/stagger/` sub-group (`convention`, `fields`, `position`) | root `attrs.metadata` (StaggerInfo as tagged dict) |
 | Normalization | `/normalization/` group | root `attrs.normalization` |
@@ -1482,7 +1482,7 @@ required.  Coordinate arrays under `/fields` make the data
 self-describing in CF/COARDS terms.
 
 **Field naming invariant.**  Stored arrays use the numbered
-canonical names (`B1`, `B2`, `B3`).  Geometry- and species-aliases
+canonical names (`B_1`, `B_2`, `B_3`).  Geometry- and species-aliases
 are read-time conveniences resolved by `FieldDataset`; they never
 appear on disk.
 

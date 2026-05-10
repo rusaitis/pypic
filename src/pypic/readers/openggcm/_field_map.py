@@ -21,12 +21,12 @@ if TYPE_CHECKING:
 
 # OpenGGCM name → canonical name
 FIELD_NAME_MAP: dict[str, str] = {
-    "vx": "V1",
-    "vy": "V2",
-    "vz": "V3",
-    "bx1": "B1",
-    "by1": "B2",
-    "bz1": "B3",
+    "vx": "V_1",
+    "vy": "V_2",
+    "vz": "V_3",
+    "bx1": "B_1",
+    "by1": "B_2",
+    "bz1": "B_3",
     "rr": "rho_m",
     "pp": "P",
 }

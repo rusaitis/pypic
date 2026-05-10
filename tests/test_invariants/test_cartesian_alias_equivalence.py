@@ -1,13 +1,13 @@
 # Source: docs/schema.md § 3 ("For Cartesian data, letter aliases
 #         (Bx, By, Bz) are preferred for readability and access the
-#         same data as B1, B2, B3") + docs/schema.md § "Split-B naming"
+#         same data as B_1, B_2, B_3") + docs/schema.md § "Split-B naming"
 #         ("B0_1, B0_2, B0_3 (aliases: B0x, B0y, B0z)") +
 #         src/pypic/grid.py:148-159 (_FIELD_PREFIX_PAIRS enumerates every
 #         vector prefix that must have Cartesian aliases registered).
 # Claim: for every registered vector prefix, the Cartesian alias
 #        (prefix + x/y/z) must return bit-exact the same array as the
 #        numbered canonical (prefix + 1/2/3). The canonical-side name
-#        pattern differs per prefix: "B" uses "B1", "B0" uses "B0_1"
+#        pattern differs per prefix: "B" uses "B_1", "B0" uses "B0_1"
 #        (schema.md "The background field prefix B0 ends in a digit,
 #        so its components use an underscore separator").
 # Regression guard for the fix surfaced by autoresearcher iter 29.
@@ -30,7 +30,7 @@ from pypic.units import Normalization
 SHAPE = (3, 4)
 
 # (alias_prefix, canonical_pattern) — canonical_pattern uses "{i}" for the
-# component index. Most prefixes plug straight in ("B" → "B1"), but "B0"
+# component index. Most prefixes plug straight in ("B" → "B_1"), but "B0"
 # needs the underscore separator per schema.md.
 _PREFIX_CASES = [
     ("B", "B{i}"),

@@ -549,7 +549,9 @@ def convert_fields(
     ] = "all",
     fields: Annotated[
         str | None,
-        typer.Option("--fields", help="Comma-separated field names (e.g. B,E3,rho_c)."),
+        typer.Option(
+            "--fields", help="Comma-separated field names (e.g. B,E_3,rho_c)."
+        ),
     ] = None,
     box: Annotated[
         str | None,
@@ -1531,20 +1533,20 @@ def validate(
             nan_fields[name] = count
     total_nan = sum(nan_fields.values())
 
-    has_b = all(ds.has_field(f) for f in ("B1", "B2", "B3"))
-    has_e = all(ds.has_field(f) for f in ("E1", "E2", "E3"))
+    has_b = all(ds.has_field(f) for f in ("B_1", "B_2", "B_3"))
+    has_e = all(ds.has_field(f) for f in ("E_1", "E_2", "E_3"))
 
     div_b_val: float | None = None
     b_energy: float | None = None
     e_energy: float | None = None
 
     if has_b:
-        b1, b2, b3 = ds["B1"], ds["B2"], ds["B3"]
+        b1, b2, b3 = ds["B_1"], ds["B_2"], ds["B_3"]
         b_mag = np.sqrt(b1**2 + b2**2 + b3**2)
         div_b_val = float(max_div_b(b1, b2, b3, *ds.grid.spacing))
         b_energy = float(field_energy(magnetic_energy_density(b_mag), ds.grid.spacing))
     if has_e:
-        e1, e2, e3 = ds["E1"], ds["E2"], ds["E3"]
+        e1, e2, e3 = ds["E_1"], ds["E_2"], ds["E_3"]
         e_mag = np.sqrt(e1**2 + e2**2 + e3**2)
         e_energy = float(field_energy(electric_energy_density(e_mag), ds.grid.spacing))
 

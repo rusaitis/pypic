@@ -445,10 +445,10 @@ quantities    = ["B", "E", "J", "rho_c",
                  "V_s0", "V_s1",
                  "P_s0", "P_s1"]
 # `quantities` shorthand expansion (read- and write-side both):
-#   "B"    -> B1, B2, B3                                  (vector group)
-#   "V_s0" -> V1_s0, V2_s0, V3_s0                         (per-species vector)
-#   "P_s0" -> P11_s0, P12_s0, P13_s0, P22_s0, P23_s0, P33_s0   (per-species tensor)
-# Already-resolved single-component aliases ("Bx", "Br", "P11", "P11_s0")
+#   "B"    -> B_1, B_2, B_3                                  (vector group)
+#   "V_s0" -> V_s0_1, V_s0_2, V_s0_3                         (per-species vector)
+#   "P_s0" -> P_s0_11, P_s0_12, P_s0_13, P_s0_22, P_s0_23, P_s0_33   (per-species tensor)
+# Already-resolved single-component aliases ("Bx", "Br", "P_11", "P_s0_11")
 # are passed through unexpanded; request the tensor explicitly when a
 # downstream `compute("P_par")` / `agyrotropy` needs it.
 dir           = "./fields"
@@ -540,7 +540,7 @@ value = 0.0
 [[probes]]
 name     = "reconnection_line"
 position = [0.0, 0.0, 0.0]
-fields   = ["B1", "B2", "B3", "E1", "E2", "E3", "J_dot_E"]
+fields   = ["B_1", "B_2", "B_3", "E_1", "E_2", "E_3", "J_dot_E"]
 
 [[probes]]
 name       = "virtual_MMS1"
@@ -613,7 +613,7 @@ created = 2026-04-23
 # active-region flux-rope eruption driven by an HMI photospheric
 # magnetogram time series. It demonstrates parts of the schema that
 # Cartesian scenarios don't exercise:
-#   * [coordinates].geometry = "spherical" — numbered fields B1/B2/B3 are
+#   * [coordinates].geometry = "spherical" — numbered fields B_1/B_2/B_3 are
 #     physically B_r / B_θ / B_φ, selected by the geometry field.
 #   * Non-Cartesian [boundary_conditions] vocabulary — "driven" (photosphere
 #     forced by magnetogram), "pole" (θ axis handling), "periodic" (φ wrap).
@@ -869,7 +869,7 @@ created = 2026-04-23
 # # direction                    = "one_way"   # pre-computed MHD fields; no feedback
 # # description                  = "BATSRUS MHD fields as coronal-scale background"
 # # source                       = "../batsrus_run_042/output/"
-# # fields                       = ["B1", "B2", "B3", "V1", "V2", "V3"]
+# # fields                       = ["B_1", "B_2", "B_3", "V_1", "V_2", "V_3"]
 # # source_physical_extent       = [40.0, 20.0, 20.0]
 # # source_physical_extent_unit  = "R_sun"
 # # target_lower                 = [5.0, 0.87, -0.87]
@@ -923,14 +923,14 @@ created = 2026-04-23
 # # Active-region apex — mimics SDO AIA line-of-sight sample above the AR
 # name     = "ar13664_apex"
 # position = [1.1, 1.45, 0.0]            # (r, θ, φ) in code units
-# fields   = ["B1", "B2", "B3", "V1", "V2", "V3", "P", "rho_m"]
+# fields   = ["B_1", "B_2", "B_3", "V_1", "V_2", "V_3", "P", "rho_m"]
 #
 # [[probes]]
 # # Parker Solar Probe encounter position (perihelion ≈ 9.86 R_sun, but
 # # PSP spends time out to ~15 R_sun during encounters)
 # name     = "psp_encounter"
 # position = [15.0, 1.73, 0.0]
-# fields   = ["B1", "B2", "B3", "V1", "V2", "V3", "rho_m", "P", "beta"]
+# fields   = ["B_1", "B_2", "B_3", "V_1", "V_2", "V_3", "rho_m", "P", "beta"]
 #
 # [schema]
 # version = "1.0"
@@ -1120,7 +1120,7 @@ created = 2026-04-23
 # direction     = "one_way"              # observational data; simulation can't affect spacecraft
 # description   = "BepiColombo MPO solar-wind monitor, Hermean dayside pass"
 # source        = "drivers/bepi_mpo_2026_04_20.csv"
-# columns       = ["t", "B1", "B2", "B3", "V1", "V2", "V3", "n", "T"]
+# columns       = ["t", "B_1", "B_2", "B_3", "V_1", "V_2", "V_3", "n", "T"]
 # cadence       = 8.0                    # seconds between samples (MPO MAG cadence)
 # interpolation = "linear"
 # # Inflow face at x = -192 d_i (-3.2 R_M, tailward edge of box)
@@ -1222,13 +1222,13 @@ created = 2026-04-23
 # # Subsolar bow shock at ~1.4 R_M upstream (typical Mercury standoff)
 # name     = "bow_shock_subsolar"
 # position = [84.0, 0.0, 0.0]            # +1.4 R_M ≈ +84 d_i
-# fields   = ["B1", "B2", "B3", "V1", "V2", "V3", "P_s0", "J_dot_E"]
+# fields   = ["B_1", "B_2", "B_3", "V_1", "V_2", "V_3", "P_s0", "J_dot_E"]
 #
 # [[probes]]
 # # Northern cusp — where BepiColombo MPO samples field-aligned currents
 # name     = "cusp_north"
 # position = [30.0, 0.0, 50.0]
-# fields   = ["B1", "B2", "B3", "V1", "V2", "V3", "P_s0"]
+# fields   = ["B_1", "B_2", "B_3", "V_1", "V_2", "V_3", "P_s0"]
 #
 # [schema]
 # version = "1.0"

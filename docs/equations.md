@@ -45,11 +45,23 @@ $\mu_0$ separates them.
 
 ## 1. Densities and Moments
 
-Per-species symbols `Pe`, `Pi`, `Ve`, `Te`, `Ti`, `n_e`, `n_i` shown
-below are pypic library-side aliases [^aliases]. The cross-tool
-canonical form uses 0-based species indices: `P_s{N}`, `V_s{N}`,
-`T_s{N}`, `n_s{N}` (see [schema.md § Per-species
+Per-species e/i suffix names throughout this document are pypic
+library-side aliases [^aliases]. Two stylistic patterns appear,
+forced by identifier readability:
+
+- **Uppercase prefix → no underscore:** `Pe`, `Pi`, `Ve`, `Vi`,
+  `Te`, `Ti`, and the multi-letter forms `EFe`, `KEFi`, `HFi`,
+  `EHFe` — alias the canonical `_s0` / `_s1` per-species form.
+- **Lowercase prefix → underscore mandatory:** `n_e`, `n_i`, `s_e`,
+  `s_i`, `beta_e`, `beta_i`, `q_e`, `q_i`, `P_par_e`, `s_gyro_e`,
+  ... — same alias relationship, written with `_e` / `_i` because
+  `betae` / `se` would be unreadable.
+
+The cross-tool canonical form uses 0-based species indices: `P_s{N}`,
+`V_s{N}`, `T_s{N}`, `n_s{N}`, `s_s{N}`, `beta_s{N}`, `q_s{N}` (see
+[schema.md § Per-species
 naming](schema.md#fluid--moment-quantities--densities)).
+See [Aliases](aliases.md) for the full registration list.
 
 | Name | Description | Normalized | SI |
 |------|-------------|------------|-----|
@@ -81,8 +93,8 @@ naming](schema.md#fluid--moment-quantities--densities)).
 |------|-------------|------------|-----|
 | `h` | Specific enthalpy | $\gamma P / ((\gamma - 1) \rho_m)$ | $h \cdot v_{ref}^2$ \[J/kg\] |
 | `h_rel` | Relativistic specific enthalpy[^2] | $c^2 + \gamma P / ((\gamma - 1) \rho_m)$ | $h_{rel} \cdot v_{ref}^2$ \[J/kg\] |
-| `s` | Specific entropy (isotropic)[^1] | $\ln(P / \rho_m^\gamma)$ (fluid) or $\ln(P_s / n_s^\gamma)$ (per-species) | -- |
-| `s_e` | Electron entropy | $\ln(P_e / n_e^\gamma)$ | -- |
+| `s` | Specific entropy (single-fluid, isotropic)[^1] | $\ln(P / \rho_m^\gamma)$ | -- |
+| `s_e` | Electron entropy[^aliases] | $\ln(P_e / n_e^\gamma)$ | -- |
 | `s_i` | Ion entropy | $\ln(P_i / n_i^\gamma)$ | -- |
 | `s_gyro` | Gyrotropic entropy | $\ln(P_{\parallel,s} P_{\perp,s}^2 / n_s^5)$ | -- |
 | `e_int` | Specific internal energy | $P / ((\gamma - 1) \rho_m)$ | $e_{int} \cdot v_{ref}^2$ \[J/kg\] |
@@ -129,8 +141,8 @@ $$\mathbf{EF}_s = \underbrace{\tfrac{1}{2} n_s m_s |\mathbf{V}_s|^2 \mathbf{V}_s
     ($\mathbf{q} = 0$), the total energy flux equals $\mathbf{KEF} + \mathbf{EHF}$.
     The conductive heat flux $\mathbf{q}$ captures non-Maxwellian and non-adiabatic
     transport — it is the physically interesting residual in reconnection exhausts,
-    shocks, and turbulence. All quantities exist as both total (MHD: `EHF1`,
-    `EHF2`, `EHF3`) and per-species (PIC: `KEF1_s0`, `HFi`, `qi`).
+    shocks, and turbulence. All quantities exist as both total (MHD: `EHF_1`,
+    `EHF_2`, `EHF_3`) and per-species (PIC: `KEF_s0_1`, `HFi`[^aliases], `q_i`).
     **Precision notes:** `HF = EF - KEF` is exact (no closure assumption).
     `EHF` uses the scalar (isotropic) pressure; for anisotropic plasmas the
     exact enthalpy flux involves the full pressure tensor
@@ -146,7 +158,7 @@ $$\mathbf{EF}_s = \underbrace{\tfrac{1}{2} n_s m_s |\mathbf{V}_s|^2 \mathbf{V}_s
 | `P` | Isotropic scalar pressure[^9] | $P = \frac{1}{3}\mathrm{Tr}(\mathbf{P}) = \frac{1}{3}(P_{11} + P_{22} + P_{33})$ | -- |
 | `P_par` | Parallel pressure | $P_\parallel = \hat{b} \cdot \mathbf{P} \cdot \hat{b}$ | -- |
 | `P_perp` | Perpendicular pressure | $P_\perp = (\mathrm{Tr}(\mathbf{P}) - P_\parallel) / 2$ | -- |
-| `Pij` | Full pressure tensor | 6 independent components: P11, P12, P13, P22, P23, P33 | -- |
+| `Pij` | Full pressure tensor | 6 independent components: P_11, P_12, P_13, P_22, P_23, P_33 | -- |
 | `agyrotropy` | Agyrotropy measure[^Q] | $Q = \sqrt{1 - 4 I_2 / [(I_1 - P_\parallel)(I_1 + 3 P_\parallel)]}$ | -- |
 
 [^Q]: Swisdak's gyrotropy measure [@Swisdak2016], computed from the
@@ -194,7 +206,7 @@ $$\mathbf{EF}_s = \underbrace{\tfrac{1}{2} n_s m_s |\mathbf{V}_s|^2 \mathbf{V}_s
 | `M_A` | Alfvén Mach number | $V / v_A$ | -- |
 | `M_ms` | Magnetosonic Mach number | $V / v_{ms}$ | -- |
 | `beta` | Plasma beta | $2P / B^2$ | $2\mu_0 P / B^2$ |
-| `beta_e` | Electron beta | $2P_e / B^2$ | $2\mu_0 P_e / B^2$ |
+| `beta_e` | Electron beta[^aliases] | $2P_e / B^2$ | $2\mu_0 P_e / B^2$ |
 | `beta_i` | Ion beta | $2P_i / B^2$ | $2\mu_0 P_i / B^2$ |
 
 [^3]: Cyclotron frequencies are positive by convention (magnitudes).
@@ -321,7 +333,7 @@ Three distinct Lorentz factors arise in plasma analysis:
 
 - **$\gamma_{bulk}$** — from the fluid (bulk) velocity $\mathbf{V}$.
   This is what `lorentz_factor()` computes from the moment velocity
-  fields `V1/V2/V3` or `u1/u2/u3`. Used in relativistic kinetic energy,
+  fields `V_1/V_2/V_3` or `u_1/u_2/u_3`. Used in relativistic kinetic energy,
   Alfven speed, and Mach numbers.
 
 - **$\langle\gamma\rangle_{thermal}$** — the mean Lorentz factor of the

@@ -35,7 +35,7 @@ def _resolve_plane_components(data: FieldDataset, field_prefix: str) -> tuple[st
     Maps surviving dataset axes to the corresponding numbered component
     indices using the full 3D geometry axis order. For example, on a
     z-normal slice with surviving axes ``(x, y)``, returns
-    ``("B1", "B2")`` for ``field_prefix="B"``.
+    ``("B_1", "B_2")`` for ``field_prefix="B"``.
 
     Parameters
     ----------

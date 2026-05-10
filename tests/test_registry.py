@@ -453,7 +453,7 @@ class TestSimulationFacade:
                 fields: set[str] | None = None,
             ) -> FieldDataset:
                 self.received_fields = fields
-                data = {"B1": np.ones(2), "B2": np.ones(2), "rho_c": np.zeros(2)}
+                data = {"B_1": np.ones(2), "B_2": np.ones(2), "rho_c": np.zeros(2)}
                 if fields is not None:
                     data = {k: v for k, v in data.items() if k in fields}
                 return FieldDataset.from_arrays(data, grid, norm)
@@ -474,8 +474,8 @@ class TestSimulationFacade:
 
         # Selective read should pass fields through to reader
         ds = sim.read(0, fields=["Bx"])
-        assert full_reader.received_fields == {"B1"}
-        assert ds.has_field("B1")
+        assert full_reader.received_fields == {"B_1"}
+        assert ds.has_field("B_1")
 
     def test_basic_reader_fallback(
         self,
@@ -497,7 +497,7 @@ class TestSimulationFacade:
 
             def read_timestep(self, path: Path, step: int) -> FieldDataset:
                 return FieldDataset.from_arrays(
-                    {"B1": np.ones(2), "B2": np.ones(2), "rho_c": np.zeros(2)},
+                    {"B_1": np.ones(2), "B_2": np.ones(2), "rho_c": np.zeros(2)},
                     grid,
                     norm,
                 )
@@ -518,8 +518,8 @@ class TestSimulationFacade:
         sim = Simulation(basic_reader, cfg, tmp_path)
 
         # Should read all then filter
-        ds = sim.read(0, fields=["B1"])
-        assert sorted(ds.field_names()) == ["B1"]
+        ds = sim.read(0, fields=["B_1"])
+        assert sorted(ds.field_names()) == ["B_1"]
 
     def test_strict_fields_raises_on_typo(
         self,
@@ -535,7 +535,7 @@ class TestSimulationFacade:
 
         class Reader:
             def read_timestep(self, path: Path, step: int) -> FieldDataset:
-                return FieldDataset.from_arrays({"B1": np.ones(2)}, grid, norm)
+                return FieldDataset.from_arrays({"B_1": np.ones(2)}, grid, norm)
 
             def available_timesteps(self, path: Path) -> list[int]:
                 return [0]
@@ -568,7 +568,7 @@ class TestSimulationFacade:
 
         class Reader:
             def read_timestep(self, path: Path, step: int) -> FieldDataset:
-                return FieldDataset.from_arrays({"B1": np.ones(2)}, grid, norm)
+                return FieldDataset.from_arrays({"B_1": np.ones(2)}, grid, norm)
 
             def available_timesteps(self, path: Path) -> list[int]:
                 return [0]
@@ -583,7 +583,7 @@ class TestSimulationFacade:
 
         with caplog.at_level(logging.WARNING, logger="pypic.readers._registry"):
             ds = sim.read(0, fields=["Bx", "Typox"])
-        assert ds.has_field("B1")
+        assert ds.has_field("B_1")
         assert any("Typox" in record.message for record in caplog.records)
 
     def test_available_fields_delegates_to_reader(
@@ -600,18 +600,18 @@ class TestSimulationFacade:
 
         class ListingReader:
             def read_timestep(self, path: Path, step: int) -> FieldDataset:
-                return FieldDataset.from_arrays({"B1": np.ones(2)}, grid, norm)
+                return FieldDataset.from_arrays({"B_1": np.ones(2)}, grid, norm)
 
             def available_timesteps(self, path: Path) -> list[int]:
                 return [0]
 
             def available_fields(self, path: Path, step: int) -> list[str]:
-                return ["B1", "B2", "E1"]
+                return ["B_1", "B_2", "E_1"]
 
             def available_fields_mapping(
                 self, path: Path, step: int
             ) -> dict[str, str | None]:
-                return {"B1": "Bx", "B2": "By", "E1": "Ex"}
+                return {"B_1": "Bx", "B_2": "By", "E_1": "Ex"}
 
         cfg = SimulationConfig(
             model_name="test",
@@ -621,9 +621,9 @@ class TestSimulationFacade:
         )
         sim = Simulation(ListingReader(), cfg, tmp_path)
         result = sim.available_fields(0)
-        assert result == ["B1", "B2", "E1"]
+        assert result == ["B_1", "B_2", "E_1"]
         mapping = sim.available_fields_mapping(0)
-        assert mapping == {"B1": "Bx", "B2": "By", "E1": "Ex"}
+        assert mapping == {"B_1": "Bx", "B_2": "By", "E_1": "Ex"}
 
     def test_available_fields_fallback_without_protocol(
         self,
@@ -640,7 +640,7 @@ class TestSimulationFacade:
         class BasicReader:
             def read_timestep(self, path: Path, step: int) -> FieldDataset:
                 return FieldDataset.from_arrays(
-                    {"B1": np.ones(2), "rho_m": np.ones(2)}, grid, norm
+                    {"B_1": np.ones(2), "rho_m": np.ones(2)}, grid, norm
                 )
 
             def available_timesteps(self, path: Path) -> list[int]:
@@ -654,7 +654,7 @@ class TestSimulationFacade:
         )
         sim = Simulation(BasicReader(), cfg, tmp_path)
         result = sim.available_fields(0)
-        assert result == ["B1", "rho_m"]
+        assert result == ["B_1", "rho_m"]
 
 
 class TestBatsrusProbeFilter:

@@ -79,14 +79,14 @@ class TestFieldNameMap:
     """Field name mapping covers all expected fields."""
 
     def test_all_velocity_components(self) -> None:
-        assert FIELD_NAME_MAP["vx"] == "V1"
-        assert FIELD_NAME_MAP["vy"] == "V2"
-        assert FIELD_NAME_MAP["vz"] == "V3"
+        assert FIELD_NAME_MAP["vx"] == "V_1"
+        assert FIELD_NAME_MAP["vy"] == "V_2"
+        assert FIELD_NAME_MAP["vz"] == "V_3"
 
     def test_all_bfield_components(self) -> None:
-        assert FIELD_NAME_MAP["bx1"] == "B1"
-        assert FIELD_NAME_MAP["by1"] == "B2"
-        assert FIELD_NAME_MAP["bz1"] == "B3"
+        assert FIELD_NAME_MAP["bx1"] == "B_1"
+        assert FIELD_NAME_MAP["by1"] == "B_2"
+        assert FIELD_NAME_MAP["bz1"] == "B_3"
 
     def test_density_and_pressure(self) -> None:
         assert FIELD_NAME_MAP["rr"] == "rho_m"
@@ -187,17 +187,27 @@ class TestOpenGGCMReader:
         _reader, _cfg, ds = reader_cfg_ds
 
         names = ds.field_names()
-        for expected in ("B1", "B2", "B3", "V1", "V2", "V3", "rho_m", "P", "n_s0"):
+        for expected in (
+            "B_1",
+            "B_2",
+            "B_3",
+            "V_1",
+            "V_2",
+            "V_3",
+            "rho_m",
+            "P",
+            "n_s0",
+        ):
             assert expected in names, f"Missing field: {expected}"
 
-        assert ds["B1"].shape == (29, 16, 16)
+        assert ds["B_1"].shape == (29, 16, 16)
 
         # B-field should be in SI (Tesla), range ~1e-9 to 1e-4
-        b1 = ds["B1"]
+        b1 = ds["B_1"]
         assert np.abs(b1).max() < 1e-3  # < 1 mT
 
         # Velocity in SI (m/s), range ~1e4 to 1e6
-        v1 = ds["V1"]
+        v1 = ds["V_1"]
         assert np.abs(v1).max() < 1e7  # < 10,000 km/s
 
     def test_cartesian_aliases(self, reader_cfg_ds) -> None:
@@ -205,7 +215,7 @@ class TestOpenGGCMReader:
         assert ds.has_field("Bx")
         assert ds.has_field("By")
         assert ds.has_field("Bz")
-        np.testing.assert_array_equal(ds["Bx"], ds["B1"])
+        np.testing.assert_array_equal(ds["Bx"], ds["B_1"])
 
     def test_non_uniform_coordinates(self, reader_cfg_ds) -> None:
         _reader, _cfg, ds = reader_cfg_ds

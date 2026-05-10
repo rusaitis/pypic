@@ -344,7 +344,7 @@ class TestConvertFieldsPassthrough:
             "custom_field": np.full(10, 42.0),
         }
         si = convert_fields_to_si(raw)
-        assert "V1" in si
+        assert "V_1" in si
         np.testing.assert_array_equal(si["custom_field"], 42.0)
         # Unknown-only field is not converted
         raw2 = {"unknown_thing": np.array([1.0, 2.0, 3.0])}

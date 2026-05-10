@@ -103,7 +103,7 @@ def test_float32_preserves_metadata_bit_exact(
     )
     b1 = np.arange(24, dtype=np.float64).reshape(4, 3, 2) * 1.5
     fds = FieldDataset.from_arrays(
-        {"B1": b1},
+        {"B_1": b1},
         grid,
         norm,
         species=species,
@@ -118,8 +118,8 @@ def test_float32_preserves_metadata_bit_exact(
 
         # Field array: precision dropped to float32. Expected-lossy check —
         # tolerates the ~6 decimal digits float32 keeps.
-        assert loaded["B1"].dtype == np.float32
-        np.testing.assert_allclose(loaded["B1"], b1, rtol=1e-6)
+        assert loaded["B_1"].dtype == np.float32
+        np.testing.assert_allclose(loaded["B_1"], b1, rtol=1e-6)
 
         # Normalization: all 8 reference values must survive bit-exact.
         assert loaded.normalization == norm

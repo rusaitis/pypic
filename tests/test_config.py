@@ -574,7 +574,7 @@ class TestMergeSimulationToml:
 
 class TestInitialConditionsAndOutput:
     """Schema-validated `[initial_conditions]` and `[output]` reach the
-    typed attributes on SimulationConfig (E2 — no longer dict-dumped into
+    typed attributes on SimulationConfig (E_2 — no longer dict-dumped into
     metadata).
     """
 
@@ -698,7 +698,7 @@ class TestForwardedSections:
             "[[probes]]\n"
             'name = "magnetopause"\n'
             "position = [10.0, 0.0, 0.0]\n"
-            'fields = ["B1", "B2", "B3"]\n'
+            'fields = ["B_1", "B_2", "B_3"]\n'
         )
         cfg = load_config(_write(tmp_path, _shell(extra=prb)))
         assert len(cfg.probes) == 1
@@ -762,8 +762,8 @@ class TestForwardedSections:
             'B = "face"\n'
             'E = "edge"\n'
             "[grid.stagger.position]\n"
-            "B1 = [0.5, 0.0, 0.0]\n"
-            "E1 = [0.0, 0.5, 0.5]\n"
+            "B_1 = [0.5, 0.0, 0.0]\n"
+            "E_1 = [0.0, 0.5, 0.5]\n"
         )
         cfg = load_config(_write(tmp_path, _shell(grid=grid_with_stagger)))
         stagger = cfg.metadata["stagger"]
@@ -771,7 +771,7 @@ class TestForwardedSections:
         assert stagger.field_locations is not None
         assert stagger.field_locations["B"] == "face"
         assert stagger.position is not None
-        assert stagger.position["B1"] == (0.5, 0.0, 0.0)
+        assert stagger.position["B_1"] == (0.5, 0.0, 0.0)
 
 
 class TestPhysicsBranches:

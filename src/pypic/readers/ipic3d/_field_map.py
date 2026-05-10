@@ -11,18 +11,18 @@ if TYPE_CHECKING:
 FOUR_PI = 4.0 * math.pi
 
 _FIELD_NAME_MAP: dict[str, str] = {
-    "Bx": "B1",
-    "By": "B2",
-    "Bz": "B3",
-    "Ex": "E1",
-    "Ey": "E2",
-    "Ez": "E3",
+    "Bx": "B_1",
+    "By": "B_2",
+    "Bz": "B_3",
+    "Ex": "E_1",
+    "Ey": "E_2",
+    "Ez": "E_3",
 }
 
 _MOMENT_COMPONENT_MAP: dict[str, str] = {
-    "Jx": "J1",
-    "Jy": "J2",
-    "Jz": "J3",
+    "Jx": "J_1",
+    "Jy": "J_2",
+    "Jz": "J_3",
     "rho": "rho_c",
 }
 
@@ -38,7 +38,7 @@ def map_field_name(ipic3d_name: str) -> str:
     Returns
     -------
     str
-        Canonical field name (e.g. ``"B1"``).
+        Canonical field name (e.g. ``"B_1"``).
 
     Raises
     ------
@@ -48,9 +48,9 @@ def map_field_name(ipic3d_name: str) -> str:
     Examples
     --------
     >>> map_field_name("Bx")
-    'B1'
+    'B_1'
     >>> map_field_name("Ez")
-    'E3'
+    'E_3'
     """
     try:
         return _FIELD_NAME_MAP[ipic3d_name]
@@ -72,16 +72,22 @@ def per_species_canonical(component: str, species_index: int) -> str:
     Returns
     -------
     str
-        Canonical per-species name (e.g. ``"J1_s0"``, ``"rho_c_s2"``).
+        Canonical per-species name (e.g. ``"J_s0_1"``, ``"rho_c_s2"``).
 
     Examples
     --------
     >>> per_species_canonical("Jx", 0)
-    'J1_s0'
+    'J_s0_1'
     >>> per_species_canonical("rho", 2)
     'rho_c_s2'
     """
     canonical = _MOMENT_COMPONENT_MAP[component]
+    # Tier-3: vector canonicals end in ``_<component>`` (J_1, J_2, J_3) —
+    # insert species before the trailing component. Scalars (rho_c) get
+    # the species suffix appended.
+    if canonical[-1].isdigit() and "_" in canonical:
+        base, _, comp = canonical.rpartition("_")
+        return f"{base}_s{species_index}_{comp}"
     return f"{canonical}_s{species_index}"
 
 
@@ -90,21 +96,21 @@ _H5HUT_FIELD_MAP: dict[str, str] = {
 }
 
 _PRESSURE_COMPONENT_MAP: dict[str, str] = {
-    "Pxx": "P11",
-    "Pxy": "P12",
-    "Pxz": "P13",
-    "Pyy": "P22",
-    "Pyz": "P23",
-    "Pzz": "P33",
+    "Pxx": "P_11",
+    "Pxy": "P_12",
+    "Pxz": "P_13",
+    "Pyy": "P_22",
+    "Pyz": "P_23",
+    "Pzz": "P_33",
 }
 
 _PHDF5_PRESSURE_MAP: dict[str, str] = {
-    "pXX": "P11",
-    "pXY": "P12",
-    "pXZ": "P13",
-    "pYY": "P22",
-    "pYZ": "P23",
-    "pZZ": "P33",
+    "pXX": "P_11",
+    "pXY": "P_12",
+    "pXZ": "P_13",
+    "pYY": "P_22",
+    "pYZ": "P_23",
+    "pZZ": "P_33",
 }
 
 _PHDF5_DIAGONAL_PRESSURE = {"pXX", "pYY", "pZZ"}
@@ -112,9 +118,9 @@ _PHDF5_DIAGONAL_PRESSURE = {"pXX", "pYY", "pZZ"}
 _H5HUT_DIAGONAL_PRESSURE = {"Pxx", "Pyy", "Pzz"}
 
 _EFLUX_MAP: dict[str, str] = {
-    "EFx": "EF1",
-    "EFy": "EF2",
-    "EFz": "EF3",
+    "EFx": "EF_1",
+    "EFy": "EF_2",
+    "EFz": "EF_3",
 }
 
 
@@ -131,17 +137,23 @@ def per_species_pressure_canonical(component: str, species_index: int) -> str:
     Returns
     -------
     str
-        Canonical per-species name (e.g. ``"P11_s0"``, ``"P12_s1"``).
+        Canonical per-species name (e.g. ``"P_s0_11"``, ``"P_s1_12"``).
 
     Examples
     --------
     >>> per_species_pressure_canonical("Pxx", 0)
-    'P11_s0'
+    'P_s0_11'
     >>> per_species_pressure_canonical("Pyz", 1)
-    'P23_s1'
+    'P_s1_23'
+    >>> per_species_pressure_canonical("pYY", 1)
+    'P_s1_22'
     """
-    canonical = _PRESSURE_COMPONENT_MAP[component]
-    return f"{canonical}_s{species_index}"
+    canonical = _PRESSURE_COMPONENT_MAP.get(component) or _PHDF5_PRESSURE_MAP[
+        component
+    ]
+    # canonical is "P_<ij>"; Tier-3 per-species form is "P_s<N>_<ij>".
+    ij = canonical.removeprefix("P_")
+    return f"P_s{species_index}_{ij}"
 
 
 def per_species_eflux_canonical(component: str, species_index: int) -> str:
@@ -157,17 +169,19 @@ def per_species_eflux_canonical(component: str, species_index: int) -> str:
     Returns
     -------
     str
-        Canonical per-species name (e.g. ``"EF1_s0"``, ``"EF2_s1"``).
+        Canonical per-species name (e.g. ``"EF_s0_1"``, ``"EF_s1_2"``).
 
     Examples
     --------
     >>> per_species_eflux_canonical("EFx", 0)
-    'EF1_s0'
+    'EF_s0_1'
     >>> per_species_eflux_canonical("EFz", 1)
-    'EF3_s1'
+    'EF_s1_3'
     """
     canonical = _EFLUX_MAP[component]
-    return f"{canonical}_s{species_index}"
+    # canonical is "EF_<c>"; Tier-3 per-species form is "EF_s<N>_<c>".
+    c = canonical.removeprefix("EF_")
+    return f"EF_s{species_index}_{c}"
 
 
 def expand_moment_dependencies(
@@ -176,7 +190,7 @@ def expand_moment_dependencies(
 ) -> set[str]:
     """Expand wanted field set to include per-species dependencies.
 
-    If a total field (e.g. ``"rho_c"``, ``"J1"``) is requested, the
+    If a total field (e.g. ``"rho_c"``, ``"J_1"``) is requested, the
     per-species components needed to compute it are added.
 
     Parameters
@@ -193,8 +207,8 @@ def expand_moment_dependencies(
 
     Examples
     --------
-    >>> sorted(expand_moment_dependencies({"rho_c", "B1"}, nspec=2))
-    ['B1', 'rho_c', 'rho_c_s0', 'rho_c_s1']
+    >>> sorted(expand_moment_dependencies({"rho_c", "B_1"}, nspec=2))
+    ['B_1', 'rho_c', 'rho_c_s0', 'rho_c_s1']
     """
     expanded = set(wanted)
     for moment_comp, canon_total in _MOMENT_COMPONENT_MAP.items():
@@ -208,7 +222,7 @@ def infer_total_fields(canonical_fields: set[str], nspec: int) -> set[str]:
     r"""Infer which total fields would be computed from per-species sums.
 
     ``compute_totals_and_filter`` sums per-species J and rho into
-    totals (J1, J2, J3, rho_c). This function predicts which totals
+    totals (J_1, J_2, J_3, rho_c). This function predicts which totals
     would be produced given a set of per-species canonical names,
     without actually loading or summing arrays.
 
@@ -222,17 +236,20 @@ def infer_total_fields(canonical_fields: set[str], nspec: int) -> set[str]:
     Returns
     -------
     set[str]
-        Total field names (subset of J1, J2, J3, rho_c) whose
+        Total field names (subset of J_1, J_2, J_3, rho_c) whose
         per-species contributions are all present.
 
     Examples
     --------
-    >>> infer_total_fields({"J1_s0", "J1_s1", "rho_c_s0"}, nspec=2)
-    {'J1'}
+    >>> infer_total_fields({"J_s0_1", "J_s1_1", "rho_c_s0"}, nspec=2)
+    {'J_1'}
     """
     totals: set[str] = set()
-    for _native, canon_total in _MOMENT_COMPONENT_MAP.items():
-        if all(f"{canon_total}_s{s}" in canonical_fields for s in range(nspec)):
+    for native, canon_total in _MOMENT_COMPONENT_MAP.items():
+        if all(
+            per_species_canonical(native, s) in canonical_fields
+            for s in range(nspec)
+        ):
             totals.add(canon_total)
     return totals
 
@@ -262,7 +279,7 @@ def gaussian_pressure_to_si(p: FloatArray) -> FloatArray:
     return p * FOUR_PI
 
 
-_CANONICAL_DIAGONAL_PRESSURE: frozenset[str] = frozenset({"P11", "P22", "P33"})
+_CANONICAL_DIAGONAL_PRESSURE: frozenset[str] = frozenset({"P_11", "P_22", "P_33"})
 
 
 def correct_pressure_tensor_component(
@@ -292,7 +309,7 @@ def correct_pressure_tensor_component(
     data : FloatArray
         Raw pressure tensor component as stored in the iPIC3D file.
     canonical_base : str
-        Canonical component name (``"P11"``, ``"P12"``, ..., ``"P33"``)
+        Canonical component name (``"P_11"``, ``"P_12"``, ..., ``"P_33"``)
         — the per-species suffix is irrelevant for this correction.
     species_qom : float
         Charge-to-mass ratio of the species, in code units.
@@ -309,13 +326,13 @@ def correct_pressure_tensor_component(
     >>> # Electron diagonal: stored negative, positive after correction
     >>> raw = np.array([-1.0 / (4.0 * 3.141592653589793)])
     >>> correct_pressure_tensor_component(
-    ...     raw, canonical_base="P11", species_qom=-1.0
+    ...     raw, canonical_base="P_11", species_qom=-1.0
     ... )
     array([1.])
     >>> # Off-diagonal: no sign flip, just Gaussian + mass weighting
     >>> raw = np.array([1.0 / (4.0 * 3.141592653589793)])
     >>> correct_pressure_tensor_component(
-    ...     raw, canonical_base="P12", species_qom=-1.0
+    ...     raw, canonical_base="P_12", species_qom=-1.0
     ... )
     array([1.])
     """
@@ -357,7 +374,7 @@ def compute_totals_and_filter(
 ) -> dict[str, FloatArray]:
     """Sum per-species moments into totals and filter to wanted fields.
 
-    Computes total ``rho_c``, ``J1``, ``J2``, ``J3`` by summing the
+    Computes total ``rho_c``, ``J_1``, ``J_2``, ``J_3`` by summing the
     per-species contributions already present in *field_data*.  Guards
     against missing per-species keys (e.g. when a species lacks data).
 
@@ -387,17 +404,17 @@ def compute_totals_and_filter(
     >>> data = {
     ...     "rho_c_s0": np.array([1.0]),
     ...     "rho_c_s1": np.array([2.0]),
-    ...     "J1_s0": np.array([0.5]),
-    ...     "J1_s1": np.array([0.3]),
-    ...     "J2_s0": np.array([0.1]),
-    ...     "J2_s1": np.array([0.2]),
-    ...     "J3_s0": np.array([0.0]),
-    ...     "J3_s1": np.array([0.4]),
+    ...     "J_s0_1": np.array([0.5]),
+    ...     "J_s1_1": np.array([0.3]),
+    ...     "J_s0_2": np.array([0.1]),
+    ...     "J_s1_2": np.array([0.2]),
+    ...     "J_s0_3": np.array([0.0]),
+    ...     "J_s1_3": np.array([0.4]),
     ... }
     >>> result = compute_totals_and_filter(data, 2, None, None)
     >>> result["rho_c"]
     array([3.])
-    >>> result["J1"]
+    >>> result["J_1"]
     array([0.8])
     """
     for moment_comp, canon_total in _MOMENT_COMPONENT_MAP.items():

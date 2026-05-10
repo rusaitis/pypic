@@ -215,9 +215,9 @@ def _normalize_field(
 ) -> FloatArray:
     """Normalize a single SI field to code units."""
     match name:
-        case "V1" | "V2" | "V3":
+        case "V_1" | "V_2" | "V_3":
             return norm.normalize("velocity", data)  # type: ignore[return-value]
-        case "B1" | "B2" | "B3":
+        case "B_1" | "B_2" | "B_3":
             return norm.normalize("b_field", data)  # type: ignore[return-value]
         case "rho_m":
             return data / (norm.density_ref * norm.mass_ref)

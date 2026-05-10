@@ -37,34 +37,34 @@ from pypic.units import Normalization
 CANONICAL_NAMES: frozenset[str] = frozenset(
     {
         # ── Electromagnetic ──────────────────────────────────────────────
-        "B1",
-        "B2",
-        "B3",
+        "B_1",
+        "B_2",
+        "B_3",
         "B0_1",
         "B0_2",
         "B0_3",
-        "E1",
-        "E2",
-        "E3",
+        "E_1",
+        "E_2",
+        "E_3",
         "|B|",
         "|E|",
         # ── Currents & velocities ────────────────────────────────────────
-        "J1",
-        "J2",
-        "J3",
+        "J_1",
+        "J_2",
+        "J_3",
         "|J|",
-        "V1",
-        "V2",
-        "V3",
+        "V_1",
+        "V_2",
+        "V_3",
         "|V|",
         "Ve1",
         "Ve2",
         "Ve3",
         "|Ve|",
         # Four-velocity (relativistic PIC)
-        "u1",
-        "u2",
-        "u3",
+        "u_1",
+        "u_2",
+        "u_3",
         "gamma_L",
         # ── Densities & moments ──────────────────────────────────────────
         "n_s0",
@@ -77,12 +77,12 @@ CANONICAL_NAMES: frozenset[str] = frozenset(
         "Pi",
         "P_par",
         "P_perp",
-        "P11",
-        "P12",
-        "P13",
-        "P22",
-        "P23",
-        "P33",
+        "P_11",
+        "P_12",
+        "P_13",
+        "P_22",
+        "P_23",
+        "P_33",
         "agyrotropy",
         "P_par_e",
         "P_par_i",
@@ -104,15 +104,15 @@ CANONICAL_NAMES: frozenset[str] = frozenset(
         "s_gyro_i",
         "gamma_eos",
         # ── Energy / flux ────────────────────────────────────────────────
-        "S1",
-        "S2",
-        "S3",
-        "EF1",
-        "EF2",
-        "EF3",
-        "EHF1",
-        "EHF2",
-        "EHF3",
+        "S_1",
+        "S_2",
+        "S_3",
+        "EF_1",
+        "EF_2",
+        "EF_3",
+        "EHF_1",
+        "EHF_2",
+        "EHF_3",
         "e_B",
         "e_E",
         "e_k",
@@ -143,12 +143,12 @@ CANONICAL_NAMES: frozenset[str] = frozenset(
         # ── Differential operators ───────────────────────────────────────
         "div_B",
         "div_E",
-        "curl_B1",
-        "curl_B2",
-        "curl_B3",
-        "vort1",
-        "vort2",
-        "vort3",
+        "curl_B_1",
+        "curl_B_2",
+        "curl_B_3",
+        "vort_1",
+        "vort_2",
+        "vort_3",
         "|vort|",
         # ── Reconnection diagnostics ─────────────────────────────────────
         "J_dot_E",
@@ -177,36 +177,36 @@ PER_SPECIES_PREFIXES: frozenset[str] = frozenset(
         "n",  # n_s0, n_s5
         "rho_c",  # rho_c_s0
         "rho_m",  # rho_m_s0
-        "J1",
-        "J2",
-        "J3",
-        "V1",
-        "V2",
-        "V3",
+        "J_1",
+        "J_2",
+        "J_3",
+        "V_1",
+        "V_2",
+        "V_3",
         "|V|",
         "P",
-        "P11",
-        "P22",
-        "P33",
-        "P12",
-        "P13",
-        "P23",
+        "P_11",
+        "P_22",
+        "P_33",
+        "P_12",
+        "P_13",
+        "P_23",
         "T",
-        "EF1",
-        "EF2",
-        "EF3",
-        "KEF1",
-        "KEF2",
-        "KEF3",
-        "HF1",
-        "HF2",
-        "HF3",
-        "EHF1",
-        "EHF2",
-        "EHF3",
-        "q1",
-        "q2",
-        "q3",
+        "EF_1",
+        "EF_2",
+        "EF_3",
+        "KEF_1",
+        "KEF_2",
+        "KEF_3",
+        "HF_1",
+        "HF_2",
+        "HF_3",
+        "EHF_1",
+        "EHF_2",
+        "EHF_3",
+        "q_1",
+        "q_2",
+        "q_3",
         "e_k",
         "e_th",
         "e_th_trace",
@@ -276,6 +276,20 @@ def test_all_schema_fields_are_reachable() -> None:
 # ---------------------------------------------------------------------------
 
 
+def _per_species_form(prefix: str, idx: int) -> str:
+    """Construct a Tier-3 per-species name from a prefix.
+
+    Vector / tensor prefixes (``J_1``, ``P_11``, ``q_2``) put the
+    species qualifier between the field name and the index:
+    ``J_1`` + s0 → ``J_s0_1``. Scalar prefixes (``n``, ``T``,
+    ``rho_c``, ``omega_p``) just append ``_s<N>``.
+    """
+    base, sep, comp = prefix.partition("_")
+    if sep and comp[:1].isdigit():
+        return f"{base}_s{idx}_{comp}"
+    return f"{prefix}_s{idx}"
+
+
 def test_all_per_species_prefixes_resolve() -> None:
     """Per-species names work for static (s0/s1) and dynamic (s5+) indices.
 
@@ -284,10 +298,10 @@ def test_all_per_species_prefixes_resolve() -> None:
     ``_SPECIES_TEMPLATES``. Both must succeed for every documented prefix.
     """
     failures = sorted(
-        f"{prefix}_s{idx}"
+        _per_species_form(prefix, idx)
         for prefix in PER_SPECIES_PREFIXES
         for idx in (0, 5)
-        if not _is_reachable(f"{prefix}_s{idx}")
+        if not _is_reachable(_per_species_form(prefix, idx))
     )
     assert not failures, _format_failures(
         "Per-species names from schema.md not reachable — check "

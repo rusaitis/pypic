@@ -447,7 +447,7 @@ B_ALONG_Z = (ZEROS, ZEROS, ONES)
 
 class TestIsotropicPressure:
     def test_trace_divided_by_three(self):
-        """P_iso = (P11 + P22 + P33) / 3."""
+        """P_iso = (P_11 + P_22 + P_33) / 3."""
         p11, p22, p33 = np.array([3.0]), np.array([6.0]), np.array([9.0])
         np.testing.assert_allclose(isotropic_pressure(p11, p22, p33), 6.0, rtol=1e-15)
 
@@ -484,7 +484,7 @@ class TestParallelPressure:
             np.testing.assert_allclose(result, 5.0, rtol=1e-14)
 
     def test_b_along_z_diagonal(self):
-        """B along z: P_∥ = P33."""
+        """B along z: P_∥ = P_33."""
         result = parallel_pressure(
             np.array([1.0]),
             np.array([2.0]),
@@ -568,7 +568,7 @@ class TestAgyrotropy:
 
     def test_agyrotropic_example(self):
         """B along z, diag(3,1,1): P_∥=1, I₁=4, known Q=0.25."""
-        # P_∥ = 1 (P33), Tr(P) = 5, I₁ = 5 - 1 = 4
+        # P_∥ = 1 (P_33), Tr(P) = 5, I₁ = 5 - 1 = 4
         # P_⊥ tensor = diag(3,1,0), Frobenius² = 9 + 1 + 0 = 10
         # I₂ = (16 - 10) / 2 = 3
         # Q = 1 - 12/16 = 0.25
@@ -967,7 +967,7 @@ class TestMagneticShearAngle:
 
 class TestMagneticFluxFunction:
     def test_uniform_field(self):
-        """Uniform B2=1: ψ = -∫B2 dx = -x*dx (negative cumsum)."""
+        """Uniform B_2=1: ψ = -∫B_2 dx = -x*dx (negative cumsum)."""
         b2 = np.ones((10, 5))
         dx = 0.5
         psi = magnetic_flux_function(b2, dx, 1.0)
@@ -977,12 +977,12 @@ class TestMagneticFluxFunction:
         assert psi[-1, 0] < psi[0, 0]
 
     def test_sign_convention(self):
-        r"""Verify B2 = -∂ψ/∂x (standard convention)."""
+        r"""Verify B_2 = -∂ψ/∂x (standard convention)."""
         nx, ny = 64, 32
         dx = 0.1
         b2 = np.ones((nx, ny)) * 2.0
         psi = magnetic_flux_function(b2, dx, 1.0)
-        # Reconstruct: -∂ψ/∂x should ≈ B2
+        # Reconstruct: -∂ψ/∂x should ≈ B_2
         dpsi_dx = np.gradient(psi, dx, axis=0)
         np.testing.assert_allclose(-dpsi_dx[2:-2, :], 2.0, rtol=0.01)
 

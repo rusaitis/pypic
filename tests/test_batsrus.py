@@ -48,8 +48,8 @@ class TestFieldMap:
 
     def test_canonical_names_cover_mhd_basics(self) -> None:
         assert FIELD_NAME_MAP["Rho"] == "rho_m"
-        assert FIELD_NAME_MAP["Bx"] == "B1"
-        assert FIELD_NAME_MAP["Ux"] == "V1"
+        assert FIELD_NAME_MAP["Bx"] == "B_1"
+        assert FIELD_NAME_MAP["Ux"] == "V_1"
         assert FIELD_NAME_MAP["P"] == "P"
 
     def test_hyp_is_skipped(self) -> None:
@@ -89,11 +89,11 @@ class TestFieldMap:
         assert_allclose(result["rho_m"], [1.0, 2.0])
 
     def test_convert_fields_applies_factors(self) -> None:
-        fields = {"B1": np.array([5.0])}
+        fields = {"B_1": np.array([5.0])}
         var_names = ("Bx",)
         unit_names = ("nT",)
         result = convert_fields_to_si(fields, var_names, unit_names)
-        assert_allclose(result["B1"], [5e-9], rtol=1e-10)
+        assert_allclose(result["B_1"], [5e-9], rtol=1e-10)
 
 
 class TestHeader:
@@ -191,9 +191,9 @@ class TestIDLUniform:
     def test_reads_with_canonical_names_and_shapes(self) -> None:
         reader, _ = open_batsrus(IDL_DIR)
         ds = reader.read_timestep(IDL_DIR, 0)
-        assert ds.has_field("B1")
+        assert ds.has_field("B_1")
         assert ds.has_field("rho_m")
-        assert ds.has_field("V1")
+        assert ds.has_field("V_1")
         assert ds.has_field("P")
         assert not ds.has_field("Hyp")
         for name in ds.field_names():
@@ -203,7 +203,7 @@ class TestIDLUniform:
         reader, _ = open_batsrus(IDL_DIR)
         ds = reader.read_timestep(IDL_DIR, 0)
         # Harris Bx profile
-        bx = ds["B1"]
+        bx = ds["B_1"]
         iy_mid = NY // 2
         assert_allclose(bx[:, iy_mid], 0.0, atol=0.3)
         assert bx[:, -1].mean() > 0.9
@@ -273,7 +273,7 @@ class TestHDF5AMR:
         reader, _ = open_batsrus(AMR_DIR)
         ds = reader.read_timestep(AMR_DIR, 0)
         # Finest dx = 0.5, domain = 16x16 -> 32x32
-        assert ds["B1"].shape == (32, 32)
+        assert ds["B_1"].shape == (32, 32)
 
     def test_no_nan_after_regrid(self) -> None:
         reader, _ = open_batsrus(AMR_DIR)
@@ -292,7 +292,7 @@ class TestHDF5AMR:
     def test_harris_profile_preserved(self) -> None:
         reader, _ = open_batsrus(AMR_DIR)
         ds = reader.read_timestep(AMR_DIR, 0)
-        bx = ds["B1"]
+        bx = ds["B_1"]
         # Top row should be near +B0
         assert bx[:, -1].mean() > 0.9
         # Bottom row should be near -B0
@@ -333,7 +333,7 @@ class TestIDLAMR:
     def test_output_at_finest_resolution(self) -> None:
         reader, _ = open_batsrus(IDL_AMR_DIR)
         ds = reader.read_timestep(IDL_AMR_DIR, 0)
-        assert ds["B1"].shape == (32, 32)
+        assert ds["B_1"].shape == (32, 32)
 
     def test_no_nan_after_regrid(self) -> None:
         reader, _ = open_batsrus(IDL_AMR_DIR)
@@ -353,7 +353,7 @@ class TestTargetResolutionHDF5:
     def test_coarsens_output(self) -> None:
         reader, _ = open_batsrus(AMR_DIR)
         ds = reader.read_timestep(AMR_DIR, 0, target_resolution=1.0)
-        assert ds["B1"].shape == (16, 16)
+        assert ds["B_1"].shape == (16, 16)
 
     def test_none_is_finest(self) -> None:
         reader, _ = open_batsrus(AMR_DIR)
@@ -370,7 +370,7 @@ class TestTargetResolutionHDF5:
     def test_preserves_harris_profile(self) -> None:
         reader, _ = open_batsrus(AMR_DIR)
         ds = reader.read_timestep(AMR_DIR, 0, target_resolution=1.0)
-        bx = ds["B1"]
+        bx = ds["B_1"]
         assert bx[:, -1].mean() > 0.9
         assert bx[:, 0].mean() < -0.9
 
@@ -385,10 +385,10 @@ class TestTargetResolutionHDF5:
         reader, _ = open_batsrus(AMR_DIR)
         # Levels are 0.5 and 1.0. Target 0.7 is closer to 0.5.
         ds = reader.read_timestep(AMR_DIR, 0, target_resolution=0.7)
-        assert ds["B1"].shape == (32, 32)
+        assert ds["B_1"].shape == (32, 32)
         # Target 0.8 is closer to 1.0.
         ds = reader.read_timestep(AMR_DIR, 0, target_resolution=0.8)
-        assert ds["B1"].shape == (16, 16)
+        assert ds["B_1"].shape == (16, 16)
 
     def test_grid_spacing_matches_target(self) -> None:
         reader, _ = open_batsrus(AMR_DIR)
@@ -402,7 +402,7 @@ class TestTargetResolutionIDL:
     def test_coarsens_output(self) -> None:
         reader, _ = open_batsrus(IDL_AMR_DIR)
         ds = reader.read_timestep(IDL_AMR_DIR, 0, target_resolution=1.0)
-        assert ds["B1"].shape == (16, 16)
+        assert ds["B_1"].shape == (16, 16)
 
     def test_none_is_finest(self) -> None:
         reader, _ = open_batsrus(IDL_AMR_DIR)
@@ -419,7 +419,7 @@ class TestTargetResolutionIDL:
     def test_preserves_harris_profile(self) -> None:
         reader, _ = open_batsrus(IDL_AMR_DIR)
         ds = reader.read_timestep(IDL_AMR_DIR, 0, target_resolution=1.0)
-        bx = ds["B1"]
+        bx = ds["B_1"]
         assert bx[:, -1].mean() > 0.9
         assert bx[:, 0].mean() < -0.9
 
@@ -432,9 +432,9 @@ class TestTargetResolutionIDL:
     def test_intermediate_snaps_to_nearest(self) -> None:
         reader, _ = open_batsrus(IDL_AMR_DIR)
         ds = reader.read_timestep(IDL_AMR_DIR, 0, target_resolution=0.7)
-        assert ds["B1"].shape == (32, 32)
+        assert ds["B_1"].shape == (32, 32)
         ds = reader.read_timestep(IDL_AMR_DIR, 0, target_resolution=0.8)
-        assert ds["B1"].shape == (16, 16)
+        assert ds["B_1"].shape == (16, 16)
 
 
 class TestSelectiveReadIDL:
@@ -442,14 +442,14 @@ class TestSelectiveReadIDL:
 
     def test_subset_returns_only_requested(self) -> None:
         reader, _ = open_batsrus(IDL_DIR)
-        ds = reader.read_timestep(IDL_DIR, 0, fields=["B1", "rho_m"])
-        assert set(ds.field_names()) == {"B1", "rho_m"}
+        ds = reader.read_timestep(IDL_DIR, 0, fields=["B_1", "rho_m"])
+        assert set(ds.field_names()) == {"B_1", "rho_m"}
 
     def test_subset_values_match_full(self) -> None:
         reader, _ = open_batsrus(IDL_DIR)
         ds_full = reader.read_timestep(IDL_DIR, 0)
-        ds_sub = reader.read_timestep(IDL_DIR, 0, fields=["B1", "P"])
-        assert_allclose(ds_sub["B1"], ds_full["B1"], rtol=1e-15)
+        ds_sub = reader.read_timestep(IDL_DIR, 0, fields=["B_1", "P"])
+        assert_allclose(ds_sub["B_1"], ds_full["B_1"], rtol=1e-15)
         assert_allclose(ds_sub["P"], ds_full["P"], rtol=1e-15)
 
     def test_none_reads_all(self) -> None:
@@ -463,14 +463,14 @@ class TestSelectiveReadHDF5:
 
     def test_subset_returns_only_requested(self) -> None:
         reader, _ = open_batsrus(HDF5_DIR)
-        ds = reader.read_timestep(HDF5_DIR, 0, fields=["B1", "rho_m"])
-        assert set(ds.field_names()) == {"B1", "rho_m"}
+        ds = reader.read_timestep(HDF5_DIR, 0, fields=["B_1", "rho_m"])
+        assert set(ds.field_names()) == {"B_1", "rho_m"}
 
     def test_subset_values_match_full(self) -> None:
         reader, _ = open_batsrus(HDF5_DIR)
         ds_full = reader.read_timestep(HDF5_DIR, 0)
-        ds_sub = reader.read_timestep(HDF5_DIR, 0, fields=["B1", "P"])
-        assert_allclose(ds_sub["B1"], ds_full["B1"], rtol=1e-15)
+        ds_sub = reader.read_timestep(HDF5_DIR, 0, fields=["B_1", "P"])
+        assert_allclose(ds_sub["B_1"], ds_full["B_1"], rtol=1e-15)
         assert_allclose(ds_sub["P"], ds_full["P"], rtol=1e-15)
 
     def test_none_reads_all(self) -> None:

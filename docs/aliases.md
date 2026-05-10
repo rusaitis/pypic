@@ -22,8 +22,8 @@ For the common two-species PIC case (species 0 = electrons, 1 = ions),
 | `n_e`, `n_i` | `n_s0`, `n_s1` | Number density |
 | `Pe`, `Pi` | `P_s0`, `P_s1` | Scalar pressure (or Tr(tensor)/3) |
 | `Te`, `Ti` | `T_s0`, `T_s1` | Temperature |
-| `Ve1`..`Ve3` | `V1_s0`..`V3_s0` | Electron bulk velocity |
-| `Vi1`..`Vi3` | `V1_s1`..`V3_s1` | Ion bulk velocity |
+| `Ve1`..`Ve3` | `V_s0_1`..`V_s0_3` | Electron bulk velocity |
+| `Vi1`..`Vi3` | `V_s1_1`..`V_s1_3` | Ion bulk velocity |
 | `EFe`, `EFi` | `EF_s0`, `EF_s1` | Energy flux (vector group) |
 | `s_e`, `s_i` | `s_s0`, `s_s1` | Per-species entropy |
 | `beta_e`, `beta_i` | `beta_s0`, `beta_s1` | Per-species plasma beta |
@@ -31,6 +31,7 @@ For the common two-species PIC case (species 0 = electrons, 1 = ions),
 | `P_perp_e`, `P_perp_i` | `P_perp_s0`, `P_perp_s1` | Per-species perpendicular pressure |
 | `agyrotropy_e`, `agyrotropy_i` | `agyrotropy_s0`, `agyrotropy_s1` | Per-species agyrotropy |
 | `s_gyro_e`, `s_gyro_i` | `s_gyro_s0`, `s_gyro_s1` | Per-species gyrotropic entropy |
+| `q_e`, `q_i` | `q_s0`, `q_s1` | Per-species conductive heat flux (vector group) |
 
 The dataset's alias resolver is bidirectional for these e/i ↔ `_sN`
 pairs: a reader that emits `Pe` (e.g. iPIC3D) satisfies a recipe asking
@@ -57,10 +58,11 @@ See `examples/advanced_calculations.py`.
 
 The vector-group expansion rules in [Schema § 3](schema.md#3-canonical-field-names)
 extend to the e/i convenience forms: `"EFe"`, `"EFi"`, `"KEFe"`,
-`"HFi"`, ... resolve to the corresponding per-species prefix
-(`EF_s0`, `EF_s1`, ...) and then expand to their three components.
-Derived quantities still expand to their dependencies — `"Pi"` loads
-the six ion pressure tensor components.
+`"HFi"`, `"q_e"`, `"q_i"`, ... resolve to the corresponding
+per-species prefix (`EF_s0`, `EF_s1`, ..., `q_s0`, `q_s1`) and
+then expand to their three components. Derived quantities still
+expand to their dependencies — `"Pi"` loads the six ion pressure
+tensor components.
 
 ## Why these aren't in the schema contract
 

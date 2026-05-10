@@ -5,7 +5,7 @@ To add a reader for your simulation code, either:
 1. **Use directly** with ``field_map`` and ``config``::
 
        reader = SimpleReader(
-           field_map={"Bx_native": "B1", "By_native": "B2", ...},
+           field_map={"Bx_native": "B_1", "By_native": "B_2", ...},
            config=my_config,
        )
        ds = reader.read_timestep(path, step=100)
@@ -163,7 +163,7 @@ class SimpleReader:
         for available timesteps.
     field_map : dict[str, str] | None
         Mapping from native HDF5 dataset names to canonical field
-        names (e.g. ``{"Bx_code": "B1"}``).  When ``None``, dataset
+        names (e.g. ``{"Bx_code": "B_1"}``).  When ``None``, dataset
         names are assumed to already be canonical.
     grid : GridInfo | None
         Explicit grid metadata.  Takes precedence over *config* but

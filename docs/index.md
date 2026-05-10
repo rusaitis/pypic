@@ -31,8 +31,8 @@ plane = PlaneSelection(normal="z")
 fds_2d = plane.apply(fds)
 
 # Convert to SI for display
-b_si = fds.in_si("B1")
-b_nT = fds.in_units("B1", "nT")
+b_si = fds.in_si("B_1")
+b_nT = fds.in_units("B_1", "nT")
 ```
 
 ## Requirements

@@ -20,14 +20,14 @@ Examples
 >>> from pypic.units import Normalization
 >>> grid = GridInfo(dimensions=(4,), spacing=(1.0,), origin=(0.0,))
 >>> a = FieldDataset.from_arrays(
-...     {"B1": np.array([1.0, 2.0, 3.0, 4.0])},
+...     {"B_1": np.array([1.0, 2.0, 3.0, 4.0])},
 ...     grid, Normalization.identity(),
 ... )
 >>> b = FieldDataset.from_arrays(
-...     {"B1": np.array([1.0, 2.0, 3.0, 4.0])},
+...     {"B_1": np.array([1.0, 2.0, 3.0, 4.0])},
 ...     grid, Normalization.identity(),
 ... )
->>> float(compare_fields(a, b, "B1"))
+>>> float(compare_fields(a, b, "B_1"))
 0.0
 """
 
@@ -94,7 +94,7 @@ def _validate_code_units_compatible(
     Code-unit comparison is only meaningful when both datasets share a
     normalization (same length/time/B/density references). Comparing
     PIC code values to MHD code values is physically meaningless even
-    though the arithmetic succeeds — the *numeric* value of ``B1`` in
+    though the arithmetic succeeds — the *numeric* value of ``B_1`` in
     a PIC dump and a BATSRUS dump means very different things in SI.
     Use ``units='si'`` for cross-model.
     """
@@ -329,10 +329,10 @@ def compare_fields(
     >>> from pypic.units import Normalization
     >>> grid = GridInfo(dimensions=(4,), spacing=(1.0,), origin=(0.0,))
     >>> ds = FieldDataset.from_arrays(
-    ...     {"B1": np.array([1.0, 2.0, 3.0, 4.0])},
+    ...     {"B_1": np.array([1.0, 2.0, 3.0, 4.0])},
     ...     grid, Normalization.identity(),
     ... )
-    >>> float(compare_fields(ds, ds, "B1"))
+    >>> float(compare_fields(ds, ds, "B_1"))
     0.0
     """
     _validate_metric(metric)
@@ -419,11 +419,11 @@ def field_comparison_report(
     >>> from pypic.units import Normalization
     >>> grid = GridInfo(dimensions=(4,), spacing=(1.0,), origin=(0.0,))
     >>> ds = FieldDataset.from_arrays(
-    ...     {"B1": np.array([1.0, 2.0, 3.0, 4.0])},
+    ...     {"B_1": np.array([1.0, 2.0, 3.0, 4.0])},
     ...     grid, Normalization.identity(),
     ... )
     >>> report = field_comparison_report(ds, ds)
-    >>> report["fields"]["B1"]["l2"]
+    >>> report["fields"]["B_1"]["l2"]
     0.0
     >>> report["units"]
     'si'
@@ -534,15 +534,15 @@ def field_difference_dataset(
     >>> from pypic.units import Normalization
     >>> grid = GridInfo(dimensions=(4,), spacing=(1.0,), origin=(0.0,))
     >>> a = FieldDataset.from_arrays(
-    ...     {"B1": np.array([1.0, 2.0, 3.0, 4.0])},
+    ...     {"B_1": np.array([1.0, 2.0, 3.0, 4.0])},
     ...     grid, Normalization.identity(),
     ... )
     >>> b = FieldDataset.from_arrays(
-    ...     {"B1": np.array([1.0, 1.5, 2.5, 4.0])},
+    ...     {"B_1": np.array([1.0, 1.5, 2.5, 4.0])},
     ...     grid, Normalization.identity(),
     ... )
     >>> diff = field_difference_dataset(a, b)
-    >>> diff["B1"]
+    >>> diff["B_1"]
     array([0. , 0.5, 0.5, 0. ])
     """
     _validate_units(units)

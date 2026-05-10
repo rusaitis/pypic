@@ -70,9 +70,9 @@ def ds_2d(grid_2d: GridInfo) -> FieldDataset:
     rng = np.random.default_rng(42)
     return FieldDataset.from_arrays(
         {
-            "B1": rng.standard_normal((10, 8)),
-            "B2": rng.standard_normal((10, 8)),
-            "B3": rng.standard_normal((10, 8)),
+            "B_1": rng.standard_normal((10, 8)),
+            "B_2": rng.standard_normal((10, 8)),
+            "B_3": rng.standard_normal((10, 8)),
             "rho_m": np.abs(rng.standard_normal((10, 8))) + 0.1,
             "P": np.abs(rng.standard_normal((10, 8))) + 0.1,
         },
@@ -86,9 +86,9 @@ def ds_3d(grid_3d: GridInfo) -> FieldDataset:
     rng = np.random.default_rng(42)
     return FieldDataset.from_arrays(
         {
-            "B1": rng.standard_normal((10, 8, 6)),
-            "B2": rng.standard_normal((10, 8, 6)),
-            "B3": rng.standard_normal((10, 8, 6)),
+            "B_1": rng.standard_normal((10, 8, 6)),
+            "B_2": rng.standard_normal((10, 8, 6)),
+            "B_3": rng.standard_normal((10, 8, 6)),
             "rho_m": np.abs(rng.standard_normal((10, 8, 6))) + 0.1,
             "P": np.abs(rng.standard_normal((10, 8, 6))) + 0.1,
         },
@@ -101,7 +101,7 @@ def ds_3d(grid_3d: GridInfo) -> FieldDataset:
 def ds_1d() -> FieldDataset:
     rng = np.random.default_rng(99)
     return FieldDataset.from_arrays(
-        {"B1": rng.standard_normal(20)},
+        {"B_1": rng.standard_normal(20)},
         make_uniform_grid(20, spacing=0.5),
         Normalization.identity(),
     )
@@ -123,7 +123,7 @@ def tabular() -> TabularData:
 
 class TestPlotFieldSlice:
     def test_returns_figure_and_axes(self, ds_2d: FieldDataset) -> None:
-        """Plotted ``B1`` data equals the input field (transposed).
+        """Plotted ``B_1`` data equals the input field (transposed).
 
         Hardened (iter 17): the pcolormesh-backed image is in
         ``ax.collections[0]``; its ``get_array()`` carries the plotted
@@ -131,18 +131,18 @@ class TestPlotFieldSlice:
         array prevents silent regressions where the colorbar renders
         but the wrong field (or wrong slice) is drawn.
         """
-        fig, ax = plot_field_slice(ds_2d, "B1")
+        fig, ax = plot_field_slice(ds_2d, "B_1")
         assert isinstance(fig, Figure)
         assert isinstance(ax, Axes)
         # pcolormesh transposes (nx, ny) → (ny, nx) for display
         plotted = np.asarray(ax.collections[0].get_array())
-        np.testing.assert_array_equal(plotted, ds_2d["B1"].T)
+        np.testing.assert_array_equal(plotted, ds_2d["B_1"].T)
         plt.close(fig)
 
     def test_custom_axes(self, ds_2d: FieldDataset) -> None:
         """``ax=`` reuses the caller's axes; no new figure is created."""
         fig_ext, ax_ext = plt.subplots()
-        fig_ret, ax = plot_field_slice(ds_2d, "B1", ax=ax_ext)
+        fig_ret, ax = plot_field_slice(ds_2d, "B_1", ax=ax_ext)
         assert ax is ax_ext
         assert fig_ret is fig_ext
         # Drawing happened on the provided axes
@@ -151,7 +151,7 @@ class TestPlotFieldSlice:
 
     def test_custom_title_and_step(self, ds_2d: FieldDataset) -> None:
         """Explicit ``title`` overrides the default; ``step`` is accepted."""
-        fig, ax = plot_field_slice(ds_2d, "B1", title="Custom", step=42)
+        fig, ax = plot_field_slice(ds_2d, "B_1", title="Custom", step=42)
         assert ax.get_title() == "Custom"
         plt.close(fig)
 
@@ -184,7 +184,7 @@ class TestPlotFieldSlice:
         and ``symmetric=False`` pins asymmetric vmin/vmax against
         the default symmetric-about-zero diverging norm.
         """
-        field = kwargs.pop("field", "B1")
+        field = kwargs.pop("field", "B_1")
         option_id = next(
             (
                 k
@@ -233,18 +233,18 @@ class TestPlotFieldSlice:
 
         Hardened (iter 17): the pre-hardening body created two figures
         and closed them with no assertions. The explicit slice at
-        ``x=3`` is pinned to the corresponding ``B2[3, :, :]`` plane
+        ``x=3`` is pinned to the corresponding ``B_2[3, :, :]`` plane
         (transposed for pcolormesh). Prevents silent regressions where
         plane-selection picks the wrong axis or the wrong index.
         """
-        fig1, ax1 = plot_field_slice(ds_3d, "B1")
+        fig1, ax1 = plot_field_slice(ds_3d, "B_1")
         assert isinstance(fig1, Figure)
         assert len(ax1.collections) == 1
         fig2, ax2 = plot_field_slice(
-            ds_3d, "B2", plane=PlaneSelection(normal="x", index=3)
+            ds_3d, "B_2", plane=PlaneSelection(normal="x", index=3)
         )
         plotted = np.asarray(ax2.collections[0].get_array())
-        np.testing.assert_array_equal(plotted, ds_3d["B2"][3, :, :].T)
+        np.testing.assert_array_equal(plotted, ds_3d["B_2"][3, :, :].T)
         plt.close(fig1)
         plt.close(fig2)
 
@@ -259,7 +259,7 @@ class TestPlotComparison:
         the ``diff`` panel (guards against a regression where the diff
         panel silently plots one of the inputs instead of ``a - b``).
         """
-        fig, axes = plot_comparison(ds_2d, ds_2d, "B1")
+        fig, axes = plot_comparison(ds_2d, ds_2d, "B_1")
         assert isinstance(fig, Figure)
         assert set(axes) == {"a", "b", "diff"}
         diff = np.asarray(axes["diff"].collections[0].get_array())
@@ -268,7 +268,7 @@ class TestPlotComparison:
 
     def test_custom_labels(self, ds_2d: FieldDataset) -> None:
         """``labels=`` sets the titles of the ``a`` and ``b`` panels."""
-        fig, axes = plot_comparison(ds_2d, ds_2d, "B1", labels=("Run1", "Run2"))
+        fig, axes = plot_comparison(ds_2d, ds_2d, "B_1", labels=("Run1", "Run2"))
         assert axes["a"].get_title() == "Run1"
         assert axes["b"].get_title() == "Run2"
         plt.close(fig)
@@ -312,7 +312,7 @@ class TestPlotComparison:
         axes plus 3 inset child axes; ``vmin/vmax`` pin the norm
         limits on all three panels.
         """
-        fig, axes = plot_comparison(ds_2d, ds_2d, "B1", **kwargs)
+        fig, axes = plot_comparison(ds_2d, ds_2d, "B_1", **kwargs)
         assert isinstance(fig, Figure)
         if "colorbar" in kwargs:
             cb = kwargs["colorbar"]
@@ -337,7 +337,7 @@ class TestColormapDetection:
         ("name", "data_positive", "quantity_type", "expected"),
         [
             ("|B|", False, None, True),
-            ("B1", False, None, False),
+            ("B_1", False, None, False),
             ("rho_m", False, "density", True),
             ("rho_c", False, "charge_density", False),
             ("beta", True, None, True),
@@ -404,7 +404,7 @@ class TestResolveFieldColormap:
     @pytest.mark.parametrize(
         ("name", "values", "quantity_type", "expect_diverging"),
         [
-            ("B1", np.array([-1.0, 0.0, 1.0]), "b_field", True),
+            ("B_1", np.array([-1.0, 0.0, 1.0]), "b_field", True),
             ("rho_c", np.array([-1.0, 0.0, 1.0]), "charge_density", True),
             ("J_dot_E", np.array([-1.0, 0.0, 1.0]), "power_density", True),
             ("psi", np.array([-1.0, 0.0, 1.0]), None, True),
@@ -412,7 +412,7 @@ class TestResolveFieldColormap:
             ("|B|", np.array([0.5, 1.0, 1.5]), None, False),
             ("n_s0", np.array([0.5, 1.0, 1.5]), "density", False),
         ],
-        ids=["B1", "rho_c", "J_dot_E", "psi", "div_B", "abs_B", "n_s0"],
+        ids=["B_1", "rho_c", "J_dot_E", "psi", "div_B", "abs_B", "n_s0"],
     )
     def test_canonical_field_dispatch(  # type: ignore[no-untyped-def]
         self,
@@ -443,7 +443,7 @@ class TestResolveFieldColormap:
         from pypic.plotting._colormaps import resolve_field_colormap
 
         cmap_name, cmap_obj = resolve_field_colormap(
-            "B1", np.array([-1.0, 1.0]), theme, cmap="viridis"
+            "B_1", np.array([-1.0, 1.0]), theme, cmap="viridis"
         )
         assert cmap_name == "viridis"
         assert cmap_obj.name == "viridis"
@@ -456,7 +456,7 @@ class TestResolveFieldColormap:
 
         plasma = plt.colormaps["plasma"]
         cmap_name, cmap_obj = resolve_field_colormap(
-            "B1", np.array([-1.0, 1.0]), theme, cmap=plasma
+            "B_1", np.array([-1.0, 1.0]), theme, cmap=plasma
         )
         assert cmap_obj is plasma
         assert cmap_name == "plasma"
@@ -466,7 +466,7 @@ class TestResolveFieldColormap:
         from pypic.plotting._colormaps import resolve_colormap, resolve_field_colormap
 
         for name, values in [
-            ("B1", np.array([-1.0, 1.0])),
+            ("B_1", np.array([-1.0, 1.0])),
             ("|B|", np.array([0.0, 1.0])),
             ("rho_c", np.array([-1.0, 1.0])),
         ]:
@@ -483,21 +483,21 @@ class TestResolveFieldValues:
     def test_stored_field(self, ds_2d: FieldDataset) -> None:
         from pypic.plotting._resolve import resolve_field_values
 
-        values = resolve_field_values(ds_2d, "B1", None)
-        np.testing.assert_array_equal(values, ds_2d["B1"])
+        values = resolve_field_values(ds_2d, "B_1", None)
+        np.testing.assert_array_equal(values, ds_2d["B_1"])
 
     def test_derived_field(self, ds_2d: FieldDataset) -> None:
         from pypic.plotting._resolve import resolve_field_values
 
         values = resolve_field_values(ds_2d, "|B|", None)
-        expected = np.sqrt(ds_2d["B1"] ** 2 + ds_2d["B2"] ** 2 + ds_2d["B3"] ** 2)
+        expected = np.sqrt(ds_2d["B_1"] ** 2 + ds_2d["B_2"] ** 2 + ds_2d["B_3"] ** 2)
         np.testing.assert_allclose(values, expected)
 
     def test_with_units(self, ds_2d: FieldDataset) -> None:
         from pypic.plotting._resolve import resolve_field_values
 
-        code = resolve_field_values(ds_2d, "B1", None)
-        si = resolve_field_values(ds_2d, "B1", "nT")
+        code = resolve_field_values(ds_2d, "B_1", None)
+        si = resolve_field_values(ds_2d, "B_1", "nT")
         # Shape preserved
         assert si.shape == code.shape
         # Identity normalization: code→SI conversion is 1 T; 1 T = 1e9 nT.
@@ -542,7 +542,7 @@ class TestThemes:
 
 class TestPlotLine:
     def test_1d(self, ds_1d: FieldDataset) -> None:
-        """1D line plot draws the full B1 vector as a single line.
+        """1D line plot draws the full B_1 vector as a single line.
 
         Hardened (iter 18): the pre-hardening body asserted only
         isinstance(fig, Figure) — tautological. We now pin the
@@ -550,55 +550,55 @@ class TestPlotLine:
         grid coordinate, so a regression that plots a slice or the
         wrong field is caught.
         """
-        fig, ax = plot_line(ds_1d, "B1")
+        fig, ax = plot_line(ds_1d, "B_1")
         assert isinstance(fig, Figure)
         assert isinstance(ax, Axes)
         assert len(ax.lines) == 1
         line = ax.lines[0]
-        np.testing.assert_array_equal(line.get_ydata(), ds_1d["B1"])
+        np.testing.assert_array_equal(line.get_ydata(), ds_1d["B_1"])
         np.testing.assert_array_equal(
             line.get_xdata(), ds_1d.grid.coordinate_arrays()[0]
         )
         plt.close(fig)
 
     def test_2d_with_axis(self, ds_2d: FieldDataset) -> None:
-        """2D slice along x sets ydata to the mid-y row of B1.
+        """2D slice along x sets ydata to the mid-y row of B_1.
 
         Hardened (iter 18): the line-count-only assertion let a
         regression that sliced the wrong axis or the wrong index pass
         silently. We now pin the ydata to the explicit
-        ``B1[:, ny // 2]`` slice that ``plot_line`` uses by default.
+        ``B_1[:, ny // 2]`` slice that ``plot_line`` uses by default.
         """
-        fig, ax = plot_line(ds_2d, "B1", axis="x")
+        fig, ax = plot_line(ds_2d, "B_1", axis="x")
         assert len(ax.lines) == 1
         ny = ds_2d.grid.dimensions[1]
-        expected = np.asarray(ds_2d["B1"])[:, ny // 2]
+        expected = np.asarray(ds_2d["B_1"])[:, ny // 2]
         np.testing.assert_array_equal(ax.lines[0].get_ydata(), expected)
         plt.close(fig)
 
     def test_custom_axes_overlay(self, ds_2d: FieldDataset) -> None:
-        """Overlaying a second call onto ``ax`` adds a distinct B2 line.
+        """Overlaying a second call onto ``ax`` adds a distinct B_2 line.
 
         Hardened (iter 18): in addition to the line-count check we pin
         each line's ydata to the correct field's midplane row, so a
         regression where the second call overwrote the first or
         plotted the wrong field is caught.
         """
-        fig, ax = plot_line(ds_2d, "B1", axis="x", label="first")
-        plot_line(ds_2d, "B2", axis="x", ax=ax, label="second")
+        fig, ax = plot_line(ds_2d, "B_1", axis="x", label="first")
+        plot_line(ds_2d, "B_2", axis="x", ax=ax, label="second")
         assert len(ax.lines) == 2
         ny = ds_2d.grid.dimensions[1]
         np.testing.assert_array_equal(
-            ax.lines[0].get_ydata(), np.asarray(ds_2d["B1"])[:, ny // 2]
+            ax.lines[0].get_ydata(), np.asarray(ds_2d["B_1"])[:, ny // 2]
         )
         np.testing.assert_array_equal(
-            ax.lines[1].get_ydata(), np.asarray(ds_2d["B2"])[:, ny // 2]
+            ax.lines[1].get_ydata(), np.asarray(ds_2d["B_2"])[:, ny // 2]
         )
         plt.close(fig)
 
     def test_missing_axis_raises(self, ds_2d: FieldDataset) -> None:
         with pytest.raises(ValueError, match="axis is required"):
-            plot_line(ds_2d, "B1")
+            plot_line(ds_2d, "B_1")
 
     def test_label_and_legend(self, ds_2d: FieldDataset) -> None:
         """Supplying ``label=`` creates a legend whose single entry
@@ -609,7 +609,7 @@ class TestPlotLine:
         user-supplied ``"test"`` so a regression that injects the
         wrong label (e.g. the raw field name) is caught.
         """
-        fig, ax = plot_line(ds_2d, "B1", axis="x", label="test")
+        fig, ax = plot_line(ds_2d, "B_1", axis="x", label="test")
         legend = ax.get_legend()
         assert legend is not None
         texts = [t.get_text() for t in legend.get_texts()]
@@ -893,7 +893,7 @@ class TestStatusBadge:
         plt.close(fig)
 
     def test_badge_renders_on_axes(self, ds_2d: FieldDataset) -> None:
-        fig, ax = plot_field_slice(ds_2d, "B1")
+        fig, ax = plot_field_slice(ds_2d, "B_1")
         box = add_badge(ax, step=42)
         assert box in ax.artists
         plt.close(fig)
@@ -981,7 +981,7 @@ class TestInsetColorbar:
     @pytest.mark.parametrize(
         "plot_fn",
         [
-            lambda ds: plot_field_slice(ds, "B1", colorbar="inset"),
+            lambda ds: plot_field_slice(ds, "B_1", colorbar="inset"),
             lambda ds: plot_streamlines(ds, "B", colorbar="inset"),
             lambda ds: plot_quiver(ds, "B", colorbar="inset"),
         ],
@@ -1058,7 +1058,7 @@ class TestAddContours:
         """
         from pypic.plotting import add_contours
 
-        fig, ax = plot_field_slice(ds_2d, "B1")
+        fig, ax = plot_field_slice(ds_2d, "B_1")
         n_before = len(ax.collections)
         cs = add_contours(ax, ds_2d, "P", levels=3)
         assert cs is not None
@@ -1151,7 +1151,7 @@ class TestComposedFieldAndVectors:
         creates a new axes silently.
         """
         fig_ext, ax_ext = plt.subplots()
-        _, ax = plot_field_slice(ds_2d, "B1", ax=ax_ext, title="")
+        _, ax = plot_field_slice(ds_2d, "B_1", ax=ax_ext, title="")
         plot_streamlines(ds_2d, "B", ax=ax, colorbar=False, legend=False, title="")
         assert ax is ax_ext
         assert len(ax_ext.collections) == 2
@@ -1169,7 +1169,7 @@ class TestPlotFieldGrid:
         """
         from pypic.plotting import plot_field_grid
 
-        fields = ["B1", "|B|", "rho_m", "P"]
+        fields = ["B_1", "|B|", "rho_m", "P"]
         fig, axes = plot_field_grid(ds_2d, fields, ncols=2)
         assert isinstance(fig, Figure)
         assert len(axes) == len(fields)
@@ -1185,7 +1185,7 @@ class TestPlotFieldGrid:
         """
         from pypic.plotting import plot_field_grid
 
-        fig, axes = plot_field_grid(ds_2d, ["B1"])
+        fig, axes = plot_field_grid(ds_2d, ["B_1"])
         assert len(axes) == 1
         assert len(axes[0].collections) == 1
         plt.close(fig)
@@ -1202,7 +1202,7 @@ class TestPlotFieldGrid:
 
         from pypic.plotting import plot_field_grid
 
-        fig, axes = plot_field_grid(ds_2d, ["B1", "P"], panel_labels=False)
+        fig, axes = plot_field_grid(ds_2d, ["B_1", "P"], panel_labels=False)
         for panel in axes:
             anchored = [a for a in panel.artists if isinstance(a, AnchoredOffsetbox)]
             assert anchored == []
@@ -1221,7 +1221,7 @@ class TestPlotCrossSection:
         """
         from pypic.plotting import plot_cross_section
 
-        fig, (ax_2d, ax_1d) = plot_cross_section(ds_2d, "B1", cut_axis="x")
+        fig, (ax_2d, ax_1d) = plot_cross_section(ds_2d, "B_1", cut_axis="x")
         assert isinstance(fig, Figure)
         assert isinstance(ax_2d, Axes)
         assert isinstance(ax_1d, Axes)
@@ -1231,18 +1231,18 @@ class TestPlotCrossSection:
 
     def test_custom_cut_index(self, ds_2d: FieldDataset) -> None:
         """Custom ``cut_index`` drives the 1D line's ydata to the
-        B1 row at that cut index.
+        B_1 row at that cut index.
 
         Hardened (iter 18): the prior body had no assertion. ``cut_axis
-        ="y"`` means slice AT y-index 2, yielding ``B1[2, :]``. Pinning
+        ="y"`` means slice AT y-index 2, yielding ``B_1[2, :]``. Pinning
         this catches a regression that silently ignores ``cut_index``
         (defaulting to midplane) or swaps the slicing axis.
         """
         from pypic.plotting import plot_cross_section
 
-        fig, (_, ax_1d) = plot_cross_section(ds_2d, "B1", cut_axis="y", cut_index=2)
+        fig, (_, ax_1d) = plot_cross_section(ds_2d, "B_1", cut_axis="y", cut_index=2)
         assert len(ax_1d.lines) >= 1
-        expected = np.asarray(ds_2d["B1"])[2, :]
+        expected = np.asarray(ds_2d["B_1"])[2, :]
         np.testing.assert_array_equal(ax_1d.lines[0].get_ydata(), expected)
         plt.close(fig)
 
@@ -1250,7 +1250,7 @@ class TestPlotCrossSection:
         from pypic.plotting import plot_cross_section
 
         with pytest.raises(ValueError, match="cut_axis"):
-            plot_cross_section(ds_2d, "B1", cut_axis="z")
+            plot_cross_section(ds_2d, "B_1", cut_axis="z")
 
 
 class TestComparisonShowError:
@@ -1264,7 +1264,7 @@ class TestComparisonShowError:
         exists on the diff panel — catches a regression that drops
         the error annotation.
         """
-        fig, axes = plot_comparison(ds_2d, ds_2d, "B1", show_error=True)
+        fig, axes = plot_comparison(ds_2d, ds_2d, "B_1", show_error=True)
         assert isinstance(fig, Figure)
         assert "diff" in axes
         diff_ax = axes["diff"]
@@ -1278,7 +1278,7 @@ class TestPlotLines:
     def test_basic(self, ds_2d: FieldDataset) -> None:
         from pypic.plotting import plot_lines
 
-        fig, ax = plot_lines(ds_2d, ["B1", "B2", "B3"], axis="x")
+        fig, ax = plot_lines(ds_2d, ["B_1", "B_2", "B_3"], axis="x")
         assert isinstance(fig, Figure)
         assert len(ax.lines) == 3
         assert ax.get_legend() is not None
@@ -1288,7 +1288,7 @@ class TestPlotLines:
         """Custom *labels* flow through to legend entry text verbatim."""
         from pypic.plotting import plot_lines
 
-        fig, ax = plot_lines(ds_2d, ["B1", "B2"], axis="x", labels=["$B_x$", "$B_y$"])
+        fig, ax = plot_lines(ds_2d, ["B_1", "B_2"], axis="x", labels=["$B_x$", "$B_y$"])
         assert len(ax.lines) == 2
         legend = ax.get_legend()
         assert legend is not None, "custom labels should force a legend"
@@ -1309,7 +1309,7 @@ class TestSetDefaultTheme:
     def test_badge_on_slice(self, ds_2d: FieldDataset) -> None:
         """Passing *step* to ``badge=True`` writes that step number into
         the badge text (not just any patch)."""
-        fig, ax = plot_field_slice(ds_2d, "B1", step=42, badge=True)
+        fig, ax = plot_field_slice(ds_2d, "B_1", step=42, badge=True)
         # The badge is a patch-bearing artist with a child text carrying
         # the formatted cycle/step string.
         patch_artists = [a for a in ax.artists if hasattr(a, "patch")]
@@ -1331,7 +1331,7 @@ class TestSetDefaultTheme:
     def test_save_creates_file(self, ds_2d: FieldDataset, tmp_path: Path) -> None:
         """``save=<path>`` writes a non-empty PNG with the PNG signature."""
         out = tmp_path / "test.png"
-        plot_field_slice(ds_2d, "B1", save=str(out))
+        plot_field_slice(ds_2d, "B_1", save=str(out))
         assert out.exists()
         # PNG magic bytes — proves a real image was written, not an empty file.
         assert out.read_bytes()[:8] == b"\x89PNG\r\n\x1a\n"
@@ -1553,7 +1553,7 @@ class TestFieldGridNewParams:
         """Explicit *vmin*/*vmax* propagate to each panel's norm identically."""
         from pypic.plotting import plot_field_grid
 
-        fig, axes = plot_field_grid(ds_2d, ["B1", "B2"], ncols=2, vmin=-2.0, vmax=2.0)
+        fig, axes = plot_field_grid(ds_2d, ["B_1", "B_2"], ncols=2, vmin=-2.0, vmax=2.0)
         assert isinstance(fig, Figure)
         # Each panel carries one pcolormesh collection; both must honor
         # the shared color limits.
@@ -1571,9 +1571,9 @@ class TestFieldGridNewParams:
 
         fig, axes = plot_field_grid(
             ds_2d,
-            ["B1", "rho_m"],
+            ["B_1", "rho_m"],
             ncols=2,
-            cmap={"B1": "RdBu_r", "rho_m": "inferno"},
+            cmap={"B_1": "RdBu_r", "rho_m": "inferno"},
         )
         assert isinstance(fig, Figure)
         assert len(axes) == 2
@@ -1586,7 +1586,7 @@ class TestFieldGridNewParams:
         """Scalar cmap string applies the same colormap to every panel."""
         from pypic.plotting import plot_field_grid
 
-        fig, axes = plot_field_grid(ds_2d, ["B1", "B2"], ncols=2, cmap="viridis")
+        fig, axes = plot_field_grid(ds_2d, ["B_1", "B_2"], ncols=2, cmap="viridis")
         assert isinstance(fig, Figure)
         for ax in axes:
             assert ax.collections[0].cmap.name == "viridis"
@@ -1609,7 +1609,7 @@ class TestComparisonNewParams:
     def test_symmetric_false(self, ds_2d: FieldDataset) -> None:
         """``symmetric=False`` allows A/B norms to span the raw data range
         (non-symmetric around zero for a random-signed field)."""
-        fig, axes = plot_comparison(ds_2d, ds_2d, "B1", symmetric=False)
+        fig, axes = plot_comparison(ds_2d, ds_2d, "B_1", symmetric=False)
         assert isinstance(fig, Figure)
         norm_a = axes["a"].collections[0].norm
         # For a random-signed field with nonzero mean, the norm should
@@ -1619,7 +1619,7 @@ class TestComparisonNewParams:
 
     def test_alpha(self, ds_2d: FieldDataset) -> None:
         """*alpha* is forwarded to every panel's mesh."""
-        fig, axes = plot_comparison(ds_2d, ds_2d, "B1", alpha=0.5)
+        fig, axes = plot_comparison(ds_2d, ds_2d, "B_1", alpha=0.5)
         assert isinstance(fig, Figure)
         for key in ("a", "b", "diff"):
             mesh = axes[key].collections[0]
@@ -1643,7 +1643,7 @@ class TestComparisonNewParams:
             fig, axes = plot_comparison(
                 ds_2d,
                 ds_2d,
-                "B1",
+                "B_1",
                 log_scale=True,
                 symmetric=True,
             )
@@ -1758,20 +1758,20 @@ class TestPlotScatter:
         """Scatter paints one marker per input cell (N = grid size)."""
         from pypic.plotting import plot_scatter
 
-        fig, ax = plot_scatter(ds_2d, "B1", "B2")
+        fig, ax = plot_scatter(ds_2d, "B_1", "B_2")
         assert isinstance(fig, Figure)
         assert isinstance(ax, Axes)
         assert ax.collections, "expected a PathCollection from scatter()"
         offsets = ax.collections[0].get_offsets()
         # ds_2d is a 10x8 grid → 80 points.
-        assert offsets.shape == (ds_2d["B1"].size, 2)
+        assert offsets.shape == (ds_2d["B_1"].size, 2)
         plt.close(fig)
 
     def test_color_field(self, ds_2d: FieldDataset) -> None:
         """``color_field`` attaches a per-point array for the colormap."""
         from pypic.plotting import plot_scatter
 
-        fig, ax = plot_scatter(ds_2d, "B1", "B2", color_field="rho_m")
+        fig, ax = plot_scatter(ds_2d, "B_1", "B_2", color_field="rho_m")
         arr = ax.collections[0].get_array()
         assert arr is not None
         assert arr.size == ds_2d["rho_m"].size
@@ -1781,7 +1781,7 @@ class TestPlotScatter:
         """``density=True`` colors points by local density — array present."""
         from pypic.plotting import plot_scatter
 
-        fig, ax = plot_scatter(ds_2d, "B1", "B2", density=True)
+        fig, ax = plot_scatter(ds_2d, "B_1", "B_2", density=True)
         arr = ax.collections[0].get_array()
         assert arr is not None
         assert arr.size > 0
@@ -1801,10 +1801,10 @@ class TestPlotScatter:
         """A 3D dataset auto-slices — scatter count matches one 2D slice."""
         from pypic.plotting import plot_scatter
 
-        fig, ax = plot_scatter(ds_3d, "B1", "B2")
+        fig, ax = plot_scatter(ds_3d, "B_1", "B_2")
         offsets = ax.collections[0].get_offsets()
         # Full 3D is 10x8x6=480; a 2D slice is 80. Accept any proper slice.
-        assert 0 < offsets.shape[0] < ds_3d["B1"].size
+        assert 0 < offsets.shape[0] < ds_3d["B_1"].size
         plt.close(fig)
 
     def test_custom_axes(self, ds_2d: FieldDataset) -> None:
@@ -1813,7 +1813,7 @@ class TestPlotScatter:
 
         fig_ext, ax_ext = plt.subplots()
         before = len(ax_ext.collections)
-        _, ax = plot_scatter(ds_2d, "B1", "B2", ax=ax_ext)
+        _, ax = plot_scatter(ds_2d, "B_1", "B_2", ax=ax_ext)
         assert ax is ax_ext
         assert len(ax_ext.collections) == before + 1
         plt.close(fig_ext)
@@ -1837,8 +1837,8 @@ class TestPlotScatter:
 
         fig, ax = plot_scatter(
             ds_2d,
-            "B1",
-            "B2",
+            "B_1",
+            "B_2",
             density=True,
             color_field="rho_m",
         )
@@ -2002,7 +2002,7 @@ class TestPlotLineComparison:
         """Two datasets → two lines; identical inputs → identical y-data."""
         from pypic.plotting import plot_line_comparison
 
-        fig, ax = plot_line_comparison([ds_2d, ds_2d], "B1", axis="x")
+        fig, ax = plot_line_comparison([ds_2d, ds_2d], "B_1", axis="x")
         assert isinstance(fig, Figure)
         assert len(ax.lines) == 2
         y0 = ax.lines[0].get_ydata()
@@ -2016,7 +2016,7 @@ class TestPlotLineComparison:
 
         fig, ax = plot_line_comparison(
             [ds_2d, ds_2d],
-            "B1",
+            "B_1",
             axis="x",
             labels=["run A", "run B"],
         )
@@ -2035,7 +2035,7 @@ class TestPlotLineComparison:
         before = len(ax_ext.lines)
         _, ax = plot_line_comparison(
             [ds_2d, ds_2d],
-            "B1",
+            "B_1",
             axis="x",
             ax=ax_ext,
         )
@@ -2125,7 +2125,7 @@ class TestSymlogSlice:
         """``symlog=True`` produces a SymLogNorm on the mesh."""
         from matplotlib.colors import SymLogNorm
 
-        fig, ax = plot_field_slice(ds_2d, "B1", symlog=True)
+        fig, ax = plot_field_slice(ds_2d, "B_1", symlog=True)
         assert isinstance(ax.collections[0].norm, SymLogNorm)
         plt.close(fig)
 
@@ -2133,7 +2133,7 @@ class TestSymlogSlice:
         """Explicit *linthresh* is honored by the resulting SymLogNorm."""
         from matplotlib.colors import SymLogNorm
 
-        fig, ax = plot_field_slice(ds_2d, "B1", symlog=True, linthresh=0.1)
+        fig, ax = plot_field_slice(ds_2d, "B_1", symlog=True, linthresh=0.1)
         norm = ax.collections[0].norm
         assert isinstance(norm, SymLogNorm)
         assert norm.linthresh == pytest.approx(0.1)

@@ -24,6 +24,7 @@ from pypic.readers.ipic3d._field_map import (
     infer_total_fields,
     per_species_canonical,
     per_species_eflux_canonical,
+    per_species_pressure_canonical,
 )
 
 if TYPE_CHECKING:
@@ -120,9 +121,11 @@ class IPic3DSerialReader:
                 if "rho" in group and cycle_key in group["rho"]:
                     mapping[per_species_canonical("rho", s)] = "rho"
 
-                for phdf5_name, canon_base in _PHDF5_PRESSURE_MAP.items():
+                for phdf5_name in _PHDF5_PRESSURE_MAP:
                     if phdf5_name in group and cycle_key in group[phdf5_name]:
-                        mapping[f"{canon_base}_s{s}"] = phdf5_name
+                        mapping[per_species_pressure_canonical(phdf5_name, s)] = (
+                            phdf5_name
+                        )
 
                 for ef_name in _EFLUX_MAP:
                     if ef_name in group and cycle_key in group[ef_name]:
@@ -268,11 +271,12 @@ class IPic3DSerialReader:
 
             # Pressure tensor (optional — not all shdf5 runs include it)
             want_p_s = expanded is None or any(
-                f"{cb}_s{s}" in expanded for cb in _PHDF5_PRESSURE_MAP.values()
+                per_species_pressure_canonical(phdf5_name, s) in expanded
+                for phdf5_name in _PHDF5_PRESSURE_MAP
             )
             if want_p_s:
                 for phdf5_name, canon_base in _PHDF5_PRESSURE_MAP.items():
-                    canon = f"{canon_base}_s{s}"
+                    canon = per_species_pressure_canonical(phdf5_name, s)
                     if expanded is not None and canon not in expanded:
                         continue
                     group_path = f"moments/species_{s}/{phdf5_name}"
@@ -291,7 +295,8 @@ class IPic3DSerialReader:
 
             # Energy flux (optional)
             want_ef_s = expanded is None or any(
-                f"{cb}_s{s}" in expanded for cb in _EFLUX_MAP.values()
+                per_species_eflux_canonical(ef_name, s) in expanded
+                for ef_name in _EFLUX_MAP
             )
             if want_ef_s:
                 for ef_name, _ef_canon_base in _EFLUX_MAP.items():

@@ -36,7 +36,7 @@ class FieldDataset:
     r"""Universal container for simulation field data.
 
     Wraps an ``xr.Dataset`` with grid metadata, normalization info, species
-    definitions, and geometry-aware field aliases (e.g. ``"Bx"`` → ``"B1"``).
+    definitions, and geometry-aware field aliases (e.g. ``"Bx"`` → ``"B_1"``).
 
     The full alias hierarchy — geometry/Cartesian aliases, species-name
     aliases (``n_electrons``→``n_s0``), and the e/i library-convenience
@@ -73,9 +73,9 @@ class FieldDataset:
     ...     dimensions=(4, 3), spacing=(1.0, 1.0), origin=(0.0, 0.0),
     ...     geometry=CARTESIAN,
     ... )
-    >>> fields = {"B1": np.ones((4, 3)), "rho_c": np.zeros((4, 3))}
+    >>> fields = {"B_1": np.ones((4, 3)), "rho_c": np.zeros((4, 3))}
     >>> ds = FieldDataset.from_arrays(fields, grid, Normalization.identity())
-    >>> ds["B1"].shape
+    >>> ds["B_1"].shape
     (4, 3)
     >>> ds.has_field("Bx")
     True
@@ -188,8 +188,8 @@ class FieldDataset:
         --------
         >>> import numpy as np
         >>> grid = GridInfo(dimensions=(2,), spacing=(1.0,))
-        >>> ds = FieldDataset.from_arrays({"B1": np.array([1.0, 2.0])}, grid)
-        >>> ds["B1"]
+        >>> ds = FieldDataset.from_arrays({"B_1": np.array([1.0, 2.0])}, grid)
+        >>> ds["B_1"]
         array([1., 2.])
         """
         if normalization is None:
@@ -522,12 +522,12 @@ class FieldDataset:
         ...     geometry=CARTESIAN,
         ... )
         >>> ds = FieldDataset.from_arrays(
-        ...     {"B1": np.ones(2)}, grid, Normalization.identity()
+        ...     {"B_1": np.ones(2)}, grid, Normalization.identity()
         ... )
         >>> ds.resolve_key("Bx")  # Cartesian alias
-        'B1'
-        >>> ds.resolve_key("B1")  # canonical
-        'B1'
+        'B_1'
+        >>> ds.resolve_key("B_1")  # canonical
+        'B_1'
         """
         if key in self._ds.data_vars:
             return key
@@ -586,9 +586,9 @@ class FieldDataset:
         ...     geometry=CARTESIAN,
         ... )
         >>> ds = FieldDataset.from_arrays(
-        ...     {"B1": np.array([1.0, 2.0])}, grid, Normalization.identity(),
+        ...     {"B_1": np.array([1.0, 2.0])}, grid, Normalization.identity(),
         ... )
-        >>> ds.has_field("B1"), ds.has_field("Bx"), ds.has_field("rho")
+        >>> ds.has_field("B_1"), ds.has_field("Bx"), ds.has_field("rho")
         (True, True, False)
         """
         return key in self._ds.data_vars or key in self._aliases
@@ -609,11 +609,11 @@ class FieldDataset:
         ...     geometry=CARTESIAN,
         ... )
         >>> ds = FieldDataset.from_arrays(
-        ...     {"B1": np.array([1.0, 2.0]), "rho_c": np.array([0.5, 0.5])},
+        ...     {"B_1": np.array([1.0, 2.0]), "rho_c": np.array([0.5, 0.5])},
         ...     grid, Normalization.identity(),
         ... )
         >>> sorted(ds.field_names())
-        ['B1', 'rho_c']
+        ['B_1', 'rho_c']
         """
         return list(self._ds.data_vars)  # type: ignore[arg-type]  # xarray types Hashable, always str
 
@@ -643,13 +643,13 @@ class FieldDataset:
         ...     geometry=CARTESIAN,
         ... )
         >>> ds = FieldDataset.from_arrays(
-        ...     {"B1": np.array([1.0, 2.0]), "B2": np.array([3.0, 4.0]),
+        ...     {"B_1": np.array([1.0, 2.0]), "B_2": np.array([3.0, 4.0]),
         ...      "rho_c": np.array([0.5, 0.5])},
         ...     grid, Normalization.identity(),
         ... )
-        >>> sub = ds.select_fields(["rho_c", "B1"])
+        >>> sub = ds.select_fields(["rho_c", "B_1"])
         >>> sub.field_names()
-        ['rho_c', 'B1']
+        ['rho_c', 'B_1']
         """
         # Dict-as-ordered-set: preserves caller insertion order while
         # deduplicating on the resolved canonical name. Alphabetical
@@ -724,9 +724,9 @@ class FieldDataset:
         ...     geometry=CARTESIAN,
         ... )
         >>> ds = FieldDataset.from_arrays(
-        ...     {"B1": np.full((4,3,2), 3.0),
-        ...      "B2": np.full((4,3,2), 4.0),
-        ...      "B3": np.zeros((4,3,2))},
+        ...     {"B_1": np.full((4,3,2), 3.0),
+        ...      "B_2": np.full((4,3,2), 4.0),
+        ...      "B_3": np.zeros((4,3,2))},
         ...     grid, Normalization.identity(),
         ... )
         >>> ds.compute("|B|")[0, 0, 0]
@@ -840,8 +840,8 @@ class FieldDataset:
         looks up metadata from the field registry, and attaches it
         with full metadata. Fields already in the dataset are skipped.
 
-        When a vector-component recipe is encountered (e.g. ``"S1"``
-        from Poynting flux), all sibling components (``"S2"``, ``"S3"``)
+        When a vector-component recipe is encountered (e.g. ``"S_1"``
+        from Poynting flux), all sibling components (``"S_2"``, ``"S_3"``)
         are computed from a single function call and stored together.
 
         Parameters
@@ -863,9 +863,9 @@ class FieldDataset:
         ...     geometry=CARTESIAN,
         ... )
         >>> ds = FieldDataset.from_arrays(
-        ...     {"B1": np.full((4,3,2), 3.0),
-        ...      "B2": np.full((4,3,2), 4.0),
-        ...      "B3": np.zeros((4,3,2))},
+        ...     {"B_1": np.full((4,3,2), 3.0),
+        ...      "B_2": np.full((4,3,2), 4.0),
+        ...      "B_3": np.zeros((4,3,2))},
         ...     grid, Normalization.identity(),
         ... )
         >>> ds = ds.with_derived("|B|")
@@ -884,7 +884,7 @@ class FieldDataset:
             if result.has_field(name):
                 continue
 
-            # Check for vector-component siblings (e.g. S1→S2,S3)
+            # Check for vector-component siblings (e.g. S_1→S_2,S_3)
             siblings = _find_sibling_components(name)
             if siblings:
                 # Compute the full vector result once, store all components
