@@ -33,6 +33,25 @@ For the common two-species PIC case (species 0 = electrons, 1 = ions),
 | `s_gyro_e`, `s_gyro_i` | `s_gyro_s0`, `s_gyro_s1` | Per-species gyrotropic entropy |
 | `q_e`, `q_i` | `q_s0`, `q_s1` | Per-species conductive heat flux (vector group) |
 
+## Characteristic-scale literature aliases (NRL Plasma Formulary)
+
+Derived/compute-only quantities use the Tier-3 `<field>_s<N>` form
+as the canonical recipe ID. The NRL Plasma Formulary spelling
+remains a registered alias for human-friendly compute calls and
+docstring readability:
+
+| Alias | Canonical | Meaning |
+|-------|-----------|---------|
+| `omega_pe`, `omega_pi` | `omega_p_s0`, `omega_p_s1` | Plasma frequency |
+| `omega_ce`, `omega_ci` | `omega_c_s0`, `omega_c_s1` | Cyclotron frequency |
+| `d_e`, `d_i` | `d_s0`, `d_s1` | Inertial / skin depth |
+| `r_e`, `r_i` | `r_s0`, `r_s1` | Thermal gyroradius |
+| `v_th_e`, `v_th_i` | `v_th_s0`, `v_th_s1` | Thermal speed (NRL convention) |
+| `lambda_D` | `lambda_D_s0` | Electron Debye length |
+
+Multi-species runs (`omega_p_s2`, `lambda_D_s3`, ...) synthesize via
+`_SPECIES_TEMPLATES` on demand — no static recipe needed.
+
 The dataset's alias resolver is bidirectional for these e/i ↔ `_sN`
 pairs: a reader that emits `Pe` (e.g. iPIC3D) satisfies a recipe asking
 for `P_s0`, and vice versa. Storage is the same data either way; the

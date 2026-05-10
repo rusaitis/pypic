@@ -178,25 +178,28 @@ class TestStructuredSpeciesComputeAliases:
     @pytest.mark.parametrize(
         ("alias", "canonical"),
         [
-            # Species-coupled scales: e/i form remains canonical (recipe
-            # registered directly); _sN form aliases up to it.
-            ("omega_p_s0", "omega_pe"),
-            ("omega_p_s1", "omega_pi"),
-            ("omega_c_s0", "omega_ce"),
-            ("omega_c_s1", "omega_ci"),
-            ("d_s0", "d_e"),
-            ("d_s1", "d_i"),
-            ("v_thermal_s0", "v_th_e"),
-            ("v_thermal_s1", "v_th_i"),
-            ("v_th_s0", "v_th_e"),
-            ("v_th_s1", "v_th_i"),
-            ("rL_s0", "r_e"),
-            ("rL_s1", "r_i"),
-            ("r_s0", "r_e"),
-            ("r_s1", "r_i"),
-            ("lambda_D_s0", "lambda_D"),
-            # Moment quantities (post v1.0.x flip): _sN is canonical;
-            # the e/i convenience name aliases down to it.
+            # Species-coupled scales: Tier-3 ``_sN`` form is canonical;
+            # the literature spellings (NRL Plasma Formulary) alias to it.
+            ("omega_pe", "omega_p_s0"),
+            ("omega_pi", "omega_p_s1"),
+            ("omega_ce", "omega_c_s0"),
+            ("omega_ci", "omega_c_s1"),
+            ("d_e", "d_s0"),
+            ("d_i", "d_s1"),
+            ("v_th_e", "v_th_s0"),
+            ("v_th_i", "v_th_s1"),
+            ("r_e", "r_s0"),
+            ("r_i", "r_s1"),
+            ("lambda_D", "lambda_D_s0"),
+            # Long-form descriptive aliases also resolve to the Tier-3 canonical.
+            ("v_thermal_s0", "v_th_s0"),
+            ("v_thermal_s1", "v_th_s1"),
+            ("rL_s0", "r_s0"),
+            ("rL_s1", "r_s1"),
+            ("larmor_radius_s0", "r_s0"),
+            ("larmor_radius_s1", "r_s1"),
+            # Moment quantities: _sN is canonical; the e/i convenience
+            # name aliases down to it.
             ("Pe", "P_s0"),
             ("Pi", "P_s1"),
             ("Te", "T_s0"),

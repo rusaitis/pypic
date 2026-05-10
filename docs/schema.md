@@ -1167,31 +1167,34 @@ arrays in place of `P_11..P_33`.
 
 ### Characteristic scales (derived)
 
-| Canonical | Meaning | Computed from |
-|-----------|---------|---------------|
-| `d_e` | Electron skin depth | `n_s0`, species |
-| `d_i` | Ion skin depth | `n_s1`, species |
-| `r_e` | Electron thermal gyroradius | `T_s0`, `|B|`, species |
-| `r_i` | Ion thermal gyroradius | `T_s1`, `|B|`, species |
-| `omega_pe` | Electron plasma frequency | `n_s0`, species |
-| `omega_pi` | Ion plasma frequency | `n_s1`, species |
-| `omega_ce` | Electron cyclotron frequency (positive by convention) | `|B|`, species |
-| `omega_ci` | Ion cyclotron frequency (positive by convention) | `|B|`, species |
-| `lambda_D` | Electron Debye length | `n_s0`, `T_s0`, species |
-| `v_A` | Alfvén speed | `|B|`, `rho_m` |
-| `v_th_e` | Electron thermal speed (NRL convention) | `T_s0`, species |
-| `v_th_i` | Ion thermal speed (NRL convention) | `T_s1`, species |
-| `c_s` | Sound speed (MHD) | `P`, `rho_m`, `gamma_eos` |
-| `v_ms` | Fast magnetosonic speed (perpendicular propagation) | `v_A`, `c_s` |
-| `M_A` | Alfvén Mach number | `|V|`, `v_A` |
-| `M_ms` | Magnetosonic Mach number | `|V|`, `v_ms` |
-| `beta` | Plasma beta (auto-expands to `beta_s{N}` per species) | `P` (or `P_s{N}`), `|B|` |
-| `sigma` | Magnetization parameter | `|B|`, `rho_m`, `c` |
+| Canonical | NRL alias | Meaning | Computed from |
+|-----------|-----------|---------|---------------|
+| `d_s0` | `d_e` | Electron skin depth | `n_s0`, species |
+| `d_s1` | `d_i` | Ion skin depth | `n_s1`, species |
+| `r_s0` | `r_e` | Electron thermal gyroradius | `T_s0`, `|B|`, species |
+| `r_s1` | `r_i` | Ion thermal gyroradius | `T_s1`, `|B|`, species |
+| `omega_p_s0` | `omega_pe` | Electron plasma frequency | `n_s0`, species |
+| `omega_p_s1` | `omega_pi` | Ion plasma frequency | `n_s1`, species |
+| `omega_c_s0` | `omega_ce` | Electron cyclotron frequency (positive by convention) | `|B|`, species |
+| `omega_c_s1` | `omega_ci` | Ion cyclotron frequency (positive by convention) | `|B|`, species |
+| `lambda_D_s0` | `lambda_D` | Electron Debye length | `n_s0`, `T_s0`, species |
+| `v_A` | — | Alfvén speed | `|B|`, `rho_m` |
+| `v_th_s0` | `v_th_e` | Electron thermal speed (NRL convention) | `T_s0`, species |
+| `v_th_s1` | `v_th_i` | Ion thermal speed (NRL convention) | `T_s1`, species |
+| `c_s` | — | Sound speed (MHD) | `P`, `rho_m`, `gamma_eos` |
+| `v_ms` | — | Fast magnetosonic speed (perpendicular propagation) | `v_A`, `c_s` |
+| `M_A` | — | Alfvén Mach number | `|V|`, `v_A` |
+| `M_ms` | — | Magnetosonic Mach number | `|V|`, `v_ms` |
+| `beta` | — | Plasma beta (auto-expands to `beta_s{N}` per species) | `P` (or `P_s{N}`), `|B|` |
+| `sigma` | — | Magnetization parameter | `|B|`, `rho_m`, `c` |
 
-These names follow the NRL Plasma Formulary convention (`omega_ce`,
-`lambda_D`, `d_i`, ...) and are the canonical compute-recipe names
-in pypic. The corresponding `_sN` forms (e.g. `omega_c_s0`,
-`d_s0`, `v_thermal_s1`) resolve as aliases.
+The Tier-3 `<field>_s<N>` form is the canonical recipe ID — the same
+template used for storage names elsewhere in the schema. NRL Plasma
+Formulary spellings (`omega_pe`, `lambda_D`, `v_th_e`, ...) resolve
+to the canonical via `_COMPUTE_ALIASES` and remain the human-friendly
+form in error messages, doctests, and physics-literature contexts.
+Multi-species runs (`omega_p_s2`, `lambda_D_s3`, ...) synthesize via
+`_SPECIES_TEMPLATES` on demand.
 
 ### Other derived quantities
 

@@ -98,8 +98,9 @@ tensor. Our stored values are always positive.
 
 ## Debye Length
 
-`lambda_D` is specifically the *electron* Debye length. The total plasma
-Debye length is $1/\lambda_D^2 = \sum_s n_s q_s^2 / (\epsilon_0 T_s)$.
+`lambda_D` (NRL alias for canonical `lambda_D_s0`) is specifically the
+*electron* Debye length. The total plasma Debye length is
+$1/\lambda_D^2 = \sum_s n_s q_s^2 / (\epsilon_0 T_s)$.
 
 ## Fast Magnetosonic Speed
 

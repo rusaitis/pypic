@@ -127,9 +127,9 @@ _REGISTRY: dict[str, _Recipe] = {
     "|J|": _Recipe(derived.current_density_magnitude, ("J_1", "J_2", "J_3")),
     "|V|": _Recipe(derived.velocity_magnitude, ("V_1", "V_2", "V_3")),
     "|Ve|": _Recipe(derived.velocity_magnitude, ("Ve1", "Ve2", "Ve3")),
-    # Plasma parameters.  Per-species ``beta_e``/``beta_i`` are produced by
-    # the species template ``"beta"`` (resolves ``beta_s0``/``beta_s1``);
-    # the e/i names alias to ``_sN`` via ``_COMPUTE_ALIASES``.
+    # Plasma parameters.  Per-species ``beta_s0``/``beta_s1`` are produced
+    # by the species template ``"beta"``; the literature ``beta_e``/
+    # ``beta_i`` spellings alias to ``_sN`` via ``_COMPUTE_ALIASES``.
     "beta": _Recipe(derived.plasma_beta, ("P", "|B|")),
     "v_A": _Recipe(derived.alfven_speed, ("|B|", "rho_m"), supports_relativistic=True),
     "c_s": _Recipe(
@@ -196,73 +196,75 @@ _REGISTRY: dict[str, _Recipe] = {
         ("P", "V_{c}"),
         needs_gamma=True,
     ),
-    # Species-dependent: electrons (species 0)
-    "omega_pe": _Recipe(
+    # Species-dependent: Tier-3 canonical recipe IDs.  Literature
+    # spellings (``omega_pe``, ``v_th_e``, ``lambda_D``) resolve here
+    # via ``_COMPUTE_ALIASES``.  Species index >= 2 falls through to
+    # ``_SPECIES_TEMPLATES`` for dynamic synthesis.
+    "omega_p_s0": _Recipe(
         derived.plasma_frequency,
         ("n_s0",),
         species_index=0,
         species_args=_SpeciesArgs.CHARGE_MASS,
     ),
-    "omega_ce": _Recipe(
+    "omega_c_s0": _Recipe(
         derived.gyrofrequency,
         ("|B|",),
         species_index=0,
         species_args=_SpeciesArgs.CHARGE_MASS,
     ),
-    "d_e": _Recipe(
+    "d_s0": _Recipe(
         derived.skin_depth,
         ("n_s0",),
         species_index=0,
         needs_c=True,
         species_args=_SpeciesArgs.CHARGE_MASS,
     ),
-    "v_th_e": _Recipe(
+    "v_th_s0": _Recipe(
         derived.thermal_speed,
         ("T_s0",),
         species_index=0,
         species_args=_SpeciesArgs.MASS_ONLY,
         supports_relativistic=True,
     ),
-    "r_e": _Recipe(
+    "r_s0": _Recipe(
         derived.gyroradius,
         ("T_s0", "|B|"),
         species_index=0,
         species_args=_SpeciesArgs.CHARGE_MASS,
     ),
-    "lambda_D": _Recipe(
+    "lambda_D_s0": _Recipe(
         derived.debye_length,
         ("T_s0", "n_s0"),
         species_index=0,
         species_args=_SpeciesArgs.CHARGE_ONLY,
     ),
-    # Species-dependent: ions (species 1)
-    "omega_pi": _Recipe(
+    "omega_p_s1": _Recipe(
         derived.plasma_frequency,
         ("n_s1",),
         species_index=1,
         species_args=_SpeciesArgs.CHARGE_MASS,
     ),
-    "omega_ci": _Recipe(
+    "omega_c_s1": _Recipe(
         derived.gyrofrequency,
         ("|B|",),
         species_index=1,
         species_args=_SpeciesArgs.CHARGE_MASS,
     ),
-    "d_i": _Recipe(
+    "d_s1": _Recipe(
         derived.skin_depth,
         ("n_s1",),
         species_index=1,
         needs_c=True,
         species_args=_SpeciesArgs.CHARGE_MASS,
     ),
-    "v_th_i": _Recipe(
+    "v_th_s1": _Recipe(
         derived.thermal_speed,
         ("T_s1",),
         species_index=1,
         species_args=_SpeciesArgs.MASS_ONLY,
         supports_relativistic=True,
     ),
-    "r_i": _Recipe(
+    "r_s1": _Recipe(
         derived.gyroradius,
         ("T_s1", "|B|"),
         species_index=1,

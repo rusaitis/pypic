@@ -186,28 +186,39 @@ $$\mathbf{EF}_s = \underbrace{\tfrac{1}{2} n_s m_s |\mathbf{V}_s|^2 \mathbf{V}_s
 
 ## 5. Characteristic Scales
 
-| Name | Description | Normalized | SI |
-|------|-------------|------------|-----|
-| `d_e` | Electron skin depth | $c / \omega_{pe}$ | -- |
-| `d_i` | Ion skin depth | $c / \omega_{pi}$ | -- |
-| `r_e` | Electron thermal gyroradius | $v_{th,e} / \omega_{ce}$ | -- |
-| `r_i` | Ion thermal gyroradius | $v_{th,i} / \omega_{ci}$ | -- |
-| `omega_pe` | Electron plasma frequency | $\sqrt{n_e q_e^2 / m_e}$ | $\sqrt{n_e e^2 / (\epsilon_0 m_e)}$ |
-| `omega_pi` | Ion plasma frequency | $\sqrt{n_i q_i^2 / m_i}$ | $\sqrt{n_i Z^2 e^2 / (\epsilon_0 m_i)}$ |
-| `omega_ce` | Electron cyclotron freq.[^3] | $\|q_e\| B / m_e$ | $\|e\| B / m_e$ |
-| `omega_ci` | Ion cyclotron freq.[^3] | $|q_i| B / m_i$ | $Z e B / m_i$ |
-| `lambda_D` | Electron Debye length[^4] | $\sqrt{T_e / (n_e q_e^2)}$ | $\sqrt{\epsilon_0 T_e / (n_e e^2)}$ |
-| `v_A` | Alfvén speed [@NRL] | $B / \sqrt{\rho_m}$ | $B / \sqrt{\mu_0 \rho_m}$ |
-| `v_th_e` | Electron thermal speed[^5] | $\sqrt{T_e / m_e}$ | -- |
-| `v_th_i` | Ion thermal speed[^5] | $\sqrt{T_i / m_i}$ | -- |
-| `c_s` | Sound speed[^6] | $\sqrt{\gamma P / \rho_m}$ | -- |
-| `c_ia` | Ion acoustic speed[^6] | $\sqrt{(\gamma_e T_e + \gamma_i T_i) / m_i}$ | -- |
-| `v_ms` | Fast magnetosonic speed[^7] | $\sqrt{v_A^2 + c_s^2}$ | -- |
-| `M_A` | Alfvén Mach number | $V / v_A$ | -- |
-| `M_ms` | Magnetosonic Mach number | $V / v_{ms}$ | -- |
-| `beta` | Plasma beta | $2P / B^2$ | $2\mu_0 P / B^2$ |
-| `beta_e` | Electron beta[^aliases] | $2P_e / B^2$ | $2\mu_0 P_e / B^2$ |
-| `beta_i` | Ion beta | $2P_i / B^2$ | $2\mu_0 P_i / B^2$ |
+The Tier-3 `<field>_s<N>` form is the canonical recipe ID; the NRL
+Plasma Formulary spelling (`omega_pe`, `v_th_e`, `lambda_D`, ...)
+remains a registered alias and the human-friendly form throughout
+this document.[^scales-aliases]
+
+| Canonical | NRL alias | Description | Normalized | SI |
+|-----------|-----------|-------------|------------|-----|
+| `d_s0` | `d_e` | Electron skin depth | $c / \omega_{pe}$ | -- |
+| `d_s1` | `d_i` | Ion skin depth | $c / \omega_{pi}$ | -- |
+| `r_s0` | `r_e` | Electron thermal gyroradius | $v_{th,e} / \omega_{ce}$ | -- |
+| `r_s1` | `r_i` | Ion thermal gyroradius | $v_{th,i} / \omega_{ci}$ | -- |
+| `omega_p_s0` | `omega_pe` | Electron plasma frequency | $\sqrt{n_e q_e^2 / m_e}$ | $\sqrt{n_e e^2 / (\epsilon_0 m_e)}$ |
+| `omega_p_s1` | `omega_pi` | Ion plasma frequency | $\sqrt{n_i q_i^2 / m_i}$ | $\sqrt{n_i Z^2 e^2 / (\epsilon_0 m_i)}$ |
+| `omega_c_s0` | `omega_ce` | Electron cyclotron freq.[^3] | $\|q_e\| B / m_e$ | $\|e\| B / m_e$ |
+| `omega_c_s1` | `omega_ci` | Ion cyclotron freq.[^3] | $|q_i| B / m_i$ | $Z e B / m_i$ |
+| `lambda_D_s0` | `lambda_D` | Electron Debye length[^4] | $\sqrt{T_e / (n_e q_e^2)}$ | $\sqrt{\epsilon_0 T_e / (n_e e^2)}$ |
+| `v_A` | — | Alfvén speed [@NRL] | $B / \sqrt{\rho_m}$ | $B / \sqrt{\mu_0 \rho_m}$ |
+| `v_th_s0` | `v_th_e` | Electron thermal speed[^5] | $\sqrt{T_e / m_e}$ | -- |
+| `v_th_s1` | `v_th_i` | Ion thermal speed[^5] | $\sqrt{T_i / m_i}$ | -- |
+| `c_s` | — | Sound speed[^6] | $\sqrt{\gamma P / \rho_m}$ | -- |
+| `c_ia` | — | Ion acoustic speed[^6] | $\sqrt{(\gamma_e T_e + \gamma_i T_i) / m_i}$ | -- |
+| `v_ms` | — | Fast magnetosonic speed[^7] | $\sqrt{v_A^2 + c_s^2}$ | -- |
+| `M_A` | — | Alfvén Mach number | $V / v_A$ | -- |
+| `M_ms` | — | Magnetosonic Mach number | $V / v_{ms}$ | -- |
+| `beta` | — | Plasma beta | $2P / B^2$ | $2\mu_0 P / B^2$ |
+| `beta_s0` | `beta_e`[^aliases] | Electron beta | $2P_e / B^2$ | $2\mu_0 P_e / B^2$ |
+| `beta_s1` | `beta_i` | Ion beta | $2P_i / B^2$ | $2\mu_0 P_i / B^2$ |
+
+[^scales-aliases]: Both spellings resolve to the same array:
+    `compute("omega_pe")` and `compute("omega_p_s0")` are
+    interchangeable. Multi-species runs (`omega_p_s2`,
+    `lambda_D_s3`, ...) synthesize via `_SPECIES_TEMPLATES` on
+    demand.
 
 [^3]: Cyclotron frequencies are positive by convention (magnitudes).
     See [conventions.md § Cyclotron Frequency](conventions.md#cyclotron-frequency-convention).
