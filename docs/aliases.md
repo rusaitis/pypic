@@ -22,8 +22,6 @@ For the common two-species PIC case (species 0 = electrons, 1 = ions),
 | `n_e`, `n_i` | `n_s0`, `n_s1` | Number density |
 | `Pe`, `Pi` | `P_s0`, `P_s1` | Scalar pressure (or Tr(tensor)/3) |
 | `Te`, `Ti` | `T_s0`, `T_s1` | Temperature |
-| `Ve1`..`Ve3` | `V_s0_1`..`V_s0_3` | Electron bulk velocity |
-| `Vi1`..`Vi3` | `V_s1_1`..`V_s1_3` | Ion bulk velocity |
 | `EFe`, `EFi` | `EF_s0`, `EF_s1` | Energy flux (vector group) |
 | `s_e`, `s_i` | `s_s0`, `s_s1` | Per-species entropy |
 | `beta_e`, `beta_i` | `beta_s0`, `beta_s1` | Per-species plasma beta |

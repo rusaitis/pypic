@@ -1114,7 +1114,7 @@ the dataset's physics config.
 | `e_th_trace` | — | Thermal energy density ($\frac{1}{2}\mathrm{Tr}(\mathbf{P})$, $\gamma$-free) | PIC, multi-moment MHD |
 | `e_th_s{N}` | — | Per-species thermal energy density | PIC (derived) |
 | `rho_m_s{N}` | — | Per-species mass density | PIC (derived) |
-| `\|V\|_s{N}` | — | Per-species velocity magnitude | PIC (derived) |
+| `\|V_s{N}\|` | — | Per-species velocity magnitude | PIC (derived) |
 
 ### Pressure tensor
 
@@ -1207,7 +1207,7 @@ Multi-species runs (`omega_p_s2`, `lambda_D_s3`, ...) synthesize via
 | `\|E\|` | — | Electric field magnitude | E_1, E_2, E_3 |
 | `\|J\|` | — | Current density magnitude | J_1, J_2, J_3 |
 | `\|V\|` | — | Bulk velocity magnitude | V_1, V_2, V_3 |
-| `\|V\|_s{N}` | — | Per-species velocity magnitude | V_s{N}_1, V_s{N}_2, V_s{N}_3 |
+| `\|V_s{N}\|` | — | Per-species velocity magnitude | V_s{N}_1, V_s{N}_2, V_s{N}_3 |
 | `div_B` | — | Divergence of B (should be ~0) | B_1, B_2, B_3, grid |
 | `div_E` | — | Divergence of E | E_1, E_2, E_3, grid |
 | `curl_B_1`, `curl_B_2`, `curl_B_3` | `curl_Bx`, ... | Curl of B | B_1, B_2, B_3, grid |

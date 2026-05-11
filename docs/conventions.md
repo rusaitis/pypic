@@ -99,8 +99,10 @@ tensor. Our stored values are always positive.
 ## Debye Length
 
 `lambda_D` (NRL alias for canonical `lambda_D_s0`) is specifically the
-*electron* Debye length. The total plasma Debye length is
-$1/\lambda_D^2 = \sum_s n_s q_s^2 / (\epsilon_0 T_s)$.
+*electron* Debye length. The total plasma Debye length, summed over
+all species (SI form), is $1/\lambda_D^2 = \sum_s n_s q_s^2 /
+(\epsilon_0 T_s)$; in pypic's normalized PIC units ($\epsilon_0 = 1$)
+the $\epsilon_0$ drops out.
 
 ## Fast Magnetosonic Speed
 
@@ -116,9 +118,9 @@ where $+$ gives the fast mode and $-$ the slow mode.
 
 $c_s = \sqrt{\gamma P / \rho_m}$ is the MHD sound speed. This differs
 from the ion acoustic speed
-$c_{ia} = \sqrt{(T_e + \gamma_i T_i) / m_i}$ commonly used in kinetic
-theory (where $\gamma_e = 1$ for isothermal electrons, $\gamma_i = 3$
-for 1D adiabatic ions).
+$c_{ia} = \sqrt{(\gamma_e T_e + \gamma_i T_i) / m_i}$ commonly used in
+kinetic theory, typically with $\gamma_e = 1$ (isothermal electrons)
+and $\gamma_i = 3$ (1D adiabatic ions).
 
 ## Gaussian vs SI-Rationalized Normalization
 
@@ -134,7 +136,8 @@ it eliminates $4\pi$ from every derived quantity ($B^2/2$ not $B^2/(8\pi)$,
 $\mathbf{E} \times \mathbf{B}$ not $\mathbf{E} \times \mathbf{B}/(4\pi)$),
 keeping the pure-function physics code free of bookkeeping constants.
 The conversion happens once in the reader. Key mapping: Gaussian
-density $\rho_G = \rho/(4\pi)$, Gaussian energy $B^2/(8\pi) \to B^2/2$.
+charge density $\rho_{c,G} = \rho_c/(4\pi)$, Gaussian energy
+$B^2/(8\pi) \to B^2/2$.
 
 ## Error Norms and Divergence
 
@@ -201,12 +204,15 @@ stencils at the first and last grid points. This is *not* periodic
 wrapping — periodic domains should pad ghost cells before calling
 the diagnostic functions.
 
-### Node-centered stencil
+### Co-located stencil
 
-All fields sit on the same node-centered grid (no stagger). The
-divergence stencil operates on co-located field components, consistent
-with the iPIC3D output convention (see Node-Centered Grid Convention
-below).
+Readers destagger to a single co-located grid on load (cell-center or
+node, depending on the source code). The divergence stencil operates
+on co-located field components; pypic does not provide a
+staggered-mesh stencil. iPIC3D specifically emits on nodes (see
+Node-Centered Grid Convention below); BATSRUS HDF5 destaggers
+face-centered B to cell centers; the convention is recorded
+per-dataset in `StaggerInfo` metadata.
 
 ## Node-Centered Grid Convention
 
@@ -268,10 +274,10 @@ physics, measuring the ratio of magnetic energy density to rest-mass
 energy density.
 
 - $\sigma \ll 1$: matter-dominated (non-relativistic MHD regime).
-  The non-relativistic Alfven speed $v_A = B/\sqrt{\rho_m}$ applies.
+  The non-relativistic Alfvén speed $v_A = B/\sqrt{\rho_m}$ applies.
 - $\sigma \sim 1$: trans-relativistic. Full relativistic formulas needed.
 - $\sigma \gg 1$: magnetically dominated (pulsar winds, jets, relativistic
-  reconnection). The Alfven speed $v_A \to c$.
+  reconnection). The Alfvén speed $v_A \to c$.
 
 $\sigma$ is analogous to $1/\beta$ in that both measure the importance
 of the magnetic field, but $\sigma$ compares to rest-mass energy while

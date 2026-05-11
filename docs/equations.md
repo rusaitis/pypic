@@ -318,7 +318,7 @@ for velocity variable choices and numerical considerations.
 | `gamma_L` | Lorentz factor (from 4-velocity) | $\gamma = \sqrt{1 + u^2/c^2}$ | numerically preferred near $v \approx c$ |
 | `sigma` | Magnetization [@MigBo] | $B^2 / (\rho_m c^2)$ | $\sigma \gg 1$: magnetically dominated |
 | `e_k` (rel.) | Rel. kinetic energy density | $(\gamma - 1)\rho_m c^2$ | recovers $\frac{1}{2}\rho_m v^2$ for $v \ll c$ |
-| `v_A` (rel.) | Rel. Alfven speed [@Lyub] | $c\sqrt{\sigma/(1+\sigma)}$ | $\to c$ as $\sigma \to \infty$; $\to B/\sqrt{\rho_m}$ for $\sigma \ll 1$ |
+| `v_A` (rel.) | Rel. Alfvén speed [@Lyub] | $c\sqrt{\sigma/(1+\sigma)}$ | $\to c$ as $\sigma \to \infty$; $\to B/\sqrt{\rho_m}$ for $\sigma \ll 1$ |
 | `c_s` (rel.) | Rel. sound speed [@MigMc] | $c\sqrt{\gamma_{eos} P / (\rho_m h_{rel})}$ | uses relativistic enthalpy $h_{rel}$ |
 | `v_ms` (rel.) | Rel. magnetosonic speed [@MigBo] | $\sqrt{v_A^2 + c_s^2 - v_A^2 c_s^2/c^2}$ | perp. propagation; always $< c$ |
 
@@ -351,7 +351,7 @@ Three distinct Lorentz factors arise in plasma analysis:
 - **$\gamma_{bulk}$** — from the fluid (bulk) velocity $\mathbf{V}$.
   This is what `lorentz_factor()` computes from the moment velocity
   fields `V_1/V_2/V_3` or `u_1/u_2/u_3`. Used in relativistic kinetic energy,
-  Alfven speed, and Mach numbers.
+  Alfvén speed, and Mach numbers.
 
 - **$\langle\gamma\rangle_{thermal}$** — the mean Lorentz factor of the
   thermal distribution. Relevant for cyclotron and plasma frequency

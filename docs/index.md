@@ -7,8 +7,8 @@ pypic provides a unified interface to multiple simulation formats (iPIC3D, BATSR
 ## Features
 
 - **Multi-code readers** -- iPIC3D (parallel HDF5, serial HDF5, H5hut), BATSRUS (IDL + HDF5 with AMR regridding), OpenGGCM (Fortran binary), and a generic HDF5 reader. Auto-detection via confidence-based probing.
-- **Derived quantities** -- field magnitudes, plasma beta, Alfven speed, Mach numbers, Poynting flux, energy densities, pressure tensor decomposition, characteristic scales, entropy, and more. All as pure functions: arrays in, arrays out.
-- **Unit system** -- PIC (electron- or ion-referenced), MHD (Alfven-speed-based), SI, or custom normalization. Round-trip `normalize()` / `to_si()`.
+- **Derived quantities** -- field magnitudes, plasma beta, Alfvén speed, Mach numbers, Poynting flux, energy densities, pressure tensor decomposition, characteristic scales, entropy, and more. All as pure functions: arrays in, arrays out.
+- **Unit system** -- PIC (electron- or ion-referenced), MHD (Alfvén-speed-based), SI, or custom normalization. Round-trip `normalize()` / `to_si()`.
 - **Geometry-aware operators** -- divergence, curl, gradient with coordinate metric factors.
 - **Selections** -- `PlaneSelection` and `BoxSelection` for slicing 3D data into lower-dimensional views.
 - **Field registry** -- `compute("beta")`, `compute("|B|")`, `compute("v_A")` dispatches to the right derived function.

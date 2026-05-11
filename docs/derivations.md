@@ -278,7 +278,7 @@ Linearizing the ideal MHD equations around a uniform equilibrium
 yields three wave families. Their phase speeds are the characteristic
 speeds used throughout pypic.
 
-**Alfven wave** (incompressible, transverse) [@NRL; @Chen]:
+**Alfvén wave** (incompressible, transverse) [@NRL; @Chen]:
 
 $$v_A = \frac{B_0}{\sqrt{\rho_0}}$$
 
@@ -317,14 +317,14 @@ See [`v_A`](equations.md#5-characteristic-scales),
     $\mathbf{B}_1 = -(\mathbf{k} \times (\mathbf{V}_1 \times \mathbf{B}_0))/\omega$
     and Ampere's law.
 
-    **Alfven mode.** For perturbations $\mathbf{V}_1$ perpendicular to
+    **Alfvén mode.** For perturbations $\mathbf{V}_1$ perpendicular to
     both $\mathbf{k}$ and $\mathbf{B}_0$ (shear polarization), the
     pressure force vanishes ($\hat{k} \cdot \mathbf{V}_1 = 0$, so
     $\rho_1 = 0$) and the dispersion relation reduces to:
 
     $$\omega^2 = k_\parallel^2 v_A^2 = k^2 v_A^2 \cos^2\theta$$
 
-    This is the **Alfven wave**: an incompressible transverse oscillation
+    This is the **Alfvén wave**: an incompressible transverse oscillation
     of field lines, propagating only along $\mathbf{B}_0$, with phase
     speed $v_A = B_0/\sqrt{\rho_0}$.
 
