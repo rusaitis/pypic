@@ -57,7 +57,7 @@ pairs: a reader that emits `Pe` (e.g. iPIC3D) satisfies a recipe asking
 for `P_s0`, and vice versa. Storage is the same data either way; the
 canonical form is a documentation choice.
 
-## Species position for derived modifiers (Stage E)
+## Species position for derived modifiers
 
 The Tier-3 rule distinguishes **generic operators** (apply to many
 fields in principle) from **compound-name descriptors** (specific to
@@ -75,12 +75,15 @@ name that gives the field its identity (`s_gyro` is a distinct entropy
 formula from `s`, not a transformation of it)? Then it's a compound-name
 descriptor and species goes at the end.
 
-| Alias | Canonical | Notes |
-|-------|-----------|-------|
-| `\|V\|_s0`, `\|V\|_s1` | `\|V_s0\|`, `\|V_s1\|` | Legacy (pre-Stage-E) pipe-outside-species form |
-| `P_par_s0`, `P_par_s1` | `P_s0_par`, `P_s1_par` | Legacy (pre-Stage-E) modifier-after-species form |
-| `P_perp_s0`, `P_perp_s1` | `P_s0_perp`, `P_s1_perp` | Same |
-| `V_s0_mag`, `V_s1_mag` | `\|V_s0\|`, `\|V_s1\|` | ASCII spelling of the pipe-bracketed canonical |
+ASCII spellings of the pipe-bracketed magnitude canonical:
+
+| Alias | Canonical |
+|-------|-----------|
+| `V_s0_mag`, `V_s1_mag` | `\|V_s0\|`, `\|V_s1\|` |
+| `Ve_mag`, `V_e_mag` | `\|V_s0\|` |
+| `Vi_mag`, `V_i_mag` | `\|V_s1\|` |
+| `\|Ve\|`, `\|V_e\|` | `\|V_s0\|` |
+| `\|Vi\|`, `\|V_i\|` | `\|V_s1\|` |
 
 ## Two-species assumption
 

@@ -57,10 +57,12 @@ CANONICAL_NAMES: frozenset[str] = frozenset(
         "V_2",
         "V_3",
         "|V|",
-        "Ve1",
-        "Ve2",
-        "Ve3",
-        "|Ve|",
+        # Per-species electron velocity (Tier-3 form; e/i magnitude
+        # shortcuts ``|Ve|`` / ``|V_e|`` resolve to ``|V_s0|``).
+        "V_s0_1",
+        "V_s0_2",
+        "V_s0_3",
+        "|V_s0|",
         # Four-velocity (relativistic PIC)
         "u_1",
         "u_2",
@@ -84,12 +86,14 @@ CANONICAL_NAMES: frozenset[str] = frozenset(
         "P_23",
         "P_33",
         "agyrotropy",
-        "P_par_e",
-        "P_par_i",
-        "P_perp_e",
-        "P_perp_i",
-        "agyrotropy_e",
-        "agyrotropy_i",
+        # Per-species pressure projections (Tier-3 form; e/i shortcuts
+        # ``P_par_e``/``P_par_i`` resolve to these via ``_COMPUTE_ALIASES``).
+        "P_s0_par",
+        "P_s1_par",
+        "P_s0_perp",
+        "P_s1_perp",
+        "agyrotropy_s0",
+        "agyrotropy_s1",
         # ── Temperature ──────────────────────────────────────────────────
         "Te",
         "Ti",
@@ -380,11 +384,30 @@ def test_all_recipe_dependencies_are_reachable() -> None:
 # ---------------------------------------------------------------------------
 
 
+def _template_canonical_form(prefix: str, idx: int) -> str:
+    r"""Construct the Tier-3 canonical name a species template synthesizes.
+
+    Most templates use the trailing ``_s<N>`` form (``omega_p_s0``,
+    ``rho_m_s0``).  Generic-operator templates (``P_par``, ``P_perp``)
+    put the species qualifier *between* field and operator
+    (``P_s0_par``).  Pipe-wrapped magnitude templates (``|V|``) put
+    the qualifier *inside* the bars (``|V_s0|``).  Vector / tensor
+    templates with a digit-suffix prefix (``V_1``, ``P_11``) put the
+    qualifier between field and component (``V_s0_1``).
+    """
+    if prefix.startswith("|") and prefix.endswith("|"):
+        return f"|{prefix[1:-1]}_s{idx}|"
+    base, sep, comp = prefix.partition("_")
+    if sep and (comp[:1].isdigit() or comp in _GENERIC_OPERATOR_SUFFIXES):
+        return f"{base}_s{idx}_{comp}"
+    return f"{prefix}_s{idx}"
+
+
 def test_all_species_template_dependencies_resolve() -> None:
     """Substituting `_s0` into each template must yield reachable deps."""
     failures: list[str] = []
     for prefix in sorted(_SPECIES_TEMPLATES):
-        name = f"{prefix}_s0"
+        name = _template_canonical_form(prefix, 0)
         recipe = _try_species_recipe(name)
         if recipe is None:
             failures.append(f"{prefix!r}: _try_species_recipe returned None")

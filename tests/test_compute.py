@@ -813,24 +813,25 @@ class TestPerSpeciesPressureDecomposition:
 
     def test_alias_resolution(self):
         ds = self._make_species_tensor_dataset()
-        # P_par_s0 (alias) and P_par_e (static) give same result
-        result_alias = compute_field("P_par_s0", ds)
-        result_static = compute_field("P_par_e", ds)
-        np.testing.assert_array_equal(result_alias, result_static)
+        # Tier-3 canonical (``P_s0_par``) and the e/i shorthand alias
+        # (``P_par_e``) give the same result.
+        result_canonical = compute_field("P_s0_par", ds)
+        result_alias = compute_field("P_par_e", ds)
+        np.testing.assert_array_equal(result_canonical, result_alias)
 
     def test_total_equals_sum_of_per_species(self):
-        """P_par = P_par_s0 + P_par_s1 (linear in tensor components)."""
+        """P_par = P_s0_par + P_s1_par (linear in tensor components)."""
         ds = self._make_species_tensor_dataset()
         total = compute_field("P_par", ds)
-        per_species_sum = compute_field("P_par_e", ds) + compute_field("P_par_i", ds)
+        per_species_sum = compute_field("P_s0_par", ds) + compute_field("P_s1_par", ds)
         np.testing.assert_allclose(total, per_species_sum, rtol=1e-15)
 
         total_perp = compute_field("P_perp", ds)
-        perp_sum = compute_field("P_perp_e", ds) + compute_field("P_perp_i", ds)
+        perp_sum = compute_field("P_s0_perp", ds) + compute_field("P_s1_perp", ds)
         np.testing.assert_allclose(total_perp, perp_sum, rtol=1e-15)
 
     def test_dynamic_species_without_species_metadata(self):
-        """P_par_s2 works when tensor fields exist but species[2] is not."""
+        """P_s2_par works when tensor fields exist but species[2] is not."""
         shape = (2, 2, 2)
         data = {
             "P_s2_11": np.full(shape, 1.0),
@@ -845,7 +846,7 @@ class TestPerSpeciesPressureDecomposition:
         }
         ds = make_test_dataset(data, shape=shape)
         # B along z → P_par = P_33 = 4
-        np.testing.assert_allclose(compute_field("P_par_s2", ds), 4.0, rtol=1e-15)
+        np.testing.assert_allclose(compute_field("P_s2_par", ds), 4.0, rtol=1e-15)
 
 
 class TestGeometryGuard:

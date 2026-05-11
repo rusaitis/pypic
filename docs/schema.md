@@ -1131,8 +1131,8 @@ decomposed from the **total** pressure tensor (`P_11..P_33`). Per-species
 decomposition (`P_s0_par`, `P_s0_perp`) uses the per-species tensors
 (`P_s0_11..P_s0_33`) and follows the Tier-3 species-before-modifier
 template: species qualifier sits before the generic operator suffix
-(`_par`, `_perp`). The literature spellings `P_par_e`, `P_par_i`,
-`P_par_s0`, `P_par_s1` remain valid aliases.
+(`_par`, `_perp`). The two-species shorthands `P_par_e` / `P_par_i` /
+`P_perp_e` / `P_perp_i` remain registered as user-facing aliases.
 
 **Storage vs derived.** Two tiers, in preference order:
 

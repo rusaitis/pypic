@@ -530,6 +530,12 @@ _SPECIES_SUFFIX_RE = re.compile(
     r"^(?P<prefix>.+?)_s(?P<idx>\d+)(?P<suffix>_[^|]+|\|)?$"
 )
 
+# Generic operator suffixes that must sit *after* the species qualifier
+# in Tier-3 canonical names (``P_s0_par`` is valid; ``P_par_s0`` is not).
+# When the regex puts these in the prefix (``P_par`` + ``_s0`` + ``""``),
+# reject so the legacy split-form (``P_par_s0``) raises ``KeyError``.
+_INVALID_PREFIX_OPERATOR_ENDINGS: tuple[str, ...] = ("_par", "_perp", "|")
+
 
 def _try_species_recipe(name: str) -> _Recipe | None:
     """Try to build a recipe from species templates for names like ``omega_p_s2``.
@@ -539,7 +545,15 @@ def _try_species_recipe(name: str) -> _Recipe | None:
     m = _SPECIES_SUFFIX_RE.match(name)
     if m is None:
         return None
-    prefix = m.group("prefix") + (m.group("suffix") or "")
+    raw_prefix = m.group("prefix")
+    raw_suffix = m.group("suffix") or ""
+    # Tier-3 canonical names put generic operators *after* the species
+    # qualifier.  Anchor the rule by rejecting matches whose prefix
+    # ends with a generic operator and whose suffix is empty (the
+    # legacy ``P_par_s0`` / ``|V|_s0`` shape).
+    if not raw_suffix and raw_prefix.endswith(_INVALID_PREFIX_OPERATOR_ENDINGS):
+        return None
+    prefix = raw_prefix + raw_suffix
     idx_str = m.group("idx")
     species_index = int(idx_str)
     template = _SPECIES_TEMPLATES.get(prefix)

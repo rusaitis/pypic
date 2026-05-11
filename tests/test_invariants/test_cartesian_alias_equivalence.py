@@ -30,18 +30,16 @@ from pypic.units import Normalization
 SHAPE = (3, 4)
 
 # (alias_prefix, canonical_pattern) — canonical_pattern uses "{i}" for the
-# component index. Most prefixes plug straight in ("B" → "B_1"), but "B0"
-# needs the underscore separator per schema.md.
+# component index. All Tier-3 canonicals use the underscore separator.
 _PREFIX_CASES = [
-    ("B", "B{i}"),
+    ("B", "B_{i}"),
     ("B0", "B0_{i}"),
-    ("E", "E{i}"),
-    ("J", "J{i}"),
-    ("V", "V{i}"),
-    ("Ve", "Ve{i}"),
-    ("S", "S{i}"),
-    ("u", "u{i}"),
-    ("EF", "EF{i}"),
+    ("E", "E_{i}"),
+    ("J", "J_{i}"),
+    ("V", "V_{i}"),
+    ("S", "S_{i}"),
+    ("u", "u_{i}"),
+    ("EF", "EF_{i}"),
 ]
 
 

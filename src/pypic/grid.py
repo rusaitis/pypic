@@ -153,7 +153,6 @@ _FIELD_PREFIX_PAIRS = (
     ("J", "J"),
     ("V", "V"),
     ("v", "V"),  # lowercase convenience alias
-    ("Ve", "Ve"),
     ("S", "S"),
     ("u", "u"),  # four-velocity
 )
@@ -166,8 +165,9 @@ def _build_aliases(
 
     The canonical RHS is always the Tier-3 form ``<prefix>_<component>``
     (`B_1`, `V_2`, `B0_1`). The alias LHS uses *separator* between
-    prefix and coordinate suffix: ``""`` gives the legacy short form
-    ``Bx`` (kept for migration), ``"_"`` gives the Tier-3 form ``B_x``.
+    prefix and coordinate suffix: ``""`` produces the compact form
+    ``Bx`` and ``"_"`` produces the underscored form ``B_x``; both
+    are user-facing convenience aliases for the same canonical.
 
     Parameters
     ----------
@@ -185,27 +185,15 @@ def _build_aliases(
     return aliases
 
 
-# Legacy short-form geometry aliases (``Bx → B_1``). Kept for the
-# v0→v1 migration window; the Tier-3 underscored form below is the
-# documented primary spelling.
+# Short-form geometry aliases (``Bx → B_1``, ``Br → B_1``).
 _CARTESIAN_ALIASES = _build_aliases(("x", "y", "z"))
 _SPHERICAL_ALIASES = _build_aliases(("r", "theta", "phi"))
 _CYLINDRICAL_ALIASES = _build_aliases(("r", "phi", "z"))
 
-# Tier-3 underscored geometry aliases (``B_x → B_1``).
+# Underscored geometry aliases (``B_x → B_1``, ``B_r → B_1``).
 _CARTESIAN_UNDERSCORE_ALIASES = _build_aliases(("x", "y", "z"), separator="_")
 _SPHERICAL_UNDERSCORE_ALIASES = _build_aliases(("r", "theta", "phi"), separator="_")
 _CYLINDRICAL_UNDERSCORE_ALIASES = _build_aliases(("r", "phi", "z"), separator="_")
-
-# Legacy no-underscore numbered aliases (``B1 → B_1``). Pre-Tier-3
-# canonical names that survive as deprecated aliases.
-_LEGACY_NUMBERED_ALIASES: dict[str, str] = {}
-for _alias_pfx, _canon_pfx in _FIELD_PREFIX_PAIRS:
-    if _canon_pfx[-1].isdigit():
-        # B0 was already underscored pre-Tier-3 (B0_1); no legacy form.
-        continue
-    for _i in (1, 2, 3):
-        _LEGACY_NUMBERED_ALIASES[f"{_alias_pfx}{_i}"] = f"{_canon_pfx}_{_i}"
 
 # Scalar underscore aliases (e.g. ``P_e`` is an alternate spelling of
 # ``Pe``).  The e/i form is what carries the rich electron/ion-specific
@@ -255,7 +243,6 @@ def _default_aliases(geometry: CoordinateGeometry) -> dict[str, str]:
             aliases.update(_CYLINDRICAL_UNDERSCORE_ALIASES)
         case _ as unreachable:
             assert_never(unreachable)
-    aliases.update(_LEGACY_NUMBERED_ALIASES)
     aliases.update(_SCALAR_UNDERSCORE_ALIASES)
     aliases.update(_SPECIES_ALIASES)
     return aliases

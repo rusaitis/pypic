@@ -81,16 +81,16 @@ def generate_synthetic_data(output_dir: Path) -> None:
 # -- Field name mapping: your code's names → pypic canonical names --
 #
 # See schema.md for the full list of canonical field names.
-# B1/B2/B3 = magnetic field components, rho_m = mass density, etc.
+# B_1/B_2/B_3 = magnetic field components, rho_m = mass density, etc.
 
 FIELD_MAP = {
-    "Bx_field": "B1",
-    "By_field": "B2",
-    "Bz_field": "B3",
+    "Bx_field": "B_1",
+    "By_field": "B_2",
+    "Bz_field": "B_3",
     "density": "rho_m",
-    "Vx_bulk": "V1",
-    "Vy_bulk": "V2",
-    "Vz_bulk": "V3",
+    "Vx_bulk": "V_1",
+    "Vy_bulk": "V_2",
+    "Vz_bulk": "V_3",
 }
 
 
@@ -135,7 +135,7 @@ def main() -> None:
             ),
         )
         ds2 = sim2.read(step=100)
-        b2 = magnetic_field_magnitude(ds2["B1"], ds2["B2"], ds2["B3"])
+        b2 = magnetic_field_magnitude(ds2["B_1"], ds2["B_2"], ds2["B_3"])
         print(f"\nStep 100 |B| mean: {b2.mean():.3f}")
 
         # -- Option C: custom I/O via _read_raw ---------------------

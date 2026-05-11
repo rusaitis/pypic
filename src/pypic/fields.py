@@ -267,14 +267,6 @@ _FIELD_INFO: dict[str, FieldInfo] = {
         r"$V_{c}$",
         mag=("|V|", "Bulk velocity magnitude", r"$|V|$"),
     ),
-    **_vec_three(
-        "Ve_{c}",
-        "velocity",
-        "Electron velocity component {c}",
-        "m/s",
-        r"$V_{{e,{c}}}$",
-        mag=("|Ve|", "Electron velocity magnitude", r"$|V_e|$"),
-    ),
     "v_A": _FI("velocity", "Alfvén speed", "m/s", r"$v_A$"),
     "c_s": _FI("velocity", "Sound speed", "m/s", r"$c_s$"),
     "c_ia": _FI("velocity", "Ion acoustic speed", "m/s", r"$c_{ia}$"),
@@ -302,14 +294,6 @@ _FIELD_INFO: dict[str, FieldInfo] = {
     "Pi": _FI("pressure", "Ion pressure", "Pa", r"$P_i$"),
     "P_par": _FI("pressure", "Parallel pressure", "Pa", r"$P_\parallel$"),
     "P_perp": _FI("pressure", "Perpendicular pressure", "Pa", r"$P_\perp$"),
-    "P_par_e": _FI(
-        "pressure", "Electron parallel pressure", "Pa", r"$P_{\parallel,e}$"
-    ),
-    "P_par_i": _FI("pressure", "Ion parallel pressure", "Pa", r"$P_{\parallel,i}$"),
-    "P_perp_e": _FI(
-        "pressure", "Electron perpendicular pressure", "Pa", r"$P_{\perp,e}$"
-    ),
-    "P_perp_i": _FI("pressure", "Ion perpendicular pressure", "Pa", r"$P_{\perp,i}$"),
     "P_11": _FI("pressure", "Pressure tensor P_11", "Pa", r"$P_{11}$"),
     "P_22": _FI("pressure", "Pressure tensor P_22", "Pa", r"$P_{22}$"),
     "P_33": _FI("pressure", "Pressure tensor P_33", "Pa", r"$P_{33}$"),

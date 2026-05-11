@@ -90,9 +90,9 @@ class TestMagnitudeComputeAliases:
         shape = (2, 2, 2)
         prefix = canonical[1]  # B, E, J, or V
         data = {
-            f"{prefix}1": np.full(shape, 3.0),
-            f"{prefix}2": np.full(shape, 4.0),
-            f"{prefix}3": np.zeros(shape),
+            f"{prefix}_1": np.full(shape, 3.0),
+            f"{prefix}_2": np.full(shape, 4.0),
+            f"{prefix}_3": np.zeros(shape),
         }
         ds = make_test_dataset(data, shape=shape)
         result_alias = compute_field(alias, ds)
@@ -389,9 +389,8 @@ class TestFieldAliasIntegrity:
         assert "B_x" in aliases
         assert "P_e" in aliases
         assert "T_i" in aliases
-        # Legacy short forms still resolve.
+        # Short forms (compact spellings) still resolve.
         assert "Bx" in aliases
-        assert "B1" in aliases
 
 
 class TestMultiSpeciesDynamicRecipes:
@@ -625,7 +624,7 @@ class TestAuditIssue6ElectronVelocityMagnitude:
         result = compute_field("|Ve|", ds)
         np.testing.assert_allclose(result, 5.0, rtol=1e-15)
 
-    @pytest.mark.parametrize("alias", ["Ve_mag", "Vemag"])
+    @pytest.mark.parametrize("alias", ["Ve_mag", "V_e_mag", "|V_e|"])
     def test_ve_magnitude_aliases(self, alias):
         shape = (2, 2, 2)
         data = {
@@ -672,9 +671,8 @@ class TestAuditSIFactorGaps:
         factor = field_si_factor("EF_s0_1", norm)
         assert factor == pytest.approx(1.0)
 
-    def test_ve_1_si_factor(self):
-        # Tier-3: electron velocity component 1 is ``Ve_1`` (Ve already
-        # implies electron). The redundant ``Ve1_s0`` form is gone.
+    def test_v_s0_1_si_factor(self):
+        # Tier-3: electron velocity component 1 is ``V_s0_1``.
         norm = Normalization(
             length_ref=1.0,
             time_ref=1.0,
@@ -685,7 +683,7 @@ class TestAuditSIFactorGaps:
             mass_ref=1.0,
             charge_ref=1.0,
         )
-        assert field_si_factor("Ve_1", norm) == pytest.approx(3.0)
+        assert field_si_factor("V_s0_1", norm) == pytest.approx(3.0)
 
     def test_ve_magnitude_si_factor(self):
         norm = Normalization(

@@ -210,9 +210,9 @@ class TestGeometryAwareLabels:
         assert info.latex == expected_latex
 
     def test_electron_velocity(self) -> None:
-        info = field_info("Ve_1", axis_names=self.CARTESIAN)
-        assert info.long_name == "Electron velocity x-component"
-        assert info.latex == r"$V_{e,x}$"
+        info = field_info("V_s0_1", axis_names=self.CARTESIAN)
+        assert info.long_name == "Velocity x-component (species 0)"
+        assert info.latex == r"$V_{x,s0}$"
 
     def test_background_b(self) -> None:
         info = field_info("B0_1", axis_names=self.CARTESIAN)
