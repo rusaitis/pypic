@@ -13,10 +13,16 @@ SI conversion boundaries. Temperatures are in energy units throughout
 ### SI conversion factors
 
 To convert a quantity from code units to SI: $x_{SI} = x_{code} \times f$,
-where $f$ is the SI factor for that quantity type. The base references
-($n_{ref}$, $m_{ref}$, $q_{ref}$, $v_{ref}$, $l_{ref}$, $t_{ref}$,
-$B_{ref}$, $E_{ref}$) are set by the normalization system (PIC, MHD, or
-custom). Compound factors are built from these:
+where $f$ is the SI factor for that quantity type. The eight **primitive
+references** ($n_{ref}$, $m_{ref}$, $q_{ref}$, $v_{ref}$, $l_{ref}$,
+$t_{ref}$, $B_{ref}$, $E_{ref}$) are set by the normalization system
+(PIC, MHD, or custom). They normalize the primitive canonical fields
+($n_s$, plus per-species $m_s$/$q_s$, $\mathbf{V}$, $\mathbf{B}$,
+$\mathbf{E}$). SI factors for compound canonical fields ($\rho_m$,
+$\rho_c$, $\mathbf{J}$, $P$, energy and flux densities) are products
+of the primitives — there is no $\rho_{ref}$ because $\rho_m$ and
+$\rho_c$ are derived ($\sum_s n_s m_s$ and $\sum_s n_s q_s$), not
+primitive.
 
 | Quantity type | SI factor $f$ | SI unit | Used by |
 |---------------|---------------|---------|---------|
@@ -39,7 +45,7 @@ custom). Compound factors are built from these:
 
 `poynting_flux` and `energy_flux` share SI units (W/m$^2$) but differ
 in normalization: EM flux scales with field references ($E_{ref} B_{ref}$),
-particle energy flux with matter references ($\rho_{ref} v_{ref}^3$). In
+particle energy flux with matter references ($n_{ref} m_{ref} v_{ref}^3$). In
 code units where $\mu_0 = 1$ these are equivalent; in SI the factor of
 $\mu_0$ separates them.
 
@@ -400,8 +406,8 @@ Three distinct Lorentz factors arise in plasma analysis:
     lines. The reconnected flux is $\Delta\psi$ between the X-point and
     O-point. The reconnection rate is $\partial\psi/\partial t$ at the
     X-point, equal to the out-of-plane electric field $E_z$ there.
-    Computed by cumulative integration: $\psi(x, y) = -\int_0^x B_2(x',
-    y)\, dx'$ (negative sign from $B_2 = -\partial\psi/\partial x_1$).
+    Computed by cumulative integration: $\psi(x, y) = -\int_0^x B_y(x',
+    y)\, dx'$ (negative sign from $B_y = -\partial\psi/\partial x$).
     [@Biskamp] §3.1.
 
 [^14]: Firehose: unstable when $P_\parallel - P_\perp > B^2/2$
