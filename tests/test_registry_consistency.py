@@ -276,16 +276,30 @@ def test_all_schema_fields_are_reachable() -> None:
 # ---------------------------------------------------------------------------
 
 
+_GENERIC_OPERATOR_SUFFIXES: frozenset[str] = frozenset({"par", "perp"})
+
+
 def _per_species_form(prefix: str, idx: int) -> str:
     """Construct a Tier-3 per-species name from a prefix.
 
-    Vector / tensor prefixes (``J_1``, ``P_11``, ``q_2``) put the
-    species qualifier between the field name and the index:
-    ``J_1`` + s0 → ``J_s0_1``. Scalar prefixes (``n``, ``T``,
-    ``rho_c``, ``omega_p``) just append ``_s<N>``.
+    Four shapes (species always sits between field root and any
+    component / generic operator):
+      - Pipe-wrapped magnitude (``|V|``) → ``|V_s{idx}|`` (species
+        inside the bars).
+      - Vector / tensor prefixes (``J_1``, ``P_11``, ``q_2``) →
+        ``J_s{idx}_1``.
+      - Generic-operator prefixes (``P_par``, ``P_perp``) →
+        ``P_s{idx}_par``.
+      - Plain scalars and compound-name descriptors (``n``, ``T``,
+        ``rho_m``, ``s_gyro``, ``omega_p``) → ``n_s{idx}``.
     """
+    if prefix.startswith("|") and prefix.endswith("|"):
+        inner = prefix[1:-1]
+        return f"|{inner}_s{idx}|"
     base, sep, comp = prefix.partition("_")
     if sep and comp[:1].isdigit():
+        return f"{base}_s{idx}_{comp}"
+    if sep and comp in _GENERIC_OPERATOR_SUFFIXES:
         return f"{base}_s{idx}_{comp}"
     return f"{prefix}_s{idx}"
 

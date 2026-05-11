@@ -617,9 +617,9 @@ class TestAuditIssue6ElectronVelocityMagnitude:
     def test_ve_magnitude_345(self):
         shape = (2, 2, 2)
         data = {
-            "Ve1": np.full(shape, 3.0),
-            "Ve2": np.full(shape, 4.0),
-            "Ve3": np.zeros(shape),
+            "V_s0_1": np.full(shape, 3.0),
+            "V_s0_2": np.full(shape, 4.0),
+            "V_s0_3": np.zeros(shape),
         }
         ds = make_test_dataset(data, shape=shape)
         result = compute_field("|Ve|", ds)
@@ -629,9 +629,9 @@ class TestAuditIssue6ElectronVelocityMagnitude:
     def test_ve_magnitude_aliases(self, alias):
         shape = (2, 2, 2)
         data = {
-            "Ve1": np.full(shape, 3.0),
-            "Ve2": np.full(shape, 4.0),
-            "Ve3": np.zeros(shape),
+            "V_s0_1": np.full(shape, 3.0),
+            "V_s0_2": np.full(shape, 4.0),
+            "V_s0_3": np.zeros(shape),
         }
         ds = make_test_dataset(data, shape=shape)
         result = compute_field(alias, ds)

@@ -14,12 +14,15 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence
 
-# Matches the canonical ``_s<index>`` species qualifier in either
-# scalar position (end of name, e.g. ``P_s0``, ``T_s1``) or Tier-3
-# vector/tensor position (followed by a component suffix, e.g.
-# ``V_s0_1``, ``P_s0_11``). Captures (species, suffix) where suffix is
-# the trailing ``_<component>`` or empty for scalars.
-_SPECIES_SUFFIX = re.compile(r"_s(\d+)(?P<suffix>_\d+)?$")
+# Matches the canonical ``_s<index>`` species qualifier in any
+# Tier-3 position:
+#   - End (scalar per-species): ``P_s0``, ``T_s1`` — no suffix.
+#   - Middle followed by a component / modifier (vector, tensor, or
+#     generic operator): ``V_s0_1``, ``P_s0_11``, ``P_s0_par``.
+#   - Middle followed by closing pipe (per-species magnitude):
+#     ``|V_s0|``, ``|J_s1|``.
+# Captures (species, suffix); suffix is ``_<x>``, ``|``, or empty.
+_SPECIES_SUFFIX = re.compile(r"_s(\d+)(?P<suffix>_[^|]+|\|)?$")
 
 _COMPUTE_ALIASES: dict[str, str] = {
     "curl_Bx": "curl_B_1",
@@ -43,10 +46,12 @@ _COMPUTE_ALIASES: dict[str, str] = {
     "Jmag": "|J|",
     "V_mag": "|V|",
     "Vmag": "|V|",
-    "Ve_mag": "|Ve|",
-    "Vemag": "|Ve|",
-    "Vi_mag": "|V|_s1",
-    "Vimag": "|V|_s1",
+    "Ve_mag": "|V_s0|",
+    "Vemag": "|V_s0|",
+    "Vi_mag": "|V_s1|",
+    "Vimag": "|V_s1|",
+    "V_s0_mag": "|V_s0|",
+    "V_s1_mag": "|V_s1|",
     "vort_mag": "|vort|",
     # Descriptive names — speeds and dimensionless numbers
     "plasma_beta": "beta",
@@ -74,10 +79,10 @@ _COMPUTE_ALIASES: dict[str, str] = {
     "debye_length_e": "lambda_D_s0",
     "parallel_pressure": "P_par",
     "perpendicular_pressure": "P_perp",
-    "parallel_pressure_e": "P_par_s0",
-    "parallel_pressure_i": "P_par_s1",
-    "perpendicular_pressure_e": "P_perp_s0",
-    "perpendicular_pressure_i": "P_perp_s1",
+    "parallel_pressure_e": "P_s0_par",
+    "parallel_pressure_i": "P_s1_par",
+    "perpendicular_pressure_e": "P_s0_perp",
+    "perpendicular_pressure_i": "P_s1_perp",
     # Descriptive names — energies and thermodynamics
     "energy_magnetic": "e_B",
     "energy_electric": "e_E",
@@ -134,10 +139,15 @@ _COMPUTE_ALIASES: dict[str, str] = {
     "s_i": "s_s1",
     "s_gyro_e": "s_gyro_s0",
     "s_gyro_i": "s_gyro_s1",
-    "P_par_e": "P_par_s0",
-    "P_par_i": "P_par_s1",
-    "P_perp_e": "P_perp_s0",
-    "P_perp_i": "P_perp_s1",
+    "P_par_e": "P_s0_par",
+    "P_par_i": "P_s1_par",
+    "P_perp_e": "P_s0_perp",
+    "P_perp_i": "P_s1_perp",
+    # Legacy spellings (pre-Stage-E) — alias to new Tier-3 canonical.
+    "P_par_s0": "P_s0_par",
+    "P_par_s1": "P_s1_par",
+    "P_perp_s0": "P_s0_perp",
+    "P_perp_s1": "P_s1_perp",
     "agyrotropy_e": "agyrotropy_s0",
     "agyrotropy_i": "agyrotropy_s1",
     # Long-form thermal-speed alias resolves to Tier-3 canonical.
@@ -168,7 +178,12 @@ _COMPUTE_ALIASES: dict[str, str] = {
     "Vi1": "V_s1_1",
     "Vi2": "V_s1_2",
     "Vi3": "V_s1_3",
-    "|Vi|": "|V|_s1",
+    "|Ve|": "|V_s0|",
+    "|Vi|": "|V_s1|",
+    # Legacy pipe-outside-species spellings (pre-Stage-E) — alias to
+    # the pipes-bracket-operand canonical.
+    "|V|_s0": "|V_s0|",
+    "|V|_s1": "|V_s1|",
     # Per-species mass density aliases
     "rho_m_e": "rho_m_s0",
     "rho_m_i": "rho_m_s1",

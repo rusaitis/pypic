@@ -694,21 +694,41 @@ _SPECIES_PATTERN_SPECS: list[tuple[str, str, str, str]] = [
     ("agyrotropy", "dimensionless", "Agyrotropy (species {N})", r"$Q_{{s{N}}}$"),
 ]
 
+# Generic operator suffixes — when a pattern prefix ends in one of these,
+# the species qualifier sits between the field root and the operator
+# (``P_s0_par``, not ``P_par_s0``). Compound-name descriptors like
+# ``_m``/``_c``/``_th``/``_int``/``_gyro``/``_trace`` stay glued to the
+# parent field and species goes at the end (``rho_m_s0``, ``s_gyro_s0``).
+_GENERIC_OPERATOR_SUFFIXES: frozenset[str] = frozenset({"par", "perp"})
+
+
 def _build_species_info_pattern(prefix: str) -> re.Pattern[str]:
     r"""Translate a Tier-3 prefix entry into its full species-name regex.
 
-    Three flavors:
+    Five flavors:
       - Vector with explicit ``([123])`` capture (e.g. ``J([123])``)
         → ``^J_s(\d+)_([123])$``
       - Tensor variant ``P(\d{0,2})`` → ``^P_s(\d+)(?:_(\d{2}))?$``
         (matches both scalar ``P_s0`` and tensor ``P_s0_11``)
-      - Scalar (no capture, e.g. ``n``, ``T``, ``omega_p``) → ``^n_s(\d+)$``
+      - Pipe-wrapped magnitude (``\|V\|`` → ``^\|V_s(\d+)\|$``):
+        species sits inside the bars, bracketing the operand.
+      - Generic-operator suffix (``P_par`` → ``^P_s(\d+)_par$``):
+        species in middle, operator at end.
+      - Plain scalar (``n``, ``T``, ``omega_p``, ``rho_m``, ``s_gyro``):
+        ``^<prefix>_s(\d+)$`` — species at end.
     """
     if "([123])" in prefix:
         base = prefix.replace("([123])", "")
         return re.compile(rf"^{base}_s(\d+)_([123])$")
     if r"P(\d{0,2})" in prefix:
         return re.compile(r"^P_s(\d+)(?:_(\d{2}))?$")
+    if prefix.startswith(r"\|") and prefix.endswith(r"\|"):
+        inner = prefix[2:-2]
+        return re.compile(rf"^\|{inner}_s(\d+)\|$")
+    if "_" in prefix:
+        root, _, suffix = prefix.rpartition("_")
+        if suffix in _GENERIC_OPERATOR_SUFFIXES:
+            return re.compile(rf"^{root}_s(\d+)_{suffix}$")
     return re.compile(rf"^{prefix}_s(\d+)$")
 
 

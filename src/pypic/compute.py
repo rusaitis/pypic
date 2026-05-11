@@ -126,7 +126,8 @@ _REGISTRY: dict[str, _Recipe] = {
     "|E|": _Recipe(derived.electric_field_magnitude, ("E_1", "E_2", "E_3")),
     "|J|": _Recipe(derived.current_density_magnitude, ("J_1", "J_2", "J_3")),
     "|V|": _Recipe(derived.velocity_magnitude, ("V_1", "V_2", "V_3")),
-    "|Ve|": _Recipe(derived.velocity_magnitude, ("Ve1", "Ve2", "Ve3")),
+    # |Ve| is registered as an alias to |V_s0| in _aliases.py — both
+    # resolve through the "|V|" species template (Stage E).
     # Plasma parameters.  Per-species ``beta_s0``/``beta_s1`` are produced
     # by the species template ``"beta"``; the literature ``beta_e``/
     # ``beta_i`` spellings alias to ``_sN`` via ``_COMPUTE_ALIASES``.
@@ -381,7 +382,7 @@ _SPECIES_TEMPLATES: dict[str, _SpeciesTemplate] = {
     ),
     "s_gyro": _SpeciesTemplate(
         derived.gyrotropic_entropy,
-        ("P_par_s{N}", "P_perp_s{N}", "n_s{N}"),
+        ("P_s{N}_par", "P_s{N}_perp", "n_s{N}"),
         _SpeciesArgs.NONE,
     ),
     "P_par": _SpeciesTemplate(
@@ -425,7 +426,7 @@ _SPECIES_TEMPLATES: dict[str, _SpeciesTemplate] = {
     ),
     # Per-species energy densities and thermodynamic quantities
     "e_k": _SpeciesTemplate(
-        derived.kinetic_energy_density, ("rho_m_s{N}", "|V|_s{N}"), _SpeciesArgs.NONE
+        derived.kinetic_energy_density, ("rho_m_s{N}", "|V_s{N}|"), _SpeciesArgs.NONE
     ),
     "e_th": _SpeciesTemplate(
         derived.thermal_energy_density,
@@ -513,13 +514,21 @@ _SPECIES_TEMPLATES: dict[str, _SpeciesTemplate] = {
     ),
 }
 
-# Match the species qualifier ``_s<N>`` either at the end (scalar
-# per-species like ``omega_p_s2``, ``P_s0``, ``T_s1``) or in the middle
-# followed by a component suffix (vector/tensor per-species under the
-# Tier-3 canonical, like ``V_s0_1``, ``q_s0_1``, ``P_s0_11``). The
-# template lookup key is ``<prefix><suffix>`` — for ``V_s0_1`` that's
-# ``"V_1"``, matching the Tier-3 template-key form.
-_SPECIES_SUFFIX_RE = re.compile(r"^(?P<prefix>.+?)_s(?P<idx>\d+)(?P<suffix>(?:_.+)?)$")
+# Match the species qualifier ``_s<N>`` in any of three positions:
+#   1. End (scalar per-species like ``omega_p_s2``, ``P_s0``, ``T_s1``).
+#   2. Middle followed by a component / modifier suffix (vector/tensor
+#      per-species or generic operator under Tier-3 canonical:
+#      ``V_s0_1``, ``q_s0_1``, ``P_s0_11``, ``P_s0_par``,
+#      ``P_s0_perp``).
+#   3. Middle followed by a closing pipe (per-species magnitude:
+#      ``|V_s0|``, ``|J_s1|``).
+# The template lookup key is ``<prefix><suffix>`` — for ``V_s0_1`` it's
+# ``"V_1"``, for ``P_s0_par`` it's ``"P_par"``, for ``|V_s0|`` it's
+# ``"|V|"``. The ``_[^|]+`` form excludes pipes so they don't get
+# swallowed into the ``_<modifier>`` branch when both forms could match.
+_SPECIES_SUFFIX_RE = re.compile(
+    r"^(?P<prefix>.+?)_s(?P<idx>\d+)(?P<suffix>_[^|]+|\|)?$"
+)
 
 
 def _try_species_recipe(name: str) -> _Recipe | None:
@@ -530,7 +539,7 @@ def _try_species_recipe(name: str) -> _Recipe | None:
     m = _SPECIES_SUFFIX_RE.match(name)
     if m is None:
         return None
-    prefix = m.group("prefix") + m.group("suffix")
+    prefix = m.group("prefix") + (m.group("suffix") or "")
     idx_str = m.group("idx")
     species_index = int(idx_str)
     template = _SPECIES_TEMPLATES.get(prefix)

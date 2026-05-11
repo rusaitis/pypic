@@ -27,8 +27,8 @@ For the common two-species PIC case (species 0 = electrons, 1 = ions),
 | `EFe`, `EFi` | `EF_s0`, `EF_s1` | Energy flux (vector group) |
 | `s_e`, `s_i` | `s_s0`, `s_s1` | Per-species entropy |
 | `beta_e`, `beta_i` | `beta_s0`, `beta_s1` | Per-species plasma beta |
-| `P_par_e`, `P_par_i` | `P_par_s0`, `P_par_s1` | Per-species parallel pressure |
-| `P_perp_e`, `P_perp_i` | `P_perp_s0`, `P_perp_s1` | Per-species perpendicular pressure |
+| `P_par_e`, `P_par_i` | `P_s0_par`, `P_s1_par` | Per-species parallel pressure |
+| `P_perp_e`, `P_perp_i` | `P_s0_perp`, `P_s1_perp` | Per-species perpendicular pressure |
 | `agyrotropy_e`, `agyrotropy_i` | `agyrotropy_s0`, `agyrotropy_s1` | Per-species agyrotropy |
 | `s_gyro_e`, `s_gyro_i` | `s_gyro_s0`, `s_gyro_s1` | Per-species gyrotropic entropy |
 | `q_e`, `q_i` | `q_s0`, `q_s1` | Per-species conductive heat flux (vector group) |
@@ -56,6 +56,31 @@ The dataset's alias resolver is bidirectional for these e/i ↔ `_sN`
 pairs: a reader that emits `Pe` (e.g. iPIC3D) satisfies a recipe asking
 for `P_s0`, and vice versa. Storage is the same data either way; the
 canonical form is a documentation choice.
+
+## Species position for derived modifiers (Stage E)
+
+The Tier-3 rule distinguishes **generic operators** (apply to many
+fields in principle) from **compound-name descriptors** (specific to
+one field family). Species qualifier position follows the kind:
+
+| Kind | Examples | Species position | Form |
+|------|----------|------------------|------|
+| Generic operator | `\|·\|`, `_par`, `_perp`, `_<i>`, `_<ij>` | *before* the operator | `\|V_s0\|`, `P_s0_par`, `V_s0_1` |
+| Compound-name descriptor | `_gyro`, `_m`, `_c`, `_th`, `_k`, `_int`, `_trace` | *after* the compound name | `s_gyro_s0`, `rho_m_s0`, `e_th_s0` |
+
+The discriminator: would the suffix meaningfully apply to many parent
+fields (parallel projection, magnitude, vector index)? Then it's a
+generic operator and species comes first. Or is it part of an atomic
+name that gives the field its identity (`s_gyro` is a distinct entropy
+formula from `s`, not a transformation of it)? Then it's a compound-name
+descriptor and species goes at the end.
+
+| Alias | Canonical | Notes |
+|-------|-----------|-------|
+| `\|V\|_s0`, `\|V\|_s1` | `\|V_s0\|`, `\|V_s1\|` | Legacy (pre-Stage-E) pipe-outside-species form |
+| `P_par_s0`, `P_par_s1` | `P_s0_par`, `P_s1_par` | Legacy (pre-Stage-E) modifier-after-species form |
+| `P_perp_s0`, `P_perp_s1` | `P_s0_perp`, `P_s1_perp` | Same |
+| `V_s0_mag`, `V_s1_mag` | `\|V_s0\|`, `\|V_s1\|` | ASCII spelling of the pipe-bracketed canonical |
 
 ## Two-species assumption
 

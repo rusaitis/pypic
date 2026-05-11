@@ -16,12 +16,15 @@ from hypothesis.extra.numpy import arrays
 from pypic.compute import _REGISTRY
 from tests._helpers import make_test_dataset
 
+# Static-registry magnitudes (totals; no species). Per-species
+# magnitudes (``|V_s0|``, ``|V_s1|``, ...) are template-synthesized
+# and live outside this list. ``|Ve|`` collapsed into an alias for
+# ``|V_s0|`` at Stage E — it's no longer in the static registry.
 MAGNITUDE_RECIPES: tuple[tuple[str, tuple[str, str, str]], ...] = (
     ("|B|", ("B_1", "B_2", "B_3")),
     ("|E|", ("E_1", "E_2", "E_3")),
     ("|J|", ("J_1", "J_2", "J_3")),
     ("|V|", ("V_1", "V_2", "V_3")),
-    ("|Ve|", ("Ve1", "Ve2", "Ve3")),
     ("|vort|", ("vort_1", "vort_2", "vort_3")),
 )
 
