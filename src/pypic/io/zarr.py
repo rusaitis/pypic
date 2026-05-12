@@ -24,6 +24,7 @@ from pypic.io._serialize import (
     _to_json_native,
     decode_pypic_attrs,
     encode_pypic_attrs,
+    read_simulation_toml,
 )
 
 if TYPE_CHECKING:
@@ -120,9 +121,7 @@ def _open_store(
         )
         raise ValueError(msg)
     if "fields" not in tree.children:
-        msg = (
-            f"{source_label}: schema.version declared but no /fields group present"
-        )
+        msg = f"{source_label}: schema.version declared but no /fields group present"
         raise ValueError(msg)
     return tree["fields"].to_dataset(), root_attrs
 
@@ -352,6 +351,7 @@ def to_zarr(
     backend: str | None = None,
     message: str | None = None,
     branch: str = "main",
+    simulation_toml: str | Path | None = None,
 ) -> str | None:
     r"""Write a FieldDataset to a Zarr v3 store.
 
@@ -409,6 +409,7 @@ def to_zarr(
             encoding=encoding,
             message=message,
             branch=branch,
+            simulation_toml=simulation_toml,
         )
     if backend is not None:
         msg = f"Unknown backend: {backend!r}. Use None or 'icechunk'."
@@ -435,7 +436,10 @@ def to_zarr(
 
     ds = fds.xr.copy(deep=False)
     tree = xr.DataTree.from_dict({"fields": ds})
-    tree.attrs = encode_pypic_attrs(fds)
+    pypic_attrs = encode_pypic_attrs(fds)
+    if simulation_toml is not None:
+        pypic_attrs["simulation_toml"] = read_simulation_toml(simulation_toml)
+    tree.attrs = pypic_attrs
 
     ds_encoding = _build_encoding(ds, dtype, encoding)
     try:
@@ -522,6 +526,7 @@ def to_zarr_timeseries(
     backend: str | None = None,
     message: str | None = None,
     branch: str = "main",
+    simulation_toml: str | Path | None = None,
 ) -> str | None:
     r"""Write multiple timesteps to a single Zarr v3 store.
 
@@ -586,6 +591,7 @@ def to_zarr_timeseries(
             encoding=encoding,
             message=message,
             branch=branch,
+            simulation_toml=simulation_toml,
         )
     if backend is not None:
         msg = f"Unknown backend: {backend!r}. Use None or 'icechunk'."
@@ -627,6 +633,9 @@ def to_zarr_timeseries(
     if pypic_attrs is None:
         msg = "No timesteps to write — source yielded zero items."
         raise ValueError(msg)
+
+    if simulation_toml is not None:
+        pypic_attrs["simulation_toml"] = read_simulation_toml(simulation_toml)
 
     # Restamp the cross-step metadata intersection on the root group.
     # ``_write_timeseries_steps`` already wrote step-1's pypic_attrs

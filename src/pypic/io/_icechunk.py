@@ -16,7 +16,7 @@ from typing import TYPE_CHECKING, Any
 import xarray as xr
 
 from pypic.io._guard import ensure_icechunk
-from pypic.io._serialize import encode_pypic_attrs
+from pypic.io._serialize import encode_pypic_attrs, read_simulation_toml
 from pypic.io.zarr import (
     _build_encoding,
     _datatree_encoding,
@@ -149,6 +149,7 @@ def to_zarr_icechunk(
     encoding: dict[str, dict[str, Any]] | None = None,
     message: str | None = None,
     branch: str = "main",
+    simulation_toml: str | Path | None = None,
 ) -> str:
     r"""Write a FieldDataset to an Icechunk-managed Zarr v3 store.
 
@@ -197,7 +198,10 @@ def to_zarr_icechunk(
 
         ds = fds.xr.copy(deep=False)
         tree = xr.DataTree.from_dict({"fields": ds})
-        tree.attrs = encode_pypic_attrs(fds)
+        pypic_attrs = encode_pypic_attrs(fds)
+        if simulation_toml is not None:
+            pypic_attrs["simulation_toml"] = read_simulation_toml(simulation_toml)
+        tree.attrs = pypic_attrs
 
         # Icechunk doesn't support Zarr's consolidated metadata
         # (snapshots already act as the equivalent index), so leave it
@@ -288,6 +292,7 @@ def to_zarr_timeseries_icechunk(
     encoding: dict[str, dict[str, Any]] | None = None,
     message: str | None = None,
     branch: str = "main",
+    simulation_toml: str | Path | None = None,
 ) -> str:
     r"""Write multiple timesteps to an Icechunk-managed Zarr v3 store.
 
@@ -354,6 +359,9 @@ def to_zarr_timeseries_icechunk(
         if pypic_attrs is None:
             msg = "No timesteps to write — source yielded zero items."
             raise ValueError(msg)
+
+        if simulation_toml is not None:
+            pypic_attrs["simulation_toml"] = read_simulation_toml(simulation_toml)
 
         # Restamp the cross-step metadata intersection on the root group;
         # ``_write_timeseries_steps`` wrote step-1's metadata via the

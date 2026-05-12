@@ -19,6 +19,8 @@ from pypic.grid import GridInfo
 from pypic.units import Normalization, PhysicsParams, SpeciesInfo
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from pypic.dataset import FieldDataset
 
 
@@ -345,6 +347,73 @@ def _from_json_native(obj: Any) -> Any:  # noqa: ANN401
 SCHEMA_VERSION = "1.0"
 
 
+# Reserved metadata keys lifted to top-level root attrs on write.
+# ``run`` and ``simulation_toml`` are emitted as siblings of ``schema``,
+# ``grid``, etc. so cross-tool consumers (webpic, Rust) can read them
+# without going through pypic's open ``metadata`` bag.  On read, both
+# are re-stuffed into ``metadata`` so the Python-side API stays a
+# single bag (no new typed FieldDataset fields required).  See
+# schema.md §4.2 for the on-disk contract.
+
+
+def _encode_run(run: Any) -> dict[str, Any]:  # noqa: ANN401
+    """Serialize a ``schema.Run`` (Pydantic model) to a JSON-native dict.
+
+    Accepts either a ``Run`` instance (the canonical form produced by
+    the TOML loader) or an already-decoded plain dict (round-trip after
+    a previous ``decode_pypic_attrs``).  Returns ``mode="json"`` shape
+    so dates land as ISO strings, which Zarr's JSON attr serializer
+    accepts.
+    """
+    from pypic.schema import Run
+
+    if isinstance(run, Run):
+        return run.model_dump(mode="json")
+    if isinstance(run, dict):
+        # Round-trip through model_validate to normalise and re-emit.
+        # Cheap and gives the same shape regardless of input dict
+        # provenance.
+        return Run.model_validate(run).model_dump(mode="json")
+    msg = (
+        f"metadata['run'] must be a pypic.schema.Run or dict, got {type(run).__name__}"
+    )
+    raise TypeError(msg)
+
+
+def _decode_run(d: dict[str, Any]) -> Any:  # noqa: ANN401
+    """Rebuild a ``schema.Run`` from a JSON-mode dict.
+
+    Strict by default: a non-conforming ``attrs.run`` is a v1.0 schema
+    violation and surfaces as ``pydantic.ValidationError``.  Callers
+    that need leniency can catch and fall back to keeping the raw dict.
+    """
+    from pypic.schema import Run
+
+    return Run.model_validate(d)
+
+
+def read_simulation_toml(source: str | Path) -> str:
+    """Read raw TOML text from a path for the ``simulation_toml=`` writer kwarg.
+
+    Stricter than the loader: validates that *source* points to an
+    existing file (the writer would otherwise stamp a misleading
+    file-path-shaped string into ``attrs.simulation_toml``).  Returns
+    the file's text content; the writer caller stamps it on the
+    encoded attrs dict.
+    """
+    from pathlib import Path as _Path
+
+    p = _Path(source)
+    if not p.is_file():
+        msg = (
+            f"simulation_toml={source!r} is not an existing file. "
+            f"Pass a path to a TOML file or attach the text manually "
+            f"to fds.metadata['simulation_toml']."
+        )
+        raise FileNotFoundError(msg)
+    return p.read_text(encoding="utf-8")
+
+
 def encode_pypic_attrs(fds: FieldDataset) -> dict[str, Any]:
     """Assemble FieldDataset metadata into the schema-v1.0 root-group attrs dict.
 
@@ -361,16 +430,38 @@ def encode_pypic_attrs(fds: FieldDataset) -> dict[str, Any]:
     for the on-disk mapping table that this dict materialises.  Other
     keys are the section dicts produced by the per-section encoders
     (``grid_to_dict``, ``normalization_to_dict``, ...).
+
+    ``run`` (typed ``[run]`` provenance: ``schema.Run`` model dump) and
+    ``simulation_toml`` (verbatim source TOML text) are lifted out of
+    :attr:`FieldDataset.metadata` and emitted as top-level keys when
+    present, so non-pypic consumers see them at ``attrs.run`` /
+    ``attrs.simulation_toml`` instead of buried in the loose metadata
+    bag.  Both keys are optional.
     """
+    metadata = dict(fds.metadata)
+    lifted: dict[str, Any] = {}
+    raw_run = metadata.pop("run", None)
+    if raw_run is not None:
+        lifted["run"] = _encode_run(raw_run)
+    raw_toml = metadata.pop("simulation_toml", None)
+    if raw_toml is not None:
+        if not isinstance(raw_toml, str):
+            msg = (
+                f"metadata['simulation_toml'] must be a str, "
+                f"got {type(raw_toml).__name__}"
+            )
+            raise TypeError(msg)
+        lifted["simulation_toml"] = raw_toml
     return {
         "schema": {"version": SCHEMA_VERSION},
         "grid": grid_to_dict(fds.grid),
         "normalization": normalization_to_dict(fds.normalization),
         "species": species_to_list(fds.species),
         "physics": physics_to_dict(fds.physics),
-        "metadata": _to_json_native(dict(fds.metadata)),
+        "metadata": _to_json_native(metadata),
         "frame": fds.frame,
         "transforms": transforms_to_dict(dict(fds.transforms)),
+        **lifted,
     }
 
 
@@ -394,6 +485,14 @@ def decode_pypic_attrs(
     -------
     tuple
         (grid, normalization, species, physics, metadata, frame, transforms)
+
+    Notes
+    -----
+    Optional top-level ``run`` and ``simulation_toml`` attrs (see
+    :func:`encode_pypic_attrs`) are re-stuffed into the returned
+    ``metadata`` dict under their reserved keys, so callers see the
+    same shape they would after constructing a FieldDataset from a
+    SimulationConfig via the reader registry.
     """
     schema_attrs = d.get("schema")
     if not isinstance(schema_attrs, dict) or "version" not in schema_attrs:
@@ -413,7 +512,13 @@ def decode_pypic_attrs(
     normalization = dict_to_normalization(d["normalization"])
     species = list_to_species(d.get("species", []))
     physics = dict_to_physics(d["physics"])
-    metadata = _from_json_native(d.get("metadata", {}))
+    metadata: dict[str, Any] = _from_json_native(d.get("metadata", {}))
+    raw_run = d.get("run")
+    if raw_run is not None:
+        metadata["run"] = _decode_run(raw_run)
+    raw_toml = d.get("simulation_toml")
+    if raw_toml is not None:
+        metadata["simulation_toml"] = raw_toml
     frame = d.get("frame", "simulation")
     transforms = dict_to_transforms(d.get("transforms", {}))
     return grid, normalization, species, physics, metadata, frame, transforms

@@ -172,6 +172,41 @@ class TestToZarrIcechunk:
         loaded = from_zarr(store, branch="main")
         np.testing.assert_allclose(loaded["B_1"], 7.0)
 
+    def test_run_and_simulation_toml_round_trip(self, tmp_path):
+        # The icechunk write path routes through the same encode/decode
+        # as plain Zarr; this pins that the icechunk-specific code path
+        # (which stamps root attrs via ``root.attrs[key] = value`` rather
+        # than a DataTree.attrs assignment) also lifts ``run`` and
+        # ``simulation_toml`` to the root.
+        from pypic.schema import Run
+
+        run = Run.model_validate({"name": "ic-test", "doi": "10.5555/example"})
+        grid = make_uniform_grid(4, 3, 2)
+        toml_text = '[schema]\nversion = "1.0"\n'
+        fds = FieldDataset.from_arrays(
+            {"B_1": np.ones((4, 3, 2))},
+            grid,
+            Normalization.identity(),
+            metadata={"run": run, "simulation_toml": toml_text},
+        )
+        store = tmp_path / "ic_run.icechunk"
+        to_zarr(fds, store, backend="icechunk")
+        loaded = from_zarr(store)
+        assert isinstance(loaded.metadata["run"], Run)
+        assert loaded.metadata["run"] == run
+        assert loaded.metadata["simulation_toml"] == toml_text
+
+    def test_simulation_toml_kwarg_icechunk(self, tmp_path):
+        # Writer kwarg forwarded through to_zarr → to_zarr_icechunk.
+        toml_path = tmp_path / "src.toml"
+        toml_text = '[schema]\nversion = "1.0"\n'
+        toml_path.write_text(toml_text, encoding="utf-8")
+        fds = make_test_dataset({"B_1": np.ones((4, 3, 2))})
+        store = tmp_path / "ic_kwarg.icechunk"
+        to_zarr(fds, store, backend="icechunk", simulation_toml=toml_path)
+        loaded = from_zarr(store)
+        assert loaded.metadata["simulation_toml"] == toml_text
+
 
 class TestFromZarrIcechunk:
     """Tests for from_zarr with Icechunk auto-detection and ref parameters."""

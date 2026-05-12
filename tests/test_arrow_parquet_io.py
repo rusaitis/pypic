@@ -255,7 +255,7 @@ class TestArrowInterchange:
             position=np.zeros((4, 3)),
             velocity=np.zeros((4, 3)),
             n_particles=4,
-            metadata={"stagger": stagger, "run": "demo"},
+            metadata={"stagger": stagger, "label": "demo"},
             weight=np.ones(4),
             species_charge=-1.0,
             species_mass=1.0,
@@ -268,7 +268,7 @@ class TestArrowInterchange:
         assert dict(rebuilt_stagger.field_locations) == {"B": "face"}
         assert rebuilt_stagger.interpolation_order == 1
         assert rebuilt_stagger.notes == "Yee"
-        assert rebuilt.metadata["run"] == "demo"
+        assert rebuilt.metadata["label"] == "demo"
 
     def test_dtype_downcast_position_float32(self):
         pcl = _make_particles(20)

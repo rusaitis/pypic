@@ -213,7 +213,7 @@ class TestSerializationHelpers:
             {"B_1": np.ones((4, 3, 2))},
             grid,
             Normalization.identity(),
-            metadata={"stagger": stagger, "run": "demo"},
+            metadata={"stagger": stagger, "label": "demo"},
         )
         store = tmp_path / "stagger.zarr"
         to_zarr(fds, store)
@@ -224,7 +224,7 @@ class TestSerializationHelpers:
         assert dict(loaded_stagger.field_locations) == {"B": "face", "E": "edge"}
         assert loaded_stagger.interpolation_order == 1
         assert loaded_stagger.notes == "Yee mesh"
-        assert loaded.metadata["run"] == "demo"
+        assert loaded.metadata["label"] == "demo"
 
 
 class TestToZarrFromZarr:
@@ -440,6 +440,173 @@ class TestToZarrFromZarr:
             zarr.consolidate_metadata(str(store))
         with pytest.raises(ValueError, match=r"schema\.version"):
             from_zarr(store)
+
+
+class TestRunAndSimulationTomlRoundTrip:
+    """Verbatim ``simulation.toml`` and typed ``[run]`` round-trip via root attrs.
+
+    Schema.md §4.2 promotes both to top-level root attrs so non-pypic
+    consumers (webpic, Rust pipelines) see them at ``attrs.run`` /
+    ``attrs.simulation_toml`` without going through the loose
+    ``metadata`` bag.  On the Python side, both re-land in
+    ``fds.metadata`` for caller ergonomics — these tests pin both
+    contracts.
+    """
+
+    _SAMPLE_TOML = """\
+[schema]
+version = "1.0"
+
+[model]
+name = "TestCode"
+type = "PIC"
+
+[run]
+name = "round-trip-test"
+description = "fixture"
+doi = "10.5281/zenodo.12345678"
+license = "CC-BY-4.0"
+
+[time]
+dt = 0.05
+t_start = 0.0
+t_end = 1.0
+n_steps = 20
+
+[grid]
+dimensions = [4, 3, 2]
+spacing = [1.0, 1.0, 1.0]
+lower = [0.0, 0.0, 0.0]
+upper = [4.0, 3.0, 2.0]
+
+[units]
+system = "SI"
+
+[coordinates]
+geometry = "cartesian"
+frame = "simulation"
+
+[[species]]
+name = "electrons"
+charge = -1.0
+mass = 1.0
+"""
+
+    def _make_run(self):
+        from pypic.schema import Run
+
+        return Run.model_validate(
+            {
+                "name": "round-trip-test",
+                "description": "fixture",
+                "doi": "10.5281/zenodo.12345678",
+                "license": "CC-BY-4.0",
+            }
+        )
+
+    def _fds(self, metadata=None):
+        return FieldDataset.from_arrays(
+            {"B_1": np.ones((4, 3, 2))},
+            make_uniform_grid(4, 3, 2),
+            Normalization.identity(),
+            metadata=metadata,
+        )
+
+    def test_run_round_trips_typed(self, tmp_path):
+        from pypic.schema import Run
+
+        run = self._make_run()
+        fds = self._fds(metadata={"run": run})
+        store = tmp_path / "run.zarr"
+        to_zarr(fds, store)
+        loaded = from_zarr(store)
+        # decode_pypic_attrs rebuilds Run via model_validate — same
+        # logical content, fresh instance.
+        loaded_run = loaded.metadata["run"]
+        assert isinstance(loaded_run, Run)
+        assert loaded_run.name == "round-trip-test"
+        assert loaded_run.doi == "10.5281/zenodo.12345678"
+        assert loaded_run.license == "CC-BY-4.0"
+        assert loaded_run == run
+
+    def test_simulation_toml_round_trips_text(self, tmp_path):
+        fds = self._fds(metadata={"simulation_toml": self._SAMPLE_TOML})
+        store = tmp_path / "toml.zarr"
+        to_zarr(fds, store)
+        loaded = from_zarr(store)
+        assert loaded.metadata["simulation_toml"] == self._SAMPLE_TOML
+
+    def test_attrs_are_top_level_not_in_metadata_bag(self, tmp_path):
+        # The whole point of the lift: cross-tool consumers read
+        # ``attrs.run`` / ``attrs.simulation_toml`` at the root group,
+        # not buried under ``attrs.metadata``.
+        run = self._make_run()
+        fds = self._fds(metadata={"run": run, "simulation_toml": self._SAMPLE_TOML})
+        store = tmp_path / "toplevel.zarr"
+        to_zarr(fds, store)
+        root = zarr.open_group(str(store), mode="r")
+        assert "run" in root.attrs
+        assert "simulation_toml" in root.attrs
+        assert root.attrs["simulation_toml"] == self._SAMPLE_TOML
+        # And NOT nested under the open metadata bag.
+        metadata_bag = root.attrs.get("metadata", {})
+        assert "run" not in metadata_bag
+        assert "simulation_toml" not in metadata_bag
+
+    def test_simulation_toml_writer_kwarg_overrides_metadata(self, tmp_path):
+        # FieldDataset has no simulation_toml in metadata; the writer
+        # kwarg attaches it from a file path at write time only.
+        toml_path = tmp_path / "src.toml"
+        toml_path.write_text(self._SAMPLE_TOML, encoding="utf-8")
+        fds = self._fds()
+        assert "simulation_toml" not in fds.metadata
+        store = tmp_path / "kwarg.zarr"
+        to_zarr(fds, store, simulation_toml=toml_path)
+        loaded = from_zarr(store)
+        assert loaded.metadata["simulation_toml"] == self._SAMPLE_TOML
+        # The source fds was not mutated.
+        assert "simulation_toml" not in fds.metadata
+
+    def test_simulation_toml_writer_kwarg_missing_path_raises(self, tmp_path):
+        fds = self._fds()
+        with pytest.raises(FileNotFoundError, match=r"simulation_toml"):
+            to_zarr(fds, tmp_path / "x.zarr", simulation_toml=tmp_path / "nope.toml")
+
+    def test_run_and_simulation_toml_round_trip_through_timeseries(self, tmp_path):
+        from pypic.schema import Run
+
+        run = self._make_run()
+        grid = make_uniform_grid(4, 3, 2)
+        pairs = [
+            (
+                float(t),
+                FieldDataset.from_arrays(
+                    {"B_1": np.full((4, 3, 2), float(t))},
+                    grid,
+                    Normalization.identity(),
+                    metadata={"run": run, "simulation_toml": self._SAMPLE_TOML},
+                ),
+            )
+            for t in (0.0, 1.0, 2.0)
+        ]
+        store = tmp_path / "ts.zarr"
+        to_zarr_timeseries(pairs, store)
+        loaded = from_zarr(store)
+        assert isinstance(loaded.metadata["run"], Run)
+        assert loaded.metadata["run"] == run
+        assert loaded.metadata["simulation_toml"] == self._SAMPLE_TOML
+
+    def test_load_config_attaches_raw_toml(self, tmp_path):
+        from pypic.readers.config import load_config
+
+        toml_path = tmp_path / "sim.toml"
+        toml_path.write_text(self._SAMPLE_TOML, encoding="utf-8")
+        cfg = load_config(toml_path)
+        assert cfg.metadata["simulation_toml"] == self._SAMPLE_TOML
+        # ``[run]`` survives onto the typed field — unchanged behaviour.
+        assert cfg.run is not None
+        assert cfg.run.name == "round-trip-test"
+        assert cfg.run.doi == "10.5281/zenodo.12345678"
 
 
 class TestToZarrTimeseries:

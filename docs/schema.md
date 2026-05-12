@@ -220,13 +220,18 @@ count    = 8192
 hours    = 393216
 ```
 
-`[run]` is **config-only provenance** in v1.0: the validator reads it
-when ``simulation.toml`` is loaded, but the data-file writers
-(`pypic.io.to_zarr`, the HDF5 §4.1 layout) do not currently round-trip
-its keys. Tools that need `git_sha` / `host` / `funding` to survive
-into derived data files should ship the original ``simulation.toml``
-alongside the output store. Persisting `[run]` through `attrs.run` is
-a candidate v1.x extension.
+`[run]` is **typed run provenance**: the validator reads it when
+``simulation.toml`` is loaded, the loader stamps the result onto
+`SimulationConfig.run`, and the Zarr writer lifts it to root
+`attrs.run` as a JSON-mode `Run.model_dump` so cross-tool consumers
+see it at the root group's attrs (see §4.2). Identity-stable across
+derivations — a regridded "MMS-event-1" run is still that run. The
+HDF5 §4.1 layout does not currently round-trip `[run]`; tools whose
+artifacts must travel through HDF5 should ship the original
+``simulation.toml`` alongside the output store, or write through
+Zarr where `attrs.run` is preserved. `[run]` lives alongside
+`attrs.simulation_toml` (verbatim text) — see §4.2 for the policy
+on each.
 
 ### [time]
 
@@ -1417,6 +1422,10 @@ my_store.zarr/                         # Zarr v3 group root
 │   ├── physics:       { gamma, c, relativistic }
 │   ├── frame:         "simulation"
 │   ├── transforms:    { <name>: { origin, rotation, scale, ... }, ... }
+│   ├── run:           (optional) { name, doi, license, authors,
+│   │                    git_sha, host, funding, embargo,
+│   │                    resources, ensemble, ... }  # schema.Run.model_dump
+│   ├── simulation_toml: (optional) "verbatim TOML text from [run] config"
 │   └── metadata:      { ... reader-specific scalars,
 │                         StaggerInfo as tagged dict ... }
 │
@@ -1469,6 +1478,8 @@ write; user-supplied `encoding=` overrides per variable.
 | `time` / `step` | top-level scalar attrs | `time` dim (multi-step) / `metadata.time` scalar (single-step) |
 | Files per write | one per timestep | one store, all steps |
 | Schema version | `/schema/version` attr | root `attrs.schema.version` (mirrors `[schema].version`) |
+| `[run]` provenance | not currently round-tripped (config-only) | root `attrs.run` (typed; `Run.model_dump`) |
+| `simulation.toml` verbatim | not currently round-tripped | root `attrs.simulation_toml` (opaque UTF-8 text) |
 
 `schema.version` is the on-disk layout discriminator. It carries the
 **writing library's** layout version — pypic v1.0 stamps `"1.0"`,
@@ -1491,6 +1502,37 @@ self-describing in CF/COARDS terms.
 canonical names (`B_1`, `B_2`, `B_3`).  Geometry- and species-aliases
 are read-time conveniences resolved by `FieldDataset`; they never
 appear on disk.
+
+**`attrs.run` — typed run provenance (optional).** When a
+`FieldDataset` carries a `[run]` block (auto-populated by
+`load_config()` from the source TOML), it is emitted as a top-level
+root attr — not buried under `attrs.metadata` — so non-pypic
+consumers (webpic, Rust pipelines) can read it without going
+through pypic's loose metadata bag. The value is the JSON-mode dump
+of `pypic.schema.Run` (`mode="json"` so dates land as ISO strings).
+On read, `from_zarr` rebuilds the typed model via
+`Run.model_validate(...)` and re-stuffs it into
+`fds.metadata["run"]`. The block is **identity-stable across
+derivations**: regrid / slice / frame-transform propagate the
+original `run` unchanged, because a derivation of "MMS-event-1" is
+still that run.
+
+**`attrs.simulation_toml` — verbatim TOML text (optional).** When
+the source `simulation.toml` is available (either via
+`load_config()` capture or the `to_zarr(..., simulation_toml=PATH)`
+writer kwarg), the whole TOML document is stamped as opaque UTF-8
+text at the root group's `attrs.simulation_toml`. This carries the
+sections that the typed `FieldDataset` boundary drops on the way to
+Zarr — `[bodies]`, `[drivers]`, `[output.*]`, `[restart]`,
+`[[probes]]`, `[[collisions]]`, `[phase_space]`, plus any `x-<code>`
+extensions — losslessly, with zero per-section encoder maintenance.
+Consumers that want a typed view re-validate via
+`pypic.schema.validate_simulation_toml(text)`. Same derivation
+policy as `attrs.run`: the original source TOML is propagated
+unchanged through derived datasets (it describes the run that
+produced the source, which is correct provenance for any
+derivation); users republishing a derived dataset can drop the attr
+explicitly.
 
 ---
 

@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import copy
 import logging
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
@@ -32,8 +33,6 @@ from pypic.schema import (
 from pypic.units import Normalization, PhysicsParams, SpeciesInfo
 
 if TYPE_CHECKING:
-    from pathlib import Path
-
     from pypic.schema import (
         BoundaryConditions,
         Coordinates,
@@ -193,7 +192,12 @@ def load_config(path: Path) -> SimulationConfig:
 
     Validates the file against the v1.0 schema
     (:mod:`pypic.schema`) and builds the internal :class:`SimulationConfig`
-    from the result.
+    from the result.  The raw TOML text is captured and attached to
+    ``metadata["simulation_toml"]`` so downstream FieldDataset writers
+    can round-trip it verbatim into ``attrs.simulation_toml`` (schema.md
+    §4.2) — losslessly preserving sections (``[bodies]``, ``[drivers]``,
+    ``[output]``, ``[restart]``, ``[probes]``, ...) that the typed
+    SimulationConfig drops on the way to FieldDataset.
 
     Parameters
     ----------
@@ -212,8 +216,14 @@ def load_config(path: Path) -> SimulationConfig:
         If the document fails schema validation. Dotted field paths in
         the error message point to every violation.
     """
-    schema = validate_simulation_toml(path)
-    return _from_schema(schema)
+    raw_text = Path(path).read_text(encoding="utf-8")
+    schema = validate_simulation_toml(raw_text)
+    config = _from_schema(schema)
+    # Re-stamp metadata with the verbatim TOML text.  ``_from_schema``
+    # already populated typed sections; this is purely additive.
+    new_metadata = dict(config.metadata)
+    new_metadata["simulation_toml"] = raw_text
+    return copy.replace(config, metadata=new_metadata)
 
 
 def _from_schema(schema: SimulationSchema) -> SimulationConfig:

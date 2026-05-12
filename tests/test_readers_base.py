@@ -216,12 +216,12 @@ class TestFieldDatasetSlicing:
             Normalization.identity(),
             species=species,
             physics=PhysicsParams(extra={"eta": 0.01}),
-            metadata={"run": "test"},
+            metadata={"label": "test"},
         )
         sliced = ds.isel(z=0)
         assert sliced.species == species
         assert sliced.physics.extra["eta"] == 0.01
-        assert sliced.metadata == {"run": "test"}
+        assert sliced.metadata == {"label": "test"}
         assert sliced.normalization is ds.normalization
 
     def test_dict_indexers_for_unicode_dims(self):

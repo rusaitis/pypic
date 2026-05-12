@@ -342,7 +342,9 @@ class Simulation:
         from pypic.readers._protocols import supports_selective_read
 
         if fields is None and not kwargs:
-            return self._reader.read_timestep(self._path, step)
+            return self._attach_config_provenance(
+                self._reader.read_timestep(self._path, step)
+            )
 
         canonical: set[str] | None = None
         alias_map: dict[str, str] = {}
@@ -374,8 +376,7 @@ class Simulation:
                 # ``B`` expand.
                 ends_with_species = re.search(r"_s\d+$", resolved) is not None
                 ends_with_component = (
-                    re.search(r"_\d+$", resolved) is not None
-                    and not ends_with_species
+                    re.search(r"_\d+$", resolved) is not None and not ends_with_species
                 )
                 if name not in alias_map and not ends_with_component:
                     for c in ("1", "2", "3"):
@@ -435,7 +436,33 @@ class Simulation:
                         name,
                     )
 
-        return ds
+        return self._attach_config_provenance(ds)
+
+    def _attach_config_provenance(self, fds: FieldDataset) -> FieldDataset:
+        """Stamp ``[run]`` and verbatim ``simulation.toml`` onto ``fds.metadata``.
+
+        Lifted to top-level ``attrs.run`` / ``attrs.simulation_toml`` at
+        Zarr write time by ``encode_pypic_attrs`` (schema.md §4.2).
+        No-op when the config carries neither (legacy/synthetic configs
+        assembled outside the schema path).  Existing reader-supplied
+        values win — readers may have stamped a code-specific run object
+        that pypic shouldn't overwrite.
+        """
+        cfg = self._config
+        raw_toml = cfg.metadata.get("simulation_toml")
+        run = cfg.run
+        if run is None and raw_toml is None:
+            return fds
+        new_meta = dict(fds.metadata)
+        if run is not None:
+            new_meta.setdefault("run", run)
+        if raw_toml is not None:
+            new_meta.setdefault("simulation_toml", raw_toml)
+        # Internal mutation: read_timestep returns a fresh FieldDataset
+        # each call, so the caller has no prior reference to invalidate.
+        # Cheaper than a full reconstruction (alias resolution etc.).
+        fds._metadata = new_meta
+        return fds
 
     def available_fields(self, step: int) -> list[str]:
         """List canonical field names at *step* without loading arrays.
