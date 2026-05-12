@@ -1,0 +1,31 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "pypic — Python for Plasma In Cells"
+abstract: >-
+  A Python toolkit for reading, analyzing, and plotting plasma
+  simulation output from PIC and MHD codes. Unified interface
+  to multiple simulation formats (iPIC3D, BATSRUS, OpenGGCM, ...)
+  with canonical field schema, normalization-aware unit
+  conversion, derived quantities, and geometry-aware operators.
+type: software
+authors:
+  - family-names: Rusaitis
+    given-names: Liutauras
+    email: liutauras.rusaitis@gmail.com
+    # orcid: "https://orcid.org/0000-0000-0000-0000"  # TODO
+version: 0.1.0
+# date-released: YYYY-MM-DD  # TODO: set when tagging the first release
+url: "https://github.com/rusaitis/pypic"
+repository-code: "https://github.com/rusaitis/pypic"
+keywords:
+  - plasma physics
+  - particle-in-cell
+  - magnetohydrodynamics
+  - simulation analysis
+  - heliophysics
+  - python
+# TODO: register a Zenodo concept DOI and uncomment.
+# identifiers:
+#   - type: doi
+#     value: 10.5281/zenodo.XXXXXXX
+#     description: Zenodo concept DOI (all versions).
