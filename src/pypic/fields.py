@@ -328,6 +328,12 @@ _FIELD_INFO: dict[str, FieldInfo] = {
         "J/m^3",
         r"$e_{th}$",
     ),
+    "e_th_trace": _FI(
+        "energy_density",
+        "Thermal energy density (tensor trace)",
+        "J/m^3",
+        r"$e_{th,\mathrm{tr}}$",
+    ),
     # Frequencies
     "omega_pe": _FI(
         "frequency",
