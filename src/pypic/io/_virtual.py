@@ -446,7 +446,11 @@ def to_icechunk_virtual(
         # pre-existing node.  Prior snapshots stay intact in repo
         # history; only this commit's root is replaced.
         session.store.sync_clear()
-        vds.vz.to_icechunk(session.store)
+        # Write virtual refs under ``/fields`` to match the schema-v1.0
+        # Zarr layout (schema.md §4.2): field arrays live under the
+        # ``/fields`` child group, pypic metadata sits flat on the root
+        # group's attrs.  ``from_zarr`` enforces both.
+        vds.vz.to_icechunk(session.store, group="fields")
 
         # Reuse open_virtual to assemble the canonical FieldDataset
         # attrs.  This re-extracts vds against an in-memory store
@@ -460,7 +464,8 @@ def to_icechunk_virtual(
             config=config,
         )
         group = zarr.open_group(session.store, mode="r+")
-        group.attrs["pypic"] = encode_pypic_attrs(fds)
+        for key, value in encode_pypic_attrs(fds).items():
+            group.attrs[key] = value
 
         snapshot: str = session.commit(
             message if message is not None else "pypic: virtual refs"
