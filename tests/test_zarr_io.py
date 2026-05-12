@@ -397,7 +397,9 @@ class TestToZarrFromZarr:
     def test_layout_v1_structure(self, tmp_path):
         # Validate the on-disk shape — the contract a non-pypic Zarr
         # consumer (a JS WebGPU viewer, a Rust zarrs pipeline) reads
-        # against — not just that ``from_zarr`` round-trips.
+        # against — not just that ``from_zarr`` round-trips. Each
+        # top-level attrs key mirrors a §2 simulation.toml section
+        # of the same name (schema.md §4.2).
         fds = make_test_dataset({"B_1": np.ones((4, 3, 2))})
         store = tmp_path / "v1.zarr"
         to_zarr(fds, store)
@@ -411,9 +413,21 @@ class TestToZarrFromZarr:
         # Field arrays under /fields, not at the root.
         assert list(root.array_keys()) == []
         assert "fields" in list(root.group_keys())
-        # Metadata sections flat at root.
-        for key in ("grid", "normalization", "physics", "frame", "transforms"):
+        # Required metadata sections flat at root, mirroring §2.
+        for key in ("grid", "normalization", "physics", "coordinates"):
             assert key in root.attrs, f"missing root attr {key!r}"
+        # Coordinates owns frame and (when present) transforms — they
+        # are no longer top-level keys under the §4.2 reshape.
+        assert "frame" not in root.attrs
+        assert "transforms" not in root.attrs
+        assert root.attrs["coordinates"]["frame"] == fds.frame
+        # Schema fields the encoder drops on emit (the reshape moved
+        # them into typed sub-keys; see schema.md §4.2 mapping table).
+        assert "dt" not in root.attrs["grid"]
+        assert "boundary" not in root.attrs["grid"]
+        assert "geometry" not in root.attrs["grid"]
+        assert "gamma" not in root.attrs["physics"]
+        assert "c" not in root.attrs["physics"]
 
     def test_from_zarr_rejects_unknown_schema_version(self, tmp_path):
         # A v2.0 store must not silently decode through the v1.0 path —
@@ -427,6 +441,67 @@ class TestToZarrFromZarr:
             zarr.consolidate_metadata(str(store))
         with pytest.raises(ValueError, match=r"schema\.version"):
             from_zarr(store)
+
+    def test_from_zarr_reads_pre_reshape_attrs_shape(self, tmp_path):
+        # Stores written before the §4.2 reshape carried ``dt`` and
+        # ``boundary`` under ``grid``, ``geometry`` as a nested struct
+        # under ``grid``, ``c`` and ``gamma`` under ``physics``, and
+        # ``frame`` / ``transforms`` at the top level. The decoder
+        # accepts that shape for one minor version so existing stores
+        # don't need migration.
+        physics = PhysicsParams(gamma=1.4, c=1.0, relativistic=True)
+        grid = GridInfo(
+            dimensions=(4, 3, 2),
+            spacing=(0.5, 0.5, 0.5),
+            origin=(1.0, 2.0, 3.0),
+            dt=0.01,
+            boundary=("periodic", "open", "periodic"),
+        )
+        fds = FieldDataset.from_arrays(
+            {"B_1": np.ones((4, 3, 2))},
+            grid,
+            Normalization.pic_electron(1e18),
+            physics=physics,
+            frame="GSM",
+        )
+        store = tmp_path / "old_layout.zarr"
+        to_zarr(fds, store)
+        root = zarr.open_group(str(store), mode="a")
+        # Repaint root attrs into the pre-reshape shape so the decoder
+        # exercises every fall-back path.
+        old_grid = dict(root.attrs["grid"])
+        old_grid["origin"] = old_grid.pop("lower")
+        old_grid.pop("upper", None)
+        old_grid["dt"] = root.attrs["time"]["dt"]
+        old_grid["boundary"] = list(root.attrs["boundary_conditions"]["lower"])
+        old_grid["geometry"] = {
+            "type": root.attrs["coordinates"]["geometry"],
+            "axis_names": list(root.attrs["coordinates"].get("axis_labels", [])),
+            "axis_units": [],
+        }
+        root.attrs["grid"] = old_grid
+        root.attrs["frame"] = root.attrs["coordinates"]["frame"]
+        root.attrs["transforms"] = root.attrs["coordinates"].get("transforms", {})
+        old_physics = dict(root.attrs["physics"])
+        old_physics["gamma"] = old_physics.pop("gamma_eos")
+        old_physics["c"] = root.attrs["normalization"]["speed_of_light"]
+        root.attrs["physics"] = old_physics
+        old_norm = dict(root.attrs["normalization"])
+        old_norm.pop("speed_of_light", None)
+        root.attrs["normalization"] = old_norm
+        del root.attrs["time"]
+        del root.attrs["boundary_conditions"]
+        del root.attrs["coordinates"]
+        if hasattr(zarr, "consolidate_metadata"):
+            zarr.consolidate_metadata(str(store))
+        loaded = from_zarr(store)
+        assert loaded.frame == "GSM"
+        assert loaded.grid.dt == 0.01
+        assert loaded.grid.boundary == ("periodic", "open", "periodic")
+        assert loaded.grid.geometry.type == fds.grid.geometry.type
+        assert loaded.physics.gamma == 1.4
+        assert loaded.physics.c == 1.0
+        assert loaded.physics.relativistic is True
 
     def test_from_zarr_rejects_missing_schema_attr(self, tmp_path):
         # Missing ``schema`` root attr is rejected with the discriminator

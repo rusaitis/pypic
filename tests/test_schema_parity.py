@@ -28,8 +28,9 @@ _TEST_SPECIES_INDICES = (0, 1, 2)
 
 # Names that appear in the "Canonical" column but represent
 # multi-component groups expanded at ``read()`` time (vector-group
-# shorthand), not directly-resolvable singletons.
-_GROUP_IDENTIFIERS = frozenset({"Pij"})
+# shorthand), not directly-resolvable singletons. ``Pij_s{N}`` is the
+# per-species tensor group analogous to ``Pij``.
+_GROUP_IDENTIFIERS = frozenset({"Pij", "Pij_s{N}"})
 
 
 def _expand_species_template(name: str) -> list[str]:

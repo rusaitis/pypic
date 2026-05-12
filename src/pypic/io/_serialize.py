@@ -418,28 +418,41 @@ def encode_pypic_attrs(fds: FieldDataset) -> dict[str, Any]:
     """Assemble FieldDataset metadata into the schema-v1.0 root-group attrs dict.
 
     The returned dict is stamped as ``xr.DataTree.attrs`` (which writes
-    it onto the Zarr root group's attrs) when writing.  Each section is
-    a top-level key so cross-language consumers can read e.g.
-    ``store.attrs["grid"]`` without going through any pypic-specific
-    umbrella.
+    it onto the Zarr root group's attrs) when writing. Each top-level
+    key mirrors a §2 ``simulation.toml`` section of the same name —
+    ``schema``, ``model``, ``time``, ``grid``, ``boundary_conditions``,
+    ``coordinates``, ``normalization``, ``species``, ``physics``,
+    ``run``, ``simulation_toml`` — so cross-language consumers can read
+    e.g. ``store.attrs["grid"]`` without going through any pypic-
+    specific umbrella. See schema.md §4.2 for the full on-disk
+    mapping table.
 
     The ``schema`` root attr carries the version at ``schema.version``,
     matching ``simulation.toml``'s ``[schema].version`` form, and
-    discriminates both vocabulary and storage layout in one go.  See
-    schema.md §1 *Versioning* for the additive-only policy and §4.2
-    for the on-disk mapping table that this dict materialises.  Other
-    keys are the section dicts produced by the per-section encoders
-    (``grid_to_dict``, ``normalization_to_dict``, ...).
+    discriminates both vocabulary and storage layout in one go.
 
-    ``run`` (typed ``[run]`` provenance: ``schema.Run`` model dump) and
-    ``simulation_toml`` (verbatim source TOML text) are lifted out of
-    :attr:`FieldDataset.metadata` and emitted as top-level keys when
-    present, so non-pypic consumers see them at ``attrs.run`` /
-    ``attrs.simulation_toml`` instead of buried in the loose metadata
-    bag.  Both keys are optional.
+    Sections derived from in-memory state:
+    * ``time`` — ``{ dt }`` only when ``grid.dt`` is set.
+    * ``boundary_conditions`` — ``{ lower, upper }`` mirrored from
+      ``grid.boundary`` (in-memory carries one tuple per axis; emitted
+      as both faces).
+    * ``coordinates`` — consolidates ``geometry``, ``frame``, optional
+      ``axis_labels``, and ``transforms`` (previously split across
+      ``grid``, top-level ``frame``, top-level ``transforms``).
+    * ``physics`` — emits ``relativistic`` plus ``gamma_eos`` (from
+      ``PhysicsParams.gamma``); ``c`` moves to
+      ``normalization.speed_of_light``.
+
+    Sections lifted from ``fds.metadata`` if present (popped, not
+    duplicated): ``model``, ``run``, ``simulation_toml``. ``run`` is
+    re-encoded through :class:`pypic.schema.Run` to a JSON-mode dump.
     """
     metadata = dict(fds.metadata)
     lifted: dict[str, Any] = {}
+
+    raw_model = metadata.pop("model", None)
+    if raw_model is not None:
+        lifted["model"] = _encode_model(raw_model)
     raw_run = metadata.pop("run", None)
     if raw_run is not None:
         lifted["run"] = _encode_run(raw_run)
@@ -452,17 +465,32 @@ def encode_pypic_attrs(fds: FieldDataset) -> dict[str, Any]:
             )
             raise TypeError(msg)
         lifted["simulation_toml"] = raw_toml
-    return {
+
+    # Stagger lives in fds.metadata as a typed dataclass instance.
+    # Promote it to ``grid.stagger`` so the on-disk shape mirrors the
+    # ``[grid.stagger]`` TOML section and §4.1's ``/grid/stagger/``
+    # group, eliminating the only ``metadata`` sub-key with a typed
+    # schema home (schema.md §4.2 finding 9).
+    raw_stagger = metadata.pop("stagger", None)
+
+    grid_attrs = _grid_to_attrs(fds.grid, stagger=raw_stagger)
+    out: dict[str, Any] = {
         "schema": {"version": SCHEMA_VERSION},
-        "grid": grid_to_dict(fds.grid),
-        "normalization": normalization_to_dict(fds.normalization),
+        "grid": grid_attrs,
+        "coordinates": _coordinates_to_attrs(fds.grid, fds.frame, dict(fds.transforms)),
+        "normalization": _normalization_to_attrs(fds.normalization, fds.physics),
         "species": species_to_list(fds.species),
-        "physics": physics_to_dict(fds.physics),
+        "physics": _physics_to_attrs(fds.physics),
         "metadata": _to_json_native(metadata),
-        "frame": fds.frame,
-        "transforms": transforms_to_dict(dict(fds.transforms)),
-        **lifted,
     }
+    time_attrs = _time_to_attrs(fds.grid)
+    if time_attrs:
+        out["time"] = time_attrs
+    bc_attrs = _boundary_conditions_to_attrs(fds.grid)
+    if bc_attrs:
+        out["boundary_conditions"] = bc_attrs
+    out.update(lifted)
+    return out
 
 
 def decode_pypic_attrs(
@@ -481,6 +509,14 @@ def decode_pypic_attrs(
     Expects schema-v1.0 flat keys at the top level with a
     ``schema.version`` discriminator at ``d["schema"]["version"]``.
 
+    Accepts both the v1.0 schema-mirror layout (current) and the
+    pre-mirror layout (one transitional shape with ``dt`` /
+    ``boundary`` / ``geometry`` under ``grid``, ``frame`` /
+    ``transforms`` at top level, ``c`` / ``gamma`` under ``physics``).
+    Older stores written before the §4.2 reshape decode through the
+    fallback path; new stores written after decode through the typed
+    path. Both reconstruct an identical in-memory FieldDataset.
+
     Returns
     -------
     tuple
@@ -488,11 +524,13 @@ def decode_pypic_attrs(
 
     Notes
     -----
-    Optional top-level ``run`` and ``simulation_toml`` attrs (see
-    :func:`encode_pypic_attrs`) are re-stuffed into the returned
-    ``metadata`` dict under their reserved keys, so callers see the
-    same shape they would after constructing a FieldDataset from a
-    SimulationConfig via the reader registry.
+    Optional top-level ``model``, ``run``, and ``simulation_toml``
+    attrs are re-stuffed into the returned ``metadata`` dict under
+    their reserved keys, so callers see the same shape they would
+    after constructing a FieldDataset from a SimulationConfig via the
+    reader registry. Stagger (under ``grid.stagger`` in the new
+    layout, or ``metadata.stagger`` in the old) is also re-stuffed
+    into ``metadata`` so the in-memory shape stays the same.
     """
     schema_attrs = d.get("schema")
     if not isinstance(schema_attrs, dict) or "version" not in schema_attrs:
@@ -508,17 +546,246 @@ def decode_pypic_attrs(
             f"{SCHEMA_VERSION!r}; cannot decode safely"
         )
         raise ValueError(msg)
-    grid = dict_to_grid(d["grid"])
+
+    coords_attrs = d.get("coordinates", {}) or {}
+    time_attrs = d.get("time", {}) or {}
+    bc_attrs = d.get("boundary_conditions", {}) or {}
+    grid = _attrs_to_grid(d["grid"], coords_attrs, time_attrs, bc_attrs)
     normalization = dict_to_normalization(d["normalization"])
     species = list_to_species(d.get("species", []))
-    physics = dict_to_physics(d["physics"])
+    physics = _attrs_to_physics(d.get("physics", {}), d.get("normalization", {}))
+
     metadata: dict[str, Any] = _from_json_native(d.get("metadata", {}))
+
+    # Promote stagger from new-shape ``grid.stagger`` back into
+    # ``metadata.stagger`` so the in-memory FieldDataset shape stays
+    # unchanged. Old-shape stores keep stagger inside ``metadata``
+    # already — _from_json_native rebuilt the StaggerInfo above.
+    raw_stagger = d["grid"].get("stagger") if isinstance(d.get("grid"), dict) else None
+    if raw_stagger is not None and "stagger" not in metadata:
+        metadata["stagger"] = _dict_to_stagger(raw_stagger)
+
+    raw_model = d.get("model")
+    if raw_model is not None:
+        metadata["model"] = raw_model
     raw_run = d.get("run")
     if raw_run is not None:
         metadata["run"] = _decode_run(raw_run)
     raw_toml = d.get("simulation_toml")
     if raw_toml is not None:
         metadata["simulation_toml"] = raw_toml
-    frame = d.get("frame", "simulation")
-    transforms = dict_to_transforms(d.get("transforms", {}))
+
+    # Frame and transforms now live under ``coordinates``; fall back
+    # to top-level keys for old-layout stores.
+    frame = coords_attrs.get("frame") or d.get("frame", "simulation")
+    raw_transforms = coords_attrs.get("transforms") or d.get("transforms", {})
+    transforms = dict_to_transforms(raw_transforms)
     return grid, normalization, species, physics, metadata, frame, transforms
+
+
+def _encode_model(model: Any) -> dict[str, Any]:  # noqa: ANN401
+    """Serialize a model dict to JSON-native form.
+
+    No typed model container exists in pypic yet (readers store ad-hoc
+    strings under ``metadata['model_name']`` / ``metadata['model_type']``);
+    this hook accepts a plain dict and normalizes it. When a typed
+    ``schema.Model`` lands, swap this for ``Model.model_dump(mode='json')``
+    by analogy with :func:`_encode_run`.
+    """
+    if not isinstance(model, dict):
+        msg = f"metadata['model'] must be a dict, got {type(model).__name__}"
+        raise TypeError(msg)
+    out: dict[str, Any] = _to_json_native(model)
+    return out
+
+
+def _grid_to_attrs(grid: GridInfo, *, stagger: Any = None) -> dict[str, Any]:  # noqa: ANN401
+    """Encode the grid section per schema.md §4.2 ``attrs.grid``.
+
+    Drops ``dt`` (now under ``attrs.time``), ``boundary`` (now under
+    ``attrs.boundary_conditions``), and ``geometry`` (now under
+    ``attrs.coordinates``). ``origin`` is replaced by
+    ``lower``/``upper`` to mirror §2 [grid].lower / [grid].upper.
+    Stagger lifts in from ``fds.metadata['stagger']`` when present.
+    """
+    lower = list(grid.origin)
+    upper = [
+        float(grid.origin[i]) + float(grid.spacing[i]) * float(grid.dimensions[i])
+        for i in range(len(grid.dimensions))
+    ]
+    out: dict[str, Any] = {
+        "dimensions": list(grid.dimensions),
+        "spacing": list(grid.spacing),
+        "lower": lower,
+        "upper": upper,
+    }
+    if grid.surviving_axes is not None:
+        out["surviving_axes"] = list(grid.surviving_axes)
+    if stagger is not None:
+        out["stagger"] = _stagger_to_dict(stagger)
+    return out
+
+
+def _attrs_to_grid(
+    grid_d: dict[str, Any],
+    coords_d: dict[str, Any],
+    time_d: dict[str, Any],
+    bc_d: dict[str, Any],
+) -> GridInfo:
+    """Reconstruct a GridInfo from the new-shape attrs sections.
+
+    Reads ``geometry`` from ``coords_d``, ``dt`` from ``time_d``,
+    ``boundary`` from ``bc_d``, and the rest from ``grid_d``. Falls
+    back to old-shape locations (``grid_d['dt']`` /
+    ``grid_d['boundary']`` / ``grid_d['geometry']`` and ``origin``)
+    for stores written before the §4.2 reshape.
+    """
+    # Coordinate origin: prefer new ``lower`` (mirrors §2 [grid].lower);
+    # fall back to old ``origin``.
+    if "lower" in grid_d:
+        origin = tuple(grid_d["lower"])
+    else:
+        origin = tuple(grid_d.get("origin", ()))
+
+    # Geometry: prefer ``coords_d['geometry']`` (new); fall back to
+    # ``grid_d['geometry']`` (old, was a nested dict).
+    geom_value = coords_d.get("geometry")
+    if geom_value is None:
+        geom_value = grid_d.get("geometry")
+    if isinstance(geom_value, dict):
+        geom_name = geom_value.get("type", "cartesian")
+    else:
+        geom_name = geom_value or "cartesian"
+    geometry = GEOMETRY_BY_NAME[geom_name]
+
+    # dt: prefer ``time_d['dt']`` (new); fall back to ``grid_d['dt']``.
+    dt = time_d.get("dt", grid_d.get("dt"))
+
+    # Boundary: prefer ``bc_d['lower']`` (new — single tuple suffices
+    # since the in-memory GridInfo carries one tuple per axis); fall
+    # back to ``grid_d['boundary']``.
+    raw_bound = bc_d.get("lower")
+    if raw_bound is None:
+        raw_bound = grid_d.get("boundary")
+    boundary = tuple(raw_bound) if raw_bound is not None else None
+
+    # surviving_axes is in the same place in both layouts.
+    raw_surv = grid_d.get("surviving_axes")
+
+    return GridInfo(
+        dimensions=tuple(grid_d["dimensions"]),
+        spacing=tuple(grid_d["spacing"]),
+        origin=origin,
+        geometry=geometry,
+        dt=dt,
+        boundary=boundary,
+        surviving_axes=tuple(raw_surv) if raw_surv is not None else None,
+    )
+
+
+def _time_to_attrs(grid: GridInfo) -> dict[str, Any]:
+    """Encode the time section per schema.md §4.2 ``attrs.time``.
+
+    Currently only ``dt`` is round-tripped — ``t_start`` / ``t_end`` /
+    ``n_steps`` / ``scheme`` live in the source ``simulation.toml``
+    but don't reach the typed in-memory FieldDataset. They will be
+    added when a typed [time] container lands.
+    """
+    out: dict[str, Any] = {}
+    if grid.dt is not None:
+        out["dt"] = grid.dt
+    return out
+
+
+def _boundary_conditions_to_attrs(grid: GridInfo) -> dict[str, Any]:
+    """Encode the boundary_conditions section per schema.md §4.2.
+
+    The in-memory GridInfo carries one boundary tag per axis; both
+    faces are emitted with the same value. Asymmetric per-face cases
+    require a typed [boundary_conditions] container (future work).
+    """
+    if grid.boundary is None:
+        return {}
+    return {
+        "lower": list(grid.boundary),
+        "upper": list(grid.boundary),
+    }
+
+
+def _coordinates_to_attrs(
+    grid: GridInfo,
+    frame: str,
+    transforms: dict[str, FrameTransform],
+) -> dict[str, Any]:
+    """Encode the coordinates section per schema.md §4.2 ``attrs.coordinates``.
+
+    Consolidates ``geometry`` (was in grid), ``frame`` (was top-level),
+    and ``transforms`` (was top-level) under one umbrella matching §2
+    [coordinates].
+    """
+    out: dict[str, Any] = {
+        "geometry": grid.geometry.type.value,
+        "frame": frame,
+    }
+    out["axis_labels"] = list(grid.geometry.axis_names)
+    if transforms:
+        out["transforms"] = transforms_to_dict(transforms)
+    return out
+
+
+def _normalization_to_attrs(
+    norm: Normalization, physics: PhysicsParams
+) -> dict[str, Any]:
+    """Encode normalization with ``speed_of_light`` lifted from physics.
+
+    Per schema.md §2 [units].speed_of_light, the speed of light is a
+    normalization reference, not a physics flag. ``math.inf`` (the
+    non-relativistic sentinel) round-trips as ``"inf"`` since JSON
+    has no infinity literal.
+    """
+    out: dict[str, Any] = dict(normalization_to_dict(norm))
+    c_val: float | str = physics.c
+    if math.isinf(physics.c):
+        c_val = "inf"
+    out["speed_of_light"] = c_val
+    return out
+
+
+def _physics_to_attrs(physics: PhysicsParams) -> dict[str, Any]:
+    """Encode physics without ``c`` (now in normalization) or top-level ``gamma``.
+
+    ``gamma`` becomes ``gamma_eos`` (the canonical schema name). This
+    is a recognized open-vocabulary key under [physics] per §1; in a
+    future typed-physics refactor it would move under ``physics.mhd
+    .gamma_eos`` (single-fluid) or per-species. ``extra`` carries
+    arbitrary code-specific knobs.
+    """
+    return {
+        "relativistic": physics.relativistic,
+        "gamma_eos": physics.gamma,
+        "extra": dict(physics.extra),
+    }
+
+
+def _attrs_to_physics(
+    physics_d: dict[str, Any], norm_d: dict[str, Any]
+) -> PhysicsParams:
+    """Reconstruct PhysicsParams from new-shape attrs.
+
+    Reads ``c`` from ``norm_d['speed_of_light']`` (new) with a
+    fall-back to ``physics_d['c']`` (old). Reads ``gamma`` from
+    ``physics_d['gamma_eos']`` (new) with a fall-back to
+    ``physics_d['gamma']`` (old). Defaults to PhysicsParams's own
+    defaults (``gamma=5/3``, ``c=math.inf``) when neither location
+    carries the value — covers minimal stores from non-pypic writers.
+    """
+    raw_c: Any = norm_d.get("speed_of_light", physics_d.get("c"))
+    c_val: float = math.inf if raw_c == "inf" or raw_c is None else float(raw_c)
+    raw_gamma: Any = physics_d.get("gamma_eos", physics_d.get("gamma"))
+    gamma_val: float = 5.0 / 3.0 if raw_gamma is None else float(raw_gamma)
+    return PhysicsParams(
+        gamma=gamma_val,
+        c=c_val,
+        relativistic=physics_d.get("relativistic", False),
+        extra=physics_d.get("extra", {}),
+    )
