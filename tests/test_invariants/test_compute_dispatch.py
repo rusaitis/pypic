@@ -33,6 +33,8 @@ MAGNITUDE_RECIPES: tuple[tuple[str, tuple[str, str, str]], ...] = (
     ("|V_perp|", ("V_perp_1", "V_perp_2", "V_perp_3")),
     ("|E_perp|", ("E_perp_1", "E_perp_2", "E_perp_3")),
     ("|E_prime_perp|", ("E_prime_perp_1", "E_prime_perp_2", "E_prime_perp_3")),
+    ("|E_ideal_perp|", ("E_ideal_perp_1", "E_ideal_perp_2", "E_ideal_perp_3")),
+    ("|E_Hall_perp|", ("E_Hall_perp_1", "E_Hall_perp_2", "E_Hall_perp_3")),
 )
 
 

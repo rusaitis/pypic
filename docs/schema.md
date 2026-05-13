@@ -1151,6 +1151,12 @@ convention and reference-vector choice.
 | `E_prime_par` | Field-aligned non-ideal residual $E'_\parallel = (\mathbf{E}+\mathbf{V}\times\mathbf{B})\cdot\hat{b}$ — the canonical reconnection-rate diagnostic | `E_1-E_3`, `V_1-V_3`, `B_1-B_3` |
 | `E_prime_perp_1`, `E_prime_perp_2`, `E_prime_perp_3` | Perpendicular non-ideal residual | `E_1-E_3`, `V_1-V_3`, `B_1-B_3` |
 | `\|E_prime_perp\|` | Perpendicular non-ideal residual magnitude | `E_1-E_3`, `V_1-V_3`, `B_1-B_3` |
+| `E_ideal_par` | Field-aligned ideal-MHD field — *analytically zero* ($\mathbf{E}^{\mathrm{ideal}} = -\mathbf{V}\times\mathbf{B} \perp \mathbf{B}$); kept as a numerical-precision diagnostic | `V_1-V_3`, `B_1-B_3` |
+| `E_ideal_perp_1`, `E_ideal_perp_2`, `E_ideal_perp_3` | Perpendicular ideal-MHD field (equals the full vector up to roundoff) | `V_1-V_3`, `B_1-B_3` |
+| `\|E_ideal_perp\|` | Perpendicular ideal-MHD field magnitude | `V_1-V_3`, `B_1-B_3` |
+| `E_Hall_par` | Field-aligned Hall field — *analytically zero* ($\mathbf{E}^{\mathrm{Hall}} \propto \mathbf{J}\times\mathbf{B} \perp \mathbf{B}$); numerical-precision diagnostic | `J_1-J_3`, `B_1-B_3`, `n_s0` |
+| `E_Hall_perp_1`, `E_Hall_perp_2`, `E_Hall_perp_3` | Perpendicular Hall field | `J_1-J_3`, `B_1-B_3`, `n_s0` |
+| `\|E_Hall_perp\|` | Perpendicular Hall field magnitude | `J_1-J_3`, `B_1-B_3`, `n_s0` |
 
 Two-species shorthand aliases `V_par_e ↔ V_s0_par`, `V_par_i ↔
 V_s1_par` are registered (mirrors `P_par_e`/`P_par_i`).  Vector-group

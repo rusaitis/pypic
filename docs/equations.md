@@ -185,6 +185,9 @@ are NaN where $|B| = 0$.
 | `V_s{N}_par`, `V_s{N}_perp_{1,2,3}`, `\|V_s{N}_perp\|` | Per-species velocity decomposition | same form on `V_s{N}_{1,2,3}` |
 | `E_prime_par` | Field-aligned non-ideal residual[^reconn_rate] | $(\mathbf{E} + \mathbf{V}\times\mathbf{B}) \cdot \hat{b}$ |
 | `\|E_prime_perp\|` | Perpendicular non-ideal residual magnitude | $\sqrt{\|\mathbf{E}'\|^2 - E'^2_\parallel}$ |
+| `E_ideal_par`, `E_Hall_par` | Field-aligned ideal-MHD / Hall field[^cross_perp] | $\equiv 0$ (cross product $\perp$ $\mathbf{B}$) |
+| `E_ideal_perp_{1,2,3}`, `E_Hall_perp_{1,2,3}` | Perpendicular ideal-MHD / Hall field | equal the full vectors up to roundoff |
+| `\|E_ideal_perp\|`, `\|E_Hall_perp\|` | Perpendicular magnitudes | $= \|\mathbf{E}^{\mathrm{ideal}}\|$, $\|\mathbf{E}^{\mathrm{Hall}}\|$ up to roundoff |
 
 [^par_perp_id]: Pythagorean identity holds exactly:
     $\|\mathbf{A}\|^2 = A_\parallel^2 + \|\mathbf{A}_\perp\|^2$. The
@@ -197,6 +200,16 @@ are NaN where $|B| = 0$.
     divergence) break the frozen-in condition.  In 2D it equals
     $\partial\psi/\partial t$ at the X-point — the standard
     reconnection-rate quantity.  Cross-reference §9 footnote 13.
+
+[^cross_perp]: $\mathbf{E}^{\mathrm{ideal}} = -\mathbf{V}\times\mathbf{B}$
+    and $\mathbf{E}^{\mathrm{Hall}} \propto \mathbf{J}\times\mathbf{B}$
+    are cross products with $\mathbf{B}$, hence orthogonal to
+    $\mathbf{B}$ by the scalar triple product identity.
+    `E_ideal_par` and `E_Hall_par` therefore evaluate to zero up to
+    floating-point roundoff.  Kept in the registry for diagnostic
+    symmetry with `E_par` / `E_prime_par` and as a numerical-precision
+    check on the cross-product implementation in the destaggered
+    co-located grid.
 
 [^Q]: Swisdak's gyrotropy measure [@Swisdak2016], computed from the
     first two invariants of the pressure tensor:

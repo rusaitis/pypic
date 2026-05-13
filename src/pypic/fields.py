@@ -402,6 +402,71 @@ _FIELD_INFO: dict[str, FieldInfo] = {
         "V/m",
         r"$|\mathbf{E}'_\perp|$",
     ),
+    # Ideal-MHD field decomposition.  ``E_ideal_par`` is analytically
+    # zero (``E_ideal = -V×B`` is perpendicular to B by construction)
+    # — kept for diagnostic symmetry with ``E_par`` / ``E_prime_par``.
+    "E_ideal_par": _FI(
+        "e_field",
+        "Parallel ideal electric field (analytically zero)",
+        "V/m",
+        r"$E^{\mathrm{ideal}}_\parallel$",
+    ),
+    "E_ideal_perp_1": _FI(
+        "e_field",
+        "Perpendicular ideal electric field (component 1)",
+        "V/m",
+        r"$E^{\mathrm{ideal}}_{\perp,1}$",
+    ),
+    "E_ideal_perp_2": _FI(
+        "e_field",
+        "Perpendicular ideal electric field (component 2)",
+        "V/m",
+        r"$E^{\mathrm{ideal}}_{\perp,2}$",
+    ),
+    "E_ideal_perp_3": _FI(
+        "e_field",
+        "Perpendicular ideal electric field (component 3)",
+        "V/m",
+        r"$E^{\mathrm{ideal}}_{\perp,3}$",
+    ),
+    "|E_ideal_perp|": _FI(
+        "e_field",
+        "Perpendicular ideal electric field magnitude",
+        "V/m",
+        r"$|\mathbf{E}^{\mathrm{ideal}}_\perp|$",
+    ),
+    # Hall-field decomposition.  Same identity: ``E_Hall_par`` is
+    # analytically zero (``J×B`` perpendicular to B).
+    "E_Hall_par": _FI(
+        "e_field",
+        "Parallel Hall electric field (analytically zero)",
+        "V/m",
+        r"$E^{\mathrm{Hall}}_\parallel$",
+    ),
+    "E_Hall_perp_1": _FI(
+        "e_field",
+        "Perpendicular Hall electric field (component 1)",
+        "V/m",
+        r"$E^{\mathrm{Hall}}_{\perp,1}$",
+    ),
+    "E_Hall_perp_2": _FI(
+        "e_field",
+        "Perpendicular Hall electric field (component 2)",
+        "V/m",
+        r"$E^{\mathrm{Hall}}_{\perp,2}$",
+    ),
+    "E_Hall_perp_3": _FI(
+        "e_field",
+        "Perpendicular Hall electric field (component 3)",
+        "V/m",
+        r"$E^{\mathrm{Hall}}_{\perp,3}$",
+    ),
+    "|E_Hall_perp|": _FI(
+        "e_field",
+        "Perpendicular Hall electric field magnitude",
+        "V/m",
+        r"$|\mathbf{E}^{\mathrm{Hall}}_\perp|$",
+    ),
     "P_11": _FI("pressure", "Pressure tensor P_11", "Pa", r"$P_{11}$"),
     "P_22": _FI("pressure", "Pressure tensor P_22", "Pa", r"$P_{22}$"),
     "P_33": _FI("pressure", "Pressure tensor P_33", "Pa", r"$P_{33}$"),

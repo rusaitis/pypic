@@ -994,6 +994,84 @@ class TestPerSpeciesFieldAlignedDecomposition:
         )
 
 
+class TestIdealAndHallDecomposition:
+    """Analytic identities for E_ideal and E_Hall decomposition.
+
+    Both fields are cross products with B (E_ideal = -V×B,
+    E_Hall ∝ J×B), so the parallel component is identically zero up
+    to floating-point roundoff and the perpendicular vector equals
+    the full field.
+    """
+
+    def _make_dataset(self):
+        # Mix V, J, B so the cross products are non-trivial in every
+        # component and the parallel-component test is non-vacuous.
+        # ``E_Hall`` requires the electron species charge from species[0].
+        shape = (2, 2, 2)
+        data = {
+            "B_1": np.full(shape, 0.3),
+            "B_2": np.full(shape, -0.4),
+            "B_3": np.full(shape, 0.5),
+            "V_1": np.full(shape, 1.0),
+            "V_2": np.full(shape, 2.0),
+            "V_3": np.full(shape, -3.0),
+            "J_1": np.full(shape, 0.1),
+            "J_2": np.full(shape, -0.2),
+            "J_3": np.full(shape, 0.05),
+            "n_s0": np.full(shape, 1.0),
+        }
+        return make_test_dataset(data, shape=shape, species=[ELECTRONS])
+
+    def test_e_ideal_par_is_zero(self):
+        ds = self._make_dataset()
+        result = compute_field("E_ideal_par", ds)
+        np.testing.assert_allclose(result, 0.0, atol=1e-14)
+
+    def test_e_hall_par_is_zero(self):
+        ds = self._make_dataset()
+        result = compute_field("E_Hall_par", ds)
+        np.testing.assert_allclose(result, 0.0, atol=1e-14)
+
+    def test_e_ideal_perp_equals_e_ideal(self):
+        """A_perp == A when A is perpendicular to B by construction."""
+        ds = self._make_dataset()
+        for c in (1, 2, 3):
+            full = compute_field(f"E_ideal_{c}", ds)
+            perp = compute_field(f"E_ideal_perp_{c}", ds)
+            np.testing.assert_allclose(perp, full, rtol=1e-14, atol=1e-14)
+
+    def test_e_hall_perp_equals_e_hall(self):
+        ds = self._make_dataset()
+        for c in (1, 2, 3):
+            full = compute_field(f"E_Hall_{c}", ds)
+            perp = compute_field(f"E_Hall_perp_{c}", ds)
+            np.testing.assert_allclose(perp, full, rtol=1e-14, atol=1e-14)
+
+    def test_perp_magnitude_equals_full_magnitude(self):
+        """|A_perp| == |A| when A_par == 0.  ``|E_ideal|`` and ``|E_Hall|``
+        are not registered as recipes; compute the full magnitude inline."""
+        ds = self._make_dataset()
+
+        def _full_mag(prefix: str) -> np.ndarray:
+            a1 = compute_field(f"{prefix}_1", ds)
+            a2 = compute_field(f"{prefix}_2", ds)
+            a3 = compute_field(f"{prefix}_3", ds)
+            return np.sqrt(a1**2 + a2**2 + a3**2)
+
+        np.testing.assert_allclose(
+            compute_field("|E_ideal_perp|", ds),
+            _full_mag("E_ideal"),
+            rtol=1e-14,
+            atol=1e-14,
+        )
+        np.testing.assert_allclose(
+            compute_field("|E_Hall_perp|", ds),
+            _full_mag("E_Hall"),
+            rtol=1e-14,
+            atol=1e-14,
+        )
+
+
 class TestGeometryGuard:
     @pytest.mark.parametrize(
         ("field", "components"),

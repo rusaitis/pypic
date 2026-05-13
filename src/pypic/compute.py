@@ -334,6 +334,39 @@ _REGISTRY: dict[str, _Recipe] = {
         derived.velocity_magnitude,
         ("E_prime_perp_1", "E_prime_perp_2", "E_prime_perp_3"),
     ),
+    # Ideal-MHD field decomposition (E_ideal = -V×B). Analytic identity:
+    # E_ideal · B = -(V×B) · B = 0, so ``E_ideal_par`` evaluates to zero
+    # up to floating-point roundoff. Kept for symmetry and as a
+    # cross-product numerical-precision diagnostic.
+    "E_ideal_par": _Recipe(
+        derived.parallel_component,
+        ("E_ideal_1", "E_ideal_2", "E_ideal_3", "B_1", "B_2", "B_3"),
+    ),
+    **_vector_recipes(
+        "E_ideal_perp_{c}",
+        derived.perpendicular_vector,
+        ("E_ideal_1", "E_ideal_2", "E_ideal_3", "B_1", "B_2", "B_3"),
+    ),
+    "|E_ideal_perp|": _Recipe(
+        derived.velocity_magnitude,
+        ("E_ideal_perp_1", "E_ideal_perp_2", "E_ideal_perp_3"),
+    ),
+    # Hall-field decomposition (E_Hall = J×B / (n_e q_e)). Same identity:
+    # ``E_Hall_par`` is analytically zero. Useful for verifying that
+    # Hall-term implementations preserve the perpendicularity property.
+    "E_Hall_par": _Recipe(
+        derived.parallel_component,
+        ("E_Hall_1", "E_Hall_2", "E_Hall_3", "B_1", "B_2", "B_3"),
+    ),
+    **_vector_recipes(
+        "E_Hall_perp_{c}",
+        derived.perpendicular_vector,
+        ("E_Hall_1", "E_Hall_2", "E_Hall_3", "B_1", "B_2", "B_3"),
+    ),
+    "|E_Hall_perp|": _Recipe(
+        derived.velocity_magnitude,
+        ("E_Hall_perp_1", "E_Hall_perp_2", "E_Hall_perp_3"),
+    ),
     # Grid-dependent diagnostics
     "div_B": _Recipe(
         diagnostics.div_b,
