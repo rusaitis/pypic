@@ -1369,3 +1369,17 @@ class TestReconnectionDiagnostics:
         np.testing.assert_allclose(from_alias, from_canonical, rtol=1e-15)
         # Perp eigenvalues 3, 1 → A_phi = 2/4 = 0.5.
         np.testing.assert_allclose(from_canonical, 0.5, rtol=1e-14)
+
+    def test_per_species_R_recon_alias(self):
+        """R_recon_e and R_recon_s0 both dispatch through the species template.
+
+        Uses the ideal-MHD fixture, in which V_s0 equals V identically, so
+        the electron-frame rate also evaluates to zero.  The literal-vs-
+        species mix (E_, B_, v_A literal; V_s{N}_* substituted) exercises
+        the same template shape used by V_par / V_perp.
+        """
+        ds = self._ideal_mhd_dataset()
+        from_alias = compute_field("R_recon_e", ds)
+        from_canonical = compute_field("R_recon_s0", ds)
+        np.testing.assert_allclose(from_alias, from_canonical, rtol=1e-15)
+        np.testing.assert_allclose(from_canonical, 0.0, atol=1e-14)

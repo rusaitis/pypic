@@ -259,9 +259,8 @@ def schindler_xi(
     ...     step_size=0.5,
     ...     max_steps=200,
     ... )
-    >>> # E_par = 0.05; path length ≈ 2*100*0.5 + 2*16*0.5 ≈ ?
-    >>> # With max_steps=200 in each direction, the trace integrates
-    >>> # up to the domain edges. Just check it's positive and finite.
+    >>> # Seed at x=15 in a [0, 32) domain: trace runs to both edges,
+    >>> # so arc length ≈ 32 and Xi ≈ 0.05 × 32 = 1.6 (E_par × ℓ).
     >>> bool(xi[0] > 0 and np.isfinite(xi[0]))
     True
     """

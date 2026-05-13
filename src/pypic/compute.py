@@ -555,6 +555,25 @@ _SPECIES_TEMPLATES: dict[str, _SpeciesTemplate] = {
         _SPECIES_PRESSURE_TENSOR_AND_B,
         _SpeciesArgs.NONE,
     ),
+    # Per-species local reconnection rate. v_A is the bulk Alfvén speed
+    # by design — the reference speed is a property of the plasma, not
+    # the species — so all R_recon_s{N} share the same denominator.
+    "R_recon": _SpeciesTemplate(
+        derived.local_reconnection_rate,
+        (
+            "E_1",
+            "E_2",
+            "E_3",
+            "V_s{N}_1",
+            "V_s{N}_2",
+            "V_s{N}_3",
+            "B_1",
+            "B_2",
+            "B_3",
+            "v_A",
+        ),
+        _SpeciesArgs.NONE,
+    ),
     # Per-species field-aligned velocity decomposition.
     # V_par scalar; V_perp_{1,2,3} use a single tuple-returning function
     # with ``component=`` to pick the right element.

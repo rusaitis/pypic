@@ -649,6 +649,18 @@ _FIELD_INFO: dict[str, FieldInfo] = {
         "",
         r"$R_{\mathrm{recon}}$",
     ),
+    "R_recon_e": _FI(
+        "dimensionless",
+        "Electron-frame local reconnection rate",
+        "",
+        r"$R_{\mathrm{recon},e}$",
+    ),
+    "R_recon_i": _FI(
+        "dimensionless",
+        "Ion-frame local reconnection rate",
+        "",
+        r"$R_{\mathrm{recon},i}$",
+    ),
     **_vec_three(
         "E_prime_{c}",
         "e_field",

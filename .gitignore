@@ -120,6 +120,7 @@ examples/*
 # tests/test_examples.py import these directly).
 !examples/ipic3d-double-harris.toml
 !examples/custom_reader_example.py
+!examples/ex_schindler_xi.py
 
 # Test fixture data (small, committed)
 !tests/data/

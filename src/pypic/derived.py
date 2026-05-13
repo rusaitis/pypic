@@ -2005,11 +2005,12 @@ def local_reconnection_rate(
     $$R_{\mathrm{recon}} = \frac{|\mathbf{E} + \mathbf{V}\times\mathbf{B}|}
     {v_A\,|\mathbf{B}|}$$
 
-    Frozen-in-violation rate normalized by the Alfvén speed and
-    magnetic-field magnitude. Regions with $R_{\mathrm{recon}} \sim 0.1$
-    flag the "fast reconnection" plateau ubiquitous in collisionless
-    simulations (Comisso & Bhattacharjee, J. Plasma Phys. 82, 595820601,
-    2016; Cassak, Liu, Shay, J. Plasma Phys. 83, 715830501, 2017).
+    Frozen-in-violation rate normalized by the **local** Alfvén speed
+    and magnetic-field magnitude. Regions with $R_{\mathrm{recon}} \sim
+    0.1$ flag the "fast reconnection" plateau ubiquitous in
+    collisionless simulations (Comisso & Bhattacharjee, J. Plasma Phys.
+    82, 595820601, 2016; Cassak, Liu, Shay, J. Plasma Phys. 83,
+    715830501, 2017).
 
     Returns NaN where $|\mathbf{B}| = 0$ or $v_A = 0$.
 
@@ -2018,9 +2019,13 @@ def local_reconnection_rate(
     e1, e2, e3 : NDArray
         Electric field components.
     v1, v2, v3 : NDArray
-        Bulk velocity components (use ion velocity in single-fluid
-        MHD; electron velocity is the natural choice for kinetic
-        analysis at electron scales — pass the species you care about).
+        Velocity components in the rest frame of choice.
+        ``compute("R_recon")`` binds to the total ``V_1/V_2/V_3``;
+        ``compute("R_recon_s{N}")`` (or the ``R_recon_e``/``R_recon_i``
+        aliases) substitutes ``V_s{N}_1/2/3`` for kinetic analysis at
+        electron / ion scales. ``v_A`` is the bulk Alfvén speed in
+        every form — the reference speed is a property of the plasma,
+        not the species.
     b1, b2, b3 : NDArray
         Magnetic field components.
     v_a : NDArray
@@ -2030,6 +2035,21 @@ def local_reconnection_rate(
     -------
     NDArray
         Dimensionless local reconnection rate.
+
+    Notes
+    -----
+    This is a **per-cell** diagnostic: it reports the magnitude of the
+    non-ideal field at every point, normalized by the local Alfvén-wave
+    flux. The canonical macroscopic rate in the reconnection literature
+    is the **global** rate
+    $R_{\mathrm{global}} = E_{\mathrm{rec}}/(v_{A,\mathrm{up}}\,B_{\mathrm{up}})$
+    measured *at the X-point* with **upstream-asymptotic**
+    $v_{A,\mathrm{up}}$ and $B_{\mathrm{up}}$. Both saturate near $0.1$
+    for fast collisionless reconnection — the source of frequent
+    conflation — but address different questions. Use ``schindler_xi``
+    (3D) or the ``reconnection_rate`` / ``find_saddle_points`` pair
+    (2D) for the global rate, and this function for spatial maps of
+    where ideal MHD breaks down.
 
     Examples
     --------

@@ -515,13 +515,17 @@ Three distinct Lorentz factors arise in plasma analysis:
     config. [@Zenitani2011].
 
 [^Rrecon]: Dimensionless local reconnection rate normalized by the
-    upstream Alfvén speed and the local field magnitude. Regions where
-    $R_{\mathrm{recon}} \sim 0.1$ flag the "fast reconnection"
-    plateau ubiquitous in collisionless simulations and observations.
-    Per-cell scalar built from the same $\mathbf{E}'$ that drives the
-    reconnection rate $\partial\psi/\partial t$ in 2D, divided by
-    $v_A\,\lvert\mathbf{B}\rvert$ so the result is comparable across
-    runs with different field strengths. [@ComissoBhattacharjee2016].
+    *local* Alfvén speed and *local* field magnitude — a per-cell map
+    of where ideal MHD fails. Distinct from the canonical macroscopic
+    rate $R_{\mathrm{global}} = E_{\mathrm{rec}}/(v_{A,\mathrm{up}}\,
+    B_{\mathrm{up}})$ measured at the X-point with upstream-asymptotic
+    quantities; both saturate near $0.1$ for fast collisionless
+    reconnection (the source of frequent conflation), but address
+    different questions. Per-cell scalar built from the same
+    $\mathbf{E}'$ that drives the 2D reconnection rate
+    $\partial\psi/\partial t$, divided by $v_A\,\lvert\mathbf{B}\rvert$
+    so the result is comparable across runs with different field
+    strengths. [@ComissoBhattacharjee2016].
 
 [^Dng]: Aunai's degree of nongyrotropy: $D_{ng} = 2\,\|\mathbf{N}\|_F
     / \mathrm{Tr}(\mathbf{P})$ where $\mathbf{N} = \mathbf{P}
