@@ -309,14 +309,21 @@ _REGISTRY: dict[str, _Recipe] = {
         derived.perpendicular_vector,
         ("E_1", "E_2", "E_3", "B_1", "B_2", "B_3"),
     ),
+    # Pythagorean form: |A_perp|² = |A|² - A_par², single pass over
+    # raw inputs.  Avoids the redundant ``perpendicular_vector`` call
+    # and materialization that the component-path recipe would do.
+    # Matches the per-species ``|V_perp|`` template below.
     "|J_perp|": _Recipe(
-        derived.velocity_magnitude, ("J_perp_1", "J_perp_2", "J_perp_3")
+        derived.perpendicular_magnitude,
+        ("J_1", "J_2", "J_3", "B_1", "B_2", "B_3"),
     ),
     "|V_perp|": _Recipe(
-        derived.velocity_magnitude, ("V_perp_1", "V_perp_2", "V_perp_3")
+        derived.perpendicular_magnitude,
+        ("V_1", "V_2", "V_3", "B_1", "B_2", "B_3"),
     ),
     "|E_perp|": _Recipe(
-        derived.velocity_magnitude, ("E_perp_1", "E_perp_2", "E_perp_3")
+        derived.perpendicular_magnitude,
+        ("E_1", "E_2", "E_3", "B_1", "B_2", "B_3"),
     ),
     # Non-ideal residual decomposition (E' = E + V×B). Reuses the
     # existing ``E_prime_{1,2,3}`` recipes (below) as inputs.
@@ -331,8 +338,8 @@ _REGISTRY: dict[str, _Recipe] = {
         ("E_prime_1", "E_prime_2", "E_prime_3", "B_1", "B_2", "B_3"),
     ),
     "|E_prime_perp|": _Recipe(
-        derived.velocity_magnitude,
-        ("E_prime_perp_1", "E_prime_perp_2", "E_prime_perp_3"),
+        derived.perpendicular_magnitude,
+        ("E_prime_1", "E_prime_2", "E_prime_3", "B_1", "B_2", "B_3"),
     ),
     # Ideal-MHD field decomposition (E_ideal = -V×B). Analytic identity:
     # E_ideal · B = -(V×B) · B = 0, so ``E_ideal_par`` evaluates to zero
@@ -348,8 +355,8 @@ _REGISTRY: dict[str, _Recipe] = {
         ("E_ideal_1", "E_ideal_2", "E_ideal_3", "B_1", "B_2", "B_3"),
     ),
     "|E_ideal_perp|": _Recipe(
-        derived.velocity_magnitude,
-        ("E_ideal_perp_1", "E_ideal_perp_2", "E_ideal_perp_3"),
+        derived.perpendicular_magnitude,
+        ("E_ideal_1", "E_ideal_2", "E_ideal_3", "B_1", "B_2", "B_3"),
     ),
     # Hall-field decomposition (E_Hall = J×B / (n_e q_e)). Same identity:
     # ``E_Hall_par`` is analytically zero. Useful for verifying that
@@ -364,8 +371,8 @@ _REGISTRY: dict[str, _Recipe] = {
         ("E_Hall_1", "E_Hall_2", "E_Hall_3", "B_1", "B_2", "B_3"),
     ),
     "|E_Hall_perp|": _Recipe(
-        derived.velocity_magnitude,
-        ("E_Hall_perp_1", "E_Hall_perp_2", "E_Hall_perp_3"),
+        derived.perpendicular_magnitude,
+        ("E_Hall_1", "E_Hall_2", "E_Hall_3", "B_1", "B_2", "B_3"),
     ),
     # Grid-dependent diagnostics
     "div_B": _Recipe(

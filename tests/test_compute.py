@@ -911,7 +911,10 @@ class TestFieldAlignedVectorDecomposition:
             compute_field("|E_prime_perp|", ds), np.sqrt(160.0), rtol=1e-14
         )
 
-    def test_zero_b_propagates_nan(self):
+    @pytest.mark.parametrize(
+        "prefix", ["J", "V", "E", "E_prime", "E_ideal", "E_Hall"]
+    )
+    def test_zero_b_propagates_nan(self, prefix):
         shape = (2, 2, 2)
         data = {
             "B_1": np.zeros(shape),
@@ -920,10 +923,17 @@ class TestFieldAlignedVectorDecomposition:
             "J_1": np.full(shape, 1.0),
             "J_2": np.full(shape, 2.0),
             "J_3": np.full(shape, 3.0),
+            "V_1": np.full(shape, 4.0),
+            "V_2": np.full(shape, 5.0),
+            "V_3": np.full(shape, 6.0),
+            "E_1": np.full(shape, 7.0),
+            "E_2": np.full(shape, 8.0),
+            "E_3": np.full(shape, 9.0),
+            "n_s0": np.full(shape, 1.0),  # required by E_Hall
         }
-        ds = make_test_dataset(data, shape=shape)
-        assert np.all(np.isnan(compute_field("J_par", ds)))
-        assert np.all(np.isnan(compute_field("|J_perp|", ds)))
+        ds = make_test_dataset(data, shape=shape, species=[ELECTRONS])
+        assert np.all(np.isnan(compute_field(f"{prefix}_par", ds)))
+        assert np.all(np.isnan(compute_field(f"|{prefix}_perp|", ds)))
 
 
 class TestPerSpeciesFieldAlignedDecomposition:
@@ -1069,6 +1079,49 @@ class TestIdealAndHallDecomposition:
             _full_mag("E_Hall"),
             rtol=1e-14,
             atol=1e-14,
+        )
+
+
+class TestFieldAlignedPythagoreanIdentity:
+    """Registry-level $|X_\\perp|^2 + X_\\parallel^2 = |X|^2$ cross-check.
+
+    The function-level identity is exercised in ``test_derived.py``;
+    this test guards the recipe wiring in ``compute.py`` so a future
+    rewire of ``|X_perp|`` against the wrong inputs (or wrong
+    magnitude function) surfaces here. B is intentionally not axis-
+    aligned so the parallel/perpendicular split is non-trivial in
+    every component. ``E_ideal`` and ``E_Hall`` are excluded — their
+    parallel projection is analytically zero, so the identity
+    degenerates to ``|X_perp| = |X|`` already covered at
+    ``TestIdealAndHallDecomposition``.
+    """
+
+    @pytest.mark.parametrize("prefix", ["J", "V", "E", "E_prime"])
+    def test_pythagorean_identity(self, prefix):
+        shape = (2, 2, 2)
+        data = {
+            "B_1": np.full(shape, 0.3),
+            "B_2": np.full(shape, -0.4),
+            "B_3": np.full(shape, 0.5),
+            "J_1": np.full(shape, 1.0),
+            "J_2": np.full(shape, 2.0),
+            "J_3": np.full(shape, 3.0),
+            "V_1": np.full(shape, 4.0),
+            "V_2": np.full(shape, -5.0),
+            "V_3": np.full(shape, 6.0),
+            "E_1": np.full(shape, 7.0),
+            "E_2": np.full(shape, 8.0),
+            "E_3": np.full(shape, -9.0),
+        }
+        ds = make_test_dataset(data, shape=shape)
+        a_par = compute_field(f"{prefix}_par", ds)
+        a_perp_mag = compute_field(f"|{prefix}_perp|", ds)
+        a1 = compute_field(f"{prefix}_1", ds)
+        a2 = compute_field(f"{prefix}_2", ds)
+        a3 = compute_field(f"{prefix}_3", ds)
+        a_sq = a1**2 + a2**2 + a3**2
+        np.testing.assert_allclose(
+            a_par**2 + a_perp_mag**2, a_sq, rtol=1e-12, atol=1e-12
         )
 
 

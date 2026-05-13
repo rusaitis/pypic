@@ -200,6 +200,7 @@ are NaN where $|B| = 0$.
     divergence) break the frozen-in condition.  In 2D it equals
     $\partial\psi/\partial t$ at the X-point — the standard
     reconnection-rate quantity.  Cross-reference §9 footnote 13.
+    [@Birn; @Hesse].
 
 [^cross_perp]: $\mathbf{E}^{\mathrm{ideal}} = -\mathbf{V}\times\mathbf{B}$
     and $\mathbf{E}^{\mathrm{Hall}} \propto \mathbf{J}\times\mathbf{B}$

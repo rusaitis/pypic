@@ -20,21 +20,31 @@ from tests._helpers import make_test_dataset
 # magnitudes (``|V_s0|``, ``|V_s1|``, ...) are template-synthesized
 # and live outside this list. ``|Ve|`` collapsed into an alias for
 # ``|V_s0|`` at Stage E — it's no longer in the static registry.
-# Field-aligned-decomposition magnitudes (``|J_perp|``, ``|V_perp|``,
-# ``|E_perp|``, ``|E_prime_perp|``) use ``velocity_magnitude`` over the
-# three perpendicular components, so the same algebraic identity holds.
-MAGNITUDE_RECIPES: tuple[tuple[str, tuple[str, str, str]], ...] = (
+#
+# Two recipe shapes:
+#  * DIRECT — ``derived.*_magnitude`` over an explicit ``(X_1, X_2, X_3)``
+#    triple; the registry directly declares the three squared inputs.
+#  * PYTHAGOREAN — ``derived.perpendicular_magnitude`` over
+#    ``(X_1, X_2, X_3, B_1, B_2, B_3)``, computing $\sqrt{|X|^2 - X_\parallel^2}$.
+#    Coverage lives in ``tests/test_compute.py``
+#    (``TestFieldAlignedPythagoreanIdentity``), which exercises the same
+#    algebraic identity through the recipe's actual inputs.
+DIRECT_MAGNITUDE_RECIPES: tuple[tuple[str, tuple[str, str, str]], ...] = (
     ("|B|", ("B_1", "B_2", "B_3")),
     ("|E|", ("E_1", "E_2", "E_3")),
     ("|J|", ("J_1", "J_2", "J_3")),
     ("|V|", ("V_1", "V_2", "V_3")),
     ("|vort|", ("vort_1", "vort_2", "vort_3")),
-    ("|J_perp|", ("J_perp_1", "J_perp_2", "J_perp_3")),
-    ("|V_perp|", ("V_perp_1", "V_perp_2", "V_perp_3")),
-    ("|E_perp|", ("E_perp_1", "E_perp_2", "E_perp_3")),
-    ("|E_prime_perp|", ("E_prime_perp_1", "E_prime_perp_2", "E_prime_perp_3")),
-    ("|E_ideal_perp|", ("E_ideal_perp_1", "E_ideal_perp_2", "E_ideal_perp_3")),
-    ("|E_Hall_perp|", ("E_Hall_perp_1", "E_Hall_perp_2", "E_Hall_perp_3")),
+)
+PYTHAGOREAN_MAGNITUDE_NAMES: frozenset[str] = frozenset(
+    {
+        "|J_perp|",
+        "|V_perp|",
+        "|E_perp|",
+        "|E_prime_perp|",
+        "|E_ideal_perp|",
+        "|E_Hall_perp|",
+    }
 )
 
 
@@ -45,7 +55,7 @@ def test_registry_magnitudes_match_expected_set() -> None:
     registry_mags = {
         name for name in _REGISTRY if name.startswith("|") and name.endswith("|")
     }
-    expected = {name for name, _ in MAGNITUDE_RECIPES}
+    expected = {name for name, _ in DIRECT_MAGNITUDE_RECIPES} | PYTHAGOREAN_MAGNITUDE_NAMES
     assert registry_mags == expected, (
         f"magnitude registry drifted: registry={registry_mags}, expected={expected}"
     )
@@ -70,7 +80,7 @@ def _finite_array() -> st.SearchStrategy[np.ndarray]:
 
 @pytest.mark.parametrize(
     ("name", "components"),
-    [pytest.param(n, c, id=n) for n, c in MAGNITUDE_RECIPES],
+    [pytest.param(n, c, id=n) for n, c in DIRECT_MAGNITUDE_RECIPES],
 )
 @given(x1=_finite_array(), x2=_finite_array(), x3=_finite_array())
 @settings(max_examples=50, deadline=None)
