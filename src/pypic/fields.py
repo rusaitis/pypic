@@ -897,6 +897,12 @@ _SPECIES_PATTERN_SPECS: list[tuple[str, str, str, str]] = [
         "Scudder agyrotropy (species {N})",
         r"$A_{{\phi,s{N}}}$",
     ),
+    (
+        "R_recon",
+        "dimensionless",
+        "Local reconnection rate (species {N})",
+        r"$R_{{\mathrm{{recon}},s{N}}}$",
+    ),
     # Per-species field-aligned velocity decomposition.
     (
         "V_par",
