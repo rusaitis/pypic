@@ -305,7 +305,7 @@ class Simulation:
         step: int,
         *,
         fields: Iterable[str] | None = None,
-        strict_fields: bool = False,
+        strict_fields: bool = True,
         **kwargs: Any,  # noqa: ANN401 — reader-specific params (e.g. target_resolution)
     ) -> FieldDataset:
         """Read field data for a single timestep.
@@ -320,10 +320,11 @@ class Simulation:
             that support selective I/O skip unwanted datasets; others
             read all fields then filter.
         strict_fields : bool
-            When ``True``, raise ``KeyError`` if any name in *fields*
-            matches no loaded field (typo guard).  Default ``False``
-            only logs a warning, for exploratory use where some
-            requested names are optional.
+            When ``True`` (default), raise :class:`KeyError` if any
+            name in *fields* matches no loaded field — the project's
+            fail-loud rule for selection APIs.  Pass ``False`` only
+            for exploratory scripts where some requested names are
+            optional; missing names are then logged as warnings.
         **kwargs
             Forwarded to readers that accept extra parameters
             (e.g. ``target_resolution`` for BATSRUS).
@@ -335,8 +336,8 @@ class Simulation:
         Raises
         ------
         KeyError
-            If *strict_fields* is true and a requested field name
-            yielded nothing.
+            If *strict_fields* is true (the default) and any requested
+            field name yielded nothing.
         """
         from pypic.grid import _default_aliases
         from pypic.readers._protocols import supports_selective_read

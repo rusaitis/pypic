@@ -551,12 +551,42 @@ class TestSimulationFacade:
         with pytest.raises(KeyError, match="Typox"):
             sim.read(0, fields=["Bx", "Typox"], strict_fields=True)
 
-    def test_strict_fields_default_warns(
+    def test_strict_fields_default_raises_on_typo(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        """Default behavior raises KeyError — the project's fail-loud rule."""
+        from pypic.coordinates.geometry import CARTESIAN
+
+        grid = GridInfo(
+            dimensions=(2,), spacing=(1.0,), origin=(0.0,), geometry=CARTESIAN
+        )
+        norm = Normalization.identity()
+
+        class Reader:
+            def read_timestep(self, path: Path, step: int) -> FieldDataset:
+                return FieldDataset.from_arrays({"B_1": np.ones(2)}, grid, norm)
+
+            def available_timesteps(self, path: Path) -> list[int]:
+                return [0]
+
+        cfg = SimulationConfig(
+            model_name="test",
+            model_type="PIC",
+            grid=grid,
+            normalization=norm,
+        )
+        sim = Simulation(Reader(), cfg, tmp_path)
+
+        with pytest.raises(KeyError, match="Typox"):
+            sim.read(0, fields=["Bx", "Typox"])  # no explicit strict_fields
+
+    def test_strict_fields_false_warns(
         self,
         tmp_path: Path,
         caplog: pytest.LogCaptureFixture,
     ) -> None:
-        """Default strict_fields=False keeps the historical warning-only behavior."""
+        """Explicit strict_fields=False opts back into warning-only behavior."""
         import logging
 
         from pypic.coordinates.geometry import CARTESIAN
@@ -582,7 +612,7 @@ class TestSimulationFacade:
         sim = Simulation(Reader(), cfg, tmp_path)
 
         with caplog.at_level(logging.WARNING, logger="pypic.readers._registry"):
-            ds = sim.read(0, fields=["Bx", "Typox"])
+            ds = sim.read(0, fields=["Bx", "Typox"], strict_fields=False)
         assert ds.has_field("B_1")
         assert any("Typox" in record.message for record in caplog.records)
 
