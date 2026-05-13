@@ -16,8 +16,6 @@ can process the data without knowing which code produced it.
 The schema defines **structure**, not exhaustive parameter lists. Model-specific
 parameters live in open-ended sections that each code fills as needed.
 
----
-
 ## 1. Configuration File: `simulation.toml` (schema v1.0)
 
 A TOML file that travels with the simulation output. Describes what
@@ -32,43 +30,42 @@ lives at `pypic.simulation.toml` at the repo root.
 
 `[schema].version` is the single discriminator for both
 `simulation.toml` and the on-disk output stores (see §4 for the
-on-disk attr path). v1.x commits to:
-
-- **Additive only.** Future v1.x releases may add optional sections,
-  optional keys, canonical field names, and enum values. They will
-  not rename or remove existing canonical names, and will not move
-  required keys. (For reference, the v0 → v1.0 rename list:
-  `omega_pe_over_omega_ce` → `omega_p_over_omega_c`.)
-- **Reordering `[[species]]` is breaking.** Per-species canonical
-  names (`_s0`, `_s1`, ...) bind to declaration order; reordering
-  changes the meaning of every per-species field on disk.
-- **`x-*` extensions are unconstrained.** Code-specific knobs under
-  `x-<code>.*` (or unknown sub-tables under `[physics.{pic,mhd,
-  hybrid,vlasov}]`) are accepted by the validator without
-  enforcement; v1.x will not break them, but also makes no
-  promises about their portability.
-
-Anything stricter than this — e.g., a removal or rename — bumps
+on-disk attr path). v1.x is **additive only**: future releases may
+add optional sections, optional keys, canonical field names, and
+enum values, but will not rename or remove existing canonical names
+and will not move required keys. (For reference, the v0 → v1.0
+rename list: `omega_pe_over_omega_ce` → `omega_p_over_omega_c`.)
+Anything stricter — e.g., a removal or rename — bumps
 `[schema].version` to `2.0`.
 
-### Required sections
+**`x-*` extensions are unconstrained.** Code-specific knobs under
+`x-<code>.*` (or unknown sub-tables under
+`[physics.{pic,mhd,hybrid,vlasov}]`) are accepted by the validator
+without enforcement; v1.x will not break them, but also makes no
+promises about their portability.
 
-A valid v1.0 document must declare:
+**User-facing constraint: species ordering is part of the deck's
+ABI.** Per-species canonical names (`_s0`, `_s1`, ...) bind to
+`[[species]]` declaration order; reordering changes the meaning of
+every per-species field on disk. Add new species at the end of the
+list, not in the middle.
+
+### Sections and extensions
+
+A valid v1.0 document must declare these sections:
 
 ```toml
 [schema]                 # version = "1.0" (REQUIRED)
 [model]                  # code identity (name, type)
 [run]                    # THIS run's identity + provenance
-[time]                   # t_start, t_end, n_steps; dt (conditional on scheme); scheme (default "fixed")
+[time]                   # t_start, t_end, n_steps; dt (required unless scheme = "adaptive"); scheme (default "fixed")
 [grid]                   # dimensions, spacing, lower/upper
 [units]                  # normalization + reference values
 [coordinates]            # geometry, frame
 [[species]]              # ≥ 1 entry required (kinetic OR fluid species)
 ```
 
-### Optional sections
-
-Listed in the order §2 walks them.
+Optional sections, listed in the order §2 walks them:
 
 ```toml
 [boundary_conditions]    # per-axis BC tags (lower/upper) + per-field overrides
@@ -77,16 +74,15 @@ Listed in the order §2 walks them.
 [initial_conditions]     # flat table: setup type + type-specific keys
 [[drivers]]              # ongoing external coupling (magnetograms, SW inflow, ...)
 [restart]                # continuation pointer (single file, glob, or list)
-[output.*]               # five independent sub-sections plus the
-                         # repeatable [[output.streams]] array, all
-                         # walked together in §2:
+[output.*]               # five fixed sub-sections plus the repeatable
+                         # [[output.streams]] array (six total), walked
+                         # together in §2:
                          #   [output.checkpoints]   lossless full-state dumps
                          #   [output.fields]        field output cadence + quantities
                          #   [output.particles]     particle output cadence + selection
                          #   [output.probes]        probe time-series cadence
                          #   [output.diagnostics]   on-the-fly derived quantities
                          #   [[output.streams]]     multi-cadence / ROI output groups
-                         #                          (repeatable, optional)
 [phase_space]            # >3D phase-space grid for gyrokinetic / full Vlasov
                          #   (continuum-Vlasov sparse-block storage lives in
                          #   the [phase_space.storage] sub-table)
@@ -94,67 +90,63 @@ Listed in the order §2 walks them.
 [[probes]]               # fixed or trajectory samplers
 ```
 
-### Extensions
+Non-portable code-specific knobs live under an `x-<code>.*`
+namespace (e.g. `[x-warpx]`, `[physics.pic.x-ipic3d]`). Validators
+accept any `x-*` or `x_*` key without validation. Unknown keys
+under `[physics.{pic,mhd,hybrid,vlasov}]` and their `.solver`
+sub-tables are also accepted — the solver vocabulary is explicitly
+reserved for evolution in v1.1+.
 
-Non-portable code-specific knobs live under an `x-<code>.*` namespace
-(e.g. `[x-warpx]`, `[physics.pic.x-ipic3d]`). Validators accept any
-`x-*` or `x_*` key without validation. Unknown keys under
-`[physics.{pic,mhd,hybrid,vlasov}]` and their `.solver` sub-tables are
-also accepted — the solver vocabulary is explicitly reserved for
-evolution in v1.1+.
+### Validation rules
 
-### Strict vs open string vocabularies
+**Strict vs open string vocabularies.** Two flavours of
+string-valued field appear in §2.
 
-Two flavours of string-valued field appear throughout §2:
+*Strict* (closed enum) — bounded structural / format primitives,
+fixed by the data model itself: `[schema].version`, `[model].type`,
+`[coordinates].geometry`, `[coordinates].physical_extent_unit`,
+`[grid.amr].amr_kind`, `[grid.stagger].convention`,
+`[grid.stagger].fields` location values, `[output.*].format`,
+`[output.*].precision`, `[output.checkpoints].partition`,
+`[output.streams.region].kind` (`"box"` | `"plane"`),
+`[restart].mode`, `[restart].restore` array values,
+`[[drivers]].coupling`, `[[drivers]].direction`,
+`[[bodies]].shape`, `[phase_space].coordinate_system`,
+`[run.resources.allocations].type`. Adding a value is a v1.x
+schema bump. Numerical knobs (integers/floats like
+`current_smoothing`, `field_substeps`) carry no vocabulary — the
+open/strict distinction applies to string-valued fields only.
 
-- **Strict** (closed enum) — bounded structural / format primitives.
-  The vocabulary is fixed by the data model itself: `[schema].version`,
-  `[model].type`, `[coordinates].geometry`, `[coordinates].physical_extent_unit`,
-  `[grid.amr].amr_kind`, `[grid.stagger].convention`,
-  `[grid.stagger].fields` location values, `[output.*].format`,
-  `[output.*].precision`, `[output.checkpoints].partition`,
-  `[output.streams.region].kind` (`"box"` | `"plane"`),
-  `[restart].mode`, `[restart].restore` array values,
-  `[[drivers]].coupling`, `[[drivers]].direction`, `[[bodies]].shape`,
-  `[time].splitting` (strict-when-present; the key itself is optional),
-  `[phase_space].coordinate_system`,
-  `[run.resources.allocations].type`. Adding a value is a v1.x
-  schema bump. Numerical knobs (integers/floats like
-  `current_smoothing`, `field_substeps`) carry no vocabulary — the
-  open/strict distinction applies to string-valued fields only.
-- **Open** (canonical list, unenforced) — numerical-method,
-  algorithm, and closure vocabularies: `[time].scheme`,
-  `[physics.*.solver].scheme`, `pusher`, `field_solver`, `limiter`,
-  `riemann`, `reconstruction`, `divergence_cleaning`,
-  `preconditioner`, `charge_correction`, `current_deposition`,
-  `[[species]].closure`, `[[species]].shape` (PIC shape factor),
-  `[[collisions]].model`, `[[drivers]].type`,
-  `[boundary_conditions]` tag values. Research codes invent new
-  schemes faster than the schema can enumerate them, so unknown
-  strings pass validation. The lists shown next to each field are
-  the v1.0 canonical values — guidance for tooling and human
-  readers, not validation gates. pypic records the value as
-  provenance metadata; it does not dispatch on it. Cross-field
-  rules (e.g. `scheme = "subcycled"` requires `field_substeps`)
-  still fire — openness applies to *value*, not *semantics*.
+*Open* (canonical list, unenforced) — numerical-method, algorithm,
+and closure vocabularies: `[time].scheme`, `[time].splitting`
+(canonical: `"strang" | "lie" | "godunov"`),
+`[physics.*.solver].scheme`, `pusher`, `field_solver`, `limiter`,
+`riemann`, `reconstruction`, `divergence_cleaning`,
+`preconditioner`, `charge_correction`, `current_deposition`,
+`[[species]].closure`, `[[species]].shape` (PIC shape factor),
+`[[collisions]].model`, `[[drivers]].type`,
+`[boundary_conditions]` tag values. Research codes invent new
+schemes faster than the schema can enumerate them, so unknown
+strings pass validation. The lists shown next to each field are
+the v1.0 canonical values — guidance for tooling and human
+readers, not validation gates. pypic records the value as
+provenance metadata; it does not dispatch on it. Cross-field
+rules (e.g. `scheme = "subcycled"` requires `field_substeps`)
+still fire — openness applies to *value*, not *semantics*. Most
+enum fields in §2 carry an inline canonical-values comment;
+absent that, refer to the lists above.
 
-Per-field annotation in §2 marks each enum's category inline.
-
-### Foreign-key resolution
-
-Sections that declare named entities (`[[species]]`, `[[bodies]]`,
-`[[drivers]]`) act as **registries**. Orphan entries — a body or
-driver declared but never referenced elsewhere — are accepted; the
-validator does not require every registry entry to be used.
-References *into* a registry, however, are validated strictly:
-`[[drivers]].body` → `[[bodies]].name`,
+**Foreign-key resolution.** Sections that declare named entities
+(`[[species]]`, `[[bodies]]`, `[[drivers]]`) act as **registries**.
+Orphan entries — a body or driver declared but never referenced
+elsewhere — are accepted; the validator does not require every
+registry entry to be used. References *into* a registry, however,
+are validated strictly: `[[drivers]].body` → `[[bodies]].name`,
 `[boundary_conditions].drivers_lower/upper` → `[[drivers]].name`,
 `[[collisions]].species_pair` and `[output.particles].species` →
 `[[species]].name`, `[units].reference_species` → `[[species]].name`
 (with `"electrons"` / `"ions"` / `"protons"` as a builtin fallback).
 Unresolved names raise a validation error at load time.
-
----
 
 ## 2. Section Specifications
 
@@ -270,7 +262,8 @@ dt_min  = 1.0e-5                   # optional — for scheme = "adaptive"
 dt_max  = 0.01                     # optional — for scheme = "adaptive"
 dt_field       = 0.004             # optional — for scheme = "subcycled"
 field_substeps = 5                 # REQUIRED when scheme = "subcycled"
-splitting      = "strang"          # optional — "strang" | "lie" | "godunov"
+splitting      = "strang"          # optional, open string. Canonical:
+                                   #   "strang" | "lie" | "godunov"
                                    #   for operator-split MHD/multi-physics
 ```
 
@@ -586,11 +579,7 @@ to leave room for v1.1+ portable additions (anticipated:
 `[physics.gyrokinetic]`). Code-specific knobs go under
 `[physics.<model>.x-<code>.*]`.
 
-All `scheme`, `pusher`, `field_solver`, `reconstruction`, `limiter`,
-`riemann`, `divergence_cleaning`, `preconditioner`,
-`charge_correction`, and `current_deposition` values are open strings
-(see §1 *Strict vs open string vocabularies*). Canonical values per
-key:
+Canonical values per key (all open strings; see §1 *Validation rules*):
 
 | Key | Canonical values (open string) |
 |---|---|
@@ -743,7 +732,6 @@ files happens at read time.
 ```toml
 [restart]
 from = "./checkpoints/chk_000030.h5"  # REQUIRED — string OR list of strings
-                                       #   (aliased; `from` is a Python keyword)
 step = 30000                           # optional
 time = 1500.0                          # optional
 restore = ["fields", "particles"]      # optional — "fields" | "particles" |
@@ -755,7 +743,8 @@ mode = "hot"                           # optional — "hot" (full state reload) 
 ### [output.*]
 
 Output cadences, quantities, directories, and precisions.
-Five independent sub-sections; each is optional.
+Five fixed sub-sections plus the repeatable `[[output.streams]]`
+array (six total); each is optional.
 
 ```toml
 [output.checkpoints]                   # lossless full-state dumps
@@ -929,8 +918,6 @@ frame = "GSM"                      # optional: transform to simulation frame
 Output: `TabularData` time-series (one row per timestep, columns per
 field). Multiple entries form probe arrays / constellations.
 
----
-
 ## 3. Canonical Field Names
 
 All projects use the same field names. Readers are responsible for
@@ -953,35 +940,30 @@ each index means:
 | 3 | z | φ | z | φ |
 
 The table names **vector components** (the subscripts on `B_i`,
-`E_i`, `V_i`, …). For `geometry = "thetaMode"` the *third array
-dimension* is the azimuthal-mode index (see the thetaMode
-paragraph below); the third *vector* component is still the
-azimuthal field component (`B_3 = B_φ`). Particle position and
-velocity columns (`x`, `y`, `z`, `vx`, `vy`, `vz`) are always
-Cartesian regardless of `[coordinates].geometry` — geometry is a
-field-grid representation choice, not a particle one (see §3
-*Per-particle data columns* and §4.3).
+`E_i`, `V_i`, …). For Cartesian data, letter aliases (`Bx`, `By`,
+`Bz`) read the same arrays; for non-Cartesian geometries the reader
+registers geometry-appropriate aliases (`Br` → `B_1` for spherical,
+etc.). Particle position and velocity columns (`x`, `y`, `z`, `vx`,
+`vy`, `vz`) are always Cartesian regardless of
+`[coordinates].geometry` — geometry is a field-grid representation
+choice, not a particle one (see *Per-particle data columns* and
+§4.3).
 
-For Cartesian data, letter aliases (`Bx`, `By`, `Bz`) are preferred for
-readability and access the same data as `B_1`, `B_2`, `B_3`. For non-Cartesian
-data, only the numbered form is canonical; the reader registers
-geometry-appropriate aliases (e.g., `Br` → `B_1` for spherical). The
-`[coordinates] geometry` field determines which aliases are active.
+**Alias-on-disk policy.** Writers MUST emit only the numbered
+canonical form (`B_1` / `B_2` / `B_3`, `B0_1` / `B0_2` / `B0_3`,
+`n_s0`, `V_s1_1`, `P_s0_11`, …). Aliases are read-time conveniences
+derived from `[coordinates].geometry` after the file is opened.
+Storing both `B_1` and `Bx` for the same data is not part of the
+v1.0 contract; readers that encounter both treat the numbered form
+as authoritative.
 
-**Alias-on-disk policy.** Aliases are read-time conveniences, derived
-from `[coordinates].geometry` after the file is opened. Writers MUST
-emit only the numbered canonical form (`B_1` / `B_2` / `B_3`,
-`B0_1` / `B0_2` / `B0_3`, `n_s0`, `V_s1_1`, `P_s0_11`, …). Storing
-both `B_1` and `Bx` for the same data is redundant and not part of
-the v1.0 contract — readers that encounter both should treat the
-numbered form as authoritative and ignore the duplicate.
-
-For `geometry = "thetaMode"` (FBPIC azimuthal-mode RZ decomposition),
-the spatial grid is two-dimensional `(r, z)` and the third index is
-the openPMD mode number from `[coordinates.modes].mode_indices`.
-Field arrays therefore have shape `(n_r, n_z, n_modes)`; the per-mode
-complex amplitude is stored as a complex dtype, not as separate real
-and imaginary axes.
+For `geometry = "thetaMode"` (FBPIC azimuthal-mode RZ
+decomposition), the spatial grid is two-dimensional `(r, z)` and
+the third *array* dimension is the openPMD mode number from
+`[coordinates.modes].mode_indices`; the third *vector* component
+is still the azimuthal field (`B_3 = B_φ`). Arrays have shape
+`(n_r, n_z, n_modes)` with complex dtype per-mode, not separate
+real/imaginary axes.
 
 ### Electromagnetic fields
 
@@ -1109,6 +1091,13 @@ the dataset's physics config.
 | `rho_m_s{N}` | — | Per-species mass density | PIC (derived) |
 | `\|V_s{N}\|` | — | Per-species velocity magnitude | PIC (derived) |
 
+`EHF` carries a total-fluid form (`EHF_1, EHF_2, EHF_3`) because
+single-fluid MHD treats enthalpy flux as a primary quantity; the
+other flux decompositions (`EF`, `KEF`, `HF`, `q`) appear only
+per-species — sum over species at read time when a total is
+needed. Volumetric scalars (`e_th`, `e_th_trace`, `e_k`) carry
+both forms.
+
 ### Pressure tensor
 
 | Canonical | Meaning | Present in |
@@ -1118,23 +1107,21 @@ the dataset's physics config.
 | `Pij`, `Pij_s{N}` | Full pressure tensor — 6 independent components (`P_11`, `P_12`, `P_13`, `P_22`, `P_23`, `P_33`) total or per species (`P_s0_11`, `P_s0_12`, …, `P_s0_33`) | PIC, multi-moment MHD |
 | `agyrotropy` | Swisdak $Q$ — see [equations.md § Pressure Tensor](equations.md#4-pressure-tensor) for the closed form $Q = \sqrt{1 - 4 I_2 / [(I_1 - P_\parallel)(I_1 + 3 P_\parallel)]}$, bounded $[0, 1]$ | PIC, multi-moment MHD (derived) |
 
-Any code that evolves the full pressure tensor (PIC, hybrid,
-10-moment MHD, CGL) can populate these fields. Per-species
-decomposition (`P_s0_par`, `P_s0_perp`) uses the per-species
-tensors (`P_s0_11..P_s0_33`); two-species shorthands
+Per-species decomposition (`P_s0_par`, `P_s0_perp`) uses the
+per-species tensors (`P_s0_11..P_s0_33`); two-species shorthands
 `P_par_e/i` and `P_perp_e/i` are registered as user-facing aliases.
+Listing `Pij` (or per-species `Pij_s{N}`) in
+`[output.fields].quantities` auto-expands to the six components.
 
-**Storage tiers.** *Preferred:* store the six tensor components
-(`Pij`, `Pij_s{N}`); `P` / `P_par` / `P_perp` / `agyrotropy` are
-derived on demand and stay $\hat{b}$-fresh under frame transforms.
-*Acceptable:* codes carrying only CGL-style anisotropy (BATSRUS
-`MhdAnisoP`, anisotropic GRMHD) may store `P_par` and `P_perp`
-directly; tensor-derived quantities are then unavailable and the
-stored values lock to the snapshot's $\hat{b}$. Cross-tool readers
-MUST accept either tier; the §4.1/§4.2 layouts show the
-six-component form because it's higher-fidelity. Listing `Pij`
-(or per-species `Pij_s{N}`) in `[output.fields].quantities`
-auto-expands to the six components.
+**Storage tiers** (cross-tool readers MUST accept either):
+
+- *Preferred* — store the six tensor components (`Pij`,
+  `Pij_s{N}`). `P` / `P_par` / `P_perp` / `agyrotropy` derive on
+  demand and stay $\hat{b}$-fresh under frame transforms.
+- *Acceptable* — store only `P_par` and `P_perp` (BATSRUS
+  `MhdAnisoP`, anisotropic GRMHD). Tensor-derived quantities are
+  then unavailable and the stored values lock to the snapshot's
+  $\hat{b}$.
 
 ### Characteristic scales (derived)
 
@@ -1159,10 +1146,10 @@ auto-expands to the six components.
 | `beta` | — | Plasma beta (auto-expands to `beta_s{N}` per species) | `P` (or `P_s{N}`), `|B|` |
 | `sigma` | — | Magnetization parameter | `|B|`, `rho_m`, `c` |
 
-The Tier-3 `<field>_s<N>` form is the canonical recipe ID; NRL
-Formulary spellings (`omega_pe`, `lambda_D`, ...) resolve as
-aliases. Multi-species runs (`omega_p_s2`, `lambda_D_s3`, ...)
-synthesize on demand.
+The `<field>_s<N>` form is the canonical recipe ID; NRL Formulary
+spellings (`omega_pe`, `lambda_D`, ...) resolve as aliases.
+Multi-species runs (`omega_p_s2`, `lambda_D_s3`, ...) synthesize on
+demand.
 
 ### Other derived quantities
 
@@ -1200,12 +1187,15 @@ and equations of motion are derived on demand
 
 | Field | Storage | Meaning |
 |-------|---------|---------|
-| `x`, `y`, `z` | per-particle (`(N,)` float) | Position in 3D ambient space — always Cartesian, even when `[coordinates].geometry` is non-Cartesian (geometry is a field-grid representation choice, not a particle one) |
-| `vx`, `vy`, `vz` | per-particle | Velocity components |
-| `weight` | per-particle (`(N,)` float64) | Physical particles per macroparticle $w$ |
-| `id` | per-particle (`(N,)` int64) | Tracking ID (when the code emits one) |
+| `x`, `y`, `z` | per-particle `(N,)` | Position in 3D ambient space — always Cartesian, even when `[coordinates].geometry` is non-Cartesian (geometry is a field-grid representation choice, not a particle one) |
+| `vx`, `vy`, `vz` | per-particle `(N,)` | Velocity components |
+| `weight` | per-particle `(N,)` float64 | Physical particles per macroparticle $w$ |
+| `id` | per-particle `(N,)` int64 | Tracking ID (when the code emits one) |
 | `species_charge` | scalar (metadata) | Per-species charge $q_s$ in code units. One charge state per `[[species]]` entry — mixed ionization → separate species. |
 | `species_mass` | scalar (metadata) | Per-species mass $m_s$ in code units |
+
+Position/velocity dtype is reader/writer choice (see §4.3 down-cast
+knobs); `weight` and `id` are stored at full source precision.
 
 Scalars round-trip through the Arrow/Parquet schema metadata (no
 per-particle storage cost).
@@ -1222,8 +1212,6 @@ canonical form so downstream consumers don't see the difference.
 `read → write → read` reconstructs $q_s w$ bit-exactly via float64
 arithmetic but does not preserve combined-layout disk bytes — pypic
 is analysis, not restart regeneration.
-
----
 
 ## 4. Output Layouts
 
@@ -1249,130 +1237,62 @@ storage container's group convention (HDF5 groups vs Zarr DataTree).
 
 ### 4.1 HDF5 Output Layout
 
-The cross-tool **read contract** for HDF5-emitting codes.  pypic does
+The cross-tool **read contract** for HDF5-emitting codes. pypic does
 not write this layout — its readers translate native HDF5 (and IDL,
 H5hut, Fortran-binary, ...) sources *into* a `FieldDataset` that
 conforms to the same canonical naming and metadata shape described
-here.  The Rust simulation code writes this layout directly, so the
+here. The Rust simulation code writes this layout directly, so the
 section doubles as its output specification.
 
 Each timestep is a separate file. Field datasets use the
 **numbered canonical names** (`B_1`, `B_2`, `B_3`), which are
-geometry-agnostic.
-
-Each top-level group mirrors a §2 TOML section of the same name; every
-group's attrs carry the keys §2 documents for that section. Optional
-groups are omitted when the corresponding TOML section is absent.
+geometry-agnostic. Per the §4.2 mapping table, every §2 section
+becomes a top-level `/<section>/` group whose attrs carry that
+section's TOML keys verbatim; optional sections are omitted when
+their TOML counterpart is absent.
 
 ```
-output_{step:06d}.h5
-│
-├── fields/                            # group: field data (numbered canonical names)
-│   ├── B_1, B_2, B_3                     # [dataset, float64, shape (n1, n2, n3)]
+output_{step:06d}.h5            # example name; actual pattern is set
+│                               # by [output.checkpoints].file_pattern
+├── fields/                     # group: field arrays (numbered canonical names)
+│   ├── B_1, B_2, B_3              # dtype set by [output.fields].precision,
+│   │                              #   shape (n1, n2, n3)
 │   ├── E_1, E_2, E_3
 │   ├── J_1, J_2, J_3
-│   ├── rho_c                          # PIC: charge density (omit for MHD-only output)
-│   ├── rho_m                          # MHD: mass density   (PIC may also write derived)
-│   ├── n_s0, n_s1, ...                # per-species number densities
-│   ├── V_s0_1, V_s0_2, V_s0_3, ...       # per-species bulk velocities
-│   ├── P_s0_11, P_s0_12, ..., P_s0_33    # per-species pressure tensor (6 components)
-│   └── u_1, u_2, u_3                     # optional — four-velocity (relativistic PIC)
+│   ├── rho_c                   # PIC: charge density (omit for MHD-only output)
+│   ├── rho_m                   # MHD: mass density   (PIC may also write derived)
+│   ├── n_s0, n_s1, ...
+│   ├── V_s0_1, V_s0_2, V_s0_3, ...
+│   ├── P_s0_11, P_s0_12, ..., P_s0_33    # per-species pressure tensor
+│   │                                     #   (or P_11..P_33 for single-fluid MHD)
+│   └── u_1, u_2, u_3                     # optional — four-velocity (rel. PIC)
 │
-├── schema/                            # mirrors [schema]
-│   └── version       [attr: "1.0"]    # same value as Zarr §4.2 attrs.schema.version
+├── schema/, model/, time/, grid/ (with stagger/ sub-group),
+├── boundary_conditions/ (with optional field_overrides/ sub-group),
+├── coordinates/ (with optional modes/ for thetaMode and transforms/
+│   sub-groups), normalization/, species/{s0,s1,...}/, physics/
+│   (with optional pic/ | mhd/ | hybrid/ model sub-groups),
+├── run/                        # optional — writer-side contract;
+│                               #   current pypic readers do not yet
+│                               #   round-trip it into SimulationConfig.run
 │
-├── model/                             # mirrors [model]
-│   ├── name          [attr: "iPIC3D"]    # code identity
-│   ├── type          [attr: "PIC"]       # drives default vocabulary
-│   └── (optional attrs: version, description, url, doi, license, authors)
-│
-├── time/                              # mirrors [time]
-│   ├── dt            [attr: float64, code units]
-│   ├── t_start       [attr: float64]
-│   ├── t_end         [attr: float64]
-│   ├── n_steps       [attr: int]
-│   ├── scheme        [attr: "fixed"]     # open string per §1
-│   └── (optional attrs: splitting, cfl, dt_min, dt_max, dt_field, field_substeps)
-│
-├── grid/                              # mirrors [grid] (no [time] or [boundary_conditions] keys)
-│   ├── dimensions    [attr: (n1, n2, n3)]
-│   ├── spacing       [attr: (d1, d2, d3)]
-│   ├── lower         [attr: (min1, min2, min3)]
-│   ├── upper         [attr: (max1, max2, max3)]
-│   ├── ghost_cells   [attr: (g1, g2, g3)]   # optional
-│   └── stagger/                              # mirrors [grid.stagger] — three optional tiers
-│       ├── convention [attr: "cell"]         # Tier 1 — "cell" | "node" | "staggered"
-│       ├── fields     [attr: {"B": "face", "E": "edge", "J": "edge"}]   # Tier 2
-│       └── position   [attr: {"B_1": (0.5, 0.0, 0.0), "B_2": (0.0, 0.5, 0.0), ...}]  # Tier 3 (ED-PIC)
-│
-├── boundary_conditions/               # mirrors [boundary_conditions]
-│   ├── lower         [attr: ("periodic", "periodic", "open")]
-│   ├── upper         [attr: ("periodic", "periodic", "open")]
-│   ├── drivers_lower [attr: {2: "solar_wind_inflow"}]    # optional, sparse
-│   ├── drivers_upper [attr: {...}]                       # optional, sparse
-│   └── field_overrides/                                  # optional sub-group
-│       ├── E/    {lower: (...), upper: (...)}
-│       ├── B/    {lower: (...), upper: (...)}
-│       └── particles/  {lower: (...), upper: (...)}
-│
-├── coordinates/                       # mirrors [coordinates]
-│   ├── geometry             [attr: "cartesian"]      # drives alias registration
-│   ├── frame                [attr: "simulation"]
-│   ├── axis_labels          [attr: ("x", "y", "z")]   # optional
-│   ├── physical_extent      [attr: (46.0, 32.0, 13.0)]   # optional
-│   ├── physical_extent_unit [attr: "R_E"]            # optional
-│   ├── modes/                                        # present iff geometry = "thetaMode"; rejected otherwise
-│   │   ├── n_modes      [attr: int]
-│   │   └── mode_indices [attr: (0, 1, 2)]
-│   └── transforms/                                   # optional, one sub-group per [coordinates.transforms.*]
-│       ├── GSM/    {origin: (...), rotation: ((...), (...), (...)), scale: 1.0, from_frame: "GSE", parameter: "dipole_tilt"}
-│       └── GSE/    {origin: (...), rotation: ((...), (...), (...)), scale: 1.0}
-│
-├── normalization/                     # mirrors [units] (renamed for storage clarity)
-│   ├── system        [attr: "PIC"]    # "PIC" | "MHD" | "SI" | "custom"
-│   ├── length_ref    [attr: float64, meters]
-│   ├── time_ref      [attr: float64, seconds]
-│   ├── velocity_ref  [attr: float64, m/s]
-│   ├── b_field_ref   [attr: float64, Tesla]
-│   ├── e_field_ref   [attr: float64, V/m]
-│   ├── density_ref   [attr: float64, m⁻³]
-│   ├── mass_ref      [attr: float64, kg]
-│   ├── charge_ref    [attr: float64, C]
-│   └── speed_of_light [attr: float64, m/s]   # from [units].speed_of_light
-│
-├── species/                           # mirrors [[species]] — one sub-group per entry, in order
-│   ├── s0/    {name: "electrons", charge: -1.0, mass: 1.0, ...}
-│   ├── s1/    {name: "ions",       charge:  1.0, mass: 256.0, ...}
-│   └── ...
-│
-├── physics/                           # mirrors [physics] (top-level keys + sub-tables)
-│   ├── relativistic  [attr: bool]
-│   └── (model-specific sub-groups: pic/, mhd/, hybrid/ — each with its own attrs and solver/ child)
-│
-├── run/                               # optional — mirrors [run] when present
-│   ├── name, description, date, git_sha, host, license, doi, funding, embargo, ...
-│   ├── ensemble/    {member_id, total}
-│   └── resources/   {mpi_ranks, nodes, wall_clock_hours, ...}
-│
-├── time              [attr: float64, code units]   # current snapshot time (per-file, not [time].t_start)
-└── step              [attr: int]                    # current snapshot step
+├── time              [attr: float64]   # current snapshot time
+└── step              [attr: int]       # current snapshot step
 ```
 
-Every file carries enough metadata to convert back to SI without the
-original `simulation.toml` and to interpret per-species field names
-(`n_s0`, `V_s1_1`, ...) without it. The HDF5 file always uses numbered
-names; `coordinates/geometry` drives alias registration in the reader
-(`Bx → B_1` for cartesian, `Br → B_1` for spherical). Existing readers
-(iPIC3D, BATSRUS, ...) translate native layouts; the Rust code writes
-this layout directly.
+**Sections not emitted to HDF5.** The §2 sections that don't survive
+the FieldDataset boundary (`[bodies]`, `[drivers]`,
+`[initial_conditions]`, `[output.*]`, `[restart]`, `[[collisions]]`,
+`[phase_space]`, `[[probes]]`, `x-<code>` extensions) are not written
+to HDF5 by any pypic-aware writer; cross-tool writers that need them
+should ship `simulation.toml` alongside the HDF5 store.
 
-Optional groups (`species/`, `coordinates/transforms/`, `coordinates/modes/`,
-`physics/<model>/`, `run/`, `boundary_conditions/field_overrides/`,
-`grid/stagger/fields`, `grid/stagger/position`) are omitted when the
-corresponding TOML section is absent — single-fluid MHD with no
-transforms produces a smaller file with no `species/` or
-`coordinates/transforms/`. The top-level snapshot scalars `time` and
-`step` are always present.
+Every emitted file carries enough metadata to convert back to SI
+without the original `simulation.toml` and to interpret per-species
+field names (`n_s0`, `V_s1_1`, ...) without it. The HDF5 file always
+uses numbered names; `coordinates/geometry` drives alias registration
+in the reader (`Bx → B_1` for cartesian, `Br → B_1` for spherical).
+The top-level snapshot scalars `time` and `step` are always present.
 
 ### 4.2 Zarr Output Layout
 
@@ -1425,47 +1345,49 @@ my_store.zarr/                         # Zarr v3 group root
 └── fields/                             # /fields child group
     ├── B_1, B_2, B_3, ...                 # field arrays
     ├── E_1, E_2, E_3, ..., rho_c, rho_m, J_1, ..., u_1, u_2, u_3
-    ├── x, y, z                         # 1-D coordinate arrays
-    │                                   #   (names match attrs.coordinates.axis_labels)
+    ├── x, y, z                         # 1-D coordinate arrays (xarray
+    │                                   #   dimension coords; names track
+    │                                   #   grid.surviving_axis_names, which
+    │                                   #   equals coordinates.axis_labels
+    │                                   #   for an un-sliced 3D dataset)
     └── time                            # only for multi-step writes
 ```
 
-**Per-array attrs.**  Each field array under `/fields/` carries
-xarray-style metadata: `long_name`, `units`, `quantity_type`,
+**Per-array metadata.** Each field array under `/fields/` carries
+xarray-style attrs: `long_name`, `units`, `quantity_type`,
 `si_unit`, `latex`, and the openPMD-style `unit_dimension` 7-tuple
-when the field has a registered SI dimension.
+when the field has a registered SI dimension. Default per-variable
+codec: `BloscCodec(cname="zstd", clevel=5, shuffle="bitshuffle")`.
+`dtype="float32"` downcasts on write; user-supplied `encoding=`
+overrides per variable.
 
-**`surviving_axes`.**  The integer tuple of grid axes still present
-after any in-pypic slicing — `(0, 1, 2)` for a full 3D dataset,
-`(0, 2)` for a `y`-slice produced by `PlaneSelection`, `(2,)` for
-a 1-D line-out.  Indices are the original axis numbers (so a `y`-slice
-preserves `0` and `2`, not `0` and `1`).  A reader can reconstruct
-the full embedding by combining `surviving_axes` with
-`attrs.coordinates.axis_labels`.
+**Slicing and append semantics.** `attrs.grid.surviving_axes` is
+the integer tuple of original grid axes still present after any
+in-pypic slicing — `(0, 1, 2)` for a full 3D dataset, `(0, 2)`
+for a `y`-slice produced by `PlaneSelection`, `(2,)` for a 1-D
+line-out. A reader reconstructs the full embedding by combining
+`surviving_axes` with `attrs.coordinates.axis_labels`.
 
-**Multi-step (timeseries).**  `to_zarr_timeseries` extends every
-field array with a leading `time` dimension, shape `(nt, n1, n2, n3)`,
-chunked so reading one timestep is O(1).  Step 1 writes the
-`DataTree` with `mode="w"` (stamps root attrs); steps 2..N append
-directly to `/fields` via `mode="a", append_dim="time"`.  The writer
-enforces a constant field set and constant identity attrs (`schema`,
-`model`, `time`, `grid`, `boundary_conditions`, `coordinates`,
-`normalization`, `species`, `physics`, `run`) across appends; per-step
-`metadata` is reduced to the **intersection** of keys present in every
-step with **identical values across all of them** — any key missing
-from any step, or present with a differing value, is dropped from
-`attrs.metadata` after the final append. In single-step writes the
-snapshot `time` lives in `attrs.metadata.time` (no `time` dimension
-exists); see the mapping table at the end of this section.
+`to_zarr_timeseries` extends every field array with a leading
+`time` dimension, shape `(nt, n1, n2, n3)`, chunked so reading
+one timestep is O(1). Step 1 writes the `DataTree` with
+`mode="w"` (stamps root attrs); steps 2..N append directly to
+`/fields` via `mode="a", append_dim="time"`. The writer enforces
+a constant field set and constant identity attrs (`grid`,
+`normalization`, `species`, `physics`, plus `frame` and
+`transforms` from `coordinates`) across appends; mismatches
+raise. Other root attrs (`schema`, `model`, `time`,
+`boundary_conditions`, `coordinates.*` outside frame/transforms,
+`run`) flow through the per-step `metadata` intersection — keys
+present in every step with identical values survive; any key
+missing from one step, or differing in value, is dropped from
+`attrs.metadata` after the final append. In single-step writes
+the snapshot `time` lives in `attrs.metadata.time` (no `time`
+dimension exists).
 
-**Codecs.**  Default per-variable codec: `BloscCodec(cname="zstd",
-clevel=5, shuffle="bitshuffle")`.  `dtype="float32"` downcasts on
-write; user-supplied `encoding=` overrides per variable.
-
-**Mapping to §4.1 (HDF5).**
-
-Both layouts mirror §2 section names; the difference is the storage
-container's group convention (HDF5 groups vs Zarr root attrs).
+**Mapping to §4.1 (HDF5).** Both layouts mirror §2 section names;
+the difference is the storage container's group convention (HDF5
+groups vs Zarr root attrs).
 
 | §2 section | §4.1 HDF5 | §4.2 Zarr |
 |---|---|---|
@@ -1483,40 +1405,33 @@ container's group convention (HDF5 groups vs Zarr root attrs).
 | `[physics]` | `/physics/` group + model sub-groups | `attrs.physics` |
 | `[run]` (optional) | `/run/` group with attrs (writer-side contract; pypic readers do not yet round-trip it) | `attrs.run` (typed; `Run.model_dump`; round-trips end-to-end) |
 | Verbatim `simulation.toml` | not currently emitted by pypic and not extracted by readers | `attrs.simulation_toml` (opaque UTF-8 text; round-trips end-to-end) |
-| Coord arrays | from `/grid/` + `/coordinates/` attrs | `/fields/{x,y,z}` (1-D arrays) |
+| Coord arrays | from `/grid/` + `/coordinates/` attrs | xarray dim coords under `/fields/` (names track `grid.surviving_axis_names`) |
 | Snapshot scalars `time` / `step` | top-level scalar attrs | `time`: dim under `/fields/time` (multi-step) or `attrs.metadata.time` scalar (single-step). `step`: `attrs.metadata.step` scalar in both modes. |
 | Files per write | one per timestep | one store, all steps |
 
-Readers reject stores whose `schema.version` major component
-doesn't match the library's expected major. Non-pypic consumers
-(Three.js viewer, Rust `zarrs` pipelines) read it straight from
-`attrs` without parsing the TOML.
+**Optional root attrs.**
 
-**Reading without pypic.** A non-pypic consumer reads section
-dicts straight from `attrs.*` and field arrays from
-`/fields/<name>`. Coordinate arrays under `/fields` make the data
-self-describing in CF/COARDS terms. Stored arrays always use
-numbered canonical names; geometry/species aliases are read-time
-conveniences and never appear on disk.
+- `attrs.run` — typed run provenance. JSON dump of
+  `pypic.schema.Run` (`mode="json"`, ISO dates), surfaced as a
+  top-level root attr so non-pypic consumers don't have to dig
+  through `attrs.metadata`. **Identity-stable across derivations**:
+  regrid / slice / frame-transform propagate the original `run`
+  unchanged (a derivation of "MMS-event-1" is still that run).
+- `attrs.simulation_toml` — verbatim TOML. Opaque UTF-8 text of the
+  source `simulation.toml`, stamped when available via
+  `load_config()` capture or the `to_zarr(..., simulation_toml=PATH)`
+  kwarg. Carries the sections the typed `FieldDataset` boundary drops
+  (`[bodies]`, `[drivers]`, `[output.*]`, `[restart]`, `[[probes]]`,
+  `[[collisions]]`, `[phase_space]`, `x-<code>` extensions)
+  losslessly. Consumers that want a typed view re-validate via
+  `pypic.schema.validate_simulation_toml(text)`. Same derivation
+  policy as `attrs.run`.
 
-**`attrs.run` — typed run provenance (optional).** JSON dump of
-`pypic.schema.Run` (`mode="json"`, ISO dates), surfaced as a
-top-level root attr so non-pypic consumers don't have to dig
-through `attrs.metadata`. **Identity-stable across derivations**:
-regrid / slice / frame-transform propagate the original `run`
-unchanged, because a derivation of "MMS-event-1" is still that run.
-
-**`attrs.simulation_toml` — verbatim TOML (optional).** Opaque
-UTF-8 text of the source `simulation.toml`, stamped when available
-via `load_config()` capture or the `to_zarr(...,
-simulation_toml=PATH)` kwarg. Carries the sections the typed
-`FieldDataset` boundary drops (`[bodies]`, `[drivers]`,
-`[output.*]`, `[restart]`, `[[probes]]`, `[[collisions]]`,
-`[phase_space]`, `x-<code>` extensions) losslessly. Consumers that
-want a typed view re-validate via
-`pypic.schema.validate_simulation_toml(text)`. Same derivation
-policy as `attrs.run` (propagated unchanged; users can drop the
-attr when republishing).
+Readers reject stores whose `schema.version` major component doesn't
+match the library's expected major. Non-pypic consumers (Three.js
+viewer, Rust `zarrs` pipelines) read section dicts straight from
+`attrs.*` and field arrays from `/fields/<name>` — no TOML parsing
+required.
 
 ### 4.3 Particle Layout (Parquet)
 
@@ -1563,21 +1478,17 @@ archival). Row groups: 500K–1M particles each. Down-cast knobs:
 metadata at full precision. See TASKS.md Step 25 for the full I/O
 contract.
 
----
-
 ## 5. Extensibility
 
 - **New simulation code:** Write a reader that maps native output to `FieldDataset` with canonical field names. No schema changes needed.
 - **New field:** Add the name to the canonical table (this document), add to relevant readers, add derived functions if applicable.
 - **New model type:** Add a `[physics.NEW_TYPE]` subsection convention, document expected fields and species.
 - **New output format:** Define the layout mapping, write a reader. Everything downstream works unchanged via `FieldDataset`.
-- **Code-specific knobs:** Park them under an `x-<code>` namespace — see §1 *Extensions*.
-
----
+- **Code-specific knobs:** Park them under an `x-<code>` namespace — see §1 *Sections and extensions*.
 
 ## 6. What This Schema Does NOT Define
 
-- **Simulation control parameters** (solver tolerances, MPI decomposition, output intervals). Note: `dt` and `n_steps` live in `[time]` because they are essential for time-series analysis. Output cadence (`step_interval`) lives in `[output.*]`.
+- **Simulation control parameters** (solver tolerances, MPI decomposition). Time-series essentials (`dt`, `n_steps`) live in `[time]`; output cadence (`step_interval`) lives in `[output.*]`.
 - **Visualization settings** (colormaps, camera angles, slice positions).
 - **Exhaustive physics parameter lists.** The `[physics]` section is open-ended by design.
 - **Native file layouts** of existing codes. Readers handle the translation.
