@@ -36,8 +36,11 @@ from pypic.derived import (
     magnetosonic_speed,
     mirror_parameter,
     non_ideal_electric_field,
+    parallel_component,
     parallel_pressure,
+    perpendicular_magnitude,
     perpendicular_pressure,
+    perpendicular_vector,
     plasma_beta,
     plasma_frequency,
     poynting_flux,
@@ -544,6 +547,104 @@ class TestPerpendicularPressure:
         p_perp = perpendicular_pressure(*args)
         trace = p11 + p22 + p33
         np.testing.assert_allclose(trace, p_par + 2.0 * p_perp, rtol=1e-14)
+
+
+class TestParallelComponent:
+    def test_b_along_z_picks_z(self):
+        """B along z extracts the z-component of A."""
+        a = (np.array([1.0]), np.array([2.0]), np.array([3.0]))
+        result = parallel_component(*a, *B_ALONG_Z)
+        np.testing.assert_allclose(result, 3.0, rtol=1e-14)
+
+    def test_a_parallel_to_b(self):
+        """A ∥ B → A_∥ = |A| (signed positive)."""
+        a = (ZEROS, ZEROS, np.array([7.0]))
+        result = parallel_component(*a, *B_ALONG_Z)
+        np.testing.assert_allclose(result, 7.0, rtol=1e-14)
+
+    def test_a_perpendicular_to_b(self):
+        """A ⊥ B → A_∥ = 0."""
+        a = (np.array([1.0]), np.array([0.0]), ZEROS)
+        result = parallel_component(*a, *B_ALONG_Z)
+        np.testing.assert_allclose(result, 0.0, atol=1e-15)
+
+    def test_antiparallel_negative(self):
+        """A = -B direction → A_∥ = -|A| (sign sanity)."""
+        a = (ZEROS, ZEROS, np.array([-4.0]))
+        result = parallel_component(*a, *B_ALONG_Z)
+        np.testing.assert_allclose(result, -4.0, rtol=1e-14)
+
+    def test_zero_b_gives_nan(self):
+        """|B| = 0 → NaN (undefined b̂)."""
+        a = (np.array([1.0]), np.array([1.0]), np.array([1.0]))
+        result = parallel_component(*a, ZEROS, ZEROS, ZEROS)
+        assert np.isnan(result[0])
+
+
+class TestPerpendicularVector:
+    def test_b_along_z_drops_z(self):
+        """B along z → A_⊥ = (A_x, A_y, 0)."""
+        a = (np.array([1.0]), np.array([2.0]), np.array([3.0]))
+        a_perp = perpendicular_vector(*a, *B_ALONG_Z)
+        np.testing.assert_allclose(a_perp[0], 1.0, rtol=1e-14)
+        np.testing.assert_allclose(a_perp[1], 2.0, rtol=1e-14)
+        np.testing.assert_allclose(a_perp[2], 0.0, atol=1e-15)
+
+    def test_a_parallel_to_b_gives_zero(self):
+        """A ∥ B → A_⊥ = 0 in all components."""
+        a = (ZEROS, ZEROS, np.array([7.0]))
+        a_perp = perpendicular_vector(*a, *B_ALONG_Z)
+        for c in a_perp:
+            np.testing.assert_allclose(c, 0.0, atol=1e-15)
+
+    def test_a_perpendicular_to_b_passes_through(self):
+        """A ⊥ B → A_⊥ = A (entire vector survives)."""
+        a = (np.array([2.5]), np.array([-1.5]), ZEROS)
+        a_perp = perpendicular_vector(*a, *B_ALONG_Z)
+        for c, expected in zip(a_perp, a, strict=True):
+            np.testing.assert_allclose(c, expected, rtol=1e-14)
+
+    def test_zero_b_gives_nan_in_all_components(self):
+        """|B| = 0 → NaN in every output component."""
+        a = (np.array([1.0]), np.array([1.0]), np.array([1.0]))
+        a_perp = perpendicular_vector(*a, ZEROS, ZEROS, ZEROS)
+        for c in a_perp:
+            assert np.isnan(c[0])
+
+    def test_pythagorean_identity(self):
+        """|A|² = A_∥² + |A_⊥|² for arbitrary A, B (structural invariant)."""
+        rng = np.random.default_rng(seed=42)
+        a1, a2, a3 = rng.normal(size=(3, 100))
+        b1, b2, b3 = rng.normal(size=(3, 100))
+        a_par = parallel_component(a1, a2, a3, b1, b2, b3)
+        a_perp = perpendicular_vector(a1, a2, a3, b1, b2, b3)
+        perp_sq = a_perp[0] ** 2 + a_perp[1] ** 2 + a_perp[2] ** 2
+        a_sq = a1**2 + a2**2 + a3**2
+        np.testing.assert_allclose(a_sq, a_par**2 + perp_sq, rtol=1e-12)
+
+
+class TestPerpendicularMagnitude:
+    def test_matches_explicit_components(self):
+        """|A_⊥| from Pythagorean identity matches sqrt of summed squares."""
+        rng = np.random.default_rng(seed=7)
+        a1, a2, a3 = rng.normal(size=(3, 100))
+        b1, b2, b3 = rng.normal(size=(3, 100))
+        from_identity = perpendicular_magnitude(a1, a2, a3, b1, b2, b3)
+        a_perp = perpendicular_vector(a1, a2, a3, b1, b2, b3)
+        from_components = np.sqrt(a_perp[0] ** 2 + a_perp[1] ** 2 + a_perp[2] ** 2)
+        np.testing.assert_allclose(from_identity, from_components, rtol=1e-12)
+
+    def test_b_along_z(self):
+        """|A_⊥| for A=(1,2,3), B along z → sqrt(5)."""
+        a = (np.array([1.0]), np.array([2.0]), np.array([3.0]))
+        result = perpendicular_magnitude(*a, *B_ALONG_Z)
+        np.testing.assert_allclose(result, np.sqrt(5.0), rtol=1e-14)
+
+    def test_zero_b_gives_nan(self):
+        """|B| = 0 → NaN."""
+        a = (np.array([1.0]), np.array([1.0]), np.array([1.0]))
+        result = perpendicular_magnitude(*a, ZEROS, ZEROS, ZEROS)
+        assert np.isnan(result[0])
 
 
 class TestAgyrotropy:

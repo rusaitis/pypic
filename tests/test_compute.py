@@ -849,6 +849,151 @@ class TestPerSpeciesPressureDecomposition:
         np.testing.assert_allclose(compute_field("P_s2_par", ds), 4.0, rtol=1e-15)
 
 
+class TestFieldAlignedVectorDecomposition:
+    """Total J/V/E parallel-perpendicular split via compute registry."""
+
+    def _make_vector_dataset(self):
+        """B along z; J, V, E each set to distinct (1,2,3)-style vectors."""
+        shape = (2, 2, 2)
+        data = {
+            "B_1": np.zeros(shape),
+            "B_2": np.zeros(shape),
+            "B_3": np.ones(shape),
+            "J_1": np.full(shape, 1.0),
+            "J_2": np.full(shape, 2.0),
+            "J_3": np.full(shape, 3.0),
+            "V_1": np.full(shape, 4.0),
+            "V_2": np.full(shape, 5.0),
+            "V_3": np.full(shape, 6.0),
+            "E_1": np.full(shape, 7.0),
+            "E_2": np.full(shape, 8.0),
+            "E_3": np.full(shape, 9.0),
+        }
+        return make_test_dataset(data, shape=shape)
+
+    def test_parallel_picks_z_component(self):
+        ds = self._make_vector_dataset()
+        # B along z: A_par = A_3
+        np.testing.assert_allclose(compute_field("J_par", ds), 3.0, rtol=1e-14)
+        np.testing.assert_allclose(compute_field("V_par", ds), 6.0, rtol=1e-14)
+        np.testing.assert_allclose(compute_field("E_par", ds), 9.0, rtol=1e-14)
+
+    def test_perpendicular_components(self):
+        ds = self._make_vector_dataset()
+        # B along z: A_perp = (A_1, A_2, 0)
+        np.testing.assert_allclose(compute_field("J_perp_1", ds), 1.0, rtol=1e-14)
+        np.testing.assert_allclose(compute_field("J_perp_2", ds), 2.0, rtol=1e-14)
+        np.testing.assert_allclose(compute_field("J_perp_3", ds), 0.0, atol=1e-15)
+        np.testing.assert_allclose(compute_field("V_perp_1", ds), 4.0, rtol=1e-14)
+        np.testing.assert_allclose(compute_field("E_perp_3", ds), 0.0, atol=1e-15)
+
+    def test_perpendicular_magnitudes(self):
+        ds = self._make_vector_dataset()
+        # |J_perp| = sqrt(1+4) = sqrt(5), |V_perp| = sqrt(16+25) = sqrt(41),
+        # |E_perp| = sqrt(49+64) = sqrt(113)
+        np.testing.assert_allclose(
+            compute_field("|J_perp|", ds), np.sqrt(5.0), rtol=1e-14
+        )
+        np.testing.assert_allclose(
+            compute_field("|V_perp|", ds), np.sqrt(41.0), rtol=1e-14
+        )
+        np.testing.assert_allclose(
+            compute_field("|E_perp|", ds), np.sqrt(113.0), rtol=1e-14
+        )
+
+    def test_non_ideal_residual_parallel(self):
+        ds = self._make_vector_dataset()
+        # V=(4,5,6), B=(0,0,1) → V×B = (5,-4,0); E' = E + V×B = (12, 4, 9)
+        # B along z → E'_par = E'_3 = 9.0
+        np.testing.assert_allclose(compute_field("E_prime_par", ds), 9.0, rtol=1e-14)
+        # |E'_perp| = sqrt(12^2 + 4^2) = sqrt(160)
+        np.testing.assert_allclose(
+            compute_field("|E_prime_perp|", ds), np.sqrt(160.0), rtol=1e-14
+        )
+
+    def test_zero_b_propagates_nan(self):
+        shape = (2, 2, 2)
+        data = {
+            "B_1": np.zeros(shape),
+            "B_2": np.zeros(shape),
+            "B_3": np.zeros(shape),
+            "J_1": np.full(shape, 1.0),
+            "J_2": np.full(shape, 2.0),
+            "J_3": np.full(shape, 3.0),
+        }
+        ds = make_test_dataset(data, shape=shape)
+        assert np.all(np.isnan(compute_field("J_par", ds)))
+        assert np.all(np.isnan(compute_field("|J_perp|", ds)))
+
+
+class TestPerSpeciesFieldAlignedDecomposition:
+    """Per-species V_par, V_perp_{1,2,3}, |V_perp| via species template."""
+
+    def _make_dataset(self):
+        shape = (2, 2, 2)
+        data = {
+            "B_1": np.zeros(shape),
+            "B_2": np.zeros(shape),
+            "B_3": np.ones(shape),
+            "V_s0_1": np.full(shape, 1.0),
+            "V_s0_2": np.full(shape, 2.0),
+            "V_s0_3": np.full(shape, 3.0),
+            "V_s1_1": np.full(shape, 10.0),
+            "V_s1_2": np.full(shape, 20.0),
+            "V_s1_3": np.full(shape, 30.0),
+        }
+        return make_test_dataset(data, shape=shape)
+
+    def test_per_species_parallel(self):
+        ds = self._make_dataset()
+        # B along z → V_par_s{N} = V_s{N}_3
+        np.testing.assert_allclose(compute_field("V_s0_par", ds), 3.0, rtol=1e-14)
+        np.testing.assert_allclose(compute_field("V_s1_par", ds), 30.0, rtol=1e-14)
+
+    def test_per_species_perp_components(self):
+        ds = self._make_dataset()
+        np.testing.assert_allclose(compute_field("V_s0_perp_1", ds), 1.0, rtol=1e-14)
+        np.testing.assert_allclose(compute_field("V_s0_perp_2", ds), 2.0, rtol=1e-14)
+        np.testing.assert_allclose(compute_field("V_s0_perp_3", ds), 0.0, atol=1e-15)
+        np.testing.assert_allclose(compute_field("V_s1_perp_1", ds), 10.0, rtol=1e-14)
+
+    def test_per_species_perp_magnitude(self):
+        ds = self._make_dataset()
+        np.testing.assert_allclose(
+            compute_field("|V_s0_perp|", ds), np.sqrt(5.0), rtol=1e-14
+        )
+        np.testing.assert_allclose(
+            compute_field("|V_s1_perp|", ds), np.sqrt(500.0), rtol=1e-14
+        )
+
+    def test_alias_resolution(self):
+        ds = self._make_dataset()
+        # ``V_par_e`` and ``V_s0_par`` resolve to the same array.
+        np.testing.assert_array_equal(
+            compute_field("V_par_e", ds), compute_field("V_s0_par", ds)
+        )
+        np.testing.assert_array_equal(
+            compute_field("V_par_i", ds), compute_field("V_s1_par", ds)
+        )
+
+    def test_dynamic_species_index(self):
+        """V_s2_par synthesizes for species[2] without metadata."""
+        shape = (2, 2, 2)
+        data = {
+            "B_1": np.zeros(shape),
+            "B_2": np.zeros(shape),
+            "B_3": np.ones(shape),
+            "V_s2_1": np.full(shape, 1.0),
+            "V_s2_2": np.full(shape, 2.0),
+            "V_s2_3": np.full(shape, 7.0),
+        }
+        ds = make_test_dataset(data, shape=shape)
+        np.testing.assert_allclose(compute_field("V_s2_par", ds), 7.0, rtol=1e-14)
+        np.testing.assert_allclose(
+            compute_field("|V_s2_perp|", ds), np.sqrt(5.0), rtol=1e-14
+        )
+
+
 class TestGeometryGuard:
     @pytest.mark.parametrize(
         ("field", "components"),

@@ -281,6 +281,59 @@ _REGISTRY: dict[str, _Recipe] = {
     "P_par": _Recipe(derived.parallel_pressure, _PRESSURE_TENSOR_AND_B),
     "P_perp": _Recipe(derived.perpendicular_pressure, _PRESSURE_TENSOR_AND_B),
     "agyrotropy": _Recipe(derived.agyrotropy, _PRESSURE_TENSOR_AND_B),
+    # Field-aligned vector decomposition against b̂ = B/|B|.
+    # NaN propagates from ``_unit_vector`` where |B| = 0.
+    # Per-species V variants are produced by the ``"V_par"`` /
+    # ``"V_perp_{c}"`` / ``"|V_perp|"`` species templates below.
+    "J_par": _Recipe(
+        derived.parallel_component, ("J_1", "J_2", "J_3", "B_1", "B_2", "B_3")
+    ),
+    "V_par": _Recipe(
+        derived.parallel_component, ("V_1", "V_2", "V_3", "B_1", "B_2", "B_3")
+    ),
+    "E_par": _Recipe(
+        derived.parallel_component, ("E_1", "E_2", "E_3", "B_1", "B_2", "B_3")
+    ),
+    **_vector_recipes(
+        "J_perp_{c}",
+        derived.perpendicular_vector,
+        ("J_1", "J_2", "J_3", "B_1", "B_2", "B_3"),
+    ),
+    **_vector_recipes(
+        "V_perp_{c}",
+        derived.perpendicular_vector,
+        ("V_1", "V_2", "V_3", "B_1", "B_2", "B_3"),
+    ),
+    **_vector_recipes(
+        "E_perp_{c}",
+        derived.perpendicular_vector,
+        ("E_1", "E_2", "E_3", "B_1", "B_2", "B_3"),
+    ),
+    "|J_perp|": _Recipe(
+        derived.velocity_magnitude, ("J_perp_1", "J_perp_2", "J_perp_3")
+    ),
+    "|V_perp|": _Recipe(
+        derived.velocity_magnitude, ("V_perp_1", "V_perp_2", "V_perp_3")
+    ),
+    "|E_perp|": _Recipe(
+        derived.velocity_magnitude, ("E_perp_1", "E_perp_2", "E_perp_3")
+    ),
+    # Non-ideal residual decomposition (E' = E + V×B). Reuses the
+    # existing ``E_prime_{1,2,3}`` recipes (below) as inputs.
+    # ``E_prime_par`` is the canonical reconnection-rate diagnostic.
+    "E_prime_par": _Recipe(
+        derived.parallel_component,
+        ("E_prime_1", "E_prime_2", "E_prime_3", "B_1", "B_2", "B_3"),
+    ),
+    **_vector_recipes(
+        "E_prime_perp_{c}",
+        derived.perpendicular_vector,
+        ("E_prime_1", "E_prime_2", "E_prime_3", "B_1", "B_2", "B_3"),
+    ),
+    "|E_prime_perp|": _Recipe(
+        derived.velocity_magnitude,
+        ("E_prime_perp_1", "E_prime_perp_2", "E_prime_perp_3"),
+    ),
     # Grid-dependent diagnostics
     "div_B": _Recipe(
         diagnostics.div_b,
@@ -355,6 +408,12 @@ class _SpeciesTemplate:
     species_args: _SpeciesArgs
     needs_gamma: bool = False
     needs_c: bool = False
+    # Mirrors ``_Recipe.component`` — for tuple-returning funcs like
+    # ``perpendicular_vector`` used in ``V_perp_{c}`` per-species
+    # templates.  The synthesized ``_Recipe`` carries it through to the
+    # compute path so the right element of the returned tuple is
+    # selected.
+    component: int | None = None
 
 
 _SPECIES_TEMPLATES: dict[str, _SpeciesTemplate] = {
@@ -398,6 +457,37 @@ _SPECIES_TEMPLATES: dict[str, _SpeciesTemplate] = {
     "agyrotropy": _SpeciesTemplate(
         derived.agyrotropy,
         _SPECIES_PRESSURE_TENSOR_AND_B,
+        _SpeciesArgs.NONE,
+    ),
+    # Per-species field-aligned velocity decomposition.
+    # V_par scalar; V_perp_{1,2,3} use a single tuple-returning function
+    # with ``component=`` to pick the right element.
+    "V_par": _SpeciesTemplate(
+        derived.parallel_component,
+        ("V_s{N}_1", "V_s{N}_2", "V_s{N}_3", "B_1", "B_2", "B_3"),
+        _SpeciesArgs.NONE,
+    ),
+    "V_perp_1": _SpeciesTemplate(
+        derived.perpendicular_vector,
+        ("V_s{N}_1", "V_s{N}_2", "V_s{N}_3", "B_1", "B_2", "B_3"),
+        _SpeciesArgs.NONE,
+        component=0,
+    ),
+    "V_perp_2": _SpeciesTemplate(
+        derived.perpendicular_vector,
+        ("V_s{N}_1", "V_s{N}_2", "V_s{N}_3", "B_1", "B_2", "B_3"),
+        _SpeciesArgs.NONE,
+        component=1,
+    ),
+    "V_perp_3": _SpeciesTemplate(
+        derived.perpendicular_vector,
+        ("V_s{N}_1", "V_s{N}_2", "V_s{N}_3", "B_1", "B_2", "B_3"),
+        _SpeciesArgs.NONE,
+        component=2,
+    ),
+    "|V_perp|": _SpeciesTemplate(
+        derived.perpendicular_magnitude,
+        ("V_s{N}_1", "V_s{N}_2", "V_s{N}_3", "B_1", "B_2", "B_3"),
         _SpeciesArgs.NONE,
     ),
     "T": _SpeciesTemplate(derived.temperature, ("P_s{N}", "n_s{N}"), _SpeciesArgs.NONE),
@@ -514,20 +604,23 @@ _SPECIES_TEMPLATES: dict[str, _SpeciesTemplate] = {
     ),
 }
 
-# Match the species qualifier ``_s<N>`` in any of three positions:
+# Match the species qualifier ``_s<N>`` in any of four positions:
 #   1. End (scalar per-species like ``omega_p_s2``, ``P_s0``, ``T_s1``).
 #   2. Middle followed by a component / modifier suffix (vector/tensor
 #      per-species or generic operator under Tier-3 canonical:
 #      ``V_s0_1``, ``q_s0_1``, ``P_s0_11``, ``P_s0_par``,
-#      ``P_s0_perp``).
+#      ``P_s0_perp``, ``V_s0_perp_1``).
 #   3. Middle followed by a closing pipe (per-species magnitude:
 #      ``|V_s0|``, ``|J_s1|``).
+#   4. Middle followed by an operator + closing pipe (per-species
+#      operator magnitude: ``|V_s0_perp|``).
 # The template lookup key is ``<prefix><suffix>`` — for ``V_s0_1`` it's
 # ``"V_1"``, for ``P_s0_par`` it's ``"P_par"``, for ``|V_s0|`` it's
-# ``"|V|"``. The ``_[^|]+`` form excludes pipes so they don't get
-# swallowed into the ``_<modifier>`` branch when both forms could match.
+# ``"|V|"``, for ``|V_s0_perp|`` it's ``"|V_perp|"``. The ``_[^|]+\|``
+# alternative comes first so the operator-plus-pipe form wins over the
+# bare ``_[^|]+`` form when both could match.
 _SPECIES_SUFFIX_RE = re.compile(
-    r"^(?P<prefix>.+?)_s(?P<idx>\d+)(?P<suffix>_[^|]+|\|)?$"
+    r"^(?P<prefix>.+?)_s(?P<idx>\d+)(?P<suffix>_[^|]+\||_[^|]+|\|)?$"
 )
 
 # Generic operator suffixes that must sit *after* the species qualifier
@@ -567,6 +660,7 @@ def _try_species_recipe(name: str) -> _Recipe | None:
         needs_gamma=template.needs_gamma,
         needs_c=template.needs_c,
         species_args=template.species_args,
+        component=template.component,
     )
 
 

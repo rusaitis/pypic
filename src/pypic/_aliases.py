@@ -18,11 +18,15 @@ if TYPE_CHECKING:
 # Tier-3 position:
 #   - End (scalar per-species): ``P_s0``, ``T_s1`` — no suffix.
 #   - Middle followed by a component / modifier (vector, tensor, or
-#     generic operator): ``V_s0_1``, ``P_s0_11``, ``P_s0_par``.
+#     generic operator): ``V_s0_1``, ``P_s0_11``, ``P_s0_par``,
+#     ``V_s0_perp_1``.
 #   - Middle followed by closing pipe (per-species magnitude):
 #     ``|V_s0|``, ``|J_s1|``.
-# Captures (species, suffix); suffix is ``_<x>``, ``|``, or empty.
-_SPECIES_SUFFIX = re.compile(r"_s(\d+)(?P<suffix>_[^|]+|\|)?$")
+#   - Middle followed by an operator + closing pipe (per-species
+#     operator magnitude): ``|V_s0_perp|``.
+# Captures (species, suffix); suffix is ``_<x>|`` (operator + pipe),
+# ``_<x>``, ``|``, or empty.
+_SPECIES_SUFFIX = re.compile(r"_s(\d+)(?P<suffix>_[^|]+\||_[^|]+|\|)?$")
 
 _COMPUTE_ALIASES: dict[str, str] = {
     "curl_Bx": "curl_B_1",
@@ -145,6 +149,9 @@ _COMPUTE_ALIASES: dict[str, str] = {
     "P_perp_i": "P_s1_perp",
     "agyrotropy_e": "agyrotropy_s0",
     "agyrotropy_i": "agyrotropy_s1",
+    # Per-species parallel velocity shorthand.
+    "V_par_e": "V_s0_par",
+    "V_par_i": "V_s1_par",
     # Long-form thermal-speed alias resolves to Tier-3 canonical.
     "thermal_speed_s0": "v_th_s0",
     "thermal_speed_s1": "v_th_s1",

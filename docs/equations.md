@@ -157,7 +157,9 @@ $$\mathbf{EF}_s = \underbrace{\tfrac{1}{2} n_s m_s |\mathbf{V}_s|^2 \mathbf{V}_s
     *both* anisotropy and heat conduction effects.
 
 
-## 4. Pressure Tensor
+## 4. Pressure Tensor and Field-Aligned Decomposition
+
+### 4.1 Pressure tensor
 
 | Name | Description | Normalized | SI |
 |------|-------------|------------|-----|
@@ -166,6 +168,35 @@ $$\mathbf{EF}_s = \underbrace{\tfrac{1}{2} n_s m_s |\mathbf{V}_s|^2 \mathbf{V}_s
 | `P_perp` | Perpendicular pressure | $P_\perp = (\mathrm{Tr}(\mathbf{P}) - P_\parallel) / 2$ | -- |
 | `Pij` | Full pressure tensor | 6 independent components: P_11, P_12, P_13, P_22, P_23, P_33 | -- |
 | `agyrotropy` | Agyrotropy measure[^Q] | $Q = \sqrt{1 - 4 I_2 / [(I_1 - P_\parallel)(I_1 + 3 P_\parallel)]}$ | -- |
+
+### 4.2 Field-aligned vector decomposition
+
+Projects a vector $\mathbf{A}$ onto $\hat{b} = \mathbf{B}/|\mathbf{B}|$.
+Generic form, same algebra for $\mathbf{J}$, $\mathbf{V}$,
+$\mathbf{E}$, and the non-ideal residual
+$\mathbf{E}' = \mathbf{E} + \mathbf{V}\times\mathbf{B}$.  All returns
+are NaN where $|B| = 0$.
+
+| Name | Description | Normalized |
+|------|-------------|------------|
+| `J_par`, `V_par`, `E_par` | Signed parallel projection | $A_\parallel = \mathbf{A}\cdot\hat{b}$ |
+| `J_perp_1/2/3`, `V_perp_1/2/3`, `E_perp_1/2/3` | Perpendicular vector components | $\mathbf{A}_\perp = \mathbf{A} - A_\parallel\hat{b}$ |
+| `\|J_perp\|`, `\|V_perp\|`, `\|E_perp\|` | Perpendicular magnitude[^par_perp_id] | $\sqrt{\|\mathbf{A}\|^2 - A_\parallel^2}$ |
+| `V_s{N}_par`, `V_s{N}_perp_{1,2,3}`, `\|V_s{N}_perp\|` | Per-species velocity decomposition | same form on `V_s{N}_{1,2,3}` |
+| `E_prime_par` | Field-aligned non-ideal residual[^reconn_rate] | $(\mathbf{E} + \mathbf{V}\times\mathbf{B}) \cdot \hat{b}$ |
+| `\|E_prime_perp\|` | Perpendicular non-ideal residual magnitude | $\sqrt{\|\mathbf{E}'\|^2 - E'^2_\parallel}$ |
+
+[^par_perp_id]: Pythagorean identity holds exactly:
+    $\|\mathbf{A}\|^2 = A_\parallel^2 + \|\mathbf{A}_\perp\|^2$. The
+    perpendicular magnitude uses this directly — half the temporaries
+    of materializing the three perpendicular components.
+
+[^reconn_rate]: $E'_\parallel$ quantifies frozen-in flux violation:
+    it is zero in ideal MHD and non-zero only where the non-ideal
+    terms in Ohm's law (resistivity, electron inertia, pressure
+    divergence) break the frozen-in condition.  In 2D it equals
+    $\partial\psi/\partial t$ at the X-point — the standard
+    reconnection-rate quantity.  Cross-reference §9 footnote 13.
 
 [^Q]: Swisdak's gyrotropy measure [@Swisdak2016], computed from the
     first two invariants of the pressure tensor:

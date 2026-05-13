@@ -1123,6 +1123,40 @@ Listing `Pij` (or per-species `Pij_s{N}`) in
   then unavailable and the stored values lock to the snapshot's
   $\hat{b}$.
 
+### Field-aligned vector decomposition
+
+Projects a vector $\mathbf{A}$ onto $\hat{b} = \mathbf{B}/|\mathbf{B}|$.
+All entries are derived-on-demand (never written to disk) and return
+NaN where $|B| = 0$.  Frame-transform behavior matches the *Acceptable*
+storage tier above: values are $\hat{b}$-locked to the snapshot, so a
+frame rotation re-expresses the perpendicular components in the new
+basis.  See [conventions.md § Field-Aligned
+Decomposition](conventions.md#field-aligned-decomposition) for the sign
+convention and reference-vector choice.
+
+| Canonical | Meaning | Computed from |
+|-----------|---------|---------------|
+| `J_par` | Field-aligned current density $J_\parallel = \mathbf{J}\cdot\hat{b}$ | `J_1`, `J_2`, `J_3`, `B_1-B_3` |
+| `J_perp_1`, `J_perp_2`, `J_perp_3` | Perpendicular current density $\mathbf{J}_\perp = \mathbf{J} - J_\parallel\hat{b}$ | `J_1-J_3`, `B_1-B_3` |
+| `\|J_perp\|` | Perpendicular current density magnitude | `J_1-J_3`, `B_1-B_3` |
+| `V_par` | Field-aligned bulk velocity | `V_1-V_3`, `B_1-B_3` |
+| `V_perp_1`, `V_perp_2`, `V_perp_3` | Perpendicular bulk velocity | `V_1-V_3`, `B_1-B_3` |
+| `\|V_perp\|` | Perpendicular bulk velocity magnitude | `V_1-V_3`, `B_1-B_3` |
+| `V_s{N}_par` | Per-species parallel velocity | `V_s{N}_1-V_s{N}_3`, `B_1-B_3` |
+| `V_s{N}_perp_1`, `V_s{N}_perp_2`, `V_s{N}_perp_3` | Per-species perpendicular velocity | `V_s{N}_1-V_s{N}_3`, `B_1-B_3` |
+| `\|V_s{N}_perp\|` | Per-species perpendicular velocity magnitude | `V_s{N}_1-V_s{N}_3`, `B_1-B_3` |
+| `E_par` | Field-aligned electric field | `E_1-E_3`, `B_1-B_3` |
+| `E_perp_1`, `E_perp_2`, `E_perp_3` | Perpendicular electric field | `E_1-E_3`, `B_1-B_3` |
+| `\|E_perp\|` | Perpendicular electric field magnitude | `E_1-E_3`, `B_1-B_3` |
+| `E_prime_par` | Field-aligned non-ideal residual $E'_\parallel = (\mathbf{E}+\mathbf{V}\times\mathbf{B})\cdot\hat{b}$ — the canonical reconnection-rate diagnostic | `E_1-E_3`, `V_1-V_3`, `B_1-B_3` |
+| `E_prime_perp_1`, `E_prime_perp_2`, `E_prime_perp_3` | Perpendicular non-ideal residual | `E_1-E_3`, `V_1-V_3`, `B_1-B_3` |
+| `\|E_prime_perp\|` | Perpendicular non-ideal residual magnitude | `E_1-E_3`, `V_1-V_3`, `B_1-B_3` |
+
+Two-species shorthand aliases `V_par_e ↔ V_s0_par`, `V_par_i ↔
+V_s1_par` are registered (mirrors `P_par_e`/`P_par_i`).  Vector-group
+expansion in `read()` resolves `"V_perp"` → `V_perp_1, V_perp_2,
+V_perp_3` and `"V_s0_perp"` → `V_s0_perp_1, V_s0_perp_2, V_s0_perp_3`.
+
 ### Characteristic scales (derived)
 
 | Canonical | NRL alias | Meaning | Computed from |

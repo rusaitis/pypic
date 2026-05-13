@@ -294,6 +294,114 @@ _FIELD_INFO: dict[str, FieldInfo] = {
     "Pi": _FI("pressure", "Ion pressure", "Pa", r"$P_i$"),
     "P_par": _FI("pressure", "Parallel pressure", "Pa", r"$P_\parallel$"),
     "P_perp": _FI("pressure", "Perpendicular pressure", "Pa", r"$P_\perp$"),
+    # Field-aligned vector decomposition (against b̂ = B/|B|).
+    "J_par": _FI(
+        "current_density", "Parallel current density", "A/m^2", r"$J_\parallel$"
+    ),
+    "J_perp_1": _FI(
+        "current_density",
+        "Perpendicular current density (component 1)",
+        "A/m^2",
+        r"$J_{\perp,1}$",
+    ),
+    "J_perp_2": _FI(
+        "current_density",
+        "Perpendicular current density (component 2)",
+        "A/m^2",
+        r"$J_{\perp,2}$",
+    ),
+    "J_perp_3": _FI(
+        "current_density",
+        "Perpendicular current density (component 3)",
+        "A/m^2",
+        r"$J_{\perp,3}$",
+    ),
+    "|J_perp|": _FI(
+        "current_density",
+        "Perpendicular current density magnitude",
+        "A/m^2",
+        r"$|\mathbf{J}_\perp|$",
+    ),
+    "V_par": _FI("velocity", "Parallel bulk velocity", "m/s", r"$V_\parallel$"),
+    "V_perp_1": _FI(
+        "velocity",
+        "Perpendicular bulk velocity (component 1)",
+        "m/s",
+        r"$V_{\perp,1}$",
+    ),
+    "V_perp_2": _FI(
+        "velocity",
+        "Perpendicular bulk velocity (component 2)",
+        "m/s",
+        r"$V_{\perp,2}$",
+    ),
+    "V_perp_3": _FI(
+        "velocity",
+        "Perpendicular bulk velocity (component 3)",
+        "m/s",
+        r"$V_{\perp,3}$",
+    ),
+    "|V_perp|": _FI(
+        "velocity",
+        "Perpendicular bulk velocity magnitude",
+        "m/s",
+        r"$|\mathbf{V}_\perp|$",
+    ),
+    "E_par": _FI("e_field", "Parallel electric field", "V/m", r"$E_\parallel$"),
+    "E_perp_1": _FI(
+        "e_field",
+        "Perpendicular electric field (component 1)",
+        "V/m",
+        r"$E_{\perp,1}$",
+    ),
+    "E_perp_2": _FI(
+        "e_field",
+        "Perpendicular electric field (component 2)",
+        "V/m",
+        r"$E_{\perp,2}$",
+    ),
+    "E_perp_3": _FI(
+        "e_field",
+        "Perpendicular electric field (component 3)",
+        "V/m",
+        r"$E_{\perp,3}$",
+    ),
+    "|E_perp|": _FI(
+        "e_field",
+        "Perpendicular electric field magnitude",
+        "V/m",
+        r"$|\mathbf{E}_\perp|$",
+    ),
+    "E_prime_par": _FI(
+        "e_field",
+        "Parallel non-ideal electric field",
+        "V/m",
+        r"$E'_\parallel$",
+    ),
+    "E_prime_perp_1": _FI(
+        "e_field",
+        "Perpendicular non-ideal electric field (component 1)",
+        "V/m",
+        r"$E'_{\perp,1}$",
+    ),
+    "E_prime_perp_2": _FI(
+        "e_field",
+        "Perpendicular non-ideal electric field (component 2)",
+        "V/m",
+        r"$E'_{\perp,2}$",
+    ),
+    "E_prime_perp_3": _FI(
+        "e_field",
+        "Perpendicular non-ideal electric field (component 3)",
+        "V/m",
+        r"$E'_{\perp,3}$",
+    ),
+    "|E_prime_perp|": _FI(
+        "e_field",
+        "Perpendicular non-ideal electric field magnitude",
+        "V/m",
+        r"$|\mathbf{E}'_\perp|$",
+    ),
     "P_11": _FI("pressure", "Pressure tensor P_11", "Pa", r"$P_{11}$"),
     "P_22": _FI("pressure", "Pressure tensor P_22", "Pa", r"$P_{22}$"),
     "P_33": _FI("pressure", "Pressure tensor P_33", "Pa", r"$P_{33}$"),
@@ -682,6 +790,25 @@ _SPECIES_PATTERN_SPECS: list[tuple[str, str, str, str]] = [
         r"$P_{{\perp,s{N}}}$",
     ),
     ("agyrotropy", "dimensionless", "Agyrotropy (species {N})", r"$Q_{{s{N}}}$"),
+    # Per-species field-aligned velocity decomposition.
+    (
+        "V_par",
+        "velocity",
+        "Parallel bulk velocity (species {N})",
+        r"$V_{{\parallel,s{N}}}$",
+    ),
+    (
+        "V_perp([123])",
+        "velocity",
+        "Perpendicular bulk velocity component {C} (species {N})",
+        r"$V_{{\perp,{C},s{N}}}$",
+    ),
+    (
+        r"\|V_perp\|",
+        "velocity",
+        "Perpendicular bulk velocity magnitude (species {N})",
+        r"$|V_{{\perp,s{N}}}|$",
+    ),
 ]
 
 # Generic operator suffixes — when a pattern prefix ends in one of these,
@@ -695,13 +822,19 @@ _GENERIC_OPERATOR_SUFFIXES: frozenset[str] = frozenset({"par", "perp"})
 def _build_species_info_pattern(prefix: str) -> re.Pattern[str]:
     r"""Translate a Tier-3 prefix entry into its full species-name regex.
 
-    Five flavors:
+    Six flavors:
       - Vector with explicit ``([123])`` capture (e.g. ``J([123])``)
-        → ``^J_s(\d+)_([123])$``
+        → ``^J_s(\d+)_([123])$``.  When the base before the capture
+        ends with a generic operator (``V_perp([123])``), the species
+        qualifier slots in between the root and the operator:
+        ``^V_s(\d+)_perp_([123])$``.
       - Tensor variant ``P(\d{0,2})`` → ``^P_s(\d+)(?:_(\d{2}))?$``
         (matches both scalar ``P_s0`` and tensor ``P_s0_11``)
       - Pipe-wrapped magnitude (``\|V\|`` → ``^\|V_s(\d+)\|$``):
-        species sits inside the bars, bracketing the operand.
+        species sits inside the bars, bracketing the operand.  When the
+        operand contains a generic operator (``\|V_perp\|``), the
+        species again slots between the root and the operator:
+        ``^\|V_s(\d+)_perp\|$``.
       - Generic-operator suffix (``P_par`` → ``^P_s(\d+)_par$``):
         species in middle, operator at end.
       - Plain scalar (``n``, ``T``, ``omega_p``, ``rho_m``, ``s_gyro``):
@@ -709,11 +842,23 @@ def _build_species_info_pattern(prefix: str) -> re.Pattern[str]:
     """
     if "([123])" in prefix:
         base = prefix.replace("([123])", "")
+        # Vector with generic operator: ``V_perp([123])`` →
+        # ``^V_s(\d+)_perp_([123])$``.
+        if "_" in base:
+            root, _, op = base.rstrip("_").rpartition("_")
+            if op in _GENERIC_OPERATOR_SUFFIXES:
+                return re.compile(rf"^{root}_s(\d+)_{op}_([123])$")
         return re.compile(rf"^{base}_s(\d+)_([123])$")
     if r"P(\d{0,2})" in prefix:
         return re.compile(r"^P_s(\d+)(?:_(\d{2}))?$")
     if prefix.startswith(r"\|") and prefix.endswith(r"\|"):
         inner = prefix[2:-2]
+        # Pipe-wrapped magnitude with generic operator:
+        # ``\|V_perp\|`` → ``^\|V_s(\d+)_perp\|$``.
+        if "_" in inner:
+            root, _, op = inner.rpartition("_")
+            if op in _GENERIC_OPERATOR_SUFFIXES:
+                return re.compile(rf"^\|{root}_s(\d+)_{op}\|$")
         return re.compile(rf"^\|{inner}_s(\d+)\|$")
     if "_" in prefix:
         root, _, suffix = prefix.rpartition("_")

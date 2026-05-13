@@ -612,10 +612,141 @@ def _unit_vector(
 
     Returns NaN where the magnitude is zero. These NaN values propagate
     into downstream consumers (``parallel_pressure``, ``perpendicular_pressure``,
-    ``agyrotropy``) in zero-field regions.
+    ``agyrotropy``, ``parallel_component``, ``perpendicular_vector``) in
+    zero-field regions.
     """
     mag = _vector_magnitude(b1, b2, b3)
     return _safe_divide(b1, mag), _safe_divide(b2, mag), _safe_divide(b3, mag)
+
+
+def parallel_component(
+    a1: FloatArray,
+    a2: FloatArray,
+    a3: FloatArray,
+    b1: FloatArray,
+    b2: FloatArray,
+    b3: FloatArray,
+) -> FloatArray:
+    r"""Signed projection of $\mathbf{A}$ onto $\hat{b} = \mathbf{B}/|\mathbf{B}|$.
+
+    $$A_\parallel = \mathbf{A} \cdot \hat{b}$$
+
+    Generic — used for $J_\parallel$, $V_\parallel$, $E_\parallel$,
+    $E'_\parallel$, and per-species variants.  Positive when $\mathbf{A}$
+    is co-directional with $\mathbf{B}$.
+
+    Parameters
+    ----------
+    a1, a2, a3 : NDArray
+        Components of the vector field to project.
+    b1, b2, b3 : NDArray
+        Components of the reference magnetic field.
+
+    Returns
+    -------
+    NDArray
+        Signed scalar projection.  Returns NaN where $|B| = 0$
+        (undefined magnetic direction).
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> parallel_component(
+    ...     np.array([1.0]), np.array([2.0]), np.array([3.0]),
+    ...     np.array([0.0]), np.array([0.0]), np.array([1.0]),
+    ... )
+    array([3.])
+    """
+    bhat_1, bhat_2, bhat_3 = _unit_vector(b1, b2, b3)
+    return a1 * bhat_1 + a2 * bhat_2 + a3 * bhat_3
+
+
+def perpendicular_vector(
+    a1: FloatArray,
+    a2: FloatArray,
+    a3: FloatArray,
+    b1: FloatArray,
+    b2: FloatArray,
+    b3: FloatArray,
+) -> tuple[FloatArray, FloatArray, FloatArray]:
+    r"""Vector component of $\mathbf{A}$ perpendicular to $\hat{b}$.
+
+    $$\mathbf{A}_\perp = \mathbf{A} - (\mathbf{A}\cdot\hat{b})\,\hat{b}$$
+
+    Returns a 3-tuple of NumPy arrays — one per component — for use
+    via the compute layer's ``_vector_recipes`` helper.
+
+    Parameters
+    ----------
+    a1, a2, a3 : NDArray
+        Components of the vector field to project.
+    b1, b2, b3 : NDArray
+        Components of the reference magnetic field.
+
+    Returns
+    -------
+    tuple of NDArray
+        Three perpendicular components.  Each returns NaN where
+        $|B| = 0$.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> a_perp = perpendicular_vector(
+    ...     np.array([1.0]), np.array([2.0]), np.array([3.0]),
+    ...     np.array([0.0]), np.array([0.0]), np.array([1.0]),
+    ... )
+    >>> [c.tolist() for c in a_perp]
+    [[1.0], [2.0], [0.0]]
+    """
+    bhat_1, bhat_2, bhat_3 = _unit_vector(b1, b2, b3)
+    a_par = a1 * bhat_1 + a2 * bhat_2 + a3 * bhat_3
+    return (
+        a1 - a_par * bhat_1,
+        a2 - a_par * bhat_2,
+        a3 - a_par * bhat_3,
+    )
+
+
+def perpendicular_magnitude(
+    a1: FloatArray,
+    a2: FloatArray,
+    a3: FloatArray,
+    b1: FloatArray,
+    b2: FloatArray,
+    b3: FloatArray,
+) -> FloatArray:
+    r"""Magnitude of the component of $\mathbf{A}$ perpendicular to $\hat{b}$.
+
+    $$|\mathbf{A}_\perp| = \sqrt{|\mathbf{A}|^2 - A_\parallel^2}$$
+
+    Pythagorean form — avoids materializing the three perpendicular
+    components when only the magnitude is needed.
+
+    Parameters
+    ----------
+    a1, a2, a3 : NDArray
+        Components of the vector field to project.
+    b1, b2, b3 : NDArray
+        Components of the reference magnetic field.
+
+    Returns
+    -------
+    NDArray
+        $|\mathbf{A}_\perp|$.  Returns NaN where $|B| = 0$.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> perpendicular_magnitude(
+    ...     np.array([1.0]), np.array([2.0]), np.array([3.0]),
+    ...     np.array([0.0]), np.array([0.0]), np.array([1.0]),
+    ... )
+    array([2.23606798])
+    """
+    a_par = parallel_component(a1, a2, a3, b1, b2, b3)
+    a_sq = a1**2 + a2**2 + a3**2
+    return np.sqrt(np.maximum(a_sq - a_par**2, 0.0))
 
 
 def temperature(pressure: FloatArray, density: FloatArray) -> FloatArray:

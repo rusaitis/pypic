@@ -214,6 +214,48 @@ Node-Centered Grid Convention below); BATSRUS HDF5 destaggers
 face-centered B to cell centers; the convention is recorded
 per-dataset in `StaggerInfo` metadata.
 
+## Field-Aligned Decomposition
+
+`compute("J_par")`, `V_par`, `E_par`, `E_prime_par`, and their per-species
+and perpendicular siblings decompose a vector $\mathbf{A}$ against
+$\hat{b} = \mathbf{B}/|\mathbf{B}|$.  Formulas are in
+[equations.md § 4.2](equations.md#42-field-aligned-vector-decomposition).
+Five conventions apply, all matching the existing pressure-tensor
+decomposition ([`P_par`](equations.md#4-pressure-tensor-and-field-aligned-decomposition)):
+
+- **Sign of $A_\parallel$.** Signed: $A_\parallel > 0$ means $\mathbf{A}$
+  is co-directional with $\mathbf{B}$, $< 0$ means anti-parallel.
+  $A_\parallel = 0$ for purely perpendicular vectors.  Identity:
+  $|\mathbf{A}|^2 = A_\parallel^2 + |\mathbf{A}_\perp|^2$.
+
+- **Reference vector.** The local, *full* magnetic field $\mathbf{B}$
+  from the dataset — not a background $\mathbf{B}_0$ (split-B) or a
+  smoothed/averaged version.  Workflows that need decomposition
+  against $\mathbf{B}_0$ should call `derived.parallel_component(a1,
+  a2, a3, B0_1, B0_2, B0_3)` directly; no `J_par_B0` recipe is
+  registered.
+
+- **Behavior at $|B| = 0$.** NaN in every output component.  Inherited
+  from `_unit_vector`; matches `P_par`/`P_perp`/`agyrotropy`.  In
+  practice, even before exact zero $\hat{b}$ becomes ill-conditioned —
+  mask cells where $|B|$ falls below a physically motivated floor
+  before drawing conclusions about $\mathbf{A}_\perp$.
+
+- **Frame transforms.** The decomposition is $\hat{b}$-locked to the
+  snapshot frame.  A frame rotation that re-expresses $\mathbf{B}$ in
+  a new basis re-expresses $\mathbf{A}_\perp$ in that basis too;
+  $A_\parallel$ is a frame-invariant scalar up to the choice of
+  $\hat{b}$.  Stored arrays reflect the snapshot frame; transform at
+  read time via `FieldDataset.transform_to(...)` if a different frame
+  is needed.
+
+- **Per-species coverage.** $\mathbf{V}$ has the per-species form
+  ($V_{s\{N\}\,\parallel}$, $V_{s\{N\}\,\perp,i}$, $|V_{s\{N\}\,\perp}|$).
+  $\mathbf{J}$ and $\mathbf{E}$ are total-only — per-species $\mathbf{J}$
+  is uncommon in output, and $\mathbf{E}$ is a field (not a species
+  moment).  Add per-species recipes for either if a reader exposes the
+  inputs.
+
 ## Node-Centered Grid Convention
 
 iPIC3D outputs all fields on **nodes** (cell vertices), not cell centers.

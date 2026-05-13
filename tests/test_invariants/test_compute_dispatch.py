@@ -20,12 +20,19 @@ from tests._helpers import make_test_dataset
 # magnitudes (``|V_s0|``, ``|V_s1|``, ...) are template-synthesized
 # and live outside this list. ``|Ve|`` collapsed into an alias for
 # ``|V_s0|`` at Stage E — it's no longer in the static registry.
+# Field-aligned-decomposition magnitudes (``|J_perp|``, ``|V_perp|``,
+# ``|E_perp|``, ``|E_prime_perp|``) use ``velocity_magnitude`` over the
+# three perpendicular components, so the same algebraic identity holds.
 MAGNITUDE_RECIPES: tuple[tuple[str, tuple[str, str, str]], ...] = (
     ("|B|", ("B_1", "B_2", "B_3")),
     ("|E|", ("E_1", "E_2", "E_3")),
     ("|J|", ("J_1", "J_2", "J_3")),
     ("|V|", ("V_1", "V_2", "V_3")),
     ("|vort|", ("vort_1", "vort_2", "vort_3")),
+    ("|J_perp|", ("J_perp_1", "J_perp_2", "J_perp_3")),
+    ("|V_perp|", ("V_perp_1", "V_perp_2", "V_perp_3")),
+    ("|E_perp|", ("E_perp_1", "E_perp_2", "E_perp_3")),
+    ("|E_prime_perp|", ("E_prime_perp_1", "E_prime_perp_2", "E_prime_perp_3")),
 )
 
 
