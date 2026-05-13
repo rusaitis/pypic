@@ -1608,19 +1608,35 @@ def agyrotropy(
     b2: FloatArray,
     b3: FloatArray,
 ) -> FloatArray:
-    r"""Compute the agyrotropy measure (Swisdak 2016).
+    r"""Compute the agyrotropy measure $Q$ (Swisdak 2016).
 
-    $$Q = 1 - \frac{4 I_2}{I_1^2}$$
+    $$Q = 1 - \frac{4 I_2}{(I_1 - P_\parallel)(I_1 + 3 P_\parallel)}$$
 
-    where $I_1 = \mathrm{Tr}(\mathbf{P}) - P_\parallel$ and
-    $I_2 = (I_1^2 - \|\boldsymbol{\Pi}\|_F^2) / 2$, with
-    $\boldsymbol{\Pi} = (\mathbf{I} - \hat{b}\hat{b}) \cdot \mathbf{P}
-    \cdot (\mathbf{I} - \hat{b}\hat{b})$ the double-projected
-    perpendicular pressure tensor (Swisdak, J. Geophys. Res. Space
-    Physics, 121, 5549-5565, 2016).
+    where the invariants of the full pressure tensor are
+
+    $$I_1 = \mathrm{Tr}(\mathbf{P}) = P_{11} + P_{22} + P_{33},$$
+
+    $$I_2 = P_{11}P_{22} + P_{11}P_{33} + P_{22}P_{33}
+            - P_{12}^2 - P_{13}^2 - P_{23}^2,$$
+
+    and $P_\parallel = \hat{b}\cdot\mathbf{P}\cdot\hat{b}$ is the
+    field-aligned pressure (Swisdak, Geophys. Res. Lett. 43, 43–49,
+    2016, Eq. A8).
 
     Bounded $[0, 1]$: 0 is gyrotropic, 1 is maximally agyrotropic.
     Returns NaN where $|B| = 0$ (undefined magnetic direction).
+    Frame-invariant — built from invariants of $\mathbf{P}$ plus the
+    field-aligned scalar $P_\parallel$.
+
+    Unlike Scudder's $A_\phi$ (``scudder_agyrotropy``), which depends
+    only on the perpendicular $2\times 2$ block and is therefore blind
+    to off-axis ($\hat{b}$-coupling) components of $\mathbf{P}$, $Q$
+    detects every form of nongyrotropy a symmetric tensor can carry.
+    Aunai's $D_{ng}$ (``aunai_nongyrotropy``) is the other
+    full-tensor measure in this trio. Swisdak's paper plots
+    $\sqrt{Q}$ to share a linear scale with $A_\phi$ and $D_{ng}$ in
+    figures; the *definition* (and what this function returns) is
+    $Q$, not $\sqrt{Q}$.
 
     Parameters
     ----------
@@ -1659,45 +1675,16 @@ def agyrotropy(
     array([0.])
     """
     bhat_1, bhat_2, bhat_3 = _unit_vector(b1, b2, b3)
-
     p_par = (
         bhat_1**2 * p11
         + bhat_2**2 * p22
         + bhat_3**2 * p33
         + 2.0 * (bhat_1 * bhat_2 * p12 + bhat_1 * bhat_3 * p13 + bhat_2 * bhat_3 * p23)
     )
-
-    invariant_1 = p11 + p22 + p33 - p_par
-
-    # Double-projected perpendicular tensor: Π = (I-b̂b̂)·P·(I-b̂b̂)
-    # Π_ij = P_ij - (Pb̂)_i b̂_j - b̂_i (Pb̂)_j + P_∥ b̂_i b̂_j
-    p_dot_bhat_1 = p11 * bhat_1 + p12 * bhat_2 + p13 * bhat_3
-    p_dot_bhat_2 = p12 * bhat_1 + p22 * bhat_2 + p23 * bhat_3
-    p_dot_bhat_3 = p13 * bhat_1 + p23 * bhat_2 + p33 * bhat_3
-
-    perp_11 = p11 - 2.0 * p_dot_bhat_1 * bhat_1 + p_par * bhat_1**2
-    perp_22 = p22 - 2.0 * p_dot_bhat_2 * bhat_2 + p_par * bhat_2**2
-    perp_33 = p33 - 2.0 * p_dot_bhat_3 * bhat_3 + p_par * bhat_3**2
-    perp_12 = (
-        p12 - p_dot_bhat_1 * bhat_2 - bhat_1 * p_dot_bhat_2 + p_par * bhat_1 * bhat_2
-    )
-    perp_13 = (
-        p13 - p_dot_bhat_1 * bhat_3 - bhat_1 * p_dot_bhat_3 + p_par * bhat_1 * bhat_3
-    )
-    perp_23 = (
-        p23 - p_dot_bhat_2 * bhat_3 - bhat_2 * p_dot_bhat_3 + p_par * bhat_2 * bhat_3
-    )
-
-    frobenius_norm_sq = (
-        perp_11**2
-        + perp_22**2
-        + perp_33**2
-        + 2.0 * (perp_12**2 + perp_13**2 + perp_23**2)
-    )
-
-    invariant_2 = (invariant_1**2 - frobenius_norm_sq) / 2.0
-
-    result: FloatArray = 1.0 - _safe_divide(4.0 * invariant_2, invariant_1**2)
+    invariant_1 = p11 + p22 + p33
+    invariant_2 = p11 * p22 + p11 * p33 + p22 * p33 - p12**2 - p13**2 - p23**2
+    denom = (invariant_1 - p_par) * (invariant_1 + 3.0 * p_par)
+    result: FloatArray = 1.0 - _safe_divide(4.0 * invariant_2, denom)
     return result
 
 

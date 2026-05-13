@@ -167,7 +167,7 @@ $$\mathbf{EF}_s = \underbrace{\tfrac{1}{2} n_s m_s |\mathbf{V}_s|^2 \mathbf{V}_s
 | `P_par` | Parallel pressure | $P_\parallel = \hat{b} \cdot \mathbf{P} \cdot \hat{b}$ | -- |
 | `P_perp` | Perpendicular pressure | $P_\perp = (\mathrm{Tr}(\mathbf{P}) - P_\parallel) / 2$ | -- |
 | `Pij` | Full pressure tensor | 6 independent components: P_11, P_12, P_13, P_22, P_23, P_33 | -- |
-| `agyrotropy` | Agyrotropy measure[^Q] | $Q = \sqrt{1 - 4 I_2 / [(I_1 - P_\parallel)(I_1 + 3 P_\parallel)]}$ | -- |
+| `agyrotropy` | Agyrotropy measure[^Q] | $Q = 1 - 4 I_2 / [(I_1 - P_\parallel)(I_1 + 3 P_\parallel)]$ | -- |
 
 ### 4.2 Field-aligned vector decomposition
 
@@ -219,21 +219,25 @@ are NaN where $|B| = 0$.
     \mathbf{A} - A_\parallel\hat{b}$ are introduced as part of the
     single-particle gyromotion decomposition [@Chen].
 
-[^Q]: Swisdak's gyrotropy measure [@Swisdak2016], computed from the
-    first two invariants of the pressure tensor:
+[^Q]: Swisdak's gyrotropy measure [@Swisdak2016] (Eq. A8), built from
+    the first two invariants of the *full* pressure tensor:
     $I_1 = \mathrm{Tr}(\mathbf{P}) = P_{11} + P_{22} + P_{33}$ and
     $I_2 = P_{11}P_{22} + P_{11}P_{33} + P_{22}P_{33} - P_{12}^2 -
     P_{13}^2 - P_{23}^2$. Bounded $Q \in [0, 1]$: $Q = 0$ for a
     perfectly gyrotropic plasma, $Q \to 1$ at maximal agyrotropy.
-    Frame-invariant (built from tensor invariants and the magnetic-
-    field-aligned scalar $P_\parallel = \hat{b} \cdot \mathbf{P}
-    \cdot \hat{b}$), so the value follows whatever $\hat{b}$ is in
-    the current frame. Alternatives in the literature: Scudder's
-    $A\phi$ [@Scudder2008] and Aunai's $D_{ng}$ [@Aunai2013] — pypic
-    standardizes on $Q$ for its closed form and bounded range, and
-    also ships both alternatives as ``A_phi`` and ``D_ng``
-    (per-species ``A_phi_s{N}`` / ``D_ng_s{N}``, with ``_e`` / ``_i``
-    aliases) for literature comparisons. See §9.
+    Frame-invariant (the invariants and $P_\parallel = \hat{b} \cdot
+    \mathbf{P}\cdot\hat{b}$ are both rotation-invariant under joint
+    rotation of $\mathbf{P}$ and $\hat{b}$). Swisdak plots $\sqrt{Q}$
+    in figures to share a linear scale with $A_\phi$ and $D_{ng}$,
+    but the *definition* (and what ``compute("agyrotropy")`` returns)
+    is $Q$ — not $\sqrt{Q}$. Alternatives in the literature: Scudder's
+    $A_\phi$ [@Scudder2008] and Aunai's $D_{ng}$ [@Aunai2013] — pypic
+    standardizes on $Q$ because, unlike $A_\phi$, it senses off-axis
+    ($\hat{b}$-coupling) components of $\mathbf{P}$, and unlike
+    $D_{ng}$ it has the closed-form denominator above and an
+    interpretable upper bound. Both alternatives ship as ``A_phi``
+    and ``D_ng`` (per-species ``A_phi_s{N}`` / ``D_ng_s{N}``, with
+    ``_e`` / ``_i`` aliases). See §9.
 
 [^9]: The trace $\mathrm{Tr}(\mathbf{P})$ is a coordinate invariant (first
     invariant of the symmetric tensor), so $P = \mathrm{Tr}(\mathbf{P})/3$

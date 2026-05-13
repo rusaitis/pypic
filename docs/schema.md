@@ -1105,7 +1105,7 @@ both forms.
 | `P_par` | Pressure parallel to B | PIC, multi-moment MHD (derived from tensor; CGL closures may store directly — see Storage tiers below) |
 | `P_perp` | Pressure perpendicular to B | PIC, multi-moment MHD (derived from tensor; CGL closures may store directly — see Storage tiers below) |
 | `Pij`, `Pij_s{N}` | Full pressure tensor — 6 independent components (`P_11`, `P_12`, `P_13`, `P_22`, `P_23`, `P_33`) total or per species (`P_s0_11`, `P_s0_12`, …, `P_s0_33`) | PIC, multi-moment MHD |
-| `agyrotropy` | Swisdak $Q$ — see [equations.md § Pressure Tensor](equations.md#4-pressure-tensor) for the closed form $Q = \sqrt{1 - 4 I_2 / [(I_1 - P_\parallel)(I_1 + 3 P_\parallel)]}$, bounded $[0, 1]$ | PIC, multi-moment MHD (derived) |
+| `agyrotropy` | Swisdak $Q$ — see [equations.md § Pressure Tensor](equations.md#4-pressure-tensor) for the closed form $Q = 1 - 4 I_2 / [(I_1 - P_\parallel)(I_1 + 3 P_\parallel)]$ with full-tensor invariants, bounded $[0, 1]$ | PIC, multi-moment MHD (derived) |
 | `D_ng` | Aunai's degree of nongyrotropy $D_{ng} = 2\,\|\mathbf{N}\|_F / \mathrm{Tr}(\mathbf{P})$ where $\mathbf{N}$ is the non-gyrotropic part of $\mathbf{P}$. Frame-invariant; alternative to $Q$. | PIC, multi-moment MHD (derived) |
 | `A_phi` | Scudder's electron agyrotropy — perpendicular-block eigenvalue ratio, bounded $[0, 1]$. Captures only perp anisotropy (misses off-axis nongyrotropy). | PIC, multi-moment MHD (derived) |
 

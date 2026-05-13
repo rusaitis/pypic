@@ -227,3 +227,75 @@ class TestSchindlerXi:
         data = _uniform_field_dataset()
         with pytest.raises(ValueError, match="seeds must have shape"):
             schindler_xi(data, np.array([[1.0, 2.0]]))  # (1, 2), not (1, 3)
+
+    def test_curved_field_line(self) -> None:
+        r"""Curved B with E ∥ B everywhere → $\Xi = E_0 \cdot \ell_{\rm traced}$.
+
+        Builds a rotational field $\mathbf{B} = (-y, x, \varepsilon)$
+        whose field lines are helical (circular in (x, y) with a slow
+        axial drift) and sets $\mathbf{E} = E_0\,\hat{\mathbf{B}}$, so
+        $E_\parallel = E_0$ at every point.  The existing
+        ``test_uniform_parallel_e_field`` only exercises straight field
+        lines — this test stresses the trapezoidal arc-length sum on
+        non-collinear ``deltas``, where ``d\ell = |\Delta\mathbf{r}|``
+        is strictly less than the sum of component magnitudes.
+        """
+        from pypic.traces import trace_field_line
+
+        e0 = 0.1
+        epsilon = 0.05
+        nx, ny, nz = 64, 64, 16
+        dx = 0.25
+        origin = (-(nx * dx) / 2.0, -(ny * dx) / 2.0, -(nz * dx) / 2.0)
+
+        grid = GridInfo(
+            dimensions=(nx, ny, nz),
+            spacing=(dx, dx, dx),
+            origin=origin,
+        )
+        coord_arrays = grid.coordinate_arrays()
+        xx, yy, _ = (
+            a.astype(np.float64) for a in np.meshgrid(*coord_arrays, indexing="ij")
+        )
+        b1 = -yy
+        b2 = xx
+        b3 = np.full_like(b1, epsilon)
+        b_mag = np.sqrt(b1**2 + b2**2 + b3**2)
+
+        data = FieldDataset.from_arrays(
+            {
+                "B_1": b1,
+                "B_2": b2,
+                "B_3": b3,
+                "E_1": e0 * b1 / b_mag,
+                "E_2": e0 * b2 / b_mag,
+                "E_3": e0 * b3 / b_mag,
+            },
+            grid,
+            Normalization.identity(),
+        )
+
+        seed = (2.0, 0.0, 0.0)
+        fl = trace_field_line(
+            data, seed, step_size=0.1, max_steps=400, direction="forward"
+        )
+        deltas = np.diff(fl.points, axis=0)
+        traced_length = float(np.sum(np.sqrt(np.sum(deltas**2, axis=1))))
+        # Sanity check: a straight-line seed-to-end distance underestimates
+        # the curved arc length, so the trace really is curved.
+        chord = float(np.linalg.norm(fl.points[-1] - fl.points[0]))
+        assert traced_length > 1.1 * chord
+
+        xi = schindler_xi(
+            data,
+            np.array([seed]),
+            step_size=0.1,
+            max_steps=400,
+            direction="forward",
+        )
+        # Tolerance set by trilinear interpolation error on the rotational
+        # field — at grid points E∥ = E0 exactly, but at trace points
+        # |B_interp| ≠ |B_grid|, so the integrand drifts by O((dx/r)²).
+        # Observed deviation ≈ 0.13 % on this configuration; rtol=5e-3
+        # gives ~4x margin while still pinning the proportionality.
+        np.testing.assert_allclose(xi[0], e0 * traced_length, rtol=5e-3)

@@ -452,6 +452,34 @@ ONES = np.array([1.0])
 B_ALONG_Z = (ZEROS, ZEROS, ONES)
 
 
+def _tensor_b_args(p: np.ndarray, b: np.ndarray) -> tuple[np.ndarray, ...]:
+    """Pack a 3x3 symmetric P and 3-vector B into the (p11, p22, p33,
+    p12, p13, p23, b1, b2, b3) argument layout used by the pressure-
+    tensor diagnostics."""
+    return (
+        np.array([p[0, 0]]),
+        np.array([p[1, 1]]),
+        np.array([p[2, 2]]),
+        np.array([p[0, 1]]),
+        np.array([p[0, 2]]),
+        np.array([p[1, 2]]),
+        np.array([b[0]]),
+        np.array([b[1]]),
+        np.array([b[2]]),
+    )
+
+
+def _random_rotation(*, seed: int) -> np.ndarray:
+    """Build a deterministic 3x3 proper rotation matrix via QR of
+    a seeded random normal matrix.  Used to verify rotational
+    invariance of tensor diagnostics."""
+    rng = np.random.default_rng(seed)
+    q, _ = np.linalg.qr(rng.standard_normal((3, 3)))
+    if np.linalg.det(q) < 0:
+        q[:, 0] = -q[:, 0]
+    return q
+
+
 class TestIsotropicPressure:
     def test_trace_divided_by_three(self):
         """P_iso = (P_11 + P_22 + P_33) / 3."""
@@ -672,11 +700,11 @@ class TestAgyrotropy:
         np.testing.assert_allclose(result, 0.0, atol=1e-14)
 
     def test_agyrotropic_example(self):
-        """B along z, diag(3,1,1): P_∥=1, I₁=4, known Q=0.25."""
-        # P_∥ = 1 (P_33), Tr(P) = 5, I₁ = 5 - 1 = 4
-        # P_⊥ tensor = diag(3,1,0), Frobenius² = 9 + 1 + 0 = 10
-        # I₂ = (16 - 10) / 2 = 3
-        # Q = 1 - 12/16 = 0.25
+        """B along z, diag(3,1,1): Swisdak Q = 1/8 (Eq. A8 hand-calc)."""
+        # I_1 = Tr(P) = 5, P_∥ = P_33 = 1.
+        # I_2 = 3·1 + 3·1 + 1·1 - 0 - 0 - 0 = 7.
+        # (I_1 - P_∥)(I_1 + 3 P_∥) = 4 · 8 = 32.
+        # Q = 1 - 4·7 / 32 = 1 - 28/32 = 4/32 = 1/8.
         result = agyrotropy(
             np.array([3.0]),
             np.array([1.0]),
@@ -686,7 +714,7 @@ class TestAgyrotropy:
             ZEROS,
             *B_ALONG_Z,
         )
-        np.testing.assert_allclose(result, 0.25, rtol=1e-14)
+        np.testing.assert_allclose(result, 1.0 / 8.0, rtol=1e-14)
 
     def test_bounded_zero_one(self):
         """Q should be in [0, 1] for a range of tensors."""
@@ -710,6 +738,30 @@ class TestAgyrotropy:
             )
             assert q[0] >= -1e-10, f"Q = {q[0]} < 0"
             assert q[0] <= 1.0 + 1e-10, f"Q = {q[0]} > 1"
+
+    def test_off_axis_nongyrotropy_caught(self):
+        """Swisdak Q detects off-axis ($\\hat{b}$-coupling) nongyrotropy
+        that Scudder's A_phi misses.
+
+        For ``P = [[2,0,1],[0,2,0],[1,0,5]]`` with B = ẑ:
+
+        - The perp 2x2 block is diag(2, 2), so A_phi = 0
+          (see ``TestScudderAgyrotropy::test_off_axis_nongyrotropy_missed``).
+        - But the full tensor carries off-axis structure via P_13 = 1.
+          Hand-calc: I_1 = 9, P_par = 5, I_2 = 2·2 + 2·5 + 2·5 - 0 - 1 - 0 = 23,
+          (I_1 - P_par)(I_1 + 3 P_par) = 4·24 = 96, Q = 1 - 92/96 = 1/24.
+
+        Pins the formula against the historical bug where this function
+        silently returned A_phi² (which would give zero here).
+        """
+        p11 = np.array([2.0])
+        p22 = np.array([2.0])
+        p33 = np.array([5.0])
+        p12 = ZEROS
+        p13 = np.array([1.0])
+        p23 = ZEROS
+        result = agyrotropy(p11, p22, p33, p12, p13, p23, *B_ALONG_Z)
+        np.testing.assert_allclose(result, 1.0 / 24.0, rtol=1e-14)
 
 
 class TestAunaiNongyrotropy:
@@ -785,6 +837,42 @@ class TestAunaiNongyrotropy:
             )
             assert d_ng[0] >= -1e-12, f"D_ng = {d_ng[0]} < 0"
 
+    def test_frame_invariance(self):
+        """D_ng is built from tensor invariants and P_∥, so it is unchanged
+        under any rotation applied jointly to P and B."""
+        # P with both perp anisotropy (diag spread) and off-axis P_xz coupling.
+        p = np.array([[2.0, 0.0, 1.0], [0.0, 2.0, 0.0], [1.0, 0.0, 5.0]])
+        b = np.array([0.0, 0.0, 1.0])
+        d_ng_lab = aunai_nongyrotropy(*_tensor_b_args(p, b))
+
+        r = _random_rotation(seed=42)
+        d_ng_rot = aunai_nongyrotropy(*_tensor_b_args(r @ p @ r.T, r @ b))
+        np.testing.assert_allclose(d_ng_rot, d_ng_lab, rtol=1e-13)
+
+    def test_off_axis_nongyrotropy_caught(self):
+        """P with off-axis (P_∥-coupling) component but no perp-eigenvalue
+        spread: D_ng must detect it even though A_phi misses it.
+
+        For ``P = [[2,0,1],[0,2,0],[1,0,5]]`` with B = ẑ:
+
+        - P_par = P_33 = 5, P_perp = (Tr(P) - P_par)/2 = 2.
+        - The non-gyrotropic part is N = P - P_par b̂b̂ - P_perp(I-b̂b̂)
+          = [[0,0,1],[0,0,0],[1,0,0]], so ‖N‖_F² = 2.
+        - D_ng = 2√2 / Tr(P) = 2√2 / 9 ≈ 0.3143.
+
+        The companion ``A_phi`` test on the same tensor expects zero —
+        this pair validates the §9 footnote claim that A_phi misses
+        off-axis ($\\hat{b}$-coupling) nongyrotropy that D_ng catches.
+        """
+        p11 = np.array([2.0])
+        p22 = np.array([2.0])
+        p33 = np.array([5.0])
+        p12 = ZEROS
+        p13 = np.array([1.0])
+        p23 = ZEROS
+        result = aunai_nongyrotropy(p11, p22, p33, p12, p13, p23, *B_ALONG_Z)
+        np.testing.assert_allclose(result, 2.0 * np.sqrt(2.0) / 9.0, rtol=1e-14)
+
 
 class TestScudderAgyrotropy:
     def test_isotropic_is_zero(self):
@@ -856,6 +944,45 @@ class TestScudderAgyrotropy:
             ZEROS,
         )
         assert np.isnan(result[0])
+
+    def test_frame_invariance(self):
+        """A_phi depends only on tensor invariants of the perp 2x2 block,
+        so a rotation applied jointly to P and B leaves it unchanged."""
+        # diag(3, 1, 5) with B = ẑ has known A_phi = 0.5 (existing test).
+        p = np.diag([3.0, 1.0, 5.0])
+        b = np.array([0.0, 0.0, 1.0])
+        a_phi_lab = scudder_agyrotropy(*_tensor_b_args(p, b))
+        np.testing.assert_allclose(a_phi_lab, 0.5, rtol=1e-14)
+
+        r = _random_rotation(seed=42)
+        a_phi_rot = scudder_agyrotropy(*_tensor_b_args(r @ p @ r.T, r @ b))
+        np.testing.assert_allclose(a_phi_rot, a_phi_lab, rtol=1e-13)
+
+    def test_off_axis_nongyrotropy_missed(self):
+        """A_phi misses off-axis ($\\hat{b}$-coupling) nongyrotropy.
+
+        ``P = [[2,0,1],[0,2,0],[1,0,5]]`` with B = ẑ has:
+
+        - Equal perp eigenvalues (the perp 2x2 block is diag(2, 2)),
+          so A_phi must be exactly zero.
+        - But the off-diagonal P_xz = 1 makes the tensor non-gyrotropic.
+          Both ``aunai_nongyrotropy`` (D_ng = 2√2/9) and ``agyrotropy``
+          (Swisdak Q = 1/24) flag it — see the companion tests
+          ``TestAunaiNongyrotropy::test_off_axis_nongyrotropy_caught``
+          and ``TestAgyrotropy::test_off_axis_nongyrotropy_caught``.
+
+        Together these three tests validate the §9 footnote claim that
+        A_phi captures only perp anisotropy and misses the
+        $\\hat{b}$-coupling that the two full-tensor measures catch.
+        """
+        p11 = np.array([2.0])
+        p22 = np.array([2.0])
+        p33 = np.array([5.0])
+        p12 = ZEROS
+        p13 = np.array([1.0])
+        p23 = ZEROS
+        result = scudder_agyrotropy(p11, p22, p33, p12, p13, p23, *B_ALONG_Z)
+        np.testing.assert_allclose(result, 0.0, atol=1e-14)
 
 
 SCALAR_FUNCTIONS_1ARG = [
@@ -1024,6 +1151,21 @@ class TestElectronFrameDissipation:
         rho_c = np.array([0.0])
         result = electron_frame_dissipation(*j, *e, *ve, *b, rho_c)
         assert np.isnan(result[0])
+
+    def test_non_relativistic_limit(self):
+        """As $v_e/c \\to 0$ the relativistic branch must converge to the
+        non-relativistic result.  Verifies the γ_e prefactor reduces to
+        the identity smoothly — guards against a sign or normalization
+        slip in the c-aware code path."""
+        # Slow electrons at v_e/c = 1e-6, so gamma_e - 1 ~ 5e-13.
+        ve = (np.array([1.0e-6]), ZEROS, ZEROS)
+        b = (ZEROS, ZEROS, np.array([0.3]))  # arbitrary non-zero B
+        j = (np.array([0.4]), np.array([-0.5]), np.array([0.2]))
+        e = (np.array([0.1]), np.array([0.7]), np.array([-0.3]))
+        rho_c = np.array([0.6])  # exercises the rho_c · V_e · E subtraction
+        d_e_nonrel = electron_frame_dissipation(*j, *e, *ve, *b, rho_c)
+        d_e_rel = electron_frame_dissipation(*j, *e, *ve, *b, rho_c, c=1.0)
+        np.testing.assert_allclose(d_e_rel, d_e_nonrel, rtol=1e-10)
 
 
 class TestLocalReconnectionRate:
