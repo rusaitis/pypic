@@ -1501,6 +1501,44 @@ class TestMagneticFluxFunction:
         with pytest.raises(ValueError, match="2D"):
             magnetic_flux_function(np.ones((4, 3, 2)), 1.0, 1.0)
 
+    @staticmethod
+    def _flux_max_error(nx: int) -> float:
+        r"""Max-norm error of $\psi$ for $B_2(x) = \cos(k x)$ vs analytic.
+
+        Analytic flux: $\psi(x) = -\int_0^x \cos(k x')\,dx' = -\sin(k x)/k$.
+        """
+        length = 2.0 * np.pi
+        dx = length / nx
+        ny = 4
+        k = 1.0
+        x = np.arange(nx) * dx
+        b2 = np.broadcast_to(np.cos(k * x)[:, None], (nx, ny))
+        psi_num = magnetic_flux_function(np.ascontiguousarray(b2), dx, 1.0)
+        # Interior only to skip endpoint bias.
+        psi_exact = -np.sin(k * x) / k
+        return float(np.max(np.abs(psi_num[2:-2, :] - psi_exact[2:-2, None])))
+
+    def test_convergence_is_first_order(self) -> None:
+        r"""``magnetic_flux_function`` uses ``np.cumsum * dx`` (left-rect rule).
+
+        Left-rectangle quadrature on $\int_0^x f\,dx'$ is first-order:
+        halving $dx$ should reduce the max error by ~2, not the ~4 of a
+        second-order scheme. Documenting the actual order — a future
+        upgrade to a trapezoidal cumsum would let this test relax to a
+        second-order assertion.
+        """
+        e_coarse = self._flux_max_error(64)
+        e_fine = self._flux_max_error(128)
+        ratio = e_coarse / e_fine
+        # First-order observed ratio ≈ 2.0; assert > 1.8 to catch
+        # accidental regressions to zeroth order while tolerating
+        # pre-asymptotic sag.
+        assert 1.8 < ratio < 2.5, (
+            f"magnetic_flux_function convergence ratio {ratio:.3f} "
+            f"outside the first-order band [1.8, 2.5]; "
+            f"coarse={e_coarse:.4g}, fine={e_fine:.4g}"
+        )
+
 
 # ---------------------------------------------------------------------------
 # Unit 12 — edge-case sweep across families that previous tests skipped
