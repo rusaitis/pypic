@@ -704,9 +704,7 @@ class TestOpenVocabularies:
     """
 
     def test_custom_time_scheme(self) -> None:
-        doc = _minimal_doc(
-            **{'scheme = "fixed"': 'scheme = "amortized-imex-rk4"'}
-        )
+        doc = _minimal_doc(**{'scheme = "fixed"': 'scheme = "amortized-imex-rk4"'})
         s = validate_simulation_toml(doc)
         assert s.time.scheme == "amortized-imex-rk4"
 
@@ -1626,9 +1624,7 @@ class TestOutputParticlesSpeciesReference:
             format        = "hdf5"
             precision     = "f32"
         """)
-        with pytest.raises(
-            ValidationError, match=r"output\.particles\.species"
-        ):
+        with pytest.raises(ValidationError, match=r"output\.particles\.species"):
             validate_simulation_toml(doc)
 
     def test_empty_species_list_accepted(self) -> None:
@@ -1670,9 +1666,7 @@ class TestReferenceSpeciesBuiltins:
     def test_unknown_reference_species_rejected(self) -> None:
         doc = _minimal_doc().replace(
             'system = "SI"',
-            'system = "PIC"\n'
-            'reference_species = "muons"\n'
-            "reference_density = 1.0e6",
+            'system = "PIC"\nreference_species = "muons"\nreference_density = 1.0e6',
         )
         with pytest.raises(ValidationError, match="reference_species"):
             validate_simulation_toml(doc)

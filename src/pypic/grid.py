@@ -179,9 +179,7 @@ def _build_aliases(
     aliases: dict[str, str] = {}
     for alias_prefix, canonical_prefix in _FIELD_PREFIX_PAIRS:
         for i, suffix in enumerate(suffixes, 1):
-            aliases[f"{alias_prefix}{separator}{suffix}"] = (
-                f"{canonical_prefix}_{i}"
-            )
+            aliases[f"{alias_prefix}{separator}{suffix}"] = f"{canonical_prefix}_{i}"
     return aliases
 
 

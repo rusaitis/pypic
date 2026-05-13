@@ -1508,8 +1508,7 @@ class SimulationSchema(_ExtensibleBase):
         if len(set(names)) != len(names):
             duplicates = sorted({n for n in names if names.count(n) > 1})
             raise ValueError(
-                f"bodies entries must have distinct names; "
-                f"duplicates: {duplicates}"
+                f"bodies entries must have distinct names; duplicates: {duplicates}"
             )
 
     def _check_driver_body_references(self) -> None:

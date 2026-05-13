@@ -377,7 +377,7 @@ def add_inset_colorbar(
     # way to clear it; cast away the bogus strictness.
     cax.set_axes_locator(None)  # type: ignore[arg-type]
 
-    def _resize_bg(event: object) -> None:
+    def _resize_bg(_event: object) -> None:
         r = fig.canvas.get_renderer()  # type: ignore[attr-defined]  # mpl backend stub gap
 
         # Temporarily put cax back at its original position to get a

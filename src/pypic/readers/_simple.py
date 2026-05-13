@@ -33,7 +33,7 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 import h5py
 import numpy as np
@@ -49,8 +49,12 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     from pypic.readers._registry import Simulation
-    from pypic.types import FloatArray
+    from pypic.types import FloatArray, ModelType
     from pypic.units import SpeciesInfo
+
+_VALID_MODEL_TYPES: frozenset[str] = frozenset(
+    ("PIC", "MHD", "hybrid", "vlasov", "gyrokinetic")
+)
 
 log = logging.getLogger(__name__)
 
@@ -128,18 +132,23 @@ def _read_grid_attrs(f: h5py.File) -> GridInfo | None:
 
 def _read_model_attrs(
     f: h5py.File,
-) -> tuple[str, str]:
+) -> tuple[str, ModelType]:
     """Read model name and type from HDF5 root attributes.
 
-    Returns ``("unknown", "unknown")`` for missing attributes.
+    Returns ``("unknown", "PIC")`` for missing or unrecognized values;
+    ``"PIC"`` is the conservative fallback for generic HDF5 files
+    that don't carry the schema.md model-type metadata.
     """
     model = f.attrs.get("model", "unknown")
-    model_type = f.attrs.get("model_type", "unknown")
+    model_type = f.attrs.get("model_type", "PIC")
     if isinstance(model, bytes):
         model = model.decode()
     if isinstance(model_type, bytes):
         model_type = model_type.decode()
-    return str(model), str(model_type)
+    model_type_str = str(model_type)
+    if model_type_str not in _VALID_MODEL_TYPES:
+        model_type_str = "PIC"
+    return str(model), cast("ModelType", model_type_str)
 
 
 class SimpleReader:
@@ -713,7 +722,7 @@ def open_simple(
 
     h5_grid: GridInfo | None = None
     model_name = "unknown"
-    model_type = "unknown"
+    model_type: ModelType = "PIC"
 
     if first_file is not None:
         with h5py.File(first_file, "r") as f:

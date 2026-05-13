@@ -322,8 +322,8 @@ class Simulation:
         strict_fields : bool
             When ``True``, raise ``KeyError`` if any name in *fields*
             matches no loaded field (typo guard).  Default ``False``
-            only logs a warning — kept for backward compatibility and
-            exploratory use where some requested names are optional.
+            only logs a warning, for exploratory use where some
+            requested names are optional.
         **kwargs
             Forwarded to readers that accept extra parameters
             (e.g. ``target_resolution`` for BATSRUS).

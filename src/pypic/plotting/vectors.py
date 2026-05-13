@@ -56,7 +56,7 @@ def _resolve_plane_components(data: FieldDataset, field_prefix: str) -> tuple[st
     all_axes = data.grid.geometry.axis_names
     comp0 = all_axes.index(surviving[0]) + 1
     comp1 = all_axes.index(surviving[1]) + 1
-    return f"{field_prefix}{comp0}", f"{field_prefix}{comp1}"
+    return f"{field_prefix}_{comp0}", f"{field_prefix}_{comp1}"
 
 
 def _resolve_vector_colors(

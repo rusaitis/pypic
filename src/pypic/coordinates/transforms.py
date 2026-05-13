@@ -327,9 +327,7 @@ def _build_vector_triplet_regex() -> re.Pattern[str]:
         reverse=True,
     )
     parts = [re.escape(p) for p in prefixes]
-    return re.compile(
-        rf"^({'|'.join(parts)})(?:_s(\d+))?_([123])$"
-    )
+    return re.compile(rf"^({'|'.join(parts)})(?:_s(\d+))?_([123])$")
 
 
 _VECTOR_TRIPLET_RE = _build_vector_triplet_regex()

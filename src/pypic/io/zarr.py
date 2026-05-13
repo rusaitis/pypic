@@ -105,7 +105,7 @@ def _open_store(
     metadata read while non-consolidated stores still load.
     """
     tree = xr.open_datatree(store, engine="zarr", consolidated="auto")
-    root_attrs = dict(tree.attrs)
+    root_attrs: dict[str, Any] = {str(k): v for k, v in tree.attrs.items()}
     schema_attrs = root_attrs.get("schema")
     if not isinstance(schema_attrs, dict) or "version" not in schema_attrs:
         msg = (

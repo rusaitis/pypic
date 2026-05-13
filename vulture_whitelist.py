@@ -4,18 +4,16 @@ Vulture cannot trace: getattr-based access, doctest usage, protocol
 definitions, or dataclass fields used only in pre-built instances.
 
 Known unsuppressable (vulture cannot whitelist function parameters):
-  - geometry.py:64  x3 in metric_factors — general signature needs all 3 coords
-  - base.py:519     path, step in SimulationReader.read_timestep — protocol params
-  - base.py:523     path in SimulationReader.available_timesteps — protocol param
+  - geometry.py:64       x3 in metric_factors — general signature needs all 3 coords
+  - _protocols.py:519    path, step in SimulationReader.read_timestep — protocol params
+  - _protocols.py:523    path in SimulationReader.available_timesteps — protocol param
 """
 
+from pypic.containers import SimulationConfig
 from pypic.coordinates.geometry import CoordinateGeometry
-from pypic.readers._field_dataset import (
-    FieldDataset,
-    GridInfo,
-    SimulationConfig,
-    SimulationReader,
-)
+from pypic.dataset import FieldDataset
+from pypic.grid import GridInfo
+from pypic.readers._protocols import SimulationReader
 from pypic.units import Normalization, PhysicsConstants, SpeciesInfo
 
 # --- geometry.py ---

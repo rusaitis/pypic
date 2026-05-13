@@ -48,8 +48,6 @@ PAIRS: list[Pair] = [
         mpl_plot.add_badge,
         pv_plot.add_badge,
         [
-            ("width", "pv", "Legacy alias for bar_width (predates rename)"),
-            ("height", "pv", "Legacy alias for bar_height (predates rename)"),
             ("theme", "pv", "Pyvista has no use_theme() — explicit theme arg"),
         ],
     ),

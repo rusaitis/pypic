@@ -1548,32 +1548,6 @@ def test_convert_fields_virtual_reflects_source_mutations(tmp_path: Path) -> Non
     np.testing.assert_array_equal(np.asarray(from_zarr(out)["B_1"]), 99.0)
 
 
-@zarr_required
-def test_convert_fields_virtual_rejects_fields_filter(tmp_path: Path) -> None:
-    # Kept for backwards-test-compat with the previous targeted test;
-    # now subsumed by the parametrised flag-rejection test above.
-    h5_path = tmp_path / "canonical.h5"
-    _write_min_h5(h5_path)
-    out = tmp_path / "nope.zarr"
-    result = runner.invoke(
-        app,
-        [
-            "convert",
-            "fields",
-            str(h5_path),
-            "--output",
-            str(out),
-            "--virtual",
-            "--backend",
-            "icechunk",
-            "--fields",
-            "B_1",
-        ],
-    )
-    assert result.exit_code != 0
-    assert "--fields" in result.output
-
-
 @arrow_required
 def test_convert_particles_box_crop(tmp_path: Path) -> None:
     from pypic.io._parquet import particles_from_dataset

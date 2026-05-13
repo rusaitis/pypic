@@ -52,8 +52,6 @@ def add_badge(
     text_color: str | tuple[float, ...] | None = None,
     text_alpha: float = 0.8,
     track_color: str | tuple[float, ...] | None = None,
-    width: float | None = None,
-    height: float | None = None,
     theme: PlotTheme | None = None,
 ) -> None:
     r"""Add a status badge overlay with optional progress bar.
@@ -125,10 +123,6 @@ def add_badge(
     track_color : str, tuple, or None
         Progress bar track color override. ``None`` uses the
         theme/variant track color.
-    width : float or None
-        Alias for *bar_width* — accepted for backward compatibility.
-    height : float or None
-        Alias for *bar_height* — accepted for backward compatibility.
     theme : PlotTheme or None
         Theme for colors.
 
@@ -198,17 +192,14 @@ def add_badge(
         + pad
     )
 
-    # Explicit overrides (new *_width/*_height names take precedence over
-    # the legacy width/height aliases for symmetry with matplotlib)
-    effective_width = bar_width if bar_width is not None else width
-    effective_height = bar_height if bar_height is not None else height
-    if effective_width is not None:
-        box_w = effective_width
-    if effective_height is not None:
-        box_h = effective_height
+    # Explicit overrides.
+    if bar_width is not None:
+        box_w = bar_width
+    if bar_height is not None:
+        box_h = bar_height
 
     # Auto-grow the box to fit long status text (unless explicitly sized)
-    if effective_width is None and status_text:
+    if bar_width is None and status_text:
         text_px = _measure_text_width_px(plotter, status_text, int(fs))
         ww = (
             float(plotter.window_size[0])

@@ -113,7 +113,7 @@ class FieldDataset:
         merged.update(
             _species_name_aliases(
                 tuple(sp.name for sp in self._species),
-                self._ds.data_vars,
+                [str(name) for name in self._ds.data_vars],
             )
         )
         # Bidirectional alias filter.  First pass — forward direction:
@@ -544,11 +544,6 @@ class FieldDataset:
         if suggestions:
             msg += f" Did you mean: {suggestions}?"
         raise KeyError(msg)
-
-    # Backwards-compatible internal alias for code that already imports
-    # the underscore name from outside this module. New code should call
-    # ``resolve_key`` directly.
-    _resolve_key = resolve_key
 
     def __getitem__(self, key: str) -> FloatArray:
         """Return field data as a NumPy array (zero-copy when possible).

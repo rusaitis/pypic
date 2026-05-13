@@ -148,9 +148,7 @@ def per_species_pressure_canonical(component: str, species_index: int) -> str:
     >>> per_species_pressure_canonical("pYY", 1)
     'P_s1_22'
     """
-    canonical = _PRESSURE_COMPONENT_MAP.get(component) or _PHDF5_PRESSURE_MAP[
-        component
-    ]
+    canonical = _PRESSURE_COMPONENT_MAP.get(component) or _PHDF5_PRESSURE_MAP[component]
     # canonical is "P_<ij>"; Tier-3 per-species form is "P_s<N>_<ij>".
     ij = canonical.removeprefix("P_")
     return f"P_s{species_index}_{ij}"
@@ -247,8 +245,7 @@ def infer_total_fields(canonical_fields: set[str], nspec: int) -> set[str]:
     totals: set[str] = set()
     for native, canon_total in _MOMENT_COMPONENT_MAP.items():
         if all(
-            per_species_canonical(native, s) in canonical_fields
-            for s in range(nspec)
+            per_species_canonical(native, s) in canonical_fields for s in range(nspec)
         ):
             totals.add(canon_total)
     return totals

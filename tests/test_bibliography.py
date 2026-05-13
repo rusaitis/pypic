@@ -115,6 +115,5 @@ def test_no_duplicate_keys() -> None:
     assert not dupes, (
         "references.bib has duplicate citation keys (BibTeX "
         "silently keeps one; this is almost always a copy-paste "
-        "mistake):\n"
-        + "\n".join(f"  - {key} ({counts[key]}x)" for key in dupes)
+        "mistake):\n" + "\n".join(f"  - {key} ({counts[key]}x)" for key in dupes)
     )
