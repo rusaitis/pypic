@@ -229,8 +229,11 @@ are NaN where $|B| = 0$.
     field-aligned scalar $P_\parallel = \hat{b} \cdot \mathbf{P}
     \cdot \hat{b}$), so the value follows whatever $\hat{b}$ is in
     the current frame. Alternatives in the literature: Scudder's
-    $A\phi$ [@Scudder2008] and Aunai's $D_{ng}$ [@Aunai2013] —
-    pypic standardizes on $Q$ for its closed form and bounded range.
+    $A\phi$ [@Scudder2008] and Aunai's $D_{ng}$ [@Aunai2013] — pypic
+    standardizes on $Q$ for its closed form and bounded range, and
+    also ships both alternatives as ``A_phi`` and ``D_ng``
+    (per-species ``A_phi_s{N}`` / ``D_ng_s{N}``, with ``_e`` / ``_i``
+    aliases) for literature comparisons. See §9.
 
 [^9]: The trace $\mathrm{Tr}(\mathbf{P})$ is a coordinate invariant (first
     invariant of the symmetric tensor), so $P = \mathrm{Tr}(\mathbf{P})/3$
@@ -423,15 +426,20 @@ Three distinct Lorentz factors arise in plasma analysis:
 | Name | Description | Normalized | SI |
 |------|-------------|------------|-----|
 | `J_dot_E` | Energy conversion rate[^11] | $\mathbf{J} \cdot \mathbf{E}$ | $\mathbf{J} \cdot \mathbf{E}$ \[W/m³\] |
+| `D_e` | Electron-frame dissipation[^De] | $\gamma_e\bigl[\mathbf{J}\cdot(\mathbf{E}+\mathbf{V}_e\times\mathbf{B}) - \rho_c\,\mathbf{V}_e\cdot\mathbf{E}\bigr]$ | same \[W/m³\] |
+| `R_recon` | Local dimensionless reconnection rate[^Rrecon] | $\lvert\mathbf{E}+\mathbf{V}\times\mathbf{B}\rvert / (v_A\,\lvert\mathbf{B}\rvert)$ | dimensionless |
 | `E_prime` | Non-ideal electric field[^12] | $\mathbf{E} + \mathbf{V} \times \mathbf{B}$ | same |
 | `E_ideal` | Ideal (convective) E field[^12] | $-\mathbf{V} \times \mathbf{B}$ | same |
 | `E_Hall` | Hall electric field[^12] | $\mathbf{J} \times \mathbf{B} / (n_e |q_e|)$ | same |
+| `D_ng` | Aunai nongyrotropy[^Dng] | $2\,\|\mathbf{N}\|_F / \mathrm{Tr}(\mathbf{P})$ | dimensionless |
+| `A_phi` | Scudder agyrotropy[^Aphi] | $\lvert\lambda_1^\perp - \lambda_2^\perp\rvert / (\lambda_1^\perp + \lambda_2^\perp)$ | dimensionless |
 | `psi` | Magnetic flux function (2D)[^13] | $-\int B_2\, dx$ | -- |
 | `firehose` | Firehose parameter[^14] | $(P_\parallel - P_\perp)/(B^2/2) - 1$ | -- |
 | `mirror` | Mirror parameter[^14] | $P_\perp/P_\parallel - 1 - 1/\beta_\perp$ | -- |
 | `theta_shear` | Magnetic shear angle[^17] | $\theta = \arccos(\mathbf{B}_a \cdot \mathbf{B}_b / |\mathbf{B}_a||\mathbf{B}_b|)$ | -- |
 | `find_saddle_points` | X-point detection[^16] | $\det(H) = \psi_{xx}\psi_{yy} - \psi_{xy}^2 < 0$ | -- |
-| `reconnection_rate` | Reconnection rate[^16] | $R = \partial\psi/\partial t\|_X$ | -- |
+| `reconnection_rate` | Reconnection rate (2D)[^16] | $R = \partial\psi/\partial t\|_X$ | -- |
+| `schindler_xi` | 3D reconnection criterion[^xi] | $\Xi(\mathbf{x}_0) = \int_{\mathcal{L}} E_\parallel\,d\ell$ | -- |
 
 [^11]: Positive $\mathbf{J} \cdot \mathbf{E} > 0$ means particles
     gain energy from fields (electromagnetic-to-kinetic energy conversion).
@@ -486,6 +494,67 @@ Three distinct Lorentz factors arise in plasma analysis:
     component reconnection analysis to determine whether reconnection
     geometry is anti-parallel ($\theta \approx \pi$) or component
     ($\theta < \pi$). [@Trattner].
+
+[^De]: Zenitani's electron-frame dissipation measure: the
+    Lorentz-boosted scalar $D_e = \gamma_e\bigl[\mathbf{J}\cdot
+    \mathbf{E}' - \rho_c\,(\mathbf{V}_e\cdot\mathbf{E})\bigr]$ with
+    $\mathbf{E}' = \mathbf{E} + \mathbf{V}_e\times\mathbf{B}$. The
+    first term is the electron-frame Joule heating; the
+    $\rho_c\,\mathbf{V}_e\cdot\mathbf{E}$ subtraction removes the bulk
+    energy-transfer contribution to which $\mathbf{J}\cdot\mathbf{E}$
+    is otherwise sensitive. Positive in the electron diffusion region,
+    vanishes in ideal MHD. The canonical EDR localizer in modern
+    collisionless PIC reconnection analysis. The non-relativistic
+    limit is $D_e \to \mathbf{J}\cdot\mathbf{E}' -
+    \rho_c\,\mathbf{V}_e\cdot\mathbf{E}$; the $\gamma_e$ prefactor
+    activates when ``physics.relativistic`` is set in the dataset
+    config. [@Zenitani2011].
+
+[^Rrecon]: Dimensionless local reconnection rate normalized by the
+    upstream Alfvén speed and the local field magnitude. Regions where
+    $R_{\mathrm{recon}} \sim 0.1$ flag the "fast reconnection"
+    plateau ubiquitous in collisionless simulations and observations.
+    Per-cell scalar built from the same $\mathbf{E}'$ that drives the
+    reconnection rate $\partial\psi/\partial t$ in 2D, divided by
+    $v_A\,\lvert\mathbf{B}\rvert$ so the result is comparable across
+    runs with different field strengths. [@ComissoBhattacharjee2016].
+
+[^Dng]: Aunai's degree of nongyrotropy: $D_{ng} = 2\,\|\mathbf{N}\|_F
+    / \mathrm{Tr}(\mathbf{P})$ where $\mathbf{N} = \mathbf{P}
+    - P_\parallel\,\hat{b}\hat{b} - P_\perp(\mathbf{I} -
+    \hat{b}\hat{b})$ is the non-gyrotropic part of the pressure
+    tensor and $\|\cdot\|_F$ is the Frobenius norm. Frame-invariant.
+    Captures both perpendicular anisotropy (eigenvalue spread in the
+    perp 2×2 block) and off-axis ($\hat{b}$-coupling) nongyrotropy.
+    Closed-form identity: $\|\mathbf{N}\|_F^2 = \mathrm{Tr}(\mathbf{P}^2)
+    - P_\parallel^2 - 2 P_\perp^2$. pypic standardizes on Swisdak's
+    $Q$ (see ``agyrotropy``) for its closed form and bounded range;
+    $D_{ng}$ ships as a research alternative for literature
+    comparisons. [@Aunai2013; @Swisdak2016].
+
+[^Aphi]: Scudder's electron agyrotropy: eigenvalue-ratio of the
+    perpendicular $2\times 2$ block of $\mathbf{P}$ in the
+    field-aligned frame, $A_\phi = \lvert\lambda_1^\perp -
+    \lambda_2^\perp\rvert / (\lambda_1^\perp + \lambda_2^\perp)$.
+    Bounded $[0, 1]$, frame-invariant. **Only** captures perpendicular
+    anisotropy — misses off-axis ($\hat{b}$-coupling) nongyrotropy
+    that $D_{ng}$ and Swisdak's $Q$ both detect. Closed form: $A_\phi
+    = \sqrt{\max(0,\;\|\Pi\|_F^2/(2 P_\perp^2) - 1)}$, where $\Pi$ is
+    the double-projected perpendicular pressure tensor (same object
+    computed inside ``agyrotropy``). [@Scudder2008; @Swisdak2016].
+
+[^xi]: Schindler-Hesse-Birn 3D general-magnetic-reconnection
+    criterion. Reconnection is defined by $\Xi(\mathbf{x}_0) \neq 0$
+    along a magnetic field line $\mathcal{L}(\mathbf{x}_0)$ — no 3D
+    null is required (unlike the 2D X-point definition). Vanishes
+    identically in ideal MHD because $\mathbf{E}^{\mathrm{ideal}}
+    = -\mathbf{V}\times\mathbf{B} \perp \mathbf{B}$, so non-zero $\Xi$
+    isolates the non-ideal contributions in Ohm's law. Implemented as
+    an RK4 field-line trace from each seed (``trace_field_line``)
+    with $E_\parallel = \mathbf{E}\cdot\hat{b}$ trapezoid-integrated
+    along arc length. Returns one scalar per seed — not a per-cell
+    field, so dispatched outside the ``compute()`` registry as
+    ``pypic.reconnection.schindler_xi``. [@Schindler1988].
 
 
 ## 10. Spectral Analysis

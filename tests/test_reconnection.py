@@ -1,11 +1,15 @@
-"""Tests for pypic.reconnection — X-point detection and reconnection rate."""
+"""Tests for pypic.reconnection — X-point detection, reconnection rate,
+Schindler $\\Xi$ integral."""
 
 from __future__ import annotations
 
 import numpy as np
 import pytest
 
-from pypic.reconnection import find_saddle_points, reconnection_rate
+from pypic.dataset import FieldDataset
+from pypic.grid import GridInfo
+from pypic.reconnection import find_saddle_points, reconnection_rate, schindler_xi
+from pypic.units import Normalization
 
 
 class TestFindSaddlePoints:
@@ -142,3 +146,84 @@ class TestReconnectionEdgeCases:
         psi[5, 5] = np.nan
         rate = reconnection_rate(psi, psi_prev, dt=1.0, x_point=(5, 5))
         assert np.isnan(rate)
+
+
+def _uniform_field_dataset(
+    *,
+    shape: tuple[int, int, int] = (32, 8, 8),
+    spacing: tuple[float, float, float] = (1.0, 1.0, 1.0),
+    b: tuple[float, float, float] = (1.0, 0.0, 0.0),
+    e: tuple[float, float, float] = (0.0, 0.0, 0.0),
+) -> FieldDataset:
+    """Build a domain with uniform B and E for Schindler integral tests."""
+    return FieldDataset.from_arrays(
+        {
+            "B_1": np.full(shape, b[0]),
+            "B_2": np.full(shape, b[1]),
+            "B_3": np.full(shape, b[2]),
+            "E_1": np.full(shape, e[0]),
+            "E_2": np.full(shape, e[1]),
+            "E_3": np.full(shape, e[2]),
+        },
+        GridInfo(dimensions=shape, spacing=spacing),
+        Normalization.identity(),
+    )
+
+
+class TestSchindlerXi:
+    """Schindler 1988 $\\Xi = \\int E_\\parallel \\, d\\ell$ along $\\mathbf{B}$."""
+
+    def test_zero_when_e_perp_to_b(self) -> None:
+        """E ⟂ B everywhere → E_par = 0 → Xi = 0 along any trace."""
+        data = _uniform_field_dataset(b=(1.0, 0.0, 0.0), e=(0.0, 0.5, 0.0))
+        seeds = np.array([[16.0, 4.0, 4.0]])
+        xi = schindler_xi(data, seeds, step_size=0.5, max_steps=200)
+        assert xi.shape == (1,)
+        np.testing.assert_allclose(xi, 0.0, atol=1e-13)
+
+    def test_uniform_parallel_e_field(self) -> None:
+        """Uniform E ∥ B → Xi = E0 · (traced arc length).
+
+        With direction='both' the trace spans the domain symmetrically;
+        for a uniform unit B-field along x at the domain center, the
+        traced length is just under 2 * (domain_half - seed_offset).
+        Check exact agreement against the computed arc length rather
+        than predicting it from max_steps.
+        """
+        from pypic.traces import trace_field_line
+
+        e0 = 0.07
+        data = _uniform_field_dataset(
+            shape=(32, 8, 8), b=(1.0, 0.0, 0.0), e=(e0, 0.0, 0.0)
+        )
+        seed = (15.5, 3.5, 3.5)
+        # First compute the actual traced arc length so the expected
+        # answer matches whatever the integrator delivers (avoids
+        # over-fitting to one set of max_steps / step_size knobs).
+        fl = trace_field_line(
+            data, seed, step_size=0.5, max_steps=200, direction="both"
+        )
+        deltas = np.diff(fl.points, axis=0)
+        traced_length = float(np.sum(np.sqrt(np.sum(deltas**2, axis=1))))
+        xi = schindler_xi(data, np.array([seed]), step_size=0.5, max_steps=200)
+        np.testing.assert_allclose(xi[0], e0 * traced_length, rtol=1e-10)
+
+    def test_out_of_domain_seed_returns_nan(self) -> None:
+        """A seed outside the grid yields NaN, not a wrong value."""
+        data = _uniform_field_dataset()
+        seeds = np.array([[16.0, 4.0, 4.0], [1000.0, 0.0, 0.0]])
+        xi = schindler_xi(data, seeds, step_size=0.5, max_steps=64)
+        assert np.isfinite(xi[0])
+        assert np.isnan(xi[1])
+
+    def test_single_seed_shape(self) -> None:
+        """A 1D seed (3,) returns a length-1 array, matching the doc contract."""
+        data = _uniform_field_dataset()
+        xi = schindler_xi(data, np.array([16.0, 4.0, 4.0]), step_size=0.5, max_steps=64)
+        assert xi.shape == (1,)
+
+    def test_invalid_seed_shape_raises(self) -> None:
+        """Seed array with wrong shape raises ValueError."""
+        data = _uniform_field_dataset()
+        with pytest.raises(ValueError, match="seeds must have shape"):
+            schindler_xi(data, np.array([[1.0, 2.0]]))  # (1, 2), not (1, 3)

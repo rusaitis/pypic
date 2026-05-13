@@ -8,10 +8,12 @@ from pypic.derived import (
     agyrotropy,
     alfven_mach,
     alfven_speed,
+    aunai_nongyrotropy,
     current_density_magnitude,
     debye_length,
     electric_energy_density,
     electric_field_magnitude,
+    electron_frame_dissipation,
     enthalpy,
     entropy,
     firehose_parameter,
@@ -25,6 +27,7 @@ from pypic.derived import (
     isotropic_pressure,
     j_dot_e,
     kinetic_energy_density,
+    local_reconnection_rate,
     lorentz_factor,
     lorentz_factor_from_four_velocity,
     magnetic_energy_density,
@@ -45,6 +48,7 @@ from pypic.derived import (
     plasma_frequency,
     poynting_flux,
     relativistic_enthalpy,
+    scudder_agyrotropy,
     skin_depth,
     sound_speed,
     thermal_energy_density,
@@ -708,6 +712,152 @@ class TestAgyrotropy:
             assert q[0] <= 1.0 + 1e-10, f"Q = {q[0]} > 1"
 
 
+class TestAunaiNongyrotropy:
+    def test_isotropic_is_zero(self):
+        """Isotropic tensor → D_ng = 0 (gyrotropic)."""
+        p = np.array([3.0])
+        result = aunai_nongyrotropy(p, p, p, ZEROS, ZEROS, ZEROS, *B_ALONG_Z)
+        np.testing.assert_allclose(result, 0.0, atol=1e-14)
+
+    def test_gyrotropic_diagonal_is_zero(self):
+        """Gyrotropic but anisotropic: diag(2,2,5) with B along z → D_ng = 0."""
+        result = aunai_nongyrotropy(
+            np.array([2.0]),
+            np.array([2.0]),
+            np.array([5.0]),
+            ZEROS,
+            ZEROS,
+            ZEROS,
+            *B_ALONG_Z,
+        )
+        np.testing.assert_allclose(result, 0.0, atol=1e-14)
+
+    def test_agyrotropic_example(self):
+        """B along z, diag(3,1,1): closed-form D_ng = 2 sqrt(2) / 5."""
+        # P_∥ = P_33 = 1, P_⊥ = (3+1)/2 = 2, Tr(P) = 5
+        # ||N||_F² = (P_11-P_⊥)² + (P_22-P_⊥)² + 0 + 2*(off-diag squared, all zero)
+        # ||N||_F² = (3-2)² + (1-2)² = 1 + 1 = 2
+        # D_ng = 2 * sqrt(2) / 5 ≈ 0.5657
+        result = aunai_nongyrotropy(
+            np.array([3.0]),
+            np.array([1.0]),
+            np.array([1.0]),
+            ZEROS,
+            ZEROS,
+            ZEROS,
+            *B_ALONG_Z,
+        )
+        np.testing.assert_allclose(result, 2.0 * np.sqrt(2.0) / 5.0, rtol=1e-14)
+
+    def test_nan_propagation_b_zero(self):
+        """D_ng returns NaN where |B| = 0."""
+        result = aunai_nongyrotropy(
+            np.array([2.0]),
+            np.array([1.0]),
+            np.array([3.0]),
+            ZEROS,
+            ZEROS,
+            ZEROS,
+            ZEROS,
+            ZEROS,
+            ZEROS,
+        )
+        assert np.isnan(result[0])
+
+    def test_non_negative_random(self):
+        """D_ng ≥ 0 for symmetric positive-definite tensors."""
+        rng = np.random.default_rng(7)
+        for _ in range(50):
+            a = rng.standard_normal((3, 3))
+            p = a @ a.T + 0.1 * np.eye(3)
+            b_vec = rng.standard_normal(3)
+            b_vec = b_vec / np.linalg.norm(b_vec)
+            d_ng = aunai_nongyrotropy(
+                np.array([p[0, 0]]),
+                np.array([p[1, 1]]),
+                np.array([p[2, 2]]),
+                np.array([p[0, 1]]),
+                np.array([p[0, 2]]),
+                np.array([p[1, 2]]),
+                np.array([b_vec[0]]),
+                np.array([b_vec[1]]),
+                np.array([b_vec[2]]),
+            )
+            assert d_ng[0] >= -1e-12, f"D_ng = {d_ng[0]} < 0"
+
+
+class TestScudderAgyrotropy:
+    def test_isotropic_is_zero(self):
+        """Isotropic tensor → A_phi = 0 (gyrotropic)."""
+        p = np.array([3.0])
+        result = scudder_agyrotropy(p, p, p, ZEROS, ZEROS, ZEROS, *B_ALONG_Z)
+        np.testing.assert_allclose(result, 0.0, atol=1e-14)
+
+    def test_gyrotropic_diagonal_is_zero(self):
+        """Gyrotropic but anisotropic: diag(2,2,5) with B along z → A_phi = 0."""
+        # Both perp eigenvalues equal 2 → no perp spread.
+        result = scudder_agyrotropy(
+            np.array([2.0]),
+            np.array([2.0]),
+            np.array([5.0]),
+            ZEROS,
+            ZEROS,
+            ZEROS,
+            *B_ALONG_Z,
+        )
+        np.testing.assert_allclose(result, 0.0, atol=1e-14)
+
+    def test_perp_anisotropy_nonzero(self):
+        """B along z, diag(3,1,5): perp eigenvalues 3,1 → A_phi = |3-1|/4 = 0.5."""
+        result = scudder_agyrotropy(
+            np.array([3.0]),
+            np.array([1.0]),
+            np.array([5.0]),
+            ZEROS,
+            ZEROS,
+            ZEROS,
+            *B_ALONG_Z,
+        )
+        np.testing.assert_allclose(result, 0.5, rtol=1e-14)
+
+    def test_bounded_zero_one(self):
+        """A_phi ∈ [0, 1] for random SPD tensors."""
+        rng = np.random.default_rng(13)
+        for _ in range(100):
+            a = rng.standard_normal((3, 3))
+            p = a @ a.T + 0.1 * np.eye(3)
+            b_vec = rng.standard_normal(3)
+            b_vec = b_vec / np.linalg.norm(b_vec)
+            a_phi = scudder_agyrotropy(
+                np.array([p[0, 0]]),
+                np.array([p[1, 1]]),
+                np.array([p[2, 2]]),
+                np.array([p[0, 1]]),
+                np.array([p[0, 2]]),
+                np.array([p[1, 2]]),
+                np.array([b_vec[0]]),
+                np.array([b_vec[1]]),
+                np.array([b_vec[2]]),
+            )
+            assert a_phi[0] >= -1e-10, f"A_phi = {a_phi[0]} < 0"
+            assert a_phi[0] <= 1.0 + 1e-10, f"A_phi = {a_phi[0]} > 1"
+
+    def test_nan_propagation_b_zero(self):
+        """A_phi returns NaN where |B| = 0."""
+        result = scudder_agyrotropy(
+            np.array([3.0]),
+            np.array([1.0]),
+            np.array([2.0]),
+            ZEROS,
+            ZEROS,
+            ZEROS,
+            ZEROS,
+            ZEROS,
+            ZEROS,
+        )
+        assert np.isnan(result[0])
+
+
 SCALAR_FUNCTIONS_1ARG = [
     lambda a: thermal_speed(a, mass=1.0),
     lambda a: plasma_frequency(a, charge=1.0, mass=1.0),
@@ -810,6 +960,124 @@ class TestJDotE:
             np.array([0.0]),
             np.array([0.0]),
         )
+        assert np.isnan(result[0])
+
+
+class TestElectronFrameDissipation:
+    """Zenitani 2011 electron-frame dissipation D_e."""
+
+    def test_ideal_mhd_is_zero(self):
+        """E = -V_e × B, rho_c = 0 → D_e = J · 0 - 0 = 0 for any J."""
+        ve = (np.array([1.5]), np.array([-0.3]), np.array([0.2]))
+        b = (np.array([0.1]), np.array([0.4]), np.array([0.9]))
+        e = (
+            -(ve[1] * b[2] - ve[2] * b[1]),
+            -(ve[2] * b[0] - ve[0] * b[2]),
+            -(ve[0] * b[1] - ve[1] * b[0]),
+        )
+        j = (np.array([0.5]), np.array([-0.2]), np.array([0.7]))
+        rho_c = np.array([0.0])
+        result = electron_frame_dissipation(*j, *e, *ve, *b, rho_c)
+        np.testing.assert_allclose(result, 0.0, atol=1e-15)
+
+    def test_zero_velocity_recovers_j_dot_e(self):
+        """V_e = 0, rho_c = 0 → D_e = J · E."""
+        ve = (ZEROS, ZEROS, ZEROS)
+        b = (ZEROS, ZEROS, ONES)
+        j = (np.array([1.0]), np.array([2.0]), np.array([3.0]))
+        e = (np.array([4.0]), np.array([5.0]), np.array([6.0]))
+        rho_c = np.array([0.0])
+        result = electron_frame_dissipation(*j, *e, *ve, *b, rho_c)
+        np.testing.assert_allclose(result, 1 * 4 + 2 * 5 + 3 * 6, rtol=1e-15)
+
+    def test_rho_c_subtraction(self):
+        """V_e = 0 cross product still zero, but rho_c * V_e · E nonzero."""
+        ve = (np.array([1.0]), np.array([0.0]), np.array([0.0]))
+        b = (np.array([0.0]), np.array([0.0]), np.array([0.0]))
+        j = (ZEROS, ZEROS, ZEROS)
+        e = (np.array([2.0]), np.array([0.0]), np.array([0.0]))
+        rho_c = np.array([3.0])
+        # E + V_e × B = E.  J · E' = 0 (J = 0).
+        # D_e = 0 - rho_c * V_e · E = -3 * 1 * 2 = -6.
+        result = electron_frame_dissipation(*j, *e, *ve, *b, rho_c)
+        np.testing.assert_allclose(result, -6.0, rtol=1e-15)
+
+    def test_relativistic_gamma_prefactor(self):
+        """c provided → multiplies by γ_e = 1/sqrt(1 - V_e²/c²)."""
+        ve = (np.array([0.6]), ZEROS, ZEROS)  # V_e = 0.6 c if c = 1
+        b = (ZEROS, ZEROS, ZEROS)
+        j = (np.array([1.0]), ZEROS, ZEROS)
+        e = (np.array([2.0]), ZEROS, ZEROS)
+        rho_c = np.array([0.0])
+        # E + V_e × B = E.  D_e_NR = J · E = 2.
+        # γ_e = 1/sqrt(1 - 0.36) = 1/0.8 = 1.25.
+        result = electron_frame_dissipation(*j, *e, *ve, *b, rho_c, c=1.0)
+        np.testing.assert_allclose(result, 1.25 * 2.0, rtol=1e-14)
+
+    def test_nan_propagation(self):
+        """NaN in any input propagates."""
+        nan = np.array([np.nan])
+        ve = (ZEROS, ZEROS, ZEROS)
+        b = (ZEROS, ZEROS, ONES)
+        j = (nan, ZEROS, ZEROS)
+        e = (ONES, ZEROS, ZEROS)
+        rho_c = np.array([0.0])
+        result = electron_frame_dissipation(*j, *e, *ve, *b, rho_c)
+        assert np.isnan(result[0])
+
+
+class TestLocalReconnectionRate:
+    """Comisso & Bhattacharjee normalized local rate |E'|/(v_A |B|)."""
+
+    def test_ideal_mhd_is_zero(self):
+        """E = -V × B → R_recon = 0."""
+        v = (np.array([0.7]), np.array([-0.1]), np.array([0.3]))
+        b = (np.array([0.2]), np.array([0.5]), np.array([0.8]))
+        e = (
+            -(v[1] * b[2] - v[2] * b[1]),
+            -(v[2] * b[0] - v[0] * b[2]),
+            -(v[0] * b[1] - v[1] * b[0]),
+        )
+        v_a = np.array([1.5])
+        result = local_reconnection_rate(*e, *v, *b, v_a)
+        np.testing.assert_allclose(result, 0.0, atol=1e-15)
+
+    def test_pure_parallel_e_field(self):
+        """V = 0, E parallel to B → R_recon = |E| / (v_A |B|)."""
+        v = (ZEROS, ZEROS, ZEROS)
+        b = (ZEROS, ZEROS, np.array([2.0]))
+        e = (ZEROS, ZEROS, np.array([3.0]))
+        v_a = np.array([4.0])
+        # |E + 0| = 3; |B| = 2; R = 3 / (4 * 2) = 0.375.
+        result = local_reconnection_rate(*e, *v, *b, v_a)
+        np.testing.assert_allclose(result, 0.375, rtol=1e-15)
+
+    def test_nan_at_zero_b(self):
+        """|B| = 0 → NaN."""
+        v = (ZEROS, ZEROS, ZEROS)
+        b = (ZEROS, ZEROS, ZEROS)
+        e = (np.array([1.0]), ZEROS, ZEROS)
+        v_a = np.array([1.0])
+        result = local_reconnection_rate(*e, *v, *b, v_a)
+        assert np.isnan(result[0])
+
+    def test_nan_at_zero_va(self):
+        """v_A = 0 → NaN."""
+        v = (ZEROS, ZEROS, ZEROS)
+        b = (ZEROS, ZEROS, ONES)
+        e = (np.array([1.0]), ZEROS, ZEROS)
+        v_a = np.array([0.0])
+        result = local_reconnection_rate(*e, *v, *b, v_a)
+        assert np.isnan(result[0])
+
+    def test_nan_propagation(self):
+        """NaN in any input propagates."""
+        nan = np.array([np.nan])
+        v = (ZEROS, ZEROS, ZEROS)
+        b = (ZEROS, ZEROS, ONES)
+        e = (nan, ZEROS, ZEROS)
+        v_a = ONES
+        result = local_reconnection_rate(*e, *v, *b, v_a)
         assert np.isnan(result[0])
 
 

@@ -621,6 +621,12 @@ _FIELD_INFO: dict[str, FieldInfo] = {
     "agyrotropy": _FI("dimensionless", "Agyrotropy measure", "", r"$Q$"),
     "agyrotropy_e": _FI("dimensionless", "Electron agyrotropy", "", r"$Q_e$"),
     "agyrotropy_i": _FI("dimensionless", "Ion agyrotropy", "", r"$Q_i$"),
+    "D_ng": _FI("dimensionless", "Aunai nongyrotropy", "", r"$D_{ng}$"),
+    "D_ng_e": _FI("dimensionless", "Electron Aunai nongyrotropy", "", r"$D_{ng,e}$"),
+    "D_ng_i": _FI("dimensionless", "Ion Aunai nongyrotropy", "", r"$D_{ng,i}$"),
+    "A_phi": _FI("dimensionless", "Scudder agyrotropy", "", r"$A_\phi$"),
+    "A_phi_e": _FI("dimensionless", "Electron Scudder agyrotropy", "", r"$A_{\phi,e}$"),
+    "A_phi_i": _FI("dimensionless", "Ion Scudder agyrotropy", "", r"$A_{\phi,i}$"),
     "gamma_L": _FI("dimensionless", "Bulk Lorentz factor", "", r"$\gamma$"),
     "sigma": _FI("dimensionless", "Magnetization parameter", "", r"$\sigma$"),
     "gamma_eos": _FI("dimensionless", "Adiabatic index", "", r"$\gamma_{eos}$"),
@@ -630,6 +636,18 @@ _FIELD_INFO: dict[str, FieldInfo] = {
         "Energy conversion rate",
         "W/m^3",
         r"$\mathbf{J} \cdot \mathbf{E}$",
+    ),
+    "D_e": _FI(
+        "power_density",
+        "Electron-frame dissipation",
+        "W/m^3",
+        r"$D_e$",
+    ),
+    "R_recon": _FI(
+        "dimensionless",
+        "Local reconnection rate",
+        "",
+        r"$R_{\mathrm{recon}}$",
     ),
     **_vec_three(
         "E_prime_{c}",
@@ -855,6 +873,18 @@ _SPECIES_PATTERN_SPECS: list[tuple[str, str, str, str]] = [
         r"$P_{{\perp,s{N}}}$",
     ),
     ("agyrotropy", "dimensionless", "Agyrotropy (species {N})", r"$Q_{{s{N}}}$"),
+    (
+        "D_ng",
+        "dimensionless",
+        "Aunai nongyrotropy (species {N})",
+        r"$D_{{ng,s{N}}}$",
+    ),
+    (
+        "A_phi",
+        "dimensionless",
+        "Scudder agyrotropy (species {N})",
+        r"$A_{{\phi,s{N}}}$",
+    ),
     # Per-species field-aligned velocity decomposition.
     (
         "V_par",

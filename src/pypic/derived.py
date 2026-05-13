@@ -1701,6 +1701,176 @@ def agyrotropy(
     return result
 
 
+def aunai_nongyrotropy(
+    p11: FloatArray,
+    p22: FloatArray,
+    p33: FloatArray,
+    p12: FloatArray,
+    p13: FloatArray,
+    p23: FloatArray,
+    b1: FloatArray,
+    b2: FloatArray,
+    b3: FloatArray,
+) -> FloatArray:
+    r"""Compute Aunai's degree of nongyrotropy.
+
+    $$D_{ng} = \frac{2\,\|\mathbf{N}\|_F}{\mathrm{Tr}(\mathbf{P})}$$
+
+    where $\mathbf{N} = \mathbf{P} - P_\parallel\,\hat{b}\hat{b}
+    - P_\perp(\mathbf{I} - \hat{b}\hat{b})$ is the non-gyrotropic part
+    of the pressure tensor and $\|\cdot\|_F$ the Frobenius norm
+    (Aunai, Hesse, Kuznetsova, Phys. Plasmas 20, 092903, 2013).
+
+    Frame-invariant. Vanishes for a gyrotropic plasma; non-zero whenever
+    $\mathbf{P}$ has either perpendicular anisotropy in its eigenframe
+    or off-axis ($\hat{b}$-coupling) components. Closed-form identity used
+    here: $\|\mathbf{N}\|_F^2 = \mathrm{Tr}(\mathbf{P}^2) - P_\parallel^2
+    - 2 P_\perp^2$, where $\mathrm{Tr}(\mathbf{P}^2) = \sum_{ij} P_{ij}^2$
+    for symmetric $\mathbf{P}$.
+
+    Pypic ships ``agyrotropy`` (Swisdak Q) as the canonical measure;
+    $D_{ng}$ is provided as a research alternative for literature
+    comparisons (Swisdak, GRL 43, 43, 2016 shows Q traces magnetic
+    separatrices better in guide-field reconnection).
+
+    Parameters
+    ----------
+    p11, p22, p33, p12, p13, p23 : NDArray
+        Pressure tensor components $P_{ij}$.
+    b1, b2, b3 : NDArray
+        Magnetic field components.
+
+    Returns
+    -------
+    NDArray
+        Aunai nongyrotropy (dimensionless). Returns NaN where
+        $|\mathbf{B}| = 0$ (undefined magnetic direction).
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> aunai_nongyrotropy(
+    ...     np.array([1.0]), np.array([1.0]), np.array([1.0]),
+    ...     np.array([0.0]), np.array([0.0]), np.array([0.0]),
+    ...     np.array([0.0]), np.array([0.0]), np.array([1.0]),
+    ... )
+    array([0.])
+    """
+    bhat_1, bhat_2, bhat_3 = _unit_vector(b1, b2, b3)
+
+    p_par = (
+        bhat_1**2 * p11
+        + bhat_2**2 * p22
+        + bhat_3**2 * p33
+        + 2.0 * (bhat_1 * bhat_2 * p12 + bhat_1 * bhat_3 * p13 + bhat_2 * bhat_3 * p23)
+    )
+    trace_p = p11 + p22 + p33
+    p_perp = (trace_p - p_par) / 2.0
+
+    frobenius_p_sq = p11**2 + p22**2 + p33**2 + 2.0 * (p12**2 + p13**2 + p23**2)
+    # ||N||_F^2 = Tr(P^2) - P_par^2 - 2 P_perp^2.  Clamp tiny negative
+    # roundoff produced by the algebraic identity before sqrt.
+    n_frobenius_sq = np.maximum(frobenius_p_sq - p_par**2 - 2.0 * p_perp**2, 0.0)
+    result: FloatArray = _safe_divide(2.0 * np.sqrt(n_frobenius_sq), trace_p)
+    return result
+
+
+def scudder_agyrotropy(
+    p11: FloatArray,
+    p22: FloatArray,
+    p33: FloatArray,
+    p12: FloatArray,
+    p13: FloatArray,
+    p23: FloatArray,
+    b1: FloatArray,
+    b2: FloatArray,
+    b3: FloatArray,
+) -> FloatArray:
+    r"""Compute Scudder's electron agyrotropy.
+
+    $$A_\phi = \frac{|\lambda_1^\perp - \lambda_2^\perp|}
+    {\lambda_1^\perp + \lambda_2^\perp}$$
+
+    where $\lambda_{1,2}^\perp$ are the eigenvalues of the
+    perpendicular $2\times 2$ block of $\mathbf{P}$ in the field-aligned
+    frame (Scudder & Daughton, J. Geophys. Res. 113, A06222, 2008).
+
+    Bounded $A_\phi \in [0, 1]$: zero on gyrotropic, one at maximal
+    perp eigenvalue spread. Captures only the perpendicular anisotropy;
+    misses off-axis ($\hat{b}$-coupling) nongyrotropy, which the
+    Aunai measure ``aunai_nongyrotropy`` and the Swisdak measure
+    ``agyrotropy`` (Q) both catch.
+
+    Frame-invariant closed form:
+    $A_\phi^2 = \|\Pi\|_F^2 / (2 P_\perp^2) - 1$, where
+    $\Pi = (\mathbf{I} - \hat{b}\hat{b})\,\mathbf{P}\,(\mathbf{I} - \hat{b}\hat{b})$
+    is the double-projected perpendicular pressure tensor — the same
+    object computed inside ``agyrotropy`` (Swisdak, GRL 43, 43, 2016).
+
+    Parameters
+    ----------
+    p11, p22, p33, p12, p13, p23 : NDArray
+        Pressure tensor components $P_{ij}$.
+    b1, b2, b3 : NDArray
+        Magnetic field components.
+
+    Returns
+    -------
+    NDArray
+        Scudder agyrotropy $A_\phi \in [0, 1]$ (dimensionless).
+        Returns NaN where $|\mathbf{B}| = 0$.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> scudder_agyrotropy(
+    ...     np.array([1.0]), np.array([1.0]), np.array([1.0]),
+    ...     np.array([0.0]), np.array([0.0]), np.array([0.0]),
+    ...     np.array([0.0]), np.array([0.0]), np.array([1.0]),
+    ... )
+    array([0.])
+    """
+    bhat_1, bhat_2, bhat_3 = _unit_vector(b1, b2, b3)
+
+    p_par = (
+        bhat_1**2 * p11
+        + bhat_2**2 * p22
+        + bhat_3**2 * p33
+        + 2.0 * (bhat_1 * bhat_2 * p12 + bhat_1 * bhat_3 * p13 + bhat_2 * bhat_3 * p23)
+    )
+    p_perp = (p11 + p22 + p33 - p_par) / 2.0
+
+    p_dot_bhat_1 = p11 * bhat_1 + p12 * bhat_2 + p13 * bhat_3
+    p_dot_bhat_2 = p12 * bhat_1 + p22 * bhat_2 + p23 * bhat_3
+    p_dot_bhat_3 = p13 * bhat_1 + p23 * bhat_2 + p33 * bhat_3
+
+    perp_11 = p11 - 2.0 * p_dot_bhat_1 * bhat_1 + p_par * bhat_1**2
+    perp_22 = p22 - 2.0 * p_dot_bhat_2 * bhat_2 + p_par * bhat_2**2
+    perp_33 = p33 - 2.0 * p_dot_bhat_3 * bhat_3 + p_par * bhat_3**2
+    perp_12 = (
+        p12 - p_dot_bhat_1 * bhat_2 - bhat_1 * p_dot_bhat_2 + p_par * bhat_1 * bhat_2
+    )
+    perp_13 = (
+        p13 - p_dot_bhat_1 * bhat_3 - bhat_1 * p_dot_bhat_3 + p_par * bhat_1 * bhat_3
+    )
+    perp_23 = (
+        p23 - p_dot_bhat_2 * bhat_3 - bhat_2 * p_dot_bhat_3 + p_par * bhat_2 * bhat_3
+    )
+
+    pi_frobenius_sq = (
+        perp_11**2
+        + perp_22**2
+        + perp_33**2
+        + 2.0 * (perp_12**2 + perp_13**2 + perp_23**2)
+    )
+    # A_phi^2 = ||Π||_F^2 / (2 P_perp^2) - 1.  Clamp tiny negative
+    # roundoff (gyrotropic case yields ||Π||_F^2 = 2 P_perp^2 exactly
+    # in arithmetic, but finite precision may dip slightly below).
+    a_phi_sq = np.maximum(_safe_divide(pi_frobenius_sq, 2.0 * p_perp**2) - 1.0, 0.0)
+    result: FloatArray = np.sqrt(a_phi_sq)
+    return result
+
+
 def j_dot_e(
     j1: FloatArray,
     j2: FloatArray,
@@ -1747,6 +1917,160 @@ def j_dot_e(
     array([2.])
     """
     return j1 * e1 + j2 * e2 + j3 * e3
+
+
+def electron_frame_dissipation(
+    j1: FloatArray,
+    j2: FloatArray,
+    j3: FloatArray,
+    e1: FloatArray,
+    e2: FloatArray,
+    e3: FloatArray,
+    ve1: FloatArray,
+    ve2: FloatArray,
+    ve3: FloatArray,
+    b1: FloatArray,
+    b2: FloatArray,
+    b3: FloatArray,
+    rho_c: FloatArray,
+    *,
+    c: float | None = None,
+) -> FloatArray:
+    r"""Compute Zenitani's electron-frame dissipation measure.
+
+    $$D_e = \gamma_e\!\left[\mathbf{J}\cdot
+    (\mathbf{E} + \mathbf{V}_e\times\mathbf{B})
+    - \rho_c\,(\mathbf{V}_e\cdot\mathbf{E})\right]$$
+
+    A frame-invariant scalar that localizes the electron diffusion
+    region in collisionless reconnection (Zenitani, Hesse, Klimas,
+    Kuznetsova, Phys. Rev. Lett. 106, 195003, 2011). Positive in the
+    EDR, vanishing in ideal-MHD regions and (unlike $\mathbf{J}\cdot
+    \mathbf{E}$) free of bulk-flow energy-transfer contributions.
+
+    When *c* is provided, the relativistic prefactor
+    $\gamma_e = (1 - V_e^2/c^2)^{-1/2}$ is included. Otherwise the
+    non-relativistic limit $\gamma_e \to 1$ is used.
+
+    Parameters
+    ----------
+    j1, j2, j3 : NDArray
+        Current-density components.
+    e1, e2, e3 : NDArray
+        Electric field components.
+    ve1, ve2, ve3 : NDArray
+        Electron bulk-velocity components.
+    b1, b2, b3 : NDArray
+        Magnetic field components.
+    rho_c : NDArray
+        Total charge density.
+    c : float or None
+        Speed of light. When provided, the relativistic
+        $\gamma_e$ prefactor is applied.
+
+    Returns
+    -------
+    NDArray
+        Electron-frame dissipation $D_e$ (power density, same units as
+        $\mathbf{J}\cdot\mathbf{E}$).
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> # Ideal MHD: E = -V_e x B (with V_e = V), J || E_perp_to_B,
+    >>> # rho_c = 0.  D_e should reduce to J · E' = 0.
+    >>> ve = (np.array([1.0]), np.array([0.0]), np.array([0.0]))
+    >>> b = (np.array([0.0]), np.array([0.0]), np.array([1.0]))
+    >>> e = (np.array([0.0]), np.array([1.0]), np.array([0.0]))  # -V_e × B
+    >>> j = (np.array([0.1]), np.array([0.0]), np.array([0.0]))
+    >>> rho_c = np.array([0.0])
+    >>> electron_frame_dissipation(*j, *e, *ve, *b, rho_c)
+    array([0.])
+    """
+    e_prime_1 = e1 + (ve2 * b3 - ve3 * b2)
+    e_prime_2 = e2 + (ve3 * b1 - ve1 * b3)
+    e_prime_3 = e3 + (ve1 * b2 - ve2 * b1)
+    j_dot_e_prime = j1 * e_prime_1 + j2 * e_prime_2 + j3 * e_prime_3
+    ve_dot_e = ve1 * e1 + ve2 * e2 + ve3 * e3
+    d_e: FloatArray = j_dot_e_prime - rho_c * ve_dot_e
+
+    if c is not None:
+        ve_sq = ve1**2 + ve2**2 + ve3**2
+        gamma_e = 1.0 / np.sqrt(1.0 - ve_sq / c**2)
+        return gamma_e * d_e
+    return d_e
+
+
+def local_reconnection_rate(
+    e1: FloatArray,
+    e2: FloatArray,
+    e3: FloatArray,
+    v1: FloatArray,
+    v2: FloatArray,
+    v3: FloatArray,
+    b1: FloatArray,
+    b2: FloatArray,
+    b3: FloatArray,
+    v_a: FloatArray,
+) -> FloatArray:
+    r"""Compute the dimensionless local reconnection rate.
+
+    $$R_{\mathrm{recon}} = \frac{|\mathbf{E} + \mathbf{V}\times\mathbf{B}|}
+    {v_A\,|\mathbf{B}|}$$
+
+    Frozen-in-violation rate normalized by the Alfvén speed and
+    magnetic-field magnitude. Regions with $R_{\mathrm{recon}} \sim 0.1$
+    flag the "fast reconnection" plateau ubiquitous in collisionless
+    simulations (Comisso & Bhattacharjee, J. Plasma Phys. 82, 595820601,
+    2016; Cassak, Liu, Shay, J. Plasma Phys. 83, 715830501, 2017).
+
+    Returns NaN where $|\mathbf{B}| = 0$ or $v_A = 0$.
+
+    Parameters
+    ----------
+    e1, e2, e3 : NDArray
+        Electric field components.
+    v1, v2, v3 : NDArray
+        Bulk velocity components (use ion velocity in single-fluid
+        MHD; electron velocity is the natural choice for kinetic
+        analysis at electron scales — pass the species you care about).
+    b1, b2, b3 : NDArray
+        Magnetic field components.
+    v_a : NDArray
+        Alfvén speed.
+
+    Returns
+    -------
+    NDArray
+        Dimensionless local reconnection rate.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> # Anti-frozen-in: E aligned with -V x B doubled in magnitude.
+    >>> # E = -2 V x B (with V along x, B along z) => E = -2 * (-V Bz hat_y)
+    >>> # So E + V x B = -V x B (one V x B remaining).
+    >>> e1 = np.array([0.0])
+    >>> e2 = np.array([2.0])  # ad-hoc — see test for the controlled case
+    >>> e3 = np.array([0.0])
+    >>> v1 = np.array([1.0])
+    >>> v2 = np.array([0.0])
+    >>> v3 = np.array([0.0])
+    >>> b1 = np.array([0.0])
+    >>> b2 = np.array([0.0])
+    >>> b3 = np.array([1.0])
+    >>> v_a = np.array([1.0])
+    >>> # |E + V x B| = |(0, 2, 0) + (1,0,0) x (0,0,1)| = |(0, 2-1, 0)| = 1
+    >>> # |B| = 1, v_a = 1, so R = 1.0
+    >>> local_reconnection_rate(e1, e2, e3, v1, v2, v3, b1, b2, b3, v_a)
+    array([1.])
+    """
+    e_prime_1 = e1 + (v2 * b3 - v3 * b2)
+    e_prime_2 = e2 + (v3 * b1 - v1 * b3)
+    e_prime_3 = e3 + (v1 * b2 - v2 * b1)
+    e_prime_mag = np.sqrt(e_prime_1**2 + e_prime_2**2 + e_prime_3**2)
+    b_mag = np.sqrt(b1**2 + b2**2 + b3**2)
+    return _safe_divide(e_prime_mag, v_a * b_mag)
 
 
 def ideal_electric_field(
@@ -2217,12 +2541,14 @@ __all__ = [
     "agyrotropy",
     "alfven_mach",
     "alfven_speed",
+    "aunai_nongyrotropy",
     "bulk_velocity",
     "conductive_heat_flux_component",
     "current_density_magnitude",
     "debye_length",
     "electric_energy_density",
     "electric_field_magnitude",
+    "electron_frame_dissipation",
     "enthalpy",
     "enthalpy_flux_component",
     "entropy",
@@ -2239,6 +2565,7 @@ __all__ = [
     "j_dot_e",
     "kinetic_energy_density",
     "kinetic_energy_flux_component",
+    "local_reconnection_rate",
     "lorentz_factor",
     "lorentz_factor_from_four_velocity",
     "magnetic_energy_density",
@@ -2256,6 +2583,7 @@ __all__ = [
     "plasma_frequency",
     "poynting_flux",
     "relativistic_enthalpy",
+    "scudder_agyrotropy",
     "skin_depth",
     "sound_speed",
     "species_mass_density",

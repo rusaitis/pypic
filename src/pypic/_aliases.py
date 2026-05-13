@@ -149,6 +149,10 @@ _COMPUTE_ALIASES: dict[str, str] = {
     "P_perp_i": "P_s1_perp",
     "agyrotropy_e": "agyrotropy_s0",
     "agyrotropy_i": "agyrotropy_s1",
+    "D_ng_e": "D_ng_s0",
+    "D_ng_i": "D_ng_s1",
+    "A_phi_e": "A_phi_s0",
+    "A_phi_i": "A_phi_s1",
     # Per-species parallel velocity shorthand.
     "V_par_e": "V_s0_par",
     "V_par_i": "V_s1_par",

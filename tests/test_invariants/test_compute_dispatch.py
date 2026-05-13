@@ -55,7 +55,9 @@ def test_registry_magnitudes_match_expected_set() -> None:
     registry_mags = {
         name for name in _REGISTRY if name.startswith("|") and name.endswith("|")
     }
-    expected = {name for name, _ in DIRECT_MAGNITUDE_RECIPES} | PYTHAGOREAN_MAGNITUDE_NAMES
+    expected = {
+        name for name, _ in DIRECT_MAGNITUDE_RECIPES
+    } | PYTHAGOREAN_MAGNITUDE_NAMES
     assert registry_mags == expected, (
         f"magnitude registry drifted: registry={registry_mags}, expected={expected}"
     )

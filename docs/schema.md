@@ -1106,6 +1106,8 @@ both forms.
 | `P_perp` | Pressure perpendicular to B | PIC, multi-moment MHD (derived from tensor; CGL closures may store directly — see Storage tiers below) |
 | `Pij`, `Pij_s{N}` | Full pressure tensor — 6 independent components (`P_11`, `P_12`, `P_13`, `P_22`, `P_23`, `P_33`) total or per species (`P_s0_11`, `P_s0_12`, …, `P_s0_33`) | PIC, multi-moment MHD |
 | `agyrotropy` | Swisdak $Q$ — see [equations.md § Pressure Tensor](equations.md#4-pressure-tensor) for the closed form $Q = \sqrt{1 - 4 I_2 / [(I_1 - P_\parallel)(I_1 + 3 P_\parallel)]}$, bounded $[0, 1]$ | PIC, multi-moment MHD (derived) |
+| `D_ng` | Aunai's degree of nongyrotropy $D_{ng} = 2\,\|\mathbf{N}\|_F / \mathrm{Tr}(\mathbf{P})$ where $\mathbf{N}$ is the non-gyrotropic part of $\mathbf{P}$. Frame-invariant; alternative to $Q$. | PIC, multi-moment MHD (derived) |
+| `A_phi` | Scudder's electron agyrotropy — perpendicular-block eigenvalue ratio, bounded $[0, 1]$. Captures only perp anisotropy (misses off-axis nongyrotropy). | PIC, multi-moment MHD (derived) |
 
 Per-species decomposition (`P_s0_par`, `P_s0_perp`) uses the
 per-species tensors (`P_s0_11..P_s0_33`); two-species shorthands
@@ -1206,12 +1208,16 @@ demand.
 | `vort_1`, `vort_2`, `vort_3` | `vort_x`, ... | Fluid vorticity | V_1, V_2, V_3, grid |
 | `\|vort\|` | — | Vorticity magnitude | vort_1, vort_2, vort_3 |
 | `J_dot_E` | — | Energy conversion rate | J_1-J_3, E_1-E_3 |
+| `D_e` | — | Electron-frame dissipation (Zenitani EDR localizer) | J_1-J_3, E_1-E_3, V_s0_1-V_s0_3, B_1-B_3, rho_c |
+| `R_recon` | — | Local dimensionless reconnection rate $|\mathbf{E}'|/(v_A|B|)$ | E_1-E_3, V_1-V_3, B_1-B_3, v_A |
 | `E_prime_1`, `E_prime_2`, `E_prime_3` | `E_prime_x`, `E_prime_y`, `E_prime_z` | Non-ideal electric field | E_1-E_3, V_1-V_3, B_1-B_3 |
 | `E_ideal_1`, `E_ideal_2`, `E_ideal_3` | `E_ideal_x`, `E_ideal_y`, `E_ideal_z` | Ideal electric field | V_1-V_3, B_1-B_3 |
 | `E_Hall_1`, `E_Hall_2`, `E_Hall_3` | `E_Hall_x`, `E_Hall_y`, `E_Hall_z` | Hall electric field | J_1-J_3, B_1-B_3, `n_s0`, species |
 | `psi` | — | Magnetic flux function (2D) | B_2, grid |
 | `firehose` | — | Firehose instability parameter | `P_par`, `P_perp`, `\|B\|` |
 | `mirror` | — | Mirror instability parameter | `P_par`, `P_perp`, `\|B\|` |
+
+The 3D Schindler reconnection criterion $\Xi(\mathbf{x}_0) = \int_{\mathcal{L}} E_\parallel\,d\ell$ returns one scalar per seed point and lives in `pypic.reconnection.schindler_xi`, outside the per-cell `compute()` registry. See [equations.md § 9](equations.md#9-reconnection-and-anisotropy-diagnostics).
 
 Scalar quantities (`n_s0`, `rho_m`, `P`, `T_s0`, `beta`, ...) use
 the same name regardless of geometry.

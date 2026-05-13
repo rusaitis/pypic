@@ -281,6 +281,11 @@ _REGISTRY: dict[str, _Recipe] = {
     "P_par": _Recipe(derived.parallel_pressure, _PRESSURE_TENSOR_AND_B),
     "P_perp": _Recipe(derived.perpendicular_pressure, _PRESSURE_TENSOR_AND_B),
     "agyrotropy": _Recipe(derived.agyrotropy, _PRESSURE_TENSOR_AND_B),
+    # Alternative agyrotropy measures: Aunai 2013 (full N Frobenius)
+    # and Scudder & Daughton 2008 (perp eigenvalue spread). Swisdak Q
+    # is the canonical default; these ship for literature comparison.
+    "D_ng": _Recipe(derived.aunai_nongyrotropy, _PRESSURE_TENSOR_AND_B),
+    "A_phi": _Recipe(derived.scudder_agyrotropy, _PRESSURE_TENSOR_AND_B),
     # Field-aligned vector decomposition against b̂ = B/|B|.
     # NaN propagates from ``_unit_vector`` where |B| = 0.
     # Per-species V variants are produced by the ``"V_par"`` /
@@ -407,6 +412,47 @@ _REGISTRY: dict[str, _Recipe] = {
     "|vort|": _Recipe(derived.velocity_magnitude, ("vort_1", "vort_2", "vort_3")),
     # Reconnection diagnostics
     "J_dot_E": _Recipe(derived.j_dot_e, ("J_1", "J_2", "J_3", "E_1", "E_2", "E_3")),
+    # Zenitani electron-frame dissipation D_e — canonical EDR localizer
+    # for collisionless reconnection.  `c` is injected under
+    # ``physics.relativistic = true`` for the γ_e prefactor.
+    "D_e": _Recipe(
+        derived.electron_frame_dissipation,
+        (
+            "J_1",
+            "J_2",
+            "J_3",
+            "E_1",
+            "E_2",
+            "E_3",
+            "V_s0_1",
+            "V_s0_2",
+            "V_s0_3",
+            "B_1",
+            "B_2",
+            "B_3",
+            "rho_c",
+        ),
+        supports_relativistic=True,
+    ),
+    # Comisso & Bhattacharjee normalized local reconnection rate
+    # |E'| / (v_A |B|).  Single-fluid V — the registry uses the total
+    # bulk velocity; for kinetic analysis at electron scales call
+    # ``derived.local_reconnection_rate`` directly with V_s0.
+    "R_recon": _Recipe(
+        derived.local_reconnection_rate,
+        (
+            "E_1",
+            "E_2",
+            "E_3",
+            "V_1",
+            "V_2",
+            "V_3",
+            "B_1",
+            "B_2",
+            "B_3",
+            "v_A",
+        ),
+    ),
     # Non-ideal electric field E' = E + VxB (component selects)
     **_vector_recipes(
         "E_prime_{c}",
@@ -496,6 +542,16 @@ _SPECIES_TEMPLATES: dict[str, _SpeciesTemplate] = {
     ),
     "agyrotropy": _SpeciesTemplate(
         derived.agyrotropy,
+        _SPECIES_PRESSURE_TENSOR_AND_B,
+        _SpeciesArgs.NONE,
+    ),
+    "D_ng": _SpeciesTemplate(
+        derived.aunai_nongyrotropy,
+        _SPECIES_PRESSURE_TENSOR_AND_B,
+        _SpeciesArgs.NONE,
+    ),
+    "A_phi": _SpeciesTemplate(
+        derived.scudder_agyrotropy,
         _SPECIES_PRESSURE_TENSOR_AND_B,
         _SpeciesArgs.NONE,
     ),

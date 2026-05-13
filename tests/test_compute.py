@@ -911,9 +911,7 @@ class TestFieldAlignedVectorDecomposition:
             compute_field("|E_prime_perp|", ds), np.sqrt(160.0), rtol=1e-14
         )
 
-    @pytest.mark.parametrize(
-        "prefix", ["J", "V", "E", "E_prime", "E_ideal", "E_Hall"]
-    )
+    @pytest.mark.parametrize("prefix", ["J", "V", "E", "E_prime", "E_ideal", "E_Hall"])
     def test_zero_b_propagates_nan(self, prefix):
         shape = (2, 2, 2)
         data = {
@@ -1236,3 +1234,138 @@ class TestRegisterRecipe:
             assert field_si_factor("_test_si", norm) == pytest.approx(7.0)
         finally:
             unregister_recipe("_test_si")
+
+
+class TestReconnectionDiagnostics:
+    """Registry-level dispatch for the Phase-1 reconnection additions."""
+
+    def _ideal_mhd_dataset(self, shape=(4, 3, 2)):
+        """Field set with E = -V × B identically (ideal MHD)."""
+        rng = np.random.default_rng(2026)
+        v = rng.standard_normal((3, *shape))
+        b = rng.standard_normal((3, *shape))
+        e = np.stack(
+            [
+                -(v[1] * b[2] - v[2] * b[1]),
+                -(v[2] * b[0] - v[0] * b[2]),
+                -(v[0] * b[1] - v[1] * b[0]),
+            ]
+        )
+        data = {
+            "V_1": v[0],
+            "V_2": v[1],
+            "V_3": v[2],
+            "B_1": b[0],
+            "B_2": b[1],
+            "B_3": b[2],
+            "E_1": e[0],
+            "E_2": e[1],
+            "E_3": e[2],
+            "J_1": rng.standard_normal(shape),
+            "J_2": rng.standard_normal(shape),
+            "J_3": rng.standard_normal(shape),
+            "V_s0_1": v[0],
+            "V_s0_2": v[1],
+            "V_s0_3": v[2],
+            "rho_c": np.zeros(shape),
+            "rho_m": np.ones(shape),
+        }
+        return make_test_dataset(data, shape=shape, species=[ELECTRONS, IONS])
+
+    def test_R_recon_zero_in_ideal_mhd(self):
+        """E = -V × B → |E'| = 0 → R_recon = 0 everywhere."""
+        ds = self._ideal_mhd_dataset()
+        result = compute_field("R_recon", ds)
+        np.testing.assert_allclose(result, 0.0, atol=1e-14)
+
+    def test_D_e_zero_in_ideal_mhd_with_zero_rho_c(self):
+        """V_e = V, ρ_c = 0 → D_e = J · (E + V × B) - 0 = 0."""
+        ds = self._ideal_mhd_dataset()
+        result = compute_field("D_e", ds)
+        np.testing.assert_allclose(result, 0.0, atol=1e-13)
+
+    def test_D_ng_zero_on_gyrotropic_dataset(self):
+        """Diagonal pressure tensor aligned with B → D_ng = 0."""
+        shape = (3, 2, 2)
+        b = np.zeros((3, *shape))
+        b[2] = 1.0  # B along z
+        data = {
+            "B_1": b[0],
+            "B_2": b[1],
+            "B_3": b[2],
+            "P_11": np.full(shape, 2.0),
+            "P_22": np.full(shape, 2.0),
+            "P_33": np.full(shape, 5.0),
+            "P_12": np.zeros(shape),
+            "P_13": np.zeros(shape),
+            "P_23": np.zeros(shape),
+        }
+        ds = make_test_dataset(data, shape=shape)
+        result = compute_field("D_ng", ds)
+        np.testing.assert_allclose(result, 0.0, atol=1e-14)
+
+    def test_A_phi_zero_on_gyrotropic_dataset(self):
+        """Diagonal pressure tensor with perp eigenvalues equal → A_phi = 0."""
+        shape = (3, 2, 2)
+        b = np.zeros((3, *shape))
+        b[2] = 1.0
+        data = {
+            "B_1": b[0],
+            "B_2": b[1],
+            "B_3": b[2],
+            "P_11": np.full(shape, 2.0),
+            "P_22": np.full(shape, 2.0),
+            "P_33": np.full(shape, 5.0),
+            "P_12": np.zeros(shape),
+            "P_13": np.zeros(shape),
+            "P_23": np.zeros(shape),
+        }
+        ds = make_test_dataset(data, shape=shape)
+        result = compute_field("A_phi", ds)
+        np.testing.assert_allclose(result, 0.0, atol=1e-14)
+
+    def test_per_species_D_ng_alias(self):
+        """D_ng_e and D_ng_s0 both dispatch to the species template."""
+        shape = (2, 2, 2)
+        b = np.zeros((3, *shape))
+        b[2] = 1.0
+        data = {
+            "B_1": b[0],
+            "B_2": b[1],
+            "B_3": b[2],
+            "P_s0_11": np.full(shape, 3.0),
+            "P_s0_22": np.full(shape, 1.0),
+            "P_s0_33": np.full(shape, 1.0),
+            "P_s0_12": np.zeros(shape),
+            "P_s0_13": np.zeros(shape),
+            "P_s0_23": np.zeros(shape),
+        }
+        ds = make_test_dataset(data, shape=shape, species=[ELECTRONS, IONS])
+        from_alias = compute_field("D_ng_e", ds)
+        from_canonical = compute_field("D_ng_s0", ds)
+        np.testing.assert_allclose(from_alias, from_canonical, rtol=1e-15)
+        # Closed-form value: P_par=1, P_perp=2, ||N||_F²=2, D_ng=2√2/5.
+        np.testing.assert_allclose(from_canonical, 2.0 * np.sqrt(2.0) / 5.0, rtol=1e-14)
+
+    def test_per_species_A_phi_alias(self):
+        """A_phi_e and A_phi_s0 both dispatch through the species template."""
+        shape = (2, 2, 2)
+        b = np.zeros((3, *shape))
+        b[2] = 1.0
+        data = {
+            "B_1": b[0],
+            "B_2": b[1],
+            "B_3": b[2],
+            "P_s0_11": np.full(shape, 3.0),
+            "P_s0_22": np.full(shape, 1.0),
+            "P_s0_33": np.full(shape, 5.0),
+            "P_s0_12": np.zeros(shape),
+            "P_s0_13": np.zeros(shape),
+            "P_s0_23": np.zeros(shape),
+        }
+        ds = make_test_dataset(data, shape=shape, species=[ELECTRONS, IONS])
+        from_alias = compute_field("A_phi_e", ds)
+        from_canonical = compute_field("A_phi_s0", ds)
+        np.testing.assert_allclose(from_alias, from_canonical, rtol=1e-15)
+        # Perp eigenvalues 3, 1 → A_phi = 2/4 = 0.5.
+        np.testing.assert_allclose(from_canonical, 0.5, rtol=1e-14)
