@@ -199,8 +199,12 @@ are NaN where $|B| = 0$.
     terms in Ohm's law (resistivity, electron inertia, pressure
     divergence) break the frozen-in condition.  In 2D it equals
     $\partial\psi/\partial t$ at the X-point — the standard
-    reconnection-rate quantity.  Cross-reference §9 footnote 13.
-    [@Birn; @Hesse].
+    reconnection-rate quantity.  This identity assumes a finite
+    out-of-plane guide field so $\hat{b}$ at the null points out of
+    plane and $E'_\parallel = E_z$; in the strict anti-parallel limit
+    $\hat{b}$ is undefined at the magnetic null and $E'_\parallel$ is
+    NaN (consistent with the $|\mathbf{B}| = 0$ handling).
+    Cross-reference §9 footnote 13. [@Birn; @Hesse].
 
 [^cross_perp]: $\mathbf{E}^{\mathrm{ideal}} = -\mathbf{V}\times\mathbf{B}$
     and $\mathbf{E}^{\mathrm{Hall}} \propto \mathbf{J}\times\mathbf{B}$
@@ -210,7 +214,10 @@ are NaN where $|B| = 0$.
     floating-point roundoff.  Kept in the registry for diagnostic
     symmetry with `E_par` / `E_prime_par` and as a numerical-precision
     check on the cross-product implementation in the destaggered
-    co-located grid.
+    co-located grid.  The underlying scalar projection $A_\parallel =
+    \mathbf{A}\cdot\hat{b}$ and rejection $\mathbf{A}_\perp =
+    \mathbf{A} - A_\parallel\hat{b}$ are introduced as part of the
+    single-particle gyromotion decomposition [@Chen].
 
 [^Q]: Swisdak's gyrotropy measure [@Swisdak2016], computed from the
     first two invariants of the pressure tensor:
