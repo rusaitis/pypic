@@ -59,7 +59,7 @@ A valid v1.0 document must declare:
 [schema]                 # version = "1.0" (REQUIRED)
 [model]                  # code identity (name, type)
 [run]                    # THIS run's identity + provenance
-[time]                   # dt, t_start, t_end, n_steps, scheme
+[time]                   # t_start, t_end, n_steps; dt (conditional on scheme); scheme (default "fixed")
 [grid]                   # dimensions, spacing, lower/upper
 [units]                  # normalization + reference values
 [coordinates]            # geometry, frame
@@ -112,10 +112,12 @@ Two flavours of string-valued field appear throughout §2:
   `[model].type`, `[coordinates].geometry`, `[coordinates].physical_extent_unit`,
   `[grid.amr].amr_kind`, `[grid.stagger].convention`,
   `[grid.stagger].fields` location values, `[output.*].format`,
-  `[output.*].precision`, `[output.streams.region].kind`,
-  `[restart].mode`, `[[drivers]].coupling`, `[[drivers]].direction`,
-  `[[bodies]].shape`, `[time].splitting`,
-  `[phase_space].coordinate_system`. Adding a value is a v1.x
+  `[output.*].precision`, `[output.checkpoints].partition`,
+  `[output.streams.region].kind`, `[restart].mode`,
+  `[restart].restore` array values, `[[drivers]].coupling`,
+  `[[drivers]].direction`, `[[bodies]].shape`, `[time].splitting`,
+  `[phase_space].coordinate_system`,
+  `[run.resources.allocations].type`. Adding a value is a v1.x
   schema bump.
 - **Open** (canonical list, unenforced) — numerical-method,
   algorithm, and closure vocabularies: `[time].scheme`,
@@ -333,7 +335,7 @@ upper = ["periodic", "periodic", "open"]
 # Keys are axis indices ("0"/"1"/"2"); values must match a declared
 # [[drivers]].name entry. Faces without a driver simply don't appear.
 # Unresolved names raise a validation error.
-drivers_lower = { 2 = "solar_wind_inflow" }
+drivers_lower = { "2" = "solar_wind_inflow" }
 
 # Per-field BC overrides (optional). Apply only to "E", "B", or
 # "particles"; each entry is a full BoundaryConditions block matching
@@ -403,10 +405,23 @@ e_field = 3.21e5                   # optional
 density = 1.0e18                   # optional
 mass = 9.109e-31                   # optional
 charge = 1.602e-19                 # optional
+# `speed_of_light` stays at top-level [units].speed_of_light
+# regardless of approach; it never appears under [units.reference].
 ```
 
 If `system` is "SI", all data is already in SI and no conversion is needed
 (all reference values = 1.0).
+
+**Input vs storage naming.** TOML inputs (Approach A's
+`reference_*` keys, Approach B's bare keys under `[units.reference]`)
+are canonicalized at read time into the eight `*_ref` storage
+primitives surfaced in §4 (`length_ref`, `time_ref`, `velocity_ref`,
+`b_field_ref`, `e_field_ref`, `density_ref`, `mass_ref`,
+`charge_ref`). Approach A derives the missing primitives (e.g. PIC
+inputs supply density/mass/charge plus `speed_of_light`; time and
+velocity references are derived from those); Approach B supplies
+each primitive directly. The `*_ref` form is the single name a
+non-pypic reader of the on-disk store needs to know.
 
 ### [coordinates]
 
@@ -544,8 +559,9 @@ Model-agnostic flags at the top level; model-specific knobs under
 sub-tables matching `[model].type`. v1.0 enumerates only
 `relativistic` at the top level; unknown top-level keys are accepted
 to leave room for v1.1+ portable additions (anticipated:
-`collisional`, `radiative`, `[physics.vlasov]`). Code-specific knobs
-go under `[physics.<model>.x-<code>.*]`.
+`collisional`, `radiative`, `[physics.vlasov]`,
+`[physics.gyrokinetic]`). Code-specific knobs go under
+`[physics.<model>.x-<code>.*]`.
 
 All `scheme`, `pusher`, `field_solver`, `reconstruction`, `limiter`,
 `riemann`, `divergence_cleaning`, `preconditioner`,
@@ -604,8 +620,10 @@ preconditioner      = "ilu"        # optional — implicit MHD only
 # riemann           = "hlld"       # Godunov family
 
 [physics.hybrid]
-# Reserved for v1.1+. Hybrid fluid-species properties live on the
-# corresponding [[species]] entry.
+# Top-level [physics.hybrid] keys reserved for v1.1+; hybrid
+# fluid-species properties live on the corresponding [[species]]
+# entry. The .solver sub-table below follows the standard solver
+# vocabulary.
 
 [physics.hybrid.solver]
 scheme            = "predictor-corrector"
@@ -909,7 +927,13 @@ each index means:
 |-------|-----------|-----------|-------------|-----------|
 | 1 | x | r | r | r |
 | 2 | y | θ | φ | z |
-| 3 | z | φ | z | mode index |
+| 3 | z | φ | z | φ |
+
+The table names **vector components** (the subscripts on `B_i`,
+`E_i`, `V_i`, …). For `geometry = "thetaMode"` the *third array
+dimension* is the azimuthal-mode index (see the thetaMode
+paragraph below); the third *vector* component is still the
+azimuthal field component (`B_3 = B_φ`).
 
 For Cartesian data, letter aliases (`Bx`, `By`, `Bz`) are preferred for
 readability and access the same data as `B_1`, `B_2`, `B_3`. For non-Cartesian
@@ -951,8 +975,8 @@ and imaginary axes.
 `rho_c` and `rho_m` are unambiguous — no overloaded `rho`.
 
 **Per-species naming:** Append `_s` plus the 0-based species index
-(`rho_c_s0`, `J_s1_1`, `n_s3`); the component index comes before the
-species suffix (`J_s0_1`, `EF_s1_2`). The species *name* lives in
+(`rho_c_s0`, `J_s1_1`, `n_s3`); the species suffix comes before the
+component index (`J_s0_1`, `EF_s1_2`). The species *name* lives in
 `[[species]]`, not in the field name.
 
 **Species-name aliases:** For any species, the canonical `<prefix>_s<index>`
@@ -974,9 +998,11 @@ depends on declaration order.
 `"B"` to `read(fields=...)` expands to `B_1, B_2, B_3`. Per-species
 groups work the same way: `"EF_s0"` expands to
 `EF_s0_1, EF_s0_2, EF_s0_3`. Derived quantities expand to their
-dependencies: `"P_s1"` loads the six ion pressure tensor components,
+dependencies: `"Pij_s1"` loads the six ion pressure tensor components,
 `"P_par"` loads the six total-pressure tensor components plus
-`B_1`..`B_3`.
+`B_1`..`B_3`. Note: `"P_s1"` (the per-species *scalar* pressure) is
+distinct from `"Pij_s1"` (the per-species tensor group); the tensor
+identifier always carries the `ij` infix.
 
 pypic also ships **library-side convenience aliases** for the common
 two-species electron/ion case (`Pe ↔ P_s0`, `n_i ↔ n_s1`,
@@ -989,8 +1015,8 @@ What does *not* expand: already-resolved single-component aliases
 a digit (`"B_1"`, `"P_s1_11"`) are passed through as scalars. In
 particular, requesting `"P_11"` alone loads only `P_11` — if a later
 `compute("P_par")` / `"P_perp"` / `"agyrotropy"` needs the full
-tensor, request the tensor explicitly via `"P_s0"` / `"P_s1"` /
-`"P_sN"`, or request the derived quantity itself.
+tensor, request the tensor explicitly via `"Pij_s0"` / `"Pij_s1"` /
+`"Pij_sN"`, or request the derived quantity itself.
 
 The same expansion rules apply to `[output.fields].quantities` —
 listing `"B"` writes `B_1`, `B_2`, `B_3`; listing `"P_s1"` writes the
@@ -1060,8 +1086,8 @@ the dataset's physics config.
 
 | Canonical | Meaning | Present in |
 |-----------|---------|------------|
-| `P_par` | Pressure parallel to B | PIC, multi-moment MHD (from tensor) |
-| `P_perp` | Pressure perpendicular to B | PIC, multi-moment MHD (from tensor) |
+| `P_par` | Pressure parallel to B | PIC, multi-moment MHD (derived from tensor; CGL closures may store directly — see Storage tiers below) |
+| `P_perp` | Pressure perpendicular to B | PIC, multi-moment MHD (derived from tensor; CGL closures may store directly — see Storage tiers below) |
 | `Pij`, `Pij_s{N}` | Full pressure tensor — 6 independent components (`P_11`, `P_12`, `P_13`, `P_22`, `P_23`, `P_33`) total or per species (`P_s0_11`, `P_s0_12`, …, `P_s0_33`) | PIC, multi-moment MHD |
 | `agyrotropy` | Swisdak $Q$ — see [equations.md § Pressure Tensor](equations.md#4-pressure-tensor) for the closed form $Q = \sqrt{1 - 4 I_2 / [(I_1 - P_\parallel)(I_1 + 3 P_\parallel)]}$, bounded $[0, 1]$ | PIC, multi-moment MHD (derived) |
 
@@ -1364,7 +1390,10 @@ my_store.zarr/                         # Zarr v3 group root
 │   │                    git_sha, host, funding, embargo,
 │   │                    resources, ensemble, ... }                    # schema.Run.model_dump
 │   ├── simulation_toml: (optional) "verbatim TOML text from [run] config"
-│   └── metadata:      { ... reader-specific scalars not covered above ... }
+│   └── metadata:      { time, step, ... other reader-specific scalars
+│                        not covered above ... }
+│                      # single-step writes only — multi-step writes
+│                      # promote `time` to a dimension under /fields
 │
 └── fields/                             # /fields child group
     ├── B_1, B_2, B_3, ...                 # field arrays
@@ -1384,7 +1413,8 @@ after any in-pypic slicing — `(0, 1, 2)` for a full 3D dataset,
 `(0, 2)` for a `y`-slice produced by `PlaneSelection`, `(2,)` for
 a 1-D line-out.  Indices are the original axis numbers (so a `y`-slice
 preserves `0` and `2`, not `0` and `1`).  A reader can reconstruct
-the full embedding by combining `surviving_axes` with `geometry.axis_names`.
+the full embedding by combining `surviving_axes` with
+`attrs.coordinates.axis_labels`.
 
 **Multi-step (timeseries).**  `to_zarr_timeseries` extends every
 field array with a leading `time` dimension, shape `(nt, n1, n2, n3)`,
@@ -1395,7 +1425,9 @@ enforces a constant field set and constant identity attrs (`schema`,
 `model`, `time`, `grid`, `boundary_conditions`, `coordinates`,
 `normalization`, `species`, `physics`, `run`) across appends, and
 intersects per-step `metadata` to the keys whose values are stable
-across all timesteps.
+across all timesteps. In single-step writes the snapshot `time`
+lives in `attrs.metadata.time` (no `time` dimension exists); see
+the mapping table at the end of this section.
 
 **Codecs.**  Default per-variable codec: `BloscCodec(cname="zstd",
 clevel=5, shuffle="bitshuffle")`.  `dtype="float32"` downcasts on
@@ -1423,7 +1455,7 @@ container's group convention (HDF5 groups vs Zarr root attrs).
 | `[run]` (optional) | `/run/` group with attrs | `attrs.run` (typed; `Run.model_dump`) |
 | Verbatim `simulation.toml` | not currently round-tripped | `attrs.simulation_toml` (opaque UTF-8 text) |
 | Coord arrays | from `/grid/` + `/coordinates/` attrs | `/fields/{x,y,z}` (1-D arrays) |
-| Snapshot scalars `time` / `step` | top-level scalar attrs | `time` dim (multi-step) / `attrs.metadata.time` scalar (single-step) |
+| Snapshot scalars `time` / `step` | top-level scalar attrs | `time`: dim under `/fields/time` (multi-step) or `attrs.metadata.time` scalar (single-step). `step`: `attrs.metadata.step` scalar in both modes. |
 | Files per write | one per timestep | one store, all steps |
 
 Readers reject stores whose `schema.version` major component
@@ -1496,8 +1528,10 @@ by Morton (Z-order) curve over `(x, y, z)` so Parquet row-group
 min/max statistics enable spatial predicate pushdown. Default codec:
 zstd with shuffle pre-filter (level 1 for processing, level 3 for
 archival). Row groups: 500K–1M particles each. Down-cast knobs:
-`position_dtype="float32"`, `velocity_dtype="float32"`. Charge stays
-float64 and `id` stays int64. See TASKS.md Step 25 for the full I/O
+`position_dtype="float32"`, `velocity_dtype="float32"`. `weight` and
+`id` stay at full source precision (float64 / int64); scalar
+`species_charge` and `species_mass` round-trip through Arrow schema
+metadata at full precision. See TASKS.md Step 25 for the full I/O
 contract.
 
 ---
