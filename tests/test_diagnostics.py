@@ -1,3 +1,5 @@
+import warnings
+
 import numpy as np
 import pytest
 
@@ -175,8 +177,9 @@ class TestFieldEnergy:
             field_energy(np.ones((4, 4, 4)), (1.0, 1.0))
 
     def test_nan_propagation(self):
+        # Explicit propagate mode preserves the original np.sum semantics.
         f = np.array([[[1.0, np.nan]]])
-        result = field_energy(f, (1.0, 1.0, 1.0))
+        result = field_energy(f, (1.0, 1.0, 1.0), nan_policy="propagate")
         assert np.isnan(result)
 
 
@@ -321,10 +324,11 @@ class TestSpatialStatistics:
     def test_mean_with_nan(self) -> None:
         from pypic.diagnostics import spatial_mean
 
-        np.testing.assert_allclose(
-            spatial_mean(np.array([1.0, np.nan, 3.0])),
-            2.0,
-        )
+        with pytest.warns(UserWarning, match="ignored 1 NaN"):
+            np.testing.assert_allclose(
+                spatial_mean(np.array([1.0, np.nan, 3.0])),
+                2.0,
+            )
 
     def test_rms(self) -> None:
         from pypic.diagnostics import spatial_rms
@@ -337,10 +341,11 @@ class TestSpatialStatistics:
     def test_rms_with_nan(self) -> None:
         from pypic.diagnostics import spatial_rms
 
-        np.testing.assert_allclose(
-            spatial_rms(np.array([3.0, np.nan, 4.0])),
-            np.sqrt(12.5),
-        )
+        with pytest.warns(UserWarning, match="ignored 1 NaN"):
+            np.testing.assert_allclose(
+                spatial_rms(np.array([3.0, np.nan, 4.0])),
+                np.sqrt(12.5),
+            )
 
     def test_extrema(self) -> None:
         from pypic.diagnostics import field_extrema
@@ -352,7 +357,8 @@ class TestSpatialStatistics:
     def test_extrema_with_nan(self) -> None:
         from pypic.diagnostics import field_extrema
 
-        lo, hi = field_extrema(np.array([3.0, -1.0, 7.0, np.nan]))
+        with pytest.warns(UserWarning, match="ignored 1 NaN"):
+            lo, hi = field_extrema(np.array([3.0, -1.0, 7.0, np.nan]))
         assert lo == -1.0
         assert hi == 7.0
 
@@ -361,3 +367,97 @@ class TestSpatialStatistics:
 
         arr = np.array([[1.0, 2.0], [3.0, 4.0]])
         np.testing.assert_allclose(spatial_mean(arr), 2.5)
+
+
+def _all_reducers() -> list:
+    """The single-array reducers in :mod:`pypic.diagnostics` that honor
+    the ``nan_policy`` convention. Each entry is a ``(name, fn)`` where
+    *fn* takes a single field array and returns either a scalar or a
+    tuple of scalars.
+
+    ``field_energy`` and ``max_div_b`` wrap their additional positional
+    arguments so the structural tests below can iterate uniformly.
+    """
+    from pypic.diagnostics import (
+        field_energy as _field_energy,
+    )
+    from pypic.diagnostics import (
+        field_extrema as _field_extrema,
+    )
+    from pypic.diagnostics import (
+        max_div_b as _max_div_b,
+    )
+    from pypic.diagnostics import (
+        spatial_mean as _spatial_mean,
+    )
+    from pypic.diagnostics import (
+        spatial_rms as _spatial_rms,
+    )
+
+    return [
+        ("spatial_mean", lambda f, **kw: _spatial_mean(f, **kw)),
+        ("spatial_rms", lambda f, **kw: _spatial_rms(f, **kw)),
+        ("field_extrema", lambda f, **kw: _field_extrema(f, **kw)),
+        ("field_energy", lambda f, **kw: _field_energy(f, (1.0,) * f.ndim, **kw)),
+        # max_div_b: build a synthetic 3D B from f so the divergence is
+        # finite where f is finite and NaN where f is NaN.
+        (
+            "max_div_b",
+            lambda f, **kw: _max_div_b(f, f, f, 1.0, 1.0, 1.0, **kw),
+        ),
+    ]
+
+
+def _scalar(x: object) -> float:
+    """Pull a representative scalar out of a reducer's return value."""
+    if isinstance(x, tuple):
+        return float(x[0])
+    return float(x)  # type: ignore[arg-type]
+
+
+class TestNanPolicyInvariants:
+    """Every reducer in pypic.diagnostics honors the three-mode policy.
+
+    See `docs/conventions.md` § "NaN handling in diagnostics".  Tested
+    structurally rather than per-reducer to catch any future reducer
+    that silently slips back to the pre-I2 behavior.
+    """
+
+    @pytest.mark.parametrize(("name", "fn"), _all_reducers())
+    def test_omit_on_clean_input_emits_no_warning(self, name, fn) -> None:
+        arr = np.full((4, 4, 4), 1.0)
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", UserWarning)
+            result = fn(arr, nan_policy="omit")
+        # Sanity: clean reduction is finite.
+        assert np.isfinite(_scalar(result)), name
+
+    @pytest.mark.parametrize(("name", "fn"), _all_reducers())
+    def test_omit_on_nan_input_warns(self, name, fn) -> None:
+        arr = np.full((4, 4, 4), 1.0)
+        arr[0, 0, 0] = np.nan
+        with pytest.warns(UserWarning, match="ignored"):
+            result = fn(arr, nan_policy="omit")
+        assert np.isfinite(_scalar(result)), name
+
+    @pytest.mark.parametrize(("name", "fn"), _all_reducers())
+    def test_propagate_on_nan_input_returns_nan_without_warning(self, name, fn) -> None:
+        arr = np.full((4, 4, 4), 1.0)
+        arr[0, 0, 0] = np.nan
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", UserWarning)
+            result = fn(arr, nan_policy="propagate")
+        assert np.isnan(_scalar(result)), name
+
+    @pytest.mark.parametrize(("name", "fn"), _all_reducers())
+    def test_raise_on_nan_input(self, name, fn) -> None:
+        arr = np.full((4, 4, 4), 1.0)
+        arr[0, 0, 0] = np.nan
+        with pytest.raises(ValueError, match="NaN"):
+            fn(arr, nan_policy="raise")
+
+    @pytest.mark.parametrize(("name", "fn"), _all_reducers())
+    def test_invalid_policy_rejected(self, name, fn) -> None:
+        arr = np.full((4, 4, 4), 1.0)
+        with pytest.raises(ValueError, match="nan_policy"):
+            fn(arr, nan_policy="ignore")  # type: ignore[arg-type]

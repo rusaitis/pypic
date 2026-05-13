@@ -34,6 +34,52 @@ type NanPolicy = Literal["omit", "propagate", "raise"]
 _PYPIC_PREFIX = (str(Path(__file__).parent),)
 
 
+def _apply_nan_policy_single(
+    field: FloatArray,
+    *,
+    nan_policy: NanPolicy,
+    function_name: str,
+) -> FloatArray | None:
+    """Apply *nan_policy* to a single-array reducer.
+
+    Returns the (possibly NaN-stripped) flat array to feed into the
+    reduction, or ``None`` to signal "all cells masked, result
+    undefined".  Mirrors :func:`_apply_nan_policy` for the
+    paired-array case but operates on one array.
+    """
+    if nan_policy not in ("omit", "propagate", "raise"):
+        msg = f"nan_policy must be 'omit', 'propagate', or 'raise', got {nan_policy!r}"
+        raise ValueError(msg)
+
+    if nan_policy == "propagate":
+        return field
+
+    nan_mask = np.isnan(field)
+    n_nan = int(nan_mask.sum())
+    if n_nan == 0:
+        return field
+
+    if nan_policy == "raise":
+        msg = f"{function_name}: input contains {n_nan} NaN cell(s)"
+        raise ValueError(msg)
+
+    valid = ~nan_mask
+    if not valid.any():
+        warnings.warn(
+            f"{function_name}: all {n_nan} cell(s) are NaN, result undefined",
+            UserWarning,
+            skip_file_prefixes=_PYPIC_PREFIX,
+        )
+        return None
+    fraction = 100.0 * n_nan / nan_mask.size
+    warnings.warn(
+        f"{function_name}: ignored {n_nan} NaN cell(s) ({fraction:.2f}% of input)",
+        UserWarning,
+        skip_file_prefixes=_PYPIC_PREFIX,
+    )
+    return field[valid]
+
+
 def _apply_nan_policy(
     computed: FloatArray,
     reference: FloatArray,
@@ -230,6 +276,8 @@ def field_difference(
 def field_energy(
     energy_density: FloatArray,
     spacing: tuple[float, ...],
+    *,
+    nan_policy: NanPolicy = "omit",
 ) -> np.floating[Any]:
     r"""Compute the volume integral of a scalar field.
 
@@ -246,16 +294,23 @@ def field_energy(
     spacing : tuple[float, ...]
         Grid spacing along each axis. Length must match the number of
         array dimensions.
+    nan_policy : {"omit", "propagate", "raise"}, default "omit"
+        How to handle NaN cells.  ``"omit"`` integrates over the valid
+        region and emits a :class:`UserWarning` reporting the dropped
+        count; ``"propagate"`` is the unaltered ``np.sum`` (NaN
+        poisons the integral); ``"raise"`` errors on any NaN.
 
     Returns
     -------
     np.floating
-        Volume-integrated quantity.
+        Volume-integrated quantity. ``nan`` if all cells are NaN
+        under ``"omit"``.
 
     Raises
     ------
     ValueError
-        If ``len(spacing)`` does not match the array dimensionality.
+        If ``len(spacing)`` does not match the array dimensionality,
+        or if ``nan_policy="raise"`` and any NaN is present.
 
     Examples
     --------
@@ -270,7 +325,12 @@ def field_energy(
         )
         raise ValueError(msg)
     dv = math.prod(spacing)
-    return np.sum(energy_density) * dv
+    masked = _apply_nan_policy_single(
+        energy_density, nan_policy=nan_policy, function_name="field_energy"
+    )
+    if masked is None:
+        return cast("np.floating[Any]", np.float64(np.nan))
+    return np.sum(masked) * dv
 
 
 def div_b(
@@ -337,6 +397,7 @@ def max_div_b(
     d3: float,
     *,
     geometry: GeometryType = GeometryType.CARTESIAN,
+    nan_policy: NanPolicy = "omit",
 ) -> np.floating[Any]:
     r"""Compute the maximum absolute divergence of B.
 
@@ -360,6 +421,10 @@ def max_div_b(
         Grid spacing along the third axis.
     geometry : GeometryType
         Coordinate geometry. Only Cartesian is implemented.
+    nan_policy : {"omit", "propagate", "raise"}, default "omit"
+        How to handle NaN cells in the divergence array (typically
+        from upstream NaN-masked input — e.g. ``SphereSelection``).
+        See :func:`field_energy` for full semantics.
 
     Returns
     -------
@@ -373,7 +438,13 @@ def max_div_b(
     >>> max_div_b(b, b, b, 1.0, 1.0, 1.0)
     np.float64(0.0)
     """
-    return np.max(np.abs(div_b(b1, b2, b3, d1, d2, d3, geometry=geometry)))
+    div = np.abs(div_b(b1, b2, b3, d1, d2, d3, geometry=geometry))
+    masked = _apply_nan_policy_single(
+        div, nan_policy=nan_policy, function_name="max_div_b"
+    )
+    if masked is None:
+        return cast("np.floating[Any]", np.float64(np.nan))
+    return np.max(masked)
 
 
 def div_e(
@@ -428,8 +499,12 @@ def div_e(
     return divergence(e1, e2, e3, d1, d2, d3, geometry=geometry)
 
 
-def spatial_mean(field: FloatArray) -> np.floating[Any]:
-    r"""Compute the spatial mean of a field, ignoring NaN.
+def spatial_mean(
+    field: FloatArray,
+    *,
+    nan_policy: NanPolicy = "omit",
+) -> np.floating[Any]:
+    r"""Compute the spatial mean of a field.
 
     Uses unweighted averaging, which is correct for uniform Cartesian grids
     where all cells have equal volume. For non-Cartesian geometries, a
@@ -439,11 +514,16 @@ def spatial_mean(field: FloatArray) -> np.floating[Any]:
     ----------
     field : NDArray
         Scalar field (any dimensionality).
+    nan_policy : {"omit", "propagate", "raise"}, default "omit"
+        How to handle NaN cells. ``"omit"`` averages over the valid
+        region and emits a :class:`UserWarning` reporting the dropped
+        count; ``"propagate"`` is the unaltered ``np.mean`` (any NaN
+        poisons the result); ``"raise"`` errors on any NaN.
 
     Returns
     -------
     np.floating
-        Spatial mean value.
+        Spatial mean value. ``nan`` if all cells are NaN under ``"omit"``.
 
     Examples
     --------
@@ -451,11 +531,20 @@ def spatial_mean(field: FloatArray) -> np.floating[Any]:
     >>> spatial_mean(np.array([1.0, 2.0, 3.0]))
     np.float64(2.0)
     """
-    return np.nanmean(field)
+    masked = _apply_nan_policy_single(
+        field, nan_policy=nan_policy, function_name="spatial_mean"
+    )
+    if masked is None:
+        return cast("np.floating[Any]", np.float64(np.nan))
+    return np.mean(masked)
 
 
-def spatial_rms(field: FloatArray) -> np.floating[Any]:
-    r"""Compute the root-mean-square of a field, ignoring NaN.
+def spatial_rms(
+    field: FloatArray,
+    *,
+    nan_policy: NanPolicy = "omit",
+) -> np.floating[Any]:
+    r"""Compute the root-mean-square of a field.
 
     $$f_{rms} = \sqrt{\langle f^2 \rangle}$$
 
@@ -466,11 +555,14 @@ def spatial_rms(field: FloatArray) -> np.floating[Any]:
     ----------
     field : NDArray
         Scalar field (any dimensionality).
+    nan_policy : {"omit", "propagate", "raise"}, default "omit"
+        How to handle NaN cells. See :func:`spatial_mean` for full
+        semantics.
 
     Returns
     -------
     np.floating
-        RMS value.
+        RMS value. ``nan`` if all cells are NaN under ``"omit"``.
 
     Examples
     --------
@@ -478,23 +570,35 @@ def spatial_rms(field: FloatArray) -> np.floating[Any]:
     >>> spatial_rms(np.array([3.0, 4.0]))
     np.float64(3.5355339059327378)
     """
-    return cast("np.floating[Any]", np.sqrt(np.nanmean(field**2)))
+    masked = _apply_nan_policy_single(
+        field, nan_policy=nan_policy, function_name="spatial_rms"
+    )
+    if masked is None:
+        return cast("np.floating[Any]", np.float64(np.nan))
+    return cast("np.floating[Any]", np.sqrt(np.mean(masked**2)))
 
 
 def field_extrema(
     field: FloatArray,
+    *,
+    nan_policy: NanPolicy = "omit",
 ) -> tuple[np.floating[Any], np.floating[Any]]:
-    r"""Return the minimum and maximum of a field, ignoring NaN.
+    r"""Return the minimum and maximum of a field.
 
     Parameters
     ----------
     field : NDArray
         Scalar field (any dimensionality).
+    nan_policy : {"omit", "propagate", "raise"}, default "omit"
+        How to handle NaN cells. See :func:`spatial_mean` for full
+        semantics. Under ``"propagate"``, any NaN yields
+        ``(nan, nan)``.
 
     Returns
     -------
     tuple[np.floating, np.floating]
-        ``(min, max)`` values.
+        ``(min, max)`` values. ``(nan, nan)`` if all cells are NaN
+        under ``"omit"``.
 
     Examples
     --------
@@ -502,7 +606,16 @@ def field_extrema(
     >>> field_extrema(np.array([3.0, -1.0, 7.0]))
     (np.float64(-1.0), np.float64(7.0))
     """
-    return np.nanmin(field), np.nanmax(field)
+    masked = _apply_nan_policy_single(
+        field, nan_policy=nan_policy, function_name="field_extrema"
+    )
+    if masked is None:
+        nan = np.float64(np.nan)
+        return (
+            cast("np.floating[Any]", nan),
+            cast("np.floating[Any]", nan),
+        )
+    return np.min(masked), np.max(masked)
 
 
 __all__ = [
