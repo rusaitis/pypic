@@ -113,12 +113,15 @@ Two flavours of string-valued field appear throughout §2:
   `[grid.amr].amr_kind`, `[grid.stagger].convention`,
   `[grid.stagger].fields` location values, `[output.*].format`,
   `[output.*].precision`, `[output.checkpoints].partition`,
-  `[output.streams.region].kind`, `[restart].mode`,
-  `[restart].restore` array values, `[[drivers]].coupling`,
-  `[[drivers]].direction`, `[[bodies]].shape`, `[time].splitting`,
+  `[output.streams.region].kind` (`"box"` | `"plane"`),
+  `[restart].mode`, `[restart].restore` array values,
+  `[[drivers]].coupling`, `[[drivers]].direction`, `[[bodies]].shape`,
+  `[time].splitting` (strict-when-present; the key itself is optional),
   `[phase_space].coordinate_system`,
   `[run.resources.allocations].type`. Adding a value is a v1.x
-  schema bump.
+  schema bump. Numerical knobs (integers/floats like
+  `current_smoothing`, `field_substeps`) carry no vocabulary — the
+  open/strict distinction applies to string-valued fields only.
 - **Open** (canonical list, unenforced) — numerical-method,
   algorithm, and closure vocabularies: `[time].scheme`,
   `[physics.*.solver].scheme`, `pusher`, `field_solver`, `limiter`,
@@ -136,6 +139,20 @@ Two flavours of string-valued field appear throughout §2:
   still fire — openness applies to *value*, not *semantics*.
 
 Per-field annotation in §2 marks each enum's category inline.
+
+### Foreign-key resolution
+
+Sections that declare named entities (`[[species]]`, `[[bodies]]`,
+`[[drivers]]`) act as **registries**. Orphan entries — a body or
+driver declared but never referenced elsewhere — are accepted; the
+validator does not require every registry entry to be used.
+References *into* a registry, however, are validated strictly:
+`[[drivers]].body` → `[[bodies]].name`,
+`[boundary_conditions].drivers_lower/upper` → `[[drivers]].name`,
+`[[collisions]].species_pair` and `[output.particles].species` →
+`[[species]].name`, `[units].reference_species` → `[[species]].name`
+(with `"electrons"` / `"ions"` / `"protons"` as a builtin fallback).
+Unresolved names raise a validation error at load time.
 
 ---
 
@@ -222,10 +239,12 @@ hours    = 393216
 `attrs.run` as a JSON-mode `Run.model_dump` so cross-tool consumers
 see it at the root group's attrs (see §4.2). Identity-stable across
 derivations — a regridded "MMS-event-1" run is still that run. The
-HDF5 §4.1 layout does not currently round-trip `[run]`; tools whose
-artifacts must travel through HDF5 should ship the original
-``simulation.toml`` alongside the output store, or write through
-Zarr where `attrs.run` is preserved. `[run]` lives alongside
+HDF5 §4.1 layout admits a `/run/` group (writer-side contract), but
+the current pypic HDF5 readers do not yet extract it into the typed
+`SimulationConfig.run`; until they do, tools whose artifacts must
+travel through HDF5 should ship the original ``simulation.toml``
+alongside the output store, or write through Zarr where `attrs.run`
+round-trips end-to-end. `[run]` lives alongside
 `attrs.simulation_toml` (verbatim text) — see §4.2 for the policy
 on each.
 
@@ -319,8 +338,12 @@ E_1 = [0.0, 0.5, 0.5]               # E_x on the x-edge
 validator does not cross-check between tiers — a writer may populate
 any subset, a reader that consumes only Tier 1 still works, and
 readers that need ED-PIC-precise destagger reach for Tier 3
-(round-trips through `StaggerInfo.position`). Readers always
-destagger to a co-located grid on load.
+(round-trips through `StaggerInfo.position`). Tier 1 is the semantic
+anchor: Tier 2 and Tier 3 values are not meaningful without it (a
+`position = [0.5, 0.0, 0.0]` is uninterpretable until you know whether
+the base grid is cell-centered or node-centered), so readers that
+consume Tier 2/3 must read Tier 1 too. Readers always destagger to a
+co-located grid on load.
 
 ### [boundary_conditions]
 
@@ -933,7 +956,11 @@ The table names **vector components** (the subscripts on `B_i`,
 `E_i`, `V_i`, …). For `geometry = "thetaMode"` the *third array
 dimension* is the azimuthal-mode index (see the thetaMode
 paragraph below); the third *vector* component is still the
-azimuthal field component (`B_3 = B_φ`).
+azimuthal field component (`B_3 = B_φ`). Particle position and
+velocity columns (`x`, `y`, `z`, `vx`, `vy`, `vz`) are always
+Cartesian regardless of `[coordinates].geometry` — geometry is a
+field-grid representation choice, not a particle one (see §3
+*Per-particle data columns* and §4.3).
 
 For Cartesian data, letter aliases (`Bx`, `By`, `Bz`) are preferred for
 readability and access the same data as `B_1`, `B_2`, `B_3`. For non-Cartesian
@@ -1294,7 +1321,7 @@ output_{step:06d}.h5
 │   ├── axis_labels          [attr: ("x", "y", "z")]   # optional
 │   ├── physical_extent      [attr: (46.0, 32.0, 13.0)]   # optional
 │   ├── physical_extent_unit [attr: "R_E"]            # optional
-│   ├── modes/                                        # only when geometry = "thetaMode"
+│   ├── modes/                                        # present iff geometry = "thetaMode"; rejected otherwise
 │   │   ├── n_modes      [attr: int]
 │   │   └── mode_indices [attr: (0, 1, 2)]
 │   └── transforms/                                   # optional, one sub-group per [coordinates.transforms.*]
@@ -1423,11 +1450,13 @@ chunked so reading one timestep is O(1).  Step 1 writes the
 directly to `/fields` via `mode="a", append_dim="time"`.  The writer
 enforces a constant field set and constant identity attrs (`schema`,
 `model`, `time`, `grid`, `boundary_conditions`, `coordinates`,
-`normalization`, `species`, `physics`, `run`) across appends, and
-intersects per-step `metadata` to the keys whose values are stable
-across all timesteps. In single-step writes the snapshot `time`
-lives in `attrs.metadata.time` (no `time` dimension exists); see
-the mapping table at the end of this section.
+`normalization`, `species`, `physics`, `run`) across appends; per-step
+`metadata` is reduced to the **intersection** of keys present in every
+step with **identical values across all of them** — any key missing
+from any step, or present with a differing value, is dropped from
+`attrs.metadata` after the final append. In single-step writes the
+snapshot `time` lives in `attrs.metadata.time` (no `time` dimension
+exists); see the mapping table at the end of this section.
 
 **Codecs.**  Default per-variable codec: `BloscCodec(cname="zstd",
 clevel=5, shuffle="bitshuffle")`.  `dtype="float32"` downcasts on
@@ -1452,8 +1481,8 @@ container's group convention (HDF5 groups vs Zarr root attrs).
 | `[units]` | `/normalization/` group | `attrs.normalization` |
 | `[[species]]` | `/species/{s0,s1,...}/` sub-groups | `attrs.species` (list, in declaration order) |
 | `[physics]` | `/physics/` group + model sub-groups | `attrs.physics` |
-| `[run]` (optional) | `/run/` group with attrs | `attrs.run` (typed; `Run.model_dump`) |
-| Verbatim `simulation.toml` | not currently round-tripped | `attrs.simulation_toml` (opaque UTF-8 text) |
+| `[run]` (optional) | `/run/` group with attrs (writer-side contract; pypic readers do not yet round-trip it) | `attrs.run` (typed; `Run.model_dump`; round-trips end-to-end) |
+| Verbatim `simulation.toml` | not currently emitted by pypic and not extracted by readers | `attrs.simulation_toml` (opaque UTF-8 text; round-trips end-to-end) |
 | Coord arrays | from `/grid/` + `/coordinates/` attrs | `/fields/{x,y,z}` (1-D arrays) |
 | Snapshot scalars `time` / `step` | top-level scalar attrs | `time`: dim under `/fields/time` (multi-step) or `attrs.metadata.time` scalar (single-step). `step`: `attrs.metadata.step` scalar in both modes. |
 | Files per write | one per timestep | one store, all steps |
