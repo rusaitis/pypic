@@ -1385,9 +1385,6 @@ class TestReconnectionDiagnostics:
         np.testing.assert_allclose(from_canonical, 0.0, atol=1e-14)
 
 
-# -- Manufactured-anisotropy fixtures (I3 closure) -------------------------
-
-
 def _rotation_from_e1_to(bhat: np.ndarray) -> np.ndarray:
     r"""Return the 3x3 rotation $R$ such that $R\hat{e}_1 = \hat{b}$.
 
@@ -1416,7 +1413,7 @@ def _rotation_from_e1_to(bhat: np.ndarray) -> np.ndarray:
 
 
 def _diag_align(p11: float, p22: float, p33: float) -> np.ndarray:
-    """Diagonal field-aligned tensor with $\\hat{b} = \\hat{e}_1$."""
+    r"""Diagonal field-aligned tensor with $\hat{b} = \hat{e}_1$."""
     return np.diag([p11, p22, p33])
 
 
@@ -1488,25 +1485,31 @@ def _build_per_species_fixture(
 
 
 class TestAgyrotropyManufacturedFixtures:
-    """End-to-end I3 closure: closed-form values for Q, D_ng, A_phi on
-    manufactured pressure-tensor configurations with a tilted $\\hat{b}$,
-    asserted through the `compute()` registry path.
+    r"""Closed-form values for Q, D_ng, A_phi on manufactured pressure-
+    tensor configurations with a tilted $\hat{b}$, asserted through the
+    ``compute()`` registry path.
 
     Three configurations exercise three distinct pieces of the algebra:
 
-    - **C1** perp anisotropy only: $\\mathbf{P}_{\\mathrm{align}} =
-      \\mathrm{diag}(1, 2, 0.5)$. $Q = 9/65$, $D_{ng} = 3\\sqrt{2}/7$,
-      $A_\\phi = 3/5$.
-    - **C2** off-axis coupling only: $\\mathbf{I} + 0.3\\,(\\hat{e}_1
-      \\hat{e}_3^T + \\hat{e}_3\\hat{e}_1^T)$. $Q = 3/100$, $D_{ng} =
-      \\sqrt{2}/5$, $A_\\phi = 0$. This is the configuration that
-      catches the b8ecb40 regression class (`agyrotropy` returning
-      $A_\\phi^2$ instead of Swisdak's $Q$).
-    - **C3** combined: $\\mathrm{diag}(1, 2, 0.5) + 0.2\\,(\\hat{e}_1
-      \\hat{e}_3^T + \\hat{e}_3\\hat{e}_1^T)$. $Q = 241/1625$, $D_{ng}
-      = \\sqrt{482}/35$, $A_\\phi = 3/5$ — same as C1 because $A_\\phi$
-      is blind to off-axis terms by construction (double-projection
+    - **C1** perp anisotropy only: $\mathbf{P}_{\mathrm{align}} =
+      \mathrm{diag}(1, 2, 0.5)$. $Q = 9/65$, $D_{ng} = 3\sqrt{2}/7$,
+      $A_\phi = 3/5$.
+    - **C2** off-axis coupling only: $\mathbf{I} + 0.3\,(\hat{e}_1
+      \hat{e}_3^T + \hat{e}_3\hat{e}_1^T)$. $Q = 3/100$, $D_{ng} =
+      \sqrt{2}/5$, $A_\phi = 0$. Catches a regression where
+      ``agyrotropy`` returns $A_\phi^2$ instead of Swisdak's $Q$
+      (the bug fixed by ``b8ecb40``).
+    - **C3** combined: $\mathrm{diag}(1, 2, 0.5) + 0.2\,(\hat{e}_1
+      \hat{e}_3^T + \hat{e}_3\hat{e}_1^T)$. $Q = 241/1625$, $D_{ng} =
+      \sqrt{482}/35$, $A_\phi = 3/5$ — same as C1 because $A_\phi$ is
+      blind to off-axis terms by construction (double-projection
       strips them).
+
+    References
+    ----------
+    - $Q$: [@Swisdak2016].
+    - $D_{ng}$: [@Aunai2013].
+    - $A_\phi$: [@Scudder2008].
     """
 
     _BHAT_LAB = np.array([0.5, 0.0, np.sqrt(3.0) / 2.0])
@@ -1517,7 +1520,7 @@ class TestAgyrotropyManufacturedFixtures:
     def test_compute_path_matches_closed_form_on_tilted_b(self) -> None:
         """All three agyrotropy metrics match closed-form values through
         compute() on tilted-b̂ configurations. Aggregated failures so a
-        regression in one config/metric reports its row (M2 pattern).
+        regression in one config/metric reports its row.
 
         Closed-form derivations
         -----------------------
