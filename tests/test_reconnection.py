@@ -207,6 +207,37 @@ def _uniform_field_dataset(
     )
 
 
+def _uniform_b_cos_e_dataset(
+    *, n: int, domain: float, k: float, e0: float = 1.0
+) -> FieldDataset:
+    r"""Cubic [0, L]^3 with B = ẑ and E_z = E_0 cos(k z).
+
+    Used by the Schindler-$\Xi$ convergence tests.  RK4 is exact on a
+    constant $\hat{b}$, so the only error sources are trapezoid arc-
+    length integration ($O(\Delta s^2)$) and trilinear field sampling
+    ($O(\Delta x^2)$).
+    """
+    spacing = (domain / n, domain / n, domain / n)
+    shape = (n, n, n)
+    grid = GridInfo(dimensions=shape, spacing=spacing)
+    _, _, zz = (
+        a.astype(np.float64)
+        for a in np.meshgrid(*grid.coordinate_arrays(), indexing="ij")
+    )
+    return FieldDataset.from_arrays(
+        {
+            "B_1": np.zeros(shape),
+            "B_2": np.zeros(shape),
+            "B_3": np.ones(shape),
+            "E_1": np.zeros(shape),
+            "E_2": np.zeros(shape),
+            "E_3": e0 * np.cos(k * zz),
+        },
+        grid,
+        Normalization.identity(),
+    )
+
+
 class TestSchindlerXi:
     """Schindler 1988 $\\Xi = \\int E_\\parallel \\, d\\ell$ along $\\mathbf{B}$."""
 
@@ -336,3 +367,84 @@ class TestSchindlerXi:
         # Observed deviation ≈ 0.13 % on this configuration; rtol=5e-3
         # gives ~4x margin while still pinning the proportionality.
         np.testing.assert_allclose(xi[0], e0 * traced_length, rtol=5e-3)
+
+    def test_xi_converges_second_order_joint(self) -> None:
+        r"""$\Xi$ converges as $O(h^2)$ when grid and step_size halve together.
+
+        Uniform $\mathbf{B} = \hat{z}$ and $E_z = \cos(k z)$ on $[0, L]^3$.
+        RK4 is exact on constant $\hat{b}$, so the only error sources are
+        trapezoid arc-length integration ($O(\Delta s^2)$) and trilinear
+        field sampling ($O(\Delta x^2)$).  Seed is placed at a cell center
+        with $\Delta s = 2\,\Delta x$, so every trace point lands on a
+        grid node and trilinear interpolation is exact — leaving only the
+        trapezoid contribution.  Halving both knobs halves the error by
+        $\approx 4\times$; we pin ratio > 3.9 to catch first-order
+        regressions while tolerating pre-asymptotic sag.
+        """
+        domain = 8.0
+        k = np.pi / 4.0
+        trace_length = 7.0
+        seed_xy = domain / 2.0
+
+        errors: list[float] = []
+        for n, step in [(32, 0.5), (64, 0.25), (128, 0.125)]:
+            dx = domain / n
+            z0 = 1.5 * dx  # second cell center — safely inside the interp domain
+            z_end = z0 + trace_length
+            xi_exact = (np.sin(k * z_end) - np.sin(k * z0)) / k
+            data = _uniform_b_cos_e_dataset(n=n, domain=domain, k=k)
+            max_steps = round(trace_length / step)
+            xi = schindler_xi(
+                data,
+                np.array([[seed_xy, seed_xy, z0]]),
+                step_size=step,
+                max_steps=max_steps,
+                direction="forward",
+            )
+            errors.append(float(abs(xi[0] - xi_exact)))
+
+        ratio_1 = errors[0] / errors[1]
+        ratio_2 = errors[1] / errors[2]
+        assert ratio_1 > 3.9, (
+            f"coarse→medium ratio = {ratio_1:.3f}, errors = {errors!r}"
+        )
+        assert ratio_2 > 3.9, f"medium→fine ratio = {ratio_2:.3f}, errors = {errors!r}"
+
+    def test_xi_trapezoid_converges_second_order(self) -> None:
+        r"""$\Xi$ converges as $O(\Delta s^2)$ with step_size halved alone.
+
+        Grid pinned at $N = 128$.  Seed at a cell center with every
+        $\Delta s$ an even multiple of $\Delta x$, so trace points land
+        on grid nodes (trilinear interpolation exact).  Pure trapezoid
+        regime; ratio > 3.9 catches a drop to first order.
+        """
+        domain = 8.0
+        k = np.pi / 4.0
+        n = 128
+        dx = domain / n
+        z0 = 1.5 * dx
+        trace_length = 7.0
+        z_end = z0 + trace_length
+        xi_exact = (np.sin(k * z_end) - np.sin(k * z0)) / k
+        seed_xy = domain / 2.0
+        seeds = np.array([[seed_xy, seed_xy, z0]])
+        data = _uniform_b_cos_e_dataset(n=n, domain=domain, k=k)
+
+        errors: list[float] = []
+        for step in [0.5, 0.25, 0.125]:
+            max_steps = round(trace_length / step)
+            xi = schindler_xi(
+                data,
+                seeds,
+                step_size=step,
+                max_steps=max_steps,
+                direction="forward",
+            )
+            errors.append(float(abs(xi[0] - xi_exact)))
+
+        ratio_1 = errors[0] / errors[1]
+        ratio_2 = errors[1] / errors[2]
+        assert ratio_1 > 3.9, (
+            f"coarse→medium ratio = {ratio_1:.3f}, errors = {errors!r}"
+        )
+        assert ratio_2 > 3.9, f"medium→fine ratio = {ratio_2:.3f}, errors = {errors!r}"
