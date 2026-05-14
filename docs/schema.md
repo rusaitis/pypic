@@ -1234,7 +1234,7 @@ and equations of motion are derived on demand
 | Field | Storage | Meaning |
 |-------|---------|---------|
 | `x`, `y`, `z` | per-particle `(N,)` | Position in 3D ambient space — always Cartesian, even when `[coordinates].geometry` is non-Cartesian (geometry is a field-grid representation choice, not a particle one) |
-| `vx`, `vy`, `vz` | per-particle `(N,)` | Velocity components |
+| `vx`, `vy`, `vz` | per-particle `(N,)` | 3-velocity $v^i$ in code units — **not** momentum $p^i = \gamma m v^i$ and **not** four-velocity $u^i = \gamma v^i$. Relativistic readers that emit momentum or four-velocity convert at load time using `species_mass` and the per-particle Lorentz factor. |
 | `weight` | per-particle `(N,)` float64 | Physical particles per macroparticle $w$ |
 | `id` | per-particle `(N,)` int64 | Tracking ID (when the code emits one) |
 | `species_charge` | scalar (metadata) | Per-species charge $q_s$ in code units. One charge state per `[[species]]` entry — mixed ionization → separate species. |
@@ -1258,6 +1258,25 @@ canonical form so downstream consumers don't see the difference.
 `read → write → read` reconstructs $q_s w$ bit-exactly via float64
 arithmetic but does not preserve combined-layout disk bytes — pypic
 is analysis, not restart regeneration.
+
+**openPMD record → canonical mapping.** The four most-used codes in
+the *Separate* camp (WarpX, PIConGPU, Smilei, FBPIC) emit the
+openPMD ED-PIC layout, where the Phase-9 reader (TASKS Step 42)
+translates each record into the canonical form above:
+
+| openPMD record | Canonical destination |
+|----------------|-----------------------|
+| `particles/<sp>/position/{x,y,z}` + `positionOffset/{x,y,z}` | `x`, `y`, `z` (sum of the two, applying `unitSI`) |
+| `particles/<sp>/momentum/{x,y,z}` | `vx`, `vy`, `vz` (divide by $\gamma m$, where $\gamma = \sqrt{1 + p^2/(m^2 c^2)}$) |
+| `particles/<sp>/weighting` | `weight` (honor `macroWeighted` + `weightingPower` per ED-PIC) |
+| `particles/<sp>/charge` (constant record) | scalar `species_charge` |
+| `particles/<sp>/mass` (constant record) | scalar `species_mass` |
+| `particles/<sp>/id` | `id` |
+
+Codes that emit non-constant `charge` or `mass` records (varying
+ionization state within one species) must be split into one canonical
+`[[species]]` per charge state — there is no per-particle `charge` or
+`mass` column in `ParticleData` to land them.
 
 ## 4. Output Layouts
 
@@ -1521,8 +1540,9 @@ archival). Row groups: 500K–1M particles each. Down-cast knobs:
 `position_dtype="float32"`, `velocity_dtype="float32"`. `weight` and
 `id` stay at full source precision (float64 / int64); scalar
 `species_charge` and `species_mass` round-trip through Arrow schema
-metadata at full precision. See TASKS.md Step 25 for the full I/O
-contract.
+metadata at full precision. See TASKS.md Step 25 (Arrow/Parquet
+foundation) and Step 25b (canonical `weight` + species-scalar form)
+for the full I/O contract.
 
 ## 5. Extensibility
 
