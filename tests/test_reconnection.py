@@ -43,31 +43,68 @@ class TestFindSaddlePoints:
         saddles = find_saddle_points(psi, dx, dx, min_separation=10)
         assert len(saddles) >= 2
 
-    @pytest.mark.parametrize(
-        "bad_shape",
-        [(10,), (4, 4, 4), (2, 3, 4, 5)],
-        ids=["1d", "3d", "4d"],
-    )
-    def test_invalid_shape(self, bad_shape: tuple[int, ...]) -> None:
-        """Any non-2D input must raise — guards against a truthy ndim check."""
-        with pytest.raises(ValueError, match="2D"):
-            find_saddle_points(np.ones(bad_shape), 1.0, 1.0)
+    def test_invalid_shapes_all_raise(self) -> None:
+        """Every non-2D input must raise — guards against a truthy ndim check.
 
-    @pytest.mark.parametrize(
-        "shape",
-        [(3, 3), (4, 5), (5, 4), (2, 10), (10, 2)],
-        ids=["square_3", "nx_lt_5", "ny_lt_5", "nx_tiny", "ny_tiny"],
-    )
-    def test_grid_too_small(self, shape: tuple[int, int]) -> None:
-        """Both axes must satisfy nx>=5 AND ny>=5; one-sided failure is enough.
+        Aggregated rather than parametrized: the structural invariant is
+        ``find_saddle_points`` rejects any ``ndim != 2``, and the failure
+        list reports every shape that slipped through.
+        """
+        bad_shapes: list[tuple[int, ...]] = [(10,), (4, 4, 4), (2, 3, 4, 5)]
+        failures: list[str] = []
+        for shape in bad_shapes:
+            try:
+                find_saddle_points(np.ones(shape), 1.0, 1.0)
+            except ValueError as e:
+                if "2D" not in str(e):
+                    failures.append(
+                        f"shape={shape}: ValueError without '2D' in message ({e!r})"
+                    )
+                continue
+            except Exception as e:
+                failures.append(
+                    f"shape={shape}: raised {type(e).__name__} (expected ValueError)"
+                )
+                continue
+            failures.append(f"shape={shape}: no exception raised")
+        assert not failures, "Non-2D shape acceptance:\n  - " + "\n  - ".join(failures)
 
-        The 2-cell margin guard inside find_saddle_points requires
+    def test_too_small_grids_all_raise(self) -> None:
+        """Both axes must satisfy ``nx>=5`` AND ``ny>=5``; one-sided failure
+        is enough.
+
+        The 2-cell margin guard inside ``find_saddle_points`` requires
         ``nx>=5`` and ``ny>=5`` independently. A regression to
         ``nx<5 and ny<5`` (AND instead of OR) would let 4x10 slip
-        through and emit garbage from the one-sided stencil.
+        through and emit garbage from the one-sided stencil. Aggregated
+        invariant — every offending shape lists in a single failure.
         """
-        with pytest.raises(ValueError, match="too small"):
-            find_saddle_points(np.ones(shape), 1.0, 1.0)
+        small_shapes: list[tuple[int, int]] = [
+            (3, 3),  # square_3
+            (4, 5),  # nx<5
+            (5, 4),  # ny<5
+            (2, 10),  # nx_tiny
+            (10, 2),  # ny_tiny
+        ]
+        failures: list[str] = []
+        for shape in small_shapes:
+            try:
+                find_saddle_points(np.ones(shape), 1.0, 1.0)
+            except ValueError as e:
+                if "too small" not in str(e):
+                    failures.append(
+                        f"shape={shape}: ValueError without 'too small' ({e!r})"
+                    )
+                continue
+            except Exception as e:
+                failures.append(
+                    f"shape={shape}: raised {type(e).__name__} (expected ValueError)"
+                )
+                continue
+            failures.append(f"shape={shape}: no exception raised")
+        assert not failures, "Too-small shape acceptance:\n  - " + "\n  - ".join(
+            failures
+        )
 
 
 class TestReconnectionRate:

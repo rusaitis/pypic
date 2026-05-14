@@ -56,35 +56,62 @@ from pypic.derived import (
     velocity_magnitude,
 )
 
-MAGNITUDE_FUNCTIONS = [
-    magnetic_field_magnitude,
-    electric_field_magnitude,
-    current_density_magnitude,
-    velocity_magnitude,
+MAGNITUDE_FUNCTIONS: list[tuple[str, Callable[..., Any]]] = [
+    ("magnetic_field_magnitude", magnetic_field_magnitude),
+    ("electric_field_magnitude", electric_field_magnitude),
+    ("current_density_magnitude", current_density_magnitude),
+    ("velocity_magnitude", velocity_magnitude),
 ]
 
 
 class TestMagnitudes:
-    @pytest.mark.parametrize("func", MAGNITUDE_FUNCTIONS)
-    def test_345_triangle(self, func):
-        result = func(np.array([3.0]), np.array([4.0]), np.array([0.0]))
-        np.testing.assert_allclose(result, 5.0, rtol=1e-15)
+    """Structural invariants every $|X| = \\sqrt{X_1^2 + X_2^2 + X_3^2}$
+    function must satisfy.
 
-    @pytest.mark.parametrize("func", MAGNITUDE_FUNCTIONS)
-    def test_multidimensional(self, func):
+    Aggregated rather than parametrized per CLAUDE.md guidance — the
+    failure message lists every offending function, so a regression
+    in one or all four surfaces in a single test run.
+    """
+
+    def test_345_triangle(self) -> None:
+        """Pythagorean identity on a 3-4-5 triangle."""
+        failures: list[str] = []
+        for label, func in MAGNITUDE_FUNCTIONS:
+            result = func(np.array([3.0]), np.array([4.0]), np.array([0.0]))
+            if not np.allclose(result, 5.0, rtol=1e-15):
+                failures.append(f"{label}: returned {result!r}, expected 5.0")
+        assert not failures, "3-4-5 identity regressions:\n  - " + "\n  - ".join(
+            failures
+        )
+
+    def test_multidimensional(self) -> None:
+        """Component-wise broadcasting over a 2x3 array."""
         c1 = np.array([[3.0, 0.0, 1.0], [0.0, 1.0, 1.0]])
         c2 = np.array([[4.0, 0.0, 1.0], [0.0, 1.0, 1.0]])
         c3 = np.array([[0.0, 0.0, 1.0], [0.0, 1.0, 1.0]])
-        result = func(c1, c2, c3)
-        assert result.shape == (2, 3)
-        np.testing.assert_allclose(result[0, 0], 5.0, rtol=1e-15)
-        np.testing.assert_allclose(result[0, 1], 0.0, atol=1e-15)
-        np.testing.assert_allclose(result[0, 2], np.sqrt(3.0), rtol=1e-15)
+        failures: list[str] = []
+        for label, func in MAGNITUDE_FUNCTIONS:
+            result = func(c1, c2, c3)
+            if result.shape != (2, 3):
+                failures.append(f"{label}: shape={result.shape}, expected (2, 3)")
+                continue
+            expected = np.array(
+                [[5.0, 0.0, np.sqrt(3.0)], [0.0, np.sqrt(3.0), np.sqrt(3.0)]]
+            )
+            if not np.allclose(result, expected, rtol=1e-15, atol=1e-15):
+                failures.append(f"{label}: values mismatch (got {result!r})")
+        assert not failures, "Broadcast regressions:\n  - " + "\n  - ".join(failures)
 
-    @pytest.mark.parametrize("func", MAGNITUDE_FUNCTIONS)
-    def test_nan_propagation(self, func):
-        result = func(np.array([np.nan]), np.array([1.0]), np.array([0.0]))
-        assert np.isnan(result[0])
+    def test_nan_propagation(self) -> None:
+        """NaN in any component poisons the magnitude."""
+        failures: list[str] = []
+        for label, func in MAGNITUDE_FUNCTIONS:
+            result = func(np.array([np.nan]), np.array([1.0]), np.array([0.0]))
+            if not np.isnan(result[0]):
+                failures.append(f"{label}: returned {result[0]!r}, expected NaN")
+        assert not failures, "NaN-propagation regressions:\n  - " + "\n  - ".join(
+            failures
+        )
 
 
 class TestPlasmaBeta:
@@ -247,42 +274,53 @@ class TestThermodynamics:
 
 
 class TestDefaultParameters:
-    @pytest.mark.parametrize(
-        ("explicit_call", "implicit_call"),
-        [
+    def test_explicit_equals_implicit(self) -> None:
+        """Calling with the documented default keyword equals omitting it.
+
+        Guards against accidental default-value drift in
+        ``thermal_energy_density``, ``internal_energy``, ``enthalpy``,
+        ``relativistic_enthalpy``, and ``entropy``.  All five share the
+        same structural invariant (``f(x, default=D) == f(x)``); a
+        regression in any one shows up in the aggregated failure list.
+        """
+        explicit_implicit: list[tuple[str, Callable[..., Any], Callable[..., Any]]] = [
             (
+                "thermal_energy_density",
                 lambda: thermal_energy_density(np.array([1.0]), gamma=5.0 / 3.0),
                 lambda: thermal_energy_density(np.array([1.0])),
             ),
             (
+                "internal_energy",
                 lambda: internal_energy(
                     np.array([1.0]), np.array([1.0]), gamma=5.0 / 3.0
                 ),
                 lambda: internal_energy(np.array([1.0]), np.array([1.0])),
             ),
             (
+                "enthalpy",
                 lambda: enthalpy(np.array([1.0]), np.array([1.0]), gamma=5.0 / 3.0),
                 lambda: enthalpy(np.array([1.0]), np.array([1.0])),
             ),
             (
+                "relativistic_enthalpy",
                 lambda: relativistic_enthalpy(np.array([1.0]), np.array([1.0]), c=1.0),
                 lambda: relativistic_enthalpy(np.array([1.0]), np.array([1.0])),
             ),
             (
+                "entropy",
                 lambda: entropy(np.array([2.0]), np.array([3.0]), gamma=5.0 / 3.0),
                 lambda: entropy(np.array([2.0]), np.array([3.0])),
             ),
-        ],
-        ids=[
-            "thermal_energy_density",
-            "internal_energy",
-            "enthalpy",
-            "relativistic_enthalpy",
-            "entropy",
-        ],
-    )
-    def test_explicit_equals_implicit(self, explicit_call, implicit_call):
-        np.testing.assert_allclose(explicit_call(), implicit_call(), rtol=1e-15)
+        ]
+        failures: list[str] = []
+        for label, explicit, implicit in explicit_implicit:
+            ev = explicit()
+            iv = implicit()
+            if not np.allclose(ev, iv, rtol=1e-15):
+                failures.append(f"{label}: explicit={ev!r}, implicit={iv!r}")
+        assert not failures, "Default-vs-explicit divergence:\n  - " + "\n  - ".join(
+            failures
+        )
 
 
 class TestEdgeCases:
@@ -985,44 +1023,64 @@ class TestScudderAgyrotropy:
         np.testing.assert_allclose(result, 0.0, atol=1e-14)
 
 
-SCALAR_FUNCTIONS_1ARG = [
-    lambda a: thermal_speed(a, mass=1.0),
-    lambda a: plasma_frequency(a, charge=1.0, mass=1.0),
-    lambda a: skin_depth(a, charge=1.0, mass=1.0),
+SCALAR_FUNCTIONS_1ARG: list[tuple[str, Callable[..., Any]]] = [
+    ("thermal_speed", lambda a: thermal_speed(a, mass=1.0)),
+    ("plasma_frequency", lambda a: plasma_frequency(a, charge=1.0, mass=1.0)),
+    ("skin_depth", lambda a: skin_depth(a, charge=1.0, mass=1.0)),
 ]
-SCALAR_FUNCTIONS_2ARG = [
-    lambda a, b: gyrofrequency(a, charge=1.0, mass=1.0),
-    lambda a, b: gyroradius(a, b, charge=1.0, mass=1.0),
-    lambda a, b: debye_length(a, b, charge=1.0),
-    lambda a, b: sound_speed(a, b),
-    lambda a, b: magnetosonic_speed(a, b),
-    lambda a, b: alfven_mach(a, b),
-    lambda a, b: magnetosonic_mach(a, b),
+SCALAR_FUNCTIONS_2ARG: list[tuple[str, Callable[..., Any]]] = [
+    ("gyrofrequency", lambda a, _b: gyrofrequency(a, charge=1.0, mass=1.0)),
+    ("gyroradius", lambda a, b: gyroradius(a, b, charge=1.0, mass=1.0)),
+    ("debye_length", lambda a, b: debye_length(a, b, charge=1.0)),
+    ("sound_speed", lambda a, b: sound_speed(a, b)),
+    ("magnetosonic_speed", lambda a, b: magnetosonic_speed(a, b)),
+    ("alfven_mach", lambda a, b: alfven_mach(a, b)),
+    ("magnetosonic_mach", lambda a, b: magnetosonic_mach(a, b)),
 ]
 
 
 class TestCharacteristicScalesEdgeCases:
-    @pytest.mark.parametrize("func", SCALAR_FUNCTIONS_1ARG)
-    def test_empty_array_1arg(self, func):
+    """Empty-input and NaN propagation across every characteristic-scale
+    function.  Aggregated invariant: shape preservation on empty input
+    and NaN propagation are properties of every scalar-output function in
+    pypic.derived; a regression in one or many shows up in a single
+    failure list.
+    """
+
+    def test_empty_arrays_propagate(self) -> None:
+        """Empty array in → empty array out, for every 1- and 2-arg scalar."""
         empty = np.array([], dtype=np.float64)
-        result = func(empty)
-        assert result.shape == (0,)
+        failures: list[str] = []
+        for label, func in SCALAR_FUNCTIONS_1ARG:
+            result = func(empty)
+            if result.shape != (0,):
+                failures.append(f"{label} (1-arg): shape={result.shape}, expected (0,)")
+        for label, func in SCALAR_FUNCTIONS_2ARG:
+            result = func(empty, empty)
+            if result.shape != (0,):
+                failures.append(f"{label} (2-arg): shape={result.shape}, expected (0,)")
+        assert not failures, "Empty-input regressions:\n  - " + "\n  - ".join(failures)
 
-    @pytest.mark.parametrize("func", SCALAR_FUNCTIONS_2ARG)
-    def test_empty_array_2arg(self, func):
-        empty = np.array([], dtype=np.float64)
-        result = func(empty, empty)
-        assert result.shape == (0,)
-
-    @pytest.mark.parametrize("func", SCALAR_FUNCTIONS_1ARG)
-    def test_nan_propagation_1arg(self, func):
-        result = func(np.array([np.nan]))
-        assert np.isnan(result[0])
-
-    @pytest.mark.parametrize("func", SCALAR_FUNCTIONS_2ARG)
-    def test_nan_propagation_2arg(self, func):
-        result = func(np.array([np.nan]), np.array([1.0]))
-        assert np.isnan(result[0])
+    def test_nan_propagates(self) -> None:
+        """NaN in the primary input poisons the result."""
+        nan = np.array([np.nan])
+        one = np.array([1.0])
+        failures: list[str] = []
+        for label, func in SCALAR_FUNCTIONS_1ARG:
+            result = func(nan)
+            if not np.isnan(result[0]):
+                failures.append(
+                    f"{label} (1-arg): returned {result[0]!r}, expected NaN"
+                )
+        for label, func in SCALAR_FUNCTIONS_2ARG:
+            result = func(nan, one)
+            if not np.isnan(result[0]):
+                failures.append(
+                    f"{label} (2-arg): returned {result[0]!r}, expected NaN"
+                )
+        assert not failures, "NaN-propagation regressions:\n  - " + "\n  - ".join(
+            failures
+        )
 
     def test_pressure_tensor_nan_propagation(self):
         nan = np.array([np.nan])
