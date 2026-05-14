@@ -1383,3 +1383,241 @@ class TestReconnectionDiagnostics:
         from_canonical = compute_field("R_recon_s0", ds)
         np.testing.assert_allclose(from_alias, from_canonical, rtol=1e-15)
         np.testing.assert_allclose(from_canonical, 0.0, atol=1e-14)
+
+
+# -- Manufactured-anisotropy fixtures (I3 closure) -------------------------
+
+
+def _rotation_from_e1_to(bhat: np.ndarray) -> np.ndarray:
+    r"""Return the 3x3 rotation $R$ such that $R\hat{e}_1 = \hat{b}$.
+
+    Rodrigues' formula about the axis $\hat{e}_1 \times \hat{b}$. Handles
+    the parallel ($\hat{b} = \pm\hat{e}_1$) edge cases. Used only for
+    test-fixture construction; no `src/` analogue.
+    """
+    bhat = bhat / np.linalg.norm(bhat)
+    e1 = np.array([1.0, 0.0, 0.0])
+    if np.allclose(bhat, e1):
+        return np.eye(3)
+    if np.allclose(bhat, -e1):
+        return np.diag([-1.0, -1.0, 1.0])
+    axis = np.cross(e1, bhat)
+    axis_n = axis / np.linalg.norm(axis)
+    cos_t = float(np.dot(e1, bhat))
+    sin_t = float(np.linalg.norm(axis))
+    k_mat = np.array(
+        [
+            [0.0, -axis_n[2], axis_n[1]],
+            [axis_n[2], 0.0, -axis_n[0]],
+            [-axis_n[1], axis_n[0], 0.0],
+        ]
+    )
+    return np.eye(3) + sin_t * k_mat + (1.0 - cos_t) * (k_mat @ k_mat)  # type: ignore[no-any-return]
+
+
+def _diag_align(p11: float, p22: float, p33: float) -> np.ndarray:
+    """Diagonal field-aligned tensor with $\\hat{b} = \\hat{e}_1$."""
+    return np.diag([p11, p22, p33])
+
+
+def _offaxis_align(delta: float) -> np.ndarray:
+    r"""$\mathbf{I} + \delta\,(\hat{e}_1\hat{e}_3^T + \hat{e}_3\hat{e}_1^T)$.
+
+    Pure off-axis nongyrotropy: equal perpendicular eigenvalues, off-axis
+    $P_{13}$ coupling. $A_\phi = 0$ in closed form; $Q$ and $D_{ng}$ both
+    detect the coupling.
+    """
+    p = np.eye(3)
+    p[0, 2] = delta
+    p[2, 0] = delta
+    return p
+
+
+def _diag_plus_offaxis(delta: float) -> np.ndarray:
+    """Combine perp anisotropy with off-axis coupling."""
+    p = np.diag([1.0, 2.0, 0.5])
+    p[0, 2] = delta
+    p[2, 0] = delta
+    return p
+
+
+def _build_fixture(
+    p_align: np.ndarray, r_mat: np.ndarray, bhat_lab: np.ndarray
+) -> FieldDataset:
+    """Build a (2,2,2) FieldDataset with spatially-uniform P (rotated to
+    lab frame via R) and uniform B = bhat_lab.
+
+    Asserts the rotated tensor stays symmetric as a construction guard.
+    """
+    p_lab = r_mat @ p_align @ r_mat.T
+    assert np.allclose(p_lab, p_lab.T, atol=1e-15), "rotation lost symmetry"
+    shape = (2, 2, 2)
+    data = {
+        "P_11": np.full(shape, p_lab[0, 0]),
+        "P_22": np.full(shape, p_lab[1, 1]),
+        "P_33": np.full(shape, p_lab[2, 2]),
+        "P_12": np.full(shape, p_lab[0, 1]),
+        "P_13": np.full(shape, p_lab[0, 2]),
+        "P_23": np.full(shape, p_lab[1, 2]),
+        "B_1": np.full(shape, bhat_lab[0]),
+        "B_2": np.full(shape, bhat_lab[1]),
+        "B_3": np.full(shape, bhat_lab[2]),
+    }
+    return make_test_dataset(data, shape=shape)
+
+
+def _build_per_species_fixture(
+    p_align: np.ndarray, r_mat: np.ndarray, bhat_lab: np.ndarray
+) -> FieldDataset:
+    """Like `_build_fixture` but with `P_s0_*` names and a species list."""
+    p_lab = r_mat @ p_align @ r_mat.T
+    assert np.allclose(p_lab, p_lab.T, atol=1e-15)
+    shape = (2, 2, 2)
+    data = {
+        "P_s0_11": np.full(shape, p_lab[0, 0]),
+        "P_s0_22": np.full(shape, p_lab[1, 1]),
+        "P_s0_33": np.full(shape, p_lab[2, 2]),
+        "P_s0_12": np.full(shape, p_lab[0, 1]),
+        "P_s0_13": np.full(shape, p_lab[0, 2]),
+        "P_s0_23": np.full(shape, p_lab[1, 2]),
+        "B_1": np.full(shape, bhat_lab[0]),
+        "B_2": np.full(shape, bhat_lab[1]),
+        "B_3": np.full(shape, bhat_lab[2]),
+    }
+    return make_test_dataset(data, shape=shape, species=[ELECTRONS, IONS])
+
+
+class TestAgyrotropyManufacturedFixtures:
+    """End-to-end I3 closure: closed-form values for Q, D_ng, A_phi on
+    manufactured pressure-tensor configurations with a tilted $\\hat{b}$,
+    asserted through the `compute()` registry path.
+
+    Three configurations exercise three distinct pieces of the algebra:
+
+    - **C1** perp anisotropy only: $\\mathbf{P}_{\\mathrm{align}} =
+      \\mathrm{diag}(1, 2, 0.5)$. $Q = 9/65$, $D_{ng} = 3\\sqrt{2}/7$,
+      $A_\\phi = 3/5$.
+    - **C2** off-axis coupling only: $\\mathbf{I} + 0.3\\,(\\hat{e}_1
+      \\hat{e}_3^T + \\hat{e}_3\\hat{e}_1^T)$. $Q = 3/100$, $D_{ng} =
+      \\sqrt{2}/5$, $A_\\phi = 0$. This is the configuration that
+      catches the b8ecb40 regression class (`agyrotropy` returning
+      $A_\\phi^2$ instead of Swisdak's $Q$).
+    - **C3** combined: $\\mathrm{diag}(1, 2, 0.5) + 0.2\\,(\\hat{e}_1
+      \\hat{e}_3^T + \\hat{e}_3\\hat{e}_1^T)$. $Q = 241/1625$, $D_{ng}
+      = \\sqrt{482}/35$, $A_\\phi = 3/5$ — same as C1 because $A_\\phi$
+      is blind to off-axis terms by construction (double-projection
+      strips them).
+    """
+
+    _BHAT_LAB = np.array([0.5, 0.0, np.sqrt(3.0) / 2.0])
+
+    def _rotation(self) -> np.ndarray:
+        return _rotation_from_e1_to(self._BHAT_LAB)
+
+    def test_compute_path_matches_closed_form_on_tilted_b(self) -> None:
+        """All three agyrotropy metrics match closed-form values through
+        compute() on tilted-b̂ configurations. Aggregated failures so a
+        regression in one config/metric reports its row (M2 pattern).
+
+        Closed-form derivations
+        -----------------------
+        C1: P_align = diag(1, 2, 0.5), b̂_align = ê_1.
+            I_1 = 3.5, I_2 = 2 + 0.5 + 1 = 3.5,
+            denom = (I_1 - P_∥)(I_1 + 3 P_∥) = 2.5 · 6.5 = 16.25,
+            Q = 1 - 4·3.5/16.25 = 9/65.
+            P_⊥ = 1.25, N = diag(0, 0.75, -0.75), ||N||_F^2 = 9/8,
+            D_ng = 2√(9/8)/3.5 = 3√2/7.
+            Perp eigenvalues (2, 0.5), A_φ = 1.5/2.5 = 3/5.
+        C2: P_align = I + δ(ê_1 ê_3^T + ê_3 ê_1^T), δ = 0.3.
+            I_1 = 3, I_2 = 3 - δ^2 = 2.91, denom = 12,
+            Q = δ^2/3 = 3/100.
+            P_∥ = P_⊥ = 1, ||N||_F^2 = 2δ^2,
+            D_ng = 2√(2δ^2)/3 = √2/5.
+            Perp 2×2 block = diag(1, 1) exactly, A_φ = 0.
+        C3: P_align = diag(1, 2, 0.5) + δ(ê_1 ê_3^T + ê_3 ê_1^T), δ = 0.2.
+            I_1 = 3.5, I_2 = 3.5 - δ^2 = 3.46, denom = 16.25,
+            Q = 1 - 4·3.46/16.25 = 241/1625.
+            P_⊥ = 1.25, ||N||_F^2 = 9/8 + 2δ^2 = 1.205,
+            D_ng = 2√1.205/3.5 = √482/35.
+            Perp double-projection strips off-axis term → diag(2, 0.5),
+            A_φ = 3/5 (same as C1, on purpose — A_φ is blind to δ).
+        """
+        bhat = self._BHAT_LAB
+        r_mat = self._rotation()
+        configs = [
+            (
+                "C1 perp",
+                _diag_align(1.0, 2.0, 0.5),
+                9.0 / 65.0,
+                3.0 * np.sqrt(2.0) / 7.0,
+                3.0 / 5.0,
+            ),
+            (
+                "C2 offaxis",
+                _offaxis_align(0.3),
+                3.0 / 100.0,
+                np.sqrt(2.0) / 5.0,
+                0.0,
+            ),
+            (
+                "C3 combined",
+                _diag_plus_offaxis(0.2),
+                241.0 / 1625.0,
+                np.sqrt(482.0) / 35.0,
+                3.0 / 5.0,
+            ),
+        ]
+        failures: list[str] = []
+        for label, p_align, q_exact, dng_exact, aphi_exact in configs:
+            ds = _build_fixture(p_align, r_mat, bhat)
+            q = float(compute_field("agyrotropy", ds).flat[0])
+            dng = float(compute_field("D_ng", ds).flat[0])
+            aphi = float(compute_field("A_phi", ds).flat[0])
+            # Q and D_ng: closed-form-arithmetic precision (1e-13).
+            # A_phi: clamp-then-sqrt in scudder_agyrotropy lifts the
+            # gyrotropic-roundoff floor to ~1e-8, so loosen atol for
+            # the A_phi = 0 row of C2.
+            if not np.isclose(q, q_exact, rtol=1e-13, atol=1e-13):
+                failures.append(f"{label}/Q: got {q!r}, want {q_exact!r}")
+            if not np.isclose(dng, dng_exact, rtol=1e-13, atol=1e-13):
+                failures.append(f"{label}/D_ng: got {dng!r}, want {dng_exact!r}")
+            if not np.isclose(aphi, aphi_exact, rtol=1e-12, atol=5e-8):
+                failures.append(f"{label}/A_phi: got {aphi!r}, want {aphi_exact!r}")
+        assert not failures, "\n".join(failures)
+
+    def test_agyrotropy_is_not_aphi_squared(self) -> None:
+        """Direct b8ecb40 sentinel: `compute("agyrotropy")` returns
+        Swisdak's $Q$, not $A_\\phi^2$.
+
+        On the off-axis-only fixture (C2), $Q = 3/100$ but $A_\\phi
+        \\approx 0$. If the historical bug returned, `agyrotropy`
+        would degenerate to $A_\\phi^2 \\approx 0$ and this assertion
+        would fail. Tight enough threshold to catch the substitution;
+        loose enough that floating-point noise around $A_\\phi^2 \\sim
+        10^{-16}$ never trips it.
+        """
+        ds = _build_fixture(_offaxis_align(0.3), self._rotation(), self._BHAT_LAB)
+        q = float(compute_field("agyrotropy", ds).flat[0])
+        aphi = float(compute_field("A_phi", ds).flat[0])
+        assert abs(q - aphi**2) > 1e-3, (
+            f"agyrotropy appears to be returning A_phi^2: "
+            f"Q = {q!r}, A_phi^2 = {aphi**2!r}"
+        )
+
+    def test_per_species_template_on_combined_fixture(self) -> None:
+        """The `_SpeciesTemplate` path delivers the same closed-form
+        values on a non-trivial tensor.
+
+        Existing `test_per_species_agyrotropy_isotropic` only exercises
+        the trivial $Q = 0$ case; this is the per-species analogue of
+        the C3 row of the joint test.
+        """
+        ds = _build_per_species_fixture(
+            _diag_plus_offaxis(0.2), self._rotation(), self._BHAT_LAB
+        )
+        q = float(compute_field("agyrotropy_s0", ds).flat[0])
+        dng = float(compute_field("D_ng_s0", ds).flat[0])
+        aphi = float(compute_field("A_phi_s0", ds).flat[0])
+        np.testing.assert_allclose(q, 241.0 / 1625.0, rtol=1e-13, atol=1e-13)
+        np.testing.assert_allclose(dng, np.sqrt(482.0) / 35.0, rtol=1e-13, atol=1e-13)
+        np.testing.assert_allclose(aphi, 3.0 / 5.0, rtol=1e-12, atol=5e-8)
