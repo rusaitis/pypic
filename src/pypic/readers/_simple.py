@@ -372,6 +372,7 @@ class SimpleReader:
             species=species,
             physics=physics,
             metadata=metadata,
+            strict_fields=False,
         )
 
     def _read_raw(

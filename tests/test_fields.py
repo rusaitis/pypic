@@ -21,7 +21,9 @@ from pypic.selections import PlaneSelection
 from pypic.units import _COMPOUND_FACTORS, _QUANTITIES, Normalization, SpeciesInfo
 
 
-def _make_dataset(fields: dict[str, np.ndarray]) -> FieldDataset:
+def _make_dataset(
+    fields: dict[str, np.ndarray], *, strict_fields: bool = True
+) -> FieldDataset:
     grid = GridInfo(dimensions=(4, 3, 2), spacing=(1.0, 1.0, 1.0))
     return FieldDataset.from_arrays(
         fields,
@@ -31,6 +33,7 @@ def _make_dataset(fields: dict[str, np.ndarray]) -> FieldDataset:
             SpeciesInfo(name="electrons", charge=-1.0, mass=1.0),
             SpeciesInfo(name="ions", charge=1.0, mass=256.0),
         ],
+        strict_fields=strict_fields,
     )
 
 
@@ -147,9 +150,24 @@ class TestXarrayAttrs:
         assert ds.xr["rho_m"].attrs["long_name"] == "Mass density"
 
     def test_unknown_field_no_attrs(self) -> None:
-        ds = _make_dataset({"custom_field": np.ones((4, 3, 2))})
+        ds = _make_dataset({"custom_field": np.ones((4, 3, 2))}, strict_fields=False)
         assert "long_name" not in ds.xr["custom_field"].attrs
         assert "units" not in ds.xr["custom_field"].attrs
+
+    def test_unknown_field_strict_raises(self) -> None:
+        with pytest.raises(KeyError, match="not in the registry"):
+            _make_dataset({"custom_field": np.ones((4, 3, 2))})
+
+    def test_strict_lists_all_unresolved_names(self) -> None:
+        """Error batches every unknown name so reader bugs surface together."""
+        with pytest.raises(KeyError, match=r"\['custom_a', 'custom_b'\]"):
+            _make_dataset(
+                {
+                    "B_1": np.ones((4, 3, 2)),
+                    "custom_a": np.ones((4, 3, 2)),
+                    "custom_b": np.ones((4, 3, 2)),
+                }
+            )
 
 
 class TestFieldSiFactorRegression:
@@ -618,5 +636,5 @@ class TestFromArraysQuantityTypeAttr:
         assert ds.xr["rho_m"].attrs["si_unit"] == "kg/m^3"
 
     def test_unknown_field_no_quantity_type(self) -> None:
-        ds = _make_dataset({"custom_xyz": np.ones((4, 3, 2))})
+        ds = _make_dataset({"custom_xyz": np.ones((4, 3, 2))}, strict_fields=False)
         assert "quantity_type" not in ds.xr["custom_xyz"].attrs

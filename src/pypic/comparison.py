@@ -590,4 +590,5 @@ def field_difference_dataset(
                 "units": units,
             }
         },
+        strict_fields=False,
     )

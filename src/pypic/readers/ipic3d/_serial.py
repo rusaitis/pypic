@@ -325,6 +325,7 @@ class IPic3DSerialReader:
             metadata={**dict(sc.metadata), "step": step},
             frame=sc.frame,
             transforms=sc.transforms or None,
+            strict_fields=False,
         )
 
     def available_auxiliary(self, path: Path) -> list[str]:

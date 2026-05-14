@@ -322,6 +322,7 @@ def regrid(
         metadata=dict(source.metadata),
         frame=source.frame,
         transforms=dict(source.transforms),
+        strict_fields=False,
     )
 
 

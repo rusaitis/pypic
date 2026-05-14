@@ -522,6 +522,7 @@ def _to_si_dataset(fds: FieldDataset) -> FieldDataset:
         metadata=dict(fds.metadata),
         frame=fds.frame,
         transforms=dict(fds.transforms),
+        strict_fields=False,
     )
 
 

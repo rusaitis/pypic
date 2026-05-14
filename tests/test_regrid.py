@@ -104,7 +104,9 @@ def _make_1d_dataset(
     grid = make_uniform_grid(n, spacing=dx, origin=origin)
     (x,) = grid.coordinate_arrays()
     values = 2.0 * x + 1.0 if func is None else func(x)
-    return FieldDataset.from_arrays({"f": values}, grid, Normalization.identity())
+    return FieldDataset.from_arrays(
+        {"f": values}, grid, Normalization.identity(), strict_fields=False
+    )
 
 
 class TestRegrid:
@@ -161,6 +163,7 @@ class TestRegrid:
             {"f": 2.0 * coarse.coordinate_arrays()[0] + 1.0},
             coarse,
             Normalization.identity(),
+            strict_fields=False,
         )
         fine_grid = make_uniform_grid(16, spacing=0.5, origin=0.5)
         result = regrid(ds, fine_grid)
@@ -175,7 +178,10 @@ class TestRegrid:
         coarse = make_uniform_grid(6, 6, spacing=2.0)
         cx, cy = np.meshgrid(*coarse.coordinate_arrays(), indexing="ij")
         ds = FieldDataset.from_arrays(
-            {"f": cx + 2.0 * cy}, coarse, Normalization.identity()
+            {"f": cx + 2.0 * cy},
+            coarse,
+            Normalization.identity(),
+            strict_fields=False,
         )
         fine = make_uniform_grid(8, 8, spacing=1.0, origin=1.0)
         result = regrid(ds, fine)
@@ -190,7 +196,10 @@ class TestRegrid:
         coarse = make_uniform_grid(6, 6, 6, spacing=2.0)
         cx, cy, cz = np.meshgrid(*coarse.coordinate_arrays(), indexing="ij")
         ds = FieldDataset.from_arrays(
-            {"f": cx + cy + cz}, coarse, Normalization.identity()
+            {"f": cx + cy + cz},
+            coarse,
+            Normalization.identity(),
+            strict_fields=False,
         )
         fine = make_uniform_grid(8, 8, 8, spacing=1.0, origin=1.0)
         result = regrid(ds, fine)
@@ -309,7 +318,9 @@ class TestRegrid:
         # Fine grid interior to coarse center range.
         coarse = make_uniform_grid(4, spacing=2.0)
         (cx,) = coarse.coordinate_arrays()
-        ds = FieldDataset.from_arrays({"f": cx}, coarse, Normalization.identity())
+        ds = FieldDataset.from_arrays(
+            {"f": cx}, coarse, Normalization.identity(), strict_fields=False
+        )
         fine = make_uniform_grid(6, spacing=1.0, origin=0.5)
         result = regrid(ds, fine, method="nearest")
         # Fine centers: 1.0, 2.0, 3.0, 4.0, 5.0, 6.0 — all in [1, 7].
@@ -343,6 +354,7 @@ class TestRegrid:
             {"f": np.ones((4, 4))},
             make_uniform_grid(4, 4),
             Normalization.identity(),
+            strict_fields=False,
         )
         target_3d = make_uniform_grid(4, 4, 4)
         with pytest.raises(ValueError, match=r"2D source.*3D target"):
@@ -362,7 +374,10 @@ class TestRegrid:
         """Single-cell source + single-cell target is a trivial passthrough."""
         grid = make_uniform_grid(1, spacing=1.0, origin=0.0)
         ds = FieldDataset.from_arrays(
-            {"f": np.array([3.14])}, grid, Normalization.identity()
+            {"f": np.array([3.14])},
+            grid,
+            Normalization.identity(),
+            strict_fields=False,
         )
         # Target grid equals source — no-op shortcut fires.
         result = regrid(ds, grid)
@@ -463,10 +478,16 @@ class TestAlignGrids:
         (cx,) = coarse.coordinate_arrays()
         (fx,) = fine.coordinate_arrays()
         ds_c = FieldDataset.from_arrays(
-            {"f": 2.0 * cx + 1.0}, coarse, Normalization.identity()
+            {"f": 2.0 * cx + 1.0},
+            coarse,
+            Normalization.identity(),
+            strict_fields=False,
         )
         ds_f = FieldDataset.from_arrays(
-            {"f": 3.0 * fx - 1.0}, fine, Normalization.identity()
+            {"f": 3.0 * fx - 1.0},
+            fine,
+            Normalization.identity(),
+            strict_fields=False,
         )
         ra, rb = align_grids(ds_c, ds_f)
         assert ra.grid.spacing == rb.grid.spacing
@@ -475,8 +496,12 @@ class TestAlignGrids:
     def test_partial_overlap(self) -> None:
         g1 = make_uniform_grid(10, spacing=1.0, origin=0.0)
         g2 = make_uniform_grid(10, spacing=1.0, origin=5.0)
-        ds1 = FieldDataset.from_arrays({"f": np.ones(10)}, g1, Normalization.identity())
-        ds2 = FieldDataset.from_arrays({"f": np.ones(10)}, g2, Normalization.identity())
+        ds1 = FieldDataset.from_arrays(
+            {"f": np.ones(10)}, g1, Normalization.identity(), strict_fields=False
+        )
+        ds2 = FieldDataset.from_arrays(
+            {"f": np.ones(10)}, g2, Normalization.identity(), strict_fields=False
+        )
         ra, rb = align_grids(ds1, ds2)
         # Both on the common grid.
         assert ra.grid == rb.grid
@@ -487,8 +512,12 @@ class TestAlignGrids:
         """``align_grids(a, b)`` and ``align_grids(b, a)`` use the same grid."""
         g1 = make_uniform_grid(10, spacing=1.0, origin=0.0)
         g2 = make_uniform_grid(15, spacing=0.5, origin=3.0)
-        ds1 = FieldDataset.from_arrays({"f": np.ones(10)}, g1, Normalization.identity())
-        ds2 = FieldDataset.from_arrays({"f": np.ones(15)}, g2, Normalization.identity())
+        ds1 = FieldDataset.from_arrays(
+            {"f": np.ones(10)}, g1, Normalization.identity(), strict_fields=False
+        )
+        ds2 = FieldDataset.from_arrays(
+            {"f": np.ones(15)}, g2, Normalization.identity(), strict_fields=False
+        )
         ra_ab, _rb_ab = align_grids(ds1, ds2)
         ra_ba, _rb_ba = align_grids(ds2, ds1)
         assert ra_ab.grid == ra_ba.grid

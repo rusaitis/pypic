@@ -488,7 +488,7 @@ class TestSampling:
         # Field value = x coordinate at each cell center
         x = np.arange(4) * 1.0 + 0.5
         field = np.broadcast_to(x[:, None, None], (4, 4, 4)).copy().astype(np.float64)
-        return FieldDataset.from_arrays({"rho": field}, grid)
+        return FieldDataset.from_arrays({"rho": field}, grid, strict_fields=False)
 
     def test_nearest_at_grid_nodes(self, field_dataset: object) -> None:
         from pypic.dataset import FieldDataset
@@ -641,7 +641,7 @@ class TestSamplingEdgeCases:
         # Field varies along x; constant along y, z
         x = np.arange(4) * 1.0 + 0.5
         field = np.broadcast_to(x[:, None, None], (4, 4, 1)).copy().astype(np.float64)
-        data = FieldDataset.from_arrays({"rho": field}, grid)
+        data = FieldDataset.from_arrays({"rho": field}, grid, strict_fields=False)
         # Sample at y=0.5, z=0.5 (the only valid z slice)
         pts = np.array([[0.5, 0.5, 0.5], [1.5, 0.5, 0.5], [2.5, 0.5, 0.5]])
         values = sample_field(data, pts, "rho", method="nearest")
@@ -658,7 +658,7 @@ class TestSamplingEdgeCases:
             origin=(0.0, 0.0, 0.0),
         )
         field = np.zeros((4, 4, 1), dtype=np.float64)
-        data = FieldDataset.from_arrays({"rho": field}, grid)
+        data = FieldDataset.from_arrays({"rho": field}, grid, strict_fields=False)
         pts = np.array([[0.5, 0.5, 100.0]])  # z way outside the single node
         values = sample_field(data, pts, "rho", method="nearest")
         assert np.all(np.isnan(values))

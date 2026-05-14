@@ -286,6 +286,7 @@ class BATSRUSReader:
             normalization,
             physics=physics,
             metadata=metadata,
+            strict_fields=False,
         )
 
     def _read_hdf5(
@@ -357,6 +358,7 @@ class BATSRUSReader:
             normalization,
             physics=physics,
             metadata=metadata,
+            strict_fields=False,
         )
 
     def _read_out(
@@ -416,6 +418,7 @@ class BATSRUSReader:
             normalization,
             physics=physics,
             metadata=metadata_out,
+            strict_fields=False,
         )
 
     def _find_file(self, path: Path, step: int, suffix: str) -> Path:

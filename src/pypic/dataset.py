@@ -159,6 +159,7 @@ class FieldDataset:
         aliases: dict[str, str] | None = None,
         frame: str = "simulation",
         transforms: dict[str, FrameTransform] | None = None,
+        strict_fields: bool = True,
     ) -> FieldDataset:
         r"""Build a FieldDataset from a dict of NumPy arrays.
 
@@ -166,7 +167,9 @@ class FieldDataset:
         ----------
         fields : dict[str, FloatArray]
             Mapping of field names to arrays. Shapes must match
-            ``grid.dimensions``.
+            ``grid.dimensions``.  Names must resolve through the field
+            registry (canonical names, registered aliases, or
+            species-templated patterns) when ``strict_fields=True``.
         grid : GridInfo
             Grid metadata.
         normalization : Normalization | None
@@ -179,10 +182,26 @@ class FieldDataset:
             Arbitrary metadata.
         aliases : dict[str, str] | None
             Extra field-name aliases.
+        strict_fields : bool
+            When ``True`` (default), every key in *fields* must resolve
+            through ``pypic.fields.field_info`` — any unknown name
+            raises ``KeyError`` with the full list of unresolved names.
+            Set ``False`` to inject scratch fields (test fixtures, ad-hoc
+            scalars) that aren't part of the canonical schema; the field
+            is then stored without registry metadata.
 
         Returns
         -------
         FieldDataset
+
+        Raises
+        ------
+        KeyError
+            When ``strict_fields=True`` and one or more keys in *fields*
+            do not resolve through the field registry.  CLAUDE.md
+            §architecture requires injection points to fail loud on
+            unknown names so reader bugs surface at construction time
+            instead of later at ``compute()``.
 
         Examples
         --------
@@ -204,6 +223,7 @@ class FieldDataset:
         from pypic.fields import quantity_dimension as _quantity_dimension
 
         data_vars: dict[str, xr.DataArray] = {}
+        unresolved: list[str] = []
         for var_name, arr in fields.items():
             da = xr.DataArray(data=arr, dims=dim_names)
             try:
@@ -217,8 +237,17 @@ class FieldDataset:
                 ud = info.unit_dimension or _quantity_dimension(info.quantity_type)
                 da.attrs["unit_dimension"] = list(ud)
             except KeyError:
-                pass
+                if strict_fields:
+                    unresolved.append(var_name)
             data_vars[var_name] = da
+        if unresolved:
+            msg = (
+                f"Field names not in the registry: {unresolved!r}. "
+                "Pass strict_fields=False to inject scratch fields, or "
+                "use FieldDataset.with_field(name, data, quantity_type=...) "
+                "to register an ad-hoc quantity_type."
+            )
+            raise KeyError(msg)
         dataset = xr.Dataset(data_vars, coords=coords)
         return cls(
             dataset,

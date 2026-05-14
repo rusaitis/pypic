@@ -311,6 +311,7 @@ class IPic3DParallelReader:
             metadata={**dict(sc.metadata), "step": step},
             frame=sc.frame,
             transforms=sc.transforms or None,
+            strict_fields=False,
         )
 
     def available_particle_steps(self, path: Path) -> list[int]:
