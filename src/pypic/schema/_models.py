@@ -841,6 +841,36 @@ class InitialConditions(_ExtensibleBase):
     type: str
 
 
+class DriverModel(_ExtensibleBase):
+    """``[drivers.model]`` — identity of a coupled external system.
+
+    Used when a driver entry refers to a *named model* rather than (or
+    in addition to) a flat data file. The type vocabulary is open:
+    ``"MHD"`` and ``"PIC"`` cover pypic-aware peers, but
+    ``"ionosphere_potential_solver"`` (RIM, Weimer), ``"magnetic_field_
+    extrapolation"`` (PFSS, NLFFF), ``"fluid_atmosphere"`` (GITM, TIE-
+    GCM), ``"fusion_transport"`` (ASTRA, JETTO), and any other category
+    are equally valid.
+
+    ``url`` is a single opaque pointer. It may be the peer's
+    ``simulation.toml`` cross-link (when pypic-aware), a homepage URL,
+    a DOI, or any other machine- or human-readable metadata reference.
+    The schema does not resolve or sniff the format — that is a consumer
+    concern, in the same spirit as ``restart.from`` and the top-level
+    ``[model].url``. A non-standard metadata file is better than no
+    link at all.
+
+    ``_ExtensibleBase`` lets coupling-specific keys (``version``,
+    ``doi``, ``git_sha``, model-specific knobs) ride along without
+    bloating the typed surface.
+    """
+
+    name: str
+    type: str
+    url: str | None = None
+    description: str | None = None
+
+
 class Driver(_ExtensibleBase):
     """One entry in ``[[drivers]]``.
 
@@ -848,6 +878,15 @@ class Driver(_ExtensibleBase):
     keys — extra keys allowed so individual driver types (magnetogram,
     solar_wind_timeseries, pickup_ion_source, ...) don't need a model
     per type in v1.0.
+
+    An entry describes the *external input from this run's
+    perspective*. For two-way coupling (``direction = "two_way"``),
+    the asymmetry is in information flow, not in physics: the peer
+    run, if pypic-aware, owns its own ``simulation.toml`` with its
+    own ``[[drivers]]`` entry pointing back. ``[drivers.model]`` is
+    where the peer's identity (name, type, url, description) lives;
+    pure data drivers (CSV, HDF5 timeseries) can omit the sub-table
+    and use ``source`` alone.
     """
 
     name: str
@@ -862,6 +901,7 @@ class Driver(_ExtensibleBase):
     target_lower: AxisFloat | None = None
     target_upper: AxisFloat | None = None
     body: str | None = None
+    model: DriverModel | None = None
 
     @model_validator(mode="after")
     def _check_target_box(self) -> Driver:

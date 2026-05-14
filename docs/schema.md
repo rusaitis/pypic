@@ -684,8 +684,10 @@ current_sheet_thickness = 0.5
 
 ### [[drivers]]
 
-Ongoing external coupling (magnetograms, solar-wind inflows, pickup-ion
-sources, surface absorption, MHD→PIC volume coupling). Repeatable.
+Ongoing external input to this run — data file, coupled model, or
+live service (magnetograms, solar-wind inflows, pickup-ion sources,
+surface absorption, MHD→PIC volume coupling, magnetosphere↔ionosphere
+two-way coupling, ...). Repeatable.
 
 ```toml
 [[drivers]]
@@ -700,10 +702,42 @@ cadence       = 720.0              # seconds between samples
 interpolation = "linear"
 target_lower  = [1.0, 0.87, -0.87] # code units (optional)
 target_upper  = [1.0, 2.60, 0.87]
-body          = "mercury"          # optional — inherits body bounding box.
-                                   #   Must match a declared [[bodies]].name;
-                                   #   unresolved names raise a validation error.
+body          = "mercury"          # optional. Without a body, the driver
+                                   #   falls through to target_lower/upper
+                                   #   or the whole domain. Drivers do not
+                                   #   require a body. When present, must
+                                   #   match a declared [[bodies]].name —
+                                   #   unresolved names raise a validation
+                                   #   error.
 ```
+
+When the upstream is a named *model* (not just a flat data file),
+add a ``[drivers.model]`` sub-table to record its identity:
+
+```toml
+[[drivers]]
+name      = "ionosphere_potentials"
+type      = "model_coupling"
+coupling  = "boundary"
+direction = "two_way"             # M-I coupling: FACs down, potentials up
+
+[drivers.model]
+name        = "RIM"
+type        = "ionosphere_potential_solver"   # open vocabulary
+url         = "../rim_run/simulation.toml"    # any pointer; pypic-aware peer
+description = "Ridley Ionosphere Model; returns potential & conductance"
+# url = "https://aerospace.gov/rim/"          # alternative: homepage for non-pypic peer
+```
+
+``[drivers.model]`` carries four fields: ``name`` (required), ``type``
+(required, open string — covers ``"MHD"``, ``"PIC"``,
+``"ionosphere_potential_solver"``, ``"magnetic_field_extrapolation"``,
+``"fluid_atmosphere"``, ``"fusion_transport"``, ...), ``url``
+(optional, opaque), and ``description`` (optional). Extra keys
+(``version``, ``doi``, ``git_sha``, code-specific knobs) pass through
+unvalidated. ``source`` and ``[drivers.model]`` can co-exist when a
+model run was checkpointed to a data file — the driver records both
+the data path and the model attribution.
 
 `coupling` and `direction` are orthogonal. Target precedence:
 1. `body` — defaults to that body's bounding box.
@@ -717,6 +751,17 @@ driver is the supplier); `target_lower/upper` and `body` further
 narrow within that face. Volume / source / sink couplings ignore
 the face entry and use `target_lower/upper` or `body` for their
 domain.
+
+**Two-way semantics.** An entry describes inputs *into this run*.
+For two-way coupling, the peer run owns its own ``simulation.toml``
+with its own ``[[drivers]]`` entry pointing back — each side
+records its half of the exchange independently. ``url`` is a single
+opaque pointer: when the peer is pypic-aware, point at its
+``simulation.toml``; otherwise point at the homepage, a DOI, or
+whatever metadata file is best available. The schema does not
+resolve ``url`` — format detection (TOML re-validation, JSON parse,
+plain text) is a consumer concern. A non-standard metadata file
+is better than no link at all.
 
 Driver-type-specific keys (`production_rate`, `fields`, etc.) are
 accepted beyond the core vocabulary above.

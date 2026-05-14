@@ -114,6 +114,7 @@ uv.lock
 *.hdf5
 *.dat
 *.log
+*.png
 examples/*
 !examples/.gitkeep
 # Reference examples used as test fixtures (tests/test_config.py and

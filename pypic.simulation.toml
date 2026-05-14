@@ -67,10 +67,21 @@
 #   direction ∈ {"one_way" (default), "two_way"}. Two-way sub-fields
 #     (forward_fields, return_fields, sync_mode, sync_interval) are v1.1 —
 #     v1.0 emits the flag but leaves the structural fields undefined.
+#   [drivers.model] (optional sub-table) — identity of a coupled external
+#     system. Fields: name (req), type (req, open string — "MHD", "PIC",
+#     "ionosphere_potential_solver", "magnetic_field_extrapolation",
+#     "fluid_atmosphere", "fusion_transport", ...), url (opaque), description.
+#     `url` is a single pointer: point at the peer's simulation.toml when
+#     pypic-aware, otherwise a homepage / DOI / any metadata file. The schema
+#     doesn't resolve `url`. Use when the upstream is a named model rather
+#     than a flat data file; can co-exist with `source` when a model run was
+#     checkpointed to data.
 #   Target precedence:
 #     1. body = "<name>" — defaults to that body's bounding box
 #     2. target_lower / target_upper — explicit box; with `body`, narrows it
 #     3. neither — whole domain (grid lower/upper)
+#   `body` is OPTIONAL; drivers without a body fall through to
+#     target_lower/upper or the whole domain.
 #   Diffuse backgrounds (CMB, GCR, ISRF, X-ray) are drivers with domain-spanning
 #   targets and coupling ∈ {"volume","source","sink"}, NOT bodies. Example:
 #
@@ -875,6 +886,30 @@ created = 2026-04-23
 # # target_lower                 = [5.0, 0.87, -0.87]
 # # target_upper                 = [21.0, 2.60, 0.87]
 # # rescale                      = "linear"
+#
+# # Optional fourth driver (commented) — two-way magnetosphere↔ionosphere
+# # coupling. The ionosphere is a *named external model* (RIM), not a flat
+# # data file: FACs flow from this run down to the ionosphere, conductances
+# # and potentials flow back as the inner-boundary BC. [drivers.model]
+# # records the peer's identity. type is open vocabulary — it's not MHD or
+# # PIC. Demonstrates direction = "two_way".
+# # [[drivers]]
+# # name          = "ionosphere_potentials"
+# # type          = "model_coupling"
+# # coupling      = "boundary"          # imposed at r = r_inner_ionosphere
+# # direction     = "two_way"           # FACs down; potentials & conductance up
+# # description   = "M-I coupling: RIM solver returns Phi(theta, phi) at r_inner"
+# # target_lower  = [1.0, 0.0, -3.14159]
+# # target_upper  = [1.0, 3.14159, 3.14159]
+# #
+# # [drivers.model]
+# # name        = "RIM"                                 # Ridley Ionosphere Model
+# # type        = "ionosphere_potential_solver"         # open string; not MHD/PIC
+# # url         = "../rim_run_042/simulation.toml"      # pypic-aware peer cross-link
+# # description = "RIM v3.1; Hall + Pedersen conductance + neutral wind dynamo"
+# # # If the peer isn't pypic-aware, point at the homepage or DOI instead:
+# # # url = "https://aerospace.gov/rim/"
+# # # version, doi, git_sha may ride along as extras (DriverModel allows extras).
 #
 # [[species]]
 # # Single-fluid MHD — entry present so per-species derived aliases (Pi, n_i)

@@ -313,7 +313,7 @@ class IPic3DH5hutReader:
                                 _read_field(block, j_key)
                             )
 
-                # Pressure tensor: Pxx_{s} → P11_s{s}, etc.
+                # Pressure tensor: Pxx_{s} → P_s{N}_{ij}, etc.
                 # nspec is clamped to self._config.ns above, so s is
                 # always a valid index into qom.
                 for pcomp, canon_base in _PRESSURE_COMPONENT_MAP.items():
@@ -329,7 +329,7 @@ class IPic3DH5hutReader:
                             species_qom=self._config.qom[s],
                         )
 
-                # Energy flux: EFx_{s} → EF1_s{s}, etc.
+                # Energy flux: EFx_{s} → EF_s{N}_{c}, etc.
                 for efcomp, _ef_canon_base in _EFLUX_MAP.items():
                     ef_key = f"{efcomp}_{s}"
                     if ef_key in available:

@@ -493,6 +493,141 @@ class TestDriverBodyReference:
             validate_simulation_toml(doc)
 
 
+class TestDriverModelSubtable:
+    """``[drivers.model]`` — optional coupled-system identity sub-table."""
+
+    def test_driver_model_subtable_round_trips(self) -> None:
+        """Minimal [drivers.model] with name + type validates."""
+        doc = _minimal_doc() + dedent("""
+            [[drivers]]
+            name = "ionosphere"
+            type = "model_coupling"
+            coupling = "boundary"
+            direction = "two_way"
+
+            [drivers.model]
+            name = "RIM"
+            type = "ionosphere_potential_solver"
+        """)
+        s = validate_simulation_toml(doc)
+        assert s.drivers[0].model is not None
+        assert s.drivers[0].model.name == "RIM"
+        assert s.drivers[0].model.type == "ionosphere_potential_solver"
+
+    def test_driver_model_full_subtable_round_trips(self) -> None:
+        """All four DriverModel fields round-trip; url is opaque text."""
+        url = "../rim_run/simulation.toml"
+        doc = _minimal_doc() + dedent(f"""
+            [[drivers]]
+            name = "ionosphere"
+            type = "model_coupling"
+            coupling = "boundary"
+            direction = "two_way"
+
+            [drivers.model]
+            name = "RIM"
+            type = "ionosphere_potential_solver"
+            url = "{url}"
+            description = "Ridley Ionosphere Model"
+        """)
+        s = validate_simulation_toml(doc)
+        model = s.drivers[0].model
+        assert model is not None
+        assert model.url == url  # verbatim, no resolution
+        assert model.description == "Ridley Ionosphere Model"
+
+    def test_driver_model_type_is_open(self) -> None:
+        """DriverModel.type accepts any string — not Literal-constrained."""
+        for type_value in (
+            "ionosphere_potential_solver",
+            "fluid_atmosphere",
+            "fusion_transport",
+            "magnetic_field_extrapolation",
+            "completely_made_up_research_code",
+        ):
+            doc = _minimal_doc() + dedent(f"""
+                [[drivers]]
+                name = "d"
+                type = "model_coupling"
+                coupling = "boundary"
+                [drivers.model]
+                name = "Peer"
+                type = "{type_value}"
+            """)
+            s = validate_simulation_toml(doc)
+            assert s.drivers[0].model is not None
+            assert s.drivers[0].model.type == type_value
+
+    def test_driver_model_extras_accepted(self) -> None:
+        """_ExtensibleBase lets coupling-specific extras pass through."""
+        doc = _minimal_doc() + dedent("""
+            [[drivers]]
+            name = "d"
+            type = "model_coupling"
+            coupling = "boundary"
+
+            [drivers.model]
+            name = "RIM"
+            type = "ionosphere_potential_solver"
+            version = "3.1"
+            doi = "10.1029/example"
+            git_sha = "abc1234"
+        """)
+        s = validate_simulation_toml(doc)
+        dumped = s.drivers[0].model.model_dump()  # type: ignore[union-attr]
+        assert dumped["version"] == "3.1"
+        assert dumped["doi"] == "10.1029/example"
+        assert dumped["git_sha"] == "abc1234"
+
+    def test_driver_with_source_and_model_coexist(self) -> None:
+        """source (data file) and [drivers.model] (attribution) co-exist."""
+        doc = _minimal_doc() + dedent("""
+            [[drivers]]
+            name = "checkpointed_mhd"
+            type = "mhd_field_coupling"
+            coupling = "volume"
+            direction = "one_way"
+            source = "drivers/batsrus_checkpoint.h5"
+
+            [drivers.model]
+            name = "BATSRUS"
+            type = "MHD"
+            url = "https://clasp.engin.umich.edu/batsrus/"
+            description = "Global MHD checkpoint loaded as PIC background"
+        """)
+        s = validate_simulation_toml(doc)
+        driver = s.drivers[0]
+        assert driver.source == "drivers/batsrus_checkpoint.h5"
+        assert driver.model is not None
+        assert driver.model.name == "BATSRUS"
+
+    def test_driver_model_name_required(self) -> None:
+        """[drivers.model] without ``name`` raises ValidationError."""
+        doc = _minimal_doc() + dedent("""
+            [[drivers]]
+            name = "d"
+            type = "model_coupling"
+            coupling = "boundary"
+            [drivers.model]
+            type = "ionosphere_potential_solver"
+        """)
+        with pytest.raises(ValidationError, match="name"):
+            validate_simulation_toml(doc)
+
+    def test_driver_model_type_required(self) -> None:
+        """[drivers.model] without ``type`` raises ValidationError."""
+        doc = _minimal_doc() + dedent("""
+            [[drivers]]
+            name = "d"
+            type = "model_coupling"
+            coupling = "boundary"
+            [drivers.model]
+            name = "RIM"
+        """)
+        with pytest.raises(ValidationError, match="type"):
+            validate_simulation_toml(doc)
+
+
 class TestProbeFrame:
     """``frame=`` is meaningful only on trajectory probes."""
 
