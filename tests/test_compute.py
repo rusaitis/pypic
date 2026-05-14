@@ -1447,7 +1447,9 @@ def _build_fixture(
     Asserts the rotated tensor stays symmetric as a construction guard.
     """
     p_lab = r_mat @ p_align @ r_mat.T
-    assert np.allclose(p_lab, p_lab.T, atol=1e-15), "rotation lost symmetry"
+    np.testing.assert_allclose(
+        p_lab, p_lab.T, atol=1e-15, err_msg="rotation lost symmetry"
+    )
     shape = (2, 2, 2)
     data = {
         "P_11": np.full(shape, p_lab[0, 0]),
@@ -1468,7 +1470,9 @@ def _build_per_species_fixture(
 ) -> FieldDataset:
     """Like `_build_fixture` but with `P_s0_*` names and a species list."""
     p_lab = r_mat @ p_align @ r_mat.T
-    assert np.allclose(p_lab, p_lab.T, atol=1e-15)
+    np.testing.assert_allclose(
+        p_lab, p_lab.T, atol=1e-15, err_msg="rotation lost symmetry"
+    )
     shape = (2, 2, 2)
     data = {
         "P_s0_11": np.full(shape, p_lab[0, 0]),

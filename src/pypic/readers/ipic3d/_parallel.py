@@ -43,6 +43,13 @@ class IPic3DParallelReader:
     ``Moments_XXXXX/`` directories containing one ``.h5`` file per
     field group.
 
+    Unique to this reader: scanning timestep directories and the
+    per-rank file fan-in. Field-name mapping, Gaussian-CGS unit
+    conversions, pressure-tensor mass correction, and config
+    translation live in :mod:`pypic.readers.ipic3d._field_map` and
+    :mod:`pypic.readers.ipic3d._config`, shared with the serial and
+    H5hut readers.
+
     Parameters
     ----------
     config : IPic3DConfig

@@ -624,8 +624,8 @@ class TestAuditIssue6ElectronVelocityMagnitude:
         result = compute_field("|Ve|", ds)
         np.testing.assert_allclose(result, 5.0, rtol=1e-15)
 
-    @pytest.mark.parametrize("alias", ["Ve_mag", "V_e_mag", "|V_e|"])
-    def test_ve_magnitude_aliases(self, alias):
+    def test_ve_magnitude_aliases(self):
+        """Every Ve-magnitude alias resolves to the same 3-4-5 result."""
         shape = (2, 2, 2)
         data = {
             "V_s0_1": np.full(shape, 3.0),
@@ -633,26 +633,43 @@ class TestAuditIssue6ElectronVelocityMagnitude:
             "V_s0_3": np.zeros(shape),
         }
         ds = make_test_dataset(data, shape=shape)
-        result = compute_field(alias, ds)
-        np.testing.assert_allclose(result, 5.0, rtol=1e-15)
+        failures: list[str] = []
+        for alias in ("Ve_mag", "V_e_mag", "|V_e|"):
+            result = compute_field(alias, ds)
+            if not np.allclose(result, 5.0, rtol=1e-15):
+                failures.append(f"{alias!r}: returned {result!r}, expected 5.0")
+        assert not failures, "Ve-magnitude alias regressions:\n  - " + "\n  - ".join(
+            failures
+        )
 
 
 class TestAuditSIFactorGaps:
     """SI factor resolution for fields added by audit."""
 
-    @pytest.mark.parametrize("name", ["s_gyro_e", "s_gyro_i"])
-    def test_gyrotropic_entropy_si_factor(self, name):
+    def test_gyrotropic_entropy_si_factor(self):
+        """Every per-species gyrotropic entropy is dimensionless under identity norm."""
         norm = Normalization.identity()
-        assert field_si_factor(name, norm) == pytest.approx(1.0)
+        failures: list[str] = []
+        for name in ("s_gyro_e", "s_gyro_i"):
+            factor = field_si_factor(name, norm)
+            if factor != pytest.approx(1.0):
+                failures.append(f"{name}: SI factor {factor}, expected 1.0")
+        assert not failures, "Gyrotropic-entropy SI-factor regressions:\n  - " + (
+            "\n  - ".join(failures)
+        )
 
-    @pytest.mark.parametrize("name", ["EF_1", "EF_2", "EF_3"])
-    def test_ef_si_factor(self, name):
+    def test_ef_si_factor(self):
+        """Every EF component is dimensionless under identity norm."""
         norm = Normalization.identity()
-        factor = field_si_factor(name, norm)
-        assert factor == pytest.approx(1.0)
+        failures: list[str] = []
+        for name in ("EF_1", "EF_2", "EF_3"):
+            factor = field_si_factor(name, norm)
+            if factor != pytest.approx(1.0):
+                failures.append(f"{name}: SI factor {factor}, expected 1.0")
+        assert not failures, "EF SI-factor regressions:\n  - " + "\n  - ".join(failures)
 
-    @pytest.mark.parametrize("name", ["B0_1", "B0_2", "B0_3"])
-    def test_b0_si_factor(self, name):
+    def test_b0_si_factor(self):
+        """Every B0 component scales by b_field_ref."""
         b_ref = 2.5
         norm = Normalization(
             length_ref=1.0,
@@ -664,7 +681,12 @@ class TestAuditSIFactorGaps:
             mass_ref=1.0,
             charge_ref=1.0,
         )
-        assert field_si_factor(name, norm) == pytest.approx(b_ref)
+        failures: list[str] = []
+        for name in ("B0_1", "B0_2", "B0_3"):
+            factor = field_si_factor(name, norm)
+            if factor != pytest.approx(b_ref):
+                failures.append(f"{name}: SI factor {factor}, expected {b_ref}")
+        assert not failures, "B0 SI-factor regressions:\n  - " + "\n  - ".join(failures)
 
     def test_ef1_s0_si_factor(self):
         norm = Normalization.identity()

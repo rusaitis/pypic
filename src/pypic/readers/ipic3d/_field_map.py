@@ -95,6 +95,7 @@ _H5HUT_FIELD_MAP: dict[str, str] = {
     "divB": "div_B",
 }
 
+# H5hut layout: capital-P with lowercase axis letters (Pxx, Pxy, ...).
 _PRESSURE_COMPONENT_MAP: dict[str, str] = {
     "Pxx": "P_11",
     "Pxy": "P_12",
@@ -104,6 +105,7 @@ _PRESSURE_COMPONENT_MAP: dict[str, str] = {
     "Pzz": "P_33",
 }
 
+# Parallel/serial PHDF5 layout: lowercase-p with uppercase axis letters (pXX, pXY, ...).
 _PHDF5_PRESSURE_MAP: dict[str, str] = {
     "pXX": "P_11",
     "pXY": "P_12",

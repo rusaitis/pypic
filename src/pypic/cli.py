@@ -30,6 +30,28 @@ app = typer.Typer(
 )
 
 
+# Shared option type aliases — used identically across `convert *`
+# subcommands so help text stays in sync. `--output` differs by
+# destination type (Zarr / Parquet / root) and stays bespoke.
+StepOption = Annotated[
+    str,
+    typer.Option(
+        "--step",
+        help="Step spec: N, first, last, all, or start:stop[:stride].",
+    ),
+]
+DryRunOption = Annotated[
+    bool, typer.Option("--dry-run", help="Print the plan without writing.")
+]
+ProgressOption = Annotated[
+    bool,
+    typer.Option(
+        "--progress/--no-progress",
+        help="Show a rich.progress bar for multi-step writes (auto on TTY).",
+    ),
+]
+
+
 def _version_callback(value: bool) -> None:
     if value:
         ver = importlib.metadata.version("pypic")
@@ -541,13 +563,7 @@ def convert_fields(
         Path,
         typer.Option("--output", "-o", help="Destination Zarr store directory."),
     ],
-    step: Annotated[
-        str,
-        typer.Option(
-            "--step",
-            help="Step spec: N, first, last, all, or start:stop[:stride].",
-        ),
-    ] = "all",
+    step: StepOption = "all",
     fields: Annotated[
         str | None,
         typer.Option(
@@ -614,17 +630,8 @@ def convert_fields(
         str | None,
         typer.Option("--tag", help="Icechunk tag name (created on success)."),
     ] = None,
-    progress: Annotated[
-        bool,
-        typer.Option(
-            "--progress/--no-progress",
-            help="Show a rich.progress bar for multi-step writes (auto on TTY).",
-        ),
-    ] = True,
-    dry_run: Annotated[
-        bool,
-        typer.Option("--dry-run", help="Print the plan without writing."),
-    ] = False,
+    progress: ProgressOption = True,
+    dry_run: DryRunOption = False,
 ) -> None:
     """Convert simulation fields to a Zarr v3 store.
 
@@ -810,13 +817,7 @@ def convert_particles(
         Path,
         typer.Option("--output", "-o", help="Destination partitioned Parquet dir."),
     ],
-    step: Annotated[
-        str,
-        typer.Option(
-            "--step",
-            help="Step spec: N, first, last, all, or start:stop[:stride].",
-        ),
-    ] = "all",
+    step: StepOption = "all",
     species: Annotated[
         str | None,
         typer.Option("--species", help="Comma-separated species names or indices."),
@@ -857,17 +858,8 @@ def convert_particles(
         int,
         typer.Option("--row-group-size", help="Rows per Parquet row group."),
     ] = 750_000,
-    progress: Annotated[
-        bool,
-        typer.Option(
-            "--progress/--no-progress",
-            help="Show a rich.progress bar (auto on TTY).",
-        ),
-    ] = True,
-    dry_run: Annotated[
-        bool,
-        typer.Option("--dry-run", help="Print the plan without writing."),
-    ] = False,
+    progress: ProgressOption = True,
+    dry_run: DryRunOption = False,
 ) -> None:
     """Convert particle output to a partitioned Parquet dataset.
 
@@ -951,18 +943,9 @@ def convert_all(
         Path,
         typer.Option("--output", "-o", help="Destination root directory."),
     ],
-    step: Annotated[
-        str,
-        typer.Option("--step", help="Step spec passed to both pipelines."),
-    ] = "all",
-    dry_run: Annotated[
-        bool,
-        typer.Option("--dry-run", help="Print the plan without writing."),
-    ] = False,
-    progress: Annotated[
-        bool,
-        typer.Option("--progress/--no-progress", help="Show progress bars."),
-    ] = True,
+    step: StepOption = "all",
+    dry_run: DryRunOption = False,
+    progress: ProgressOption = True,
 ) -> None:
     """Run both fields and particles pipelines with defaults.
 

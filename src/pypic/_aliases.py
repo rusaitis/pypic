@@ -97,7 +97,7 @@ _COMPUTE_ALIASES: dict[str, str] = {
     "energy_internal": "e_int",
     # Literature spellings (NRL Plasma Formulary form) — alias to Tier-3 canonical.
     # Stays the user-facing form in error messages and docs even though the
-    # internal recipe ID follows the storage-name shape.
+    # internal recipe ID follows the storage-name shape (schema.md §3).
     "omega_pe": "omega_p_s0",
     "omega_pi": "omega_p_s1",
     "omega_ce": "omega_c_s0",

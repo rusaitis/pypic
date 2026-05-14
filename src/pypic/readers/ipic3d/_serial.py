@@ -42,6 +42,13 @@ class IPic3DSerialReader:
     timesteps. This reader assembles the global arrays from the per-process
     local patches.
 
+    Unique to this reader: the per-process patch reassembly. Field-name
+    mapping, Gaussian-CGS unit conversions, pressure-tensor mass
+    correction, and config translation live in
+    :mod:`pypic.readers.ipic3d._field_map` and
+    :mod:`pypic.readers.ipic3d._config`, shared with the parallel and
+    H5hut readers.
+
     Parameters
     ----------
     config : IPic3DConfig

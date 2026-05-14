@@ -629,7 +629,7 @@ def can_read_confidence(path: Path) -> float:
                 score += 0.3
             if "grid" in f:
                 score += 0.2
-    except Exception:
+    except OSError:
         log.debug("Failed to read %s", h5_file, exc_info=True)
 
     return min(score, 1.0)

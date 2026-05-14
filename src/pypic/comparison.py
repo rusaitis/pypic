@@ -65,24 +65,9 @@ _ALLOWED_NAN_POLICIES = ("omit", "propagate", "raise")
 _RESOLUTION_WARNING_THRESHOLD = 10.0
 
 
-def _validate_units(units: str) -> None:
-    if units not in _ALLOWED_UNITS:
-        msg = f"units must be one of {_ALLOWED_UNITS!r}, got {units!r}"
-        raise ValueError(msg)
-
-
-def _validate_metric(metric: str) -> None:
-    if metric not in _ALLOWED_METRICS:
-        msg = f"metric must be one of {_ALLOWED_METRICS!r}, got {metric!r}"
-        raise ValueError(msg)
-
-
-def _validate_nan_policy(nan_policy: str) -> None:
-    # Duplicates the check inside ``_apply_nan_policy`` intentionally:
-    # a bad policy caught *here* fails before the expensive alignment
-    # step, turning a wasted multi-field regrid into an instant error.
-    if nan_policy not in _ALLOWED_NAN_POLICIES:
-        msg = f"nan_policy must be one of {_ALLOWED_NAN_POLICIES!r}, got {nan_policy!r}"
+def _validate_choice(value: str, allowed: tuple[str, ...], name: str) -> None:
+    if value not in allowed:
+        msg = f"{name} must be one of {allowed!r}, got {value!r}"
         raise ValueError(msg)
 
 
@@ -204,7 +189,7 @@ def _extract_values(ds: FieldDataset, canonical_name: str, units: str) -> FloatA
     """Return the field array in the requested units.
 
     *units* is assumed pre-validated by the public function — see
-    :func:`_validate_units`.
+    :func:`_validate_choice`.
     """
     if units == "si":
         return ds.in_si(canonical_name)
@@ -335,9 +320,12 @@ def compare_fields(
     >>> float(compare_fields(ds, ds, "B_1"))
     0.0
     """
-    _validate_metric(metric)
-    _validate_units(units)
-    _validate_nan_policy(nan_policy)
+    _validate_choice(metric, _ALLOWED_METRICS, "metric")
+    _validate_choice(units, _ALLOWED_UNITS, "units")
+    # Duplicates the check inside ``_apply_nan_policy`` intentionally:
+    # a bad policy caught *here* fails before the expensive alignment
+    # step, turning a wasted multi-field regrid into an instant error.
+    _validate_choice(nan_policy, _ALLOWED_NAN_POLICIES, "nan_policy")
     _validate_code_units_compatible(a, b, units)
     # Resolve the field name against the *original* datasets — frame and
     # grid alignment both rebuild datasets without forwarding custom
@@ -428,8 +416,8 @@ def field_comparison_report(
     >>> report["units"]
     'si'
     """
-    _validate_units(units)
-    _validate_nan_policy(nan_policy)
+    _validate_choice(units, _ALLOWED_UNITS, "units")
+    _validate_choice(nan_policy, _ALLOWED_NAN_POLICIES, "nan_policy")
     _validate_code_units_compatible(a, b, units)
     # Resolve names against the *originals* so custom aliases from
     # ``from_arrays(aliases=...)`` survive — both transform_to and
@@ -545,7 +533,7 @@ def field_difference_dataset(
     >>> diff["B_1"]
     array([0. , 0.5, 0.5, 0. ])
     """
-    _validate_units(units)
+    _validate_choice(units, _ALLOWED_UNITS, "units")
     _validate_code_units_compatible(a, b, units)
     # Capture original frames *before* _align_frames for the provenance
     # record below; the metadata should reflect what the user passed in,

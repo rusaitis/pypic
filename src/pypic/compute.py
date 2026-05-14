@@ -13,7 +13,7 @@ import re
 import threading
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, assert_never
 
 from scipy import constants
 
@@ -931,8 +931,6 @@ def _append_species_params(
         case _SpeciesArgs.NONE:
             pass
         case _ as unreachable:  # pragma: no cover
-            from typing import assert_never
-
             assert_never(unreachable)
 
 

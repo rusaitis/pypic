@@ -39,7 +39,7 @@ uv run python tests/visual_dipole_3d.py
 
 Optional dead code test using vulture:
 ```
-uv run vulture src/
+uv run vulture src/ tests/ vulture_whitelist.py
 ```
 Optional Sloppy code test:
 

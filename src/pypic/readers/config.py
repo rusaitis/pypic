@@ -45,6 +45,10 @@ if TYPE_CHECKING:
 
 log = logging.getLogger(__name__)
 
+# Per-axis scale ratios within this fraction of their mean are treated
+# as a single uniform scale; anything beyond it is non-uniform and rejects.
+_SCALE_UNIFORMITY_TOLERANCE = 0.05
+
 _DEFAULT_SPECIES_PARAMS: dict[str, tuple[float, float]] = {
     "electrons": (constants.m_e, constants.e),
     "ions": (constants.m_p, constants.e),
@@ -132,7 +136,10 @@ def apply_physical_extent(
 
         computed_scale = float(np.mean(scales))
         for s in scales:
-            if abs(s - computed_scale) / abs(computed_scale) > 0.05:  # 5% tolerance
+            if (
+                abs(s - computed_scale) / abs(computed_scale)
+                > _SCALE_UNIFORMITY_TOLERANCE
+            ):
                 raise ValueError(
                     f"physical_extent implies non-uniform scale for "
                     f"transform {name!r}: per-axis ratios {scales.tolist()}"
@@ -150,7 +157,7 @@ def apply_physical_extent(
         else:
             new_transforms[name] = transform
             rel_diff = abs(transform.scale - computed_scale) / abs(computed_scale)
-            if rel_diff > 0.05:
+            if rel_diff > _SCALE_UNIFORMITY_TOLERANCE:
                 log.warning(
                     "Scale mismatch: transform %r has scale=%.4f, but "
                     "physical_extent implies scale=%.4f (%.1f%% difference)",

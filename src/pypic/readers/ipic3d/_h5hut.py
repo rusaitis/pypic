@@ -61,6 +61,14 @@ class IPic3DH5hutReader:
     correction to density, current, and pressure, matching the phdf5/shdf5
     readers. Electromagnetic fields are unaffected.
 
+    Unique to this reader: the single-file-per-timestep layout, ZYX
+    transpose, and H5hut-specific field naming (uppercase axis letters
+    in ``_PRESSURE_COMPONENT_MAP``). Field-name mapping for everything
+    else, the Gaussian conversions, pressure-tensor mass correction, and
+    config translation live in :mod:`pypic.readers.ipic3d._field_map` and
+    :mod:`pypic.readers.ipic3d._config`, shared with the parallel and
+    serial readers.
+
     Parameters
     ----------
     config : IPic3DConfig

@@ -293,12 +293,6 @@ class TestScoreSignals:
         assert score_signals(tmp_path, []) == 0.0
 
 
-@pytest.mark.parametrize("reader_id", ["ipic3d", "batsrus", "openggcm"])
-def test_probe_empty_dir_returns_zero(tmp_path: Path, reader_id: str) -> None:
-    """Every reader returns 0.0 confidence on an empty directory."""
-    assert _probe_func(reader_id)(tmp_path) == 0.0
-
-
 # (reader_id, files_to_touch, expected_min_score) — each row is one scenario.
 # Thresholds match the legacy per-reader signal weights; scenarios that used
 # strict equality (OpenGGCM) have been relaxed to >= without loss of coverage.
@@ -316,21 +310,32 @@ _PROBE_SCENARIOS = [
 ]
 
 
-@pytest.mark.parametrize(
-    ("reader_id", "files", "expected_min"),
-    _PROBE_SCENARIOS,
-    ids=[f"{row[0]}-{'+'.join(row[1])}" for row in _PROBE_SCENARIOS],
-)
-def test_probe_detects_signature(
-    tmp_path: Path,
-    reader_id: str,
-    files: tuple[str, ...],
-    expected_min: float,
-) -> None:
+def test_probe_empty_dir_returns_zero(tmp_path: Path) -> None:
+    """Every reader returns 0.0 confidence on an empty directory."""
+    failures: list[str] = []
+    for reader_id in ("ipic3d", "batsrus", "openggcm"):
+        d = tmp_path / reader_id
+        d.mkdir()
+        score = _probe_func(reader_id)(d)
+        if score != 0.0:
+            failures.append(f"{reader_id}: scored {score} on empty dir, expected 0.0")
+    assert not failures, "Empty-dir probe regressions:\n  - " + "\n  - ".join(failures)
+
+
+def test_probe_detects_signature(tmp_path: Path) -> None:
     """Each signature file bumps the probe score above its per-reader threshold."""
-    for fname in files:
-        (tmp_path / fname).touch()
-    assert _probe_func(reader_id)(tmp_path) >= expected_min
+    failures: list[str] = []
+    for reader_id, files, expected_min in _PROBE_SCENARIOS:
+        scenario_dir = tmp_path / f"{reader_id}-{'+'.join(files)}"
+        scenario_dir.mkdir()
+        for fname in files:
+            (scenario_dir / fname).touch()
+        score = _probe_func(reader_id)(scenario_dir)
+        if score < expected_min:
+            failures.append(
+                f"{reader_id} {files}: score {score} below threshold {expected_min}"
+            )
+    assert not failures, "Probe-signature regressions:\n  - " + "\n  - ".join(failures)
 
 
 def test_ipic3d_probe_rejects_file_path(tmp_path: Path) -> None:
