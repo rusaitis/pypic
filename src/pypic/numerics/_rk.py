@@ -36,7 +36,7 @@ import numpy as np
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from pypic.types import FloatArray
+    from pypic.types import BoolArray, FloatArray, IntArray
 
 
 # Dormand-Prince 5(4) Butcher tableau (7 stages, FSAL).
@@ -246,3 +246,186 @@ def embedded_error_norm(
     scale = atol + rtol * np.abs(y_new)
     scaled = err_vec / scale
     return float(np.sqrt(np.mean(scaled * scaled)))
+
+
+@dataclass(frozen=True, slots=True)
+class DPStepResultBatched:
+    """Outcome of one batched Dormand-Prince 5(4) step over N seeds.
+
+    Same FSAL/embedded-error contract as :class:`DPStepResult`, lifted
+    over an N-seed batch. ``y_new`` / ``err_vec`` / ``k_last`` are
+    always populated as ``(N, n)`` arrays; per-seed validity is read
+    from ``failed_stage`` (``-1`` = success, ``0..6`` = first stage at
+    which the RHS reported invalid).
+
+    Attributes
+    ----------
+    y_new : FloatArray
+        5th-order solution at ``t + h``, shape ``(N, n)``. Slots where
+        ``failed_stage != -1`` carry undefined values — the caller must
+        filter by ``failed_stage`` before consuming.
+    err_vec : FloatArray
+        Embedded 4(5) error estimate, shape ``(N, n)``. Same caveat as
+        ``y_new`` for failed seeds.
+    k_last : FloatArray
+        Last-stage value ``f(y_new)`` for FSAL re-use, shape ``(N, n)``.
+        Re-pass via ``k0=`` on the next call to skip stage-0 evaluation
+        for the surviving seeds.
+    failed_stage : FloatArray
+        Per-seed first-failed-stage index, shape ``(N,)`` int. ``-1``
+        means the step succeeded for that seed; ``0..6`` indexes the
+        Butcher row whose RHS evaluation returned ``valid=False``.
+    failed_point : FloatArray
+        Per-seed evaluation point at which the failure occurred, shape
+        ``(N, n)``. NaN where ``failed_stage == -1``.
+    """
+
+    y_new: FloatArray
+    err_vec: FloatArray
+    k_last: FloatArray
+    failed_stage: IntArray
+    failed_point: FloatArray
+
+
+def dormand_prince_step_batched(
+    f: Callable[[FloatArray], tuple[FloatArray, BoolArray]],
+    y: FloatArray,
+    h: FloatArray | float,
+    *,
+    k0: FloatArray | None = None,
+) -> DPStepResultBatched:
+    r"""Batched Dormand-Prince 5(4) step over N independent seeds.
+
+    Vectorized form of :func:`dormand_prince_step` — each of the seven
+    Butcher stages becomes a single ``f`` call on the whole ``(N, n)``
+    batch instead of N calls on individual ``(n,)`` vectors. The
+    arithmetic for each seed is identical to the single-step kernel;
+    the only contract difference is the RHS callable.
+
+    The RHS ``f(y_batch)`` must return ``(rhs_values, valid_mask)``
+    where ``rhs_values`` is the ``(N, n)`` RHS array and ``valid_mask``
+    is an ``(N,)`` boolean array (``True`` = valid seed). Invalid
+    seeds at any stage are recorded in the per-seed ``failed_stage``
+    array of the returned result; the kernel still evaluates the
+    remaining stages for the surviving seeds (their ``y_new`` and
+    ``err_vec`` are unaffected by the failed seeds because the
+    Butcher contraction is stage-axis only).
+
+    Currently assumes ``y`` is 2-D ``(N, n)``. Field-line tracing
+    uses ``n = 3``.
+
+    Parameters
+    ----------
+    f : callable
+        Batched RHS ``f(y) -> (rhs, valid_mask)``. ``rhs`` is
+        ``(N, n)``; ``valid_mask`` is ``(N,)`` bool.
+    y : NDArray
+        Current state, shape ``(N, n)``.
+    h : NDArray or float
+        Step size. Scalar (shared across seeds) or shape ``(N,)``
+        (per-seed). Sign-bearing — negative ``h`` integrates backward.
+    k0 : NDArray or None
+        Pre-computed first-stage value from a previous accepted step's
+        ``k_last`` (FSAL re-use), shape ``(N, n)``. When supplied,
+        skips the stage-0 RHS evaluation for the whole batch.
+
+    Returns
+    -------
+    DPStepResultBatched
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> def rhs(y):
+    ...     return -y, np.ones(y.shape[0], dtype=bool)
+    >>> y0 = np.array([[1.0], [2.0]])
+    >>> r = dormand_prince_step_batched(rhs, y0, 0.1)
+    >>> bool(np.allclose(r.y_new[:, 0], y0[:, 0] * np.exp(-0.1), atol=1e-9))
+    True
+    >>> int(r.failed_stage.max())
+    -1
+    """
+    n_seeds, n_dim = y.shape
+    k = np.empty((7, n_seeds, n_dim), dtype=np.float64)
+    failed_stage = np.full(n_seeds, -1, dtype=np.intp)
+    failed_point = np.full((n_seeds, n_dim), np.nan, dtype=np.float64)
+
+    h_arr = np.asarray(h, dtype=np.float64)
+    if h_arr.ndim == 0:
+        h_arr = np.full(n_seeds, float(h_arr), dtype=np.float64)
+    elif h_arr.shape != (n_seeds,):
+        msg = f"h must be scalar or shape ({n_seeds},), got {h_arr.shape}"
+        raise ValueError(msg)
+    h_col = h_arr[:, None]
+
+    if k0 is None:
+        rhs0, valid0 = f(y)
+        k[0] = rhs0
+        bad0 = ~valid0
+        if bad0.any():
+            failed_stage[bad0] = 0
+            failed_point[bad0] = y[bad0]
+    else:
+        k[0] = k0
+
+    for i in range(1, 7):
+        yi = y + h_col * np.tensordot(_DP_A[i, :i], k[:i], axes=([0], [0]))
+        rhs_i, valid_i = f(yi)
+        k[i] = rhs_i
+        newly_failed = (failed_stage < 0) & ~valid_i
+        if newly_failed.any():
+            failed_stage[newly_failed] = i
+            failed_point[newly_failed] = yi[newly_failed]
+
+    y_new = y + h_col * np.tensordot(_DP_B5, k, axes=([0], [0]))
+    err_vec = h_col * np.tensordot(_DP_E, k, axes=([0], [0]))
+
+    return DPStepResultBatched(
+        y_new=y_new,
+        err_vec=err_vec,
+        k_last=k[6],
+        failed_stage=failed_stage,
+        failed_point=failed_point,
+    )
+
+
+def embedded_error_norm_batched(
+    err_vec: FloatArray,
+    y_new: FloatArray,
+    atol: float,
+    rtol: float,
+) -> FloatArray:
+    r"""Per-seed RMS error norm for a batched embedded RK step.
+
+    Vectorized form of :func:`embedded_error_norm`. Same RMS formula,
+    averaged over the *component* axis (``axis=-1``) so each seed gets
+    its own scalar error norm.
+
+    Parameters
+    ----------
+    err_vec : NDArray
+        Embedded error vectors, shape ``(N, n)``.
+    y_new : NDArray
+        Proposed solutions at the new time, shape ``(N, n)``.
+    atol, rtol : float
+        Absolute and relative tolerances (shared across seeds; per-seed
+        tolerances are not in scope for v1).
+
+    Returns
+    -------
+    FloatArray
+        Per-seed scaled RMS error norms, shape ``(N,)``. Values ``<= 1``
+        mark acceptable steps under the requested tolerances.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> err = np.array([[1e-6, 2e-6], [3e-6, 4e-6]])
+    >>> y = np.array([[1.0, 2.0], [3.0, 4.0]])
+    >>> norms = embedded_error_norm_batched(err, y, atol=1e-6, rtol=0.0)
+    >>> norms.shape
+    (2,)
+    """
+    scale = atol + rtol * np.abs(y_new)
+    scaled = err_vec / scale
+    return np.sqrt(np.mean(scaled * scaled, axis=-1))  # type: ignore[no-any-return]

@@ -8,6 +8,7 @@ __all__ = [
     "estimate_tracing_error",
     "trace_field_line",
     "trace_field_line_adaptive",
+    "trace_field_lines_adaptive",
 ]
 
 from dataclasses import dataclass
@@ -19,8 +20,11 @@ from scipy.interpolate import RegularGridInterpolator
 
 from pypic.numerics import (
     dormand_prince_step,
+    dormand_prince_step_batched,
     embedded_error_norm,
+    embedded_error_norm_batched,
     i_step_controller,
+    i_step_controller_batched,
 )
 from pypic.traces._fieldline import _VALID_DIRECTIONS
 
@@ -29,7 +33,7 @@ if TYPE_CHECKING:
 
     from pypic.dataset import FieldDataset
     from pypic.traces._fieldline import FieldLine
-    from pypic.types import FloatArray, Vector3
+    from pypic.types import BoolArray, FloatArray, IntArray, Vector3
 
 
 class TerminationReason(StrEnum):
@@ -100,6 +104,27 @@ class VectorFieldInterpolator:
             Field vector, shape ``(3,)``. NaN if outside domain.
         """
         return self._interp(point.reshape(1, 3))[0]  # type: ignore[no-any-return]
+
+    def batch(self, points: FloatArray) -> FloatArray:
+        """Evaluate the vector field at ``N`` points in one call.
+
+        Used by the batched adaptive tracer so all seeds in a step share
+        a single ``RegularGridInterpolator`` dispatch. Roughly N× faster
+        than calling :meth:`__call__` N times because per-call Python /
+        argument-marshaling overhead amortizes over the batch.
+
+        Parameters
+        ----------
+        points : FloatArray
+            Positions, shape ``(N, 3)``.
+
+        Returns
+        -------
+        FloatArray
+            Field vectors, shape ``(N, 3)``. Rows are NaN where the
+            corresponding point is outside the interpolation domain.
+        """
+        return self._interp(points)
 
 
 def _rhs(
@@ -248,6 +273,137 @@ def _trace_single_direction_adaptive(
             h = h_new
 
     return buf[: n + 1], reason, max_local_error
+
+
+# Reason codes for the batched tracer's per-seed reasons_int array.
+# Keeping the encoding numeric lets the per-step bookkeeping stay in
+# vectorized NumPy (rather than dropping into Python objects for
+# enum values).
+_R_MAX = 0
+_R_DOMAIN = 1
+_R_NULL = 2
+_R_CALLBACK = 3
+
+_REASON_FROM_INT: dict[int, TerminationReason] = {
+    _R_MAX: TerminationReason.MAX_STEPS,
+    _R_DOMAIN: TerminationReason.DOMAIN_EXIT,
+    _R_NULL: TerminationReason.NULL_POINT,
+    _R_CALLBACK: TerminationReason.CALLBACK,
+}
+
+
+def _trace_batch_single_direction_adaptive(
+    interp: VectorFieldInterpolator,
+    seeds: FloatArray,
+    sign: float,
+    atol: float,
+    rtol: float,
+    step_size_init: float,
+    min_step: float,
+    max_step: float,
+    max_steps: int,
+    null_threshold: float,
+    terminate: Callable[[FloatArray], bool] | None,
+) -> tuple[FloatArray, IntArray, IntArray, FloatArray]:
+    """Batched Dormand-Prince 5(4) adaptive integration in one direction.
+
+    Runs the kernel on the full ``(N, 3)`` batch each step; per-seed
+    termination is tracked via a ``live`` mask in the closure RHS so
+    dead seeds report ``valid=False`` and don't contaminate the
+    surviving seeds (Butcher contraction is stage-axis only).
+
+    Returns a tuple ``(buf, n_steps, reasons_int, max_local_error)``:
+    ``buf`` has shape ``(N, max_steps + 1, 3)`` with the per-seed
+    trajectory written in-place; ``n_steps[i]`` is the number of
+    *accepted* steps for seed ``i`` (so ``buf[i, :n_steps[i] + 1]`` is
+    the seed's trace, always at least one point — the seed itself);
+    ``reasons_int[i]`` is the encoded :class:`TerminationReason`;
+    ``max_local_error[i]`` is the worst per-step error norm for seed
+    ``i``.
+    """
+    n_seeds = seeds.shape[0]
+    buf = np.empty((n_seeds, max_steps + 1, 3), dtype=np.float64)
+    buf[:, 0] = seeds
+    n_steps = np.zeros(n_seeds, dtype=np.intp)
+    reasons_int = np.full(n_seeds, -1, dtype=np.intp)
+    h = np.full(n_seeds, step_size_init, dtype=np.float64)
+    max_local_error = np.zeros(n_seeds, dtype=np.float64)
+    k_carry: FloatArray | None = None
+    live = np.ones(n_seeds, dtype=bool)
+
+    def rhs_batched(y: FloatArray) -> tuple[FloatArray, BoolArray]:
+        b = interp.batch(y)
+        mag = np.linalg.norm(b, axis=-1)
+        valid = live & np.isfinite(mag) & (mag >= null_threshold)
+        out = np.zeros_like(b)
+        if valid.any():
+            out[valid] = sign * b[valid] / mag[valid, np.newaxis]
+        return out, valid
+
+    while live.any():
+        # Terminate any seed that has filled its buffer (no more room
+        # to advance — buf is shape (N, max_steps + 1, 3)). Check at
+        # the top of the loop so we never overrun by accepting one
+        # past the end.
+        maxed = live & (n_steps >= max_steps)
+        if maxed.any():
+            reasons_int[maxed] = _R_MAX
+            live &= ~maxed
+            if not live.any():
+                break
+
+        y_cur = buf[np.arange(n_seeds), n_steps]  # (N, 3)
+        result = dormand_prince_step_batched(rhs_batched, y_cur, h, k0=k_carry)
+
+        err_norm = embedded_error_norm_batched(
+            result.err_vec, result.y_new, atol, rtol
+        )
+        # Track per-seed worst error only for live seeds. Dead seeds
+        # have garbage err_norm; keep their previous max_local_error.
+        max_local_error = np.maximum(
+            max_local_error, np.where(live, err_norm, 0.0)
+        )
+        h_new = i_step_controller_batched(
+            h, err_norm, min_step=min_step, max_step=max_step
+        )
+
+        success = result.failed_stage == -1
+        accept = live & success & ((err_norm <= 1.0) | (h <= min_step))
+        newly_failed = live & ~success
+
+        if accept.any():
+            acc_idx = np.flatnonzero(accept)
+            n_steps[acc_idx] += 1
+            buf[acc_idx, n_steps[acc_idx]] = result.y_new[acc_idx]
+            if k_carry is None:
+                k_carry = np.zeros((n_seeds, 3), dtype=np.float64)
+            k_carry[acc_idx] = result.k_last[acc_idx]
+
+        # Update h for all live seeds. Rejected seeds (live & success &
+        # ~accept) retry with the smaller h; dead seeds keep their last
+        # h (irrelevant — they won't step again).
+        h = np.where(live, h_new, h)
+
+        if newly_failed.any():
+            # Per-seed classify by re-evaluating the interpolator at the
+            # failed point. This loop is N_failed long, not N_total, and
+            # only runs on terminating steps.
+            for i in np.flatnonzero(newly_failed):
+                fp = result.failed_point[i]
+                b_at = interp(fp)
+                if np.any(np.isnan(b_at)):
+                    reasons_int[i] = _R_DOMAIN
+                else:
+                    reasons_int[i] = _R_NULL
+            live &= ~newly_failed
+
+        if terminate is not None and accept.any():
+            for i in np.flatnonzero(accept):
+                if terminate(buf[i, n_steps[i]]):
+                    reasons_int[i] = _R_CALLBACK
+                    live[i] = False
+
+    return buf, n_steps, reasons_int, max_local_error
 
 
 _EMPTY_POINTS = np.empty((0, 3), dtype=np.float64)
@@ -591,6 +747,213 @@ def trace_field_line_adaptive(
                 data.normalization,
                 _meta(max(fwd_err, bwd_err)),
             )
+
+
+def trace_field_lines_adaptive(
+    data: FieldDataset,
+    seeds: FloatArray,
+    *,
+    atol: float = 1e-6,
+    rtol: float = 1e-3,
+    step_size_init: float = 0.5,
+    min_step: float = 1e-8,
+    max_step: float = 2.0,
+    max_steps: int = 10_000,
+    direction: str = "both",
+    field_components: tuple[str, str, str] = ("B_1", "B_2", "B_3"),
+    null_threshold: float = 1e-12,
+    terminate: Callable[[FloatArray], bool] | None = None,
+    interpolator: VectorFieldInterpolator | None = None,
+) -> list[FieldLine]:
+    r"""Trace ``N`` field lines adaptively in parallel via the batched DP kernel.
+
+    Functionally equivalent to calling :func:`trace_field_line_adaptive`
+    ``N`` times in a Python loop, but each Butcher-stage RHS evaluation
+    is amortized across all seeds in one
+    :class:`VectorFieldInterpolator` dispatch — ~10× faster for
+    moderate ``N``, larger speedups for ``N`` in the thousands. Memory
+    cost is ``N * (max_steps + 1) * 24`` bytes per direction; pick
+    ``max_steps`` accordingly for large seed arrays.
+
+    Per-seed termination state (live mask, step count, reason, max
+    local error) is tracked in vectorized NumPy; dead seeds report
+    ``valid=False`` to the kernel on subsequent steps and don't
+    contaminate the surviving seeds (Butcher contraction is over the
+    stage axis, not the seed axis).
+
+    Parameters
+    ----------
+    data : FieldDataset
+        Gridded vector field data.
+    seeds : FloatArray
+        Starting points, shape ``(N, 3)``.
+    atol, rtol, step_size_init, min_step, max_step, max_steps : float
+        Adaptive integration controls; semantics identical to
+        :func:`trace_field_line_adaptive`. Applied per-seed.
+    direction : str
+        ``"forward"``, ``"backward"``, or ``"both"``.
+    field_components : tuple[str, str, str]
+        Names of the three vector field components.
+    null_threshold : float
+        Field magnitude below which a point is treated as a null.
+    terminate : Callable[[FloatArray], bool] | None
+        Optional per-seed callback; stops a seed when it returns
+        ``True`` on the newly accepted point.
+    interpolator : VectorFieldInterpolator | None
+        Pre-built interpolator. Built internally if ``None``.
+
+    Returns
+    -------
+    list[FieldLine]
+        One :class:`FieldLine` per input seed, in seed order.
+
+    Raises
+    ------
+    ValueError
+        If ``seeds`` has the wrong shape, if any seed is outside the
+        interpolation domain, or if any seed is at a field null. The
+        upfront validation matches the single-seed contract — invalid
+        seeds fail loudly rather than producing a 1-point trace.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> from pypic.dataset import FieldDataset
+    >>> from pypic.grid import GridInfo
+    >>> from pypic.units import Normalization
+    >>> grid = GridInfo(dimensions=(8, 8, 8), spacing=(1.0, 1.0, 1.0))
+    >>> data = FieldDataset.from_arrays(
+    ...     {
+    ...         "B_1": np.ones((8, 8, 8)),
+    ...         "B_2": np.zeros((8, 8, 8)),
+    ...         "B_3": np.zeros((8, 8, 8)),
+    ...     },
+    ...     grid,
+    ...     Normalization.identity(),
+    ... )
+    >>> seeds = np.array([[2.0, 2.0, 2.0], [4.0, 4.0, 4.0]])
+    >>> lines = trace_field_lines_adaptive(
+    ...     data, seeds, max_steps=4, direction="forward"
+    ... )
+    >>> len(lines)
+    2
+    >>> all(fl.metadata["method"] == "rk45_dopri" for fl in lines)
+    True
+    """
+    if direction not in _VALID_DIRECTIONS:
+        msg = f"direction must be one of {sorted(_VALID_DIRECTIONS)}, got {direction!r}"
+        raise ValueError(msg)
+
+    if interpolator is None:
+        interpolator = VectorFieldInterpolator.from_dataset(data, field_components)
+
+    seeds_arr = np.asarray(seeds, dtype=np.float64)
+    if seeds_arr.ndim != 2 or seeds_arr.shape[1] != 3:
+        msg = f"seeds must have shape (N, 3), got {seeds_arr.shape}"
+        raise ValueError(msg)
+    n_seeds = seeds_arr.shape[0]
+
+    # Upfront per-seed validation: invalid seeds raise here rather than
+    # producing 1-point traces that violate FieldLine's N >= 2 invariant.
+    # O(N) Python overhead, negligible vs. the actual tracing.
+    for i in range(n_seeds):
+        _validate_seed(seeds_arr[i], interpolator, null_threshold)
+
+    field_name = _field_name_from_components(field_components)
+    args = (
+        atol,
+        rtol,
+        step_size_init,
+        min_step,
+        max_step,
+        max_steps,
+        null_threshold,
+        terminate,
+    )
+
+    def _build(
+        fwd_pts: FloatArray,
+        fwd_reason: TerminationReason,
+        bwd_pts: FloatArray,
+        bwd_reason: TerminationReason,
+        seed_i: int,
+        max_err: float,
+    ) -> FieldLine:
+        meta: dict = {  # type: ignore[type-arg]
+            "method": "rk45_dopri",
+            "atol": atol,
+            "rtol": rtol,
+            "max_local_error": max_err,
+        }
+        return _assemble_field_line(
+            fwd_pts,
+            fwd_reason,
+            bwd_pts,
+            bwd_reason,
+            tuple(seeds_arr[seed_i].tolist()),
+            direction,
+            field_name,
+            data.normalization,
+            meta,
+        )
+
+    field_lines: list[FieldLine] = []
+
+    match direction:
+        case "forward":
+            buf, n_steps, reasons, errs = _trace_batch_single_direction_adaptive(
+                interpolator, seeds_arr, 1.0, *args
+            )
+            for i in range(n_seeds):
+                field_lines.append(
+                    _build(
+                        buf[i, : int(n_steps[i]) + 1],
+                        _REASON_FROM_INT[int(reasons[i])],
+                        _EMPTY_POINTS,
+                        TerminationReason.MAX_STEPS,
+                        i,
+                        float(errs[i]),
+                    )
+                )
+        case "backward":
+            buf, n_steps, reasons, errs = _trace_batch_single_direction_adaptive(
+                interpolator, seeds_arr, -1.0, *args
+            )
+            for i in range(n_seeds):
+                field_lines.append(
+                    _build(
+                        _EMPTY_POINTS,
+                        TerminationReason.MAX_STEPS,
+                        buf[i, : int(n_steps[i]) + 1],
+                        _REASON_FROM_INT[int(reasons[i])],
+                        i,
+                        float(errs[i]),
+                    )
+                )
+        case _:
+            fwd_buf, fwd_n, fwd_reasons, fwd_errs = (
+                _trace_batch_single_direction_adaptive(
+                    interpolator, seeds_arr, 1.0, *args
+                )
+            )
+            bwd_buf, bwd_n, bwd_reasons, bwd_errs = (
+                _trace_batch_single_direction_adaptive(
+                    interpolator, seeds_arr, -1.0, *args
+                )
+            )
+            for i in range(n_seeds):
+                field_lines.append(
+                    _build(
+                        fwd_buf[i, : int(fwd_n[i]) + 1],
+                        _REASON_FROM_INT[int(fwd_reasons[i])],
+                        bwd_buf[i, : int(bwd_n[i]) + 1],
+                        _REASON_FROM_INT[int(bwd_reasons[i])],
+                        i,
+                        max(float(fwd_errs[i]), float(bwd_errs[i])),
+                    )
+                )
+
+    return field_lines
 
 
 def estimate_tracing_error(

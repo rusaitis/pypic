@@ -14,9 +14,13 @@ import pytest
 
 from pypic.numerics import (
     DPStepResult,
+    DPStepResultBatched,
     dormand_prince_step,
+    dormand_prince_step_batched,
     embedded_error_norm,
+    embedded_error_norm_batched,
     i_step_controller,
+    i_step_controller_batched,
 )
 from pypic.numerics._step_control import _GROWTH_MAX, _GROWTH_MIN
 
@@ -229,3 +233,179 @@ class TestDPStepResult:
         )
         with pytest.raises(AttributeError):
             result.failed_stage = 1  # type: ignore[misc]
+
+
+def _all_valid_rhs(f_scalar):  # type: ignore[no-untyped-def]
+    """Wrap a scalar-shape RHS so it answers the batched contract."""
+
+    def rhs_batched(y: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+        return f_scalar(y), np.ones(y.shape[0], dtype=bool)
+
+    return rhs_batched
+
+
+class TestDormandPrinceStepBatched:
+    def test_single_seed_matches_scalar_kernel(self) -> None:
+        """For N=1, batched and scalar kernels agree bit-for-bit."""
+        f_scalar = lambda y: -y  # noqa: E731
+        y0 = np.array([[1.5]])
+        scalar = dormand_prince_step(lambda y: -y, np.array([1.5]), 0.1)
+        batched = dormand_prince_step_batched(_all_valid_rhs(f_scalar), y0, 0.1)
+        assert scalar.y_new is not None
+        assert scalar.err_vec is not None
+        assert scalar.k_last is not None
+        np.testing.assert_allclose(batched.y_new[0], scalar.y_new)
+        np.testing.assert_allclose(batched.err_vec[0], scalar.err_vec)
+        np.testing.assert_allclose(batched.k_last[0], scalar.k_last)
+        assert int(batched.failed_stage[0]) == -1
+
+    def test_n_seeds_match_per_seed_scalar_loop(self) -> None:
+        """Batched advance of N seeds equals N independent scalar calls."""
+        f_scalar = lambda y: -y  # noqa: E731
+        y0 = np.array([[0.5], [1.0], [2.0], [-0.7]])
+        h = 0.05
+
+        scalar_results = [
+            dormand_prince_step(f_scalar, y0[i], h) for i in range(y0.shape[0])
+        ]
+        batched = dormand_prince_step_batched(_all_valid_rhs(f_scalar), y0, h)
+
+        for i, sc in enumerate(scalar_results):
+            assert sc.y_new is not None
+            np.testing.assert_allclose(batched.y_new[i], sc.y_new, atol=1e-15)
+
+    def test_per_seed_h_advances_each_independently(self) -> None:
+        """Per-seed h: each seed advances by its own step size."""
+        f_scalar = lambda y: -y  # noqa: E731
+        y0 = np.array([[1.0], [1.0]])
+        h = np.array([0.05, 0.20])  # second seed steps 4× as far
+        batched = dormand_prince_step_batched(_all_valid_rhs(f_scalar), y0, h)
+        # Both seeds start at 1.0 and decay; second seed should be smaller.
+        assert batched.y_new[1, 0] < batched.y_new[0, 0]
+        np.testing.assert_allclose(batched.y_new[0, 0], np.exp(-0.05), atol=1e-10)
+        np.testing.assert_allclose(batched.y_new[1, 0], np.exp(-0.20), atol=1e-10)
+
+    def test_failed_seed_isolated_from_good_seeds(self) -> None:
+        """One seed's stage failure does not contaminate good seeds' y_new."""
+
+        def rhs(y: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+            # Seed 0 valid for all calls; seed 1 invalid (NaN-poisoned).
+            values = -y
+            valid = np.array([True, False])
+            return values, valid
+
+        y0 = np.array([[1.0], [1.0]])
+        result = dormand_prince_step_batched(rhs, y0, 0.1)
+        assert int(result.failed_stage[0]) == -1
+        # Seed 1 fails at stage 0 (the very first RHS call).
+        assert int(result.failed_stage[1]) == 0
+        # Good seed should be untouched by the bad seed's failure.
+        scalar = dormand_prince_step(lambda y: -y, np.array([1.0]), 0.1)
+        assert scalar.y_new is not None
+        np.testing.assert_allclose(result.y_new[0], scalar.y_new)
+
+    def test_failed_point_captures_invalid_evaluation_point(self) -> None:
+        """failed_point[bad] is the point passed to the failed stage."""
+
+        def rhs(y: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+            # Seed 0 invalid at stage 0 → failed_point should equal y0.
+            valid = np.array([False, True])
+            return -y, valid
+
+        y0 = np.array([[3.14, 2.71], [0.0, 0.0]])
+        result = dormand_prince_step_batched(rhs, y0, 0.1)
+        np.testing.assert_allclose(result.failed_point[0], y0[0])
+        # Good seed's failed_point stays NaN.
+        assert np.all(np.isnan(result.failed_point[1]))
+
+    def test_fsal_k0_skips_stage_zero_eval(self) -> None:
+        """Passing k0 skips the stage-0 RHS call across the whole batch."""
+        calls = [0]
+        f_scalar = lambda y: -y  # noqa: E731
+
+        def rhs(y: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+            calls[0] += 1
+            return -y, np.ones(y.shape[0], dtype=bool)
+
+        y0 = np.array([[1.0], [2.0], [3.0]])
+        # Cold start: 7 RHS calls.
+        warmup = dormand_prince_step_batched(rhs, y0, 0.1)
+        assert calls[0] == 7
+
+        # Re-use k_last as k0 → 6 RHS calls on the next step.
+        calls[0] = 0
+        reused = dormand_prince_step_batched(rhs, warmup.y_new, 0.1, k0=warmup.k_last)
+        assert calls[0] == 6
+        # Result must match a fresh call (no FSAL).
+        without_fsal = dormand_prince_step_batched(
+            _all_valid_rhs(f_scalar), warmup.y_new, 0.1
+        )
+        np.testing.assert_allclose(reused.y_new, without_fsal.y_new)
+
+    def test_h_shape_mismatch_raises(self) -> None:
+        """h with a shape other than scalar / (N,) raises."""
+        f_scalar = lambda y: -y  # noqa: E731
+        y0 = np.array([[1.0], [2.0]])
+        with pytest.raises(ValueError, match=r"h must be scalar or shape"):
+            dormand_prince_step_batched(_all_valid_rhs(f_scalar), y0, np.array([0.1]))
+
+    def test_result_is_frozen(self) -> None:
+        """DPStepResultBatched is immutable (frozen=True, slots=True)."""
+        zero = np.zeros((1, 1))
+        result = DPStepResultBatched(
+            y_new=zero,
+            err_vec=zero,
+            k_last=zero,
+            failed_stage=np.zeros(1, dtype=np.intp),
+            failed_point=zero,
+        )
+        with pytest.raises(AttributeError):
+            result.failed_stage = np.ones(1, dtype=np.intp)  # type: ignore[misc]
+
+
+class TestEmbeddedErrorNormBatched:
+    def test_collapses_to_scalar_kernel_for_n1(self) -> None:
+        """For N=1, the batched RMS norm equals the scalar version."""
+        err = np.array([[0.1, 0.2, 0.3]])
+        y = np.array([[1.0, 1.0, 1.0]])
+        batched = embedded_error_norm_batched(err, y, atol=1.0, rtol=0.0)
+        scalar = embedded_error_norm(err[0], y[0], atol=1.0, rtol=0.0)
+        assert batched.shape == (1,)
+        assert batched[0] == pytest.approx(scalar)
+
+    def test_per_seed_independence(self) -> None:
+        """Each seed's RMS norm depends only on that seed's err and y."""
+        err = np.array([[0.1, 0.2], [1.0, 2.0]])
+        y = np.array([[1.0, 1.0], [1.0, 1.0]])
+        norms = embedded_error_norm_batched(err, y, atol=1.0, rtol=0.0)
+        # Seed 0: sqrt(mean([0.01, 0.04])) = sqrt(0.025) ≈ 0.158
+        # Seed 1: sqrt(mean([1.0,  4.0])) = sqrt(2.5)   ≈ 1.581
+        assert norms[0] == pytest.approx(np.sqrt(0.025))
+        assert norms[1] == pytest.approx(np.sqrt(2.5))
+
+
+class TestIStepControllerBatched:
+    def test_per_seed_independence(self) -> None:
+        """Each seed gets its own h_new based on its own err."""
+        h = np.array([1.0, 1.0, 1.0])
+        err = np.array([1.0, 0.0, 1e6])  # at-tol / zero / blown
+        h_new = i_step_controller_batched(h, err, min_step=1e-6, max_step=10.0)
+        assert h_new[0] == pytest.approx(0.9)  # safety factor
+        assert h_new[1] == pytest.approx(_GROWTH_MAX)  # growth clamp
+        assert h_new[2] == pytest.approx(_GROWTH_MIN)  # shrink clamp
+
+    def test_absolute_clamps_apply_per_seed(self) -> None:
+        """min_step / max_step clamps apply elementwise."""
+        h = np.array([1e-3, 2.0])
+        err = np.array([1e6, 0.0])  # first blown, second zero
+        h_new = i_step_controller_batched(h, err, min_step=0.5, max_step=3.0)
+        assert h_new[0] == pytest.approx(0.5)  # blown step pinned to min
+        assert h_new[1] == pytest.approx(3.0)  # zero-err pinned to max
+
+    def test_collapses_to_scalar_controller(self) -> None:
+        """For N=1, batched controller agrees with scalar version."""
+        h = np.array([1.0])
+        err = np.array([0.5])
+        batched = i_step_controller_batched(h, err, min_step=1e-6, max_step=10.0)
+        scalar = i_step_controller(1.0, 0.5, min_step=1e-6, max_step=10.0)
+        assert float(batched[0]) == pytest.approx(scalar)

@@ -30,6 +30,7 @@ from pypic.traces._tracing import (
     estimate_tracing_error,
     trace_field_line,
     trace_field_line_adaptive,
+    trace_field_lines_adaptive,
 )
 
 __all__ = [
@@ -58,4 +59,5 @@ __all__ = [
     "tangent_vectors",
     "trace_field_line",
     "trace_field_line_adaptive",
+    "trace_field_lines_adaptive",
 ]

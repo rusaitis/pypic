@@ -870,6 +870,107 @@ class TestTraceFieldLineAdaptive:
         assert fl.metadata["method"] == "rk45_dopri"
 
 
+class TestTraceFieldLinesAdaptive:
+    """Batched adaptive tracer over N seeds.
+
+    Equivalence with the single-seed adaptive tracer is the core
+    contract: tracing N seeds in the batch must produce the same
+    FieldLine endpoints (up to floating-point noise from the kernel's
+    different evaluation order) as N independent calls to
+    :func:`trace_field_line_adaptive`.
+    """
+
+    def test_n_lines_returned_in_seed_order(
+        self, uniform_field_data: FieldDataset
+    ) -> None:
+        from pypic.traces import trace_field_lines_adaptive
+
+        seeds = np.array([[5.0, 5.0, 5.0], [10.0, 10.0, 10.0], [15.0, 15.0, 15.0]])
+        lines = trace_field_lines_adaptive(
+            uniform_field_data, seeds, max_steps=10, direction="forward"
+        )
+        assert len(lines) == 3
+        # Seed-order preserved: each line starts at its seed.
+        for i, line in enumerate(lines):
+            np.testing.assert_allclose(line.points[0], seeds[i])
+
+    def test_equivalence_to_per_seed_loop(
+        self, uniform_field_data: FieldDataset
+    ) -> None:
+        """Endpoints match a per-seed scalar adaptive trace."""
+        from pypic.traces import trace_field_line_adaptive, trace_field_lines_adaptive
+
+        seeds = np.array([[5.0, 8.0, 7.0], [10.0, 10.0, 10.0], [12.0, 6.0, 14.0]])
+        kw: dict = dict(  # type: ignore[type-arg]
+            atol=1e-8, rtol=1e-8, step_size_init=0.5, max_steps=20, direction="forward"
+        )
+        batched = trace_field_lines_adaptive(uniform_field_data, seeds, **kw)
+        for i in range(len(seeds)):
+            scalar = trace_field_line_adaptive(
+                uniform_field_data, tuple(seeds[i].tolist()), **kw
+            )
+            np.testing.assert_allclose(
+                batched[i].points[-1], scalar.points[-1], atol=1e-9
+            )
+            # Same termination reason recorded.
+            assert batched[i].metadata["reason"] == scalar.metadata["reason"]
+
+    def test_mixed_termination_per_seed(self, uniform_field_data: FieldDataset) -> None:
+        """One seed near the +x edge exits domain; others run to MAX_STEPS."""
+        from pypic.traces import TerminationReason, trace_field_lines_adaptive
+
+        # Domain is [0, 19]^3, B = (1,0,0). With max_step=0.5 and
+        # max_steps=8, interior seeds advance at most 4.0 in +x. Seed
+        # near the +x boundary exits before consuming all steps.
+        seeds = np.array([[18.5, 10.0, 10.0], [5.0, 10.0, 10.0], [10.0, 10.0, 10.0]])
+        lines = trace_field_lines_adaptive(
+            uniform_field_data,
+            seeds,
+            step_size_init=0.3,
+            min_step=1e-3,
+            max_step=0.5,
+            max_steps=8,
+            direction="forward",
+        )
+        # Seed 0 exits the +x boundary before consuming all steps.
+        assert lines[0].metadata["reason"] == str(TerminationReason.DOMAIN_EXIT)
+        # Seeds 1 and 2 run to MAX_STEPS (still inside domain).
+        assert lines[1].metadata["reason"] == str(TerminationReason.MAX_STEPS)
+        assert lines[2].metadata["reason"] == str(TerminationReason.MAX_STEPS)
+
+    def test_invalid_seed_shape_raises(self, uniform_field_data: FieldDataset) -> None:
+        from pypic.traces import trace_field_lines_adaptive
+
+        with pytest.raises(ValueError, match=r"seeds must have shape \(N, 3\)"):
+            trace_field_lines_adaptive(
+                uniform_field_data, np.array([1.0, 2.0, 3.0]), max_steps=4
+            )
+
+    def test_seed_outside_domain_raises(self, uniform_field_data: FieldDataset) -> None:
+        """One bad seed in the batch fails the whole call (matches scalar contract)."""
+        from pypic.traces import trace_field_lines_adaptive
+
+        seeds = np.array([[10.0, 10.0, 10.0], [-1e6, -1e6, -1e6]])
+        with pytest.raises(ValueError, match=r"outside the interpolation domain"):
+            trace_field_lines_adaptive(uniform_field_data, seeds, max_steps=4)
+
+    def test_both_directions(self, uniform_field_data: FieldDataset) -> None:
+        """direction='both' produces lines longer than either single direction."""
+        from pypic.traces import trace_field_lines_adaptive
+
+        seeds = np.array([[10.0, 10.0, 10.0], [9.0, 10.0, 10.0]])
+        fwd = trace_field_lines_adaptive(
+            uniform_field_data, seeds, max_steps=8, direction="forward"
+        )
+        both = trace_field_lines_adaptive(
+            uniform_field_data, seeds, max_steps=8, direction="both"
+        )
+        for i in range(len(seeds)):
+            assert both[i].n_points >= fwd[i].n_points
+            # Bidirectional trace passes through the seed point.
+            assert any(np.allclose(p, seeds[i]) for p in both[i].points)
+
+
 class TestEstimateTracingError:
     def test_error_estimate(self, uniform_field_data: FieldDataset) -> None:
         from pypic.traces import estimate_tracing_error, trace_field_line
