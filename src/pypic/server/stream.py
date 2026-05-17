@@ -50,6 +50,15 @@ __all__ = ["register_stream"]
 log = logging.getLogger(__name__)
 
 
+class _UnknownStepError(KeyError):
+    """Raised when a subscribe targets a step the simulation does not have.
+
+    Subclass of ``KeyError`` so callers that catch the broader type still
+    work, but the dedicated subclass lets :func:`_handle_one` route to
+    the ``unknown_step`` error kind without inspecting message strings.
+    """
+
+
 def register_stream(router: APIRouter) -> None:
     """Attach the streaming WebSocket endpoint to *router*."""
 
@@ -90,6 +99,8 @@ async def _handle_one(
         await _serve_subscribe(ws, sim_name, req, registry)
     except ValidationError as exc:
         await _send_error(ws, request_id, "validation", str(exc))
+    except _UnknownStepError as exc:
+        await _send_error(ws, request_id, "unknown_step", str(exc).strip("'"))
     except KeyError as exc:
         # Unknown sim, unknown field, or unknown step — all use KeyError
         # in the underlying pypic API.  Use the message to disambiguate.
@@ -120,7 +131,7 @@ async def _serve_subscribe(
     simulation = registry.get(sim_name)
     if req.step not in simulation.steps:
         msg = f"Step {req.step} not available"
-        raise KeyError(msg)
+        raise _UnknownStepError(msg)
 
     fields = req.fields if req.fields else None
     fds: FieldDataset = simulation.read(

@@ -194,7 +194,7 @@ def test_unknown_step_yields_error_frame(client: TestClient) -> None:
         ws.send_text(json.dumps({"type": "subscribe", "request_id": "x", "step": 999}))
         frame = json.loads(ws.receive_text())
     assert frame["type"] == "error"
-    assert frame["kind"] == "unknown_field"  # KeyError, "Step 999 not available"
+    assert frame["kind"] == "unknown_step"
 
 
 def test_unknown_sim_yields_error_frame(client: TestClient) -> None:
