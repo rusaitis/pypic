@@ -136,6 +136,11 @@ uv run mypy src                       # type check
 # tests/test_schema_export.py and the lint-job step in
 # .github/workflows/ci.yml will fail otherwise.
 uv run pypic schema export -o src/pypic/schema/simulation.schema.v1.0.json
+
+# Lint one or more simulation.toml files against the v1.0 schema.
+uv run pypic schema validate path/to/simulation.toml
+# Diff two JSON Schema documents (second defaults to bundled current).
+uv run pypic schema diff path/to/proposed.json
 ```
 
 ## Progress

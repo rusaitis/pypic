@@ -45,6 +45,7 @@ Examples
 'PIC'
 """
 
+from pypic.schema._diff import schema_structured_diff, schema_text_diff
 from pypic.schema._export import build_schema, dump_schema, get_schema_path
 from pypic.schema._loader import ValidationError, validate_simulation_toml
 from pypic.schema._models import (
@@ -159,5 +160,7 @@ __all__ = [
     "build_schema",
     "dump_schema",
     "get_schema_path",
+    "schema_structured_diff",
+    "schema_text_diff",
     "validate_simulation_toml",
 ]

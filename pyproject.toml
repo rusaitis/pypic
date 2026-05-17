@@ -93,6 +93,7 @@ allowed-confusables = [
     "–",  # en dash (vs hyphen-minus)
     "ρ", "μ", "ε", "π", "σ", "θ", "φ", "γ", "α", "β", "λ", "ω",  # greek letters
     "Δ", "∇",  # nabla, capital delta
+    "ℓ",  # script small l (arc length, used in line integrals)
 ]
 
 [tool.ruff.lint.pydocstyle]
