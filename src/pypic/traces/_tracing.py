@@ -17,6 +17,11 @@ from typing import TYPE_CHECKING, Self
 import numpy as np
 from scipy.interpolate import RegularGridInterpolator
 
+from pypic.numerics import (
+    dormand_prince_step,
+    embedded_error_norm,
+    pi_step_controller,
+)
 from pypic.traces._fieldline import _VALID_DIRECTIONS
 
 if TYPE_CHECKING:
@@ -180,39 +185,6 @@ def _trace_single_direction(
     return buf[: n + 1], reason
 
 
-# Standard PI controller constants for the Dormand-Prince step-size
-# adaptation. The formulas follow Hairer/Wanner "Solving ODEs I" §II.4.
-# Kept as module constants so the magic numbers are explained in one place.
-_DP_SAFETY = 0.9  # Safety factor: bias accepted steps slightly small
-_DP_GROWTH_MIN = 0.2  # Minimum step-size shrink ratio per accept/reject
-_DP_GROWTH_MAX = 5.0  # Maximum step-size growth ratio per accept
-_DP_ERR_FLOOR = 1e-15  # Avoid pow(0, ·) when err is exactly machine zero
-_DP_EXPONENT = -0.2  # -1/p with p = 5 (5th-order embedded method)
-
-
-# Dormand-Prince RK4(5) Butcher tableau (7 stages)
-# Rows = stages, columns = weights on previous stages
-_DP_A = np.array(
-    [
-        [0, 0, 0, 0, 0, 0, 0],
-        [1 / 5, 0, 0, 0, 0, 0, 0],
-        [3 / 40, 9 / 40, 0, 0, 0, 0, 0],
-        [44 / 45, -56 / 15, 32 / 9, 0, 0, 0, 0],
-        [19372 / 6561, -25360 / 2187, 64448 / 6561, -212 / 729, 0, 0, 0],
-        [9017 / 3168, -355 / 33, 46732 / 5247, 49 / 176, -5103 / 18656, 0, 0],
-        [35 / 384, 0, 500 / 1113, 125 / 192, -2187 / 6784, 11 / 84, 0],
-    ],
-    dtype=np.float64,
-)
-_DP_B5 = np.array(
-    [35 / 384, 0, 500 / 1113, 125 / 192, -2187 / 6784, 11 / 84, 0],
-)
-_DP_B4 = np.array(
-    [5179 / 57600, 0, 7571 / 16695, 393 / 640, -92097 / 339200, 187 / 2100, 1 / 40],
-)
-_DP_E = _DP_B5 - _DP_B4
-
-
 def _trace_single_direction_adaptive(
     interp: VectorFieldInterpolator,
     seed: FloatArray,
@@ -226,7 +198,13 @@ def _trace_single_direction_adaptive(
     null_threshold: float,
     terminate: Callable[[FloatArray], bool] | None,
 ) -> tuple[FloatArray, TerminationReason, float]:
-    """Dormand-Prince RK4(5) adaptive integration in one direction."""
+    """Dormand-Prince RK4(5) adaptive integration in one direction.
+
+    Bookkeeping (buffer, signed direction, null/out-of-domain
+    classification, termination callback) lives here; the pure
+    Dormand-Prince step + error estimator + PI controller live in
+    :mod:`pypic.numerics`.
+    """
     buf = np.empty((max_steps + 1, 3), dtype=np.float64)
     buf[0] = seed
     n = 0
@@ -234,46 +212,29 @@ def _trace_single_direction_adaptive(
     h = step_size_init
     max_local_error = 0.0
 
+    def rhs(yi: FloatArray) -> FloatArray | None:
+        return _rhs(yi, interp, sign, null_threshold)
+
     while n < max_steps:
-        y = buf[n]
-
-        # Evaluate all 7 Dormand-Prince stages
-        k = np.empty((7, 3))
-        failed = False
-        for i in range(7):
-            yi = y if i == 0 else y + h * np.dot(_DP_A[i, :i], k[:i])
-            rhs_val = _rhs(yi, interp, sign, null_threshold)
-            if rhs_val is None:
-                reason = _classify_failure(yi, interp)
-                failed = True
-                break
-            k[i] = rhs_val
-
-        if failed:
+        result = dormand_prince_step(rhs, buf[n], h)
+        if result.failed_stage is not None:
+            assert result.failed_point is not None  # invariant of DPStepResult
+            reason = _classify_failure(result.failed_point, interp)
             break
 
-        # 5th-order solution and embedded error estimate
-        y5 = y + h * np.dot(_DP_B5, k)
-        err_vec = h * np.dot(_DP_E, k)
-        scale = atol + rtol * np.abs(y5)
-        err_norm = float(np.max(np.abs(err_vec) / scale))
+        assert result.y_new is not None  # success path
+        assert result.err_vec is not None
+        err_norm = embedded_error_norm(result.err_vec, result.y_new, atol, rtol)
         max_local_error = max(max_local_error, err_norm)
-
-        # Step size control via standard PI controller (see _DP_* constants)
-        factor = min(
-            _DP_GROWTH_MAX,
-            max(
-                _DP_GROWTH_MIN,
-                _DP_SAFETY * max(err_norm, _DP_ERR_FLOOR) ** _DP_EXPONENT,
-            ),
+        h_new = pi_step_controller(
+            h, err_norm, min_step=min_step, max_step=max_step
         )
-        h_new = float(np.clip(h * factor, min_step, max_step))
 
         if err_norm <= 1.0 or h <= min_step:
             n += 1
-            buf[n] = y5
+            buf[n] = result.y_new
             h = h_new
-            if terminate is not None and terminate(y5):
+            if terminate is not None and terminate(result.y_new):
                 reason = TerminationReason.CALLBACK
                 break
         else:
