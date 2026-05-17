@@ -21,8 +21,17 @@ or extend a species pattern.
 
 from __future__ import annotations
 
+import inspect
+
 from pypic._aliases import _COMPUTE_ALIASES, _get_field_alias_fallback
-from pypic.compute import _REGISTRY, _SPECIES_TEMPLATES, _try_species_recipe
+from pypic.compute import (
+    _REGISTRY,
+    _SPECIES_TEMPLATES,
+    _Recipe,
+    _SpeciesArgs,
+    _SpeciesTemplate,
+    _try_species_recipe,
+)
 from pypic.fields import _FIELD_INFO, _SPECIES_INFO_PATTERNS, field_info
 from pypic.units import Normalization
 
@@ -457,5 +466,140 @@ def test_species_pattern_quantity_types_resolve() -> None:
             failures.append(f"{pattern.pattern!r} (quantity_type={qtype!r})")
     assert not failures, _format_failures(
         "Species patterns with quantity_types lacking SI factors",
+        failures,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Test 8 — every recipe's func signature matches its declared call shape
+# ---------------------------------------------------------------------------
+# The compute dispatcher (``compute._execute_recipe``) builds each call's
+# positional list and kwargs dynamically from recipe metadata: ``fields``
+# arrays first, then optional species charge/mass scalars, gamma, c, and
+# grid spacing (dx, dy, dz). Kwargs ``c=`` / ``geometry=`` are injected
+# when ``supports_relativistic`` / (``passes_geometry`` + ``needs_grid``)
+# are set. A mismatch between this construction and the function's actual
+# signature is currently a runtime ``TypeError`` at compute time. This
+# test catches every such mismatch at CI time.
+
+_SPECIES_ARGS_COUNT: dict[_SpeciesArgs, int] = {
+    _SpeciesArgs.CHARGE_MASS: 2,
+    _SpeciesArgs.MASS_ONLY: 1,
+    _SpeciesArgs.CHARGE_ONLY: 1,
+    _SpeciesArgs.NONE: 0,
+}
+
+
+def _expected_positional_count(entry: _Recipe | _SpeciesTemplate) -> int:
+    """Positional args ``_execute_recipe`` passes to ``entry.func``.
+
+    Source of truth: ``compute._execute_recipe``. Keep aligned if that
+    function grows new auto-injection branches.
+    """
+    fields = entry.fields if isinstance(entry, _Recipe) else entry.field_pattern
+    n = len(fields)
+    species_args = getattr(entry, "species_args", None)
+    needs_species = (
+        isinstance(entry, _SpeciesTemplate)
+        or getattr(entry, "species_index", None) is not None
+    )
+    if needs_species and species_args is not None:
+        n += _SPECIES_ARGS_COUNT[species_args]
+    if entry.needs_gamma:
+        n += 1
+    if entry.needs_c:
+        n += 1
+    if isinstance(entry, _Recipe) and entry.needs_grid:
+        n += 3
+    return n
+
+
+def _expected_kwargs(entry: _Recipe | _SpeciesTemplate) -> set[str]:
+    """Kwargs ``_execute_recipe`` passes to ``entry.func``."""
+    kw: set[str] = set()
+    if getattr(entry, "supports_relativistic", False):
+        kw.add("c")
+    if isinstance(entry, _Recipe) and entry.passes_geometry and entry.needs_grid:
+        kw.add("geometry")
+    return kw
+
+
+def test_registry_func_signatures_match_recipe_metadata() -> None:
+    """Every recipe's func signature accepts the call shape its metadata declares.
+
+    Catches at CI time the failure class that today surfaces only at
+    ``compute(name)`` time on a real dataset: wrong ``fields=`` tuple
+    length, missing ``species_args=``, forgotten ``needs_grid=True``,
+    ``supports_relativistic=True`` on a function without a ``c=`` kwarg.
+    """
+    entries: list[tuple[str, str, _Recipe | _SpeciesTemplate]] = [
+        *(("registry", name, recipe) for name, recipe in _REGISTRY.items()),
+        *(("template", prefix, tmpl) for prefix, tmpl in _SPECIES_TEMPLATES.items()),
+    ]
+
+    failures: list[str] = []
+    for kind, ident, entry in entries:
+        sig = inspect.signature(entry.func)
+        params = list(sig.parameters.values())
+
+        positional = [
+            p
+            for p in params
+            if p.kind
+            in (
+                inspect.Parameter.POSITIONAL_ONLY,
+                inspect.Parameter.POSITIONAL_OR_KEYWORD,
+            )
+        ]
+        required_positional = sum(
+            1 for p in positional if p.default is inspect.Parameter.empty
+        )
+        has_var_positional = any(
+            p.kind == inspect.Parameter.VAR_POSITIONAL for p in params
+        )
+        has_var_keyword = any(
+            p.kind == inspect.Parameter.VAR_KEYWORD for p in params
+        )
+
+        expected_pos = _expected_positional_count(entry)
+        expected_kw = _expected_kwargs(entry)
+        fields_desc = (
+            entry.fields if isinstance(entry, _Recipe) else entry.field_pattern
+        )
+
+        if required_positional > expected_pos:
+            failures.append(
+                f"{kind} {ident!r}: func {entry.func.__qualname__} "
+                f"requires {required_positional} positional args but "
+                f"recipe metadata provides only {expected_pos} "
+                f"(fields={fields_desc!r}, check species_args / "
+                f"needs_grid / needs_gamma / needs_c)"
+            )
+        if expected_pos > len(positional) and not has_var_positional:
+            failures.append(
+                f"{kind} {ident!r}: recipe metadata provides {expected_pos} "
+                f"positional args but func {entry.func.__qualname__} "
+                f"accepts at most {len(positional)}"
+            )
+
+        if not has_var_keyword:
+            accepted_kw = {
+                p.name
+                for p in params
+                if p.kind
+                in (
+                    inspect.Parameter.POSITIONAL_OR_KEYWORD,
+                    inspect.Parameter.KEYWORD_ONLY,
+                )
+            }
+            for kw in expected_kw:
+                if kw not in accepted_kw:
+                    failures.append(
+                        f"{kind} {ident!r}: dispatcher injects {kw}= but "
+                        f"func {entry.func.__qualname__} does not accept it"
+                    )
+
+    assert not failures, _format_failures(
+        "Recipe/func signature mismatches",
         failures,
     )

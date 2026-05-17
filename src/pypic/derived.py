@@ -2387,7 +2387,8 @@ def magnetic_shear_angle(
 def magnetic_flux_function(
     b2: FloatArray,
     dx: float,
-    dy: float,
+    dy: float = 1.0,
+    dz: float = 1.0,
 ) -> FloatArray:
     r"""Compute the magnetic flux function for 2D geometry.
 
@@ -2410,9 +2411,12 @@ def magnetic_flux_function(
         integration direction). Shape ``(nx, ny)`` for 2D data.
     dx : float
         Grid spacing along the first axis.
-    dy : float
-        Grid spacing along the second axis (unused, accepted for
-        compatibility with the grid-dependent dispatch).
+    dy, dz : float
+        Grid spacing along the other axes (unused, accepted for
+        compatibility with the grid-dependent dispatch on 2D or 3D
+        datasets — ``dz`` is present so a 3D dataset reaches the
+        ``ValueError`` below rather than failing with a ``TypeError``
+        from the dispatcher.)
 
     Returns
     -------
