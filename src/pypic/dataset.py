@@ -1081,3 +1081,27 @@ class FieldDataset:
         axis_names = list(self._grid.surviving_axis_names)
         mask_da = xr.DataArray(cond, dims=axis_names)
         return self._wrap_sliced(self._ds.where(mask_da, other=other))
+
+    def project(self, axis: str, **kwargs: Any) -> FieldDataset:  # noqa: ANN401
+        r"""Reduce this dataset along one axis (see :func:`pypic.project`).
+
+        Convenience method equivalent to
+        ``pypic.project(self, axis, **kwargs)``.  Enables fluent
+        chaining: ``ds.where(mask).project("z", reduction="integrate")``.
+
+        Parameters
+        ----------
+        axis : str
+            Surviving-axis name to reduce away.
+        **kwargs
+            Forwarded to :func:`pypic.reductions.project`:
+            ``reduction``, ``selection``, ``fields``, ``nan_policy``.
+
+        Returns
+        -------
+        FieldDataset
+            With *axis* removed from the grid.
+        """
+        from pypic.reductions import project as _project
+
+        return _project(self, axis, **kwargs)

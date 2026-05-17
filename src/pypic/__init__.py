@@ -125,6 +125,7 @@ from pypic.readers import (
     supports_selective_read,
     unregister_reader,
 )
+from pypic.reductions import project
 from pypic.regrid import align_grids, common_grid, regrid
 from pypic.schema import SimulationSchema, validate_simulation_toml
 from pypic.selections import BoxSelection, PlaneSelection, SphereSelection
@@ -239,6 +240,7 @@ __all__ = [
     "plasma_beta",
     "plasma_frequency",
     "poynting_flux",
+    "project",
     "quantity_dimension",
     "query_sql",
     "read_phdf5_particles",
