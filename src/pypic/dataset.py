@@ -1082,26 +1082,30 @@ class FieldDataset:
         mask_da = xr.DataArray(cond, dims=axis_names)
         return self._wrap_sliced(self._ds.where(mask_da, other=other))
 
-    def project(self, axis: str, **kwargs: Any) -> FieldDataset:  # noqa: ANN401
-        r"""Reduce this dataset along one axis (see :func:`pypic.project`).
+    def reduce(
+        self,
+        axis: str | tuple[str, ...],
+        **kwargs: Any,  # noqa: ANN401
+    ) -> FieldDataset:
+        r"""Reduce this dataset along one or more axes (see :func:`pypic.reduce`).
 
         Convenience method equivalent to
-        ``pypic.project(self, axis, **kwargs)``.  Enables fluent
-        chaining: ``ds.where(mask).project("z", reduction="integrate")``.
+        ``pypic.reduce(self, axis, **kwargs)``.  Enables fluent
+        chaining: ``ds.where(mask).reduce("z", reduction="integrate")``.
 
         Parameters
         ----------
-        axis : str
-            Surviving-axis name to reduce away.
+        axis : str or tuple of str
+            Surviving-axis name(s) to reduce away.
         **kwargs
-            Forwarded to :func:`pypic.reductions.project`:
+            Forwarded to :func:`pypic.reductions.reduce`:
             ``reduction``, ``selection``, ``fields``, ``nan_policy``.
 
         Returns
         -------
         FieldDataset
-            With *axis* removed from the grid.
+            With *axis* (or every name in the tuple) removed from the grid.
         """
-        from pypic.reductions import project as _project
+        from pypic.reductions import reduce as _reduce
 
-        return _project(self, axis, **kwargs)
+        return _reduce(self, axis, **kwargs)

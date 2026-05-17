@@ -1,9 +1,11 @@
-"""Axis reductions: collapse a FieldDataset along one dimension.
+"""Axis reductions: collapse a FieldDataset along one or more dimensions.
 
-The :func:`project` function reduces a :class:`~pypic.dataset.FieldDataset`
-along a single axis using a chosen reduction (``"integrate"``, ``"sum"``,
-``"mean"``, ``"max"``, ``"min"``, ``"std"``).  Column densities, line-of-
-sight integrals, slab averages, and projected-max diagnostics all
+The :func:`reduce` function collapses a :class:`~pypic.dataset.FieldDataset`
+along one axis (``axis="z"``) or several (``axis=("y", "z")``) using a
+chosen reduction.  Supported reductions: ``"integrate"``, ``"sum"``,
+``"mean"``, ``"median"``, ``"max"``, ``"min"``, ``"std"``, ``"var"``,
+``"argmax"``, ``"argmin"``.  Column densities, line-of-sight integrals,
+slab averages, projected-max diagnostics, and peak-position maps all
 compose from this single primitive paired with an optional
 :class:`~pypic.selections.BoxSelection` or
 :class:`~pypic.selections.SphereSelection`.
@@ -12,16 +14,21 @@ Why no ``SlabSelection``? Selections describe regions, not data
 (CLAUDE.md §architecture).  A ``Slab`` would fuse "pick a thick slice"
 (region) with "reduce along the thick axis" (data), which forces every
 caller to think about both at once.  Splitting them keeps the existing
-``BoxSelection`` reusable for non-projection workflows and gives
+``BoxSelection`` reusable for non-reduction workflows and gives
 webpic-style viewers a clean wire format:
-``{selection, axis, reduction}`` → one server-side ``project()`` call.
+``{selection, axis, reduction}`` → one server-side ``reduce()`` call.
+
+The verb is ``reduce`` (not ``project``) deliberately: ``project()`` is
+already taken by Three.js (``Vector3.project(camera)``) for screen-space
+camera projection, and webpic is a Three.js viewer.  Server-side
+``reduce`` keeps the cross-stack vocabulary clean.
 """
 
 from __future__ import annotations
 
-__all__ = ["project"]
+__all__ = ["Reduction", "reduce"]
 
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Literal, get_args
 
 import numpy as np
 
@@ -30,65 +37,110 @@ from pypic.coordinates.geometry import GeometryType
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
+    import xarray as xr
+
     from pypic.dataset import FieldDataset
     from pypic.diagnostics import NanPolicy
     from pypic.selections import BoxSelection, SphereSelection
 
 
-type Reduction = Literal["integrate", "sum", "mean", "max", "min", "std"]
-
-_VALID_REDUCTIONS: tuple[str, ...] = (
+type Reduction = Literal[
     "integrate",
     "sum",
     "mean",
+    "median",
     "max",
     "min",
     "std",
-)
+    "var",
+    "argmax",
+    "argmin",
+]
+
+_VALID_REDUCTIONS: tuple[str, ...] = get_args(Reduction.__value__)
 _VALID_NAN_POLICIES: tuple[str, ...] = ("omit", "propagate", "raise")
 
+# Reductions accepting xarray's ``dim=[...]`` natively.
+_MULTI_AXIS_DIM_REDUCERS: frozenset[str] = frozenset(
+    {"sum", "mean", "median", "max", "min", "std", "var"}
+)
+# Reductions that return the *coordinate value* at the extremum (via
+# xarray's ``idxmax`` / ``idxmin``).  Single-axis only — there is no
+# meaningful coord-value to return over a multi-dim search.
+_INDEX_REDUCERS: frozenset[str] = frozenset({"argmax", "argmin"})
+# Reductions that accept a ``weight=`` kwarg.  ``sum`` is trivially
+# achieved by pre-multiplying; ``max`` / ``min`` / ``median`` ignore
+# weights semantically; ``std`` / ``var`` weighted versions are niche
+# (revisit if requested); ``argmax`` / ``argmin`` return positions.
+_WEIGHTABLE_REDUCERS: frozenset[str] = frozenset({"mean", "integrate"})
 
-def project(
+
+def reduce(
     data: FieldDataset,
-    axis: str,
+    axis: str | tuple[str, ...],
     *,
     reduction: Reduction = "integrate",
     selection: BoxSelection | SphereSelection | None = None,
     fields: Iterable[str] | None = None,
+    weight: str | None = None,
     nan_policy: NanPolicy = "omit",
 ) -> FieldDataset:
-    r"""Reduce a FieldDataset along one axis.
+    r"""Reduce a FieldDataset along one or more axes.
 
     Apply *selection* (if given) to crop or NaN-mask, then collapse the
-    *axis* dimension using *reduction*.  Returns a FieldDataset with one
-    fewer surviving axis — the natural input to ``plot_field_slice``,
-    ``compute(...)``, ``in_si(...)``, and other dataset-consuming APIs.
+    *axis* dimension(s) using *reduction*.  Returns a FieldDataset with
+    one fewer surviving axis per name passed — the natural input to
+    ``plot_field_slice``, ``compute(...)``, ``in_si(...)``, and other
+    dataset-consuming APIs.
 
     Parameters
     ----------
     data : FieldDataset
-        Input dataset (1-, 2-, or 3-D — must contain *axis*).
-    axis : str
-        Surviving-axis name to reduce away (e.g. ``"x"``, ``"z"``).
-        Validated against ``data.grid.surviving_axis_names``.
-    reduction : {"integrate", "sum", "mean", "max", "min", "std"}
-        How to collapse the axis.  ``"integrate"`` uses xarray's
-        trapezoidal-rule integration over the coordinate values — the
-        physically correct line-of-sight / column integral for both
-        uniform and (future) non-uniform 1-D coords.  ``"sum"`` is the
-        unweighted Riemann sum (no ``× dx`` factor).  The remaining
-        reductions are direct xarray equivalents.  Default
-        ``"integrate"`` matches plasma-physics convention (column
-        densities, integrated $\mathbf{J}\!\cdot\!\mathbf{E}$).
+        Input dataset (1-, 2-, or 3-D — must contain every name in *axis*).
+    axis : str or tuple of str
+        Surviving-axis name(s) to reduce away (e.g. ``"x"``, ``("y", "z")``).
+        Validated against ``data.grid.surviving_axis_names``.  Multi-axis
+        reduction collapses several dimensions in one call — useful for
+        going from 3D to 1D without chaining.  ``"argmax"`` and
+        ``"argmin"`` require a single axis.
+    reduction : str
+        How to collapse the axis.  Choices:
+
+        * ``"integrate"`` — xarray trapezoidal-rule integration over the
+          coordinate values (looped over axes for multi-axis input).
+          Default — matches plasma-physics convention (column densities,
+          integrated $\mathbf{J}\!\cdot\!\mathbf{E}$).
+        * ``"sum"`` — unweighted Riemann sum (no ``× dx`` factor).
+        * ``"mean"`` / ``"median"`` / ``"max"`` / ``"min"`` / ``"std"`` /
+          ``"var"`` — direct xarray equivalents.
+        * ``"argmax"`` / ``"argmin"`` — return the *coordinate value* of
+          the extremum along *axis* (xarray's ``idxmax`` / ``idxmin``);
+          single-axis only.  Result is a position along the reduced
+          axis, so ``quantity_type`` is overridden to ``"length"``.
     selection : BoxSelection | SphereSelection | None
         Optional region selector applied before reduction.  ``None``
-        projects the full domain.  Sugar for
-        ``selection.apply(data)``-then-project; the two forms are
+        reduces over the full domain.  Sugar for
+        ``selection.apply(data)``-then-reduce; the two forms are
         observationally identical.
     fields : Iterable[str] | None
-        Optional subset of field names (canonical or alias) to project.
-        ``None`` projects every data variable.  Unknown names raise
+        Optional subset of field names (canonical or alias) to reduce.
+        ``None`` reduces every data variable.  Unknown names raise
         :class:`KeyError` with the full list (CLAUDE.md §architecture).
+    weight : str | None
+        Name of a field to weight the reduction by.  Only supported for
+        ``reduction in {"mean", "integrate"}`` — other reductions raise
+        ``ValueError`` (``sum`` is trivially achieved by pre-multiplying;
+        ``max`` / ``min`` / ``median`` / ``std`` / ``var`` /
+        ``argmax`` / ``argmin`` reject weights).  ``mean`` returns
+        $\langle f \rangle_w = \sum f w / \sum w$ over the reduced axes;
+        ``integrate`` returns the weighted line average
+        $\int f w \, dx / \int w \, dx$ (yt's emission-weighted /
+        density-weighted column average).  Resolves via
+        ``data.resolve_key`` (aliases accepted); unknown names raise
+        :class:`KeyError`.  NaN handling under ``nan_policy="omit"``
+        uses a joint mask: cells where the field *or* weight is NaN
+        contribute zero to both the numerator and denominator and are
+        skipped consistently.
     nan_policy : {"omit", "propagate", "raise"}
         ``"omit"`` (default) → ``skipna=True``: NaN cells are dropped
         from each reduction.  Pairs naturally with
@@ -100,9 +152,13 @@ def project(
     -------
     FieldDataset
         Same metadata (normalization, species, frame, transforms) with
-        ``axis`` removed from the grid and dimensions; each surviving
-        DataArray gains an ``attrs["projection"]`` dict recording axis,
-        reduction, and (for integrate/sum) the original axis length.
+        the named axis (or axes) removed from the grid and dimensions.
+        Each surviving DataArray gains an ``attrs["reduction"]`` dict
+        recording ``{axis, op}`` — plus ``result_kind: "axis_position"``
+        for ``argmax`` / ``argmin``, and ``weight: <canonical name>``
+        when *weight* is set.  The inner ``op`` key holds the reduction
+        name (``"mean"``, ``"integrate"``, ...) to avoid shadowing the
+        outer ``reduction`` key.
 
     Raises
     ------
@@ -110,8 +166,10 @@ def project(
         Non-Cartesian geometry.  Spherical / cylindrical Jacobian-aware
         integration is deferred to TASKS Step 19b/20b.
     ValueError
-        Unknown *axis*, invalid *reduction* or *nan_policy*, or — under
-        ``nan_policy="raise"`` — any NaN in a projected field.
+        Unknown *axis* name, invalid *reduction* or *nan_policy*,
+        multi-axis input passed with ``reduction="argmax"`` /
+        ``"argmin"``, or — under ``nan_policy="raise"`` — any NaN in a
+        reduced field.
     KeyError
         Any name in *fields* fails to resolve via
         ``FieldDataset.resolve_key``.
@@ -119,14 +177,14 @@ def project(
     Notes
     -----
     **Unit caveat (MVP).** After ``reduction="integrate"`` the SI unit
-    dimension shifts by one length factor along *axis* (e.g. number
-    density m\ :sup:`-3` → column density m\ :sup:`-2`).  Per-field
-    ``quantity_type`` and ``si_unit`` attrs are **preserved unchanged**
-    by this MVP; ``in_si()`` therefore returns the value the *original*
-    SI factor would yield — off by one length-unit.  Users needing
-    correct SI units multiply by ``data.normalization.length_si``.
-    Unit-aware projection is tracked alongside Step 20b
-    (volume-weighted norms).
+    dimension shifts by one length factor along each reduced axis
+    (e.g. number density m\ :sup:`-3` → column density m\ :sup:`-2`).
+    Per-field ``quantity_type`` and ``si_unit`` attrs are **preserved
+    unchanged** by this MVP; ``in_si()`` therefore returns the value the
+    *original* SI factor would yield — off by one length-unit per
+    reduced axis.  Users needing correct SI units multiply by the
+    appropriate ``data.normalization.length_si`` factor.  Unit-aware
+    reduction is tracked alongside Step 20b.
 
     Examples
     --------
@@ -134,17 +192,20 @@ def project(
     >>> from pypic.coordinates import CARTESIAN
     >>> from pypic.dataset import FieldDataset
     >>> from pypic.grid import GridInfo
-    >>> from pypic.reductions import project
+    >>> from pypic.reductions import reduce
     >>> from pypic.units import Normalization
     >>> grid = GridInfo(dimensions=(4, 3, 2), spacing=(1.0, 1.0, 1.0),
     ...     origin=(0.0, 0.0, 0.0), geometry=CARTESIAN)
     >>> ds = FieldDataset.from_arrays(
     ...     {"B_1": np.ones((4, 3, 2))}, grid, Normalization.identity())
-    >>> column = project(ds, "z", reduction="integrate")
+    >>> column = reduce(ds, "z", reduction="integrate")
     >>> column.grid.dimensions
     (4, 3)
     >>> column.grid.surviving_axis_names
     ('x', 'y')
+    >>> line = reduce(ds, ("y", "z"), reduction="mean")
+    >>> line.grid.dimensions
+    (4,)
     """
     if reduction not in _VALID_REDUCTIONS:
         msg = f"reduction must be one of {_VALID_REDUCTIONS}, got {reduction!r}"
@@ -152,24 +213,45 @@ def project(
     if nan_policy not in _VALID_NAN_POLICIES:
         msg = f"nan_policy must be 'omit', 'propagate', or 'raise', got {nan_policy!r}"
         raise ValueError(msg)
+    if weight is not None and reduction not in _WEIGHTABLE_REDUCERS:
+        msg = (
+            f"weight= is only supported for reduction in "
+            f"{sorted(_WEIGHTABLE_REDUCERS)!r}, got {reduction!r}"
+        )
+        raise ValueError(msg)
 
     if selection is not None:
         data = selection.apply(data)
 
     if data.grid.geometry.type is not GeometryType.CARTESIAN:
         msg = (
-            f"project() supports Cartesian grids only "
+            f"reduce() supports Cartesian grids only "
             f"(got {data.grid.geometry.type.value}); "
             f"spherical/cylindrical Jacobian-aware integration is "
             f"deferred to TASKS Step 19b/20b"
         )
         raise NotImplementedError(msg)
 
-    axis_names = data.grid.surviving_axis_names
-    if axis not in axis_names:
-        msg = f"Axis {axis!r} not found in dataset dimensions {axis_names!r}"
+    axes: tuple[str, ...] = (axis,) if isinstance(axis, str) else tuple(axis)
+    if not axes:
+        msg = "reduce(): axis must name at least one dimension"
         raise ValueError(msg)
-    local_idx = axis_names.index(axis)
+    if len(set(axes)) != len(axes):
+        msg = f"reduce(): duplicate axis names in {axes!r}"
+        raise ValueError(msg)
+
+    axis_names = data.grid.surviving_axis_names
+    for ax in axes:
+        if ax not in axis_names:
+            msg = f"Axis {ax!r} not found in dataset dimensions {axis_names!r}"
+            raise ValueError(msg)
+
+    if reduction in _INDEX_REDUCERS and len(axes) > 1:
+        msg = (
+            f"reduction={reduction!r} requires a single axis "
+            f"(got {axes!r}); idxmax/idxmin have no multi-axis form"
+        )
+        raise ValueError(msg)
 
     if fields is None:
         ds_to_reduce = data.xr
@@ -182,47 +264,170 @@ def project(
             except KeyError:
                 unresolved.append(name)
         if unresolved:
-            msg = f"project(): unknown fields {unresolved!r}"
+            msg = f"reduce(): unknown fields {unresolved!r}"
             raise KeyError(msg)
         ds_to_reduce = data.xr[canonicals]
+
+    weight_canonical: str | None = None
+    weight_da = None
+    if weight is not None:
+        try:
+            weight_canonical = data.resolve_key(weight)
+        except KeyError as exc:
+            msg = f"reduce(): unknown weight field {weight!r}"
+            raise KeyError(msg) from exc
+        weight_da = data.xr[weight_canonical]
 
     if nan_policy == "raise":
         for name in [str(n) for n in ds_to_reduce.data_vars]:
             arr = ds_to_reduce[name].values
             n_nan = int(np.isnan(arr).sum())
             if n_nan > 0:
-                msg = f"project: input contains {n_nan} NaN cell(s) in {name!r}"
+                msg = f"reduce: input contains {n_nan} NaN cell(s) in {name!r}"
+                raise ValueError(msg)
+        if weight_da is not None:
+            n_nan = int(np.isnan(weight_da.values).sum())
+            if n_nan > 0:
+                msg = (
+                    f"reduce: weight field {weight_canonical!r} contains "
+                    f"{n_nan} NaN cell(s)"
+                )
                 raise ValueError(msg)
 
     skipna = nan_policy == "omit"
 
     if reduction == "integrate":
-        reduced = ds_to_reduce.integrate(coord=axis)
+        if weight_da is None:
+            reduced = ds_to_reduce
+            for ax in axes:
+                reduced = reduced.integrate(coord=ax)
+        else:
+            reduced = _weighted_integrate(
+                ds_to_reduce, weight_da, axes, nan_policy=nan_policy
+            )
         # xarray's Dataset.integrate doesn't expose keep_attrs; restore
         # per-DataArray attrs from the source so quantity_type / si_unit
         # / latex survive for downstream in_si()/field_info() lookups.
         for name in [str(n) for n in reduced.data_vars]:
             reduced[name].attrs = dict(data.xr[name].attrs)
-    elif reduction == "sum":
-        reduced = ds_to_reduce.sum(dim=axis, skipna=skipna, keep_attrs=True)
-    elif reduction == "mean":
-        reduced = ds_to_reduce.mean(dim=axis, skipna=skipna, keep_attrs=True)
-    elif reduction == "max":
-        reduced = ds_to_reduce.max(dim=axis, skipna=skipna, keep_attrs=True)
-    elif reduction == "min":
-        reduced = ds_to_reduce.min(dim=axis, skipna=skipna, keep_attrs=True)
-    else:  # std
-        reduced = ds_to_reduce.std(dim=axis, skipna=skipna, keep_attrs=True)
+    elif reduction == "mean" and weight_da is not None:
+        reduced = _weighted_mean(ds_to_reduce, weight_da, axes, nan_policy=nan_policy)
+    elif reduction in _MULTI_AXIS_DIM_REDUCERS:
+        method = getattr(ds_to_reduce, reduction)
+        reduced = method(dim=list(axes), skipna=skipna, keep_attrs=True)
+    else:  # argmax / argmin (single-axis enforced above)
+        method_name = "idxmax" if reduction == "argmax" else "idxmin"
+        method = getattr(ds_to_reduce, method_name)
+        match axes:
+            case (single_axis,):
+                reduced = method(dim=single_axis, skipna=skipna, keep_attrs=True)
+            case _:  # unreachable — guarded above
+                raise AssertionError(f"argmax/argmin single-axis invariant: {axes!r}")
+        # Override metadata: the result is a coordinate position along
+        # the reduced axis, not a value of the original field.
+        for name in [str(n) for n in reduced.data_vars]:
+            attrs = dict(reduced[name].attrs)
+            attrs["quantity_type"] = "length"
+            attrs["si_unit"] = "m"
+            attrs.pop("latex", None)
+            attrs["unit_dimension"] = (1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+            reduced[name].attrs = attrs
 
-    projection_attr: dict[str, str | float] = {
-        "axis": axis,
-        "reduction": reduction,
+    reduction_axis: str | tuple[str, ...]
+    match axes:
+        case (single,):
+            reduction_axis = single
+        case _:
+            reduction_axis = axes
+    reduction_attr: dict[str, str | tuple[str, ...]] = {
+        "axis": reduction_axis,
+        "op": reduction,
     }
-    if reduction in ("integrate", "sum"):
-        projection_attr["length"] = float(
-            data.grid.spacing[local_idx] * data.grid.dimensions[local_idx]
-        )
+    if reduction in _INDEX_REDUCERS:
+        reduction_attr["result_kind"] = "axis_position"
+    if weight_canonical is not None:
+        reduction_attr["weight"] = weight_canonical
     for name in [str(n) for n in reduced.data_vars]:
-        reduced[name].attrs["projection"] = dict(projection_attr)
+        reduced[name].attrs["reduction"] = dict(reduction_attr)
 
     return data._wrap_sliced(reduced)
+
+
+def _weighted_mean(
+    ds: xr.Dataset,
+    weight_da: xr.DataArray,
+    axes: tuple[str, ...],
+    *,
+    nan_policy: NanPolicy,
+) -> xr.Dataset:
+    r"""Weighted mean :math:`\langle f \rangle_w = \sum f w / \sum w`.
+
+    Joint NaN-masking under ``nan_policy="omit"``: cells where field or
+    weight is NaN contribute zero to both numerator and denominator,
+    skipping them consistently.  Under ``"propagate"``, NaN flows
+    through naturally.  Under ``"raise"``, NaN was pre-checked.
+    """
+
+    def _one(field_da: xr.DataArray) -> xr.DataArray:
+        fw, w = _joint_mask(field_da, weight_da, nan_policy=nan_policy)
+        fw_sum = fw.sum(dim=list(axes), skipna=False, keep_attrs=True)
+        w_sum = w.sum(dim=list(axes), skipna=False)
+        result: xr.DataArray = fw_sum / w_sum
+        result.attrs = dict(field_da.attrs)
+        return result
+
+    return ds.map(_one, keep_attrs=True)
+
+
+def _weighted_integrate(
+    ds: xr.Dataset,
+    weight_da: xr.DataArray,
+    axes: tuple[str, ...],
+    *,
+    nan_policy: NanPolicy,
+) -> xr.Dataset:
+    r"""Weighted line average :math:`\int f w \, dx / \int w \, dx`.
+
+    yt's emission-weighted / density-weighted column average.  For
+    multi-axis input the numerator and denominator are integrated over
+    every named axis in turn (the integration is associative and
+    commutative for trapezoidal-rule integration of a smooth product).
+    Joint NaN-masking under ``nan_policy="omit"`` matches
+    :func:`_weighted_mean`.
+    """
+
+    def _one(field_da: xr.DataArray) -> xr.DataArray:
+        fw, w = _joint_mask(field_da, weight_da, nan_policy=nan_policy)
+        for ax in axes:
+            fw = fw.integrate(coord=ax)
+            w = w.integrate(coord=ax)
+        result: xr.DataArray = fw / w
+        return result
+
+    return ds.map(_one, keep_attrs=True)
+
+
+def _joint_mask(
+    field_da: xr.DataArray,
+    weight_da: xr.DataArray,
+    *,
+    nan_policy: NanPolicy,
+) -> tuple[xr.DataArray, xr.DataArray]:
+    r"""Return ``(field * weight, weight)`` with joint NaN masking.
+
+    Under ``nan_policy="omit"``, cells where either the field or the
+    weight is NaN are replaced with zero in *both* the numerator
+    ``field * weight`` and the denominator ``weight``, so they
+    contribute nothing to either integral and the resulting weighted
+    average is taken over the non-NaN region.  Under ``"propagate"``
+    (and ``"raise"``, where NaN was already screened out upstream) no
+    masking is applied; NaN flows through naturally.
+    """
+    if nan_policy == "omit":
+        nan_mask = field_da.isnull() | weight_da.isnull()
+        fw = (field_da * weight_da).where(~nan_mask, 0.0)
+        w = weight_da.where(~nan_mask, 0.0)
+    else:
+        fw = field_da * weight_da
+        w = weight_da
+    return fw, w

@@ -59,6 +59,7 @@ nav:
     - Units & Normalization: api/units.md
     - Field Registry: api/fields.md
     - Selections: api/selections.md
+    - Reductions: api/reductions.md
     - Coordinates & Operators: api/coordinates.md
     - Readers: api/readers.md
     - Field Line Tracing: api/traces.md

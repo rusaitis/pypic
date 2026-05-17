@@ -1621,3 +1621,258 @@ def test_convert_all_dry_run_particles(tmp_path: Path) -> None:
     # directory — the expected contract is that --dry-run has no
     # filesystem side effects.
     assert not out.exists()
+
+
+# -- reduce ------------------------------------------------------------------
+
+
+def test_reduce_apply_dry_run(tmp_path: Path) -> None:
+    d = _make_sim_dir(tmp_path)
+    out = tmp_path / "reduced.zarr"
+    result = runner.invoke(
+        app,
+        [
+            "reduce",
+            "apply",
+            str(d),
+            "--output",
+            str(out),
+            "--axis",
+            "z",
+            "--reduction",
+            "mean",
+            "--dry-run",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    assert "Would reduce" in result.output
+    assert "axis:" in result.output
+    assert "reduction: mean" in result.output
+    assert not out.exists()
+
+
+@zarr_required
+def test_reduce_apply_single_step_zarr(tmp_path: Path) -> None:
+    from pypic.io import from_zarr
+
+    d = _make_sim_dir(tmp_path)
+    out = tmp_path / "reduced.zarr"
+    result = runner.invoke(
+        app,
+        [
+            "reduce",
+            "apply",
+            str(d),
+            "--output",
+            str(out),
+            "--axis",
+            "z",
+            "--reduction",
+            "mean",
+            "--step",
+            "0",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    fds = from_zarr(out)
+    # z is collapsed: 3D (4,4,4) → 2D (4,4)
+    assert fds["B_1"].shape == (4, 4)
+    assert fds.grid.surviving_axis_names == ("x", "y")
+
+
+@zarr_required
+def test_reduce_apply_multi_step_timeseries(tmp_path: Path) -> None:
+    from pypic.io import from_zarr
+
+    d = _make_sim_dir(tmp_path, n_steps=3)
+    out = tmp_path / "reduced_ts.zarr"
+    result = runner.invoke(
+        app,
+        [
+            "reduce",
+            "apply",
+            str(d),
+            "--output",
+            str(out),
+            "--axis",
+            "z",
+            "--reduction",
+            "mean",
+            "--step",
+            "all",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    fds = from_zarr(out)
+    # leading time dim of length 3, spatial dims collapsed to (x, y)
+    assert fds["B_1"].shape == (3, 4, 4)
+
+
+@zarr_required
+def test_reduce_apply_multi_axis(tmp_path: Path) -> None:
+    from pypic.io import from_zarr
+
+    d = _make_sim_dir(tmp_path)
+    out = tmp_path / "lineout.zarr"
+    result = runner.invoke(
+        app,
+        [
+            "reduce",
+            "apply",
+            str(d),
+            "--output",
+            str(out),
+            "--axis",
+            "y,z",
+            "--reduction",
+            "mean",
+            "--step",
+            "0",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    fds = from_zarr(out)
+    # 3D → 1D along x
+    assert fds["B_1"].shape == (4,)
+    assert fds.grid.surviving_axis_names == ("x",)
+
+
+@zarr_required
+def test_reduce_apply_with_weight(tmp_path: Path) -> None:
+    """--weight flag produces a weighted mean (different from unweighted)."""
+    from pypic.io import from_zarr
+
+    d = _make_sim_dir(tmp_path)
+    weighted_out = tmp_path / "weighted.zarr"
+    unweighted_out = tmp_path / "unweighted.zarr"
+    # Use B_2 as the weight (just a positive-ish field; values include
+    # negatives so this is a synthetic test of the wire-through, not
+    # physical density-weighting).
+    weighted = runner.invoke(
+        app,
+        [
+            "reduce",
+            "apply",
+            str(d),
+            "--output",
+            str(weighted_out),
+            "--axis",
+            "z",
+            "--reduction",
+            "mean",
+            "--weight",
+            "B_2",
+            "--fields",
+            "B_1",
+            "--step",
+            "0",
+        ],
+    )
+    unweighted = runner.invoke(
+        app,
+        [
+            "reduce",
+            "apply",
+            str(d),
+            "--output",
+            str(unweighted_out),
+            "--axis",
+            "z",
+            "--reduction",
+            "mean",
+            "--fields",
+            "B_1",
+            "--step",
+            "0",
+        ],
+    )
+    assert weighted.exit_code == 0, weighted.output
+    assert unweighted.exit_code == 0, unweighted.output
+    fds_w = from_zarr(weighted_out)
+    fds_u = from_zarr(unweighted_out)
+    # Provenance attr must record the weight
+    assert fds_w.xr["B_1"].attrs["reduction"]["weight"] == "B_2"
+    # Sanity: weighted ≠ unweighted (deterministic seed; the random
+    # fixture data makes equality astronomically unlikely).
+    assert not np.allclose(fds_w["B_1"], fds_u["B_1"])
+
+
+@zarr_required
+def test_reduce_apply_with_box(tmp_path: Path) -> None:
+    """--box restricts the reduction to a sub-volume (axis ranges, index-based)."""
+    from pypic.io import from_zarr
+
+    d = _make_sim_dir(tmp_path)
+    out = tmp_path / "boxed.zarr"
+    result = runner.invoke(
+        app,
+        [
+            "reduce",
+            "apply",
+            str(d),
+            "--output",
+            str(out),
+            "--axis",
+            "z",
+            "--reduction",
+            "mean",
+            "--box",
+            "x=1:3,y=1:3",
+            "--step",
+            "0",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    fds = from_zarr(out)
+    # x=1:3 → 2 cells, y=1:3 → 2 cells, z collapsed.
+    assert fds["B_1"].shape == (2, 2)
+
+
+def test_reduce_apply_unknown_axis(tmp_path: Path) -> None:
+    d = _make_sim_dir(tmp_path)
+    out = tmp_path / "bad.zarr"
+    result = runner.invoke(
+        app,
+        [
+            "reduce",
+            "apply",
+            str(d),
+            "--output",
+            str(out),
+            "--axis",
+            "w",
+            "--reduction",
+            "mean",
+            "--step",
+            "0",
+        ],
+    )
+    assert result.exit_code != 0
+    assert isinstance(result.exception, ValueError)
+    assert "not found" in str(result.exception)
+
+
+def test_reduce_apply_weight_rejected_for_max(tmp_path: Path) -> None:
+    d = _make_sim_dir(tmp_path)
+    out = tmp_path / "bad.zarr"
+    result = runner.invoke(
+        app,
+        [
+            "reduce",
+            "apply",
+            str(d),
+            "--output",
+            str(out),
+            "--axis",
+            "z",
+            "--reduction",
+            "max",
+            "--weight",
+            "B_2",
+            "--step",
+            "0",
+        ],
+    )
+    assert result.exit_code != 0
+    assert isinstance(result.exception, ValueError)
+    assert "weight=" in str(result.exception)
