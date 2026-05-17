@@ -158,10 +158,12 @@ def reduce(
         the named axis (or axes) removed from the grid and dimensions.
         Each surviving DataArray gains an ``attrs["reduction"]`` dict
         recording ``{axis, op}`` — plus ``result_kind: "axis_position"``
-        for ``argmax`` / ``argmin``, and ``weight: <canonical name>``
-        when *weight* is set.  The inner ``op`` key holds the reduction
-        name (``"mean"``, ``"integrate"``, ...) to avoid shadowing the
-        outer ``reduction`` key.
+        for ``argmax`` / ``argmin``, ``weight: <canonical name>`` when
+        *weight* is set, and ``length_axes: <int>`` after unweighted
+        ``integrate`` (the running count of length-dimension shifts
+        across chained reductions).  The inner ``op`` key holds the
+        reduction name (``"mean"``, ``"integrate"``, ...) to avoid
+        shadowing the outer ``reduction`` key.
 
     Raises
     ------
@@ -181,15 +183,19 @@ def reduce(
 
     Notes
     -----
-    **Unit caveat (MVP).** After ``reduction="integrate"`` the SI unit
-    dimension shifts by one length factor along each reduced axis
-    (e.g. number density m\ :sup:`-3` → column density m\ :sup:`-2`).
-    Per-field ``quantity_type`` and ``si_unit`` attrs are **preserved
-    unchanged** by this MVP; ``in_si()`` therefore returns the value the
-    *original* SI factor would yield — off by one length-unit per
-    reduced axis.  Users needing correct SI units multiply by the
-    appropriate ``data.normalization.length_si`` factor.  Unit-aware
-    reduction is tracked as TASKS Step 43c.
+    **Unit shift after ``integrate``.** After unweighted
+    ``reduction="integrate"`` the SI unit dimension shifts by one
+    length factor along each reduced axis (e.g. number density
+    m\ :sup:`-3` → column density m\ :sup:`-2`).  Per-field
+    ``quantity_type`` and ``si_unit`` *strings* are preserved
+    unchanged — but the numeric value returned by ``in_si()`` is
+    correct: the ``length_axes`` provenance stamp here lets
+    ``FieldDataset.in_si`` apply an extra ``length_ref **
+    length_axes`` factor at the boundary.  Weighted ``integrate``
+    does not stamp ``length_axes`` because the length factor
+    cancels between numerator and denominator.  The displayed
+    unit string and the openPMD 7-tuple are still authoritatively
+    fixed by TASKS Step 43c.
 
     Examples
     --------
@@ -355,16 +361,34 @@ def reduce(
             reduction_axis = single
         case _:
             reduction_axis = axes
-    reduction_attr: dict[str, str | tuple[str, ...]] = {
+    base_attr: dict[str, str | int | tuple[str, ...]] = {
         "axis": reduction_axis,
         "op": reduction,
     }
     if reduction in _INDEX_REDUCERS:
-        reduction_attr["result_kind"] = "axis_position"
+        base_attr["result_kind"] = "axis_position"
     if weight_canonical is not None:
-        reduction_attr["weight"] = weight_canonical
+        base_attr["weight"] = weight_canonical
+
+    # Accumulate ``length_axes`` across chained reductions so ``in_si()``
+    # can apply the right number of ``length_ref`` factors.  Unweighted
+    # ``integrate`` adds ``len(axes)``; weighted ``integrate`` cancels
+    # the length factors between numerator and denominator (units of
+    # ``∫ f w dx / ∫ w dx`` equal units of ``f``); every other reduction
+    # is unit-preserving so it carries the prior count forward
+    # unchanged.  ``argmax``/``argmin`` overwrite ``quantity_type`` to
+    # ``"length"`` and reset the unit dimension entirely — the prior
+    # ``length_axes`` is moot and dropped.
     for name in [str(n) for n in reduced.data_vars]:
-        reduced[name].attrs["reduction"] = dict(reduction_attr)
+        field_attr = dict(base_attr)
+        if reduction not in _INDEX_REDUCERS:
+            prior = data.xr[name].attrs.get("reduction") or {}
+            prior_length_axes = int(prior.get("length_axes", 0))
+            added = len(axes) if (reduction == "integrate" and weight is None) else 0
+            total = prior_length_axes + added
+            if total:
+                field_attr["length_axes"] = total
+        reduced[name].attrs["reduction"] = field_attr
 
     return data._wrap_sliced(reduced)
 

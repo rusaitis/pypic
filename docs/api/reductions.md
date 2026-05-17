@@ -42,6 +42,36 @@ non-`integrate` reductions; for `integrate` the multi-axis form runs a
 sequential trapezoidal that matches the chained two-call form to
 machine precision.
 
+## Unit handling after `integrate`
+
+Unweighted `integrate` shifts the SI unit dimension by one length
+factor per reduced axis (number density m⁻³ → column density m⁻²,
+energy density J/m³ → areal energy J/m²). `reduce` stamps the
+running count on `attrs["reduction"]["length_axes"]` so
+`FieldDataset.in_si` applies the extra `length_ref**n` factor at the
+boundary — column densities come out in the correct C/m² (or m⁻²,
+etc.) without manual length-unit bookkeeping.
+
+```python
+column = pypic.reduce(ds, "z", reduction="integrate")
+column.in_si("rho_c")                # C/m^2 — correct SI
+column.xr["rho_c"].attrs["reduction"]
+# {"axis": "z", "op": "integrate", "length_axes": 1}
+```
+
+Chained integrates accumulate: `reduce(reduce(ds, "y", "integrate"),
+"z", "integrate")` stamps `length_axes=2`, equivalent to
+`reduce(ds, ("y","z"), "integrate")`. Non-integrate reductions
+(`mean`/`sum`/`max`/...) are unit-preserving and carry the count
+forward unchanged. **Weighted** `integrate` does **not** stamp
+`length_axes` because the length factor cancels in
+`∫ f w dx / ∫ w dx`.
+
+The displayed `si_unit` string and the openPMD 7-tuple are still
+authoritatively fixed by TASKS Step 43c; the `length_axes` mechanism
+here is the interim fix that gets `in_si()` returning the right
+*number* today.
+
 ## Weight semantics
 
 `weight=<field-name>` produces yt-style density- or emission-weighted

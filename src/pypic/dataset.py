@@ -973,10 +973,22 @@ class FieldDataset:
         return _field_info(name, axis_names=self._grid.geometry.axis_names)
 
     def in_si(self, name: str) -> FloatArray:
-        """Return a field or derived quantity in SI units.
+        r"""Return a field or derived quantity in SI units.
 
         Checks xarray DataArray attrs first (set by ``with_field()``
         or ``from_arrays()``), then falls back to the global registry.
+
+        For fields that have been reduced via
+        :func:`pypic.reductions.reduce` with ``reduction="integrate"``,
+        the ``attrs["reduction"]["length_axes"]`` provenance stamp
+        records how many length-dimension factors the integration
+        added; ``in_si`` multiplies the registry SI factor by
+        ``normalization.length_ref ** length_axes`` so column
+        densities, line-of-sight integrals, etc. come out in the
+        right SI units (e.g. column density m\ :sup:`-2` instead of
+        m\ :sup:`-3`).  Weighted ``integrate`` does not stamp
+        ``length_axes`` because the length factor cancels in
+        ``∫ f w dx / ∫ w dx``.
 
         Parameters
         ----------
@@ -990,12 +1002,17 @@ class FieldDataset:
         """
         from pypic.compute import compute_field, field_si_factor
 
+        length_axes = 0
         if self.has_field(name):
             resolved = self.resolve_key(name)
             data = self._ds[resolved].values
+            reduction_attr = self._ds[resolved].attrs.get("reduction") or {}
+            length_axes = int(reduction_attr.get("length_axes", 0))
             qt = self._ds[resolved].attrs.get("quantity_type")
             if qt is not None:
                 factor = self._normalization.si_factor(qt)
+                if length_axes:
+                    factor *= self._normalization.length_ref**length_axes
                 return data if factor == 1.0 else data * factor
             # No quantity_type attr — fall through to global registry
         else:
@@ -1003,6 +1020,8 @@ class FieldDataset:
 
         # Fall back to global registry
         factor = field_si_factor(name, self._normalization)
+        if length_axes:
+            factor *= self._normalization.length_ref**length_axes
         return data if factor == 1.0 else data * factor
 
     def in_units(self, name: str, unit_str: str) -> FloatArray:

@@ -259,7 +259,7 @@ def test_aliases_preserved(cartesian_3d: FieldDataset) -> None:
 def test_reduction_attr_recorded(cartesian_3d: FieldDataset) -> None:
     result = reduce(cartesian_3d, "z", reduction="integrate")
     attr = result.xr["B_1"].attrs["reduction"]
-    assert attr == {"axis": "z", "op": "integrate"}
+    assert attr == {"axis": "z", "op": "integrate", "length_axes": 1}
 
 
 def test_reduction_attr_no_length_key(cartesian_3d: FieldDataset) -> None:
@@ -573,3 +573,131 @@ def test_weight_with_nan_raise_checks_weight(
             weight="rho_c",
             nan_policy="raise",
         )
+
+
+# -- length_axes provenance + in_si() round-trip ------------------------------
+
+
+def test_integrate_stamps_length_axes_one(cartesian_3d: FieldDataset) -> None:
+    result = reduce(cartesian_3d, "z", reduction="integrate")
+    assert result.xr["B_1"].attrs["reduction"]["length_axes"] == 1
+
+
+def test_integrate_multi_axis_stamps_length_axes(
+    cartesian_3d: FieldDataset,
+) -> None:
+    result = reduce(cartesian_3d, ("y", "z"), reduction="integrate")
+    assert result.xr["B_1"].attrs["reduction"]["length_axes"] == 2
+
+
+def test_chained_integrate_accumulates_length_axes(
+    cartesian_3d: FieldDataset,
+) -> None:
+    """Sequential single-axis integrates compose to the same count as
+    one multi-axis call."""
+    chained = reduce(
+        reduce(cartesian_3d, "y", reduction="integrate"),
+        "z",
+        reduction="integrate",
+    )
+    one_call = reduce(cartesian_3d, ("y", "z"), reduction="integrate")
+    assert chained.xr["B_1"].attrs["reduction"]["length_axes"] == 2
+    assert one_call.xr["B_1"].attrs["reduction"]["length_axes"] == 2
+
+
+def test_integrate_then_mean_preserves_length_axes(
+    cartesian_3d: FieldDataset,
+) -> None:
+    """Non-integrate reductions are unit-preserving — the length_axes
+    count survives unchanged."""
+    integrated = reduce(cartesian_3d, "z", reduction="integrate")
+    averaged = reduce(integrated, "y", reduction="mean")
+    assert averaged.xr["B_1"].attrs["reduction"]["length_axes"] == 1
+
+
+def test_weighted_integrate_does_not_stamp_length_axes(
+    cartesian_weighted_3d: FieldDataset,
+) -> None:
+    """``∫ f w dx / ∫ w dx`` has the same units as ``f`` — no shift."""
+    result = reduce(cartesian_weighted_3d, "z", reduction="integrate", weight="rho_c")
+    assert "length_axes" not in result.xr["B_1"].attrs["reduction"]
+
+
+def test_non_integrate_unweighted_does_not_stamp_length_axes(
+    cartesian_3d: FieldDataset,
+) -> None:
+    """Sum / mean / max / argmax all preserve units — never stamped on
+    a fresh (no prior integrate) reduction."""
+    for op in ("sum", "mean", "max", "argmax"):
+        result = reduce(cartesian_3d, "z", reduction=op)  # type: ignore[arg-type]
+        assert "length_axes" not in result.xr["B_1"].attrs["reduction"], op
+
+
+def test_argmax_after_integrate_drops_length_axes(
+    cartesian_3d: FieldDataset,
+) -> None:
+    """argmax / argmin overwrite quantity_type to ``length`` — the
+    inherited length_axes count is moot and must be dropped."""
+    integrated = reduce(cartesian_3d, "z", reduction="integrate")
+    located = reduce(integrated, "y", reduction="argmax")
+    assert "length_axes" not in located.xr["B_1"].attrs["reduction"]
+    assert located.field_info("B_1").quantity_type == "length"
+
+
+def test_in_si_honors_length_axes_for_density() -> None:
+    """``in_si`` of a column charge density must equal raw integral
+    times ``length_ref`` — the length factor an unguarded ``in_si``
+    would miss."""
+    n_e = 1e18  # m^-3
+    norm = Normalization.pic_electron(n_e)
+    grid = GridInfo(
+        dimensions=(4, 3, 4),
+        spacing=(0.5, 0.5, 0.5),
+        origin=(0.0, 0.0, 0.0),
+        geometry=CARTESIAN,
+    )
+    # Constant charge density of 1.0 in code units → SI = q_ref * n_ref C/m^3.
+    fields = {"rho_c": np.full((4, 3, 4), 1.0)}
+    ds = FieldDataset.from_arrays(fields, grid, norm)
+
+    column = reduce(ds, "z", reduction="integrate")
+    # The integrated raw value (trapezoidal over a constant=1 over
+    # z spanning [0.25, 1.75]) is just the z-extent of (n-1)*dx = 1.5
+    # in code units.  Each cell carries the same column value.
+    raw_value = float(column["rho_c"][0, 0])
+    expected_si = raw_value * norm.charge_ref * norm.density_ref * norm.length_ref
+    np.testing.assert_allclose(column.in_si("rho_c"), expected_si, rtol=1e-12)
+
+
+def test_in_si_no_length_axes_unchanged(cartesian_3d: FieldDataset) -> None:
+    """Without an integrate, ``in_si`` matches the pre-fix path
+    (identity normalization gives identity output)."""
+    result = reduce(cartesian_3d, "z", reduction="mean")
+    np.testing.assert_array_equal(result.in_si("B_1"), result["B_1"])
+
+
+def test_in_si_weighted_integrate_unchanged(
+    cartesian_weighted_3d: FieldDataset,
+) -> None:
+    """Weighted integrate doesn't shift units — ``in_si`` must equal
+    the raw values under identity normalization."""
+    result = reduce(cartesian_weighted_3d, "z", reduction="integrate", weight="rho_c")
+    np.testing.assert_array_equal(result.in_si("B_1"), result["B_1"])
+
+
+def test_in_si_chained_integrate_applies_two_length_factors() -> None:
+    """A 2-axis integrate must apply ``length_ref ** 2``."""
+    norm = Normalization.pic_electron(1e18)
+    grid = GridInfo(
+        dimensions=(4, 4, 4),
+        spacing=(0.5, 0.5, 0.5),
+        origin=(0.0, 0.0, 0.0),
+        geometry=CARTESIAN,
+    )
+    fields = {"rho_c": np.full((4, 4, 4), 1.0)}
+    ds = FieldDataset.from_arrays(fields, grid, norm)
+
+    column2d = reduce(ds, ("y", "z"), reduction="integrate")
+    raw_value = float(column2d["rho_c"][0])
+    expected_si = raw_value * norm.charge_ref * norm.density_ref * norm.length_ref**2
+    np.testing.assert_allclose(column2d.in_si("rho_c"), expected_si, rtol=1e-12)
