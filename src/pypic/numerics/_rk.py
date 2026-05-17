@@ -20,11 +20,10 @@ one RHS evaluation per accepted step.
 
 References
 ----------
-- Dormand & Prince (1980), "A family of embedded Runge--Kutta
-  formulae", J. Comput. Appl. Math. 6:19--26 — original tableau,
-  embedded error estimator, and FSAL property.
-- Hairer, Nørsett & Wanner (1993), "Solving ODEs I", §II.4 —
-  textbook treatment, step-size control, stability.
+- Dormand-Prince [@DormandPrince1980] — original tableau, embedded
+  error estimator, and FSAL property.
+- Hairer, Nørsett & Wanner [@HairerWanner1993] §II.4 — textbook
+  treatment, step-size control, stability.
 """
 
 from __future__ import annotations
@@ -206,15 +205,18 @@ def embedded_error_norm(
     atol: float,
     rtol: float,
 ) -> float:
-    r"""Infinity-norm of ``err_vec`` scaled by ``atol + rtol * |y_new|``.
+    r"""RMS norm of ``err_vec`` scaled by ``atol + rtol * |y_new|``.
 
-    $$\|\mathrm{err}\|_{\infty} = \max_i \frac{|\mathrm{err}_i|}
-    {\mathrm{atol} + \mathrm{rtol}\,|y_{\mathrm{new},i}|}$$
+    $$\|\mathrm{err}\|_{\mathrm{RMS}} = \sqrt{\frac{1}{n}\sum_i
+    \left(\frac{\mathrm{err}_i}
+    {\mathrm{atol} + \mathrm{rtol}\,|y_{\mathrm{new},i}|}\right)^2}$$
 
     Standard mixed absolute/relative tolerance norm for embedded
-    Runge-Kutta error estimators (Hairer & Wanner §II.4, 1993). A
+    Runge-Kutta error estimators ([@HairerWanner1993] §II.4). A
     returned value $\le 1$ means the step is acceptable under the
-    requested tolerances.
+    requested tolerances. Matches the convention used by
+    ``scipy.integrate.RK45._estimate_error_norm`` so step-size
+    sequences remain comparable between the two.
 
     Parameters
     ----------
@@ -230,15 +232,17 @@ def embedded_error_norm(
     Returns
     -------
     float
-        Scaled infinity-norm of the error.
+        Scaled RMS norm of the error. For a single-component state
+        the RMS collapses to $|\mathrm{err}| / \mathrm{scale}$.
 
     Examples
     --------
     >>> import numpy as np
     >>> err = np.array([1e-6, 2e-6])
     >>> y = np.array([1.0, 2.0])
-    >>> float(embedded_error_norm(err, y, atol=1e-6, rtol=0.0))
-    2.0
+    >>> float(round(embedded_error_norm(err, y, atol=1e-6, rtol=0.0), 6))
+    1.581139
     """
     scale = atol + rtol * np.abs(y_new)
-    return float(np.max(np.abs(err_vec) / scale))
+    scaled = err_vec / scale
+    return float(np.sqrt(np.mean(scaled * scaled)))

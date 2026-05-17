@@ -1,10 +1,17 @@
 """Step-size controllers for embedded Runge-Kutta methods.
 
 The current implementation is the **elementary (I) controller** from
-Hairer, Nørsett & Wanner, "Solving ODEs I", §II.4 (1993): one step's
-error norm sets the next step. A true PI controller (Gustafsson 1988;
-H&W §IV.2) — which threads in the previous step's error — lands in
-this module when a consumer needs it.
+[@HairerWanner1993] §II.4: one step's error norm sets the next step. A
+true PI controller ([@Gustafsson1988]; [@HairerWanner1993] §IV.2) —
+which threads in the previous step's error — lands in this module when
+a consumer needs it.
+
+References
+----------
+- Hairer, Nørsett & Wanner [@HairerWanner1993] §II.4 — elementary
+  (I) step-size controller, safety factor, growth clamps.
+- Gustafsson [@Gustafsson1988] — PI controller (reserved for future
+  upgrade via the ``err_prev`` kwarg).
 """
 
 from __future__ import annotations

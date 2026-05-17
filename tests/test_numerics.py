@@ -166,12 +166,13 @@ class TestEmbeddedErrorNorm:
         # scale = 0 + 0.01 * 100 = 1, err / scale = 1
         assert embedded_error_norm(err, y, atol=0.0, rtol=0.01) == pytest.approx(1.0)
 
-    def test_infinity_norm_picks_max(self) -> None:
-        """Multi-dimensional err uses max, not sum."""
+    def test_rms_norm_averages_over_components(self) -> None:
+        """Multi-dim err uses RMS = sqrt(mean(scaled^2)), matching SciPy."""
         err = np.array([0.1, 1.0, 0.01])
         y = np.array([1.0, 1.0, 1.0])
         result = embedded_error_norm(err, y, atol=1.0, rtol=0.0)
-        assert result == pytest.approx(1.0)
+        # sqrt((0.01 + 1.0 + 0.0001) / 3) ≈ 0.58026
+        assert result == pytest.approx(np.sqrt(1.0101 / 3.0))
 
 
 class TestIStepController:

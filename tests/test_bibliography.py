@@ -3,8 +3,9 @@
 Four invariants that ``mkdocs build --strict`` does not catch:
 
 * every key in ``references.bib`` is cited somewhere in ``docs/**.md``
-  (no orphan entries surviving past a rename),
-* every ``[@Key]`` invocation in the docs has a matching ``.bib``
+  or in ``src/**/*.py`` module/function docstrings (no orphan entries
+  surviving past a rename),
+* every ``[@Key]`` invocation in docs or source has a matching ``.bib``
   entry (independent of ``--strict``; works even if the build flag
   is dropped),
 * every ``doi = {…}`` value parses as a bare DOI — no ``https://``
@@ -27,6 +28,7 @@ from pybtex.database import Entry, parse_file
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 _BIB_PATH = _REPO_ROOT / "docs" / "references.bib"
 _DOCS_DIR = _REPO_ROOT / "docs"
+_SRC_DIR = _REPO_ROOT / "src"
 
 # ``[@Key]``, ``[@Key1; @Key2]``, ``[@Key1; @Key2; @Key3]``. Each
 # key is preceded by ``[`` (first slot) or ``;`` (chained slots).
@@ -40,10 +42,12 @@ _DOI_RE = re.compile(r"^10\.\d{4,9}/\S+$")
 
 
 def _cited_keys() -> set[str]:
-    """Every ``[@Key]`` mentioned across ``docs/**.md``."""
+    """Every ``[@Key]`` mentioned in docs prose or Python docstrings."""
     keys: set[str] = set()
     for md in _DOCS_DIR.glob("*.md"):
         keys.update(_CITATION_RE.findall(md.read_text()))
+    for py in _SRC_DIR.rglob("*.py"):
+        keys.update(_CITATION_RE.findall(py.read_text()))
     return keys
 
 
@@ -57,8 +61,8 @@ def test_no_orphan_bib_entries() -> None:
     orphans = sorted(bib_keys - _cited_keys())
     assert not orphans, (
         "references.bib has entries that are no longer cited "
-        "anywhere in docs/**.md (probable rename or section "
-        "deletion left them behind):\n"
+        "anywhere in docs/**.md or src/**/*.py (probable rename or "
+        "section deletion left them behind):\n"
         + "\n".join(f"  - {key}" for key in orphans)
         + "\n\nEither cite them or remove the entry from "
         "docs/references.bib."
@@ -66,12 +70,12 @@ def test_no_orphan_bib_entries() -> None:
 
 
 def test_all_cited_keys_have_entries() -> None:
-    """Every ``[@Key]`` in the docs resolves to a ``.bib`` entry."""
+    """Every ``[@Key]`` in docs or source resolves to a ``.bib`` entry."""
     bib_keys = set(_bib_entries().keys())
     missing = sorted(_cited_keys() - bib_keys)
     assert not missing, (
-        "docs/**.md cite keys that have no matching entry in "
-        "docs/references.bib:\n"
+        "docs/**.md or src/**/*.py cite keys that have no matching "
+        "entry in docs/references.bib:\n"
         + "\n".join(f"  - {key}" for key in missing)
         + "\n\nAdd the missing @article/@book entry or fix the "
         "citation key."
