@@ -16,11 +16,11 @@ from pypic.numerics._rk import (
     dormand_prince_step,
     embedded_error_norm,
 )
-from pypic.numerics._step_control import pi_step_controller
+from pypic.numerics._step_control import i_step_controller
 
 __all__ = [
     "DPStepResult",
     "dormand_prince_step",
     "embedded_error_norm",
-    "pi_step_controller",
+    "i_step_controller",
 ]

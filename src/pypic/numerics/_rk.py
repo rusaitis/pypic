@@ -5,8 +5,15 @@ tracing or any other pypic concept. The caller supplies the RHS as a
 ``Callable[[FloatArray], FloatArray | None]`` and decides what to do
 with success / failure outcomes.
 
+The kernel exploits Dormand-Prince's First-Same-As-Last (FSAL)
+property: row 6 of the Butcher matrix equals the 5th-order weights,
+so the 7th stage of an accepted step is evaluated at the new
+solution and equals the 1st stage of the next step. Callers can
+pass ``k0`` from the previous accepted step's ``k_last`` to skip
+one RHS evaluation per accepted step.
+
 Reference: Hairer & Wanner, "Solving ODEs I" §II.4 (Butcher tableau,
-embedded error estimator).
+embedded error estimator, FSAL).
 """
 
 from __future__ import annotations
@@ -49,12 +56,12 @@ _DP_E = _DP_B5 - _DP_B4
 class DPStepResult:
     """Outcome of one Dormand-Prince RK4(5) step.
 
-    On success, ``failed_stage`` is ``None`` and ``y_new`` / ``err_vec``
-    are populated. On RHS-callable failure, ``failed_stage`` is the
-    stage index (0-6) whose evaluation returned ``None`` and
-    ``failed_point`` is the point passed to that stage so the caller
-    can classify the failure mode (e.g. null hit, out-of-domain) in
-    its own vocabulary.
+    On success, ``failed_stage`` is ``None`` and ``y_new`` /
+    ``err_vec`` / ``k_last`` are populated. On RHS-callable failure,
+    ``failed_stage`` is the stage index (0-6) whose evaluation
+    returned ``None`` and ``failed_point`` is the point passed to
+    that stage so the caller can classify the failure mode (e.g.
+    null hit, out-of-domain) in its own vocabulary.
 
     Attributes
     ----------
@@ -63,9 +70,10 @@ class DPStepResult:
     err_vec : FloatArray or None
         Embedded 4(5) error estimate vector (same shape as ``y_new``).
         ``None`` on failure.
-    k : FloatArray
-        Stage evaluations of shape ``(7, n)``. Stages 0 through
-        ``failed_stage - 1`` are valid; later rows are unspecified.
+    k_last : FloatArray or None
+        Last stage value ``f(y_new)`` from the FSAL row. ``None`` on
+        failure. Re-pass to the next step via ``k0=`` to skip the
+        stage-0 RHS call on accepted steps.
     failed_stage : int or None
         Index of the stage whose RHS evaluation returned ``None``,
         or ``None`` on success.
@@ -76,7 +84,7 @@ class DPStepResult:
 
     y_new: FloatArray | None
     err_vec: FloatArray | None
-    k: FloatArray
+    k_last: FloatArray | None
     failed_stage: int | None
     failed_point: FloatArray | None
 
@@ -85,6 +93,8 @@ def dormand_prince_step(
     f: Callable[[FloatArray], FloatArray | None],
     y: FloatArray,
     h: float,
+    *,
+    k0: FloatArray | None = None,
 ) -> DPStepResult:
     r"""One Dormand-Prince RK4(5) step from ``y`` over a step of size ``h``.
 
@@ -94,6 +104,9 @@ def dormand_prince_step(
     point is invalid (out-of-domain, at a magnetic null, ...); when
     that happens the step is aborted at the failing stage and the
     failure point is reported back for caller-side classification.
+
+    Currently assumes ``y`` is 1-D ``(n,)``. Vectorize via
+    ``np.tensordot`` when a batched consumer arrives.
 
     Parameters
     ----------
@@ -105,6 +118,11 @@ def dormand_prince_step(
     h : float
         Step size (sign-bearing — pass a negative ``h`` to integrate
         backward).
+    k0 : NDArray or None
+        Pre-computed first-stage value ``f(y)`` from a previous
+        accepted step's ``k_last`` (FSAL re-use). When supplied,
+        skips the stage-0 RHS evaluation. ``None`` (default)
+        evaluates stage 0 normally.
 
     Returns
     -------
@@ -122,14 +140,29 @@ def dormand_prince_step(
     """
     n = y.shape[0]
     k = np.empty((7, n), dtype=np.float64)
-    for i in range(7):
-        yi = y if i == 0 else y + h * np.dot(_DP_A[i, :i], k[:i])
+
+    if k0 is None:
+        rhs0 = f(y)
+        if rhs0 is None:
+            return DPStepResult(
+                y_new=None,
+                err_vec=None,
+                k_last=None,
+                failed_stage=0,
+                failed_point=y,
+            )
+        k[0] = rhs0
+    else:
+        k[0] = k0
+
+    for i in range(1, 7):
+        yi = y + h * np.dot(_DP_A[i, :i], k[:i])
         rhs_val = f(yi)
         if rhs_val is None:
             return DPStepResult(
                 y_new=None,
                 err_vec=None,
-                k=k,
+                k_last=None,
                 failed_stage=i,
                 failed_point=yi,
             )
@@ -140,7 +173,7 @@ def dormand_prince_step(
     return DPStepResult(
         y_new=y_new,
         err_vec=err_vec,
-        k=k,
+        k_last=k[6],
         failed_stage=None,
         failed_point=None,
     )

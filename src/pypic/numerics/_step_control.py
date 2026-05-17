@@ -1,37 +1,42 @@
-"""PI step-size controller for embedded Runge-Kutta methods.
+"""Step-size controllers for embedded Runge-Kutta methods.
 
-The standard order-controlled step adaptation from Hairer & Wanner
-"Solving ODEs I" §II.4. The current implementation is scalar PI
-suitable for the embedded RK4(5) pair; if future kernels need full
-PI/PID with memory of prior errors, this module is where it lands.
+The current implementation is the **elementary (I) controller** from
+Hairer & Wanner "Solving ODEs I" §II.4: one step's error norm sets the
+next step. A true PI controller (with memory of the previous step's
+error) lands in this module when a consumer needs it.
 """
 
 from __future__ import annotations
 
 import numpy as np
 
-# Standard tuning constants for the order-5 embedded method.
-_DP_SAFETY = 0.9  # Bias accepted steps slightly small.
-_DP_GROWTH_MIN = 0.2  # Minimum shrink ratio per accept/reject.
-_DP_GROWTH_MAX = 5.0  # Maximum growth ratio per accept.
-_DP_ERR_FLOOR = 1e-15  # Avoid pow(0, ·) when err is exactly machine zero.
-_DP_EXPONENT = -0.2  # -1 / p with p = 5 (5th-order embedded method).
+# Tuning constants shared across embedded-RK orders.
+_SAFETY = 0.9  # Bias accepted steps slightly small.
+_GROWTH_MIN = 0.2  # Minimum shrink ratio per accept/reject.
+_GROWTH_MAX = 5.0  # Maximum growth ratio per accept.
+_ERR_FLOOR = 1e-15  # Avoid pow(0, ·) when err is exactly machine zero.
 
 
-def pi_step_controller(
+def i_step_controller(
     h: float,
     err_norm: float,
     *,
     min_step: float,
     max_step: float,
+    order: int = 5,
+    err_prev: float | None = None,  # reserved for future PI upgrade
 ) -> float:
-    r"""Next step size from current step and last error norm.
+    r"""Next step size from the current step and its error norm.
 
-    Applies the standard order-5 step-size formula
+    Applies the elementary order-$p$ step-size formula
     $h_{new} = h \cdot S \cdot (\mathrm{err})^{-1/p}$ with safety
-    factor $S = 0.9$ and order $p = 5$, then clamps the growth ratio
-    to ``[_DP_GROWTH_MIN, _DP_GROWTH_MAX]`` and the absolute step to
-    ``[min_step, max_step]``.
+    factor $S = 0.9$, then clamps the growth ratio to
+    ``[_GROWTH_MIN, _GROWTH_MAX]`` and the absolute step to
+    ``[min_step, max_step]``. ``order`` is the order of the embedded
+    method's higher-order solution (5 for Dormand-Prince RK4(5)).
+
+    ``err_prev`` is reserved for a future PI upgrade and ignored
+    today; passing it is harmless.
 
     Parameters
     ----------
@@ -43,6 +48,11 @@ def pi_step_controller(
         ``<= 1`` indicate an acceptable step.
     min_step, max_step : float
         Lower / upper bounds on the returned step magnitude.
+    order : int
+        Order $p$ of the embedded higher-order solution. Default 5
+        (Dormand-Prince RK4(5)).
+    err_prev : float or None
+        Reserved for the PI controller. Currently ignored.
 
     Returns
     -------
@@ -52,17 +62,19 @@ def pi_step_controller(
     Examples
     --------
     >>> # err_norm = 1 → step factor ≈ safety = 0.9
-    >>> float(round(pi_step_controller(1.0, 1.0, min_step=1e-6, max_step=10.0), 6))
+    >>> float(round(i_step_controller(1.0, 1.0, min_step=1e-6, max_step=10.0), 6))
     0.9
-    >>> # err_norm → 0 → growth clamped to _DP_GROWTH_MAX
-    >>> float(pi_step_controller(1.0, 0.0, min_step=1e-6, max_step=10.0))
+    >>> # err_norm → 0 → growth clamped to _GROWTH_MAX
+    >>> float(i_step_controller(1.0, 0.0, min_step=1e-6, max_step=10.0))
     5.0
     """
+    del err_prev  # reserved; not yet used
+    exponent = -1.0 / order
     factor = min(
-        _DP_GROWTH_MAX,
+        _GROWTH_MAX,
         max(
-            _DP_GROWTH_MIN,
-            _DP_SAFETY * max(err_norm, _DP_ERR_FLOOR) ** _DP_EXPONENT,
+            _GROWTH_MIN,
+            _SAFETY * max(err_norm, _ERR_FLOOR) ** exponent,
         ),
     )
     return float(np.clip(h * factor, min_step, max_step))

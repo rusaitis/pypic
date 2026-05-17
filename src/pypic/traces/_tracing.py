@@ -20,7 +20,7 @@ from scipy.interpolate import RegularGridInterpolator
 from pypic.numerics import (
     dormand_prince_step,
     embedded_error_norm,
-    pi_step_controller,
+    i_step_controller,
 )
 from pypic.traces._fieldline import _VALID_DIRECTIONS
 
@@ -202,8 +202,8 @@ def _trace_single_direction_adaptive(
 
     Bookkeeping (buffer, signed direction, null/out-of-domain
     classification, termination callback) lives here; the pure
-    Dormand-Prince step + error estimator + PI controller live in
-    :mod:`pypic.numerics`.
+    Dormand-Prince step + error estimator + step-size controller
+    live in :mod:`pypic.numerics`.
     """
     buf = np.empty((max_steps + 1, 3), dtype=np.float64)
     buf[0] = seed
@@ -211,12 +211,16 @@ def _trace_single_direction_adaptive(
     reason = TerminationReason.MAX_STEPS
     h = step_size_init
     max_local_error = 0.0
+    # FSAL: k_last from the previous accepted step seeds k[0] of the
+    # next attempt. None on the very first attempt. On a rejection,
+    # y is unchanged so k_carry stays valid for the retry — no reset.
+    k_carry: FloatArray | None = None
 
     def rhs(yi: FloatArray) -> FloatArray | None:
         return _rhs(yi, interp, sign, null_threshold)
 
     while n < max_steps:
-        result = dormand_prince_step(rhs, buf[n], h)
+        result = dormand_prince_step(rhs, buf[n], h, k0=k_carry)
         if result.failed_stage is not None:
             assert result.failed_point is not None  # invariant of DPStepResult
             reason = _classify_failure(result.failed_point, interp)
@@ -224,20 +228,23 @@ def _trace_single_direction_adaptive(
 
         assert result.y_new is not None  # success path
         assert result.err_vec is not None
+        assert result.k_last is not None
         err_norm = embedded_error_norm(result.err_vec, result.y_new, atol, rtol)
         max_local_error = max(max_local_error, err_norm)
-        h_new = pi_step_controller(
-            h, err_norm, min_step=min_step, max_step=max_step
-        )
+        h_new = i_step_controller(h, err_norm, min_step=min_step, max_step=max_step)
 
         if err_norm <= 1.0 or h <= min_step:
             n += 1
             buf[n] = result.y_new
+            k_carry = result.k_last
             h = h_new
             if terminate is not None and terminate(result.y_new):
                 reason = TerminationReason.CALLBACK
                 break
         else:
+            # Reject: y unchanged, retry with smaller h. k_carry stays
+            # as-is (still f(buf[n]) from the prior accept), so the
+            # retry also benefits from FSAL.
             h = h_new
 
     return buf[: n + 1], reason, max_local_error
