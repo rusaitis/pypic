@@ -188,6 +188,68 @@ def test_non_cartesian_raises_not_implemented(
         reduce(spherical_3d, "r")
 
 
+def test_reduce_along_time_dim(cartesian_3d: FieldDataset) -> None:
+    """``reduce`` accepts non-grid dims like ``time``  — useful for
+    ``to_zarr_timeseries`` outputs where ``time`` is the leading dim
+    on every field array.  Grid covers spatial axes only; xarray
+    tracks any extra leading dims independently."""
+    import xarray as xr
+
+    grid = cartesian_3d.grid
+    base = cartesian_3d.xr["B_1"]
+    # Stack two snapshots along a new "time" dim, with explicit coords
+    # so trapezoidal integration also works.
+    stacked_b1 = xr.concat([base, base + 10.0], dim="time").assign_coords(
+        time=[0.0, 1.0]
+    )
+    stacked = xr.Dataset({"B_1": stacked_b1})
+    fds = FieldDataset(stacked, grid, cartesian_3d.normalization)
+
+    time_mean = reduce(fds, "time", reduction="mean")
+    expected = (base.values + (base.values + 10.0)) / 2
+    np.testing.assert_allclose(time_mean["B_1"], expected, rtol=1e-12)
+    # Grid is unchanged — time is not a spatial axis.
+    assert time_mean.grid.surviving_axis_names == ("x", "y", "z")
+    assert time_mean.grid.dimensions == grid.dimensions
+
+
+def test_reduce_along_time_dim_non_cartesian(
+    spherical_3d: FieldDataset,
+) -> None:
+    """Pure non-spatial reductions bypass the Cartesian gate — the
+    Jacobian only matters when integrating over a spatial axis."""
+    import xarray as xr
+
+    base = spherical_3d.xr["B_1"]
+    stacked_b1 = xr.concat([base, base * 2.0], dim="time").assign_coords(
+        time=[0.0, 1.0]
+    )
+    stacked = xr.Dataset({"B_1": stacked_b1})
+    fds = FieldDataset(stacked, spherical_3d.grid, spherical_3d.normalization)
+    # No NotImplementedError — time is not in surviving_axis_names.
+    time_mean = reduce(fds, "time", reduction="mean")
+    expected = (base.values + base.values * 2.0) / 2
+    np.testing.assert_allclose(time_mean["B_1"], expected, rtol=1e-12)
+
+
+def test_reduce_along_time_then_spatial_still_gates_geometry(
+    spherical_3d: FieldDataset,
+) -> None:
+    """Mixed (time, r) reduction on a spherical grid must still raise:
+    once any spatial axis enters the reduction the Jacobian deferral
+    kicks in."""
+    import xarray as xr
+
+    base = spherical_3d.xr["B_1"]
+    stacked_b1 = xr.concat([base, base * 2.0], dim="time").assign_coords(
+        time=[0.0, 1.0]
+    )
+    stacked = xr.Dataset({"B_1": stacked_b1})
+    fds = FieldDataset(stacked, spherical_3d.grid, spherical_3d.normalization)
+    with pytest.raises(NotImplementedError, match="Cartesian"):
+        reduce(fds, ("time", "r"), reduction="mean")
+
+
 def test_aliases_preserved(cartesian_3d: FieldDataset) -> None:
     result = reduce(cartesian_3d, "z", reduction="mean")
     assert result.has_field("Bx")
@@ -254,6 +316,17 @@ def test_argmax_overrides_quantity_type(cartesian_3d: FieldDataset) -> None:
     """``argmax`` returns an axis position — quantity becomes ``length``."""
     result = reduce(cartesian_3d, "z", reduction="argmax")
     assert result.field_info("B_1").quantity_type == "length"
+
+
+def test_argmax_clears_field_descriptors(cartesian_3d: FieldDataset) -> None:
+    """``argmax`` must drop ``latex`` and ``long_name`` — the array now
+    holds coordinate positions, not field values, so the original
+    field-specific descriptors would mislabel the result."""
+    # Sanity: the input has these set (from the field registry).
+    assert cartesian_3d.xr["B_1"].attrs.get("long_name")
+    result = reduce(cartesian_3d, "z", reduction="argmax")
+    assert "latex" not in result.xr["B_1"].attrs
+    assert "long_name" not in result.xr["B_1"].attrs
 
 
 def test_argmax_stamps_result_kind(cartesian_3d: FieldDataset) -> None:

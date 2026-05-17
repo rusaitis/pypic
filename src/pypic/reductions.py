@@ -98,11 +98,14 @@ def reduce(
     data : FieldDataset
         Input dataset (1-, 2-, or 3-D — must contain every name in *axis*).
     axis : str or tuple of str
-        Surviving-axis name(s) to reduce away (e.g. ``"x"``, ``("y", "z")``).
-        Validated against ``data.grid.surviving_axis_names``.  Multi-axis
-        reduction collapses several dimensions in one call — useful for
-        going from 3D to 1D without chaining.  ``"argmax"`` and
-        ``"argmin"`` require a single axis.
+        Dimension name(s) to reduce away (e.g. ``"x"``, ``("y", "z")``,
+        ``"time"``).  Validated against the underlying xarray dataset's
+        dims so non-grid dims like ``time`` (added by
+        :func:`pypic.io.to_zarr_timeseries`) are accepted alongside the
+        spatial ``grid.surviving_axis_names``.  Multi-axis reduction
+        collapses several dimensions in one call — useful for going
+        from 3D to 1D without chaining.  ``"argmax"`` and ``"argmin"``
+        require a single axis.
     reduction : str
         How to collapse the axis.  Choices:
 
@@ -163,8 +166,10 @@ def reduce(
     Raises
     ------
     NotImplementedError
-        Non-Cartesian geometry.  Spherical / cylindrical Jacobian-aware
-        integration is deferred to TASKS Step 19b/20b.
+        Non-Cartesian geometry combined with a spatial-axis reduction.
+        Spherical / cylindrical Jacobian-aware integration is deferred
+        to TASKS Step 43b.  Pure non-spatial reductions (e.g. along
+        ``time``) bypass this check.
     ValueError
         Unknown *axis* name, invalid *reduction* or *nan_policy*,
         multi-axis input passed with ``reduction="argmax"`` /
@@ -184,7 +189,7 @@ def reduce(
     *original* SI factor would yield — off by one length-unit per
     reduced axis.  Users needing correct SI units multiply by the
     appropriate ``data.normalization.length_si`` factor.  Unit-aware
-    reduction is tracked alongside Step 20b.
+    reduction is tracked as TASKS Step 43c.
 
     Examples
     --------
@@ -223,15 +228,6 @@ def reduce(
     if selection is not None:
         data = selection.apply(data)
 
-    if data.grid.geometry.type is not GeometryType.CARTESIAN:
-        msg = (
-            f"reduce() supports Cartesian grids only "
-            f"(got {data.grid.geometry.type.value}); "
-            f"spherical/cylindrical Jacobian-aware integration is "
-            f"deferred to TASKS Step 19b/20b"
-        )
-        raise NotImplementedError(msg)
-
     axes: tuple[str, ...] = (axis,) if isinstance(axis, str) else tuple(axis)
     if not axes:
         msg = "reduce(): axis must name at least one dimension"
@@ -240,11 +236,29 @@ def reduce(
         msg = f"reduce(): duplicate axis names in {axes!r}"
         raise ValueError(msg)
 
-    axis_names = data.grid.surviving_axis_names
+    spatial_axes = data.grid.surviving_axis_names
+    xr_dims = tuple(str(d) for d in data.xr.dims)
     for ax in axes:
-        if ax not in axis_names:
-            msg = f"Axis {ax!r} not found in dataset dimensions {axis_names!r}"
+        # Accept any name present on the underlying xarray dataset, so
+        # non-grid dims like ``time`` (added by ``to_zarr_timeseries``)
+        # can be reduced too — not just the spatial ``surviving_axis_names``.
+        if ax not in xr_dims:
+            msg = f"Axis {ax!r} not found in dataset dimensions {xr_dims!r}"
             raise ValueError(msg)
+
+    # The Cartesian gate only fires when at least one *spatial* axis is
+    # being reduced — Jacobian-aware integration on non-Cartesian grids
+    # is deferred to Step 43b.  Pure non-spatial reductions (e.g.
+    # ``reduce(ts, "time", "mean")``) are geometry-agnostic.
+    reduces_spatial = any(ax in spatial_axes for ax in axes)
+    if reduces_spatial and data.grid.geometry.type is not GeometryType.CARTESIAN:
+        msg = (
+            f"reduce() supports Cartesian grids only for spatial-axis "
+            f"reductions (got {data.grid.geometry.type.value}); "
+            f"spherical/cylindrical Jacobian-aware integration is "
+            f"deferred to TASKS Step 43b"
+        )
+        raise NotImplementedError(msg)
 
     if reduction in _INDEX_REDUCERS and len(axes) > 1:
         msg = (
@@ -298,9 +312,7 @@ def reduce(
 
     if reduction == "integrate":
         if weight_da is None:
-            reduced = ds_to_reduce
-            for ax in axes:
-                reduced = reduced.integrate(coord=ax)
+            reduced = ds_to_reduce.integrate(coord=list(axes))
         else:
             reduced = _weighted_integrate(
                 ds_to_reduce, weight_da, axes, nan_policy=nan_policy
@@ -329,8 +341,12 @@ def reduce(
             attrs = dict(reduced[name].attrs)
             attrs["quantity_type"] = "length"
             attrs["si_unit"] = "m"
-            attrs.pop("latex", None)
             attrs["unit_dimension"] = (1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+            # The array now holds coordinate positions, not field values —
+            # clear field-specific descriptors so downstream tooling doesn't
+            # mislabel the result as the original quantity.
+            attrs.pop("latex", None)
+            attrs.pop("long_name", None)
             reduced[name].attrs = attrs
 
     reduction_axis: str | tuple[str, ...]
@@ -395,14 +411,11 @@ def _weighted_integrate(
     Joint NaN-masking under ``nan_policy="omit"`` matches
     :func:`_weighted_mean`.
     """
+    coords = list(axes)
 
     def _one(field_da: xr.DataArray) -> xr.DataArray:
         fw, w = _joint_mask(field_da, weight_da, nan_policy=nan_policy)
-        for ax in axes:
-            fw = fw.integrate(coord=ax)
-            w = w.integrate(coord=ax)
-        result: xr.DataArray = fw / w
-        return result
+        return fw.integrate(coord=coords) / w.integrate(coord=coords)
 
     return ds.map(_one, keep_attrs=True)
 

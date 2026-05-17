@@ -11,6 +11,7 @@ pypic provides a unified interface to multiple simulation formats (iPIC3D, BATSR
 - **Unit system** — PIC (electron- or ion-referenced), MHD (Alfvén-speed-based), SI, or custom normalization. Round-trip `normalize()` / `to_si()` with display unit conversion (`"nT"`, `"km/s"`, etc.).
 - **Geometry-aware operators** — divergence, curl, gradient with coordinate metric factors. Cartesian implemented; spherical/cylindrical planned.
 - **Selections** — `PlaneSelection` and `BoxSelection` for slicing 3D data into lower-dimensional views.
+- **Reductions** — `pypic.reduce(ds, axis, reduction=...)` collapses fields along one or more axes (trapezoidal `integrate`, `mean`/`median`/`sum`, `argmax`/`argmin` returning coordinate positions, etc.). Pairs with selections for column densities, slab averages, density-weighted line averages (`weight=`), and projected-peak diagnostics.
 - **Field registry** — `compute("beta")`, `compute("|B|")`, `compute("v_A")` dispatches to the right derived function. Extensible via `register_field()`.
 
 ## Requirements

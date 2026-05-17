@@ -104,6 +104,81 @@ fig, ax = pypic.plot_field_slice(
 `reduce → plot_field_slice` is the canonical pattern for column
 density / LOS imaging.
 
+## Time-axis reduction
+
+`reduce` accepts any dimension on the underlying xarray dataset —
+not just the spatial `grid.surviving_axis_names`. For time-series
+stores written by `to_zarr_timeseries`, every field has `time` as
+the leading dim, so a time-mean / time-integrate works directly:
+
+```python
+ts = pypic.from_zarr("run.zarr")     # fields shaped (nt, nx, ny, nz)
+B_mean = pypic.reduce(ts, "time", reduction="mean")
+```
+
+Pure non-spatial reductions bypass the Cartesian-grid gate — the
+Jacobian only matters when integrating over a spatial axis. A
+mixed `("time", "r")` reduction on a spherical grid still raises
+`NotImplementedError` until Step 43b lands.
+
+## Worked examples
+
+Three first-line plasma diagnostics expressible in the current API.
+
+### EDR localization via the Zenitani localizer
+
+The electron-frame dissipation $D_e$ (Zenitani EDR localizer) peaks
+inside the electron diffusion region. Per-column z-position of the
+peak gives an EDR centroid map:
+
+```python
+ds_with_De = ds.compute("D_e")
+# argmax returns the *coordinate value* of the maximum along z,
+# not an integer index — the result is one z-position per (x, y).
+z_peak = pypic.reduce(ds_with_De, "z", reduction="argmax", fields=["D_e"])
+# z_peak.field_info("D_e").quantity_type == "length"
+```
+
+For the *value* at the peak (rather than the location), swap to
+`reduction="max"`.
+
+### Density-weighted column temperature (synthetic LOS observable)
+
+The line-of-sight temperature that an external observer would
+measure is the emission/density-weighted average — the yt
+"`weight_field`" convention:
+
+```python
+T_col = pypic.reduce(ds, "z", reduction="integrate",
+                     weight="rho_c", fields=["T_s0"])
+# T_col["T_s0"] == ∫ T_s0 ρ_c dz / ∫ ρ_c dz
+```
+
+The provenance attr records the weight:
+`T_col.xr["T_s0"].attrs["reduction"]` →
+`{"axis": "z", "op": "integrate", "weight": "rho_c"}`.
+
+### Energy-budget conservation
+
+For each timestep, integrate the energy densities over the full
+volume to get total magnetic, kinetic, and thermal energy:
+
+```python
+totals_by_step: list[tuple[float, dict[str, float]]] = []
+for step in sim.steps:
+    ds = sim.read(step).compute("e_B", "e_k", "e_th")
+    totals = pypic.reduce(ds, ("x", "y", "z"), reduction="integrate")
+    totals_by_step.append(
+        (sim.time_for(step), {
+            "E_B": float(totals["e_B"]),
+            "E_k": float(totals["e_k"]),
+            "E_th": float(totals["e_th"]),
+        })
+    )
+# Plot E_B(t) + E_k(t) + E_th(t) — should be conserved in ideal MHD
+# runs and slowly evolve in dissipative ones.
+```
+
 ## CLI
 
 ```bash
