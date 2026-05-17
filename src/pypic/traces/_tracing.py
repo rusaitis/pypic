@@ -198,7 +198,7 @@ def _trace_single_direction_adaptive(
     null_threshold: float,
     terminate: Callable[[FloatArray], bool] | None,
 ) -> tuple[FloatArray, TerminationReason, float]:
-    """Dormand-Prince RK4(5) adaptive integration in one direction.
+    """Dormand-Prince 5(4) adaptive integration in one direction.
 
     Bookkeeping (buffer, signed direction, null/out-of-domain
     classification, termination callback) lives here; the pure
@@ -448,7 +448,7 @@ def trace_field_line_adaptive(
     terminate: Callable[[FloatArray], bool] | None = None,
     interpolator: VectorFieldInterpolator | None = None,
 ) -> FieldLine:
-    r"""Trace a field line using adaptive Dormand-Prince RK4(5).
+    r"""Trace a field line using adaptive Dormand-Prince 5(4).
 
     Uses embedded error estimation to adapt step size, taking larger
     steps in smooth regions and smaller steps near strong curvature.

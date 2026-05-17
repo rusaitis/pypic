@@ -1,9 +1,10 @@
 """Step-size controllers for embedded Runge-Kutta methods.
 
 The current implementation is the **elementary (I) controller** from
-Hairer & Wanner "Solving ODEs I" §II.4: one step's error norm sets the
-next step. A true PI controller (with memory of the previous step's
-error) lands in this module when a consumer needs it.
+Hairer, Nørsett & Wanner, "Solving ODEs I", §II.4 (1993): one step's
+error norm sets the next step. A true PI controller (Gustafsson 1988;
+H&W §IV.2) — which threads in the previous step's error — lands in
+this module when a consumer needs it.
 """
 
 from __future__ import annotations
@@ -33,7 +34,7 @@ def i_step_controller(
     factor $S = 0.9$, then clamps the growth ratio to
     ``[_GROWTH_MIN, _GROWTH_MAX]`` and the absolute step to
     ``[min_step, max_step]``. ``order`` is the order of the embedded
-    method's higher-order solution (5 for Dormand-Prince RK4(5)).
+    method's higher-order solution (5 for Dormand-Prince 5(4)).
 
     ``err_prev`` is reserved for a future PI upgrade and ignored
     today; passing it is harmless.
@@ -50,7 +51,7 @@ def i_step_controller(
         Lower / upper bounds on the returned step magnitude.
     order : int
         Order $p$ of the embedded higher-order solution. Default 5
-        (Dormand-Prince RK4(5)).
+        (Dormand-Prince 5(4)).
     err_prev : float or None
         Reserved for the PI controller. Currently ignored.
 

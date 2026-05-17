@@ -1,9 +1,15 @@
-"""Dormand-Prince RK4(5) adaptive ODE step kernel.
+"""Dormand-Prince 5(4) adaptive ODE step kernel.
 
 Pure numerics: state-vector-agnostic, no dependency on field-line
 tracing or any other pypic concept. The caller supplies the RHS as a
 ``Callable[[FloatArray], FloatArray | None]`` and decides what to do
 with success / failure outcomes.
+
+The notation ``p(q)`` follows Hairer & Wanner: propagate with order
+*p*, embedded estimator order *q*. The 5th-order weights ``_DP_B5``
+advance the solution; the 4th-order weights ``_DP_B4`` produce the
+embedded error estimate. SciPy's ``RK45`` and MATLAB's ``ode45``
+implement the same tableau.
 
 The kernel exploits Dormand-Prince's First-Same-As-Last (FSAL)
 property: row 6 of the Butcher matrix equals the 5th-order weights,
@@ -12,8 +18,13 @@ solution and equals the 1st stage of the next step. Callers can
 pass ``k0`` from the previous accepted step's ``k_last`` to skip
 one RHS evaluation per accepted step.
 
-Reference: Hairer & Wanner, "Solving ODEs I" §II.4 (Butcher tableau,
-embedded error estimator, FSAL).
+References
+----------
+- Dormand & Prince (1980), "A family of embedded Runge--Kutta
+  formulae", J. Comput. Appl. Math. 6:19--26 — original tableau,
+  embedded error estimator, and FSAL property.
+- Hairer, Nørsett & Wanner (1993), "Solving ODEs I", §II.4 —
+  textbook treatment, step-size control, stability.
 """
 
 from __future__ import annotations
@@ -29,7 +40,7 @@ if TYPE_CHECKING:
     from pypic.types import FloatArray
 
 
-# Dormand-Prince RK4(5) Butcher tableau (7 stages).
+# Dormand-Prince 5(4) Butcher tableau (7 stages, FSAL).
 # Rows = stages, columns = weights on previous stages.
 _DP_A = np.array(
     [
@@ -54,7 +65,7 @@ _DP_E = _DP_B5 - _DP_B4
 
 @dataclass(frozen=True, slots=True)
 class DPStepResult:
-    """Outcome of one Dormand-Prince RK4(5) step.
+    """Outcome of one Dormand-Prince 5(4) step.
 
     On success, ``failed_stage`` is ``None`` and ``y_new`` /
     ``err_vec`` / ``k_last`` are populated. On RHS-callable failure,
@@ -96,10 +107,20 @@ def dormand_prince_step(
     *,
     k0: FloatArray | None = None,
 ) -> DPStepResult:
-    r"""One Dormand-Prince RK4(5) step from ``y`` over a step of size ``h``.
+    r"""One Dormand-Prince 5(4) step from ``y`` over a step of size ``h``.
 
     Evaluates the 7 stages of the Dormand-Prince tableau and returns
-    both the 5th-order solution and the embedded 4(5) error estimate.
+    both the 5th-order solution and the embedded 4th-order error
+    estimate:
+
+    $$y_{n+1} = y_n + h \sum_{i=1}^{7} b_i\, k_i, \qquad
+    k_i = f\!\left(y_n + h \sum_{j<i} a_{ij}\, k_j\right)$$
+
+    $$\mathrm{err} = h \sum_{i=1}^{7} (b_i - \hat{b}_i)\, k_i$$
+
+    where $b_i$ are the 5th-order propagation weights (``_DP_B5``)
+    and $\hat{b}_i$ are the embedded 4th-order weights (``_DP_B4``).
+
     The RHS callable ``f`` may return ``None`` to signal that the
     point is invalid (out-of-domain, at a magnetic null, ...); when
     that happens the step is aborted at the failing stage and the
@@ -187,10 +208,13 @@ def embedded_error_norm(
 ) -> float:
     r"""Infinity-norm of ``err_vec`` scaled by ``atol + rtol * |y_new|``.
 
+    $$\|\mathrm{err}\|_{\infty} = \max_i \frac{|\mathrm{err}_i|}
+    {\mathrm{atol} + \mathrm{rtol}\,|y_{\mathrm{new},i}|}$$
+
     Standard mixed absolute/relative tolerance norm for embedded
-    Runge-Kutta error estimators (Hairer & Wanner §II.4). A returned
-    value ``<= 1`` means the step is acceptable under the requested
-    tolerances.
+    Runge-Kutta error estimators (Hairer & Wanner §II.4, 1993). A
+    returned value $\le 1$ means the step is acceptable under the
+    requested tolerances.
 
     Parameters
     ----------
