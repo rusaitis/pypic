@@ -130,6 +130,17 @@ class TestSchemaValidateCli:
         first = entry["errors"][0]
         assert {"type", "loc", "msg"} <= first.keys()
 
+    def test_stdin_with_other_paths_exits_two(self, tmp_path: Path) -> None:
+        # '-' is only valid when it's the sole input — otherwise the
+        # second '-' (or any stdin slot beyond the first) would read
+        # an already-drained stream and silently produce empty input.
+        other = tmp_path / "ok.toml"
+        other.write_text(_build_toml())
+        runner = CliRunner()
+        result = runner.invoke(schema_app, ["validate", "-", str(other)])
+        assert result.exit_code == 2, result.output
+        assert "stdin" in result.output.lower()
+
 
 class TestSchemaDiffCli:
     def test_same_file_no_diff(self) -> None:
@@ -179,6 +190,16 @@ class TestSchemaDiffCli:
         runner = CliRunner()
         result = runner.invoke(schema_app, ["diff", str(bad)])
         assert result.exit_code == 2, result.output
+
+    def test_stdin_for_second_arg_exits_two(self) -> None:
+        # '-' is only meaningful for the first argument; the second
+        # would read an already-drained stdin. Reject early with a
+        # clear message instead of bubbling up a downstream JSON
+        # decode error.
+        runner = CliRunner()
+        result = runner.invoke(schema_app, ["diff", str(ON_DISK_SCHEMA), "-"])
+        assert result.exit_code == 2, result.output
+        assert "stdin" in result.output.lower()
 
 
 class TestSchemaDiffPure:

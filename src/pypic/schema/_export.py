@@ -81,12 +81,13 @@ def build_schema(
 def dump_schema(schema: Mapping[str, Any], *, pretty: bool = True) -> str:
     """Serialize ``schema`` as JSON with stable key ordering.
 
-    Pretty output ends with a trailing newline so the file plays nicely
-    with POSIX text-file conventions and ``git diff``.
+    Both ``pretty`` and ``compact`` output end with a trailing newline
+    so the file plays nicely with POSIX text-file conventions and
+    ``git diff``, and so callers don't have to special-case the sink.
     """
     if pretty:
         return json.dumps(schema, indent=2, sort_keys=True) + "\n"
-    return json.dumps(schema, separators=(",", ":"), sort_keys=True)
+    return json.dumps(schema, separators=(",", ":"), sort_keys=True) + "\n"
 
 
 def get_schema_path(version: str = SCHEMA_VERSION) -> Path:

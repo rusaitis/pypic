@@ -104,6 +104,7 @@ def test_pretty_and_compact_are_semantically_equivalent() -> None:
     assert json.loads(pretty) == json.loads(compact)
     assert len(compact) < len(pretty)
     assert pretty.endswith("\n")
+    assert compact.endswith("\n")
 
 
 def test_on_disk_artifact_matches_current_models() -> None:

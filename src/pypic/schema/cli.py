@@ -116,8 +116,6 @@ def export(
     payload = dump_schema(schema, pretty=pretty)
     if str(output) == "-":
         sys.stdout.write(payload)
-        if not pretty:
-            sys.stdout.write("\n")
     else:
         output.write_text(payload)
 
@@ -151,6 +149,13 @@ def validate(
     broken TOML (hard errors override validation failures in the exit
     code).
     """
+    if len(paths) > 1 and any(str(p) == "-" for p in paths):
+        typer.echo(
+            "'-' (stdin) may only be used when it is the sole input.",
+            err=True,
+        )
+        raise typer.Exit(code=2)
+
     results: list[dict[str, Any]] = []
     exit_code = 0
 
@@ -247,6 +252,13 @@ def diff(
 
     if b is None:
         b = get_schema_path(schema_version)
+    elif str(b) == "-":
+        typer.echo(
+            "'-' (stdin) is only accepted for the first argument; "
+            "the second must be a file path.",
+            err=True,
+        )
+        raise typer.Exit(code=2)
 
     try:
         a_doc = _load_json(a)
