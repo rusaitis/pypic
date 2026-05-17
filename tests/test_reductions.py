@@ -701,3 +701,78 @@ def test_in_si_chained_integrate_applies_two_length_factors() -> None:
     raw_value = float(column2d["rho_c"][0])
     expected_si = raw_value * norm.charge_ref * norm.density_ref * norm.length_ref**2
     np.testing.assert_allclose(column2d.in_si("rho_c"), expected_si, rtol=1e-12)
+
+
+# -- defensive edge cases ----------------------------------------------------
+
+
+def test_all_nan_field_omit_returns_all_nan(cartesian_3d: FieldDataset) -> None:
+    """SphereSelection that misses the entire domain leaves every cell
+    NaN. ``nan_policy='omit'`` must return all-NaN without raising —
+    the empty-region path through skipna reductions."""
+    import warnings
+
+    far_sphere = SphereSelection(
+        center=(1000.0, 1000.0, 1000.0), radius=0.1, keep="inside"
+    )
+    with warnings.catch_warnings():
+        # xarray's skipna reductions emit RuntimeWarning on all-NaN
+        # slices; the call must still return without raising.
+        warnings.simplefilter("ignore", RuntimeWarning)
+        result = reduce(cartesian_3d, "z", selection=far_sphere, reduction="mean")
+    assert np.all(np.isnan(result["B_1"]))
+
+
+def test_weight_zero_everywhere_mean_yields_nan(cartesian_3d: FieldDataset) -> None:
+    """Weighted mean with weight ≡ 0 → denominator 0 → 0/0 = NaN.
+    Locks the behavior in so a future ``denom + eps`` regression can't
+    silently convert NaN to a misleading finite value."""
+    grid = cartesian_3d.grid
+    fields = {
+        "B_1": cartesian_3d.xr["B_1"].values,
+        "rho_c": np.zeros(grid.dimensions),
+    }
+    ds = FieldDataset.from_arrays(fields, grid, Normalization.identity())
+    result = reduce(ds, "z", reduction="mean", weight="rho_c")
+    assert np.all(np.isnan(result["B_1"]))
+
+
+def test_weight_zero_everywhere_integrate_yields_nan(
+    cartesian_3d: FieldDataset,
+) -> None:
+    """Weighted integrate with weight ≡ 0 → ∫ w dx = 0 → 0/0 = NaN."""
+    grid = cartesian_3d.grid
+    fields = {
+        "B_1": cartesian_3d.xr["B_1"].values,
+        "rho_c": np.zeros(grid.dimensions),
+    }
+    ds = FieldDataset.from_arrays(fields, grid, Normalization.identity())
+    result = reduce(ds, "z", reduction="integrate", weight="rho_c")
+    assert np.all(np.isnan(result["B_1"]))
+
+
+def test_weight_integrate_with_nan_omit_uses_joint_mask(
+    cartesian_weighted_3d: FieldDataset,
+) -> None:
+    """Joint masking for ``reduction='integrate'`` — symmetric to
+    ``test_weight_with_nan_omit_uses_joint_mask`` (which covers the
+    ``mean`` path). Cells where field or weight is NaN must be zeroed
+    in both numerator and denominator of ``∫ f w dx / ∫ w dx``."""
+    f = cartesian_weighted_3d.xr["B_1"].values.copy()
+    w = cartesian_weighted_3d.xr["rho_c"].values.copy()
+    f[0, 0, 0] = np.nan  # field NaN at z=0
+    w[0, 0, 1] = np.nan  # weight NaN at z=1
+    grid = cartesian_weighted_3d.grid
+    nan_ds = FieldDataset.from_arrays(
+        {"B_1": f, "rho_c": w}, grid, Normalization.identity()
+    )
+    result = reduce(
+        nan_ds, "z", reduction="integrate", weight="rho_c", nan_policy="omit"
+    )
+    # Column (0, 0): both z-cells masked → 0/0 = NaN
+    assert np.isnan(result["B_1"][0, 0])
+    # Undisturbed column (3, 2): matches plain weighted integrate
+    z = grid.coordinate_arrays()[2]
+    numer = np.trapezoid(f[3, 2, :] * w[3, 2, :], x=z)
+    denom = np.trapezoid(w[3, 2, :], x=z)
+    assert_allclose(result["B_1"][3, 2], numer / denom, rtol=1e-12)
