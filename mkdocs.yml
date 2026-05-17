@@ -63,3 +63,4 @@ nav:
     - Coordinates & Operators: api/coordinates.md
     - Readers: api/readers.md
     - Field Line Tracing: api/traces.md
+    - Server: api/server.md

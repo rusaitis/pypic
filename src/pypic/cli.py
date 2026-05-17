@@ -2344,5 +2344,55 @@ def plot_compare(
         plt.show()
 
 
+@app.command()
+def serve(
+    root: Annotated[
+        Path,
+        typer.Argument(help="Directory whose subdirectories contain simulation.toml."),
+    ],
+    host: Annotated[
+        str,
+        typer.Option("--host", help="Bind address."),
+    ] = "127.0.0.1",
+    port: Annotated[
+        int,
+        typer.Option("--port", help="Port number."),
+    ] = 8000,
+    reload: Annotated[
+        bool,
+        typer.Option("--reload", help="Auto-reload on code change (dev)."),
+    ] = False,
+    cors_origin: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--cors-origin",
+            help="CORS-allowed origin (repeatable). Default '*' for local dev.",
+        ),
+    ] = None,
+) -> None:
+    """Run the Arrow IPC + JSON HTTP server (Step 37 foundations).
+
+    Exposes JSON discovery routes (``/health``, ``/sims``, ...) and one
+    WebSocket endpoint (``/sims/{sim}/stream``) that streams
+    :class:`~pypic.dataset.FieldDataset` slices as Arrow IPC bytes to
+    webpic and other Arrow-aware clients.  See ``docs/api/server.md``
+    for the wire protocol.
+
+    Requires the ``server`` extra (pip install 'pypic[server]').
+    """
+    try:
+        from pypic.server.app import serve as _serve
+    except ImportError as exc:
+        typer.echo(
+            "pypic serve requires the server extra. "
+            "Install with: pip install pypic[server]",
+            err=True,
+        )
+        raise typer.Exit(1) from exc
+
+    origins = tuple(cors_origin) if cors_origin else ("*",)
+    _serve(root, host=host, port=port, reload=reload, cors_origins=origins)
+
+
 if __name__ == "__main__":
     app()
