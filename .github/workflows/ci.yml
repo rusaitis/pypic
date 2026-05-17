@@ -23,6 +23,15 @@ jobs:
       - run: uv sync --all-extras --all-groups
       - run: uv run ruff check src tests
       - run: uv run ruff format --check src tests
+      # Drift guard for the bundled JSON Schema. The pytest layer
+      # (tests/test_schema_export.py::test_on_disk_artifact_matches_current_models)
+      # gives a precise diff on failure; this step catches the case
+      # where someone regenerates locally and forgets to commit.
+      - name: JSON Schema artifact in sync with Pydantic models
+        run: |
+          uv run pypic schema export \
+            -o src/pypic/schema/simulation.schema.v1.0.json
+          git diff --exit-code -- src/pypic/schema/
 
   type-check:
     runs-on: ubuntu-latest

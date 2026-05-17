@@ -45,8 +45,10 @@ Examples
 'PIC'
 """
 
+from pypic.schema._export import build_schema, dump_schema, get_schema_path
 from pypic.schema._loader import ValidationError, validate_simulation_toml
 from pypic.schema._models import (
+    SCHEMA_VERSION,
     Allocation,
     Author,
     Body,
@@ -101,6 +103,7 @@ from pypic.schema._models import (
 )
 
 __all__ = [
+    "SCHEMA_VERSION",
     "Allocation",
     "Author",
     "Body",
@@ -153,5 +156,8 @@ __all__ = [
     "UnitsReferenceTable",
     "UnitsSI",
     "ValidationError",
+    "build_schema",
+    "dump_schema",
+    "get_schema_path",
     "validate_simulation_toml",
 ]

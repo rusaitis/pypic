@@ -17,7 +17,7 @@ accept unknown sub-tables here and MAY warn). Everywhere else,
 from __future__ import annotations
 
 from datetime import date as _date  # noqa: TC003  (pydantic needs it at runtime)
-from typing import TYPE_CHECKING, Annotated, Any, Literal
+from typing import TYPE_CHECKING, Annotated, Any, Final, Literal
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Mapping
@@ -32,6 +32,11 @@ from pydantic import (
     PositiveInt,
     model_validator,
 )
+
+# Single source of truth for the schema version. Mirrors the value the
+# validator enforces on ``[schema].version`` and pins the filename of the
+# exported JSON Schema (``simulation.schema.v{SCHEMA_VERSION}.json``).
+SCHEMA_VERSION: Final[str] = "1.0"
 
 # Two flavours of string-typed fields:
 #

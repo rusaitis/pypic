@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING, Annotated, Literal
 import typer
 
 from pypic.dataset import FieldDataset
+from pypic.schema.cli import app as schema_app
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Sequence
@@ -554,6 +555,7 @@ convert_app = typer.Typer(
     no_args_is_help=True,
 )
 app.add_typer(convert_app, name="convert")
+app.add_typer(schema_app, name="schema")
 
 
 @convert_app.command("fields")

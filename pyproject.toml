@@ -50,7 +50,16 @@ dev = [
     "vulture>=2.15",
     "typer>=0.12",
     "rich>=13.0",
+    "jsonschema>=4.21",
 ]
+
+# Bundle the generated JSON Schema(s) into the wheel so downstream
+# consumers (other-language validators, MATLAB users, anyone who isn't
+# running the CLI) can read it via importlib.resources without cloning
+# the repo. Switch to a glob when v1.1+ ships alongside v1.0.
+[tool.hatch.build.targets.wheel.force-include]
+"src/pypic/schema/simulation.schema.v1.0.json" = "pypic/schema/simulation.schema.v1.0.json"
+
 
 [tool.ruff]
 line-length = 88
