@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 
 from pypic.compute import (
-    _COMPUTE_ALIASES,
+    COMPUTE_ALIASES,
     compute_field,
     field_si_factor,
 )
@@ -140,7 +140,7 @@ class TestDescriptiveComputeAliases:
         ],
     )
     def test_descriptive_aliases_resolve(self, alias, canonical):
-        assert _COMPUTE_ALIASES[alias] == canonical
+        assert COMPUTE_ALIASES[alias] == canonical
 
 
 class TestStructuredSpeciesComputeAliases:
@@ -211,7 +211,7 @@ class TestStructuredSpeciesComputeAliases:
         ],
     )
     def test_species_aliases_resolve(self, alias, canonical):
-        assert _COMPUTE_ALIASES[alias] == canonical
+        assert COMPUTE_ALIASES[alias] == canonical
 
 
 class TestOperatorAliases:
@@ -230,8 +230,8 @@ class TestOperatorAliases:
     def test_operator_aliases_resolve(self, alias, canonical):
         # Tier-3 canonicals (curl_B_1, vort_2, S_3, ...) are direct
         # registry entries — they resolve through ``_REGISTRY``, not
-        # ``_COMPUTE_ALIASES``. Only the x/y/z spellings are aliases.
-        assert _COMPUTE_ALIASES[alias] == canonical
+        # ``COMPUTE_ALIASES``. Only the x/y/z spellings are aliases.
+        assert COMPUTE_ALIASES[alias] == canonical
 
     def test_curl_b_x_computes(self):
         shape = (4, 4, 4)
@@ -582,13 +582,13 @@ class TestAuditIssue2SGyroRename:
     def test_s_gyro_e_resolves(self):
         # Post v1.0.x: per-species entropies come from the ``"s_gyro"``
         # species template (``s_gyro_s0``); ``s_gyro_e`` aliases down to it.
-        assert _COMPUTE_ALIASES["s_gyro_e"] == "s_gyro_s0"
+        assert COMPUTE_ALIASES["s_gyro_e"] == "s_gyro_s0"
 
     def test_s_gyro_i_resolves(self):
-        assert _COMPUTE_ALIASES["s_gyro_i"] == "s_gyro_s1"
+        assert COMPUTE_ALIASES["s_gyro_i"] == "s_gyro_s1"
 
     def test_bare_s_gyro_not_in_aliases(self):
-        assert "s_gyro" not in _COMPUTE_ALIASES
+        assert "s_gyro" not in COMPUTE_ALIASES
 
     def test_bare_s_gyro_raises_with_suggestions(self):
         """Bare s_gyro raises KeyError with suggestion to use s_gyro_e."""
@@ -740,7 +740,7 @@ class TestAuditFieldPrefixAliases:
         np.testing.assert_array_equal(ds["B0x"], ds["B0_1"])
 
     def test_ion_acoustic_speed_alias(self):
-        assert _COMPUTE_ALIASES["ion_acoustic_speed"] == "c_ia"
+        assert COMPUTE_ALIASES["ion_acoustic_speed"] == "c_ia"
 
 
 class TestEnergyFluxAliases:
@@ -755,7 +755,7 @@ class TestEnergyFluxAliases:
         ],
     )
     def test_energy_flux_alias_resolves(self, alias, canonical):
-        assert _COMPUTE_ALIASES[alias] == canonical
+        assert COMPUTE_ALIASES[alias] == canonical
 
     def test_energy_flux_x_passthrough(self):
         shape = (2, 2, 2)

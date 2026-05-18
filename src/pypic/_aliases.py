@@ -3,6 +3,10 @@
 Central location for name-resolution data used by both ``compute`` and
 ``fields``.  Kept separate to avoid the circular dependency that would
 arise if either module imported the other at top level.
+
+The public surface (:data:`COMPUTE_ALIASES`, :data:`GROUP_ALIASES`,
+:data:`SPECIES_SUFFIX_RE`, :func:`species_name_aliases`) is re-exported
+through :mod:`pypic.aliases` for codegen consumers.
 """
 
 from __future__ import annotations
@@ -26,9 +30,9 @@ if TYPE_CHECKING:
 #     operator magnitude): ``|V_s0_perp|``.
 # Captures (species, suffix); suffix is ``_<x>|`` (operator + pipe),
 # ``_<x>``, ``|``, or empty.
-_SPECIES_SUFFIX = re.compile(r"_s(\d+)(?P<suffix>_[^|]+\||_[^|]+|\|)?$")
+SPECIES_SUFFIX_RE = re.compile(r"_s(\d+)(?P<suffix>_[^|]+\||_[^|]+|\|)?$")
 
-_COMPUTE_ALIASES: dict[str, str] = {
+COMPUTE_ALIASES: dict[str, str] = {
     "curl_Bx": "curl_B_1",
     "curl_By": "curl_B_2",
     "curl_Bz": "curl_B_3",
@@ -200,7 +204,7 @@ _COMPUTE_ALIASES: dict[str, str] = {
     "h_i": "h_s1",
     # Cartesian-component aliases for the total energy flux vector
     # (the bare-prefix forms ``EF``, ``KEF``, ``HF``, ``EHF`` are
-    # vector-group expansions in ``_GROUP_ALIASES`` below).
+    # vector-group expansions in ``GROUP_ALIASES`` below).
     "energy_flux_x": "EF_1",
     "energy_flux_y": "EF_2",
     "energy_flux_z": "EF_3",
@@ -209,11 +213,11 @@ _COMPUTE_ALIASES: dict[str, str] = {
 
 # Vector-group shorthand: aliases that expand to a three-component group
 # at read time (``read(fields=["EFe"]) → EF_s0_1, EF_s0_2, EF_s0_3``). These
-# are deliberately separate from ``_COMPUTE_ALIASES`` because their target
+# are deliberately separate from ``COMPUTE_ALIASES`` because their target
 # is a *prefix*, not a single computable quantity — feeding ``EF_s0`` to
 # ``compute()`` would fail. Reader code consults this map after the
 # scalar alias map; see ``readers/_registry.py`` for the expansion logic.
-_GROUP_ALIASES: dict[str, str] = {
+GROUP_ALIASES: dict[str, str] = {
     "EFe": "EF_s0",
     "EFi": "EF_s1",
     "KEFe": "KEF_s0",
@@ -306,7 +310,7 @@ def species_name_aliases(
         return aliases
     available_set = set(available)
     for canonical in available_set:
-        match = _SPECIES_SUFFIX.search(canonical)
+        match = SPECIES_SUFFIX_RE.search(canonical)
         if match is None:
             continue
         idx = int(match.group(1))

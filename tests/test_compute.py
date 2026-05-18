@@ -3,8 +3,8 @@ import pytest
 from scipy import constants
 
 from pypic.compute import (
-    _COMPUTE_ALIASES,
     _REGISTRY,
+    COMPUTE_ALIASES,
     available_quantities,
     compute_field,
     display_unit_factor,
@@ -21,7 +21,7 @@ from tests._helpers import ELECTRONS, IONS, make_test_dataset
 
 class TestRegistryIntegrity:
     def test_no_duplicate_names(self):
-        overlap = set(_REGISTRY) & set(_COMPUTE_ALIASES)
+        overlap = set(_REGISTRY) & set(COMPUTE_ALIASES)
         assert not overlap, f"Name collision: {overlap}"
 
     def test_all_aliases_resolve(self):
@@ -54,7 +54,7 @@ class TestRegistryIntegrity:
             "q_s0",
             "q_s1",
         }
-        for alias, target in _COMPUTE_ALIASES.items():
+        for alias, target in COMPUTE_ALIASES.items():
             in_registry = target in _REGISTRY
             in_raw = target in raw_field_targets
             in_species = _try_species_recipe(target) is not None
@@ -1612,7 +1612,7 @@ class TestAgyrotropyManufacturedFixtures:
         )
 
     def test_per_species_template_on_combined_fixture(self) -> None:
-        """The `_SpeciesTemplate` path delivers the same closed-form
+        """The `SpeciesTemplate` path delivers the same closed-form
         values on a non-trivial tensor.
 
         Existing `test_per_species_agyrotropy_isotropic` only exercises

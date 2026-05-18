@@ -15,7 +15,7 @@ import threading
 from dataclasses import dataclass
 from enum import StrEnum
 
-from pypic._aliases import _COMPUTE_ALIASES, _get_field_alias_fallback
+from pypic._aliases import COMPUTE_ALIASES, _get_field_alias_fallback
 
 log = logging.getLogger(__name__)
 
@@ -1109,7 +1109,7 @@ def field_info(
         return _maybe_localize(info)
 
     # 2. Compute alias resolution (B_mag -> |B|, etc.)
-    canonical = _COMPUTE_ALIASES.get(name)
+    canonical = COMPUTE_ALIASES.get(name)
     if canonical is not None:
         info = _FIELD_INFO.get(canonical)
         if info is not None:

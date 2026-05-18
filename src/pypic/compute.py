@@ -13,14 +13,15 @@ import re
 import threading
 from dataclasses import dataclass
 from enum import StrEnum
+from types import MappingProxyType
 from typing import TYPE_CHECKING, Any, assert_never
 
 from scipy import constants
 
 from pypic import derived, diagnostics
 from pypic._aliases import (
-    _COMPUTE_ALIASES,
-    _GROUP_ALIASES,
+    COMPUTE_ALIASES,
+    GROUP_ALIASES,
     _get_field_alias_fallback,
 )
 from pypic.coordinates import operators
@@ -35,7 +36,7 @@ if TYPE_CHECKING:
     from pypic.units import Normalization
 
 
-class _SpeciesArgs(StrEnum):
+class SpeciesArgs(StrEnum):
     """Describes which species parameters a dynamic recipe needs."""
 
     CHARGE_MASS = "charge_mass"
@@ -45,7 +46,16 @@ class _SpeciesArgs(StrEnum):
 
 
 @dataclass(frozen=True, slots=True)
-class _Recipe:
+class Recipe:
+    """Describes how to derive one quantity from existing fields.
+
+    Mapped from a canonical name in :data:`RECIPES`. ``func`` consumes
+    the dependency arrays declared in ``fields`` (in order) and returns
+    the derived array. The remaining attributes describe what extras
+    the dispatcher should inject (grid, gamma, species args, …) before
+    calling ``func``.
+    """
+
     func: Callable[..., Any]
     fields: tuple[str, ...]
     species_index: int | None = None
@@ -53,7 +63,7 @@ class _Recipe:
     needs_gamma: bool = False
     needs_c: bool = False
     component: int | None = None
-    species_args: _SpeciesArgs | None = None
+    species_args: SpeciesArgs | None = None
     # When True, the dataset's geometry is passed to ``func`` as a
     # ``geometry=`` kwarg. Used by operator-backed recipes
     # (``div_B``, ``div_E``, ``curl_B*``, ``vort*``) so that the
@@ -84,8 +94,8 @@ def _vector_recipes(
     name_tmpl: str,
     func: Callable[..., Any],
     fields: tuple[str, ...],
-    **kwargs: Any,  # noqa: ANN401  # forwarded verbatim to _Recipe
-) -> dict[str, _Recipe]:
+    **kwargs: Any,  # noqa: ANN401  # forwarded verbatim to Recipe
+) -> dict[str, Recipe]:
     """Three component recipes for a tuple-returning func (curl, Poynting, ...).
 
     The same ``(func, fields)`` is shared across the three; only
@@ -93,7 +103,7 @@ def _vector_recipes(
     digit (e.g. ``"S_{c}"``, ``"curl_B_{c}"``).
     """
     return {
-        name_tmpl.format(c=c + 1): _Recipe(func, fields, component=c, **kwargs)
+        name_tmpl.format(c=c + 1): Recipe(func, fields, component=c, **kwargs)
         for c in range(3)
     }
 
@@ -102,8 +112,8 @@ def _scalar_component_recipes(
     name_tmpl: str,
     func: Callable[..., Any],
     fields_tmpl: tuple[str, ...],
-    **kwargs: Any,  # noqa: ANN401  # forwarded verbatim to _Recipe
-) -> dict[str, _Recipe]:
+    **kwargs: Any,  # noqa: ANN401  # forwarded verbatim to Recipe
+) -> dict[str, Recipe]:
     """Three per-component scalar recipes (``EHF{c}`` style).
 
     ``fields_tmpl`` entries containing ``{c}`` are expanded per component;
@@ -111,7 +121,7 @@ def _scalar_component_recipes(
     function returns a scalar so ``component`` is not set.
     """
     return {
-        name_tmpl.format(c=c): _Recipe(
+        name_tmpl.format(c=c): Recipe(
             func,
             tuple(f.format(c=c) if "{c}" in f else f for f in fields_tmpl),
             **kwargs,
@@ -120,68 +130,68 @@ def _scalar_component_recipes(
     }
 
 
-_REGISTRY: dict[str, _Recipe] = {
+_REGISTRY: dict[str, Recipe] = {
     # Magnitudes
-    "|B|": _Recipe(derived.magnetic_field_magnitude, ("B_1", "B_2", "B_3")),
-    "|E|": _Recipe(derived.electric_field_magnitude, ("E_1", "E_2", "E_3")),
-    "|J|": _Recipe(derived.current_density_magnitude, ("J_1", "J_2", "J_3")),
-    "|V|": _Recipe(derived.velocity_magnitude, ("V_1", "V_2", "V_3")),
+    "|B|": Recipe(derived.magnetic_field_magnitude, ("B_1", "B_2", "B_3")),
+    "|E|": Recipe(derived.electric_field_magnitude, ("E_1", "E_2", "E_3")),
+    "|J|": Recipe(derived.current_density_magnitude, ("J_1", "J_2", "J_3")),
+    "|V|": Recipe(derived.velocity_magnitude, ("V_1", "V_2", "V_3")),
     # |Ve| is registered as an alias to |V_s0| in _aliases.py — both
     # resolve through the "|V|" species template (Stage E).
     # Plasma parameters.  Per-species ``beta_s0``/``beta_s1`` are produced
     # by the species template ``"beta"``; the literature ``beta_e``/
-    # ``beta_i`` spellings alias to ``_sN`` via ``_COMPUTE_ALIASES``.
-    "beta": _Recipe(derived.plasma_beta, ("P", "|B|")),
-    "v_A": _Recipe(derived.alfven_speed, ("|B|", "rho_m"), supports_relativistic=True),
-    "c_s": _Recipe(
+    # ``beta_i`` spellings alias to ``_sN`` via ``COMPUTE_ALIASES``.
+    "beta": Recipe(derived.plasma_beta, ("P", "|B|")),
+    "v_A": Recipe(derived.alfven_speed, ("|B|", "rho_m"), supports_relativistic=True),
+    "c_s": Recipe(
         derived.sound_speed,
         ("P", "rho_m"),
         needs_gamma=True,
         supports_relativistic=True,
     ),
-    "c_ia": _Recipe(
+    "c_ia": Recipe(
         derived.ion_acoustic_speed,
         ("T_s0", "T_s1"),
         species_index=1,
-        species_args=_SpeciesArgs.MASS_ONLY,
+        species_args=SpeciesArgs.MASS_ONLY,
     ),
-    "v_ms": _Recipe(
+    "v_ms": Recipe(
         derived.magnetosonic_speed,
         ("v_A", "c_s"),
         supports_relativistic=True,
     ),
-    "M_A": _Recipe(derived.alfven_mach, ("|V|", "v_A")),
-    "M_ms": _Recipe(derived.magnetosonic_mach, ("|V|", "v_ms")),
+    "M_A": Recipe(derived.alfven_mach, ("|V|", "v_A")),
+    "M_ms": Recipe(derived.magnetosonic_mach, ("|V|", "v_ms")),
     # Energies
-    "e_B": _Recipe(derived.magnetic_energy_density, ("|B|",)),
-    "e_E": _Recipe(derived.electric_energy_density, ("|E|",)),
-    "e_k": _Recipe(
+    "e_B": Recipe(derived.magnetic_energy_density, ("|B|",)),
+    "e_E": Recipe(derived.electric_energy_density, ("|E|",)),
+    "e_k": Recipe(
         derived.kinetic_energy_density,
         ("rho_m", "|V|"),
         supports_relativistic=True,
     ),
-    "e_th": _Recipe(derived.thermal_energy_density, ("P",), needs_gamma=True),
-    "e_th_trace": _Recipe(
+    "e_th": Recipe(derived.thermal_energy_density, ("P",), needs_gamma=True),
+    "e_th_trace": Recipe(
         derived.thermal_energy_density_trace,
         ("P_11", "P_22", "P_33"),
     ),
     # Thermodynamic
-    "h": _Recipe(
+    "h": Recipe(
         derived.enthalpy,
         ("P", "rho_m"),
         needs_gamma=True,
         supports_relativistic=True,
     ),
-    "h_rel": _Recipe(
+    "h_rel": Recipe(
         derived.relativistic_enthalpy,
         ("P", "rho_m"),
         needs_gamma=True,
         needs_c=True,
     ),
-    "gamma_L": _Recipe(derived.lorentz_factor, ("|V|",), needs_c=True),
-    "sigma": _Recipe(derived.magnetization, ("|B|", "rho_m"), needs_c=True),
-    "e_int": _Recipe(derived.internal_energy, ("P", "rho_m"), needs_gamma=True),
-    "s": _Recipe(derived.entropy, ("P", "rho_m"), needs_gamma=True),
+    "gamma_L": Recipe(derived.lorentz_factor, ("|V|",), needs_c=True),
+    "sigma": Recipe(derived.magnetization, ("|B|", "rho_m"), needs_c=True),
+    "e_int": Recipe(derived.internal_energy, ("P", "rho_m"), needs_gamma=True),
+    "s": Recipe(derived.entropy, ("P", "rho_m"), needs_gamma=True),
     # Per-species entropies (``s_e``, ``s_i``, ``s_gyro_e``, ``s_gyro_i``)
     # come from the ``"s"`` and ``"s_gyro"`` species templates below.
     # Poynting flux (tuple return — component selects)
@@ -199,104 +209,104 @@ _REGISTRY: dict[str, _Recipe] = {
     ),
     # Species-dependent: Tier-3 canonical recipe IDs.  Literature
     # spellings (``omega_pe``, ``v_th_e``, ``lambda_D``) resolve here
-    # via ``_COMPUTE_ALIASES``.  Species index >= 2 falls through to
-    # ``_SPECIES_TEMPLATES`` for dynamic synthesis.
-    "omega_p_s0": _Recipe(
+    # via ``COMPUTE_ALIASES``.  Species index >= 2 falls through to
+    # ``SPECIES_TEMPLATES`` for dynamic synthesis.
+    "omega_p_s0": Recipe(
         derived.plasma_frequency,
         ("n_s0",),
         species_index=0,
-        species_args=_SpeciesArgs.CHARGE_MASS,
+        species_args=SpeciesArgs.CHARGE_MASS,
     ),
-    "omega_c_s0": _Recipe(
+    "omega_c_s0": Recipe(
         derived.gyrofrequency,
         ("|B|",),
         species_index=0,
-        species_args=_SpeciesArgs.CHARGE_MASS,
+        species_args=SpeciesArgs.CHARGE_MASS,
     ),
-    "d_s0": _Recipe(
+    "d_s0": Recipe(
         derived.skin_depth,
         ("n_s0",),
         species_index=0,
         needs_c=True,
-        species_args=_SpeciesArgs.CHARGE_MASS,
+        species_args=SpeciesArgs.CHARGE_MASS,
     ),
-    "v_th_s0": _Recipe(
+    "v_th_s0": Recipe(
         derived.thermal_speed,
         ("T_s0",),
         species_index=0,
-        species_args=_SpeciesArgs.MASS_ONLY,
+        species_args=SpeciesArgs.MASS_ONLY,
         supports_relativistic=True,
     ),
-    "r_s0": _Recipe(
+    "r_s0": Recipe(
         derived.gyroradius,
         ("T_s0", "|B|"),
         species_index=0,
-        species_args=_SpeciesArgs.CHARGE_MASS,
+        species_args=SpeciesArgs.CHARGE_MASS,
     ),
-    "lambda_D_s0": _Recipe(
+    "lambda_D_s0": Recipe(
         derived.debye_length,
         ("T_s0", "n_s0"),
         species_index=0,
-        species_args=_SpeciesArgs.CHARGE_ONLY,
+        species_args=SpeciesArgs.CHARGE_ONLY,
     ),
-    "omega_p_s1": _Recipe(
+    "omega_p_s1": Recipe(
         derived.plasma_frequency,
         ("n_s1",),
         species_index=1,
-        species_args=_SpeciesArgs.CHARGE_MASS,
+        species_args=SpeciesArgs.CHARGE_MASS,
     ),
-    "omega_c_s1": _Recipe(
+    "omega_c_s1": Recipe(
         derived.gyrofrequency,
         ("|B|",),
         species_index=1,
-        species_args=_SpeciesArgs.CHARGE_MASS,
+        species_args=SpeciesArgs.CHARGE_MASS,
     ),
-    "d_s1": _Recipe(
+    "d_s1": Recipe(
         derived.skin_depth,
         ("n_s1",),
         species_index=1,
         needs_c=True,
-        species_args=_SpeciesArgs.CHARGE_MASS,
+        species_args=SpeciesArgs.CHARGE_MASS,
     ),
-    "v_th_s1": _Recipe(
+    "v_th_s1": Recipe(
         derived.thermal_speed,
         ("T_s1",),
         species_index=1,
-        species_args=_SpeciesArgs.MASS_ONLY,
+        species_args=SpeciesArgs.MASS_ONLY,
         supports_relativistic=True,
     ),
-    "r_s1": _Recipe(
+    "r_s1": Recipe(
         derived.gyroradius,
         ("T_s1", "|B|"),
         species_index=1,
-        species_args=_SpeciesArgs.CHARGE_MASS,
+        species_args=SpeciesArgs.CHARGE_MASS,
     ),
     # Total pressure from partial pressures.  ``P_s0``/``P_s1`` each resolve
     # via the species template ``"P"`` (trace of the diagonal tensor) when
     # not stored directly; ``Pe``/``Pi`` continue to work via the alias map.
-    "P": _Recipe(derived.total_pressure, ("P_s0", "P_s1")),
+    "P": Recipe(derived.total_pressure, ("P_s0", "P_s1")),
     # Pressure tensor decomposition (total).  Per-species (``P_par_s0``,
     # ``P_par_e``, ...) is produced by the ``"P_par"`` / ``"P_perp"`` /
     # ``"agyrotropy"`` species templates below.
-    "P_par": _Recipe(derived.parallel_pressure, _PRESSURE_TENSOR_AND_B),
-    "P_perp": _Recipe(derived.perpendicular_pressure, _PRESSURE_TENSOR_AND_B),
-    "agyrotropy": _Recipe(derived.agyrotropy, _PRESSURE_TENSOR_AND_B),
+    "P_par": Recipe(derived.parallel_pressure, _PRESSURE_TENSOR_AND_B),
+    "P_perp": Recipe(derived.perpendicular_pressure, _PRESSURE_TENSOR_AND_B),
+    "agyrotropy": Recipe(derived.agyrotropy, _PRESSURE_TENSOR_AND_B),
     # Alternative agyrotropy measures: Aunai 2013 (full N Frobenius)
     # and Scudder & Daughton 2008 (perp eigenvalue spread). Swisdak Q
     # is the canonical default; these ship for literature comparison.
-    "D_ng": _Recipe(derived.aunai_nongyrotropy, _PRESSURE_TENSOR_AND_B),
-    "A_phi": _Recipe(derived.scudder_agyrotropy, _PRESSURE_TENSOR_AND_B),
+    "D_ng": Recipe(derived.aunai_nongyrotropy, _PRESSURE_TENSOR_AND_B),
+    "A_phi": Recipe(derived.scudder_agyrotropy, _PRESSURE_TENSOR_AND_B),
     # Field-aligned vector decomposition against b̂ = B/|B|.
     # NaN propagates from ``_unit_vector`` where |B| = 0.
     # Per-species V variants are produced by the ``"V_par"`` /
     # ``"V_perp_{c}"`` / ``"|V_perp|"`` species templates below.
-    "J_par": _Recipe(
+    "J_par": Recipe(
         derived.parallel_component, ("J_1", "J_2", "J_3", "B_1", "B_2", "B_3")
     ),
-    "V_par": _Recipe(
+    "V_par": Recipe(
         derived.parallel_component, ("V_1", "V_2", "V_3", "B_1", "B_2", "B_3")
     ),
-    "E_par": _Recipe(
+    "E_par": Recipe(
         derived.parallel_component, ("E_1", "E_2", "E_3", "B_1", "B_2", "B_3")
     ),
     **_vector_recipes(
@@ -318,22 +328,22 @@ _REGISTRY: dict[str, _Recipe] = {
     # raw inputs.  Avoids the redundant ``perpendicular_vector`` call
     # and materialization that the component-path recipe would do.
     # Matches the per-species ``|V_perp|`` template below.
-    "|J_perp|": _Recipe(
+    "|J_perp|": Recipe(
         derived.perpendicular_magnitude,
         ("J_1", "J_2", "J_3", "B_1", "B_2", "B_3"),
     ),
-    "|V_perp|": _Recipe(
+    "|V_perp|": Recipe(
         derived.perpendicular_magnitude,
         ("V_1", "V_2", "V_3", "B_1", "B_2", "B_3"),
     ),
-    "|E_perp|": _Recipe(
+    "|E_perp|": Recipe(
         derived.perpendicular_magnitude,
         ("E_1", "E_2", "E_3", "B_1", "B_2", "B_3"),
     ),
     # Non-ideal residual decomposition (E' = E + V×B). Reuses the
     # existing ``E_prime_{1,2,3}`` recipes (below) as inputs.
     # ``E_prime_par`` is the canonical reconnection-rate diagnostic.
-    "E_prime_par": _Recipe(
+    "E_prime_par": Recipe(
         derived.parallel_component,
         ("E_prime_1", "E_prime_2", "E_prime_3", "B_1", "B_2", "B_3"),
     ),
@@ -342,7 +352,7 @@ _REGISTRY: dict[str, _Recipe] = {
         derived.perpendicular_vector,
         ("E_prime_1", "E_prime_2", "E_prime_3", "B_1", "B_2", "B_3"),
     ),
-    "|E_prime_perp|": _Recipe(
+    "|E_prime_perp|": Recipe(
         derived.perpendicular_magnitude,
         ("E_prime_1", "E_prime_2", "E_prime_3", "B_1", "B_2", "B_3"),
     ),
@@ -350,7 +360,7 @@ _REGISTRY: dict[str, _Recipe] = {
     # E_ideal · B = -(V×B) · B = 0, so ``E_ideal_par`` evaluates to zero
     # up to floating-point roundoff. Kept for symmetry and as a
     # cross-product numerical-precision diagnostic.
-    "E_ideal_par": _Recipe(
+    "E_ideal_par": Recipe(
         derived.parallel_component,
         ("E_ideal_1", "E_ideal_2", "E_ideal_3", "B_1", "B_2", "B_3"),
     ),
@@ -359,14 +369,14 @@ _REGISTRY: dict[str, _Recipe] = {
         derived.perpendicular_vector,
         ("E_ideal_1", "E_ideal_2", "E_ideal_3", "B_1", "B_2", "B_3"),
     ),
-    "|E_ideal_perp|": _Recipe(
+    "|E_ideal_perp|": Recipe(
         derived.perpendicular_magnitude,
         ("E_ideal_1", "E_ideal_2", "E_ideal_3", "B_1", "B_2", "B_3"),
     ),
     # Hall-field decomposition (E_Hall = J×B / (n_e q_e)). Same identity:
     # ``E_Hall_par`` is analytically zero. Useful for verifying that
     # Hall-term implementations preserve the perpendicularity property.
-    "E_Hall_par": _Recipe(
+    "E_Hall_par": Recipe(
         derived.parallel_component,
         ("E_Hall_1", "E_Hall_2", "E_Hall_3", "B_1", "B_2", "B_3"),
     ),
@@ -375,18 +385,18 @@ _REGISTRY: dict[str, _Recipe] = {
         derived.perpendicular_vector,
         ("E_Hall_1", "E_Hall_2", "E_Hall_3", "B_1", "B_2", "B_3"),
     ),
-    "|E_Hall_perp|": _Recipe(
+    "|E_Hall_perp|": Recipe(
         derived.perpendicular_magnitude,
         ("E_Hall_1", "E_Hall_2", "E_Hall_3", "B_1", "B_2", "B_3"),
     ),
     # Grid-dependent diagnostics
-    "div_B": _Recipe(
+    "div_B": Recipe(
         diagnostics.div_b,
         ("B_1", "B_2", "B_3"),
         needs_grid=True,
         passes_geometry=True,
     ),
-    "div_E": _Recipe(
+    "div_E": Recipe(
         diagnostics.div_e,
         ("E_1", "E_2", "E_3"),
         needs_grid=True,
@@ -409,13 +419,13 @@ _REGISTRY: dict[str, _Recipe] = {
         passes_geometry=True,
     ),
     # Vorticity magnitude — depends on vort_1/2/3
-    "|vort|": _Recipe(derived.velocity_magnitude, ("vort_1", "vort_2", "vort_3")),
+    "|vort|": Recipe(derived.velocity_magnitude, ("vort_1", "vort_2", "vort_3")),
     # Reconnection diagnostics
-    "J_dot_E": _Recipe(derived.j_dot_e, ("J_1", "J_2", "J_3", "E_1", "E_2", "E_3")),
+    "J_dot_E": Recipe(derived.j_dot_e, ("J_1", "J_2", "J_3", "E_1", "E_2", "E_3")),
     # Zenitani electron-frame dissipation D_e — canonical EDR localizer
     # for collisionless reconnection.  `c` is injected under
     # ``physics.relativistic = true`` for the γ_e prefactor.
-    "D_e": _Recipe(
+    "D_e": Recipe(
         derived.electron_frame_dissipation,
         (
             "J_1",
@@ -438,7 +448,7 @@ _REGISTRY: dict[str, _Recipe] = {
     # |E'| / (v_A |B|).  Single-fluid V — the registry uses the total
     # bulk velocity; for kinetic analysis at electron scales call
     # ``derived.local_reconnection_rate`` directly with V_s0.
-    "R_recon": _Recipe(
+    "R_recon": Recipe(
         derived.local_reconnection_rate,
         (
             "E_1",
@@ -471,18 +481,18 @@ _REGISTRY: dict[str, _Recipe] = {
         derived.hall_electric_field,
         ("J_1", "J_2", "J_3", "B_1", "B_2", "B_3", "n_s0"),
         species_index=0,
-        species_args=_SpeciesArgs.CHARGE_ONLY,
+        species_args=SpeciesArgs.CHARGE_ONLY,
     ),
     # Anisotropy instability parameters
-    "firehose": _Recipe(derived.firehose_parameter, ("P_par", "P_perp", "|B|")),
-    "mirror": _Recipe(derived.mirror_parameter, ("P_par", "P_perp", "|B|")),
+    "firehose": Recipe(derived.firehose_parameter, ("P_par", "P_perp", "|B|")),
+    "mirror": Recipe(derived.mirror_parameter, ("P_par", "P_perp", "|B|")),
     # Magnetic flux function (2D only)
-    "psi": _Recipe(derived.magnetic_flux_function, ("B_2",), needs_grid=True),
+    "psi": Recipe(derived.magnetic_flux_function, ("B_2",), needs_grid=True),
 }
 
 
 @dataclass(frozen=True, slots=True)
-class _SpeciesTemplate:
+class SpeciesTemplate:
     """Template for species-dependent derived quantities.
 
     Used to dynamically synthesize recipes for species index >= 2,
@@ -491,74 +501,72 @@ class _SpeciesTemplate:
 
     func: Callable[..., Any]
     field_pattern: tuple[str, ...]
-    species_args: _SpeciesArgs
+    species_args: SpeciesArgs
     needs_gamma: bool = False
     needs_c: bool = False
-    # Mirrors ``_Recipe.component`` — for tuple-returning funcs like
+    # Mirrors ``Recipe.component`` — for tuple-returning funcs like
     # ``perpendicular_vector`` used in ``V_perp_{c}`` per-species
-    # templates.  The synthesized ``_Recipe`` carries it through to the
+    # templates.  The synthesized ``Recipe`` carries it through to the
     # compute path so the right element of the returned tuple is
     # selected.
     component: int | None = None
 
 
-_SPECIES_TEMPLATES: dict[str, _SpeciesTemplate] = {
-    "omega_p": _SpeciesTemplate(
-        derived.plasma_frequency, ("n_s{N}",), _SpeciesArgs.CHARGE_MASS
+SPECIES_TEMPLATES: dict[str, SpeciesTemplate] = {
+    "omega_p": SpeciesTemplate(
+        derived.plasma_frequency, ("n_s{N}",), SpeciesArgs.CHARGE_MASS
     ),
-    "omega_c": _SpeciesTemplate(
-        derived.gyrofrequency, ("|B|",), _SpeciesArgs.CHARGE_MASS
+    "omega_c": SpeciesTemplate(
+        derived.gyrofrequency, ("|B|",), SpeciesArgs.CHARGE_MASS
     ),
-    "d": _SpeciesTemplate(
-        derived.skin_depth, ("n_s{N}",), _SpeciesArgs.CHARGE_MASS, needs_c=True
+    "d": SpeciesTemplate(
+        derived.skin_depth, ("n_s{N}",), SpeciesArgs.CHARGE_MASS, needs_c=True
     ),
-    "v_th": _SpeciesTemplate(
-        derived.thermal_speed, ("T_s{N}",), _SpeciesArgs.MASS_ONLY
+    "v_th": SpeciesTemplate(derived.thermal_speed, ("T_s{N}",), SpeciesArgs.MASS_ONLY),
+    "r": SpeciesTemplate(
+        derived.gyroradius, ("T_s{N}", "|B|"), SpeciesArgs.CHARGE_MASS
     ),
-    "r": _SpeciesTemplate(
-        derived.gyroradius, ("T_s{N}", "|B|"), _SpeciesArgs.CHARGE_MASS
+    "lambda_D": SpeciesTemplate(
+        derived.debye_length, ("T_s{N}", "n_s{N}"), SpeciesArgs.CHARGE_ONLY
     ),
-    "lambda_D": _SpeciesTemplate(
-        derived.debye_length, ("T_s{N}", "n_s{N}"), _SpeciesArgs.CHARGE_ONLY
+    "beta": SpeciesTemplate(derived.plasma_beta, ("P_s{N}", "|B|"), SpeciesArgs.NONE),
+    "s": SpeciesTemplate(
+        derived.entropy, ("P_s{N}", "n_s{N}"), SpeciesArgs.NONE, needs_gamma=True
     ),
-    "beta": _SpeciesTemplate(derived.plasma_beta, ("P_s{N}", "|B|"), _SpeciesArgs.NONE),
-    "s": _SpeciesTemplate(
-        derived.entropy, ("P_s{N}", "n_s{N}"), _SpeciesArgs.NONE, needs_gamma=True
-    ),
-    "s_gyro": _SpeciesTemplate(
+    "s_gyro": SpeciesTemplate(
         derived.gyrotropic_entropy,
         ("P_s{N}_par", "P_s{N}_perp", "n_s{N}"),
-        _SpeciesArgs.NONE,
+        SpeciesArgs.NONE,
     ),
-    "P_par": _SpeciesTemplate(
+    "P_par": SpeciesTemplate(
         derived.parallel_pressure,
         _SPECIES_PRESSURE_TENSOR_AND_B,
-        _SpeciesArgs.NONE,
+        SpeciesArgs.NONE,
     ),
-    "P_perp": _SpeciesTemplate(
+    "P_perp": SpeciesTemplate(
         derived.perpendicular_pressure,
         _SPECIES_PRESSURE_TENSOR_AND_B,
-        _SpeciesArgs.NONE,
+        SpeciesArgs.NONE,
     ),
-    "agyrotropy": _SpeciesTemplate(
+    "agyrotropy": SpeciesTemplate(
         derived.agyrotropy,
         _SPECIES_PRESSURE_TENSOR_AND_B,
-        _SpeciesArgs.NONE,
+        SpeciesArgs.NONE,
     ),
-    "D_ng": _SpeciesTemplate(
+    "D_ng": SpeciesTemplate(
         derived.aunai_nongyrotropy,
         _SPECIES_PRESSURE_TENSOR_AND_B,
-        _SpeciesArgs.NONE,
+        SpeciesArgs.NONE,
     ),
-    "A_phi": _SpeciesTemplate(
+    "A_phi": SpeciesTemplate(
         derived.scudder_agyrotropy,
         _SPECIES_PRESSURE_TENSOR_AND_B,
-        _SpeciesArgs.NONE,
+        SpeciesArgs.NONE,
     ),
     # Per-species local reconnection rate. v_A is the bulk Alfvén speed
     # by design — the reference speed is a property of the plasma, not
     # the species — so all R_recon_s{N} share the same denominator.
-    "R_recon": _SpeciesTemplate(
+    "R_recon": SpeciesTemplate(
         derived.local_reconnection_rate,
         (
             "E_1",
@@ -572,150 +580,150 @@ _SPECIES_TEMPLATES: dict[str, _SpeciesTemplate] = {
             "B_3",
             "v_A",
         ),
-        _SpeciesArgs.NONE,
+        SpeciesArgs.NONE,
     ),
     # Per-species field-aligned velocity decomposition.
     # V_par scalar; V_perp_{1,2,3} use a single tuple-returning function
     # with ``component=`` to pick the right element.
-    "V_par": _SpeciesTemplate(
+    "V_par": SpeciesTemplate(
         derived.parallel_component,
         ("V_s{N}_1", "V_s{N}_2", "V_s{N}_3", "B_1", "B_2", "B_3"),
-        _SpeciesArgs.NONE,
+        SpeciesArgs.NONE,
     ),
-    "V_perp_1": _SpeciesTemplate(
+    "V_perp_1": SpeciesTemplate(
         derived.perpendicular_vector,
         ("V_s{N}_1", "V_s{N}_2", "V_s{N}_3", "B_1", "B_2", "B_3"),
-        _SpeciesArgs.NONE,
+        SpeciesArgs.NONE,
         component=0,
     ),
-    "V_perp_2": _SpeciesTemplate(
+    "V_perp_2": SpeciesTemplate(
         derived.perpendicular_vector,
         ("V_s{N}_1", "V_s{N}_2", "V_s{N}_3", "B_1", "B_2", "B_3"),
-        _SpeciesArgs.NONE,
+        SpeciesArgs.NONE,
         component=1,
     ),
-    "V_perp_3": _SpeciesTemplate(
+    "V_perp_3": SpeciesTemplate(
         derived.perpendicular_vector,
         ("V_s{N}_1", "V_s{N}_2", "V_s{N}_3", "B_1", "B_2", "B_3"),
-        _SpeciesArgs.NONE,
+        SpeciesArgs.NONE,
         component=2,
     ),
-    "|V_perp|": _SpeciesTemplate(
+    "|V_perp|": SpeciesTemplate(
         derived.perpendicular_magnitude,
         ("V_s{N}_1", "V_s{N}_2", "V_s{N}_3", "B_1", "B_2", "B_3"),
-        _SpeciesArgs.NONE,
+        SpeciesArgs.NONE,
     ),
-    "T": _SpeciesTemplate(derived.temperature, ("P_s{N}", "n_s{N}"), _SpeciesArgs.NONE),
-    "P": _SpeciesTemplate(
+    "T": SpeciesTemplate(derived.temperature, ("P_s{N}", "n_s{N}"), SpeciesArgs.NONE),
+    "P": SpeciesTemplate(
         derived.isotropic_pressure,
         ("P_s{N}_11", "P_s{N}_22", "P_s{N}_33"),
-        _SpeciesArgs.NONE,
+        SpeciesArgs.NONE,
     ),
-    "V_1": _SpeciesTemplate(
-        derived.bulk_velocity, ("J_s{N}_1", "rho_c_s{N}"), _SpeciesArgs.NONE
+    "V_1": SpeciesTemplate(
+        derived.bulk_velocity, ("J_s{N}_1", "rho_c_s{N}"), SpeciesArgs.NONE
     ),
-    "V_2": _SpeciesTemplate(
-        derived.bulk_velocity, ("J_s{N}_2", "rho_c_s{N}"), _SpeciesArgs.NONE
+    "V_2": SpeciesTemplate(
+        derived.bulk_velocity, ("J_s{N}_2", "rho_c_s{N}"), SpeciesArgs.NONE
     ),
-    "V_3": _SpeciesTemplate(
-        derived.bulk_velocity, ("J_s{N}_3", "rho_c_s{N}"), _SpeciesArgs.NONE
+    "V_3": SpeciesTemplate(
+        derived.bulk_velocity, ("J_s{N}_3", "rho_c_s{N}"), SpeciesArgs.NONE
     ),
-    "|V|": _SpeciesTemplate(
+    "|V|": SpeciesTemplate(
         derived.velocity_magnitude,
         ("V_s{N}_1", "V_s{N}_2", "V_s{N}_3"),
-        _SpeciesArgs.NONE,
+        SpeciesArgs.NONE,
     ),
     # Per-species mass density: rho_m_s = |rho_c_s| * m / |q|
-    "rho_m": _SpeciesTemplate(
-        derived.species_mass_density, ("rho_c_s{N}",), _SpeciesArgs.CHARGE_MASS
+    "rho_m": SpeciesTemplate(
+        derived.species_mass_density, ("rho_c_s{N}",), SpeciesArgs.CHARGE_MASS
     ),
     # Per-species energy densities and thermodynamic quantities
-    "e_k": _SpeciesTemplate(
-        derived.kinetic_energy_density, ("rho_m_s{N}", "|V_s{N}|"), _SpeciesArgs.NONE
+    "e_k": SpeciesTemplate(
+        derived.kinetic_energy_density, ("rho_m_s{N}", "|V_s{N}|"), SpeciesArgs.NONE
     ),
-    "e_th": _SpeciesTemplate(
+    "e_th": SpeciesTemplate(
         derived.thermal_energy_density,
         ("P_s{N}",),
-        _SpeciesArgs.NONE,
+        SpeciesArgs.NONE,
         needs_gamma=True,
     ),
-    "e_th_trace": _SpeciesTemplate(
+    "e_th_trace": SpeciesTemplate(
         derived.thermal_energy_density_trace,
         ("P_s{N}_11", "P_s{N}_22", "P_s{N}_33"),
-        _SpeciesArgs.NONE,
+        SpeciesArgs.NONE,
     ),
-    "e_int": _SpeciesTemplate(
+    "e_int": SpeciesTemplate(
         derived.internal_energy,
         ("P_s{N}", "rho_m_s{N}"),
-        _SpeciesArgs.NONE,
+        SpeciesArgs.NONE,
         needs_gamma=True,
     ),
-    "h": _SpeciesTemplate(
+    "h": SpeciesTemplate(
         derived.enthalpy,
         ("P_s{N}", "rho_m_s{N}"),
-        _SpeciesArgs.NONE,
+        SpeciesArgs.NONE,
         needs_gamma=True,
     ),
     # Kinetic energy flux: KEF_i = (1/2) n m |V|² V_i
-    "KEF_1": _SpeciesTemplate(
+    "KEF_1": SpeciesTemplate(
         derived.kinetic_energy_flux_component,
         ("V_s{N}_1", "V_s{N}_1", "V_s{N}_2", "V_s{N}_3", "rho_c_s{N}"),
-        _SpeciesArgs.CHARGE_MASS,
+        SpeciesArgs.CHARGE_MASS,
     ),
-    "KEF_2": _SpeciesTemplate(
+    "KEF_2": SpeciesTemplate(
         derived.kinetic_energy_flux_component,
         ("V_s{N}_2", "V_s{N}_1", "V_s{N}_2", "V_s{N}_3", "rho_c_s{N}"),
-        _SpeciesArgs.CHARGE_MASS,
+        SpeciesArgs.CHARGE_MASS,
     ),
-    "KEF_3": _SpeciesTemplate(
+    "KEF_3": SpeciesTemplate(
         derived.kinetic_energy_flux_component,
         ("V_s{N}_3", "V_s{N}_1", "V_s{N}_2", "V_s{N}_3", "rho_c_s{N}"),
-        _SpeciesArgs.CHARGE_MASS,
+        SpeciesArgs.CHARGE_MASS,
     ),
     # Heat flux: HF_i = EF_i - KEF_i (thermal + heat flux residual)
-    "HF_1": _SpeciesTemplate(
-        derived.heat_flux_component, ("EF_s{N}_1", "KEF_s{N}_1"), _SpeciesArgs.NONE
+    "HF_1": SpeciesTemplate(
+        derived.heat_flux_component, ("EF_s{N}_1", "KEF_s{N}_1"), SpeciesArgs.NONE
     ),
-    "HF_2": _SpeciesTemplate(
-        derived.heat_flux_component, ("EF_s{N}_2", "KEF_s{N}_2"), _SpeciesArgs.NONE
+    "HF_2": SpeciesTemplate(
+        derived.heat_flux_component, ("EF_s{N}_2", "KEF_s{N}_2"), SpeciesArgs.NONE
     ),
-    "HF_3": _SpeciesTemplate(
-        derived.heat_flux_component, ("EF_s{N}_3", "KEF_s{N}_3"), _SpeciesArgs.NONE
+    "HF_3": SpeciesTemplate(
+        derived.heat_flux_component, ("EF_s{N}_3", "KEF_s{N}_3"), SpeciesArgs.NONE
     ),
     # Enthalpy flux (per-species): EHF_i = (gamma/(gamma-1)) P_s V_i_s
-    "EHF_1": _SpeciesTemplate(
+    "EHF_1": SpeciesTemplate(
         derived.enthalpy_flux_component,
         ("P_s{N}", "V_s{N}_1"),
-        _SpeciesArgs.NONE,
+        SpeciesArgs.NONE,
         needs_gamma=True,
     ),
-    "EHF_2": _SpeciesTemplate(
+    "EHF_2": SpeciesTemplate(
         derived.enthalpy_flux_component,
         ("P_s{N}", "V_s{N}_2"),
-        _SpeciesArgs.NONE,
+        SpeciesArgs.NONE,
         needs_gamma=True,
     ),
-    "EHF_3": _SpeciesTemplate(
+    "EHF_3": SpeciesTemplate(
         derived.enthalpy_flux_component,
         ("P_s{N}", "V_s{N}_3"),
-        _SpeciesArgs.NONE,
+        SpeciesArgs.NONE,
         needs_gamma=True,
     ),
     # Conductive heat flux: q_i = HF_i - EHF_i (non-adiabatic residual)
-    "q_1": _SpeciesTemplate(
+    "q_1": SpeciesTemplate(
         derived.conductive_heat_flux_component,
         ("HF_s{N}_1", "EHF_s{N}_1"),
-        _SpeciesArgs.NONE,
+        SpeciesArgs.NONE,
     ),
-    "q_2": _SpeciesTemplate(
+    "q_2": SpeciesTemplate(
         derived.conductive_heat_flux_component,
         ("HF_s{N}_2", "EHF_s{N}_2"),
-        _SpeciesArgs.NONE,
+        SpeciesArgs.NONE,
     ),
-    "q_3": _SpeciesTemplate(
+    "q_3": SpeciesTemplate(
         derived.conductive_heat_flux_component,
         ("HF_s{N}_3", "EHF_s{N}_3"),
-        _SpeciesArgs.NONE,
+        SpeciesArgs.NONE,
     ),
 }
 
@@ -745,7 +753,7 @@ _SPECIES_SUFFIX_RE = re.compile(
 _INVALID_PREFIX_OPERATOR_ENDINGS: tuple[str, ...] = ("_par", "_perp", "|")
 
 
-def _try_species_recipe(name: str) -> _Recipe | None:
+def _try_species_recipe(name: str) -> Recipe | None:
     """Try to build a recipe from species templates for names like ``omega_p_s2``.
 
     Returns ``None`` if the name doesn't match any template.
@@ -764,11 +772,11 @@ def _try_species_recipe(name: str) -> _Recipe | None:
     prefix = raw_prefix + raw_suffix
     idx_str = m.group("idx")
     species_index = int(idx_str)
-    template = _SPECIES_TEMPLATES.get(prefix)
+    template = SPECIES_TEMPLATES.get(prefix)
     if template is None:
         return None
     fields = tuple(f.replace("{N}", idx_str) for f in template.field_pattern)
-    return _Recipe(
+    return Recipe(
         func=template.func,
         fields=fields,
         species_index=species_index,
@@ -840,10 +848,10 @@ _MAX_DEPTH = 10
 
 def _resolve_name(name: str) -> str:
     """Resolve a compute alias to its canonical registry name."""
-    return _COMPUTE_ALIASES.get(name, name)
+    return COMPUTE_ALIASES.get(name, name)
 
 
-def _get_recipe(name: str) -> _Recipe:
+def _get_recipe(name: str) -> Recipe:
     """Look up a recipe by name, raising KeyError with suggestions on miss."""
     canonical = _resolve_name(name)
     try:
@@ -855,8 +863,8 @@ def _get_recipe(name: str) -> _Recipe:
     if dynamic is not None:
         return dynamic
     # Check if this is a vector group alias (e.g. "EFe" → read-time only)
-    if name in _GROUP_ALIASES or canonical in _GROUP_ALIASES:
-        group_name = name if name in _GROUP_ALIASES else canonical
+    if name in GROUP_ALIASES or canonical in GROUP_ALIASES:
+        group_name = name if name in GROUP_ALIASES else canonical
         msg = (
             f"{name!r} is a vector group (expands to 3 components). "
             f"Use {group_name}1/{group_name}2/{group_name}3 in compute(), "
@@ -874,12 +882,12 @@ def _get_recipe(name: str) -> _Recipe:
 
 def _get_species_args(
     dataset: FieldDataset,
-    recipe: _Recipe,
+    recipe: Recipe,
 ) -> list[float]:
     """Extract charge and mass from species info for a recipe."""
     if recipe.species_index is None:
         return []
-    if recipe.species_args is _SpeciesArgs.NONE:
+    if recipe.species_args is SpeciesArgs.NONE:
         return []
     idx = recipe.species_index
     if not dataset.species or idx >= len(dataset.species):
@@ -918,17 +926,17 @@ def _get_c(dataset: FieldDataset) -> float:
 def _append_species_params(
     args: list[Any],
     species_args: list[float],
-    kind: _SpeciesArgs,
+    kind: SpeciesArgs,
 ) -> None:
     """Append the right species parameters based on the descriptor."""
     match kind:
-        case _SpeciesArgs.CHARGE_MASS:
+        case SpeciesArgs.CHARGE_MASS:
             args.extend(species_args)
-        case _SpeciesArgs.MASS_ONLY:
+        case SpeciesArgs.MASS_ONLY:
             args.append(species_args[1])
-        case _SpeciesArgs.CHARGE_ONLY:
+        case SpeciesArgs.CHARGE_ONLY:
             args.append(species_args[0])
-        case _SpeciesArgs.NONE:
+        case SpeciesArgs.NONE:
             pass
         case _ as unreachable:  # pragma: no cover
             assert_never(unreachable)
@@ -938,7 +946,7 @@ def _execute_recipe(
     canonical: str,
     dataset: FieldDataset,
     _depth: int = 0,
-) -> tuple[_Recipe, Any]:
+) -> tuple[Recipe, Any]:
     """Build arguments for a recipe and invoke its pure function.
 
     Returns ``(recipe, full_result)``. ``full_result`` is the raw output
@@ -1147,7 +1155,7 @@ def available_quantities() -> list[str]:
     -------
     list[str]
     """
-    return sorted(set(_REGISTRY) | set(_COMPUTE_ALIASES))
+    return sorted(set(_REGISTRY) | set(COMPUTE_ALIASES))
 
 
 def field_dependencies(name: str, _depth: int = 0) -> set[str]:
@@ -1272,7 +1280,7 @@ def register_recipe(
     """
     from pypic.fields import register_field as _register_field
 
-    recipe = _Recipe(
+    recipe = Recipe(
         func=func,
         fields=fields,
         needs_grid=needs_grid,
@@ -1320,7 +1328,21 @@ def unregister_recipe(name: str) -> None:
         raise
 
 
+# Public read-only view of the recipe registry. Codegen consumers
+# (webpic, rustpic tooling) iterate ``RECIPES.items()`` to generate
+# cross-language mirrors. The underlying ``_REGISTRY`` stays a mutable
+# dict because :func:`register_recipe` / :func:`unregister_recipe`
+# update it under ``_recipe_lock``; the proxy guarantees external
+# callers only see the read side.
+RECIPES: MappingProxyType[str, Recipe] = MappingProxyType(_REGISTRY)
+
+
 __all__ = [
+    "RECIPES",
+    "SPECIES_TEMPLATES",
+    "Recipe",
+    "SpeciesArgs",
+    "SpeciesTemplate",
     "available_quantities",
     "compute_field",
     "display_unit_factor",

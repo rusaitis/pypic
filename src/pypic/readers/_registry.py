@@ -279,9 +279,9 @@ class Simulation:
         """Return the canonical names that *name* could have expanded to."""
         import re
 
-        from pypic._aliases import _COMPUTE_ALIASES
+        from pypic._aliases import COMPUTE_ALIASES
 
-        resolved = alias_map.get(name, _COMPUTE_ALIASES.get(name, name))
+        resolved = alias_map.get(name, COMPUTE_ALIASES.get(name, name))
         candidates = {resolved}
         # Tier-3 vector expansion: append ``_<component>`` to the resolved
         # name. ``B`` → ``B_1``..``B_3``; ``J_s0`` → ``J_s0_1``..``J_s0_3``.
@@ -352,7 +352,7 @@ class Simulation:
         if fields is not None:
             import re
 
-            from pypic._aliases import _COMPUTE_ALIASES, _GROUP_ALIASES
+            from pypic._aliases import COMPUTE_ALIASES, GROUP_ALIASES
             from pypic.compute import field_dependencies
 
             alias_map = _default_aliases(self._config.grid.geometry)
@@ -364,7 +364,7 @@ class Simulation:
                 # their target is a vector prefix, not a scalar name.
                 resolved = alias_map.get(
                     name,
-                    _COMPUTE_ALIASES.get(name, _GROUP_ALIASES.get(name, name)),
+                    COMPUTE_ALIASES.get(name, GROUP_ALIASES.get(name, name)),
                 )
                 expanded.add(resolved)
                 # Tier-3 vector group shorthand:

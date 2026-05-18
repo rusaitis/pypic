@@ -68,18 +68,25 @@ def scene_nested_islands(theme: str = "dark") -> Path:
     seeds = np.column_stack([radii, np.zeros_like(radii), np.zeros_like(radii)])
 
     section = poincare_section(
-        data, seeds, surf,
-        max_steps=4000, direction="forward",
-        atol=1e-10, rtol=1e-10,
-        step_size_init=0.005, max_step=0.02,
+        data,
+        seeds,
+        surf,
+        max_steps=4000,
+        direction="forward",
+        atol=1e-10,
+        rtol=1e-10,
+        step_size_init=0.005,
+        max_step=0.02,
     )
 
     with use_theme(theme):
         fig, ax = plot_poincare_section(section, marker_size=8.0, alpha=0.9)
         ax.set_xlim(-1.5, 1.5)
         ax.set_ylim(-1.5, 1.5)
-        ax.set_title("Nested magnetic islands\n"
-                     r"$\mathbf{B} = (-y, x, 0)$, fan of seeds, $y = 0$ section")
+        ax.set_title(
+            "Nested magnetic islands\n"
+            r"$\mathbf{B} = (-y, x, 0)$, fan of seeds, $y = 0$ section"
+        )
     out = OUTPUT_DIR / f"poincare_islands_{theme}.png"
     fig.savefig(out, dpi=160, bbox_inches="tight")
     plt.close(fig)
@@ -102,16 +109,23 @@ def scene_helical_drift(theme: str = "dark") -> Path:
     seeds = np.array([[r, 0.0, -2.0] for r in [0.4, 0.7, 1.0, 1.3]])
 
     section = poincare_section(
-        data, seeds, surf,
-        max_steps=10_000, direction="forward",
-        atol=1e-10, rtol=1e-10,
-        step_size_init=0.01, max_step=0.05,
+        data,
+        seeds,
+        surf,
+        max_steps=10_000,
+        direction="forward",
+        atol=1e-10,
+        rtol=1e-10,
+        step_size_init=0.01,
+        max_step=0.05,
     )
 
     with use_theme(theme):
         fig, ax = plot_poincare_section(section, marker_size=10.0, alpha=0.85)
-        ax.set_title("Helical drift\n"
-                     r"$\mathbf{B} = (-y, x, 0.1)$, seeds at $z = -2$, $y = 0$ section")
+        ax.set_title(
+            "Helical drift\n"
+            r"$\mathbf{B} = (-y, x, 0.1)$, seeds at $z = -2$, $y = 0$ section"
+        )
         ax.set_xlabel(r"$u = -z$")
         ax.set_ylabel(r"$v = -x$")
     out = OUTPUT_DIR / f"poincare_helix_{theme}.png"
@@ -121,8 +135,11 @@ def scene_helical_drift(theme: str = "dark") -> Path:
 
 
 def _abc_field(
-    n: int = 192, periods: int = 4,
-    a: float = 1.0, b: float = 1.0 / np.sqrt(2), c: float = 1.0 / np.sqrt(3),
+    n: int = 192,
+    periods: int = 4,
+    a: float = 1.0,
+    b: float = 1.0 / np.sqrt(2),
+    c: float = 1.0 / np.sqrt(3),
 ) -> FieldDataset:
     r"""Arnold–Beltrami–Childress (ABC) flow, sampled on multiple periods.
 
@@ -167,26 +184,38 @@ def scene_abc_flow(theme: str = "dark") -> Path:
 
     n_seeds = 36
     seed_x = np.linspace(0.1, 2 * np.pi - 0.1, n_seeds)
-    seeds = np.column_stack([
-        seed_x,
-        np.full(n_seeds, np.pi),
-        np.zeros(n_seeds),
-    ])
+    seeds = np.column_stack(
+        [
+            seed_x,
+            np.full(n_seeds, np.pi),
+            np.zeros(n_seeds),
+        ]
+    )
 
     section = poincare_section(
-        data, seeds, surf,
-        max_steps=50_000, direction="both",
-        atol=1e-9, rtol=1e-9,
-        step_size_init=0.02, max_step=0.1,
+        data,
+        seeds,
+        surf,
+        max_steps=50_000,
+        direction="both",
+        atol=1e-9,
+        rtol=1e-9,
+        step_size_init=0.02,
+        max_step=0.1,
     )
 
     with use_theme(theme):
         fig, ax = plot_poincare_section(
-            section, marker_size=1.2, alpha=0.55, color_by_seed=True,
+            section,
+            marker_size=1.2,
+            alpha=0.55,
+            color_by_seed=True,
         )
-        ax.set_title("Arnold–Beltrami–Childress (ABC) flow\n"
-                     r"$(A, B, C) = (1, 1/\sqrt{2}, 1/\sqrt{3})$, "
-                     r"$z = 0$ Poincaré section")
+        ax.set_title(
+            "Arnold–Beltrami–Childress (ABC) flow\n"
+            r"$(A, B, C) = (1, 1/\sqrt{2}, 1/\sqrt{3})$, "
+            r"$z = 0$ Poincaré section"
+        )
     out = OUTPUT_DIR / f"poincare_abc_{theme}.png"
     fig.savefig(out, dpi=160, bbox_inches="tight")
     plt.close(fig)
@@ -205,25 +234,37 @@ def scene_tilted_plane(theme: str = "dark") -> Path:
 
     n_seeds = 36
     seed_x = np.linspace(0.1, 2 * np.pi - 0.1, n_seeds)
-    seeds = np.column_stack([
-        seed_x,
-        np.full(n_seeds, np.pi),
-        np.zeros(n_seeds),
-    ])
+    seeds = np.column_stack(
+        [
+            seed_x,
+            np.full(n_seeds, np.pi),
+            np.zeros(n_seeds),
+        ]
+    )
 
     section = poincare_section(
-        data, seeds, surf,
-        max_steps=50_000, direction="both",
-        atol=1e-9, rtol=1e-9,
-        step_size_init=0.02, max_step=0.1,
+        data,
+        seeds,
+        surf,
+        max_steps=50_000,
+        direction="both",
+        atol=1e-9,
+        rtol=1e-9,
+        step_size_init=0.02,
+        max_step=0.1,
     )
 
     with use_theme(theme):
         fig, ax = plot_poincare_section(
-            section, marker_size=1.2, alpha=0.55, color_by_seed=True,
+            section,
+            marker_size=1.2,
+            alpha=0.55,
+            color_by_seed=True,
         )
-        ax.set_title("ABC flow, tilted Poincaré plane\n"
-                     r"normal $\propto (0.3, 0, 1)$, Gram–Schmidt $(u, v)$ basis")
+        ax.set_title(
+            "ABC flow, tilted Poincaré plane\n"
+            r"normal $\propto (0.3, 0, 1)$, Gram–Schmidt $(u, v)$ basis"
+        )
     out = OUTPUT_DIR / f"poincare_tilted_{theme}.png"
     fig.savefig(out, dpi=160, bbox_inches="tight")
     plt.close(fig)

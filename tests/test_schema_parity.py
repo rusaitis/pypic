@@ -2,7 +2,7 @@
 
 Every canonical name the schema promises must resolve via the public
 ``field_info()`` resolver, and every alias target in
-``_COMPUTE_ALIASES`` must resolve too.  This guards against three
+``COMPUTE_ALIASES`` must resolve too.  This guards against three
 drift classes between the cross-tool schema contract and the pypic
 registry:
 
@@ -16,7 +16,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from pypic._aliases import _COMPUTE_ALIASES
+from pypic._aliases import COMPUTE_ALIASES
 from pypic.fields import field_info
 
 _SCHEMA_MD = Path(__file__).resolve().parent.parent / "docs" / "schema.md"
@@ -115,19 +115,19 @@ def test_schema_canonicals_resolve() -> None:
 
 
 def test_alias_targets_resolve() -> None:
-    """Every ``_COMPUTE_ALIASES`` target resolves via ``field_info()``.
+    """Every ``COMPUTE_ALIASES`` target resolves via ``field_info()``.
 
     Catches alias rot — a target renamed without updating the alias.
     Independent of the schema docs.
     """
     broken: list[tuple[str, str]] = []
-    for alias, target in _COMPUTE_ALIASES.items():
+    for alias, target in COMPUTE_ALIASES.items():
         try:
             field_info(target)
         except KeyError:
             broken.append((alias, target))
     assert not broken, (
-        "_COMPUTE_ALIASES has aliases pointing at unresolvable "
+        "COMPUTE_ALIASES has aliases pointing at unresolvable "
         "targets (probable rename drift):\n"
         + "\n".join(f"  - {a!r} -> {t!r}" for a, t in broken)
     )

@@ -166,6 +166,37 @@ def test_cli_export_smoke() -> None:
     assert json.loads(main_result.stdout) == parsed
 
 
+def test_cli_export_codegen_flags_smoke() -> None:
+    """Wire-check for ``--inline-single-use-defs --include-x-extensions``.
+
+    The cross-tool codegen pipelines (webpic, rustpic tooling) pin both
+    flags. Each flag's semantics is covered by
+    ``test_inline_single_use_defs_flattens_unique_refs`` and
+    ``test_include_x_extensions_annotates_extensible_objects``; this
+    test guards the CLI surface that wires them together.
+    """
+    runner = CliRunner()
+    result = runner.invoke(
+        schema_app,
+        ["export", "--inline-single-use-defs", "--include-x-extensions", "--compact"],
+    )
+    assert result.exit_code == 0, result.stdout
+    payload = json.loads(result.stdout)
+    assert payload["$id"].endswith(f"/v{SCHEMA_VERSION}.json")
+    # Flags actually change the output relative to defaults.
+    default = runner.invoke(schema_app, ["export", "--compact"])
+    assert default.exit_code == 0, default.stdout
+    assert result.stdout != default.stdout
+    # The --inline-single-use-defs effect: fewer $defs after inlining.
+    default_payload = json.loads(default.stdout)
+    assert len(payload.get("$defs", {})) < len(default_payload["$defs"])
+    # The --include-x-extensions effect: x-* patternProperties appear
+    # somewhere in the document (location is brittle to which $defs
+    # survive inlining — string-scan instead).
+    assert '"^x[-_]' in result.stdout
+    assert '"^x[-_]' not in default.stdout
+
+
 def test_get_schema_path_resolves_to_bundled_file() -> None:
     path = get_schema_path()
     assert path.exists()

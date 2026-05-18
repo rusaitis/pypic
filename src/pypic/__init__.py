@@ -2,12 +2,15 @@
 
 __version__ = "0.1.0"
 
+from pypic import aliases
 from pypic.comparison import (
     compare_fields,
     field_comparison_report,
     field_difference_dataset,
 )
 from pypic.compute import (
+    RECIPES,
+    Recipe,
     available_quantities,
     field_dependencies,
     register_recipe,
@@ -146,6 +149,7 @@ from pypic.units import Normalization, PhysicsConstants, PhysicsParams, SpeciesI
 __all__ = [
     "CARTESIAN",
     "CYLINDRICAL",
+    "RECIPES",
     "SPHERICAL",
     "BoxSelection",
     "CoordinateGeometry",
@@ -164,6 +168,7 @@ __all__ = [
     "PoincareSection",
     "PoincareSurface",
     "QuantityType",
+    "Recipe",
     "Reduction",
     "SimpleReader",
     "Simulation",
@@ -179,6 +184,7 @@ __all__ = [
     "agyrotropy",
     "alfven_mach",
     "alfven_speed",
+    "aliases",
     "align_grids",
     "available_quantities",
     "common_grid",

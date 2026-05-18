@@ -1477,6 +1477,35 @@ class TestFileThemes:
             assert matplotlib.rcParams["text.color"] != original
         assert matplotlib.rcParams["text.color"] == original
 
+    def test_bundled_themes_have_webpic_section(self) -> None:
+        """Every bundled theme carries a parseable ``[webpic]`` block.
+
+        Cross-tool contract: webpic reads ``[webpic]`` (panel layout,
+        shortcuts, diagnostics) plus the shared ``[colors]``/
+        ``[colormaps]``/``[font]`` for visual identity. A missing or
+        mis-versioned section silently degrades webpic's defaults.
+        """
+        import tomllib
+        from pathlib import Path as _Path
+
+        from pypic.plotting._theme_io import _bundled_theme_dir
+
+        problems: list[str] = []
+        for path in sorted(_Path(_bundled_theme_dir()).glob("*.toml")):
+            raw = tomllib.loads(path.read_text())
+            webpic = raw.get("webpic")
+            if not isinstance(webpic, dict):
+                problems.append(f"{path.name}: missing [webpic]")
+                continue
+            if webpic.get("version") != 1:
+                got = webpic.get("version")
+                problems.append(f"{path.name}: webpic.version = {got!r}, expected 1")
+                continue
+            for required in ("layout", "shortcuts", "diagnostics", "embed"):
+                if required not in webpic:
+                    problems.append(f"{path.name}: missing [webpic.{required}]")
+        assert not problems, "themes failed [webpic] invariant: " + "; ".join(problems)
+
 
 class TestLegendEntryNoneColor:
     def test_none_color_creates(self) -> None:

@@ -23,13 +23,13 @@ from __future__ import annotations
 
 import inspect
 
-from pypic._aliases import _COMPUTE_ALIASES, _get_field_alias_fallback
+from pypic._aliases import COMPUTE_ALIASES, _get_field_alias_fallback
 from pypic.compute import (
     _REGISTRY,
-    _SPECIES_TEMPLATES,
-    _Recipe,
-    _SpeciesArgs,
-    _SpeciesTemplate,
+    SPECIES_TEMPLATES,
+    Recipe,
+    SpeciesArgs,
+    SpeciesTemplate,
     _try_species_recipe,
 )
 from pypic.fields import _FIELD_INFO, _SPECIES_INFO_PATTERNS, field_info
@@ -96,7 +96,7 @@ CANONICAL_NAMES: frozenset[str] = frozenset(
         "P_33",
         "agyrotropy",
         # Per-species pressure projections (Tier-3 form; e/i shortcuts
-        # ``P_par_e``/``P_par_i`` resolve to these via ``_COMPUTE_ALIASES``).
+        # ``P_par_e``/``P_par_i`` resolve to these via ``COMPUTE_ALIASES``).
         "P_s0_par",
         "P_s1_par",
         "P_s0_perp",
@@ -184,7 +184,7 @@ CANONICAL_NAMES: frozenset[str] = frozenset(
 # Per-species name *prefixes* listed in schema.md (suffixed with _sN at
 # runtime). Each prefix is checked against synthetic species indices 0
 # and 5 so we exercise both the static `_REGISTRY` entries (s0/s1) and
-# the dynamic `_SPECIES_TEMPLATES` synthesis (s5).
+# the dynamic `SPECIES_TEMPLATES` synthesis (s5).
 PER_SPECIES_PREFIXES: frozenset[str] = frozenset(
     {
         "n",  # n_s0, n_s5
@@ -247,7 +247,7 @@ def _is_reachable(name: str) -> bool:
         return True
     if name in _REGISTRY:
         return True
-    canonical = _COMPUTE_ALIASES.get(name)
+    canonical = COMPUTE_ALIASES.get(name)
     if canonical is not None and (canonical in _FIELD_INFO or canonical in _REGISTRY):
         return True
     fallback = _get_field_alias_fallback()
@@ -278,7 +278,7 @@ def test_all_schema_fields_are_reachable() -> None:
     unreachable = sorted(n for n in CANONICAL_NAMES if not _is_reachable(n))
     assert not unreachable, _format_failures(
         "SCHEMA names not reachable via _FIELD_INFO, compute._REGISTRY, "
-        "_COMPUTE_ALIASES, or species patterns — register them or remove "
+        "COMPUTE_ALIASES, or species patterns — register them or remove "
         "from CANONICAL_NAMES",
         unreachable,
     )
@@ -322,7 +322,7 @@ def test_all_per_species_prefixes_resolve() -> None:
 
     The static path goes through ``_FIELD_INFO`` / ``_REGISTRY``;
     the dynamic path goes through ``_SPECIES_INFO_PATTERNS`` /
-    ``_SPECIES_TEMPLATES``. Both must succeed for every documented prefix.
+    ``SPECIES_TEMPLATES``. Both must succeed for every documented prefix.
     """
     failures = sorted(
         _per_species_form(prefix, idx)
@@ -332,7 +332,7 @@ def test_all_per_species_prefixes_resolve() -> None:
     )
     assert not failures, _format_failures(
         "Per-species names from schema.md not reachable — check "
-        "_SPECIES_INFO_PATTERNS in fields.py and _SPECIES_TEMPLATES in "
+        "_SPECIES_INFO_PATTERNS in fields.py and SPECIES_TEMPLATES in "
         "compute.py",
         failures,
     )
@@ -415,7 +415,7 @@ def _template_canonical_form(prefix: str, idx: int) -> str:
 def test_all_species_template_dependencies_resolve() -> None:
     """Substituting `_s0` into each template must yield reachable deps."""
     failures: list[str] = []
-    for prefix in sorted(_SPECIES_TEMPLATES):
+    for prefix in sorted(SPECIES_TEMPLATES):
         name = _template_canonical_form(prefix, 0)
         recipe = _try_species_recipe(name)
         if recipe is None:
@@ -436,16 +436,16 @@ def test_all_species_template_dependencies_resolve() -> None:
 
 
 def test_all_compute_aliases_resolve() -> None:
-    """Every entry in _COMPUTE_ALIASES must point at a name that resolves."""
+    """Every entry in COMPUTE_ALIASES must point at a name that resolves."""
     failures = sorted(
         f"{alias!r} → {target!r}"
-        for alias, target in _COMPUTE_ALIASES.items()
+        for alias, target in COMPUTE_ALIASES.items()
         if not _is_reachable(target)
     )
     assert not failures, _format_failures(
-        "_COMPUTE_ALIASES entries pointing at unknown targets — update "
+        "COMPUTE_ALIASES entries pointing at unknown targets — update "
         "or remove. (Vector-group shorthand like 'EFe' → 'EF_s0' belongs "
-        "in _GROUP_ALIASES, not _COMPUTE_ALIASES)",
+        "in GROUP_ALIASES, not COMPUTE_ALIASES)",
         failures,
     )
 
@@ -482,25 +482,25 @@ def test_species_pattern_quantity_types_resolve() -> None:
 # signature is currently a runtime ``TypeError`` at compute time. This
 # test catches every such mismatch at CI time.
 
-_SPECIES_ARGS_COUNT: dict[_SpeciesArgs, int] = {
-    _SpeciesArgs.CHARGE_MASS: 2,
-    _SpeciesArgs.MASS_ONLY: 1,
-    _SpeciesArgs.CHARGE_ONLY: 1,
-    _SpeciesArgs.NONE: 0,
+_SPECIES_ARGS_COUNT: dict[SpeciesArgs, int] = {
+    SpeciesArgs.CHARGE_MASS: 2,
+    SpeciesArgs.MASS_ONLY: 1,
+    SpeciesArgs.CHARGE_ONLY: 1,
+    SpeciesArgs.NONE: 0,
 }
 
 
-def _expected_positional_count(entry: _Recipe | _SpeciesTemplate) -> int:
+def _expected_positional_count(entry: Recipe | SpeciesTemplate) -> int:
     """Positional args ``_execute_recipe`` passes to ``entry.func``.
 
     Source of truth: ``compute._execute_recipe``. Keep aligned if that
     function grows new auto-injection branches.
     """
-    fields = entry.fields if isinstance(entry, _Recipe) else entry.field_pattern
+    fields = entry.fields if isinstance(entry, Recipe) else entry.field_pattern
     n = len(fields)
     species_args = getattr(entry, "species_args", None)
     needs_species = (
-        isinstance(entry, _SpeciesTemplate)
+        isinstance(entry, SpeciesTemplate)
         or getattr(entry, "species_index", None) is not None
     )
     if needs_species and species_args is not None:
@@ -509,17 +509,17 @@ def _expected_positional_count(entry: _Recipe | _SpeciesTemplate) -> int:
         n += 1
     if entry.needs_c:
         n += 1
-    if isinstance(entry, _Recipe) and entry.needs_grid:
+    if isinstance(entry, Recipe) and entry.needs_grid:
         n += 3
     return n
 
 
-def _expected_kwargs(entry: _Recipe | _SpeciesTemplate) -> set[str]:
+def _expected_kwargs(entry: Recipe | SpeciesTemplate) -> set[str]:
     """Kwargs ``_execute_recipe`` passes to ``entry.func``."""
     kw: set[str] = set()
     if getattr(entry, "supports_relativistic", False):
         kw.add("c")
-    if isinstance(entry, _Recipe) and entry.passes_geometry and entry.needs_grid:
+    if isinstance(entry, Recipe) and entry.passes_geometry and entry.needs_grid:
         kw.add("geometry")
     return kw
 
@@ -532,9 +532,9 @@ def test_registry_func_signatures_match_recipe_metadata() -> None:
     length, missing ``species_args=``, forgotten ``needs_grid=True``,
     ``supports_relativistic=True`` on a function without a ``c=`` kwarg.
     """
-    entries: list[tuple[str, str, _Recipe | _SpeciesTemplate]] = [
+    entries: list[tuple[str, str, Recipe | SpeciesTemplate]] = [
         *(("registry", name, recipe) for name, recipe in _REGISTRY.items()),
-        *(("template", prefix, tmpl) for prefix, tmpl in _SPECIES_TEMPLATES.items()),
+        *(("template", prefix, tmpl) for prefix, tmpl in SPECIES_TEMPLATES.items()),
     ]
 
     failures: list[str] = []
@@ -557,15 +557,11 @@ def test_registry_func_signatures_match_recipe_metadata() -> None:
         has_var_positional = any(
             p.kind == inspect.Parameter.VAR_POSITIONAL for p in params
         )
-        has_var_keyword = any(
-            p.kind == inspect.Parameter.VAR_KEYWORD for p in params
-        )
+        has_var_keyword = any(p.kind == inspect.Parameter.VAR_KEYWORD for p in params)
 
         expected_pos = _expected_positional_count(entry)
         expected_kw = _expected_kwargs(entry)
-        fields_desc = (
-            entry.fields if isinstance(entry, _Recipe) else entry.field_pattern
-        )
+        fields_desc = entry.fields if isinstance(entry, Recipe) else entry.field_pattern
 
         if required_positional > expected_pos:
             failures.append(
