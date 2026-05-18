@@ -1267,6 +1267,46 @@ The 3D Schindler reconnection criterion $\Xi(\mathbf{x}_0) = \int_{\mathcal{L}} 
 Scalar quantities (`n_s0`, `rho_m`, `P`, `T_s0`, `beta`, ...) use
 the same name regardless of geometry.
 
+### Field-line map quantities
+
+Outputs of `pypic.maps` (Step 44g — planned). Derived from
+**field-line tracing** rather than per-cell pointwise computation,
+so they live on a 2D *footpoint* / *seed* grid $(\theta_0, \phi_0)$
+or an arbitrary slice surface — not the simulation cell grid.
+Stored as scalar arrays in the canonical Zarr/HDF5 layout (§4.1 /
+§4.2) once `pypic.maps` ships; consumers reading these names from
+disk should expect a 2D mapping array, not a 3D field.
+
+| Canonical | Description | Producer |
+|-----------|-------------|----------|
+| `Q_map` | Squashing factor $Q$ on a footpoint grid (Titov-Démoulin) | `pypic.maps.squashing_factor` |
+| `connectivity_map` | Open/closed/disconnected classification (small-int enum) | `pypic.maps.classify_connectivity` |
+| `length_map` | Total arc length of the traced field line | `pypic.maps.field_line_length` |
+| `r_map_f`, `t_map_f`, `p_map_f` | Forward (outward) footpoint coordinates | `pypic.maps.footpoint_map` |
+| `r_map_b`, `t_map_b`, `p_map_b` | Backward (inward) footpoint coordinates | `pypic.maps.footpoint_map` |
+
+The footpoint maps are the raw output of field-line tracing;
+everything else in the literature (signed-log $Q$, MapFL's $K$-factor
+$\log_{10}|B_{r,0}/B_{r,1}|$, flux-tube expansion factor
+$(B_{r,0}\,r_0^2)/(B_{r,1}\,r_1^2)$, magnetic-dip counts) derives
+from these names plus the simulation $B$ field, so `pypic.maps`
+exposes those as Python functions returning numpy arrays without
+booking new canonical on-disk names.
+
+The producer is **analysis, not simulation**: rustpic / webpic /
+foreign readers do not emit these names; pypic writes them after
+the fact, typically into a dedicated Zarr store alongside the
+simulation output. Map outputs carry an `attrs["map"]` provenance
+block recording the tracer settings (`integrator`,
+`step_control`, `atol`/`rtol` or `over_rc`, `interpolation`),
+the seed grid definition (`r0`, `t0_range`, `p0_range`, ...), and
+the finite-difference $h$ used for $Q$ — sufficient for
+reproducibility across re-runs. Tracer + interpolator vocabulary
+(integrator scheme, step-control mode, periodic-axes flags) is
+populated by `pypic.numerics` and `pypic.traces` at write time;
+no `simulation.toml` section is needed because maps are a
+post-processing artefact, not a simulation control parameter.
+
 ### Per-particle data columns
 
 For PIC and hybrid codes, `ParticleData` carries one canonical
@@ -1593,6 +1633,8 @@ for the full I/O contract.
 
 - **New simulation code:** Write a reader that maps native output to `FieldDataset` with canonical field names. No schema changes needed.
 - **New field:** Add the name to the canonical table (this document), add to relevant readers, add derived functions if applicable.
+- **New derived map output:** Add the name to the *Field-line map quantities* table in §3, write the producer in `pypic.maps`, persist via `pypic.io.to_zarr`. Map outputs are 2D arrays on a footpoint grid, not 3D fields — schema accommodates either without changing the layout contract.
+- **New numerical method:** Land integrators / step controllers / interpolators in `pypic.numerics` (one shared kernel package — the adaptive tracer is the current consumer; future particle pushers and the Step 44 symplectic / periodic-tricubic / curvature-step paths land in the same module). The vocabulary surfaces as free-form strings in the map `attrs["map"]` provenance block.
 - **New model type:** Add a `[physics.NEW_TYPE]` subsection convention, document expected fields and species.
 - **New output format:** Define the layout mapping, write a reader. Everything downstream works unchanged via `FieldDataset`.
 - **Code-specific knobs:** Park them under an `x-<code>` namespace — see §1 *Sections and extensions*.
