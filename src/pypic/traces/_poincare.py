@@ -5,7 +5,9 @@ fixed transverse surface $\Sigma$ and record the puncture points. The
 resulting 2D scatter pattern makes topology visually obvious — closed
 curves are islands / O-points, dense 1D fills are KAM surfaces, blobs
 are chaotic regions. Standard tool for fusion poloidal sections and
-magnetotail X-line geometry.
+magnetotail X-line geometry — the FLARE 3D boundary code uses the
+same construction for stellarator / divertor footprint analysis
+[@Frerichs2024].
 
 This module is a thin orchestrator on top of two existing primitives:
 :func:`pypic.traces.trace_field_lines_adaptive` (integration) and
@@ -37,7 +39,7 @@ from pypic.traces._tracing import (
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Mapping, Sequence
 
     from pypic.dataset import FieldDataset
     from pypic.traces._fieldline import FieldLine
@@ -47,6 +49,10 @@ if TYPE_CHECKING:
 _AXIS_INDEX: dict[str, int] = {"x": 0, "y": 1, "z": 2}
 
 
+# slots=False: cached_property writes through __dict__, which slotted
+# dataclasses don't expose. Switching to slots would require a manual
+# cache slot per cached attribute — not worth the line-count tradeoff
+# for a result dataclass with three cached lookups.
 @dataclass(frozen=True)
 class PoincareSurface:
     r"""Transverse plane $\Sigma$ for a Poincaré section.
@@ -146,7 +152,8 @@ class PoincareSurface:
 
         Constructed via Gram--Schmidt against the world axis least
         aligned with $\hat{\mathbf{n}}$ for numerical stability — the
-        same convention used in COMSOL / FLARE / Mayavi.
+        standard oblique-section basis shared by FLARE
+        [@Frerichs2024] and most field-mapping tools.
         """
         n = self._normal_arr
         # Pick the world axis least parallel to n
@@ -198,6 +205,8 @@ class PoincareSurface:
         return np.column_stack([rel @ u, rel @ v])
 
 
+# slots=False: same reason as PoincareSurface — cached_property needs
+# the instance __dict__.
 @dataclass(frozen=True)
 class PoincareSection:
     r"""Result of :func:`poincare_section`: per-seed punctures and provenance.
@@ -258,7 +267,9 @@ class PoincareSection:
     punctures_3d: tuple[FloatArray, ...]
     punctures_2d: tuple[FloatArray, ...]
     field_lines: tuple[FieldLine, ...]
-    metadata: dict[str, Any] = field(default_factory=dict)
+    # Read-only after __post_init__ rewraps to MappingProxyType. Accept
+    # a plain dict on construction for callers' convenience.
+    metadata: Mapping[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "metadata", MappingProxyType(dict(self.metadata)))

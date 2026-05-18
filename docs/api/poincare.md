@@ -11,9 +11,11 @@ pattern makes topology visually obvious:
 - **densely-filled 1D fills** ⇒ KAM surfaces (good confinement)
 - **2D blobs** ⇒ chaotic / stochastic regions
 
-The classical post-1890s tool for fusion poloidal sections, X-line
-separatrix mapping in magnetotail reconnection, and mirror-mode
-magnetic-hole topology.
+A classical dynamical-systems diagnostic; in 3D plasma the same
+construction underpins fusion poloidal sections, X-line separatrix
+mapping in magnetotail reconnection, mirror-mode magnetic-hole
+topology, and stellarator divertor footprint analysis
+[@Frerichs2024].
 
 ## Tokamak poloidal section (closed orbits)
 
@@ -105,8 +107,9 @@ surf = PoincareSurface(normal=(1.0, 1.0, 0.0), point=(0.0, 0.0, 0.0))
 ```
 
 The Gram--Schmidt basis is built against the world axis least
-parallel to $\hat{\mathbf{n}}$ for numerical stability — the same
-convention used in COMSOL, FLARE, and Mayavi.
+parallel to $\hat{\mathbf{n}}$ for numerical stability — the standard
+oblique-section convention shared by FLARE [@Frerichs2024] and most
+field-mapping tools.
 
 ## Implementation notes
 

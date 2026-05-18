@@ -314,7 +314,11 @@ class TestTraceFixedCircular:
     def test_fourth_order_convergence(self) -> None:
         """Error ratio when halving h should be ~16 (4th order).
 
-        Uses n=200 grid so interpolation error is negligible.
+        Uses n=200 grid so interpolation error is negligible. We
+        accept ratios > 12 rather than the theoretical 16 — the
+        underlying field is reached via trilinear interpolation,
+        which contributes a residual O(grid_h^2) term that erodes
+        the leading-order RK4 estimate by a few percent.
         """
         data = _make_circular_field(n=200, extent=10.0)
         center = 5.0
@@ -348,8 +352,8 @@ class TestTraceFixedCircular:
 
         ratio_1 = errors[0] / errors[1]
         ratio_2 = errors[1] / errors[2]
-        assert ratio_1 > 10, f"Ratio {ratio_1:.1f} too low"
-        assert ratio_2 > 10, f"Ratio {ratio_2:.1f} too low"
+        assert ratio_1 > 12, f"Ratio {ratio_1:.1f} too low (RK4 expects ~16)"
+        assert ratio_2 > 12, f"Ratio {ratio_2:.1f} too low (RK4 expects ~16)"
 
 
 class TestTraceAdaptive:

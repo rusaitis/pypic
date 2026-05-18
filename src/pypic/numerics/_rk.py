@@ -397,9 +397,10 @@ def embedded_error_norm_batched(
 ) -> FloatArray:
     r"""Per-seed RMS error norm for a batched embedded RK step.
 
-    Vectorized form of :func:`embedded_error_norm`. Same RMS formula,
-    averaged over the *component* axis (``axis=-1``) so each seed gets
-    its own scalar error norm.
+    Vectorized form of :func:`embedded_error_norm`. Same mixed
+    absolute/relative scaling and RMS reduction as the scalar form
+    ([@HairerWanner1993] §II.4), averaged over the *component* axis
+    (``axis=-1``) so each seed gets its own scalar error norm.
 
     Parameters
     ----------
