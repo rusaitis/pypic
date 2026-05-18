@@ -971,6 +971,265 @@ class TestTraceFieldLinesAdaptive:
             assert any(np.allclose(p, seeds[i]) for p in both[i].points)
 
 
+class TestClosedLoopDetection:
+    """Sliding-window proximity detector for trapped / closed orbits.
+
+    Mirror-mode magnetic holes and O-type islands have closed
+    field-line topology — a tracer entering one orbits indefinitely
+    and otherwise burns through ``max_steps``. The detector terminates
+    with :attr:`TerminationReason.CLOSED_LOOP` when the trace re-enters
+    a ``loop_tol``-radius ball around a past point separated by more
+    than ``loop_min_arclen`` of arc length.
+    """
+
+    @pytest.fixture
+    def closed_loop_field_data(self) -> FieldDataset:
+        """Closed circular field $\\mathbf{B} = (-(y-cy), (x-cx), 0)$.
+
+        Centered at (10, 10, 10) on a 20³ domain. Field-line topology
+        is concentric circles in the z=const plane; the centre is a
+        magnetic null (|B|=0) so seeds must lie off-axis.
+        """
+        from pypic.grid import GridInfo
+
+        grid = GridInfo(
+            dimensions=(20, 20, 20),
+            spacing=(1.0, 1.0, 1.0),
+            origin=(0.0, 0.0, 0.0),
+        )
+        cx, cy = 10.0, 10.0
+        coords = np.arange(20.0)
+        x, y, _z = np.meshgrid(coords, coords, coords, indexing="ij")
+        b1 = -(y - cy)
+        b2 = x - cx
+        b3 = np.zeros_like(x)
+        return FieldDataset.from_arrays(
+            {"B_1": b1, "B_2": b2, "B_3": b3},
+            grid,
+            Normalization.identity(),
+        )
+
+    @pytest.fixture
+    def vortex_field_data(self) -> FieldDataset:
+        """Helical field $\\mathbf{B} = (-(y-cy), (x-cx), 0.2)$.
+
+        Same vortex pattern as :func:`closed_loop_field_data`, plus a
+        constant axial drift. Field lines are open helices that exit
+        the +z boundary; closed-loop detection should NOT trigger
+        because each turn is offset in z by $2\\pi \\cdot 0.2 \\approx
+        1.26$ — much larger than any reasonable ``loop_tol``.
+        """
+        from pypic.grid import GridInfo
+
+        grid = GridInfo(
+            dimensions=(20, 20, 20),
+            spacing=(1.0, 1.0, 1.0),
+            origin=(0.0, 0.0, 0.0),
+        )
+        cx, cy = 10.0, 10.0
+        coords = np.arange(20.0)
+        x, y, _z = np.meshgrid(coords, coords, coords, indexing="ij")
+        b1 = -(y - cy)
+        b2 = x - cx
+        b3 = 0.2 * np.ones_like(x)
+        return FieldDataset.from_arrays(
+            {"B_1": b1, "B_2": b2, "B_3": b3},
+            grid,
+            Normalization.identity(),
+        )
+
+    def test_closed_circle_triggers_well_before_max_steps(
+        self, closed_loop_field_data: FieldDataset
+    ) -> None:
+        """A trace on a closed-circle field terminates with CLOSED_LOOP."""
+        from pypic.traces import TerminationReason, trace_field_line_adaptive
+
+        # Seed at radius 2 from the centre — one orbit is ~4π ≈ 12.6 of
+        # arc length. With loop_tol=0.1 and loop_min_arclen=2.0, the
+        # detector should fire well within a single orbit.
+        fl = trace_field_line_adaptive(
+            closed_loop_field_data,
+            (12.0, 10.0, 10.0),
+            step_size_init=0.1,
+            max_step=0.2,
+            max_steps=500,
+            direction="forward",
+            loop_tol=0.1,
+            loop_min_arclen=2.0,
+        )
+        assert fl.metadata["reason"] == str(TerminationReason.CLOSED_LOOP)
+        # Should terminate before consuming half the step budget.
+        assert fl.n_points < 250
+
+    def test_uniform_field_does_not_trigger(
+        self, uniform_field_data: FieldDataset
+    ) -> None:
+        """Straight-line trace: detection must NOT fire."""
+        from pypic.traces import TerminationReason, trace_field_line_adaptive
+
+        fl = trace_field_line_adaptive(
+            uniform_field_data,
+            (5.0, 10.0, 10.0),
+            step_size_init=0.5,
+            max_step=0.5,
+            max_steps=20,
+            direction="forward",
+            loop_tol=0.1,
+            loop_min_arclen=2.0,
+        )
+        assert fl.metadata["reason"] != str(TerminationReason.CLOSED_LOOP)
+
+    def test_open_helix_does_not_false_trigger(
+        self, vortex_field_data: FieldDataset
+    ) -> None:
+        """Helical trace with axial pitch >> loop_tol must NOT fire."""
+        from pypic.traces import TerminationReason, trace_field_line_adaptive
+
+        # Pitch per turn ≈ 2π * 0.2 / sqrt(1 + 0.2² normalization) ≈
+        # 1.23 in arc length. With loop_tol=0.2 (much less than pitch)
+        # and a couple of orbits of step budget, the detector must not
+        # mistake near-passes for a closed loop.
+        fl = trace_field_line_adaptive(
+            vortex_field_data,
+            (12.0, 10.0, 10.0),
+            step_size_init=0.1,
+            max_step=0.2,
+            max_steps=400,
+            direction="forward",
+            loop_tol=0.2,
+            loop_min_arclen=2.0,
+        )
+        assert fl.metadata["reason"] != str(TerminationReason.CLOSED_LOOP)
+
+    def test_loop_min_arclen_guards_against_self_trigger(
+        self, uniform_field_data: FieldDataset
+    ) -> None:
+        """A loose loop_tol with too-small arclen guard would self-trigger.
+
+        Use a uniform field with loop_tol large enough to contain the
+        immediately preceding sample. With a tiny loop_min_arclen the
+        detector fires after one step (the guard isn't doing its job).
+        With a larger loop_min_arclen the past tail older than that is
+        empty, so no proximity scan runs and the trace runs to
+        MAX_STEPS / DOMAIN_EXIT as it would without detection.
+        """
+        from pypic.traces import TerminationReason, trace_field_line_adaptive
+
+        seed = (5.0, 10.0, 10.0)
+        # loop_min_arclen smaller than the first step's arc length →
+        # the (n-1)-th sample sneaks past the guard.
+        fl_self_trigger = trace_field_line_adaptive(
+            uniform_field_data,
+            seed,
+            step_size_init=0.5,
+            max_step=0.5,
+            max_steps=20,
+            direction="forward",
+            loop_tol=1.0,
+            loop_min_arclen=0.01,
+        )
+        assert fl_self_trigger.metadata["reason"] == str(TerminationReason.CLOSED_LOOP)
+
+        # loop_min_arclen larger than any arc length reached →
+        # detector never has candidates to test.
+        fl_guarded = trace_field_line_adaptive(
+            uniform_field_data,
+            seed,
+            step_size_init=0.5,
+            max_step=0.5,
+            max_steps=20,
+            direction="forward",
+            loop_tol=1.0,
+            loop_min_arclen=100.0,
+        )
+        assert fl_guarded.metadata["reason"] != str(TerminationReason.CLOSED_LOOP)
+
+    def test_batched_mixed_seed_termination(
+        self,
+        closed_loop_field_data: FieldDataset,
+    ) -> None:
+        """Batched: per-seed CLOSED_LOOP vs MAX_STEPS.
+
+        Both seeds orbit (it's a vortex field — there's no escape),
+        but only the small-radius orbit completes within the step
+        budget. The large-radius orbit is truncated at MAX_STEPS, so
+        the detector never sees the trace return to the seed.
+        """
+        from pypic.traces import TerminationReason, trace_field_lines_adaptive
+
+        # Seed 0: radius 2 → circumference 4π ≈ 12.6, completes one
+        #         orbit in ~126 steps at step_size 0.1.
+        # Seed 1: radius 8 → circumference 16π ≈ 50.3, well beyond
+        #         the 200-step × 0.2-max-step = 40 arclen budget.
+        seeds = np.array([[12.0, 10.0, 10.0], [18.0, 10.0, 10.0]])
+        lines = trace_field_lines_adaptive(
+            closed_loop_field_data,
+            seeds,
+            step_size_init=0.1,
+            max_step=0.2,
+            max_steps=200,
+            direction="forward",
+            loop_tol=0.1,
+            loop_min_arclen=2.0,
+        )
+        assert lines[0].metadata["reason"] == str(TerminationReason.CLOSED_LOOP)
+        assert lines[1].metadata["reason"] == str(TerminationReason.MAX_STEPS)
+
+    def test_disabled_by_default_preserves_behavior(
+        self, closed_loop_field_data: FieldDataset
+    ) -> None:
+        """Without loop_tol, the trace runs to MAX_STEPS as before."""
+        from pypic.traces import TerminationReason, trace_field_line_adaptive
+
+        fl = trace_field_line_adaptive(
+            closed_loop_field_data,
+            (12.0, 10.0, 10.0),
+            step_size_init=0.1,
+            max_step=0.2,
+            max_steps=200,
+            direction="forward",
+        )
+        assert fl.metadata["reason"] == str(TerminationReason.MAX_STEPS)
+
+    def test_loop_min_arclen_without_loop_tol_raises(
+        self, uniform_field_data: FieldDataset
+    ) -> None:
+        from pypic.traces import trace_field_line_adaptive
+
+        with pytest.raises(ValueError, match="loop_min_arclen requires loop_tol"):
+            trace_field_line_adaptive(
+                uniform_field_data,
+                (10.0, 10.0, 10.0),
+                max_steps=4,
+                loop_min_arclen=1.0,
+            )
+
+    def test_negative_loop_tol_raises(self, uniform_field_data: FieldDataset) -> None:
+        from pypic.traces import trace_field_line_adaptive
+
+        with pytest.raises(ValueError, match="loop_tol must be positive"):
+            trace_field_line_adaptive(
+                uniform_field_data,
+                (10.0, 10.0, 10.0),
+                max_steps=4,
+                loop_tol=-0.1,
+            )
+
+    def test_negative_loop_min_arclen_raises(
+        self, uniform_field_data: FieldDataset
+    ) -> None:
+        from pypic.traces import trace_field_line_adaptive
+
+        with pytest.raises(ValueError, match="loop_min_arclen must be positive"):
+            trace_field_line_adaptive(
+                uniform_field_data,
+                (10.0, 10.0, 10.0),
+                max_steps=4,
+                loop_tol=0.1,
+                loop_min_arclen=-1.0,
+            )
+
+
 class TestEstimateTracingError:
     def test_error_estimate(self, uniform_field_data: FieldDataset) -> None:
         from pypic.traces import estimate_tracing_error, trace_field_line

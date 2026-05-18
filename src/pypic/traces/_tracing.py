@@ -43,6 +43,7 @@ class TerminationReason(StrEnum):
     DOMAIN_EXIT = "domain_exit"  # left interpolation domain (NaN)
     NULL_POINT = "null_point"  # |B| below null_threshold
     CALLBACK = "callback"  # user terminate() returned True
+    CLOSED_LOOP = "closed_loop"  # trace re-entered a loop_tol ball of a past point
 
 
 @dataclass(frozen=True, slots=True)
@@ -158,6 +159,35 @@ def _classify_failure(
     return TerminationReason.NULL_POINT
 
 
+def _resolve_loop_kwargs(
+    loop_tol: float | None,
+    loop_min_arclen: float | None,
+    step_size_init: float,
+) -> tuple[float | None, float | None]:
+    """Validate and apply defaults for the closed-loop detection kwargs.
+
+    Returns the resolved pair. When loop_tol is None, returns (None, None)
+    so detection is off in the inner loops. When loop_tol is set and
+    loop_min_arclen is None, defaults to 10 * step_size_init — large
+    enough to clear the initial cluster of small accepted steps, small
+    enough to detect tight islands.
+    """
+    if loop_tol is None and loop_min_arclen is None:
+        return None, None
+    if loop_tol is None:
+        msg = "loop_min_arclen requires loop_tol to be set"
+        raise ValueError(msg)
+    if loop_tol <= 0.0:
+        msg = f"loop_tol must be positive, got {loop_tol}"
+        raise ValueError(msg)
+    if loop_min_arclen is None:
+        loop_min_arclen = 10.0 * step_size_init
+    elif loop_min_arclen <= 0.0:
+        msg = f"loop_min_arclen must be positive, got {loop_min_arclen}"
+        raise ValueError(msg)
+    return loop_tol, loop_min_arclen
+
+
 def _trace_single_direction(
     interp: VectorFieldInterpolator,
     seed: FloatArray,
@@ -222,6 +252,8 @@ def _trace_single_direction_adaptive(
     max_steps: int,
     null_threshold: float,
     terminate: Callable[[FloatArray], bool] | None,
+    loop_tol: float | None,
+    loop_min_arclen: float | None,
 ) -> tuple[FloatArray, TerminationReason, float]:
     """Dormand-Prince 5(4) adaptive integration in one direction.
 
@@ -240,6 +272,16 @@ def _trace_single_direction_adaptive(
     # next attempt. None on the very first attempt. On a rejection,
     # y is unchanged so k_carry stays valid for the retry — no reset.
     k_carry: FloatArray | None = None
+
+    # Closed-loop detection: monotone arc-length prefix over accepted
+    # steps, used with searchsorted to bound the proximity scan to the
+    # past tail older than `loop_min_arclen`. Allocated only when
+    # detection is enabled.
+    arclen: FloatArray | None = (
+        np.empty(max_steps + 1, dtype=np.float64) if loop_tol is not None else None
+    )
+    if arclen is not None:
+        arclen[0] = 0.0
 
     def rhs(yi: FloatArray) -> FloatArray | None:
         return _rhs(yi, interp, sign, null_threshold)
@@ -263,6 +305,22 @@ def _trace_single_direction_adaptive(
             buf[n] = result.y_new
             k_carry = result.k_last
             h = h_new
+            if arclen is not None:
+                arclen[n] = arclen[n - 1] + float(np.linalg.norm(buf[n] - buf[n - 1]))
+                assert loop_tol is not None  # arclen allocation invariant
+                assert loop_min_arclen is not None  # paired by public-API check
+                # Past points older than loop_min_arclen of arc length:
+                # `arclen` is monotone, so a single searchsorted finds
+                # the right boundary. side='right' gives us the first
+                # index whose arclen exceeds the cutoff; everything to
+                # its left is fair game (the [:j_end] half-open slice).
+                cutoff = arclen[n] - loop_min_arclen
+                j_end = int(np.searchsorted(arclen[:n], cutoff, side="right"))
+                if j_end > 0:
+                    dists = np.linalg.norm(buf[:j_end] - buf[n], axis=1)
+                    if dists.min() <= loop_tol:
+                        reason = TerminationReason.CLOSED_LOOP
+                        break
             if terminate is not None and terminate(result.y_new):
                 reason = TerminationReason.CALLBACK
                 break
@@ -283,12 +341,14 @@ _R_MAX = 0
 _R_DOMAIN = 1
 _R_NULL = 2
 _R_CALLBACK = 3
+_R_CLOSED_LOOP = 4
 
 _REASON_FROM_INT: dict[int, TerminationReason] = {
     _R_MAX: TerminationReason.MAX_STEPS,
     _R_DOMAIN: TerminationReason.DOMAIN_EXIT,
     _R_NULL: TerminationReason.NULL_POINT,
     _R_CALLBACK: TerminationReason.CALLBACK,
+    _R_CLOSED_LOOP: TerminationReason.CLOSED_LOOP,
 }
 
 
@@ -304,6 +364,8 @@ def _trace_batch_single_direction_adaptive(
     max_steps: int,
     null_threshold: float,
     terminate: Callable[[FloatArray], bool] | None,
+    loop_tol: float | None,
+    loop_min_arclen: float | None,
 ) -> tuple[FloatArray, IntArray, IntArray, FloatArray]:
     """Batched Dormand-Prince 5(4) adaptive integration in one direction.
 
@@ -330,6 +392,15 @@ def _trace_batch_single_direction_adaptive(
     max_local_error = np.zeros(n_seeds, dtype=np.float64)
     k_carry: FloatArray | None = None
     live = np.ones(n_seeds, dtype=bool)
+
+    # Closed-loop detection: monotone per-seed arc-length prefix,
+    # allocated only when detection is enabled. Mirrors the scalar
+    # tracer's `arclen` array, one row per seed.
+    arclen: FloatArray | None = (
+        np.zeros((n_seeds, max_steps + 1), dtype=np.float64)
+        if loop_tol is not None
+        else None
+    )
 
     def rhs_batched(y: FloatArray) -> tuple[FloatArray, BoolArray]:
         b = interp.batch(y)
@@ -375,6 +446,26 @@ def _trace_batch_single_direction_adaptive(
                 k_carry = np.zeros((n_seeds, 3), dtype=np.float64)
             k_carry[acc_idx] = result.k_last[acc_idx]
 
+            if arclen is not None:
+                assert loop_tol is not None  # arclen allocation invariant
+                assert loop_min_arclen is not None  # paired by public-API check
+                # Per-seed: update arclen prefix at the new index, then
+                # run a searchsorted-bounded proximity scan against the
+                # seed's own past tail. Python loop over accepted seeds
+                # only; mirrors the callback-check pattern below.
+                for i in acc_idx:
+                    ni = int(n_steps[i])
+                    arclen[i, ni] = arclen[i, ni - 1] + float(
+                        np.linalg.norm(buf[i, ni] - buf[i, ni - 1])
+                    )
+                    cutoff = arclen[i, ni] - loop_min_arclen
+                    j_end = int(np.searchsorted(arclen[i, :ni], cutoff, side="right"))
+                    if j_end > 0:
+                        dists = np.linalg.norm(buf[i, :j_end] - buf[i, ni], axis=1)
+                        if dists.min() <= loop_tol:
+                            reasons_int[i] = _R_CLOSED_LOOP
+                            live[i] = False
+
         # Update h for all live seeds. Rejected seeds (live & success &
         # ~accept) retry with the smaller h; dead seeds keep their last
         # h (irrelevant — they won't step again).
@@ -395,6 +486,9 @@ def _trace_batch_single_direction_adaptive(
 
         if terminate is not None and accept.any():
             for i in np.flatnonzero(accept):
+                # Skip seeds we just killed via closed-loop above.
+                if not live[i]:
+                    continue
                 if terminate(buf[i, n_steps[i]]):
                     reasons_int[i] = _R_CALLBACK
                     live[i] = False
@@ -598,6 +692,8 @@ def trace_field_line_adaptive(
     field_components: tuple[str, str, str] = ("B_1", "B_2", "B_3"),
     null_threshold: float = 1e-12,
     terminate: Callable[[FloatArray], bool] | None = None,
+    loop_tol: float | None = None,
+    loop_min_arclen: float | None = None,
     interpolator: VectorFieldInterpolator | None = None,
 ) -> FieldLine:
     r"""Trace a field line using adaptive Dormand-Prince 5(4).
@@ -631,6 +727,29 @@ def trace_field_line_adaptive(
         Field magnitude below which the point is a null.
     terminate : Callable[[FloatArray], bool] | None
         Optional callback; stops if it returns ``True``.
+    loop_tol : float or None
+        Proximity threshold for closed-loop detection, in code units.
+        When set, the trace terminates with
+        :attr:`TerminationReason.CLOSED_LOOP` as soon as it re-enters a
+        ``loop_tol``-radius ball around any previously visited point
+        separated by more than ``loop_min_arclen`` of arc length. The
+        canonical use case is mirror-mode magnetic holes and O-type
+        islands [@Ahmadi2024], where an open RK tracer would otherwise
+        burn through ``max_steps`` on a single closed orbit. A
+        sliding-window proximity check is the streaming termination
+        criterion used by streamline-visualization tooling; the
+        Poincaré-map / invariant-manifold approach used by fusion
+        boundary codes [@Frerichs2024] is for systematic island
+        characterization, not per-trace short-circuiting. Default
+        ``None`` disables detection — behavior unchanged from earlier
+        releases.
+    loop_min_arclen : float or None
+        Minimum arc-length distance between the current point and a
+        candidate past point before a proximity hit counts as a closed
+        loop. Prevents self-trigger on the immediately preceding samples
+        when ``loop_tol`` is comparable to the step size. When ``None``
+        and ``loop_tol`` is set, defaults to ``10 * step_size_init``.
+        Has no effect when ``loop_tol`` is ``None``.
     interpolator : VectorFieldInterpolator | None
         Pre-built interpolator. Built internally if ``None``.
 
@@ -641,7 +760,9 @@ def trace_field_line_adaptive(
     Raises
     ------
     ValueError
-        If seed is outside domain or at a null point.
+        If seed is outside domain or at a null point, if
+        ``loop_min_arclen`` is set without ``loop_tol``, or if either
+        loop threshold is non-positive.
 
     Examples
     --------
@@ -671,6 +792,10 @@ def trace_field_line_adaptive(
         msg = f"direction must be one of {sorted(_VALID_DIRECTIONS)}, got {direction!r}"
         raise ValueError(msg)
 
+    loop_tol, loop_min_arclen = _resolve_loop_kwargs(
+        loop_tol, loop_min_arclen, step_size_init
+    )
+
     if interpolator is None:
         interpolator = VectorFieldInterpolator.from_dataset(data, field_components)
 
@@ -692,6 +817,8 @@ def trace_field_line_adaptive(
             max_steps,
             null_threshold,
             terminate,
+            loop_tol,
+            loop_min_arclen,
         )
 
     def _meta(err: float) -> dict:  # type: ignore[type-arg]
@@ -759,6 +886,8 @@ def trace_field_lines_adaptive(
     field_components: tuple[str, str, str] = ("B_1", "B_2", "B_3"),
     null_threshold: float = 1e-12,
     terminate: Callable[[FloatArray], bool] | None = None,
+    loop_tol: float | None = None,
+    loop_min_arclen: float | None = None,
     interpolator: VectorFieldInterpolator | None = None,
 ) -> list[FieldLine]:
     r"""Trace ``N`` field lines adaptively in parallel via the batched DP kernel.
@@ -795,6 +924,19 @@ def trace_field_lines_adaptive(
     terminate : Callable[[FloatArray], bool] | None
         Optional per-seed callback; stops a seed when it returns
         ``True`` on the newly accepted point.
+    loop_tol : float or None
+        Proximity threshold for closed-loop detection, in code units.
+        Applied per-seed: each trace terminates with
+        :attr:`TerminationReason.CLOSED_LOOP` as soon as it re-enters
+        a ``loop_tol``-radius ball around one of its own previously
+        visited points separated by more than ``loop_min_arclen`` of
+        arc length. Default ``None`` disables detection. See
+        :func:`trace_field_line_adaptive` for the underlying rationale
+        (mirror-mode magnetic holes, O-type islands).
+    loop_min_arclen : float or None
+        Minimum arc-length separation before a proximity hit counts.
+        Defaults to ``10 * step_size_init`` when ``loop_tol`` is set
+        and this is left ``None``.
     interpolator : VectorFieldInterpolator | None
         Pre-built interpolator. Built internally if ``None``.
 
@@ -840,6 +982,10 @@ def trace_field_lines_adaptive(
         msg = f"direction must be one of {sorted(_VALID_DIRECTIONS)}, got {direction!r}"
         raise ValueError(msg)
 
+    loop_tol, loop_min_arclen = _resolve_loop_kwargs(
+        loop_tol, loop_min_arclen, step_size_init
+    )
+
     if interpolator is None:
         interpolator = VectorFieldInterpolator.from_dataset(data, field_components)
 
@@ -865,6 +1011,8 @@ def trace_field_lines_adaptive(
         max_steps,
         null_threshold,
         terminate,
+        loop_tol,
+        loop_min_arclen,
     )
 
     def _build(
