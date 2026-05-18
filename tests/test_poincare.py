@@ -204,6 +204,15 @@ class TestPoincareSection:
         r2_min = np.abs(section.punctures_2d[2][:, 1]).min()
         assert r0_max < r2_min, "seed-0 and seed-2 rings overlap"
 
+        # Metadata bookkeeping: n_steps_per_seed mirrors the per-seed
+        # trace length. Pins the schema documented on PoincareSection.
+        for k in range(len(radii)):
+            expected = section.field_lines[k].n_points - 1
+            assert int(section.metadata["n_steps_per_seed"][k]) == expected, (
+                f"seed {k}: metadata n_steps={section.metadata['n_steps_per_seed'][k]} "
+                f"!= n_points-1={expected}"
+            )
+
     def test_vortex_axial_drift(self) -> None:
         r"""Helical $\mathbf{B} = (-y, x, 0.1)$: punctures cluster around $|v| = r$.
 
@@ -237,6 +246,52 @@ class TestPoincareSection:
         assert np.all(np.diff(u_coords) < 0), (
             f"u (= -z) should decrease monotonically, got {u_coords}"
         )
+
+    def test_tilted_plane_closed_circle_punctures(self) -> None:
+        r"""Tilted plane $x + y = 0$ on closed circles: punctures at $(\pm r, 0)$.
+
+        End-to-end exercise of a non-axis-aligned surface — the basis-only
+        test pins Gram--Schmidt, but the full ``poincare_section`` path
+        had no analytic prediction on a tilted plane.
+
+        Geometry: $\mathbf{B} = (-y, x, 0)$ gives closed circles in
+        constant-$z$ planes. The surface ``normal=(1,1,0)/√2``,
+        ``point=origin`` has equation $x + y = 0$. A circle of radius
+        $r$ intersects at $t = 3\pi/4, 7\pi/4$, giving 3D punctures
+        $(\mp r/\sqrt{2}, \pm r/\sqrt{2}, 0)$.
+
+        The Gram--Schmidt basis from the implementation is $\hat u =
+        (1, -1, 0)/\sqrt{2}$ (least-parallel seed = $\hat z$) and
+        $\hat v = (0, 0, -1)$. So $u = (x - y)/\sqrt{2}$ and $v = -z$;
+        the two predicted punctures project to exactly $(\pm r, 0)$.
+        """
+        data = _closed_circle_data(n=128, extent=1.5)
+        surf = PoincareSurface(normal=(1.0, 1.0, 0.0), point=(0.0, 0.0, 0.0))
+        r = 0.5
+        seeds = np.array([[r, 0.0, 0.0]])
+        section = poincare_section(
+            data,
+            seeds,
+            surf,
+            max_steps=2000,
+            direction="forward",
+            atol=1e-10,
+            rtol=1e-10,
+            step_size_init=0.005,
+            max_step=0.02,
+        )
+        pts = section.punctures_2d[0]
+        assert pts.shape[0] >= 4, (
+            f"tilted plane got only {pts.shape[0]} punctures; need both signs"
+        )
+        # v ≈ 0 exactly (B_3 = 0 preserves z, and v = -z by construction)
+        np.testing.assert_allclose(pts[:, 1], 0.0, atol=1e-10)
+        # |u| ≈ r within ~10% grid-interp drift (same caveat as the
+        # axis-aligned closed-circle test).
+        np.testing.assert_allclose(np.abs(pts[:, 0]), r, rtol=0.1)
+        # Punctures split into ±u clusters
+        assert np.any(pts[:, 0] > 0), "missing positive-u puncture"
+        assert np.any(pts[:, 0] < 0), "missing negative-u puncture"
 
     def test_uniform_field_single_puncture(self) -> None:
         """B = x̂: a trace from x<0 crosses x=x₀ exactly once."""

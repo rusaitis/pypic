@@ -1,17 +1,15 @@
 """Step-size controllers for embedded Runge-Kutta methods.
 
 The current implementation is the **elementary (I) controller** from
-[@HairerWanner1993] §II.4: one step's error norm sets the next step. A
-true PI controller ([@Gustafsson1988]; [@HairerWanner1993] §IV.2) —
-which threads in the previous step's error — lands in this module when
-a consumer needs it.
+[@HairerWanner1993] §II.4: one step's error norm sets the next step.
+A true PI controller — which threads in the previous step's error —
+is queued behind the ``err_prev`` kwarg for when a consumer needs it
+(see the parameter docstring for citations).
 
 References
 ----------
 - Hairer, Nørsett & Wanner [@HairerWanner1993] §II.4 — elementary
   (I) step-size controller, safety factor, growth clamps.
-- Gustafsson [@Gustafsson1988] — PI controller (reserved for future
-  upgrade via the ``err_prev`` kwarg).
 """
 
 from __future__ import annotations
@@ -65,7 +63,10 @@ def i_step_controller(
         Order $p$ of the embedded higher-order solution. Default 5
         (Dormand-Prince 5(4)).
     err_prev : float or None
-        Reserved for the PI controller. Currently ignored.
+        Reserved for a future PI controller upgrade
+        ([@Gustafsson1988]; [@HairerWanner1993] §IV.2) that would
+        thread the previous step's error norm into the formula.
+        Currently ignored; passing it is harmless.
 
     Returns
     -------
@@ -124,7 +125,8 @@ def i_step_controller_batched(
         Order $p$ of the embedded higher-order solution. Default 5
         (Dormand-Prince 5(4)).
     err_prev : NDArray or None
-        Reserved for a future per-seed PI controller. Currently
+        Reserved for a future per-seed PI controller upgrade
+        ([@Gustafsson1988]; [@HairerWanner1993] §IV.2). Currently
         ignored; passing it is harmless.
 
     Returns

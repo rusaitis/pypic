@@ -192,6 +192,8 @@ def _resolve_loop_kwargs(
         msg = f"loop_tol must be positive, got {loop_tol}"
         raise ValueError(msg)
     if loop_min_arclen is None:
+        # 10× the initial step covers the warm-up window where the
+        # controller is still settling; past that, recurrence is real.
         loop_min_arclen = 10.0 * step_size_init
     elif loop_min_arclen <= 0.0:
         msg = f"loop_min_arclen must be positive, got {loop_min_arclen}"

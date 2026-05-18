@@ -10,6 +10,30 @@ splitting helpers, higher-order quadrature) land here. A true PI
 controller [@Gustafsson1988] is queued behind an `err_prev` kwarg
 already wired through the public signatures.
 
+## What's tested
+
+The kernel's contract is pinned in `tests/test_numerics.py`:
+
+- **5th-order convergence** — halving $h$ on $y'' + 4y = 0$ reduces
+  the global error by a factor in $(20, 60)$, ruling out 4th- and
+  6th-order rounding accidents.
+- **FSAL identity and savings** — the last stage of an accepted step
+  equals $f(y_{n+1})$; passing it as `k0` saves exactly one RHS
+  evaluation on the next step and produces bit-for-bit identical
+  results.
+- **Batched ↔ scalar bit-for-bit equivalence** — at N=1 and across
+  N=4 with mixed states, the batched kernel matches a per-seed
+  scalar loop to `atol=1e-15`.
+- **Per-seed failure isolation** — one batched seed failing at any
+  Butcher stage leaves the other seeds' `y_new` unaffected.
+- **Adaptive-loop integration** — a minimal driver wiring DP × error
+  norm × I controller solves $y''+4y=0$ to tighter and looser
+  tolerances; the tighter run achieves a strictly smaller global
+  error than the looser one.
+- **Controller monotonicity** — `h_new` is non-increasing in
+  `err_norm` across a sweep that spans the unclamped middle and
+  both growth clamps.
+
 ## Planned additions (TASKS Step 44)
 
 - **Implicit-midpoint integrator** (44a) — single-stage Gauss-Legendre

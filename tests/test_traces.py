@@ -1104,14 +1104,27 @@ class TestClosedLoopDetection:
     def test_loop_min_arclen_guards_against_self_trigger(
         self, uniform_field_data: FieldDataset
     ) -> None:
-        """A loose loop_tol with too-small arclen guard would self-trigger.
+        """A loose ``loop_tol`` with too-small arclen guard self-triggers.
 
-        Use a uniform field with loop_tol large enough to contain the
-        immediately preceding sample. With a tiny loop_min_arclen the
-        detector fires after one step (the guard isn't doing its job).
-        With a larger loop_min_arclen the past tail older than that is
-        empty, so no proximity scan runs and the trace runs to
-        MAX_STEPS / DOMAIN_EXIT as it would without detection.
+        Concrete arithmetic, so the test reads obviously-correct:
+
+        - $\\mathbf{B} = \\hat{x}$ on a uniform grid → unit-magnitude
+          tangent, so arc length per step equals the step size.
+        - ``step_size_init=0.5``, ``max_step=0.5`` → every accepted step
+          contributes 0.5 of arc length, and the past sample one step
+          back is exactly 0.5 away in 3-space.
+        - ``loop_tol=1.0`` is *larger* than that gap → distance check
+          would admit the past sample as a "loop closure".
+        - The ``loop_min_arclen`` guard is the only thing that excludes
+          it. With 0.01, every past sample qualifies → detector fires
+          on the first scan. With 100.0, no past sample is old enough
+          → scan finds no candidates and the trace runs to its natural
+          terminus.
+
+        Also pins (B3) that the self-trigger fires within the first few
+        accepted steps — a future buffer-layout change that shifts
+        *which* past sample is matched will move ``n_points`` and the
+        assertion catches the drift.
         """
         from pypic.traces import TerminationReason, trace_field_line_adaptive
 
@@ -1129,6 +1142,13 @@ class TestClosedLoopDetection:
             loop_min_arclen=0.01,
         )
         assert fl_self_trigger.metadata["reason"] == str(TerminationReason.CLOSED_LOOP)
+        # Detector must fire within the first few accepted steps — not
+        # late in the trace. Without this, a buffer-layout regression
+        # that pushes the match to step ~10 would pass silently.
+        assert fl_self_trigger.n_points <= 5, (
+            f"self-trigger fired late ({fl_self_trigger.n_points} points); "
+            "expected detection within first few accepted steps"
+        )
 
         # loop_min_arclen larger than any arc length reached →
         # detector never has candidates to test.
@@ -1252,6 +1272,36 @@ class TestClosedLoopDetection:
         )
         np.testing.assert_array_equal(fl_auto.points, fl_explicit.points)
         assert fl_auto.metadata["reason"] == fl_explicit.metadata["reason"]
+
+    def test_loop_min_arclen_default_equals_ten_step_init(
+        self, closed_loop_field_data: FieldDataset
+    ) -> None:
+        """Default ``loop_min_arclen = 10 * step_size_init`` — endpoints match.
+
+        Companion to ``test_auto_equals_half_min_spacing``: pins the
+        second of the two grid/step-derived defaults in
+        ``_resolve_loop_kwargs``. A future retune (10 → 8, say) is
+        caught by element-wise equality of the trace points.
+        """
+        from pypic.traces import trace_field_line_adaptive
+
+        kw: dict = dict(  # type: ignore[type-arg]
+            step_size_init=0.1,
+            max_step=0.2,
+            max_steps=500,
+            direction="forward",
+        )
+        fl_default = trace_field_line_adaptive(
+            closed_loop_field_data, (12.0, 10.0, 10.0), **kw
+        )
+        fl_explicit = trace_field_line_adaptive(
+            closed_loop_field_data,
+            (12.0, 10.0, 10.0),
+            loop_min_arclen=10.0 * kw["step_size_init"],
+            **kw,
+        )
+        np.testing.assert_array_equal(fl_default.points, fl_explicit.points)
+        assert fl_default.metadata["reason"] == fl_explicit.metadata["reason"]
 
     def test_loop_min_arclen_with_explicit_none_raises(
         self, uniform_field_data: FieldDataset

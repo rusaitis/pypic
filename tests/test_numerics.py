@@ -26,11 +26,17 @@ from pypic.numerics._step_control import _GROWTH_MAX, _GROWTH_MIN
 
 
 def _integrate_fixed(f, y0: np.ndarray, t_end: float, h: float) -> np.ndarray:
-    """Fixed-step DP integration; returns final state."""
+    """Fixed-step DP integration over ``[0, t_end]`` with step ``h``.
+
+    Direction follows ``sign(h) == sign(t_end)`` — caller passes a
+    negative ``t_end`` and matching negative ``h`` to integrate backward.
+    """
     y = y0.copy()
     t = 0.0
-    while t < t_end - 1e-15:
-        step = min(h, t_end - t)
+    sign = 1.0 if h > 0 else -1.0
+    while sign * (t_end - t) > 1e-15:
+        remaining = t_end - t
+        step = h if abs(h) < abs(remaining) else remaining
         result = dormand_prince_step(f, y, step)
         assert result.failed_stage is None
         assert result.y_new is not None
@@ -145,15 +151,83 @@ class TestDormandPrinceStep:
         assert with_fsal.y_new is not None
         np.testing.assert_allclose(with_fsal.y_new, without_fsal.y_new)
 
-    def test_negative_step_integrates_backward(self) -> None:
-        """h < 0 integrates dy/dt = -y backward: from y(1)=exp(-1) → y(0)=1."""
-        y = np.array([math.exp(-1.0)])
-        result = dormand_prince_step(lambda v: -v, y, -1.0)
-        # Coarse single-step backward integration won't be precise, but the
-        # direction must be correct (y grows when integrating backward
-        # through exponential decay).
+    def test_backward_integration_matches_analytic(self) -> None:
+        """Backward integration of dy/dt=-y recovers y(0)=1 from y(1)=exp(-1).
+
+        Pins the sign-bearing-``h`` claim in the docstring at 5th-order
+        precision: a negative step size must integrate backward with the
+        same precision as forward integration, not just "in the right
+        direction".
+        """
+        y0 = np.array([math.exp(-1.0)])
+        y_final = _integrate_fixed(lambda v: -v, y0, -1.0, -0.01)
+        np.testing.assert_allclose(y_final[0], 1.0, atol=1e-9)
+
+
+def _adaptive_solve(
+    f,  # type: ignore[no-untyped-def]
+    y0: np.ndarray,
+    t_end: float,
+    *,
+    atol: float,
+    rtol: float,
+) -> np.ndarray:
+    """Minimal adaptive driver wiring DP + error norm + I controller.
+
+    Exists so the test below can exercise the three numerics primitives
+    together at the ``pypic.numerics`` layer — the field-line tracer
+    has its own end-to-end coverage but conflates kernel × interpolator
+    × tracer-specific bookkeeping.
+    """
+    y = y0.copy()
+    t = 0.0
+    h = 0.1
+    k0: np.ndarray | None = None
+    while t < t_end - 1e-15:
+        step_h = min(h, t_end - t)
+        result = dormand_prince_step(f, y, step_h, k0=k0)
+        assert result.failed_stage is None
         assert result.y_new is not None
-        assert result.y_new[0] > y[0]
+        assert result.err_vec is not None
+        err = embedded_error_norm(result.err_vec, result.y_new, atol, rtol)
+        if err <= 1.0:
+            y = result.y_new
+            t += step_h
+            k0 = result.k_last  # FSAL reuse after accept
+        else:
+            k0 = None  # FSAL invalid after reject; recompute stage 0
+        h = i_step_controller(h, err, min_step=1e-8, max_step=1.0)
+    return y
+
+
+class TestAdaptiveIntegration:
+    """End-to-end at the numerics layer: DP × error norm × I controller."""
+
+    def test_tighter_tolerance_yields_smaller_error(self) -> None:
+        """Halving atol/rtol drives a strictly smaller global error.
+
+        Catches regressions in the controller × kernel interaction
+        (safety factor, growth bound, FSAL re-use across rejects) that
+        the isolated kernel and controller tests don't see.
+        """
+        rhs = lambda y: np.array([y[1], -4.0 * y[0]])  # noqa: E731
+        y0 = np.array([1.0, 0.0])
+        true_final = np.array([math.cos(2.0), -2.0 * math.sin(2.0)])
+
+        err_loose = np.linalg.norm(
+            _adaptive_solve(rhs, y0, 1.0, atol=1e-6, rtol=1e-6) - true_final
+        )
+        err_tight = np.linalg.norm(
+            _adaptive_solve(rhs, y0, 1.0, atol=1e-9, rtol=1e-9) - true_final
+        )
+        # The tight run must achieve strictly smaller error than the loose run.
+        # We don't assert a precise ratio — the controller's safety factor and
+        # growth clamps make the per-tolerance error coupling looser than
+        # err ∝ tol — only the ordering, which is the controller's contract.
+        assert err_tight < err_loose
+        # Both runs must clear their respective tolerances by a healthy margin.
+        assert err_loose < 1e-4
+        assert err_tight < 1e-7
 
 
 class TestEmbeddedErrorNorm:
@@ -219,6 +293,26 @@ class TestIStepController:
         h_without = i_step_controller(1.0, 0.5, min_step=1e-6, max_step=10.0)
         h_with = i_step_controller(1.0, 0.5, min_step=1e-6, max_step=10.0, err_prev=0.1)
         assert h_with == pytest.approx(h_without)
+
+    def test_h_new_monotone_non_increasing_in_err(self) -> None:
+        """``h_new`` never grows when ``err_norm`` grows.
+
+        Three isolated points are already pinned (err=1 → safety, err→0
+        and err→∞ → clamps). This sweep covers the unclamped middle and
+        the transitions into both clamps so a future controller change
+        that breaks the order is caught.
+        """
+        # Spans both clamps (err≈0 hits _GROWTH_MAX; err=1e6 hits _GROWTH_MIN)
+        # with several unclamped samples around err=1.
+        err_sweep = [0.0, 1e-3, 0.1, 0.5, 0.9, 1.0, 1.1, 2.0, 100.0, 1e6]
+        prev_h: float | None = None
+        for err in err_sweep:
+            h_new = i_step_controller(1.0, err, min_step=1e-8, max_step=100.0)
+            if prev_h is not None:
+                assert h_new <= prev_h + 1e-12, (
+                    f"non-monotone at err={err}: {h_new} > prev {prev_h}"
+                )
+            prev_h = h_new
 
 
 class TestDPStepResult:
@@ -383,6 +477,20 @@ class TestEmbeddedErrorNormBatched:
         assert norms[0] == pytest.approx(np.sqrt(0.025))
         assert norms[1] == pytest.approx(np.sqrt(2.5))
 
+    def test_single_component_collapses_to_absolute_scaled_error(self) -> None:
+        """For n=1, RMS reduces to |err|/scale per seed (no averaging).
+
+        Pins the docstring claim — covered for the scalar form already,
+        but the batched path's mean-over-component reduction needs its
+        own check.
+        """
+        err = np.array([[1e-6], [-3e-6]])
+        y = np.array([[1.0], [2.0]])
+        norms = embedded_error_norm_batched(err, y, atol=1e-6, rtol=0.0)
+        # scale = atol = 1e-6 (rtol=0); per-seed result is |err|/atol.
+        expected = np.array([1.0, 3.0])
+        np.testing.assert_allclose(norms, expected)
+
 
 class TestIStepControllerBatched:
     def test_per_seed_independence(self) -> None:
@@ -409,3 +517,18 @@ class TestIStepControllerBatched:
         batched = i_step_controller_batched(h, err, min_step=1e-6, max_step=10.0)
         scalar = i_step_controller(1.0, 0.5, min_step=1e-6, max_step=10.0)
         assert float(batched[0]) == pytest.approx(scalar)
+
+    def test_all_zero_err_does_not_trigger_pow_zero(self) -> None:
+        """An all-zero err vector clamps to _GROWTH_MAX, no NaN/Inf leakage.
+
+        The scalar controller's zero-error path is covered by
+        ``TestIStepController.test_zero_error_clamps_to_max_growth``;
+        the batched path goes through ``np.maximum(err, _ERR_FLOOR)``
+        as a single vectorized op and needs its own dedicated check
+        against a regression that drops the floor.
+        """
+        h = np.array([1.0, 1.0, 1.0])
+        err = np.zeros(3)
+        h_new = i_step_controller_batched(h, err, min_step=1e-6, max_step=100.0)
+        np.testing.assert_allclose(h_new, _GROWTH_MAX)
+        assert np.all(np.isfinite(h_new))
