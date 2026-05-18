@@ -355,14 +355,10 @@ def _trace_batch_single_direction_adaptive(
         y_cur = buf[np.arange(n_seeds), n_steps]  # (N, 3)
         result = dormand_prince_step_batched(rhs_batched, y_cur, h, k0=k_carry)
 
-        err_norm = embedded_error_norm_batched(
-            result.err_vec, result.y_new, atol, rtol
-        )
+        err_norm = embedded_error_norm_batched(result.err_vec, result.y_new, atol, rtol)
         # Track per-seed worst error only for live seeds. Dead seeds
         # have garbage err_norm; keep their previous max_local_error.
-        max_local_error = np.maximum(
-            max_local_error, np.where(live, err_norm, 0.0)
-        )
+        max_local_error = np.maximum(max_local_error, np.where(live, err_norm, 0.0))
         h_new = i_step_controller_batched(
             h, err_norm, min_step=min_step, max_step=max_step
         )

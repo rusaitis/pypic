@@ -47,3 +47,14 @@ Optional Sloppy code test:
 ```
 uvx sloppylint src/ tests/
 ```
+
+## Benchmarks
+
+Manual performance benchmarks live in `benchmarks/`. Not run by CI — use
+them to verify the batched/vectorized paths still pay after a kernel
+change. Each script is self-contained, reproducible (seeded RNG), and
+prints a small table:
+
+```sh
+uv run python benchmarks/bench_batched_tracer.py  # batched vs scalar adaptive tracer
+```
