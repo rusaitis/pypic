@@ -34,6 +34,7 @@ from pypic.plotting.lines import (
     plot_time_series,
 )
 from pypic.plotting.panels import plot_field_grid
+from pypic.plotting.poincare import plot_poincare_section
 from pypic.plotting.scatter import plot_scatter
 from pypic.plotting.slices import add_contours, plot_field_slice
 from pypic.plotting.spectral import plot_power_spectrum
@@ -81,6 +82,7 @@ __all__ = [
     "plot_line",
     "plot_line_comparison",
     "plot_lines",
+    "plot_poincare_section",
     "plot_power_spectrum",
     "plot_quiver",
     "plot_scatter",

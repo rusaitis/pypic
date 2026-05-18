@@ -18,6 +18,11 @@ from pypic.traces._analysis import (
 )
 from pypic.traces._fieldline import FieldLine
 from pypic.traces._particletrace import ParticleTrace
+from pypic.traces._poincare import (
+    PoincareSection,
+    PoincareSurface,
+    poincare_section,
+)
 from pypic.traces._sampling import (
     attach_scalars,
     attach_scalars_to_trace,
@@ -36,6 +41,8 @@ from pypic.traces._tracing import (
 __all__ = [
     "FieldLine",
     "ParticleTrace",
+    "PoincareSection",
+    "PoincareSurface",
     "TerminationReason",
     "VectorFieldInterpolator",
     "arc_length_cumulative",
@@ -52,6 +59,7 @@ __all__ = [
     "kinetic_energy",
     "mirror_points",
     "plane_crossings",
+    "poincare_section",
     "resample_by_arc_length",
     "sample_field",
     "sample_fields",

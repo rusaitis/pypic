@@ -64,4 +64,5 @@ nav:
     - Numerics: api/numerics.md
     - Readers: api/readers.md
     - Field Line Tracing: api/traces.md
+    - Poincaré Sections: api/poincare.md
     - Server: api/server.md
