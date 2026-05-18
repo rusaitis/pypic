@@ -35,6 +35,13 @@ Each step produces something testable. No step starts until the previous step's 
 - [x] **Step 32:** Separate four_velocity quantity type
 - [x] **Step 33:** specific_energy quantity type for enthalpy (fixed dimensional bug)
 - [x] **Step 34:** StaggerInfo provenance metadata
+- [x] **M0-prep: webpic API readiness** — promoted compute-side name registries to public surface so cross-tool codegen (webpic, rustpic tooling) reads stable names instead of underscore-prefixed internals.
+  - New `pypic.aliases` module re-exports `COMPUTE_ALIASES`, `GROUP_ALIASES`, `SPECIES_SUFFIX_RE`, `species_name_aliases`.
+  - `pypic.compute` now exposes `Recipe`, `RECIPES` (`MappingProxyType` view over the mutable `_REGISTRY`), `SpeciesArgs`, `SpeciesTemplate`, `SPECIES_TEMPLATES`; `pypic` top-level re-exports `aliases`, `Recipe`, `RECIPES`.
+  - `_REGISTRY` stays underscore-prefixed (mutated by `register_recipe`/`unregister_recipe` under `_recipe_lock`); the proxy guarantees external callers only see the read side.
+  - CLI smoke test `tests/test_schema_export.py::test_cli_export_codegen_flags_smoke` covers the `--inline-single-use-defs --include-x-extensions` flag combination webpic codegen pins (per-flag semantics already covered by `test_inline_single_use_defs_flattens_unique_refs` / `test_include_x_extensions_annotates_extensible_objects`).
+  - `[webpic]` block (version=1; layout, shortcuts, diagnostics, embed) appended to all 7 bundled theme TOMLs with three per-theme overrides — LCARS `docked-side = "left"`, synthwave `timestamp-query-overlay = true`, light `fps-overlay = false`. pypic's theme loader (`plotting/_theme_io.py`) already ignores unknown sections, so no loader change was needed.
+  - New `tests/test_public_api.py` (6 aggregated invariants: identity-with-private symbols, RECIPES vs `_REGISTRY` keyset parity, proxy immutability, live `register_recipe` reflection, codegen-import smoke); `tests/test_plotting.py::TestFileThemes::test_bundled_themes_have_webpic_section` checks every theme parses with a `[webpic]` block containing the required sub-tables.
 
 **Milestone: daily-use tool** — load data → compute derived quantities → compare runs → select subregions → convert units → make paper figures. ✅
 

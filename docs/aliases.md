@@ -48,7 +48,7 @@ docstring readability:
 | `lambda_D` | `lambda_D_s0` | Electron Debye length |
 
 Multi-species runs (`omega_p_s2`, `lambda_D_s3`, ...) synthesize via
-`_SPECIES_TEMPLATES` on demand — no static recipe needed.
+`SPECIES_TEMPLATES` on demand — no static recipe needed.
 
 The dataset's alias resolver is bidirectional for these e/i ↔ `_sN`
 pairs: a reader that emits `Pe` (e.g. iPIC3D) satisfies a recipe asking

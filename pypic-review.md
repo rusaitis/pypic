@@ -157,7 +157,7 @@ two-species case.
 ### 3.7 Frozen dataclasses with slots, immutable-first
 
 Every container type — `GridInfo`, `StaggerInfo`, `SimulationConfig`,
-`TabularData`, `ParticleData`, `FieldInfo`, the `_Recipe` entries in
+`TabularData`, `ParticleData`, `FieldInfo`, the `Recipe` entries in
 the compute registry — is declared as
 `@dataclass(frozen=True, slots=True)`. Internal dicts that need to
 be exposed go through `types.MappingProxyType` rather than being
@@ -226,8 +226,8 @@ use in `src/pypic/`:
 - **Frozen + slotted dataclasses** everywhere
   (`containers.py`, `grid.py`, `fields.py`, `compute.py`,
   `selections.py`).
-- **`StrEnum`** for `QuantityType` (`fields.py`) and the private
-  `_SpeciesArgs` enum (`compute.py`).
+- **`StrEnum`** for `QuantityType` (`fields.py`) and the
+  `SpeciesArgs` enum (`compute.py`).
 - **PEP 695 `type` aliases** for `FloatArray`, `Vector3` in
   `types.py`; imported inside `if TYPE_CHECKING:` blocks to avoid
   runtime cost.

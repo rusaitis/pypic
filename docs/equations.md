@@ -282,7 +282,7 @@ this document.[^scales-aliases]
 [^scales-aliases]: Both spellings resolve to the same array:
     `compute("omega_pe")` and `compute("omega_p_s0")` are
     interchangeable. Multi-species runs (`omega_p_s2`,
-    `lambda_D_s3`, ...) synthesize via `_SPECIES_TEMPLATES` on
+    `lambda_D_s3`, ...) synthesize via `SPECIES_TEMPLATES` on
     demand.
 
 [^3]: Cyclotron frequencies are positive by convention (magnitudes).
