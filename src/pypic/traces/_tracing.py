@@ -13,7 +13,7 @@ __all__ = [
 
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import TYPE_CHECKING, Self
+from typing import TYPE_CHECKING, Literal, Self
 
 import numpy as np
 from scipy.interpolate import RegularGridInterpolator
@@ -157,6 +157,17 @@ def _classify_failure(
     if np.any(np.isnan(b)):
         return TerminationReason.DOMAIN_EXIT
     return TerminationReason.NULL_POINT
+
+
+def _auto_loop_tol(data: FieldDataset) -> float:
+    """Grid-aware default for closed-loop proximity threshold.
+
+    Half a cell along the tightest axis: tight enough to catch orbits
+    of a single grid cell (the practical floor for linear-interpolation
+    tracing), loose enough that smooth open traces don't false-trigger
+    as long as they advance by at least half a cell between revisits.
+    """
+    return 0.5 * min(data.grid.spacing)
 
 
 def _resolve_loop_kwargs(
@@ -449,22 +460,43 @@ def _trace_batch_single_direction_adaptive(
             if arclen is not None:
                 assert loop_tol is not None  # arclen allocation invariant
                 assert loop_min_arclen is not None  # paired by public-API check
-                # Per-seed: update arclen prefix at the new index, then
-                # run a searchsorted-bounded proximity scan against the
-                # seed's own past tail. Python loop over accepted seeds
-                # only; mirrors the callback-check pattern below.
-                for i in acc_idx:
-                    ni = int(n_steps[i])
-                    arclen[i, ni] = arclen[i, ni - 1] + float(
-                        np.linalg.norm(buf[i, ni] - buf[i, ni - 1])
-                    )
-                    cutoff = arclen[i, ni] - loop_min_arclen
-                    j_end = int(np.searchsorted(arclen[i, :ni], cutoff, side="right"))
-                    if j_end > 0:
-                        dists = np.linalg.norm(buf[i, :j_end] - buf[i, ni], axis=1)
-                        if dists.min() <= loop_tol:
-                            reasons_int[i] = _R_CLOSED_LOOP
-                            live[i] = False
+                # Vectorized arclen update + vectorized proximity scan
+                # across all accepted seeds. Each step does:
+                #   1. arclen[i, ni] = arclen[i, ni-1] + |buf[i, ni] - buf[i, ni-1]|
+                #   2. mask past indices j < ni AND arclen[i, j] <= cutoff[i]
+                #   3. min over masked distances; trigger CLOSED_LOOP if <= loop_tol
+                # The scan window grows as max(cur_idx) across the batch,
+                # not max_steps — early steps allocate small temporaries,
+                # late-phase steady-state cost is bounded by trace length.
+                cur_idx = n_steps[acc_idx]  # (M,)
+                prev_idx = cur_idx - 1
+                deltas = buf[acc_idx, cur_idx] - buf[acc_idx, prev_idx]  # (M, 3)
+                step_lens = np.linalg.norm(deltas, axis=1)  # (M,)
+                arclen[acc_idx, cur_idx] = arclen[acc_idx, prev_idx] + step_lens
+                cutoffs = arclen[acc_idx, cur_idx] - loop_min_arclen  # (M,)
+
+                # Gate: skip the entire scan until at least one seed has
+                # accumulated past loop_min_arclen.
+                if cutoffs.max() > 0.0:
+                    max_n = int(cur_idx.max())
+                    past_buf = buf[acc_idx, :max_n]  # (M, max_n, 3)
+                    past_arc = arclen[acc_idx, :max_n]  # (M, max_n)
+                    cur_pts = buf[acc_idx, cur_idx]  # (M, 3)
+                    dists = np.linalg.norm(
+                        past_buf - cur_pts[:, np.newaxis, :], axis=2
+                    )  # (M, max_n)
+                    # eligible[i, j] = past index j is within seed i's
+                    # own past trajectory AND far enough back in arclen.
+                    valid = np.arange(max_n)[np.newaxis, :] < cur_idx[:, np.newaxis]
+                    guard_ok = past_arc <= cutoffs[:, np.newaxis]
+                    eligible = valid & guard_ok
+                    masked = np.where(eligible, dists, np.inf)
+                    min_dists = masked.min(axis=1)  # (M,)
+                    triggered_local = min_dists <= loop_tol
+                    if triggered_local.any():
+                        trig_global = acc_idx[triggered_local]
+                        reasons_int[trig_global] = _R_CLOSED_LOOP
+                        live[trig_global] = False
 
         # Update h for all live seeds. Rejected seeds (live & success &
         # ~accept) retry with the smaller h; dead seeds keep their last
@@ -692,7 +724,7 @@ def trace_field_line_adaptive(
     field_components: tuple[str, str, str] = ("B_1", "B_2", "B_3"),
     null_threshold: float = 1e-12,
     terminate: Callable[[FloatArray], bool] | None = None,
-    loop_tol: float | None = None,
+    loop_tol: float | None | Literal["auto"] = "auto",
     loop_min_arclen: float | None = None,
     interpolator: VectorFieldInterpolator | None = None,
 ) -> FieldLine:
@@ -727,9 +759,9 @@ def trace_field_line_adaptive(
         Field magnitude below which the point is a null.
     terminate : Callable[[FloatArray], bool] | None
         Optional callback; stops if it returns ``True``.
-    loop_tol : float or None
+    loop_tol : float, None, or ``"auto"``
         Proximity threshold for closed-loop detection, in code units.
-        When set, the trace terminates with
+        The trace terminates with
         :attr:`TerminationReason.CLOSED_LOOP` as soon as it re-enters a
         ``loop_tol``-radius ball around any previously visited point
         separated by more than ``loop_min_arclen`` of arc length. The
@@ -741,8 +773,11 @@ def trace_field_line_adaptive(
         Poincaré-map / invariant-manifold approach used by fusion
         boundary codes [@Frerichs2024] is for systematic island
         characterization, not per-trace short-circuiting. Default
-        ``None`` disables detection — behavior unchanged from earlier
-        releases.
+        ``"auto"`` derives ``loop_tol = 0.5 * min(data.grid.spacing)``
+        — half a cell along the tightest grid axis — so closed orbits
+        terminate cleanly even when the user didn't anticipate them.
+        Pass ``None`` to force-disable detection (recovers pre-v0.X
+        behavior), or pass a float to override the auto value.
     loop_min_arclen : float or None
         Minimum arc-length distance between the current point and a
         candidate past point before a proximity hit counts as a closed
@@ -792,6 +827,8 @@ def trace_field_line_adaptive(
         msg = f"direction must be one of {sorted(_VALID_DIRECTIONS)}, got {direction!r}"
         raise ValueError(msg)
 
+    if loop_tol == "auto":
+        loop_tol = _auto_loop_tol(data)
     loop_tol, loop_min_arclen = _resolve_loop_kwargs(
         loop_tol, loop_min_arclen, step_size_init
     )
@@ -886,7 +923,7 @@ def trace_field_lines_adaptive(
     field_components: tuple[str, str, str] = ("B_1", "B_2", "B_3"),
     null_threshold: float = 1e-12,
     terminate: Callable[[FloatArray], bool] | None = None,
-    loop_tol: float | None = None,
+    loop_tol: float | None | Literal["auto"] = "auto",
     loop_min_arclen: float | None = None,
     interpolator: VectorFieldInterpolator | None = None,
 ) -> list[FieldLine]:
@@ -924,15 +961,17 @@ def trace_field_lines_adaptive(
     terminate : Callable[[FloatArray], bool] | None
         Optional per-seed callback; stops a seed when it returns
         ``True`` on the newly accepted point.
-    loop_tol : float or None
+    loop_tol : float, None, or ``"auto"``
         Proximity threshold for closed-loop detection, in code units.
         Applied per-seed: each trace terminates with
         :attr:`TerminationReason.CLOSED_LOOP` as soon as it re-enters
         a ``loop_tol``-radius ball around one of its own previously
         visited points separated by more than ``loop_min_arclen`` of
-        arc length. Default ``None`` disables detection. See
-        :func:`trace_field_line_adaptive` for the underlying rationale
-        (mirror-mode magnetic holes, O-type islands).
+        arc length. Default ``"auto"`` derives
+        ``0.5 * min(data.grid.spacing)``; pass ``None`` to disable or
+        a float to override. See :func:`trace_field_line_adaptive` for
+        the underlying rationale (mirror-mode magnetic holes, O-type
+        islands).
     loop_min_arclen : float or None
         Minimum arc-length separation before a proximity hit counts.
         Defaults to ``10 * step_size_init`` when ``loop_tol`` is set
@@ -982,6 +1021,8 @@ def trace_field_lines_adaptive(
         msg = f"direction must be one of {sorted(_VALID_DIRECTIONS)}, got {direction!r}"
         raise ValueError(msg)
 
+    if loop_tol == "auto":
+        loop_tol = _auto_loop_tol(data)
     loop_tol, loop_min_arclen = _resolve_loop_kwargs(
         loop_tol, loop_min_arclen, step_size_init
     )

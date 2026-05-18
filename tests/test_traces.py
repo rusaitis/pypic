@@ -1175,10 +1175,8 @@ class TestClosedLoopDetection:
         assert lines[0].metadata["reason"] == str(TerminationReason.CLOSED_LOOP)
         assert lines[1].metadata["reason"] == str(TerminationReason.MAX_STEPS)
 
-    def test_disabled_by_default_preserves_behavior(
-        self, closed_loop_field_data: FieldDataset
-    ) -> None:
-        """Without loop_tol, the trace runs to MAX_STEPS as before."""
+    def test_explicit_none_disables(self, closed_loop_field_data: FieldDataset) -> None:
+        """``loop_tol=None`` is the explicit opt-out — runs to MAX_STEPS."""
         from pypic.traces import TerminationReason, trace_field_line_adaptive
 
         fl = trace_field_line_adaptive(
@@ -1188,12 +1186,81 @@ class TestClosedLoopDetection:
             max_step=0.2,
             max_steps=200,
             direction="forward",
+            loop_tol=None,
         )
         assert fl.metadata["reason"] == str(TerminationReason.MAX_STEPS)
 
-    def test_loop_min_arclen_without_loop_tol_raises(
+    def test_auto_default_triggers_on_closed_circle(
+        self, closed_loop_field_data: FieldDataset
+    ) -> None:
+        """Without any loop kwargs the default ``"auto"`` catches closed orbits."""
+        from pypic.traces import TerminationReason, trace_field_line_adaptive
+
+        fl = trace_field_line_adaptive(
+            closed_loop_field_data,
+            (12.0, 10.0, 10.0),
+            step_size_init=0.1,
+            max_step=0.2,
+            max_steps=500,
+            direction="forward",
+        )
+        assert fl.metadata["reason"] == str(TerminationReason.CLOSED_LOOP)
+
+    def test_auto_default_does_not_trigger_on_uniform(
         self, uniform_field_data: FieldDataset
     ) -> None:
+        """The default detector must not fire on a smooth open trace."""
+        from pypic.traces import TerminationReason, trace_field_line_adaptive
+
+        fl = trace_field_line_adaptive(
+            uniform_field_data,
+            (5.0, 10.0, 10.0),
+            step_size_init=0.5,
+            max_step=0.5,
+            max_steps=20,
+            direction="forward",
+        )
+        assert fl.metadata["reason"] != str(TerminationReason.CLOSED_LOOP)
+
+    def test_auto_equals_half_min_spacing(
+        self, closed_loop_field_data: FieldDataset
+    ) -> None:
+        """``"auto"`` derives ``0.5 * min(grid.spacing)`` — endpoints match.
+
+        Sanity-check the formula doesn't drift: an explicit float equal
+        to the auto-derived value must produce the same trace as the
+        ``"auto"`` sentinel.
+        """
+        from pypic.traces import trace_field_line_adaptive
+
+        spacing = closed_loop_field_data.grid.spacing
+        explicit_tol = 0.5 * min(spacing)
+        kw: dict = dict(  # type: ignore[type-arg]
+            step_size_init=0.1,
+            max_step=0.2,
+            max_steps=500,
+            direction="forward",
+        )
+        fl_auto = trace_field_line_adaptive(
+            closed_loop_field_data, (12.0, 10.0, 10.0), **kw
+        )
+        fl_explicit = trace_field_line_adaptive(
+            closed_loop_field_data,
+            (12.0, 10.0, 10.0),
+            loop_tol=explicit_tol,
+            **kw,
+        )
+        np.testing.assert_array_equal(fl_auto.points, fl_explicit.points)
+        assert fl_auto.metadata["reason"] == fl_explicit.metadata["reason"]
+
+    def test_loop_min_arclen_with_explicit_none_raises(
+        self, uniform_field_data: FieldDataset
+    ) -> None:
+        """``loop_min_arclen`` without an active ``loop_tol`` is a misuse.
+
+        With the auto default in effect, this is reachable only when the
+        caller has explicitly disabled detection via ``loop_tol=None``.
+        """
         from pypic.traces import trace_field_line_adaptive
 
         with pytest.raises(ValueError, match="loop_min_arclen requires loop_tol"):
@@ -1201,6 +1268,7 @@ class TestClosedLoopDetection:
                 uniform_field_data,
                 (10.0, 10.0, 10.0),
                 max_steps=4,
+                loop_tol=None,
                 loop_min_arclen=1.0,
             )
 

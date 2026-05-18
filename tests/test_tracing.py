@@ -354,7 +354,13 @@ class TestTraceFixedCircular:
 
 class TestTraceAdaptive:
     def test_adaptive_closes_circle(self) -> None:
-        """Adaptive tracer closes the circle within tolerance."""
+        """Adaptive tracer closes the circle within tolerance.
+
+        Disables the auto closed-loop detector so the trace can sweep a
+        full orbit and be checked for proximity to its own seed; the
+        detector's correctness is exercised by ``TestClosedLoopDetection``
+        in ``test_traces.py``.
+        """
         data = _make_circular_field(n=60, extent=10.0)
         center = 5.0
         radius = 2.0
@@ -366,6 +372,7 @@ class TestTraceAdaptive:
             rtol=1e-4,
             max_steps=5000,
             direction="forward",
+            loop_tol=None,
         )
         distances = np.linalg.norm(
             fl.points[1:] - np.array(seed),

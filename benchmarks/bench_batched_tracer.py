@@ -17,6 +17,14 @@ reproducible. Both paths use the same adaptive tolerances and the same
 ``VectorFieldInterpolator`` instance; the only difference is the
 dispatch (N scalar calls vs one batched call).
 
+This bench leaves ``loop_tol`` unset, so the always-on auto closed-loop
+detector is active — the helix's per-orbit axial drift (~1.23 in
+arclen) far exceeds the auto threshold (0.5 × grid spacing ≈ 0.016),
+so the detector runs every step but never fires. The numbers below
+therefore include the per-step cost of the vectorized arclen update
+and proximity scan; subtract a few percent at N=1000 if you want the
+pure-kernel timing (pass ``loop_tol=None``).
+
 Expected numbers
 ----------------
 On a modern workstation, single-threaded NumPy, you should see roughly:
