@@ -43,172 +43,52 @@ Each step produces something testable. No step starts until the previous step's 
 ## Phase 8: Modern I/O Formats
 
 - [x] **Step 24: `pypic.io` — Zarr export/import for FieldDataset**
-  Zarr v3 + xarray DataTree for chunked, self-describing field data
-  storage.  Layout v1 (post-2026.05): fields under ``/fields`` (mirroring
-  schema.md §4.1's HDF5 grouping), pypic metadata as flat keys at the root
-  group's attrs (``grid``, ``normalization``, ``physics``, ...), with a
-  ``pypic_layout: "v1"`` discriminator.  Cross-language consumers
-  (JS/Rust) can read the layout without going through pypic.
-  Consolidated metadata (``consolidated=True`` on writes,
-  ``consolidated="auto"`` on reads) gives a one-shot metadata fetch.
-  Two write modes:
-  - `to_zarr(fds, path)` — single timestep. Builds an `xr.DataTree`
-    from `{"fields": fds.xr}`, stamps root attrs from
-    `encode_pypic_attrs(fds)`, calls `tree.to_zarr(...)`.
-  - `to_zarr_timeseries(simulation, path, *, steps, fields)` — multi-timestep store with `time` as a dimension. Each field becomes `(nt, nx, ny, nz)`, chunked along `time` so reading one step is O(1). Enables time-series analysis without scanning separate files.
-  `from_zarr(path) -> FieldDataset` reconstructs everything including per-field metadata. Returns lazy-loading dataset by default (`xr.open_zarr` is lazy — reading one field doesn't touch others). For multi-variable stores, async concurrent metadata fetching via `zarr.config.set({'async.concurrency': 128})` delivers up to 14× speedup.
-  **Naming:** Canonical numbered names (`B_1`, `B_2`, `B_3`) in the stored format, not geometry-specific (`Bx`, `Br`). Geometry is in metadata; aliases resolve on load. Consistent with HDF5 layout (schema.md § 4).
-  **Field metadata:** Already self-describing via xarray DataArray attrs (`quantity_type`, `si_unit`, `long_name`, `latex`, `units`), set by `from_arrays()` and `with_field()`. `xr.Dataset.to_zarr()` serializes attrs automatically. `from_zarr()` reconstructs `FieldDataset` including per-field metadata. No CF vocabulary (CF has no plasma physics coverage).
-  **FrameTransforms:** Serialize origin, rotation matrix, and scale as arrays in metadata. Skip callable-based transforms; reconstruct on load.
-  **Precision:** `dtype="float32"` kwarg on `to_zarr()` / `to_zarr_timeseries()` downcasts all field arrays to single precision on write (halves storage). Most PIC codes write single-precision dumps anyway; float64→float32 loses ~7 decimal digits, well below PIC numerical accuracy. Default: preserve source dtype. Implemented via xarray's `encoding` dict — user can also pass `encoding=` directly for per-field control.
-  **Compression:** Default `BloscCodec(cname='zstd', clevel=5, shuffle='bitshuffle')` — the standalone `ZstdCodec` lacks shuffle pre-filtering and compresses floats poorly. Blosc2 + zstd + bitshuffle achieves 10–300× on smooth electromagnetic field data due to high spatial correlation. The newer bytedelta filter (Blosc2 2.8+) is an emerging improvement over bitshuffle (37% better on pressure-type data) — expose as an option once stable. User-configurable via `encoding=` passthrough to xarray.
-  **Sharding (cloud):** For cloud-hosted stores (S_3, GCS, R2), enable sharding to group chunks into single storage objects, avoiding the small-files problem. Shards are the minimum write unit — the entire shard must fit in memory. Dask chunks must align with shard boundaries. Expose via `shards=` kwarg.
-  **Version pinning:** `zarr>=3.1.0,<4` — versions 3.0.0–3.0.7 were yanked from PyPI due to a data-loss bug (append mode silently deleted data). v3.0.8 is the first safe release; v3.1+ is recommended. Requires `numcodecs>=0.16.0` (fixes BloscCodec defaulting to `typesize=1`, which produced 10–20× larger chunks). Optional deps under `zarr` extra.
+  Zarr v3 + xarray DataTree. Layout v1 (post-2026.05): fields under `/fields` (mirrors schema.md §4.1 HDF5 grouping), metadata as flat keys on the root group's attrs (`grid`, `normalization`, `physics`, ...), with a `pypic_layout: "v1"` discriminator so JS/Rust consumers can read without going through pypic. Consolidated metadata (`consolidated=True` write, `"auto"` read) gives one-shot fetch.
+  Two write modes: `to_zarr(fds, path)` (single timestep, builds `xr.DataTree`) and `to_zarr_timeseries(simulation, path, *, steps, fields)` (multi-timestep with `time` as a dimension; chunked along time so reading one step is O(1)). `from_zarr(path) -> FieldDataset` reconstructs lazily including per-field metadata. Async concurrent metadata fetching (`zarr.config.set({'async.concurrency': 128})`) gives up to 14× speedup.
+  **Naming:** canonical numbered names (`B_1`, `B_2`, `B_3`) on disk — geometry-specific aliases resolve on load. **Field metadata:** xarray attrs (`quantity_type`, `si_unit`, `long_name`, `latex`, `units`) serialize automatically. **FrameTransforms:** origin, rotation, scale as arrays in metadata; callable-based transforms skipped.
+  **Precision:** `dtype="float32"` kwarg downcasts on write (halves storage; PIC outputs are single-precision anyway). **Compression:** default `BloscCodec(cname='zstd', clevel=5, shuffle='bitshuffle')` — 10–300× on smooth EM data. Standalone `ZstdCodec` lacks shuffle and compresses floats poorly. Bytedelta (Blosc2 2.8+) is 37% better than bitshuffle on pressure-type data — expose as option once stable. **Sharding:** `shards=` kwarg for cloud stores (S3/GCS/R2) avoids small-files problem.
+  **Version pinning:** `zarr>=3.1.0,<4` (3.0.0–3.0.7 yanked for append-mode data-loss bug). Requires `numcodecs>=0.16.0` (fixes BloscCodec `typesize=1` default). Optional deps under `zarr` extra.
 
 - [x] **Step 24b: `pypic.io` — VirtualiZarr for legacy HDF5**
-  `open_virtual(path) -> FieldDataset` creates lightweight virtual Zarr views over existing HDF5 simulation outputs by extracting byte-range metadata, enabling `xr.open_zarr()` access that transparently reads from original files without conversion. Uses VirtualiZarr v2.4+ (`open_virtual_dataset()`, standard `xr.concat`/`merge`). Virtual references can be persisted to Icechunk (Step 24c) for repeated fast access. Limitations: inherits source file chunking (contiguous HDF5 datasets become single chunks), potential issues with non-standard HDF5 compression filters. Optional dep: `virtualizarr>=2.4` under `zarr` extra.
-  **Depends on:** Step 24 (Zarr foundations).
+  `open_virtual(path) -> FieldDataset` creates lightweight virtual Zarr views over existing HDF5 by extracting byte-range metadata — `xr.open_zarr()` reads from original files without conversion. Uses VirtualiZarr v2.4+. Refs can be persisted to Icechunk (24c). Limitations: inherits source chunking (contiguous HDF5 datasets become single chunks); non-standard HDF5 compression filters may fail. Optional dep: `virtualizarr>=2.4` under `zarr` extra.
+  **Depends on:** Step 24.
 
 - [x] **Step 24c: `pypic.io` — Icechunk storage backend**
-  Optional Git-like versioning and ACID transactions over Zarr v3 stores via Icechunk. Rust-based I/O backend achieves 13–14 Gbps read/write throughput on cloud instances (2–10× faster than zarr + s3fs). Value for pypic: tag dataset versions for reproducibility (`repo.create_tag("v1.0-paper-submission", snapshot_id=...)`), time-travel to prior analysis states, and Rust-accelerated I/O even for non-versioned workflows. `to_zarr(..., backend="icechunk")` writes to an Icechunk-managed store; `from_zarr()` auto-detects Icechunk stores. Optional dep: `icechunk>=1.1` under `icechunk` extra.
-  **Migrate `open_virtual` to Zarr v3:** Step 24b's `open_virtual` currently uses Kerchunk (Zarr v2 format) as the virtual-reference intermediary because VirtualiZarr's native Zarr v3 virtual backend is Icechunk. Once Icechunk is available, switch `open_virtual` to persist virtual refs via `vds.vz.to_icechunk()` instead of `vds.vz.to_kerchunk()`, eliminating the only Zarr v2 code path in pypic and fixing the fill-value edge case (datasets where all values equal the fill value read back incorrectly through Kerchunk).
-  **Depends on:** Step 24 (Zarr foundations).
+  Optional Git-like versioning and ACID transactions over Zarr v3 via Icechunk. Rust-based I/O: 13–14 Gbps read/write on cloud (2–10× faster than zarr+s3fs). Value: version tags for reproducibility (`repo.create_tag("v1.0-paper", snapshot_id=...)`), time-travel, Rust-accelerated I/O for non-versioned workflows too. `to_zarr(..., backend="icechunk")` writes; `from_zarr()` auto-detects. Optional dep: `icechunk>=1.1` under `icechunk` extra.
+  **Migrate `open_virtual` to Zarr v3:** Step 24b uses Kerchunk (Zarr v2) because VirtualiZarr's native v3 virtual backend *is* Icechunk. Once available, switch to `vds.vz.to_icechunk()`, eliminating the only Zarr v2 path and fixing the fill-value edge case (datasets where all values equal the fill value read back wrong through Kerchunk).
+  **Depends on:** Step 24.
 
 - [x] **Step 25: `pypic.io` — Parquet/Arrow for ParticleData**
-  Two-tier API for particle I/O, designed for billion-particle datasets with selective reads.
-  **Low-level (in-memory interchange):**
-  `particles_to_arrow(data) -> pyarrow.Table` (zero-copy NumPy→Arrow), `particles_from_arrow(table) -> ParticleData`. Columnar storage: `x/y/z/vx/vy/vz/charge/id` columns (letter names — particle positions are always in the simulation Cartesian frame). Species metadata in Arrow schema metadata. Used by the Starlette server (Step 37) for Arrow IPC over WebSocket streaming.
-  **High-level (partitioned dataset for large-scale I/O):**
-  `particles_to_parquet(data, path)` — single species/step file. `particles_to_dataset(simulation, path, *, steps, species)` — multi-step partitioned Parquet dataset with Hive-style layout:
-  ```
-  particles/step=000000/species=electrons/part-00000.parquet
-  ```
-  **Selection support** via `particles_from_dataset(path, *, step, species, spatial_box, ids, energy_min, columns)`:
-  - *Time*: partition pruning — reading step 100 opens only `step=000100/`.
-  - *Species*: partition pruning — reading electrons skips ion files.
-  - *Spatial region*: particles sorted by Morton (Z-order) curve within each partition. Morton confirmed over Hilbert — <5% locality difference at fine row-group granularity, 5–8× cheaper to compute (bit-interleaving via BMI2). Parquet row-group min/max statistics on x/y/z enable predicate pushdown; spatial box queries skip 95%+ of row groups.
-  - *Energy*: `|v|` stored as a derived column at write time. Parquet statistics enable energy-threshold pushdown.
-  - *Particle ID*: predicate pushdown on `id` column. Optional secondary index file (`id → step/row_group`) for trajectory reconstruction across timesteps.
-  - *Column pruning*: `columns=["x", "y", "z"]` reads only requested columns.
-  **Row groups:** 500K–1M rows per row group (balances metadata overhead vs skip granularity).
-  **Compression:** zstd with shuffle pre-filter. Expect 1.5–3× lossless on particle data (noisy positions/velocities lack the spatial correlation that gives field data 10–300×). Always apply shuffle before compression — without it, LZ4 achieves ~1× and zstd only 5–8× on raw floats. Use zstd level 1 for processing, level 3 for archival.
-  **Precision:** `position_dtype="float32"` and `velocity_dtype="float32"` kwargs downcast position/velocity columns to single precision on write. Charge stays float64 (full mantissa serves as unique particle identifier) and id stays int64. The `|v|` derived column follows the velocity dtype. Default: preserve source dtype.
-  **DuckDB query engine (optional):** `query_sql(path, sql) -> ParticleData | pa.Table` provides SQL access to partitioned particle datasets via DuckDB. Automatic predicate pushdown, partition pruning, and morsel-driven parallelism — 45ms filtered counts where Pandas takes 7.5s, ~1.3 GB memory on 140 GB datasets. Pattern: DuckDB for interactive exploration and ad-hoc spatial queries, PyArrow dataset API for programmatic pipelines. DuckDB queries Arrow tables with zero-copy; results export as Arrow or NumPy. Optional dep: `duckdb>=1.4` under `duckdb` extra.
-  `particles_from_parquet(path) -> ParticleData` for single-file full load. Optional dep: `pyarrow>=17.0` under `arrow` extra.
-  **Evaluated and rejected:** Lance (1.1× compression vs Parquet's 3×+, AI/ML-focused ecosystem, no browser reader), GeoParquet (WKB encoding overhead, 2D-biased tooling, ~3× larger files than plain Parquet with spatial sorting), TileDB (immature xarray integration, lower cloud I/O throughput than Zarr+Rust backends, minimal physics/earth-science adoption).
+  Two-tier API for billion-particle datasets with selective reads.
+  **Low-level (in-memory):** `particles_to_arrow(data) -> pyarrow.Table` (zero-copy NumPy→Arrow), `particles_from_arrow(table) -> ParticleData`. Columnar `x/y/z/vx/vy/vz/weight/id` (positions always Cartesian). Species metadata in Arrow schema metadata. Used by the Starlette server (Step 37) for Arrow IPC over WebSocket.
+  **High-level (partitioned):** `particles_to_parquet` (single file) and `particles_to_dataset(simulation, path, *, steps, species)` (Hive layout: `particles/step=000000/species=electrons/part-00000.parquet`).
+  **Selection** via `particles_from_dataset(path, *, step, species, spatial_box, ids, energy_min, columns)`:
+  - *Time / species:* partition pruning.
+  - *Spatial:* Morton (Z-order) sort within partitions — chosen over Hilbert (<5% locality difference, 5–8× cheaper via BMI2 bit-interleaving). Parquet row-group min/max on x/y/z skips 95%+ of row groups.
+  - *Energy:* `|v|` stored as derived column; predicate pushdown.
+  - *ID:* predicate pushdown on `id`. Optional secondary index (`id → step/row_group`) for trajectory reconstruction.
+  - *Columns:* column pruning via `columns=`.
+  **Row groups:** 500K–1M rows. **Compression:** zstd + shuffle pre-filter (1.5–3× on particle data; without shuffle, LZ4 ≈1×, zstd 5–8×). Level 1 for processing, 3 for archival. **Precision:** `position_dtype`/`velocity_dtype="float32"` kwargs; `weight` stays full precision, `id` int64.
+  **DuckDB (optional):** `query_sql(path, sql)` — automatic pushdown + partition pruning + morsel-driven parallelism. 45ms filtered counts vs Pandas 7.5s on 140 GB. Pattern: DuckDB for interactive, PyArrow for pipelines. Optional dep: `duckdb>=1.4` under `duckdb` extra. Core dep: `pyarrow>=17.0` under `arrow` extra.
+  **Evaluated and rejected:** Lance (1.1× compression, no browser reader), GeoParquet (WKB overhead, ~3× larger), TileDB (immature xarray, lower cloud throughput).
 
 - [x] **Step 25b: canonicalize `ParticleData` — drop per-particle `charge`, standardize on `weight` + scalars**
-  Tighten the Step 25 schema before it hardens: **readers always translate native PIC layouts into one canonical form** — per-particle `weight` (array) plus scalar `species_charge` and `species_mass`. The optional per-particle `charge` field disappears entirely; storage-convention branching moves from `ParticleData` and every downstream caller into the single place where it belongs (the reader).
-  **Container changes (`containers.py`):**
-  - Remove `charge: FloatArray | None` from `ParticleData`.
-  - `weight`, `species_charge`, `species_mass` become required-ish (validation ensures they're present together for any per-particle mass/charge computation).
-  - `macro_charge` collapses to a one-liner: `species_charge × weight`. No two-branch fallback.
-  - `macro_mass` unchanged: `species_mass × weight`.
-  - Drop the `__post_init__` validation block for `charge`.
-  **Reader responsibility:** each `SimulationReader` produces the canonical form regardless of native layout.
-  - **Combined-storage codes** (iPIC3D, OSIRIS): read per-particle `q = q_s × w` from disk, split into `weight = |q| / |species_charge|` and populate `species_charge`/`species_mass` from the run config. iPIC3D already does this split today — just stop storing the redundant `charge` array.
-  - **Separate-storage codes** (VPIC, WarpX, Smilei, EPOCH, PIConGPU, TRISTAN-MP): read `weight` directly, populate scalars from config. No change.
-  **I/O layer (`pypic.io._arrow`, `pypic.io._parquet`):**
-  - Arrow/Parquet schema loses the optional `charge` column. Always has `weight` (`(N,)` float64) + scalar metadata.
-  - `particles_to_arrow` / `particles_from_arrow`: drop the `charge` branch.
-  - `particles_from_dataset`: `id_column="charge"` no longer valid; particle tracking uses `id_column="weight"` (already supported — the per-particle `weight` value carries the same unique-identifier property that iPIC3D's `charge` did, since `|q_species| = 1` makes them identical up to sign).
-  - `particles_to_parquet`: `sort_by="charge"` drops; `sort_by="weight"` remains and absorbs the particle-tracking use case.
-  **Schema (`docs/schema.md` § Per-particle data columns):**
-  - Remove `charge` from the canonical field table.
-  - Rewrite the "Charge–weight conventions across PIC codes" section: mention the combined/separate split as a *reader concern only*, note that the canonical container doesn't carry it.
-  - Document the single-charge-state-per-species assumption explicitly (mixed ionization states must be modeled as separate species).
-  - Note the round-trip fidelity caveat: `read → write → read` reconstructs `q = species_charge × weight` bit-exactly but doesn't preserve the original disk bytes of combined-storage codes. pypic is analysis, not simulation — not a concern for restart regeneration.
-  **Tests:**
-  - Remove tests that assert per-particle `charge` round-trip presence.
-  - Keep tests that assert `macro_charge` derives correctly and equals the pre-refactor value on iPIC3D fixtures.
-  - Add a reader-boundary test: iPIC3D reader input (per-particle `q` on disk) produces canonical form (no `charge`, populated `weight` + scalars).
-  **Migration:** breaking change to the Step 25 Parquet schema. Version window is open (Step 25 just shipped). Bump `__version__` minor; no deprecation shim — pypic hasn't hit 1.0.
-  **Depends on:** Step 25 (Parquet/Arrow foundation), commit `c272e33` (introduced `weight`/species scalars).
+  Readers always translate native PIC layouts into one canonical form — per-particle `weight` (array) plus scalar `species_charge` and `species_mass`. The optional per-particle `charge` field disappears; storage-convention branching moves into the reader.
+  **Container:** drop `charge: FloatArray | None`; `weight` + scalars become required-together for any per-particle mass/charge computation. `macro_charge = species_charge × weight` (one-liner). Drop the `__post_init__` charge validation.
+  **Reader responsibility:** combined-storage codes (iPIC3D, OSIRIS) split `q = q_s × w` from disk into `weight = |q|/|species_charge|` + scalars. Separate-storage codes (VPIC, WarpX, Smilei, EPOCH, PIConGPU, TRISTAN-MP) already write `weight` — no change.
+  **I/O layer:** Arrow/Parquet schema loses `charge` column. Particle tracking uses `id_column="weight"` / `sort_by="weight"` — equivalent because `|q_species| = 1` makes `weight` and old `charge` identical up to sign.
+  **Schema doc:** drop `charge` from canonical table; document combined/separate split as reader concern only; single-charge-state-per-species assumption (mixed ionization → separate species). Round-trip fidelity caveat: `read → write → read` reconstructs `q` bit-exactly via float64 but doesn't preserve combined-layout disk bytes (pypic is analysis, not restart regeneration).
+  **Migration:** breaking change to Step 25 Parquet schema. Version window open (Step 25 just shipped). Bump minor; no deprecation shim — pre-1.0.
+  **Depends on:** Step 25.
 
 - [x] **Step 26: `pypic convert` CLI subcommand — fields & particles**
-  Two subcommands with pipeline-appropriate flags. Both reuse the existing
-  step-range parser (`parse_steps` in `cli.py`, which already handles `N`,
-  `first`, `last`, `all`, `start:stop:stride`) and the unified
-  `open_simulation()` path resolver.
-
-  **`pypic convert fields <path> --output DIR`**
-  - `--step SPEC` — forwarded to `parse_steps`. Default `all`.
-  - `--fields B,E_3,rho_c` — forwarded to `Simulation.read(fields=...)`;
-    supports vector-group shorthand (`"B"` → `B_1,B_2,B_3`) and aliases.
-  - `--box x=0:64,y=0:64,z=32:64` — `BoxSelection.apply()` at convert
-    time to crop spatial extent.
-  - `--plane z=mid` — `PlaneSelection.apply()` for 2D slabs (reuses the
-    plane-parsing helper already in `cli.py`).
-  - `--target-resolution DX` — regrid to uniform spacing via `pypic.regrid`.
-  - `--to-si` — boolean; applies `in_si()` to every field before write
-    and writes with `Normalization.identity()`.  Handoff path for non-
-    pypic consumers (IDL, MATLAB, plain xarray readers).  Default
-    (code units + full Normalization serialized) is lossless and the
-    right choice for pypic-to-pypic round-trips — consumers can call
-    `in_units()` at read time.
-  - `--dtype float32` — forwarded to `to_zarr{,_timeseries}(dtype=...)`.
-  - `--compression zstd|blosc[:level]` — built into the `encoding=` dict
-    passed to `to_zarr{,_timeseries}`.
-  - `--virtual` — use `open_virtual()` to build lazy HDF5-backed refs
-    instead of copying data; the resulting FieldDataset is written
-    through the same `to_zarr` path (persists refs, not data).
-  - `--backend zarr|icechunk` — forwards to `to_zarr{,_timeseries}
-    (backend=...)`. Icechunk enables Git-like versioning (Step 24c).
-  - `--tag NAME` / `--message TEXT` — icechunk-only; pass `message=` to
-    the writer and `repo.create_tag(NAME, snapshot_id=...)` on success.
-  - `--progress / --no-progress` — rich.progress bar for multi-step runs
-    (default: enabled when stderr is a TTY).
-  - `--dry-run` — print the planned write list without executing.
-
-  **`pypic convert particles <path> --output DIR`**
-  - `--step SPEC` — same parser; forwarded to
-    `particles_to_dataset(steps=...)`.
-  - `--species electrons,ions` — forwarded to
-    `particles_to_dataset(species=...)`; accepts names or indices.
-  - `--columns x,y,z` — forwarded to the reader's `columns=` kwarg.
-  - `--box x=0.0:10.0,y=...` — crop particles by position before write.
-  - `--sort-by position|weight` — forwards to
-    `particles_to_{parquet,dataset}(sort_by=...)`.
-  - `--position-dtype float32` / `--velocity-dtype float32` — forwards
-    to the two existing downcast kwargs.
-  - `--compression-level 1|3|5` — forwards to
-    `particles_to_{parquet,dataset}(compression_level=...)`.
-  - `--row-group-size N` — forwards to `row_group_size=`.
-  - `--progress / --no-progress` / `--dry-run` — as above.
-
-  **Both-pipelines subcommand:** `pypic convert all <path> --output DIR`
-  writes fields to `{DIR}/fields.zarr` and particles (when present) to
-  `{DIR}/particles/`.  Detects particle output via `sim.particle_steps`.
-  Chosen over a subcommand-less default because typer's `Context` model
-  conflates callback args with subcommand args.
-
-  **Not in scope (separate future steps):** frame transforms at convert
-  time (Step 40 extension), DuckDB-query-based particle filtering
-  (belongs in `query_sql` in `pypic.io._parquet`, not the convert CLI),
-  cloud sharding (`shards=` passthrough — add once `to_zarr` exposes it
-  as a documented kwarg).
-
-  **Shipped:** `convert fields` with `--step`, `--output`, `--fields`,
-  `--box`, `--plane`/`--plane-index`/`--plane-coord`,
-  `--target-resolution`, `--to-si`, `--dtype`, `--compression
-  zstd|blosc[:level]`, `--virtual`, `--backend`, `--message`, `--tag`,
-  `--progress/--no-progress`, `--dry-run`. `convert particles` with
-  `--step`, `--output`, `--species`, `--columns`, `--box` (position
-  filter in code units), `--sort-by`, `--position-dtype`,
-  `--velocity-dtype`, `--compression-level`, `--row-group-size`,
-  `--progress/--no-progress`, `--dry-run`. `convert all` runs both
-  with sensible defaults. Single-step writes call `to_zarr`; multi-step
-  writes call `to_zarr_timeseries` (adds a leading time dim). Icechunk
-  `--tag` uses `icechunk_create_tag` after a successful write. Virtual
-  mode (`--virtual`) treats PATH as a single HDF5 file and persists
-  byte-range refs via `open_virtual` → `to_zarr`.
-
-  **Dropped from spec:** per-field `--units nT,km/s,...` display
-  strings.  Unit metadata is always serialized via the Normalization
-  object; consumers call `in_units()` at read time.  Baking display
-  units into the file would break the "one coherent normalization per
-  file" invariant without saving anyone a step.
-
+  Two subcommands reusing the existing step-range parser (`parse_steps`: `N | first | last | all | start:stop:stride`) and `open_simulation()` path resolver.
+  **`convert fields <path> --output DIR`:** `--step`, `--fields` (vector-group shorthand: `"B"` → `B_1,B_2,B_3`), `--box`, `--plane`/`--plane-index`/`--plane-coord`, `--target-resolution`, `--to-si` (boolean; writes with `Normalization.identity()` for non-pypic consumers — default code-units is lossless for pypic round-trips), `--dtype float32`, `--compression zstd|blosc[:level]`, `--virtual` (uses `open_virtual()` to persist HDF5 byte-range refs), `--backend zarr|icechunk`, `--tag NAME` / `--message TEXT` (icechunk only), `--progress/--no-progress`, `--dry-run`.
+  **`convert particles <path> --output DIR`:** `--step`, `--species`, `--columns`, `--box` (position filter in code units), `--sort-by position|weight`, `--position-dtype`/`--velocity-dtype float32`, `--compression-level 1|3|5`, `--row-group-size`, `--progress`, `--dry-run`.
+  **`convert all`:** runs both with sensible defaults. Detects particle output via `sim.particle_steps`. Chosen over a subcommand-less default because typer's Context model conflates callback and subcommand args.
+  Single-step writes call `to_zarr`; multi-step writes call `to_zarr_timeseries` (leading time dim). Icechunk `--tag` calls `icechunk_create_tag` after success.
+  **Not in scope:** frame transforms at convert time (→ Step 40 extension), DuckDB-query-based particle filtering (belongs in `query_sql`), cloud sharding (add once `to_zarr` exposes `shards=`).
+  **Dropped from spec:** per-field `--units` display strings — unit metadata always serialized via Normalization; consumers call `in_units()` at read time. Baking display units would break "one coherent normalization per file" without saving anyone a step.
   **Depends on:** Steps 24, 24b, 24c, 25, 25b — all shipped.
 
 ---
@@ -216,95 +96,91 @@ Each step produces something testable. No step starts until the previous step's 
 ## Phase 9: Additional Readers
 
 - [ ] **Step 23: `pypic.readers.vlasiator` — VLSV reader via analysator**
-  `VLasiatorReader` implementing `SimulationReader`. Two-grid strategy: FSgrid fields (`fg_b`, `fg_e`) read directly as uniform arrays; DCCRG fields (`proton/vg_rho`, `proton/vg_v`, `proton/vg_p`) regridded to uniform at `target_resolution` (default: FSgrid resolution). DCCRG cell IDs encode position + refinement level — decode to (x, y, z, dx) then block-average/NN-repeat (like BATSRUS AMR pattern, not `pypic.regrid` which is for uniform→uniform).
-  Field mapping: `fg_b` → `B_1/B_2/B_3`, `fg_e` → `E_1/E_2/E_3`, `proton/vg_rho` → `n_s0`, `proton/vg_v` → `V_1/V_2/V_3`, `proton/vg_p` (6 components) → pressure tensor. Species auto-detected from VLSV population names. Auto-detection: `.vlsv` extension + file signature. `open_vlasiator()` convenience function. Optional dep: `analysator` under `vlasiator` extra. All tests mock analysator.
+  `VLasiatorReader`. Two-grid strategy: FSgrid fields (`fg_b`, `fg_e`) read as uniform arrays; DCCRG fields (`proton/vg_rho`, `proton/vg_v`, `proton/vg_p`) regridded to uniform at `target_resolution` (default: FSgrid resolution). DCCRG cell IDs encode position + refinement level — decode then block-average/NN-repeat (BATSRUS AMR pattern, not `pypic.regrid`). Field map: `fg_b` → `B_*`, `fg_e` → `E_*`, `proton/vg_rho` → `n_s0`, `proton/vg_v` → `V_*`, `proton/vg_p` (6 components) → pressure tensor. Species auto-detected from VLSV population names. Auto-detect via `.vlsv` extension + signature. Optional dep: `analysator` under `vlasiator` extra. Tests mock analysator.
 
 - [ ] **Step 35: `pypic.readers.vpic` — VPIC reader**
-  `VPICReader` implementing `SimulationReader`. VPIC writes per-rank binary files (band-interleaved by field) or HDF5 via `vpic_decks`. Field mapping: `cbx/cby/cbz` → `B_1/B_2/B_3` (cell-centered B), `ex/ey/ez` → `E_1/E_2/E_3` (Yee edge), `jfx/jfy/jfz` → `J_1/J_2/J_3`, `rhob` → `rho_c`, per-species hydro files → density, velocity, pressure tensor. Yee mesh destaggering to co-located grid (linear interpolation, `StaggerInfo(convention="staggered")`). Metadata from `info` dumps or deck header. Auto-detection: `global.vpc` or `info` file presence. `open_vpic()` convenience function. All tests use synthetic fixtures.
+  `VPICReader`. VPIC writes per-rank binary (band-interleaved by field) or HDF5 via `vpic_decks`. Map: `cbx/cby/cbz` → `B_*` (cell-centered), `ex/ey/ez` → `E_*` (Yee edge), `jfx/jfy/jfz` → `J_*`, `rhob` → `rho_c`, per-species hydro → density/velocity/pressure tensor. Yee mesh destaggering (linear interp, `StaggerInfo(convention="staggered")`). Metadata from `info` dumps or deck header. Auto-detect: `global.vpc` or `info` file. Tests use synthetic fixtures.
 
 - [ ] **Step 36: `pypic.readers.arms` — ARMS reader**
-  `ARMSReader` implementing `SimulationReader`. ARMS (Adaptively Refined MHD Solver) outputs HDF5 with block-structured AMR. Regrid to uniform grid at `target_resolution` (like BATSRUS pattern). Field mapping from ARMS native names to canonical schema. Spherical geometry support (ARMS is commonly run in spherical coordinates for coronal/heliospheric simulations). `StaggerInfo(convention="staggered")` — ARMS uses a staggered mesh (CT for divergence-free B). Auto-detection: ARMS-specific HDF5 group structure. `open_arms()` convenience function. All tests use synthetic fixtures.
+  `ARMSReader`. ARMS (Adaptively Refined MHD Solver) outputs HDF5 block-structured AMR. Regrid to uniform at `target_resolution` (BATSRUS pattern). Spherical geometry support (ARMS commonly run in spherical for coronal/heliospheric). `StaggerInfo(convention="staggered")` — CT for divergence-free B. Auto-detect via ARMS-specific HDF5 group structure. Tests use synthetic fixtures.
 
 - [ ] **Step 42: `pypic.readers.openpmd` — openPMD reader (WarpX, PIConGPU, Smilei, FBPIC)**
-  `OpenPMDReader` implementing `SimulationReader`. One reader covers four of the most-used modern PIC codes since they all emit the openPMD standard natively (HDF5 + ADIOS2 backends). High leverage compared to one reader per code.
-  **Iteration encoding:** support both `groupBased` (single file, `/data/<step>/`) and `fileBased` (one file per step, `%T` placeholder pattern). `variableBased` (ADIOS2 streaming) is out of scope for v1.
-  **Field mapping:** `meshes/B/{x,y,z}` → `B_1/B_2/B_3`, `meshes/E/{x,y,z}` → `E_1/E_2/E_3`, `meshes/J/{x,y,z}` → `J_1/J_2/J_3`, `meshes/rho` → `rho_c`. Per-species moments where the code emits them.
-  **Stagger:** read the per-record `position` array (0.0–1.0 offset) directly into `StaggerInfo` (depends on Tier 2 per-component stagger work). Destagger to co-located grid for the canonical `FieldDataset`.
-  **Units:** read `unitDimension` 7-tuple + `unitSI` per record; preserve as field metadata. The simulation-level `[units]` block is reconstructed from ED-PIC particle records (`charge`, `mass`, `weighting`) plus reference density derivable from species moments. Codes that don't write enough metadata to reconstruct fall back to `Normalization.identity()` (treat as SI).
-  **Particles:** read `particles/<species>/{position,positionOffset,momentum,charge,mass,weighting,id}` and translate to canonical `ParticleData`. Honor `macroWeighted` + `weightingPower` semantics from ED-PIC when reading; always emit canonical form (per-particle `weight` + scalar `species_charge`/`species_mass`) per Step 25b.
-  **Geometry:** `cartesian` → our `cartesian`; `thetaMode` (FBPIC RZ-mode decomposition) requires an azimuthal-mode reconstruction step before destagger — likely punt to Phase 2 of this reader.
-  **Run metadata:** populate `[run].name` from `software` + `softwareVersion` attrs; `[run].date` from `date` attr; resources from `machine` attr.
-  **Code identification:** the openPMD `software` attribute (e.g., "WarpX", "PIConGPU") drives a small dispatch table for the few code-specific metadata quirks (path conventions, mass/charge units that don't follow ED-PIC strictly). Auto-detection: presence of `openPMD` root attribute.
-  Optional dep: `openpmd-api>=0.17` under an `openpmd` extra. All tests use synthetic openPMD files generated via openpmd-api in the test fixture setup. **Depends on:** Tier 1 ED-PIC vocabulary adoption (TASKS-schema-extension.md), Tier 2 per-component stagger (`StaggerInfo.position` array), Documentation backlog openPMD mapping.
+  `OpenPMDReader`. One reader covers four major modern PIC codes (all emit openPMD natively, HDF5 + ADIOS2). High leverage vs per-code readers.
+  **Iteration encoding:** `groupBased` (single file, `/data/<step>/`) and `fileBased` (one file per step, `%T` pattern). `variableBased` (ADIOS2 streaming) out of scope for v1.
+  **Field map:** `meshes/B/{x,y,z}` → `B_*`, `meshes/E/{x,y,z}` → `E_*`, `meshes/J/{x,y,z}` → `J_*`, `meshes/rho` → `rho_c`. Per-species moments where emitted.
+  **Stagger:** read per-record `position` array (0.0–1.0 offset) into `StaggerInfo` (Tier 2/3 per-component). Destagger to co-located grid.
+  **Units:** read `unitDimension` 7-tuple + `unitSI` per record. Reconstruct `[units]` from ED-PIC particle records (`charge`, `mass`, `weighting`) + reference density from species moments. Fall back to `Normalization.identity()` (treat as SI) when insufficient metadata.
+  **Particles:** `position/positionOffset/momentum/charge/mass/weighting/id` → canonical `ParticleData` (Step 25b form). Honor `macroWeighted` + `weightingPower` semantics.
+  **Geometry:** `cartesian` → ours; `thetaMode` (FBPIC RZ-mode) needs azimuthal-mode reconstruction before destagger — punt to Phase 2.
+  **Code dispatch:** `software` attribute drives a small table for code-specific quirks (path conventions, mass/charge unit drift from ED-PIC). Auto-detect via `openPMD` root attribute.
+  Optional dep: `openpmd-api>=0.17` under `openpmd` extra. Tests use synthetic openPMD via openpmd-api. **Depends on:** Tier 1 ED-PIC vocabulary, Tier 2 per-component stagger.
 
 ---
 
 ## Pending Extensions
 
 - [ ] **Step 19b: spherical regridding for `pypic.regrid`**
-  Extend `regrid()` / `common_grid()` / `align_grids()` to handle `GeometryType.SPHERICAL`. Metric-factor-aware interpolation on $(r, \theta, \phi)$ grids (not just tensor-product linear in the raw indices — the $\sin\theta$ Jacobian matters near the poles). Pole handling: clamp $\theta \in [\epsilon, \pi - \epsilon]$ or switch to a local Cartesian chart near each pole. Intersection grid semantics: $r$ extends like Cartesian; $\theta$ intersected in $[0, \pi]$; $\phi$ intersected modulo $2\pi$ with wrap-around support.
-  Primary use case: comparing two ARMS runs at different angular resolutions (Step 36). Also unblocks Step 20b (volume-weighted comparison norms). Keeps the `NotImplementedError` branch in `_require_cartesian_grid` alive for cylindrical until that reader lands.
-  Tests: spherical harmonic round-trip ($Y_\ell^m$ sampled on a coarse grid, regridded to fine, residual bounded by the truncation order), pole fidelity (analytic $\cos\theta$ field, zero error at $\theta = 0, \pi$ within interpolation tolerance), $\phi$-wrap correctness (periodic field resampled across the $\phi = 2\pi$ seam).
-  **Depends on:** Step 19 (Cartesian regrid).
+  Extend `regrid()` / `common_grid()` / `align_grids()` to handle `GeometryType.SPHERICAL`. Metric-factor-aware interpolation on $(r, \theta, \phi)$ — $\sin\theta$ Jacobian matters near the poles. Pole handling: clamp $\theta \in [\epsilon, \pi - \epsilon]$ or local Cartesian chart near each pole. Intersection: $r$ like Cartesian; $\theta$ in $[0, \pi]$; $\phi$ modulo $2\pi$ with wrap. Primary use: comparing ARMS runs at different angular resolutions (Step 36); unblocks Step 20b.
+  Tests: spherical harmonic round-trip ($Y_\ell^m$, residual bounded by truncation order); pole fidelity ($\cos\theta$ field, zero error at poles within tolerance); $\phi$-wrap correctness at the $2\pi$ seam.
+  **Depends on:** Step 19.
 
 - [ ] **Step 20b: volume-weighted comparison norms**
-  Add metric-factor integration to `compare_fields()` / `field_comparison_report()` so L2 and L∞ correctly weight each cell by $\sqrt{|g|}\,d^n x$ instead of treating every sample uniformly. Current Step 20 is correct for uniform Cartesian grids (where $\Delta V$ cancels between numerator and denominator of the L2 norm), but wrong for spherical grids where cells near the poles or near $r = 0$ cover exponentially less volume. New API: `compare_fields(..., weighted: bool = False)` — defaults preserve current Cartesian behavior, `True` switches to the properly-weighted norm via `GridInfo.geometry.metric_factors()`. L∞ unaffected (max is a pointwise statistic). Tests: volume-weighted L2 of a radial shell equals the analytic shell volume; Cartesian result unchanged (regression test against current values).
-  **Depends on:** Step 19b (spherical regridding — without it there is no spherical dataset to compare and this step is vacuous).
+  Add metric-factor integration to `compare_fields()` / `field_comparison_report()` so L2/L∞ weight each cell by $\sqrt{|g|}\,d^n x$. Step 20 is correct on uniform Cartesian ($\Delta V$ cancels) but wrong on spherical (poles, $r=0$). API: `compare_fields(..., weighted: bool = False)` — defaults preserve Cartesian behavior. L∞ unaffected (pointwise). Tests: radial shell L2 = analytic shell volume; Cartesian regression unchanged.
+  **Depends on:** Step 19b.
 
 - [x] **Step 43: `pypic.reductions` — `reduce()` axis reduction**
-  Single primitive that collapses a `FieldDataset` along one *or several* surviving axes (`axis: str | tuple[str, ...]`) with a chosen reduction (`integrate`, `sum`, `mean`, `median`, `max`, `min`, `std`, `var`, `argmax`, `argmin`), optionally pre-filtered by a `BoxSelection` or `SphereSelection`. Column densities, line-of-sight integrated $\mathbf{J}\!\cdot\!\mathbf{E}$, slab-mean fields, projected-max diagnostics, and peak-position maps all compose from this one verb — no `SlabSelection` type needed, preserving the *selections describe regions, not data* invariant. `integrate` uses xarray's trapezoidal `.integrate(coord=...)` (looped over axes for multi-axis input), so non-uniform 1-D coords work for free once stretched grids land. `argmax` / `argmin` use xarray's `idxmax` / `idxmin` to return the *coordinate value* of the extremum (not a raw integer index) — physically meaningful as e.g. "the z-position where |J| peaks"; single-axis only since there's no single coord-value over a multi-dim search. `weight=<field-name>` produces yt-style density / emission-weighted averages for `mean` and `integrate` ($\sum f w / \sum w$ and $\int f w \, dx / \int w \, dx$ respectively); joint NaN-masking under `nan_policy="omit"` skips cells where field or weight is NaN consistently from both numerator and denominator. Each reduced DataArray gains an `attrs["reduction"]` dict (`{axis, op}` plus `result_kind: "axis_position"` for argmax/argmin, plus `weight: <canonical name>` when weighted) for downstream provenance. Returns a `FieldDataset` with `surviving_axes` correctly updated via `_wrap_sliced`, so subsequent `compute()`, `transform_to()`, `plot_field_slice()`, and `in_si()` work unchanged. The `Reduction` type alias is exported from `pypic.reductions` (and re-exported at package root) so callers can type their own kwargs; `_VALID_REDUCTIONS` derives from `typing.get_args(Reduction.__value__)` to stay in lockstep with the `Literal`. The verb is `reduce` rather than `project` to avoid colliding with Three.js `Vector3.project(camera)` (camera/screen-space projection) on webpic's client side. CLI surface: `pypic reduce apply <path> --axis z --reduction mean --weight rho_c --output out.zarr`, composing with `--box`, `--plane`, multi-step time-series writes, Icechunk tags, and `--dry-run`. Gives webpic a clean wire format: `{selection, axis, reduction, weight?}` decodes to one server-side call. Docs: `docs/api/reductions.md`.
-  **Carry-overs** (cross-references, no longer blocking 43):
-  - **Spherical / cylindrical Jacobian-aware integration** — see **Step 43b**. (Late-breaking: `CoordinateGeometry.metric_factors()` is already implemented for all three geometries, so this is no longer blocked on Step 19b — it just needs the integration path wired into `reduce`.)
-  - **Unit-aware reduction** (`quantity_type` / `si_unit` shift after `integrate`) — see **Step 43c**, sibling to Step 20b's volume-weighted-norm work.
-  - **`plot_reduction` helper** — not a separate step; the canonical composition is `plot_field_slice(ds.reduce("z", ...), ...)` and works today.
+  Single primitive that collapses a `FieldDataset` along one or more surviving axes (`axis: str | tuple[str, ...]`) with `integrate | sum | mean | median | max | min | std | var | argmax | argmin`, optionally pre-filtered by a `BoxSelection`/`SphereSelection`. Column densities, LOS-integrated $\mathbf{J}\!\cdot\!\mathbf{E}$, slab means, projected-max diagnostics, peak-position maps all compose — no `SlabSelection` type needed (preserves *selections describe regions, not data*).
+  `integrate` uses xarray's trapezoidal `.integrate(coord=...)` looped over axes (non-uniform 1-D coords work for free). `argmax`/`argmin` use `idxmax`/`idxmin` returning the *coordinate value* (single-axis only). `weight=<field-name>` produces yt-style density/emission-weighted averages for `mean` and `integrate` ($\sum f w / \sum w$); joint NaN-masking under `nan_policy="omit"`. Result carries `attrs["reduction"]` ({axis, op, result_kind, weight}) for provenance. `surviving_axes` updated via `_wrap_sliced` so downstream `compute()`, `transform_to()`, `plot_field_slice()`, `in_si()` work unchanged. The `Reduction` type alias is exported; `_VALID_REDUCTIONS = typing.get_args(Reduction.__value__)`. Verb is `reduce` (not `project`) to avoid colliding with Three.js `Vector3.project(camera)` on webpic.
+  CLI: `pypic reduce apply <path> --axis z --reduction mean --weight rho_c --output out.zarr`, composes with `--box`, `--plane`, multi-step writes, Icechunk tags, `--dry-run`. Gives webpic a wire format: `{selection, axis, reduction, weight?}`. Docs: `docs/api/reductions.md`.
+  **Carry-overs:** spherical/cylindrical Jacobian → Step 43b (no longer blocked on 19b — `metric_factors()` already implemented for all geometries); unit-aware reduction → Step 43c; `plot_reduction` is just `plot_field_slice(ds.reduce(...))`.
 
 - [ ] **Step 43b: spherical / cylindrical Jacobian-aware `reduce(integrate)`**
-  Wire `CoordinateGeometry.metric_factors(...)` into the `integrate` branch of `pypic.reductions.reduce()` so reductions on spherical / cylindrical grids return the metric-weighted line integral $\int f \, h_i \, dx^i$ instead of raising `NotImplementedError`. Build a 3-D Jacobian $J = \prod_{i \in \text{reduced axes}} h_i$ (a function of the *surviving* coords for axes whose $h_i$ depends on them — $r$ for spherical $\theta$-integration, $r \sin\theta$ for $\phi$, etc.) and broadcast as an xarray DataArray; multiply field by $J$ before trapezoidal. Cartesian path unchanged ($h_i = 1 \Rightarrow J = 1$). Drop the `_require_cartesian_grid`-style guard in `reduce()` once the spherical/cylindrical paths are tested. Tests: spherical-shell volume integral matches analytic $\frac{4}{3}\pi(r_2^3 - r_1^3)$ at machine precision; cylindrical disc area matches $\pi r^2$ to trapezoidal order; Cartesian regression unchanged. Late-breaking finding: `metric_factors()` is fully implemented for all three geometries at `coordinates/geometry.py:73-116`, so this is no longer blocked on Step 19b.
-  **Depends on:** Step 5 (FieldDataset), Step 43.
+  Wire `CoordinateGeometry.metric_factors(...)` into the `integrate` branch so reductions on spherical/cylindrical return $\int f \, h_i \, dx^i$ instead of raising `NotImplementedError`. Build Jacobian $J = \prod_i h_i$ over reduced axes (function of *surviving* coords — $r$ for spherical $\theta$-integration, $r\sin\theta$ for $\phi$), broadcast, multiply field by $J$ before trapezoidal. Cartesian unchanged ($h_i=1$). Tests: spherical shell volume = $\frac{4}{3}\pi(r_2^3 - r_1^3)$ at machine precision; cylindrical disc area = $\pi r^2$ to trapezoidal order; Cartesian regression unchanged. `metric_factors()` is already at `coordinates/geometry.py:73-116` for all three geometries, so no longer blocked on 19b.
+  **Depends on:** Step 5, Step 43.
 
 - [ ] **Step 43c: unit-aware `reduce()`**
-  After `reduce(..., reduction="integrate")` along $n$ axes, the SI unit dimension shifts by $n$ length factors (m⁻³ → m⁻² → m⁻¹ for density along one or two axes). Today `quantity_type` and `si_unit` are preserved unchanged on the result, so `in_si()` is off by one length factor per reduced axis on integrated outputs (workaround: multiply by `normalization.length_si**n_reduced`). Possible approaches: (a) generalize the `unit_dimension` 7-tuple arithmetic so the field attrs carry correct dimensions post-reduction (and `in_si()` reads from `unit_dimension` instead of the `quantity_type` string), (b) introduce shifted canonical `quantity_type` entries (`column_density`, `surface_brightness`, ...) where conventional, (c) hybrid — generalize the 7-tuple and add a small registry of conventional names. Pairs with Step 20b's volume-weighted-norms work (same `unit_dimension` arithmetic concerns).
-  **Depends on:** Step 43, Step 20b (analogous unit-dim work; can ship independently).
+  After `reduce(reduction="integrate")` along $n$ axes, the SI unit shifts by $n$ length factors (m⁻³ → m⁻² → m⁻¹). Today `quantity_type`/`si_unit` are preserved unchanged, so `in_si()` is off by one length factor per reduced axis (workaround: multiply by `normalization.length_si**n`). Options: (a) generalize the `unit_dimension` 7-tuple arithmetic so attrs carry correct post-reduction dimensions; (b) add shifted canonical names (`column_density`, `surface_brightness`); (c) hybrid. Pairs with Step 20b's volume-weighted-norms work (same unit-dim concerns).
+  **Depends on:** Step 43; Step 20b (analogous; can ship independently).
 
 - [ ] **Step 40: time-dependent frame transforms**
-  Extend `FrameTransform` to support rotation matrices that vary per timestep. Primary use case: GSE↔GSM depends on dipole tilt angle, which changes with time. Two approaches, both supported:
-  - **Parameter-driven:** `parameter = "dipole_tilt"` in `[coordinates.transforms]` names a time-varying quantity looked up per step from simulation metadata or auxiliary data. The rotation matrix is recomputed at each timestep.
-  - **SPICE kernels:** Optional integration with `spiceypy` for ephemeris-based transforms (GSE↔HEE↔RTN, planetary frames). `from_spice(frame_a, frame_b, epoch)` builds a `FrameTransform` from NAIF kernels. Optional dep: `spiceypy` under `spice` extra. Useful for comparing simulation output with spacecraft observations in the correct frame at the correct epoch.
-  `FieldDataset.transform_to(frame, *, epoch=None)` gains an optional epoch parameter. Static transforms (current behavior) are unchanged. Tests: round-trip GSE→GSM→GSE at known tilt angles against published rotation matrices.
-  **Depends on:** Step 15 (frame transforms).
+  Extend `FrameTransform` to per-timestep rotations. Primary use: GSE↔GSM via dipole tilt angle. Two paths:
+  - **Parameter-driven:** `parameter = "dipole_tilt"` in `[coordinates.transforms]` names a time-varying quantity; rotation recomputed each step.
+  - **SPICE:** `from_spice(frame_a, frame_b, epoch)` builds a transform from NAIF kernels (GSE↔HEE↔RTN, planetary frames). Optional dep: `spiceypy` under `spice` extra. Useful for spacecraft-observation comparison.
+  `FieldDataset.transform_to(frame, *, epoch=None)` gains optional epoch. Static transforms unchanged. Tests: round-trip GSE→GSM→GSE at known tilt angles against published rotation matrices.
+  **Depends on:** Step 15.
 
 - [ ] **Step 44: field-line tracer & mapping infrastructure — symplectic integrator, periodic tricubic, curvature step control, squashing factor $Q$**
-  A bundle of additive upgrades to `pypic.traces` plus a new `pypic.maps` module. Every sub-step is opt-in and sits *next to* the existing `trace_field_line_adaptive` / `trace_field_lines_adaptive` (Dormand-Prince 5(4) + trilinear interpolation + per-seed full-trace storage + PI step control), which stays the default. The motivating use cases span three domains:
-  - **Fusion / Poincaré-section topology** — bounded (not secularly drifting) invariants on closed orbits → 44a, 44b.
-  - **Solar coronal mapping** — large-scale footpoint maps over PFSS / MAS solutions on spherical grids → 44d, 44e, 44f, 44g.
-  - **Magnetospheric topology** — quasi-separatrix-layer / X-line detection from MHD output → 44e, 44f, 44g.
+  Bundle of additive upgrades to `pypic.traces` + new `pypic.maps` module. Every sub-step is opt-in and sits next to the existing `trace_field_line_adaptive` (Dormand-Prince 5(4) + trilinear + PI step control, stays default). Motivating use cases:
+  - **Fusion / Poincaré-section topology** — bounded invariants on closed orbits → 44a, 44b.
+  - **Solar coronal mapping** — footpoint maps over PFSS/MAS on spherical grids → 44d, 44e, 44f, 44g.
+  - **Magnetospheric topology** — QSL / X-line detection from MHD → 44e, 44f, 44g.
 
-  The infrastructure pieces (44e: curvature step control, 44f: endpoint-only mode) are direct lifts from Predictive Science's MapFL Fortran tracer; 44g (squashing factor $Q$) builds on both and gives pypic the headline solar/heliosphere mapping deliverable that's currently absent.
+  Infrastructure pieces (44e curvature step control, 44f endpoint-only) are direct lifts from Predictive Science's MapFL Fortran tracer; 44g ($Q$) builds on both and delivers the headline solar/heliosphere mapping currently absent.
 
-  **Sub-step 44a — implicit midpoint integrator.** New entry points `trace_field_line_symplectic` / `trace_field_lines_symplectic` (mirror the signatures of their adaptive cousins, drop `atol`/`rtol` in favour of fixed `step_size`). Single-stage Gauss-Legendre Runge-Kutta: $\mathbf{x}_{n+1} = \mathbf{x}_n + h\,\hat{\mathbf{B}}((\mathbf{x}_n + \mathbf{x}_{n+1})/2)$, solved by 2-3 fixed-point iterations on the unit-tangent RHS (Newton not needed — `f` is smooth and Lipschitz away from nulls). Preserves a discrete symplectic 2-form, so invariants like $r^2$ on closed orbits stay *bounded* instead of drifting secularly under Dormand-Prince. For Hamiltonian-like flows (closed orbits, KAM tori) you typically take 5-10× larger steps than DP needs for the same picture quality, so net wall-clock is ~1.2-1.5× rather than the naïve 2-3× implicit-solve overhead. Order 4 is available as the 2-stage Gauss-Legendre variant — defer until 1-stage is shipped and benchmarked. Reuses `VectorFieldInterpolator` and the existing `closed_loop` / domain-exit / null-point termination logic verbatim; the only new code is the step loop. **Tests:** $r^2$ conservation on $\mathbf{B} = (-y, x, 0)$ over $10^4$ steps (bounded oscillation, not linear drift); $\psi$-conservation on a 2D analytic flux function; benchmark against the existing closed-circle Poincaré section (Step pre-44) showing the puncture cloud collapses onto a single $|v| = r$ ring instead of the current ~5% scatter.
+  **44a — implicit midpoint integrator.** New `trace_field_line_symplectic` / `trace_field_lines_symplectic` (fixed `step_size`, no `atol`/`rtol`). 1-stage Gauss-Legendre RK: $\mathbf{x}_{n+1} = \mathbf{x}_n + h\,\hat{\mathbf{B}}((\mathbf{x}_n+\mathbf{x}_{n+1})/2)$, solved by 2-3 fixed-point iterations (Newton not needed, $f$ smooth and Lipschitz away from nulls). Preserves discrete symplectic 2-form: invariants like $r^2$ on closed orbits stay *bounded* instead of secularly drifting under DP. Take 5-10× larger steps for same picture quality on Hamiltonian-like flows → net wall-clock 1.2-1.5× rather than 2-3× naive overhead. Order 4 (2-stage Gauss-Legendre) deferred until 1-stage is benchmarked. Reuses `VectorFieldInterpolator` + termination logic; only new code is the step loop. **Tests:** $r^2$ conservation on $\mathbf{B}=(-y,x,0)$ over $10^4$ steps (bounded oscillation, no drift); $\psi$-conservation on 2D analytic flux; closed-circle Poincaré collapses to single ring vs current ~5% scatter.
 
-  **Sub-step 44b — tricubic interpolation kwarg.** Promote `VectorFieldInterpolator.from_dataset(..., method="cubic")` (already supported by scipy's `RegularGridInterpolator` — one-line kwarg passthrough). Reduces interpolation error from $O(h^2)$ to $O(h^4)$ in the grid spacing, at ~3-5× per-evaluation cost. Helps two cases the existing trilinear path mishandles: (a) sharp gradient regions like current sheets and shock fronts where linear interp swings the unit-tangent direction nonphysically; (b) preserving smoothness of $\nabla \hat{\mathbf{B}}$ across cell faces, which the symplectic integrator's per-step error model is more sensitive to than DP's. **Tests:** convergence rate test on $\mathbf{B} = (-y, x, 0)$ at three grid resolutions; current-sheet smoothness test ($\tanh(y/L)$ Harris field; ensure no spurious $\hat{\mathbf{B}}$ flips at cell boundaries).
+  **44b — tricubic interpolation kwarg.** Promote `VectorFieldInterpolator.from_dataset(..., method="cubic")` (one-line scipy passthrough). Error $O(h^2) \to O(h^4)$ at 3-5× per-eval cost. Helps sharp-gradient regions (current sheets, shocks) where linear interp swings $\hat{\mathbf{B}}$ nonphysically, and preserves $\nabla\hat{\mathbf{B}}$ smoothness across cell faces (44a is more sensitive than DP). **Tests:** convergence on $\mathbf{B}=(-y,x,0)$ at three resolutions; Harris ($\tanh(y/L)$) smoothness — no spurious $\hat{\mathbf{B}}$ flips at cell faces.
 
-  **Optional sub-step 44c — $\mathbf{A}$-based reconstruction.** When a reader exposes the vector potential `A_1`/`A_2`/`A_3`, interpolate $\mathbf{A}$ cubically and compute $\mathbf{B} = \nabla \times \mathbf{A}$ analytically inside the interpolator. Guarantees $\nabla \cdot \mathbf{B} = 0$ at every interior point, which matters near magnetic nulls and separatrices where finite-difference $\nabla \cdot \mathbf{B}$ artifacts dominate the topology classification. Punt until a reader actually writes `A_*` to disk (BATSRUS HDF5 does, iPIC3D doesn't).
+  **44c — $\mathbf{A}$-based reconstruction (optional).** When a reader exposes `A_1/A_2/A_3`, interpolate $\mathbf{A}$ cubically and compute $\mathbf{B}=\nabla\times\mathbf{A}$ analytically. Guarantees $\nabla\cdot\mathbf{B}=0$ at every interior point — matters near nulls/separatrices where FD $\nabla\cdot\mathbf{B}$ artifacts dominate topology classification. Punt until a reader writes `A_*` (BATSRUS HDF5 does, iPIC3D doesn't).
 
-  **Sub-step 44d — periodic tricubic splines for $\phi$ / $\theta$.** Once `pypic.regrid` and the tracer gain spherical-geometry support (Step 19b territory), the natural follow-on is periodic-aware tricubic interpolation. scipy's `RegularGridInterpolator(method="cubic")` (the 44b path) does *not* handle periodic axes: values near the $\phi = 2\pi$ seam interpolate against a one-sided stencil, producing a C⁰ (not C¹) discontinuity in $\hat{\mathbf{B}}$ that visibly bends field lines crossing the seam. MapFL handles this with two custom periodic-spline routines (`spline_periodic_type1` / `spline_periodic_type2` at `mapfl.f:8885, 9028`) wrapped by `compute_spline_3d` / `evaluate_spline_3d` — the latter is the inner loop of MapFL's `getb` when `cubic=.true.` (see `mapfl.f:7286`). For pypic, the proposed knob is a `periodic_axes: tuple[int, ...] = ()` kwarg on `VectorFieldInterpolator.from_dataset()`: flagged axes use the periodic boundary condition during 1-D cubic-spline coefficient construction (`scipy.interpolate.CubicSpline(..., bc_type="periodic")` per spline line, accumulated into a tensor-product cubic block). Theta-pole fidelity is a secondary beneficiary once cylindrical / spherical regrid lands. **Tests:** seamless interpolation across $\phi = 2\pi$ on $\mathbf{B} = (-\sin\phi, \cos\phi, 0)$ (unit-tangent should be C¹ continuous to spline accuracy at the seam, not C⁰); regression against 44b trilinear/non-periodic-cubic in the seam-free interior to confirm zero behavior change away from periodic boundaries.
-  **Depends on:** Step 19b (spherical regridding — gates the geometry where periodicity actually bites); Step 44b (non-periodic cubic kwarg as the codepath the periodic variant extends).
+  **44d — periodic tricubic splines for $\phi$/$\theta$.** Once `pypic.regrid` and tracer gain spherical support (19b territory), natural follow-on. scipy's `RegularGridInterpolator(method="cubic")` doesn't handle periodicity: $\phi=2\pi$ seam interpolates against one-sided stencil → C⁰ (not C¹) discontinuity in $\hat{\mathbf{B}}$ that visibly bends field lines. MapFL uses periodic-spline routines (`spline_periodic_type1/2` at `mapfl.f:8885, 9028`, wrapped by `compute/evaluate_spline_3d`; `mapfl.f:7286` is the `getb` inner loop with `cubic=.true.`). Knob: `periodic_axes: tuple[int,...] = ()` on `VectorFieldInterpolator.from_dataset()` — flagged axes use `CubicSpline(..., bc_type="periodic")` per spline line, accumulated into a tensor-product cubic block. **Tests:** seamless across $\phi=2\pi$ on $\mathbf{B}=(-\sin\phi,\cos\phi,0)$ (C¹ to spline accuracy); regression vs 44b in seam-free interior (zero behavior change).
+  **Depends on:** Step 19b (gates the geometry where periodicity bites); 44b (the codepath this extends).
 
-  **Sub-step 44e — curvature-based step control (non-default).** Add a `step_control: Literal["error", "curvature"] = "error"` kwarg alongside the existing Gustafsson PI controller. The curvature path uses MapFL's recipe (`mapfl.f:6445`): keep $\|\hat{\mathbf{B}}_{n+1} - \hat{\mathbf{B}}_n\| \cdot h / \Delta s \approx$ `over_rc` (default `0.0025` — the unit-tangent rotation per step), then clamp by `local_mesh_factor × min(\Delta x_i)` so a step never overshoots its source cell. The win is on long quasi-laminar traces (PFSS coronal mapping, dipole magnetospheres, tokamak equilibria) where the absolute-tolerance PI controller can't distinguish smooth from chaotic regions and takes uniformly conservative steps. Curvature control automatically tightens in sharp-gradient regions because both $\|\Delta\hat{\mathbf{B}}\|$ *and* the local mesh size shrink there — no separate adaptation logic needed. **Tests:** PFSS-like dipole field, compare step count between `"error"` and `"curvature"` at matched endpoint-position tolerance (curvature wins by 2-5× on smooth fields); Harris current-sheet field, the two should converge to similar step counts in the sharp region (regression against PI on a known-good case).
-  **Depends on:** existing `pypic.traces._tracing` infrastructure (`step_size_init`, `min_step`, `max_step`, `VectorFieldInterpolator`).
+  **44e — curvature-based step control (non-default).** `step_control: Literal["error","curvature"] = "error"` kwarg alongside the existing Gustafsson PI. Curvature path (MapFL `mapfl.f:6445`): keep $\|\hat{\mathbf{B}}_{n+1}-\hat{\mathbf{B}}_n\|\cdot h/\Delta s \approx$ `over_rc` (default 0.0025 — unit-tangent rotation per step), clamped by `local_mesh_factor × min(\Delta x_i)` so a step never overshoots its source cell. Win on long quasi-laminar traces (PFSS, dipole magnetospheres, tokamak equilibria) where absolute-tolerance PI can't distinguish smooth from chaotic and stays uniformly conservative. Auto-tightens in sharp-gradient regions because both $\|\Delta\hat{\mathbf{B}}\|$ and mesh size shrink. **Tests:** PFSS dipole — curvature wins 2-5× on smooth fields at matched endpoint tolerance; Harris — both converge to similar step counts.
+  **Depends on:** `pypic.traces._tracing` (`step_size_init`, `min_step`, `max_step`, `VectorFieldInterpolator`).
 
-  **Sub-step 44f — endpoint-only mode for `trace_field_lines_adaptive`.** Add a `return_endpoints_only: bool = False` kwarg that skips materializing `FieldLine.points` / `FieldLine.arc_lengths` and instead returns a lightweight `FieldLineEndpoint` namedtuple per seed: `(start, end, arc_length, termination_reason)`. Memory matters: for a $1000 \times 1000$ footpoint map at 20k steps each, full-trace storage is $\mathcal{O}(\text{TB})$ — completely unworkable when only the endpoint is consumed downstream. MapFL's tracer (`mapfl.f:7479`) makes trajectory storage opt-in (`xt` argument is `optional`) precisely so map computations can skip it. Endpoint-only mode is also the kernel of 44g (squashing factor $Q$ does five endpoint-only traces per seed) and any future `pypic.maps` connectivity / footpoint diagnostic. **Tests:** endpoint-mode trace yields the same `end` position as full-trace mode within roundoff; memory profiling confirms $O(M)$ per-seed allocation instead of $O(M \cdot N_{\text{steps}})$ on a large-$M$ map.
-  **Depends on:** existing `pypic.traces._tracing` infrastructure.
+  **44f — endpoint-only mode for `trace_field_lines_adaptive`.** `return_endpoints_only: bool = False` kwarg skips materializing `FieldLine.points`/`arc_lengths`, returns a `FieldLineEndpoint` namedtuple: `(start, end, arc_length, termination_reason)`. Memory: a 1000×1000 map at 20k steps is $\mathcal{O}(\text{TB})$ in full-trace mode — unworkable when only endpoints are consumed. MapFL makes trajectory storage opt-in (`xt` is `optional` at `mapfl.f:7479`) for this reason. Also the kernel of 44g ($Q$ = 5 endpoint traces per seed) and any future `pypic.maps` connectivity diagnostic. **Tests:** endpoint = full-trace endpoint within roundoff; memory $O(M)$ per-seed not $O(M\cdot N_{steps})$.
+  **Depends on:** `pypic.traces._tracing`.
 
-  **Sub-step 44g — `pypic.maps` module + squashing factor $Q$.** New top-level module `pypic.maps` providing field-line *map* diagnostics: open/closed classification, footpoint mapping $\mathbf{r}(\theta_0, \phi_0) \mapsto \mathbf{r}(\theta_1, \phi_1)$, the squashing factor $Q$ (Titov-Démoulin), and the signed-log form $\text{slog}(Q) = \mathrm{sign}(B_r) \cdot \log_{10}\!\bigl(Q/2 + \sqrt{(Q/2)^2 - 1}\bigr)$ (Pariat & Démoulin 2012) that flips sign across separatrices. The flagship entry point is `squashing_factor(ds, seeds, *, h=1e-4, ...) -> FloatArray`: at each seed, trace one *central* field line plus four neighbours offset by $\pm h$ in two perpendicular directions, finite-difference the footpoint mapping to build the $2 \times 2$ Jacobian $D$, and return $Q = \|D\|_F^2 / |\det D|$. This is MapFL's `getq` recipe verbatim (`mapfl.f:4864`) — five endpoint-only traces per seed, central + four perp-pair neighbours, Jacobian via central differences, with the $\sin\theta < 5\times 10^{-3}$ pole-handling switch to Cartesian basis vectors that MapFL hardcodes. The implementation rests on 44f (endpoint-only mode — $Q$ on a 1000² map is 5 million traces; full trajectory storage is untenable) and inherits the existing closed-loop / domain-exit termination logic. **Use cases:** solar coronal connectivity (the headline MapFL deliverable — open-field maps, coronal-hole boundaries, slow-vs-fast wind footpoints), magnetospheric quasi-separatrix-layer mapping, pre-flare $Q$-line detection. **Tests:** $Q \approx 2$ on a uniform field (the analytic lower bound); $Q \to \infty$ across an analytic separatrix; numerical comparison against MapFL on a published PFSS test problem (e.g. the Titov-Démoulin flux rope or a synthetic dipole + ring-current configuration).
-  **References:** Titov, Hornig & Démoulin 2002 (squashing factor definition); Pariat & Démoulin 2012 (slog $Q$); Predictive Science MapFL (`mapfl.f:4864`) for the 5-trace finite-difference implementation pattern.
-  **Depends on:** Step 44f (endpoint-only mode is the inner loop); benefits from 44d (periodic tricubic) when applied to spherical PFSS data.
+  **44g — `pypic.maps` module + squashing factor $Q$.** New top-level module: open/closed classification, footpoint mapping $\mathbf{r}(\theta_0,\phi_0)\mapsto\mathbf{r}(\theta_1,\phi_1)$, the Titov-Démoulin squashing factor $Q$, and the Pariat & Démoulin 2012 signed-log $\text{slog}(Q) = \mathrm{sign}(B_r)\cdot\log_{10}(Q/2 + \sqrt{(Q/2)^2-1})$ that flips sign across separatrices. Flagship: `squashing_factor(ds, seeds, *, h=1e-4, ...)` — at each seed, trace 1 central + 4 perp-pair neighbors, central-difference for the 2×2 Jacobian $D$, return $Q = \|D\|_F^2/|\det D|$. Verbatim MapFL `getq` recipe (`mapfl.f:4864`), including the $\sin\theta < 5\times10^{-3}$ pole switch to Cartesian basis. Rests on 44f ($Q$ on 1000² = 5M traces; full storage untenable) and existing termination logic. **Use cases:** solar coronal connectivity (open-field maps, coronal-hole boundaries, slow/fast wind footpoints), magnetospheric QSL mapping, pre-flare $Q$-line detection. **Tests:** $Q\approx 2$ on uniform field (analytic lower bound); $Q\to\infty$ across analytic separatrix; numerical comparison vs MapFL on published PFSS test (Titov-Démoulin flux rope, or synthetic dipole + ring current).
+  **References:** Titov, Hornig & Démoulin 2002; Pariat & Démoulin 2012; MapFL `mapfl.f:4864`.
+  **Depends on:** 44f. Benefits from 44d on spherical PFSS.
 
-  **Reference:** Hairer, Lubich & Wanner, *Geometric Numerical Integration* (2006) — Chapter II.1 covers implicit midpoint as the canonical 1-stage Gauss-Legendre RK and walks through why the midpoint-evaluation symmetry produces symplecticity; Chapter V covers the bounded-vs-secular drift theorem for Hamiltonian systems via the shadow-Hamiltonian construction. Cite as `[@HairerLubichWanner2006]` (added to `docs/references.bib`).
+  **Reference:** Hairer, Lubich & Wanner, *Geometric Numerical Integration* (2006) — Ch. II.1 (implicit midpoint as 1-stage Gauss-Legendre, symplecticity), Ch. V (bounded-vs-secular drift theorem via shadow-Hamiltonian). Cite as `[@HairerLubichWanner2006]`.
 
-  **Not in scope:** variational integrators (Discrete Euler-Lagrange formulation — overkill for field-line tracing without a Lagrangian in hand); higher-order Gauss-Legendre (the 2-stage order-4 variant) until the 1-stage path is shipped and benchmarked; Hamiltonian formulation in flux coordinates (Boozer / Hamada) — that's a separate analysis pipeline that fusion codes do *because they have flux coordinates*, and pypic's data model assumes Cartesian/spherical/cylindrical grids; the full MapFL diagnostic surface beyond $Q$ (expansion factor, $K$-factor, magnetic dips) — add piecewise to `pypic.maps` when a concrete use case appears, not speculatively.
+  **Not in scope:** variational integrators (overkill without a Lagrangian); 2-stage order-4 Gauss-Legendre (until 1-stage benchmarked); Hamiltonian formulation in flux coordinates (Boozer/Hamada — fusion-codes do this *because they have flux coordinates*; pypic assumes Cartesian/spherical/cylindrical); full MapFL diagnostic surface beyond $Q$ (expansion factor, $K$-factor, magnetic dips — add piecewise when a concrete use case appears).
 
-  **Depends on:** existing `pypic.traces` infrastructure (`VectorFieldInterpolator`, `FieldLine`, termination logic). Step 19b (spherical regridding) gates 44d. No new mandatory dependencies — scipy already ships cubic `RegularGridInterpolator` and `CubicSpline(..., bc_type="periodic")`.
+  **Depends on:** existing `pypic.traces` (`VectorFieldInterpolator`, `FieldLine`, termination logic). 19b gates 44d. No new mandatory deps — scipy ships cubic `RegularGridInterpolator` and periodic `CubicSpline`.
 
 ---
 
@@ -312,63 +188,56 @@ Each step produces something testable. No step starts until the previous step's 
 
 - [ ] **Step 27: `pypic.interop` — yt, PlasmaPy, SpacePy adapters**
   `pypic.interop.yt`: `to_yt_dataset(fds) -> yt.StreamDataset` — maps canonical fields to yt field tuples, sets domain from GridInfo. Cartesian only.
-  `pypic.interop.plasmpy`: `to_plasmpy_plasma(fds, species_index) -> dict` — extracts density, temperature, |B| as `astropy.units.Quantity` (SI via `normalization.to_si()`). Dict, not PlasmaPy Plasma object (their API is unstable). `validate_against_plasmpy()` for cross-validation of derived quantities.
-  `pypic.interop.spacepy`: `from_spacepy_dm(dm, grid, normalization) -> FieldDataset` — converts SpacePy DataModel (CDF/ISTP) with user-provided grid and field map.
-  Optional deps: `yt>=4.3`, `plasmapy>=2024.7` + `astropy>=6.0`, `spacepy>=0.6` — each under its own extra. Each adapter is import-guarded with helpful install message. All tests mock external libraries.
+  `pypic.interop.plasmpy`: `to_plasmpy_plasma(fds, species_index) -> dict` — extracts density, temperature, |B| as `astropy.units.Quantity` (SI via `normalization.to_si()`). Dict, not PlasmaPy Plasma object (API unstable). `validate_against_plasmpy()` cross-validates derived quantities.
+  `pypic.interop.spacepy`: `from_spacepy_dm(dm, grid, normalization) -> FieldDataset` — converts SpacePy DataModel (CDF/ISTP) with user-supplied grid and field map.
+  Optional deps: `yt>=4.3`, `plasmapy>=2024.7`+`astropy>=6.0`, `spacepy>=0.6` — each under its own extra. Import-guarded with helpful install message. Tests mock external libraries.
 
 - [ ] **Step 28: ecosystem documentation page**
-  `docs/ecosystem.md` — positioning guide: pypic (multi-code reader unification + normalization + derived quantities), PlasmaPy (reference formulas + constants), SpacePy (spacecraft/observational data + CDF), yt (AMR visualization + volume rendering). Code examples for each adapter. "When to use which tool" decision guide.
+  `docs/ecosystem.md` — positioning: pypic (multi-code reader + normalization + derived), PlasmaPy (reference formulas + constants), SpacePy (spacecraft/CDF), yt (AMR + volume rendering). Code examples for each adapter. "When to use which tool" decision guide.
 
 - [ ] **Step 29: `pypic.interop.spase` — SPASE XML metadata export**
-  `to_spase_xml(fds, *, resource_id, contact, description) -> str` generates a SPASE `NumericalData` XML document from FieldDataset metadata. Maps `simulation.toml` sections to SPASE elements: `[model]` → `SimulationRun`, `[grid]` → `SpatialDescription`, `[units]` → `Units` on each Parameter, `[[species]]` → `Particle` parameters, canonical fields → `Parameter` elements with `ParameterKey`/`Name`/`Description`/`Units`. `to_spase_file(fds, path, **kwargs)` writes to disk. No external deps (stdlib `xml.etree.ElementTree`). Enables publishing pypic-processed data to CDAWEB/VHO/CCMC archives. All tests use synthetic FieldDatasets.
+  `to_spase_xml(fds, *, resource_id, contact, description) -> str` generates a SPASE `NumericalData` XML. Maps `simulation.toml` sections to SPASE elements: `[model]` → `SimulationRun`, `[grid]` → `SpatialDescription`, `[units]` → `Units` on each Parameter, `[[species]]` → `Particle`, canonical fields → `Parameter` (`ParameterKey`/`Name`/`Description`/`Units`). `to_spase_file(fds, path, **kwargs)` writes to disk. No external deps (stdlib `xml.etree.ElementTree`). Enables publishing to CDAWEB/VHO/CCMC. Tests use synthetic FieldDatasets.
 
 ---
 
 ## Phase 12: Virtual Probes & Spacecraft
 
 - [ ] **Step 41: `pypic.probes` — virtual probe sampling**
-  `Probe` frozen dataclass: a named point `(x, y, z)` in the simulation domain. `ProbeArray`: collection of probes (detector arrays, virtual satellite constellations). `ProbeTrajectory`: time-varying position as `(t, x, y, z)` array — a spacecraft orbit or moving detector path. A fixed probe is a degenerate trajectory (constant position).
+  `Probe` frozen dataclass: named point `(x, y, z)`. `ProbeArray`: collection (detector arrays, satellite constellations). `ProbeTrajectory`: time-varying `(t, x, y, z)` — spacecraft orbit / moving detector. A fixed probe is a degenerate trajectory.
   Core functions:
   - `sample(probe, dataset) -> dict[str, float]` — interpolate all fields at the probe position for one timestep. Reuses `RegularGridInterpolator` from `traces/_sampling.py`.
-  - `sample_timeseries(probe, simulation, steps) -> TabularData` — sample across timesteps, producing time-series columns (time, B_1, B_2, B_3, ...). Output is `TabularData` (already exists).
-  - `sample_trajectory(trajectory, simulation) -> TabularData` — sample along a moving path, one position per timestep.
-  - `sample_array(probes, dataset) -> TabularData` — sample all probes at one timestep, one row per probe.
-  Schema: `[[probes]]` section in simulation.toml (see schema.md § 8). Probes defined in config are available via `Simulation.probes`. CLI: `pypic probe <path> --name NAME --step all --field FIELD` for quick time-series extraction.
-  **iPIC3D integration:** iPIC3D outputs virtual satellite data at fixed probe locations via its own high-cadence sampling. `AuxiliaryDataReader` already loads this as `TabularData`. The probe framework can: (a) define new probes and resample from field output, (b) load iPIC3D native virtual satellite data, (c) compare the two (native has higher time resolution; resampled has all derived fields).
-  **Depends on:** `traces/_sampling.py` (interpolation), `TabularData` (output container).
+  - `sample_timeseries(probe, simulation, steps) -> TabularData` — sample across timesteps (time, B_1, B_2, B_3, ...).
+  - `sample_trajectory(trajectory, simulation) -> TabularData` — sample along a moving path.
+  - `sample_array(probes, dataset) -> TabularData` — all probes at one timestep, one row per probe.
+  Schema: `[[probes]]` section (schema.md § 8). Probes from config available via `Simulation.probes`. CLI: `pypic probe <path> --name NAME --step all --field FIELD`.
+  **iPIC3D integration:** iPIC3D outputs native virtual satellite data at fixed locations (high cadence). `AuxiliaryDataReader` already loads as `TabularData`. Probes can: (a) define new and resample, (b) load native, (c) compare (native = higher time res; resampled = all derived fields).
+  **Depends on:** `traces/_sampling.py`, `TabularData`.
 
 - [ ] **Step 41b: SPICE-driven probe trajectories**
-  `ProbeTrajectory.from_spice(target, observer, frame, epochs)` builds a trajectory from NAIF SPICE kernels via `spiceypy`. Enables direct comparison: load simulation, define a probe trajectory matching MMS/Cluster/PSP orbit, sample simulated fields along the real spacecraft path, compare with CDF observations (via SpacePy adapter, Step 27). Optional dep: `spiceypy` under `spice` extra.
-  **Depends on:** Step 41 (probes), Step 40 (SPICE frame transforms).
+  `ProbeTrajectory.from_spice(target, observer, frame, epochs)` builds a trajectory from NAIF SPICE kernels via `spiceypy`. Direct comparison: load sim, define trajectory matching MMS/Cluster/PSP orbit, sample fields along real path, compare with CDF observations (SpacePy adapter, Step 27). Optional dep: `spiceypy` under `spice` extra.
+  **Depends on:** Step 41, Step 40.
 
 ---
 
 ## Phase 13: Cross-Project Integration
 
-> **Tier-3 canonical names (locked in pre-v1.0).** Cross-tool work
-> below adopts the Tier-3 canonical name shape: `<field>[_s<N>][_<i>]`
-> with the species qualifier between the field name and the index
-> (`B_1`, `V_s0_1`, `P_s0_11`, `q_s0_1`). HDF5 §4.1 and Zarr §4.2
-> stores must use these names — `B1`, `V1_s0`, `P11_s0` are not
-> emitted by any pypic-aware tool. rustpic and webpic should wire
-> directly to Tier-3 names; no migration shim needed since neither
-> has shipped.
+> **Tier-3 canonical names (locked pre-v1.0).** Cross-tool work below uses `<field>[_s<N>][_<i>]` with species qualifier between field name and index (`B_1`, `V_s0_1`, `P_s0_11`, `q_s0_1`). HDF5 §4.1 and Zarr §4.2 stores must use these — `B1`, `V1_s0`, `P11_s0` are not emitted by any pypic-aware tool. rustpic and webpic wire directly to Tier-3; no migration shim since neither has shipped.
 
 - [ ] **Step 37: `pypic.server` — Arrow IPC streaming via Starlette/FastAPI**
-  Zero-copy field data serving to webpic (Three.js/WebGPU viewer). Arrow IPC over WebSocket — **not** Arrow Flight (no Flight JS client exists for browsers; gRPC-Web requires an Envoy proxy and eliminates Flight's advantages). Pipeline: `pyarrow RecordBatch → IPC stream bytes → WebSocket → tableFromIPC() → Float32Array → Three.js BufferAttribute → GPU`. WebSocket provides persistent bidirectional connections ideal for continuous simulation streaming and time-series animation.
-  Selections from the viewer UI map to pypic `Selection` objects server-side. Lazy I/O via xarray/dask serves only requested slices from disk. Arrow IPC carries structured metadata (field names, coordinates, units, normalization) in a single response. Readable in JS (`apache-arrow` npm package) and Rust (`arrow-rs`), aligning all three projects on one interchange format. Derived quantities computed server-side via `compute()`, unit conversion via `in_si()` / `in_units()`. Optional dep: `fastapi`, `uvicorn`, `pyarrow`, `websockets` under `server` extra. The server is a separate entry point, not part of the library import path.
-  **Depends on:** Steps 24-25 (Zarr/Arrow foundations).
+  Zero-copy field serving to webpic. Arrow IPC over WebSocket — **not** Arrow Flight (no JS Flight client for browsers; gRPC-Web needs Envoy proxy and eliminates Flight's advantages). Pipeline: `pyarrow RecordBatch → IPC bytes → WebSocket → tableFromIPC() → Float32Array → Three.js BufferAttribute → GPU`. WebSocket = persistent bidirectional for streaming + time-series animation.
+  Viewer-UI selections map to pypic `Selection` server-side. Lazy I/O via xarray/dask serves only requested slices. Arrow IPC carries structured metadata (names, coords, units, normalization) in a single response. Readable in JS (`apache-arrow`) and Rust (`arrow-rs`) — aligns all three projects on one interchange format. Derived quantities via `compute()`; unit conversion via `in_si()`/`in_units()`. Optional dep: `fastapi`, `uvicorn`, `pyarrow`, `websockets` under `server` extra. Separate entry point, not on library import path.
+  **Depends on:** Steps 24-25.
 
 - [ ] **Step 37b: selection provenance — `attrs.selections` round-trip**
-  Symmetric counterpart to `attrs["reduction"]` on reduced fields. Today `BoxSelection`/`PlaneSelection`/`SphereSelection` produce datasets with no recorded region definition — box/plane are partly recoverable from the post-slice `grid.lower/upper/dimensions`, but `SphereSelection` loses centre, radius, and keep-direction entirely once the NaN mask lands. Webpic's `{selection, axis, reduction}` wire format becomes round-trippable only when selection state survives `to_zarr` → `from_zarr`. Design points: (a) store as a **list** at the dataset root (`attrs.selections`), not per-field — selections always apply globally, and chained `BoxSelection → SphereSelection → reduce` needs ordered composition; (b) each entry typed by `kind` (`"box"` | `"plane"` | `"sphere"`) with parameters in code units, plus a pointer to the active `attrs.normalization` so radii stay interpretable across normalizations; (c) Pydantic-side: new `[[selection]]` records in `pypic.schema._models`, JSON Schema regen + drift test update; (d) replay via `Selection.from_attrs(record)` classmethods. Defer until Step 37 forces the wire-format contract — designing it earlier would either be redone or unnecessarily constrain the server work.
-  **Depends on:** Step 37 (Arrow IPC streaming — wire format crystallizes here).
+  Symmetric counterpart to `attrs["reduction"]`. Today `BoxSelection`/`PlaneSelection`/`SphereSelection` produce datasets with no recorded region — box/plane partly recoverable from post-slice `grid.lower/upper/dimensions`, but `SphereSelection` loses centre, radius, keep-direction once NaN mask lands. Webpic's `{selection, axis, reduction}` wire format round-trippable only when selection state survives `to_zarr`/`from_zarr`. Design: (a) **list** at root (`attrs.selections`), not per-field — selections apply globally and chained `Box → Sphere → reduce` needs ordered composition; (b) entries typed by `kind` (`"box"`|`"plane"`|`"sphere"`) with parameters in code units + pointer to active normalization (radii interpretable across normalizations); (c) Pydantic `[[selection]]` records in `pypic.schema._models`, JSON Schema regen + drift test; (d) replay via `Selection.from_attrs(record)` classmethods. Defer until 37 forces the wire-format contract.
+  **Depends on:** Step 37.
 
 - [ ] **Step 38: `pypic.readers.rustpic` — Rust PIC code reader**
-  Reader for rustpic's schema.md-conformant HDF5 output. The Rust code writes the canonical HDF5 layout directly (Section 4 of schema.md), so this is essentially `SimpleReader` with rustpic-specific metadata extraction and validation. pypic serves as the **reference implementation** — validate Rust-computed derived quantities against Python results on the same problem. Cross-project integration tests: run both codes on identical initial conditions, compare via `field_comparison_report()`. `open_rustpic()` convenience function. Auto-detection via HDF5 `model` attribute = `"rustpic"`.
-  **Depends on:** Step 20 (cross-grid comparison diagnostics).
+  Reader for rustpic's schema.md-conformant HDF5 output. Rust writes the canonical layout (Section 4) directly, so essentially `SimpleReader` + rustpic-specific metadata extraction + validation. pypic serves as the **reference implementation** — validate Rust-computed derived quantities against Python on the same problem. Cross-project integration tests: identical ICs, compare via `field_comparison_report()`. Auto-detect via HDF5 `model` attribute = `"rustpic"`.
+  **Depends on:** Step 20.
 
 - [ ] **Step 39: webpic data pipeline documentation**
-  End-to-end guide for the full platform: rustpic (Rust simulation) → HDF5 → pypic (Python analysis) → Starlette/FastAPI + Arrow IPC → webpic (Three.js/WebGPU visualization). Documents the schema.md contract that keeps Python, Rust, and JavaScript in sync. Selection round-trip: viewer UI selection → server `Selection` object → `FieldDataset` slice → Arrow IPC → GPU buffer. Coordinate transform pipeline: viewer requests a frame → server calls `transform_to()` → transformed data streamed. Covers: authentication model, chunked transfer for large datasets, WebSocket option for time-series animation.
+  End-to-end guide: rustpic (Rust sim) → HDF5 → pypic (Python analysis) → Starlette/FastAPI + Arrow IPC → webpic (Three.js/WebGPU). Documents schema.md contract syncing Python, Rust, JS. Selection round-trip: viewer UI → server `Selection` → `FieldDataset` slice → Arrow IPC → GPU buffer. Coordinate transform: viewer requests frame → server `transform_to()` → transformed data streamed. Covers auth model, chunked transfer, WebSocket option for time-series animation.
 
 ---
 
@@ -385,4 +254,4 @@ Step 5 (FieldDataset) ←── Steps 24, 25 (Zarr/Arrow) ←── Step 26 (con
                       ←── Step 27 (interop adapters)
 ```
 
-Recommended order: 24/25 parallelizable anytime, 24b/24c after 24, 25b right after 25 (before the Parquet schema hardens), 26 shipped, 40 anytime, 23/35/36 anytime, 27–28 after API stabilizes.
+Recommended order: 24/25 parallelizable anytime, 24b/24c after 24, 25b right after 25 (before Parquet schema hardens), 26 shipped, 40 anytime, 23/35/36 anytime, 27–28 after API stabilizes.
