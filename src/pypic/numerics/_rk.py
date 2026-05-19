@@ -215,9 +215,11 @@ def embedded_error_norm(
     Standard mixed absolute/relative tolerance norm for embedded
     Runge-Kutta error estimators ([@HairerWanner1993] §II.4). A
     returned value $\le 1$ means the step is acceptable under the
-    requested tolerances. Matches the convention used by
-    ``scipy.integrate.RK45._estimate_error_norm`` so step-size
-    sequences remain comparable between the two.
+    requested tolerances. RMS (rather than the alternative max-norm)
+    aligns with SciPy's ``RK45._estimate_error_norm`` and the
+    Hairer-Nørsett-Wanner convention, so step-size sequences here
+    are directly comparable to other Python and Fortran ODE
+    integrators that follow the same recipe.
 
     Parameters
     ----------

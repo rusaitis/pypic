@@ -938,6 +938,29 @@ class TestTraceFieldLinesAdaptive:
         assert lines[1].metadata["reason"] == str(TerminationReason.MAX_STEPS)
         assert lines[2].metadata["reason"] == str(TerminationReason.MAX_STEPS)
 
+    def test_terminate_callback_fires_per_seed(
+        self, uniform_field_data: FieldDataset
+    ) -> None:
+        """``terminate=`` fires asymmetrically: one seed stops, others run."""
+        from pypic.traces import TerminationReason, trace_field_lines_adaptive
+
+        # B = (1,0,0). With x > 12 the callback only ever triggers on the
+        # seed that started at x=10 (which crosses 12 quickly); the seed
+        # at x=5 doesn't reach 12 within the step budget.
+        seeds = np.array([[10.0, 10.0, 10.0], [5.0, 10.0, 10.0]])
+        lines = trace_field_lines_adaptive(
+            uniform_field_data,
+            seeds,
+            step_size_init=0.3,
+            min_step=1e-3,
+            max_step=0.5,
+            max_steps=8,
+            direction="forward",
+            terminate=lambda pt: pt[0] > 12.0,
+        )
+        assert lines[0].metadata["reason"] == str(TerminationReason.CALLBACK)
+        assert lines[1].metadata["reason"] == str(TerminationReason.MAX_STEPS)
+
     def test_invalid_seed_shape_raises(self, uniform_field_data: FieldDataset) -> None:
         from pypic.traces import trace_field_lines_adaptive
 

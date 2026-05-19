@@ -24,6 +24,8 @@ from __future__ import annotations
 import json
 from typing import TYPE_CHECKING, Any
 
+import numpy as np
+
 from pypic.io._guard import ensure_arrow
 
 if TYPE_CHECKING:
@@ -111,10 +113,21 @@ def field_dataset_to_arrow_ipc(
     # separate batch — but to keep the foundations API single-shot,
     # we pad coordinate columns into one schema metadata slot rather
     # than emitting two batches.
+    #
+    # Coordinates must be finite: the schema_meta payload is later
+    # ``json.dumps``-ed, and NaN/inf would either emit non-strict JSON
+    # (``"NaN"``, ``"Infinity"``) or silently mislead JS/Rust clients.
     coord_arrays: dict[str, list[float]] = {}
     for dim in dims:
         if dim in fds.xr.coords:
-            coord_arrays[dim] = [float(v) for v in fds.xr.coords[dim].values]
+            values = fds.xr.coords[dim].values
+            if not np.isfinite(values).all():
+                msg = (
+                    f"Coordinate {dim!r} contains non-finite values; "
+                    "the Arrow IPC wire format requires finite coordinates."
+                )
+                raise ValueError(msg)
+            coord_arrays[dim] = [float(v) for v in values]
 
     schema_meta = {
         _PYPIC_META_KEY: json.dumps(
@@ -163,7 +176,6 @@ def decode_field_dataset_ipc(ipc_bytes: bytes) -> dict[str, Any]:
         ``metadata`` (the parsed JSON from schema metadata).
     """
     ensure_arrow()
-    import numpy as np
     import pyarrow as pa
 
     reader = pa.ipc.open_stream(ipc_bytes)
