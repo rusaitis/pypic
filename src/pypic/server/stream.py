@@ -30,6 +30,7 @@ from fastapi import WebSocket, WebSocketDisconnect
 from pydantic import ValidationError
 
 from pypic.reductions import reduce
+from pypic.server._state import UnknownSimulationError
 from pypic.server.arrow import field_dataset_to_arrow_ipc
 from pypic.server.protocol import (
     Ack,
@@ -101,14 +102,12 @@ async def _handle_one(
         await _send_error(ws, request_id, "validation", str(exc))
     except _UnknownStepError as exc:
         await _send_error(ws, request_id, "unknown_step", str(exc).strip("'"))
+    except UnknownSimulationError as exc:
+        await _send_error(ws, request_id, "unknown_sim", str(exc).strip("'"))
     except KeyError as exc:
-        # Unknown sim, unknown field, or unknown step — all use KeyError
-        # in the underlying pypic API.  Use the message to disambiguate.
-        msg = str(exc).strip("'")
-        kind: str = "unknown_field"
-        if "simulation" in msg.lower():
-            kind = "unknown_sim"
-        await _send_error(ws, request_id, kind, msg)
+        # Only field-resolution KeyErrors reach this branch: step is
+        # already typed as _UnknownStepError, sim as UnknownSimulationError.
+        await _send_error(ws, request_id, "unknown_field", str(exc).strip("'"))
     except NotImplementedError as exc:
         await _send_error(ws, request_id, "geometry_unsupported", str(exc))
     except ValueError as exc:

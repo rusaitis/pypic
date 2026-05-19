@@ -24,6 +24,16 @@ if TYPE_CHECKING:
     from pypic.readers._registry import Simulation
 
 
+class UnknownSimulationError(KeyError):
+    """No simulation with that name exists under the registry root.
+
+    Subclass of :class:`KeyError` so callers that catch the broader
+    type still work, but the dedicated subclass lets the WebSocket
+    handler route to the ``unknown_sim`` error kind without inspecting
+    message strings.
+    """
+
+
 class SimulationRegistry:
     """Lazy, thread-safe cache of opened simulations under one root.
 
@@ -79,9 +89,10 @@ class SimulationRegistry:
 
         Raises
         ------
-        KeyError
+        UnknownSimulationError
             *name* is not present under ``root``, or its directory
-            lacks a ``simulation.toml`` file.
+            lacks a ``simulation.toml`` file. Subclass of
+            :class:`KeyError`.
         """
         cached = self._cache.get(name)
         if cached is not None:
@@ -103,7 +114,7 @@ class SimulationRegistry:
                     f"No simulation named {name!r} under {self._root!s} "
                     "(directory missing or no simulation.toml)"
                 )
-                raise KeyError(msg)
+                raise UnknownSimulationError(msg)
             sim = open_simulation(path)
             self._cache[name] = sim
             return sim
