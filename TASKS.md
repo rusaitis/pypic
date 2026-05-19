@@ -31,7 +31,7 @@ Each step produces something testable. No step starts until the previous step's 
 - [x] **Step 21:** CLI — info, fields, stats, compare, validate (typer + rich)
 - [x] **Step 22:** CLI — plot, plot-compare (themes, contours, animate, batch)
 - [x] **Step 30:** Reduced geometry after slicing
-- [~] **Step 31:** Remove default geometry from operators — deferred (revisit when non-Cartesian operators land)
+- [ ] **Step 31: Remove default geometry from operators — Deferred.** Revisit when non-Cartesian operators land.
 - [x] **Step 32:** Separate four_velocity quantity type
 - [x] **Step 33:** specific_energy quantity type for enthalpy (fixed dimensional bug)
 - [x] **Step 34:** StaggerInfo provenance metadata
@@ -50,7 +50,7 @@ Each step produces something testable. No step starts until the previous step's 
 ## Phase 8: Modern I/O Formats
 
 - [x] **Step 24: `pypic.io` — Zarr export/import for FieldDataset**
-  Zarr v3 + xarray DataTree. Layout v1 (post-2026.05): fields under `/fields` (mirrors schema.md §4.1 HDF5 grouping), metadata as flat keys on the root group's attrs (`grid`, `normalization`, `physics`, ...), with a `pypic_layout: "v1"` discriminator so JS/Rust consumers can read without going through pypic. Consolidated metadata (`consolidated=True` write, `"auto"` read) gives one-shot fetch.
+  Zarr v3 + xarray DataTree. Layout v1 (post-2026.05): fields under `/fields` (mirrors schema.md §4.1 HDF5 grouping), metadata as flat keys on the root group's attrs (`grid`, `normalization`, `physics`, ...), with a `schema.version` discriminator (mirroring `simulation.toml`'s `[schema].version`; see schema.md §1 *Versioning*) so JS/Rust consumers can read without going through pypic. Consolidated metadata (`consolidated=True` write, `"auto"` read) gives one-shot fetch.
   Two write modes: `to_zarr(fds, path)` (single timestep, builds `xr.DataTree`) and `to_zarr_timeseries(simulation, path, *, steps, fields)` (multi-timestep with `time` as a dimension; chunked along time so reading one step is O(1)). `from_zarr(path) -> FieldDataset` reconstructs lazily including per-field metadata. Async concurrent metadata fetching (`zarr.config.set({'async.concurrency': 128})`) gives up to 14× speedup.
   **Naming:** canonical numbered names (`B_1`, `B_2`, `B_3`) on disk — geometry-specific aliases resolve on load. **Field metadata:** xarray attrs (`quantity_type`, `si_unit`, `long_name`, `latex`, `units`) serialize automatically. **FrameTransforms:** origin, rotation, scale as arrays in metadata; callable-based transforms skipped.
   **Precision:** `dtype="float32"` kwarg downcasts on write (halves storage; PIC outputs are single-precision anyway). **Compression:** default `BloscCodec(cname='zstd', clevel=5, shuffle='bitshuffle')` — 10–300× on smooth EM data. Standalone `ZstdCodec` lacks shuffle and compresses floats poorly. Bytedelta (Blosc2 2.8+) is 37% better than bitshuffle on pressure-type data — expose as option once stable. **Sharding:** `shards=` kwarg for cloud stores (S3/GCS/R2) avoids small-files problem.
@@ -62,7 +62,7 @@ Each step produces something testable. No step starts until the previous step's 
 
 - [x] **Step 24c: `pypic.io` — Icechunk storage backend**
   Optional Git-like versioning and ACID transactions over Zarr v3 via Icechunk. Rust-based I/O: 13–14 Gbps read/write on cloud (2–10× faster than zarr+s3fs). Value: version tags for reproducibility (`repo.create_tag("v1.0-paper", snapshot_id=...)`), time-travel, Rust-accelerated I/O for non-versioned workflows too. `to_zarr(..., backend="icechunk")` writes; `from_zarr()` auto-detects. Optional dep: `icechunk>=1.1` under `icechunk` extra.
-  **Migrate `open_virtual` to Zarr v3:** Step 24b uses Kerchunk (Zarr v2) because VirtualiZarr's native v3 virtual backend *is* Icechunk. Once available, switch to `vds.vz.to_icechunk()`, eliminating the only Zarr v2 path and fixing the fill-value edge case (datasets where all values equal the fill value read back wrong through Kerchunk).
+  **`open_virtual` runs on Zarr v3.** Originally specced against Kerchunk (Zarr v2) because VirtualiZarr's native v3 virtual backend *is* Icechunk; the Icechunk-backed `vds.vz.to_icechunk()` path landed (`pypic/io/_virtual.py`) and is now the only virtual-store path. The Kerchunk fill-value edge case (datasets where all values equal the fill value) is gone with it.
   **Depends on:** Step 24.
 
 - [x] **Step 25: `pypic.io` — Parquet/Arrow for ParticleData**
@@ -147,7 +147,7 @@ Each step produces something testable. No step starts until the previous step's 
 
 - [ ] **Step 43c: unit-aware `reduce()`**
   After `reduce(reduction="integrate")` along $n$ axes, the SI unit shifts by $n$ length factors (m⁻³ → m⁻² → m⁻¹). Today `quantity_type`/`si_unit` are preserved unchanged, so `in_si()` is off by one length factor per reduced axis (workaround: multiply by `normalization.length_si**n`). Options: (a) generalize the `unit_dimension` 7-tuple arithmetic so attrs carry correct post-reduction dimensions; (b) add shifted canonical names (`column_density`, `surface_brightness`); (c) hybrid. Pairs with Step 20b's volume-weighted-norms work (same unit-dim concerns).
-  **Depends on:** Step 43; Step 20b (analogous; can ship independently).
+  **Depends on:** Step 43. **Pairs with:** Step 20b (shares the `unit_dimension` 7-tuple arithmetic concerns; ships independently).
 
 - [ ] **Step 40: time-dependent frame transforms**
   Extend `FrameTransform` to per-timestep rotations. Primary use: GSE↔GSM via dipole tilt angle. Two paths:
@@ -207,7 +207,7 @@ Each step produces something testable. No step starts until the previous step's 
 
 ---
 
-## Phase 12: Virtual Probes & Spacecraft
+## Phase 11: Virtual Probes & Spacecraft
 
 - [ ] **Step 41: `pypic.probes` — virtual probe sampling**
   `Probe` frozen dataclass: named point `(x, y, z)`. `ProbeArray`: collection (detector arrays, satellite constellations). `ProbeTrajectory`: time-varying `(t, x, y, z)` — spacecraft orbit / moving detector. A fixed probe is a degenerate trajectory.
@@ -216,7 +216,7 @@ Each step produces something testable. No step starts until the previous step's 
   - `sample_timeseries(probe, simulation, steps) -> TabularData` — sample across timesteps (time, B_1, B_2, B_3, ...).
   - `sample_trajectory(trajectory, simulation) -> TabularData` — sample along a moving path.
   - `sample_array(probes, dataset) -> TabularData` — all probes at one timestep, one row per probe.
-  Schema: `[[probes]]` section (schema.md § 8). Probes from config available via `Simulation.probes`. CLI: `pypic probe <path> --name NAME --step all --field FIELD`.
+  Schema: `[[probes]]` section (schema.md § 2 — `[[probes]]`). Probes from config available via `Simulation.probes`. CLI: `pypic probe <path> --name NAME --step all --field FIELD`.
   **iPIC3D integration:** iPIC3D outputs native virtual satellite data at fixed locations (high cadence). `AuxiliaryDataReader` already loads as `TabularData`. Probes can: (a) define new and resample, (b) load native, (c) compare (native = higher time res; resampled = all derived fields).
   **Depends on:** `traces/_sampling.py`, `TabularData`.
 
@@ -226,7 +226,7 @@ Each step produces something testable. No step starts until the previous step's 
 
 ---
 
-## Phase 13: Cross-Project Integration
+## Phase 12: Cross-Project Integration
 
 > **Tier-3 canonical names (locked pre-v1.0).** Cross-tool work below uses `<field>[_s<N>][_<i>]` with species qualifier between field name and index (`B_1`, `V_s0_1`, `P_s0_11`, `q_s0_1`). HDF5 §4.1 and Zarr §4.2 stores must use these — `B1`, `V1_s0`, `P11_s0` are not emitted by any pypic-aware tool. rustpic and webpic wire directly to Tier-3; no migration shim since neither has shipped.
 
@@ -261,14 +261,23 @@ Each step produces something testable. No step starts until the previous step's 
 ## Dependency Graph
 
 ```
-Step 19 (regrid) ←── Step 19b (spherical) ←── Step 20b (volume-weighted norms)
-Step 15 (transforms) ←── Step 40 (time-dependent transforms)
-Step 5 (FieldDataset) ←── Steps 24, 25 (Zarr/Arrow) ←── Step 26 (convert CLI)
-                      ←── Step 24b (VirtualiZarr) ←── Step 24
-                      ←── Step 24c (Icechunk) ←── Step 24
-                      ←── Step 25b (canonical ParticleData) ←── Step 25
-                      ←── Steps 23, 35, 36 (additional readers)
-                      ←── Step 27 (interop adapters)
+Step 19 (regrid)         ←── 19b (spherical) ←── 20b (volume-weighted norms)  pairs-with 43c
+Step 15 (transforms)     ←── 40 (time-dependent) ←── 41b (SPICE trajectory)
+Step 5 (FieldDataset)    ←── 24, 25 (Zarr/Arrow)    ←── 26 (convert CLI)
+                                                   ←── 24b (VirtualiZarr), 24c (Icechunk)
+                                                   ←── 25b (canonical ParticleData)
+                         ←── 23, 35, 36, 42 (readers)
+                         ←── 27 (interop adapters)
+Step 11 + Step 5         ←── 43 (reductions) ←── 43b (Jacobian), 43c (units)
+Steps 24, 25             ←── 37 (Arrow IPC server) ←── 37a (typed exceptions, shipped)
+                                                   ←── 37b (selection provenance), 39 (docs)
+Step 20                  ←── 38 (rustpic reader)
+pypic.traces             ←── 44 (field-line tracer + pypic.maps)
+                              44a (implicit midpoint), 44b (tricubic), 44c (A-based)
+                              44d (periodic tricubic) ←── 19b, 44b
+                              44e (curvature step), 44f (endpoint-only)
+                              44g (pypic.maps + Q)    ←── 44f, (44d on spherical)
+traces/_sampling.py      ←── 41 (probes) ←── 41b (SPICE)
 ```
 
-Recommended order: 24/25 parallelizable anytime, 24b/24c after 24, 25b right after 25 (before Parquet schema hardens), 26 shipped, 40 anytime, 23/35/36 anytime, 27–28 after API stabilizes.
+Recommended order: 37b after 37 (37a shipped); 38 needs a rustpic dump; 39 follows 37; 23/35/36/42 anytime; 40 unblocks 41b; 43b/43c anytime after 43; 44a-g modular (44f is the kernel for 44g); 19b precedes 20b and 44d.
