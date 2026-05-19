@@ -21,7 +21,7 @@ from typing import TYPE_CHECKING, Any, cast
 
 from fastapi import APIRouter, Query, Request
 
-from pypic.io._serialize import (
+from pypic.io.metadata import (
     grid_to_dict,
     normalization_to_dict,
     physics_to_dict,

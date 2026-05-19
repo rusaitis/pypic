@@ -15,6 +15,7 @@ Optional dependencies per feature:
     ``pip install pypic[duckdb]`` — DuckDB SQL queries
 """
 
+from pypic.io import metadata
 from pypic.io._arrow import particles_from_arrow, particles_to_arrow
 from pypic.io._duckdb import query_sql
 from pypic.io._icechunk import (
@@ -35,6 +36,7 @@ __all__ = [
     "from_zarr",
     "icechunk_ancestry",
     "icechunk_create_tag",
+    "metadata",
     "open_icechunk_repo",
     "open_virtual",
     "particles_from_arrow",

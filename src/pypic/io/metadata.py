@@ -1,9 +1,18 @@
-"""Serialize/deserialize pypic metadata to JSON-compatible dicts.
+"""JSON-compatible metadata encoders/decoders for pypic stores.
 
-These converters bridge the gap between pypic's frozen dataclasses and
-the JSON-compatible attribute dicts that xarray stores in Zarr metadata.
-Round-trip fidelity is the primary design goal: every ``encode`` →
-``decode`` cycle must reconstruct an identical object.
+The public surface here is the shared contract between three internal
+consumers: the Zarr writer (:mod:`pypic.io.zarr`), the Arrow IPC server
+(:mod:`pypic.server.arrow`), and the HTTP discovery routes
+(:mod:`pypic.server.routes`). Each emits or reads the same JSON shapes
+documented in :doc:`schema.md` §4.2, so the encode/decode pair lives in
+one place to keep round-trip fidelity tight and the storage layout
+discriminator (``SCHEMA_VERSION``) single-sourced.
+
+Round-trip fidelity is the design goal: every ``encode`` → ``decode``
+cycle must reconstruct an identical object. :func:`to_json_native` and
+:func:`from_json_native` handle the value-level coercions (NumPy
+scalars, tuples, typed ``StaggerInfo``, non-string-keyed dicts) that
+sit underneath the named typed encoders.
 """
 
 from __future__ import annotations
@@ -22,6 +31,26 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     from pypic.dataset import FieldDataset
+
+
+__all__ = [
+    "SCHEMA_VERSION",
+    "decode_pypic_attrs",
+    "dict_to_grid",
+    "dict_to_normalization",
+    "dict_to_physics",
+    "dict_to_transforms",
+    "encode_pypic_attrs",
+    "from_json_native",
+    "grid_to_dict",
+    "list_to_species",
+    "normalization_to_dict",
+    "physics_to_dict",
+    "read_simulation_toml",
+    "species_to_list",
+    "to_json_native",
+    "transforms_to_dict",
+]
 
 
 def grid_to_dict(grid: GridInfo) -> dict[str, Any]:
@@ -228,7 +257,7 @@ def dict_to_transforms(
 def _stagger_to_dict(stagger: Any) -> dict[str, Any]:  # noqa: ANN401
     """Serialize a StaggerInfo to a tagged JSON dict.
 
-    Tagged with ``__pypic_class__`` so ``_from_json_native`` can spot
+    Tagged with ``__pypic_class__`` so ``from_json_native`` can spot
     it during decode and rebuild the dataclass instead of leaving a
     plain dict in ``metadata``.
     """
@@ -248,7 +277,7 @@ def _stagger_to_dict(stagger: Any) -> dict[str, Any]:  # noqa: ANN401
     }
 
 
-def _to_json_native(obj: Any) -> Any:  # noqa: ANN401
+def to_json_native(obj: Any) -> Any:  # noqa: ANN401
     """Recursively coerce arbitrary Python values to JSON-native equivalents.
 
     HDF5 readers (h5py) commonly hand back attrs as ``numpy.float32`` /
@@ -265,7 +294,7 @@ def _to_json_native(obj: Any) -> Any:  # noqa: ANN401
     * Dicts with non-string keys — JSON has only string keys, so plain
       stringification silently collides ``{1: ..., "1": ...}``.
 
-    Decode is the inverse via ``_from_json_native``.
+    Decode is the inverse via :func:`from_json_native`.
     """
     from pypic.containers import StaggerInfo
 
@@ -278,24 +307,24 @@ def _to_json_native(obj: Any) -> Any:  # noqa: ANN401
     if isinstance(obj, tuple):
         return {
             "__pypic_class__": "tuple",
-            "items": [_to_json_native(v) for v in obj],
+            "items": [to_json_native(v) for v in obj],
         }
     if isinstance(obj, dict):
         if any(not isinstance(k, str) for k in obj):
             return {
                 "__pypic_class__": "keyed_dict",
                 "items": [
-                    [_to_json_native(k), _to_json_native(v)] for k, v in obj.items()
+                    [to_json_native(k), to_json_native(v)] for k, v in obj.items()
                 ],
             }
-        return {k: _to_json_native(v) for k, v in obj.items()}
+        return {k: to_json_native(v) for k, v in obj.items()}
     if isinstance(obj, list):
-        return [_to_json_native(v) for v in obj]
+        return [to_json_native(v) for v in obj]
     return obj
 
 
 def _dict_to_stagger(d: dict[str, Any]) -> Any:  # noqa: ANN401
-    """Reconstruct a StaggerInfo from a tagged dict written by ``_to_json_native``."""
+    """Reconstruct a StaggerInfo from a tagged ``to_json_native`` dict."""
     from pypic.containers import StaggerInfo
 
     raw_position = d.get("position")
@@ -313,8 +342,8 @@ def _dict_to_stagger(d: dict[str, Any]) -> Any:  # noqa: ANN401
     )
 
 
-def _from_json_native(obj: Any) -> Any:  # noqa: ANN401
-    """Inverse of ``_to_json_native``: rebuild tagged typed values.
+def from_json_native(obj: Any) -> Any:  # noqa: ANN401
+    """Inverse of :func:`to_json_native`: rebuild tagged typed values.
 
     Walks dicts/lists recursively.  Plain JSON values pass through
     unchanged.  Only the ``__pypic_class__`` marker triggers
@@ -325,15 +354,15 @@ def _from_json_native(obj: Any) -> Any:  # noqa: ANN401
         if cls == "StaggerInfo":
             return _dict_to_stagger(obj)
         if cls == "tuple":
-            return tuple(_from_json_native(v) for v in obj.get("items", []))
+            return tuple(from_json_native(v) for v in obj.get("items", []))
         if cls == "keyed_dict":
             return {
-                _from_json_native(k): _from_json_native(v)
+                from_json_native(k): from_json_native(v)
                 for k, v in obj.get("items", [])
             }
-        return {k: _from_json_native(v) for k, v in obj.items()}
+        return {k: from_json_native(v) for k, v in obj.items()}
     if isinstance(obj, list):
-        return [_from_json_native(v) for v in obj]
+        return [from_json_native(v) for v in obj]
     return obj
 
 
@@ -481,7 +510,7 @@ def encode_pypic_attrs(fds: FieldDataset) -> dict[str, Any]:
         "normalization": _normalization_to_attrs(fds.normalization, fds.physics),
         "species": species_to_list(fds.species),
         "physics": _physics_to_attrs(fds.physics),
-        "metadata": _to_json_native(metadata),
+        "metadata": to_json_native(metadata),
     }
     time_attrs = _time_to_attrs(fds.grid)
     if time_attrs:
@@ -555,12 +584,12 @@ def decode_pypic_attrs(
     species = list_to_species(d.get("species", []))
     physics = _attrs_to_physics(d.get("physics", {}), d.get("normalization", {}))
 
-    metadata: dict[str, Any] = _from_json_native(d.get("metadata", {}))
+    metadata: dict[str, Any] = from_json_native(d.get("metadata", {}))
 
     # Promote stagger from new-shape ``grid.stagger`` back into
     # ``metadata.stagger`` so the in-memory FieldDataset shape stays
     # unchanged. Old-shape stores keep stagger inside ``metadata``
-    # already — _from_json_native rebuilt the StaggerInfo above.
+    # already — from_json_native rebuilt the StaggerInfo above.
     raw_stagger = d["grid"].get("stagger") if isinstance(d.get("grid"), dict) else None
     if raw_stagger is not None and "stagger" not in metadata:
         metadata["stagger"] = _dict_to_stagger(raw_stagger)
@@ -595,7 +624,7 @@ def _encode_model(model: Any) -> dict[str, Any]:  # noqa: ANN401
     if not isinstance(model, dict):
         msg = f"metadata['model'] must be a dict, got {type(model).__name__}"
         raise TypeError(msg)
-    out: dict[str, Any] = _to_json_native(model)
+    out: dict[str, Any] = to_json_native(model)
     return out
 
 

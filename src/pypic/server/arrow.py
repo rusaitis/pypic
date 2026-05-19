@@ -27,6 +27,13 @@ from typing import TYPE_CHECKING, Any
 import numpy as np
 
 from pypic.io._guard import ensure_arrow
+from pypic.io.metadata import (
+    SCHEMA_VERSION,
+    grid_to_dict,
+    normalization_to_dict,
+    species_to_list,
+    to_json_native,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -230,11 +237,10 @@ def _serialize_field_attrs(attrs: dict[str, Any]) -> dict[str, Any]:
 
     Drops xarray-internal keys that have no cross-tool meaning (e.g.
     chunk encoding state) and passes the documented metadata through
-    via the shared ``_to_json_native`` coercer so NumPy scalars,
-    tuples, and the ``reduction`` provenance dict round-trip cleanly.
+    via the shared :func:`pypic.io.metadata.to_json_native` coercer so
+    NumPy scalars, tuples, and the ``reduction`` provenance dict
+    round-trip cleanly.
     """
-    from pypic.io._serialize import _to_json_native
-
     keep = {
         k: v
         for k, v in attrs.items()
@@ -248,7 +254,7 @@ def _serialize_field_attrs(attrs: dict[str, Any]) -> dict[str, Any]:
             "reduction",
         }
     }
-    return {k: _to_json_native(v) for k, v in keep.items()}
+    return {k: to_json_native(v) for k, v in keep.items()}
 
 
 def _build_schema_metadata(
@@ -260,13 +266,6 @@ def _build_schema_metadata(
     units: str,
 ) -> dict[str, Any]:
     """Assemble the JSON payload that goes under the ``b"pypic"`` key."""
-    from pypic.io._serialize import (
-        SCHEMA_VERSION,
-        grid_to_dict,
-        normalization_to_dict,
-        species_to_list,
-    )
-
     return {
         "schema_version": SCHEMA_VERSION,
         "shape": list(fds.grid.dimensions),

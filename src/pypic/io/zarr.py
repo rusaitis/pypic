@@ -19,12 +19,12 @@ import xarray as xr
 
 from pypic.dataset import FieldDataset
 from pypic.io._guard import ensure_zarr
-from pypic.io._serialize import (
+from pypic.io.metadata import (
     SCHEMA_VERSION,
-    _to_json_native,
     decode_pypic_attrs,
     encode_pypic_attrs,
     read_simulation_toml,
+    to_json_native,
 )
 
 if TYPE_CHECKING:
@@ -326,7 +326,7 @@ def _write_timeseries_steps(
             assert first_fds is not None
             _check_timeseries_identity(first_fds, fds, time_val)
             running_meta = _intersect_encoded_metadata(
-                running_meta, _to_json_native(dict(fds.metadata))
+                running_meta, to_json_native(dict(fds.metadata))
             )
             ds.to_zarr(
                 store,

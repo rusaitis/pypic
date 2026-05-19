@@ -14,7 +14,7 @@ from pypic.coordinates.transforms import FrameTransform  # noqa: E402
 from pypic.dataset import FieldDataset  # noqa: E402
 from pypic.grid import GridInfo  # noqa: E402
 from pypic.io import from_zarr, to_zarr, to_zarr_timeseries  # noqa: E402
-from pypic.io._serialize import (  # noqa: E402
+from pypic.io.metadata import (  # noqa: E402
     dict_to_grid,
     dict_to_normalization,
     dict_to_physics,
@@ -36,7 +36,7 @@ from tests._helpers import (  # noqa: E402
 
 
 class TestSerializationHelpers:
-    """Unit tests for _serialize round-trip fidelity."""
+    """Unit tests for ``pypic.io.metadata`` round-trip fidelity."""
 
     def test_grid_round_trip_basic(self):
         grid = make_uniform_grid(4, 3, 2, spacing=0.5, origin=-1.0)

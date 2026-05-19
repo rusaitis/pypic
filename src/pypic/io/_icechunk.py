@@ -16,7 +16,7 @@ from typing import TYPE_CHECKING, Any
 import xarray as xr
 
 from pypic.io._guard import ensure_icechunk
-from pypic.io._serialize import encode_pypic_attrs, read_simulation_toml
+from pypic.io.metadata import encode_pypic_attrs, read_simulation_toml
 from pypic.io.zarr import (
     _build_encoding,
     _datatree_encoding,

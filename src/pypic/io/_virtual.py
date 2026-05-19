@@ -22,7 +22,7 @@ from pypic.dataset import FieldDataset
 from pypic.grid import GridInfo
 from pypic.io._guard import ensure_icechunk, ensure_virtualizarr
 from pypic.io._icechunk import _ensure_branch
-from pypic.io._serialize import encode_pypic_attrs
+from pypic.io.metadata import encode_pypic_attrs
 from pypic.units import Normalization
 
 if TYPE_CHECKING:
