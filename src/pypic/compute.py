@@ -1053,6 +1053,10 @@ def compute_field(name: str, dataset: FieldDataset, _depth: int = 0) -> FloatArr
         If *name* is unknown and not in the dataset.
     ValueError
         If required species or physics info is missing.
+    GeometryUnsupportedError
+        If the recipe requires Cartesian geometry but the dataset
+        grid is spherical or cylindrical.  Subclass of
+        :class:`NotImplementedError`.
     RecursionError
         If dependency chain exceeds depth limit.
     """

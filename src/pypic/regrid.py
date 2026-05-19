@@ -118,8 +118,9 @@ def common_grid(a: GridInfo, b: GridInfo) -> GridInfo:
 
     Raises
     ------
-    NotImplementedError
-        If either grid is non-Cartesian.
+    GeometryUnsupportedError
+        If either grid is non-Cartesian.  Subclass of
+        :class:`NotImplementedError`.
     ValueError
         If dimensionalities differ or sample ranges do not overlap.
 
@@ -228,8 +229,9 @@ def regrid(
 
     Raises
     ------
-    NotImplementedError
-        If either grid is non-Cartesian.
+    GeometryUnsupportedError
+        If either grid is non-Cartesian.  Subclass of
+        :class:`NotImplementedError`.
     ValueError
         If source and target dimensionalities differ.
     KeyError
@@ -365,8 +367,9 @@ def align_grids(
 
     Raises
     ------
-    NotImplementedError
-        If either grid is non-Cartesian.
+    GeometryUnsupportedError
+        If either grid is non-Cartesian.  Subclass of
+        :class:`NotImplementedError`.
     ValueError
         If dimensionalities differ or domains do not overlap.
     KeyError

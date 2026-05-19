@@ -621,6 +621,29 @@ class TestSimulationFacade:
         assert ds.has_field("B_1")
         assert any("Typox" in record.message for record in caplog.records)
 
+    def test_from_arrays_strict_fields_raises_unknown_field_error(
+        self,
+    ) -> None:
+        """FieldDataset.from_arrays mirrors Simulation.read's typed failure.
+
+        Both injection points must raise UnknownFieldError (not bare KeyError)
+        so the server boundary routes via classvar dispatch.  Back-compat: the
+        exception is still a KeyError subclass.
+        """
+        from pypic.coordinates.geometry import CARTESIAN
+        from pypic.exceptions import UnknownFieldError
+
+        grid = GridInfo(
+            dimensions=(2,), spacing=(1.0,), origin=(0.0,), geometry=CARTESIAN
+        )
+        with pytest.raises(UnknownFieldError, match="Typox") as exc_info:
+            FieldDataset.from_arrays(
+                {"B_1": np.ones(2), "Typox": np.zeros(2)},
+                grid,
+                strict_fields=True,
+            )
+        assert isinstance(exc_info.value, KeyError)
+
     def test_available_fields_delegates_to_reader(
         self,
         tmp_path: Path,

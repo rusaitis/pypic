@@ -197,12 +197,14 @@ class FieldDataset:
 
         Raises
         ------
-        KeyError
+        UnknownFieldError
             When ``strict_fields=True`` and one or more keys in *fields*
             do not resolve through the field registry.  CLAUDE.md
             §architecture requires injection points to fail loud on
             unknown names so reader bugs surface at construction time
-            instead of later at ``compute()``.
+            instead of later at ``compute()``.  Subclass of
+            :class:`KeyError`, so existing ``except KeyError`` callers
+            keep working unchanged.
 
         Examples
         --------
@@ -248,7 +250,7 @@ class FieldDataset:
                 "use FieldDataset.with_field(name, data, quantity_type=...) "
                 "to register an ad-hoc quantity_type."
             )
-            raise KeyError(msg)
+            raise UnknownFieldError(msg)
         dataset = xr.Dataset(data_vars, coords=coords)
         return cls(
             dataset,

@@ -1,10 +1,11 @@
 """Server-boundary exception hierarchy.
 
-Re-exports the four library-raised typed exceptions from
-:mod:`pypic.exceptions` so HTTP/WebSocket handlers have a single
-import line, and defines :class:`ValidationFailedError` — the server
-wrapper for :class:`pydantic.ValidationError` from request-frame
-parsing and ``simulation.toml`` validation.
+Re-exports the library-raised typed exceptions from
+:mod:`pypic.exceptions` (base :class:`PypicError` plus its four
+subclasses) so HTTP/WebSocket handlers have a single import line, and
+defines :class:`ValidationFailedError` — the server wrapper for
+:class:`pydantic.ValidationError` from request-frame parsing and
+``simulation.toml`` validation.
 
 The library does not raise :class:`ValidationFailedError` directly;
 the server constructs it at the boundary where pydantic errors are
