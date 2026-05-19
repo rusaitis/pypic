@@ -1136,14 +1136,14 @@ def field_info(
     raise KeyError(msg)
 
 
-def unit_label(name: str, *, si: bool = False) -> str:
+def unit_label(name: str, *, to_si: bool = False) -> str:
     r"""Return a unit label string for a field, suitable for plot axes.
 
     Parameters
     ----------
     name : str
         Field or derived quantity name.
-    si : bool
+    to_si : bool
         If ``True``, return the SI unit label (e.g. ``"T"``).
         If ``False``, return ``"normalized"`` or ``""`` for dimensionless.
 
@@ -1153,17 +1153,17 @@ def unit_label(name: str, *, si: bool = False) -> str:
 
     Examples
     --------
-    >>> unit_label("B_1", si=True)
+    >>> unit_label("B_1", to_si=True)
     'T'
     >>> unit_label("B_1")
     'normalized'
-    >>> unit_label("beta", si=True)
+    >>> unit_label("beta", to_si=True)
     ''
     >>> unit_label("beta")
     ''
     """
     info = field_info(name)
-    if si:
+    if to_si:
         return info.si_unit
     return "" if info.quantity_type == "dimensionless" else "normalized"
 

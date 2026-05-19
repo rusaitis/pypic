@@ -15,6 +15,14 @@ fields handle boundary completion (cropping or extrapolation) themselves.
 Readers should also construct a fresh :class:`StaggerInfo` with
 ``interpolation_order=1`` and a ``notes`` string recording the
 destagger provenance.
+
+Currently unwired in production readers — this module is pre-built
+infrastructure for the upcoming VPIC reader (``TASKS.md`` Step 35,
+which destaggers ``cbx/cby/cbz`` on faces and ``ex/ey/ez`` on edges)
+and the openPMD reader (``TASKS.md`` Step 42, which consumes the
+ED-PIC per-component ``position`` tuple).  The Cartesian-Yee
+algorithm is kept tested in ``tests/test_destagger.py`` so it is
+ready to wire up when those readers land.
 """
 
 from __future__ import annotations

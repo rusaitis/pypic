@@ -42,7 +42,7 @@ if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
 
     from pypic.dataset import FieldDataset
-    from pypic.traces._fieldline import FieldLine
+    from pypic.traces._fieldline import FieldLine, TraceDirection
     from pypic.types import FloatArray, Vector3
 
 
@@ -263,7 +263,7 @@ class PoincareSection:
 
     surface: PoincareSurface
     seeds: FloatArray
-    direction: str
+    direction: TraceDirection
     punctures_3d: tuple[FloatArray, ...]
     punctures_2d: tuple[FloatArray, ...]
     field_lines: tuple[FieldLine, ...]
@@ -299,7 +299,7 @@ def poincare_section(
     seeds: FloatArray | Sequence[Vector3],
     surface: PoincareSurface,
     *,
-    direction: Literal["forward", "backward", "both"] = "forward",
+    direction: TraceDirection = "forward",
     max_steps: int = 50_000,
     field_components: tuple[str, str, str] = ("B_1", "B_2", "B_3"),
     atol: float = 1e-6,

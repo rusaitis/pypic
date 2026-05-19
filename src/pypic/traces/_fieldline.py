@@ -2,17 +2,18 @@
 
 from __future__ import annotations
 
-__all__ = ["FieldLine"]
+__all__ = ["FieldLine", "TraceDirection"]
 
 import copy
 from dataclasses import dataclass, field
 from types import MappingProxyType
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
 if TYPE_CHECKING:
     from pypic.types import FloatArray, Vector3
     from pypic.units import Normalization
 
+type TraceDirection = Literal["forward", "backward", "both"]
 _VALID_DIRECTIONS = frozenset({"both", "forward", "backward"})
 
 
@@ -70,7 +71,7 @@ class FieldLine:
     normalization: Normalization
     time: float | None = None
     step: int | None = None
-    direction: str = "both"
+    direction: TraceDirection = "both"
     scalars: dict[str, FloatArray] = field(default_factory=dict)
     metadata: dict[str, Any] = field(default_factory=dict)
 

@@ -20,6 +20,7 @@ import numpy as np
 
 if TYPE_CHECKING:
     from pypic.dataset import FieldDataset
+    from pypic.traces._fieldline import TraceDirection
     from pypic.types import FloatArray
 
 
@@ -180,7 +181,7 @@ def schindler_xi(
     *,
     step_size: float = 0.5,
     max_steps: int = 10_000,
-    direction: str = "both",
+    direction: TraceDirection = "both",
     method: str = "linear",
     field_components: tuple[str, str, str] = ("B_1", "B_2", "B_3"),
     e_components: tuple[str, str, str] = ("E_1", "E_2", "E_3"),

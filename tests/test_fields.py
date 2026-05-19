@@ -103,7 +103,7 @@ class TestFieldInfoLookup:
 
 
 @pytest.mark.parametrize(
-    ("name", "si", "expected"),
+    ("name", "to_si", "expected"),
     [
         ("B_1", True, "T"),
         ("B_1", False, "normalized"),
@@ -112,8 +112,8 @@ class TestFieldInfoLookup:
         ("v_A", True, "m/s"),
     ],
 )
-def test_unit_label(name: str, si: bool, expected: str) -> None:
-    assert unit_label(name, si=si) == expected
+def test_unit_label(name: str, to_si: bool, expected: str) -> None:
+    assert unit_label(name, to_si=to_si) == expected
 
 
 class TestQuantityUnits:

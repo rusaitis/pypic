@@ -13,7 +13,7 @@ __all__ = [
 
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import TYPE_CHECKING, Literal, Self
+from typing import TYPE_CHECKING, Literal, Self, assert_never
 
 import numpy as np
 from scipy.interpolate import RegularGridInterpolator
@@ -32,7 +32,7 @@ if TYPE_CHECKING:
     from collections.abc import Callable
 
     from pypic.dataset import FieldDataset
-    from pypic.traces._fieldline import FieldLine
+    from pypic.traces._fieldline import FieldLine, TraceDirection
     from pypic.types import BoolArray, FloatArray, IntArray, Vector3
 
 
@@ -539,7 +539,7 @@ def _assemble_field_line(
     bwd_points: FloatArray,
     bwd_reason: TerminationReason,
     seed: Vector3,
-    direction: str,
+    direction: TraceDirection,
     field_name: str,
     normalization: object,
     metadata: dict,  # type: ignore[type-arg]
@@ -554,8 +554,8 @@ def _assemble_field_line(
         case "backward":
             all_points = bwd_points[::-1]
             reason = bwd_reason
-        case _:
-            # "both": reverse backward, drop duplicated seed, append forward.
+        case "both":
+            # Reverse backward, drop duplicated seed, append forward.
             # Reason: MAX_STEPS if either direction was truncated,
             # otherwise forward reason (arbitrary but deterministic).
             bwd_rev = bwd_points[::-1]
@@ -570,6 +570,8 @@ def _assemble_field_line(
                 or bwd_reason == TerminationReason.MAX_STEPS
             )
             reason = TerminationReason.MAX_STEPS if is_max else fwd_reason
+        case _ as unreachable:
+            assert_never(unreachable)
 
     metadata["reason"] = str(reason)
     metadata["n_steps"] = len(all_points) - 1
@@ -590,7 +592,7 @@ def trace_field_line(
     *,
     step_size: float = 0.5,
     max_steps: int = 10_000,
-    direction: str = "both",
+    direction: TraceDirection = "both",
     field_components: tuple[str, str, str] = ("B_1", "B_2", "B_3"),
     null_threshold: float = 1e-12,
     terminate: Callable[[FloatArray], bool] | None = None,
@@ -696,7 +698,7 @@ def trace_field_line(
                 data.normalization,
                 meta,
             )
-        case _:
+        case "both":
             fwd, fwd_r = _trace_single_direction(interpolator, seed_arr, 1.0, *args)
             bwd, bwd_r = _trace_single_direction(interpolator, seed_arr, -1.0, *args)
             return _assemble_field_line(
@@ -710,6 +712,8 @@ def trace_field_line(
                 data.normalization,
                 meta,
             )
+        case _ as unreachable:
+            assert_never(unreachable)
 
 
 def trace_field_line_adaptive(
@@ -722,7 +726,7 @@ def trace_field_line_adaptive(
     min_step: float = 1e-8,
     max_step: float = 2.0,
     max_steps: int = 10_000,
-    direction: str = "both",
+    direction: TraceDirection = "both",
     field_components: tuple[str, str, str] = ("B_1", "B_2", "B_3"),
     null_threshold: float = 1e-12,
     terminate: Callable[[FloatArray], bool] | None = None,
@@ -895,7 +899,7 @@ def trace_field_line_adaptive(
                 data.normalization,
                 _meta(bwd_err),
             )
-        case _:
+        case "both":
             fwd, fwd_r, fwd_err = _adapt(1.0)
             bwd, bwd_r, bwd_err = _adapt(-1.0)
             return _assemble_field_line(
@@ -909,6 +913,8 @@ def trace_field_line_adaptive(
                 data.normalization,
                 _meta(max(fwd_err, bwd_err)),
             )
+        case _ as unreachable:
+            assert_never(unreachable)
 
 
 def trace_field_lines_adaptive(
@@ -921,7 +927,7 @@ def trace_field_lines_adaptive(
     min_step: float = 1e-8,
     max_step: float = 2.0,
     max_steps: int = 10_000,
-    direction: str = "both",
+    direction: TraceDirection = "both",
     field_components: tuple[str, str, str] = ("B_1", "B_2", "B_3"),
     null_threshold: float = 1e-12,
     terminate: Callable[[FloatArray], bool] | None = None,
@@ -1117,7 +1123,7 @@ def trace_field_lines_adaptive(
                         float(errs[i]),
                     )
                 )
-        case _:
+        case "both":
             fwd_buf, fwd_n, fwd_reasons, fwd_errs = (
                 _trace_batch_single_direction_adaptive(
                     interpolator, seeds_arr, 1.0, *args
@@ -1139,6 +1145,8 @@ def trace_field_lines_adaptive(
                         max(float(fwd_errs[i]), float(bwd_errs[i])),
                     )
                 )
+        case _ as unreachable:
+            assert_never(unreachable)
 
     return field_lines
 
