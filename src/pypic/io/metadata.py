@@ -33,6 +33,16 @@ if TYPE_CHECKING:
     from pypic.dataset import FieldDataset
 
 
+# Storage layout discriminator.  Mirrors ``[schema].version`` from
+# ``simulation.toml`` — the storage layout (Zarr DataTree with fields
+# under ``/fields`` and metadata flat at root) is part of the schema
+# v1.0 contract documented in schema.md §4.2.  Bumping the schema
+# version is the single coordinated way to evolve both vocabulary and
+# storage shape together.  On disk the value sits at the root attr
+# path ``schema.version`` so the key path mirrors the TOML form.
+SCHEMA_VERSION = "1.0"
+
+
 __all__ = [
     "SCHEMA_VERSION",
     "decode_pypic_attrs",
@@ -46,6 +56,7 @@ __all__ = [
     "list_to_species",
     "normalization_to_dict",
     "physics_to_dict",
+    "pop_reserved_metadata",
     "read_simulation_toml",
     "species_to_list",
     "to_json_native",
@@ -178,18 +189,25 @@ def list_to_species(lst: list[dict[str, Any]]) -> tuple[SpeciesInfo, ...]:
     return tuple(_dict_to_species(d) for d in lst)
 
 
+def _encode_c(c: float) -> float | str:
+    """Encode the speed of light for JSON: ``math.inf`` → ``"inf"``."""
+    return "inf" if math.isinf(c) else c
+
+
+def _decode_c(raw: Any) -> float:  # noqa: ANN401
+    """Decode the speed of light: ``"inf"`` (or missing) → ``math.inf``."""
+    return math.inf if raw == "inf" or raw is None else float(raw)
+
+
 def physics_to_dict(physics: PhysicsParams) -> dict[str, Any]:
     """Serialize PhysicsParams to a JSON-compatible dict.
 
     ``math.inf`` (used for *c* in non-relativistic MHD) is stored as
     the string ``"inf"`` since JSON has no infinity literal.
     """
-    c_val: float | str = physics.c
-    if math.isinf(physics.c):
-        c_val = "inf"
     return {
         "gamma": physics.gamma,
-        "c": c_val,
+        "c": _encode_c(physics.c),
         "relativistic": physics.relativistic,
         "extra": dict(physics.extra),
     }
@@ -197,12 +215,9 @@ def physics_to_dict(physics: PhysicsParams) -> dict[str, Any]:
 
 def dict_to_physics(d: dict[str, Any]) -> PhysicsParams:
     """Reconstruct PhysicsParams from a serialized dict."""
-    c_val = d["c"]
-    if c_val == "inf":
-        c_val = math.inf
     return PhysicsParams(
         gamma=d["gamma"],
-        c=float(c_val),
+        c=_decode_c(d["c"]),
         relativistic=d["relativistic"],
         extra=d.get("extra", {}),
     )
@@ -320,7 +335,17 @@ def to_json_native(obj: Any) -> Any:  # noqa: ANN401
         return {k: to_json_native(v) for k, v in obj.items()}
     if isinstance(obj, list):
         return [to_json_native(v) for v in obj]
-    return obj
+    # ``bool`` is checked explicitly even though it is a subclass of
+    # ``int`` — readers don't pass it specially, but the listing keeps
+    # the JSON-native set self-documenting.
+    if obj is None or isinstance(obj, (str, bool, int, float)):
+        return obj
+    msg = (
+        f"to_json_native does not coerce {type(obj).__name__!r}; "
+        f"convert at the caller boundary (ISO string for dates, "
+        f"list for sets, etc.) or extend metadata.py"
+    )
+    raise TypeError(msg)
 
 
 def _dict_to_stagger(d: dict[str, Any]) -> Any:  # noqa: ANN401
@@ -366,23 +391,40 @@ def from_json_native(obj: Any) -> Any:  # noqa: ANN401
     return obj
 
 
-# Storage layout discriminator.  Mirrors ``[schema].version`` from
-# ``simulation.toml`` — the storage layout (Zarr DataTree with fields
-# under ``/fields`` and metadata flat at root) is part of the schema
-# v1.0 contract documented in schema.md §4.2.  Bumping the schema
-# version is the single coordinated way to evolve both vocabulary and
-# storage shape together.  On disk the value sits at the root attr
-# path ``schema.version`` so the key path mirrors the TOML form.
-SCHEMA_VERSION = "1.0"
-
-
 # Reserved metadata keys lifted to top-level root attrs on write.
 # ``run`` and ``simulation_toml`` are emitted as siblings of ``schema``,
 # ``grid``, etc. so cross-tool consumers (webpic, Rust) can read them
 # without going through pypic's open ``metadata`` bag.  On read, both
 # are re-stuffed into ``metadata`` so the Python-side API stays a
-# single bag (no new typed FieldDataset fields required).  See
-# schema.md §4.2 for the on-disk contract.
+# single bag (no new typed FieldDataset fields required).  ``stagger``
+# moves to ``grid.stagger`` (schema.md §4.2 finding 9); ``model`` is
+# scaffolded for the future typed ``schema.Model``.  See schema.md §4.2
+# for the on-disk contract.
+_RESERVED_METADATA_KEYS: tuple[str, ...] = (
+    "model",
+    "run",
+    "simulation_toml",
+    "stagger",
+)
+
+
+def pop_reserved_metadata(
+    metadata: dict[str, Any],
+) -> dict[str, Any]:
+    """Pop the reserved keys (``model``/``run``/``simulation_toml``/``stagger``).
+
+    Returned dict contains the popped values keyed by name; the input
+    is mutated in place so the caller is left with the open-bag
+    portion safe to pass through :func:`to_json_native`.  Used by both
+    :func:`encode_pypic_attrs` and the Zarr timeseries writer so the
+    two paths agree on which keys are JSON-typed-elsewhere.
+    """
+    out: dict[str, Any] = {}
+    for key in _RESERVED_METADATA_KEYS:
+        value = metadata.pop(key, None)
+        if value is not None:
+            out[key] = value
+    return out
 
 
 def _encode_run(run: Any) -> dict[str, Any]:  # noqa: ANN401
@@ -477,16 +519,18 @@ def encode_pypic_attrs(fds: FieldDataset) -> dict[str, Any]:
     re-encoded through :class:`pypic.schema.Run` to a JSON-mode dump.
     """
     metadata = dict(fds.metadata)
+    reserved = pop_reserved_metadata(metadata)
     lifted: dict[str, Any] = {}
 
-    raw_model = metadata.pop("model", None)
-    if raw_model is not None:
-        lifted["model"] = _encode_model(raw_model)
-    raw_run = metadata.pop("run", None)
-    if raw_run is not None:
-        lifted["run"] = _encode_run(raw_run)
-    raw_toml = metadata.pop("simulation_toml", None)
-    if raw_toml is not None:
+    # No reader sets ``metadata['model']`` today; the branch is kept
+    # so the future typed ``schema.Model`` swap is a one-line edit in
+    # ``_encode_model``.  See that function's docstring.
+    if "model" in reserved:
+        lifted["model"] = _encode_model(reserved["model"])
+    if "run" in reserved:
+        lifted["run"] = _encode_run(reserved["run"])
+    if "simulation_toml" in reserved:
+        raw_toml = reserved["simulation_toml"]
         if not isinstance(raw_toml, str):
             msg = (
                 f"metadata['simulation_toml'] must be a str, "
@@ -500,9 +544,7 @@ def encode_pypic_attrs(fds: FieldDataset) -> dict[str, Any]:
     # ``[grid.stagger]`` TOML section and §4.1's ``/grid/stagger/``
     # group, eliminating the only ``metadata`` sub-key with a typed
     # schema home (schema.md §4.2 finding 9).
-    raw_stagger = metadata.pop("stagger", None)
-
-    grid_attrs = _grid_to_attrs(fds.grid, stagger=raw_stagger)
+    grid_attrs = _grid_to_attrs(fds.grid, stagger=reserved.get("stagger"))
     out: dict[str, Any] = {
         "schema": {"version": SCHEMA_VERSION},
         "grid": grid_attrs,
@@ -605,9 +647,11 @@ def decode_pypic_attrs(
         metadata["simulation_toml"] = raw_toml
 
     # Frame and transforms now live under ``coordinates``; fall back
-    # to top-level keys for old-layout stores.
+    # to top-level keys for old-layout stores.  Trailing ``or {}``
+    # guards against an explicit ``null`` in either location, which
+    # would otherwise crash ``dict_to_transforms``.
     frame = coords_attrs.get("frame") or d.get("frame", "simulation")
-    raw_transforms = coords_attrs.get("transforms") or d.get("transforms", {})
+    raw_transforms = coords_attrs.get("transforms") or d.get("transforms", {}) or {}
     transforms = dict_to_transforms(raw_transforms)
     return grid, normalization, species, physics, metadata, frame, transforms
 
@@ -773,10 +817,7 @@ def _normalization_to_attrs(
     has no infinity literal.
     """
     out: dict[str, Any] = dict(normalization_to_dict(norm))
-    c_val: float | str = physics.c
-    if math.isinf(physics.c):
-        c_val = "inf"
-    out["speed_of_light"] = c_val
+    out["speed_of_light"] = _encode_c(physics.c)
     return out
 
 
@@ -809,12 +850,11 @@ def _attrs_to_physics(
     carries the value — covers minimal stores from non-pypic writers.
     """
     raw_c: Any = norm_d.get("speed_of_light", physics_d.get("c"))
-    c_val: float = math.inf if raw_c == "inf" or raw_c is None else float(raw_c)
     raw_gamma: Any = physics_d.get("gamma_eos", physics_d.get("gamma"))
     gamma_val: float = 5.0 / 3.0 if raw_gamma is None else float(raw_gamma)
     return PhysicsParams(
         gamma=gamma_val,
-        c=c_val,
+        c=_decode_c(raw_c),
         relativistic=physics_d.get("relativistic", False),
         extra=physics_d.get("extra", {}),
     )

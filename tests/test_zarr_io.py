@@ -15,15 +15,18 @@ from pypic.dataset import FieldDataset  # noqa: E402
 from pypic.grid import GridInfo  # noqa: E402
 from pypic.io import from_zarr, to_zarr, to_zarr_timeseries  # noqa: E402
 from pypic.io.metadata import (  # noqa: E402
+    decode_pypic_attrs,
     dict_to_grid,
     dict_to_normalization,
     dict_to_physics,
     dict_to_transforms,
+    encode_pypic_attrs,
     grid_to_dict,
     list_to_species,
     normalization_to_dict,
     physics_to_dict,
     species_to_list,
+    to_json_native,
     transforms_to_dict,
 )
 from pypic.units import Normalization, PhysicsParams, SpeciesInfo  # noqa: E402
@@ -227,6 +230,67 @@ class TestSerializationHelpers:
         assert loaded.metadata["label"] == "demo"
 
 
+class TestToJsonNativeStrict:
+    """``to_json_native`` fails loud on types it cannot coerce.
+
+    Silent pass-through would defer the failure to ``json.dumps`` deep
+    inside the Zarr writer, producing a cryptic ``Object of type X is
+    not JSON serializable`` error that hides which metadata stamp
+    introduced the bad value.  Raising at the coercion boundary names
+    the offending type and the responsible caller.
+    """
+
+    def test_set_raises(self):
+        with pytest.raises(TypeError, match="'set'"):
+            to_json_native({1, 2, 3})
+
+    def test_bytes_raises(self):
+        with pytest.raises(TypeError, match="'bytes'"):
+            to_json_native(b"abc")
+
+    def test_datetime_date_raises(self):
+        import datetime
+
+        with pytest.raises(TypeError, match="'date'"):
+            to_json_native(datetime.date(2026, 5, 19))
+
+    def test_arbitrary_object_raises(self):
+        class Custom:
+            pass
+
+        with pytest.raises(TypeError, match="'Custom'"):
+            to_json_native(Custom())
+
+    def test_nested_unsupported_raises(self):
+        # The strict guard fires regardless of nesting depth — the
+        # recursive walk surfaces the bad leaf.
+        with pytest.raises(TypeError, match="'bytes'"):
+            to_json_native({"outer": {"inner": [b"abc"]}})
+
+
+class TestDecodeTransformsNullEdge:
+    """``decode_pypic_attrs`` tolerates an explicit ``null`` transforms key.
+
+    Pre-fix, ``coords_attrs.get("transforms") or d.get("transforms", {})``
+    fell through to ``None`` when both keys were present-but-null,
+    crashing ``dict_to_transforms(None)`` with ``AttributeError``.  The
+    trailing ``or {}`` collapses the null branch to an empty mapping.
+    """
+
+    def test_coordinates_transforms_null_decodes_to_empty(self):
+        grid = make_uniform_grid(4, 3, 2)
+        fds = FieldDataset.from_arrays(
+            {"B_1": np.ones((4, 3, 2))},
+            grid,
+            Normalization.identity(),
+        )
+        attrs = encode_pypic_attrs(fds)
+        attrs["coordinates"]["transforms"] = None
+        attrs["transforms"] = None
+        _, _, _, _, _, _, transforms = decode_pypic_attrs(attrs)
+        assert transforms == {}
+
+
 class TestToZarrFromZarr:
     """Round-trip tests for to_zarr / from_zarr."""
 
@@ -365,12 +429,15 @@ class TestToZarrFromZarr:
             from_zarr(store)
 
     def test_failed_write_cleans_up_fresh_store(self, tmp_path):
-        # Reviewer regression: ``ds.to_zarr`` in mode='w' creates the
-        # destination directory (and writes ``zarr.json``) before
-        # xarray's attribute validator rejects a non-serializable
-        # value.  Without cleanup the half-written store survives and
-        # a later ``from_zarr`` surfaces "No 'pypic' metadata found"
-        # instead of the real write error.  A set is not JSON-native.
+        # Non-JSON-native values (here, a ``set``) are now rejected by
+        # ``to_json_native`` inside ``encode_pypic_attrs`` *before* any
+        # zarr disk operation runs, so no half-written store can survive
+        # — strictly stronger than the prior "cleanup after partial
+        # write" contract.  Kept as a regression: if a future value
+        # slipped past ``to_json_native`` and failed inside the zarr
+        # attr encoder, the writer's cleanup logic would still need to
+        # delete the half-store, and ``assert not store.exists()``
+        # would re-catch it.
         grid = make_uniform_grid(4, 3, 2)
         fds = FieldDataset.from_arrays(
             {"B_1": np.ones((4, 3, 2))},
@@ -379,7 +446,7 @@ class TestToZarrFromZarr:
             metadata={"bad": {1, 2, 3}},
         )
         store = tmp_path / "broken.zarr"
-        with pytest.raises(TypeError, match=r"Invalid attribute"):
+        with pytest.raises(TypeError, match=r"does not coerce 'set'"):
             to_zarr(fds, store)
         assert not store.exists()
 

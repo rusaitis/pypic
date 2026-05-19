@@ -133,12 +133,13 @@ class TestToZarrIcechunk:
             to_zarr(fds, store, backend="nosql")
 
     def test_failed_write_cleans_up_fresh_repo(self, tmp_path):
-        # Reviewer regression: any error between
-        # ``open_icechunk_repo(create=True)`` and ``session.commit``
-        # used to leave a half-initialized repo behind — same stale-
-        # store problem already fixed for the timeseries writer.  A
-        # set is not JSON-serializable, so xarray's attr validator
-        # raises during ``ds.to_zarr`` and the cleanup branch fires.
+        # Non-JSON-native values (here, a ``set``) are now rejected by
+        # ``to_json_native`` inside ``encode_pypic_attrs`` *before* the
+        # icechunk repo is initialized, so no half-initialized repo can
+        # survive — strictly stronger than the prior "cleanup after
+        # partial init" contract.  Kept as a regression so that if a
+        # future value slips past ``to_json_native``, the cleanup
+        # branch in ``open_icechunk_repo`` still catches it.
         grid = make_uniform_grid(4, 3, 2)
         fds = FieldDataset.from_arrays(
             {"B_1": np.ones((4, 3, 2))},
@@ -147,7 +148,7 @@ class TestToZarrIcechunk:
             metadata={"bad": {1, 2, 3}},
         )
         store = tmp_path / "broken.icechunk"
-        with pytest.raises(TypeError, match=r"Invalid attribute"):
+        with pytest.raises(TypeError, match=r"does not coerce 'set'"):
             to_zarr(fds, store, backend="icechunk")
         assert not store.exists()
         assert not is_icechunk_store(store)
@@ -166,7 +167,7 @@ class TestToZarrIcechunk:
             Normalization.identity(),
             metadata={"bad": {1, 2, 3}},
         )
-        with pytest.raises(TypeError, match=r"Invalid attribute"):
+        with pytest.raises(TypeError, match=r"does not coerce 'set'"):
             to_zarr(bad, store, backend="icechunk", branch="nightly")
         assert is_icechunk_store(store)
         loaded = from_zarr(store, branch="main")

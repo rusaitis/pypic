@@ -23,6 +23,7 @@ from pypic.io.metadata import (
     SCHEMA_VERSION,
     decode_pypic_attrs,
     encode_pypic_attrs,
+    pop_reserved_metadata,
     read_simulation_toml,
     to_json_native,
 )
@@ -325,8 +326,15 @@ def _write_timeseries_steps(
             _check_timeseries_fields(expected_fields, current_fields, time_val)
             assert first_fds is not None
             _check_timeseries_identity(first_fds, fds, time_val)
+            # Strip reserved keys (typed values that ``to_json_native``
+            # deliberately refuses) before the intersection.  These are
+            # single-source-of-truth at step 0; the encoded form is
+            # already in ``pypic_attrs`` so they wouldn't survive the
+            # intersection anyway.
+            step_meta = dict(fds.metadata)
+            pop_reserved_metadata(step_meta)
             running_meta = _intersect_encoded_metadata(
-                running_meta, to_json_native(dict(fds.metadata))
+                running_meta, to_json_native(step_meta)
             )
             ds.to_zarr(
                 store,
