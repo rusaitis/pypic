@@ -72,7 +72,7 @@ def create_app(
             "Discovery via JSON HTTP routes; binary field data via the "
             "Arrow IPC WebSocket at /sims/{sim}/stream."
         ),
-        version=_app_version(),
+        version=_pypic_version(),
     )
     app.add_middleware(
         CORSMiddleware,
@@ -121,11 +121,15 @@ def serve(
     uvicorn.run(app, host=host, port=port, reload=reload)
 
 
-def _app_version() -> str:
-    """Pypic version string for the FastAPI ``version`` field."""
+def _pypic_version() -> str:
+    """Look up the installed pypic version (returns ``"unknown"`` if absent).
+
+    Shared by the ``/health`` probe and the FastAPI ``version`` field
+    so the two never drift.
+    """
     import importlib.metadata
 
     try:
         return importlib.metadata.version("pypic")
     except importlib.metadata.PackageNotFoundError:
-        return "0.0.0+local"
+        return "unknown"

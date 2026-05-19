@@ -125,8 +125,9 @@ def dormand_prince_step(
     that happens the step is aborted at the failing stage and the
     failure point is reported back for caller-side classification.
 
-    Currently assumes ``y`` is 1-D ``(n,)``. Vectorize via
-    ``np.tensordot`` when a batched consumer arrives.
+    Operates on a 1-D state ``y`` of shape ``(n,)``. See
+    :func:`dormand_prince_step_batched` for the vectorized form over
+    a leading seed axis.
 
     Parameters
     ----------

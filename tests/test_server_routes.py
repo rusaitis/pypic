@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-import h5py  # type: ignore[import-untyped]
-import numpy as np
 import pytest
 
 pytest.importorskip("fastapi")
@@ -13,80 +11,23 @@ pytest.importorskip("fastapi")
 from fastapi.testclient import TestClient
 
 from pypic.server.app import create_app
+from tests._server_helpers import make_sim_dir
 
 if TYPE_CHECKING:
     from pathlib import Path
 
 
-_TOML = """\
-[schema]
-version = "1.0"
-
-[model]
-name = "test_sim"
-type = "MHD"
-
-[run]
-name = "server_test_run"
-
-[time]
-scheme = "fixed"
-dt = 0.1
-t_start = 0.0
-t_end = 1.0
-n_steps = 3
-
-[grid]
-dimensions = [4, 4, 4]
-spacing = [1.0, 1.0, 1.0]
-lower = [0.0, 0.0, 0.0]
-upper = [4.0, 4.0, 4.0]
-
-[units]
-system = "SI"
-
-[coordinates]
-geometry = "cartesian"
-frame = "simulation"
-
-[physics.mhd]
-gamma = 1.6667
-
-[[species]]
-name = "p"
-charge = 1.0
-mass = 1.0
-"""
-
-
-def _make_sim_dir(parent: Path, name: str = "run0", *, n_steps: int = 3) -> Path:
-    d = parent / name
-    d.mkdir()
-    (d / "simulation.toml").write_text(_TOML, encoding="utf-8")
-    rng = np.random.default_rng(42)
-    shape = (4, 4, 4)
-    for i in range(n_steps):
-        with h5py.File(d / f"output_{i:06d}.h5", "w") as f:
-            grp = f.create_group("fields")
-            grp.create_dataset("B_1", data=rng.standard_normal(shape))
-            grp.create_dataset("B_2", data=rng.standard_normal(shape))
-            grp.create_dataset("B_3", data=rng.standard_normal(shape))
-            f.attrs["model"] = "test_sim"
-            f.attrs["step"] = i
-    return d
-
-
 @pytest.fixture
 def client(tmp_path: Path) -> TestClient:
-    _make_sim_dir(tmp_path)
+    make_sim_dir(tmp_path)
     app = create_app(tmp_path)
     return TestClient(app)
 
 
 @pytest.fixture
 def client_multi(tmp_path: Path) -> TestClient:
-    _make_sim_dir(tmp_path, "run_a")
-    _make_sim_dir(tmp_path, "run_b")
+    make_sim_dir(tmp_path, "run_a")
+    make_sim_dir(tmp_path, "run_b")
     app = create_app(tmp_path)
     return TestClient(app)
 
@@ -120,7 +61,7 @@ def test_sims_empty_root(tmp_path: Path) -> None:
 def test_sims_ignores_dirs_without_toml(tmp_path: Path) -> None:
     # A directory with no simulation.toml is invisible to the registry.
     (tmp_path / "not_a_sim").mkdir()
-    _make_sim_dir(tmp_path, "real_one")
+    make_sim_dir(tmp_path, "real_one")
     client = TestClient(create_app(tmp_path))
     assert client.get("/sims").json() == {"sims": ["real_one"]}
 
@@ -146,7 +87,7 @@ def test_sim_info_404_for_missing_sim(client: TestClient) -> None:
 def test_sim_steps(client: TestClient) -> None:
     response = client.get("/sims/run0/steps")
     assert response.status_code == 200
-    # Three timesteps (0, 1, 2 from _make_sim_dir's n_steps=3).
+    # Three timesteps (0, 1, 2 from make_sim_dir's n_steps=3).
     assert response.json() == {"steps": [0, 1, 2]}
 
 

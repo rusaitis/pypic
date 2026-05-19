@@ -512,7 +512,7 @@ class SpeciesTemplate:
     component: int | None = None
 
 
-SPECIES_TEMPLATES: dict[str, SpeciesTemplate] = {
+_SPECIES_TEMPLATES: dict[str, SpeciesTemplate] = {
     "omega_p": SpeciesTemplate(
         derived.plasma_frequency, ("n_s{N}",), SpeciesArgs.CHARGE_MASS
     ),
@@ -772,7 +772,7 @@ def _try_species_recipe(name: str) -> Recipe | None:
     prefix = raw_prefix + raw_suffix
     idx_str = m.group("idx")
     species_index = int(idx_str)
-    template = SPECIES_TEMPLATES.get(prefix)
+    template = _SPECIES_TEMPLATES.get(prefix)
     if template is None:
         return None
     fields = tuple(f.replace("{N}", idx_str) for f in template.field_pattern)
@@ -1335,6 +1335,9 @@ def unregister_recipe(name: str) -> None:
 # update it under ``_recipe_lock``; the proxy guarantees external
 # callers only see the read side.
 RECIPES: MappingProxyType[str, Recipe] = MappingProxyType(_REGISTRY)
+SPECIES_TEMPLATES: MappingProxyType[str, SpeciesTemplate] = MappingProxyType(
+    _SPECIES_TEMPLATES
+)
 
 
 __all__ = [

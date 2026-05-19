@@ -10,7 +10,6 @@ from __future__ import annotations
 import json
 from typing import TYPE_CHECKING
 
-import h5py  # type: ignore[import-untyped]
 import numpy as np
 import pytest
 
@@ -21,6 +20,7 @@ from fastapi.testclient import TestClient
 
 from pypic.server.app import create_app
 from pypic.server.arrow import decode_field_dataset_ipc
+from tests._server_helpers import make_sim_dir
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -28,67 +28,9 @@ if TYPE_CHECKING:
     from starlette.testclient import WebSocketTestSession
 
 
-_TOML = """\
-[schema]
-version = "1.0"
-
-[model]
-name = "test_sim"
-type = "MHD"
-
-[run]
-name = "stream_test_run"
-
-[time]
-scheme = "fixed"
-dt = 0.1
-t_start = 0.0
-t_end = 1.0
-n_steps = 3
-
-[grid]
-dimensions = [4, 4, 4]
-spacing = [1.0, 1.0, 1.0]
-lower = [0.0, 0.0, 0.0]
-upper = [4.0, 4.0, 4.0]
-
-[units]
-system = "SI"
-
-[coordinates]
-geometry = "cartesian"
-frame = "simulation"
-
-[physics.mhd]
-gamma = 1.6667
-
-[[species]]
-name = "p"
-charge = 1.0
-mass = 1.0
-"""
-
-
-def _make_sim_dir(parent: Path, name: str = "run0", *, n_steps: int = 3) -> Path:
-    d = parent / name
-    d.mkdir()
-    (d / "simulation.toml").write_text(_TOML, encoding="utf-8")
-    rng = np.random.default_rng(42)
-    shape = (4, 4, 4)
-    for i in range(n_steps):
-        with h5py.File(d / f"output_{i:06d}.h5", "w") as f:
-            grp = f.create_group("fields")
-            grp.create_dataset("B_1", data=rng.standard_normal(shape))
-            grp.create_dataset("B_2", data=rng.standard_normal(shape))
-            grp.create_dataset("B_3", data=rng.standard_normal(shape))
-            f.attrs["model"] = "test_sim"
-            f.attrs["step"] = i
-    return d
-
-
 @pytest.fixture
 def client(tmp_path: Path) -> TestClient:
-    _make_sim_dir(tmp_path)
+    make_sim_dir(tmp_path)
     return TestClient(create_app(tmp_path))
 
 

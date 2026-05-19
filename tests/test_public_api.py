@@ -38,10 +38,24 @@ def test_recipes_proxy_mirrors_registry_keyset() -> None:
     assert set(compute_module.RECIPES) == set(compute_module._REGISTRY)
 
 
+def test_species_templates_proxy_mirrors_internal_keyset() -> None:
+    """``SPECIES_TEMPLATES`` is a read-only view over the internal mutable dict."""
+    assert isinstance(compute_module.SPECIES_TEMPLATES, types.MappingProxyType)
+    assert set(compute_module.SPECIES_TEMPLATES) == set(
+        compute_module._SPECIES_TEMPLATES
+    )
+
+
 def test_recipes_proxy_rejects_mutation() -> None:
     """External callers cannot bypass ``register_recipe`` via the proxy."""
     with pytest.raises(TypeError):
         compute_module.RECIPES["impossible"] = None  # type: ignore[index]
+
+
+def test_species_templates_proxy_rejects_mutation() -> None:
+    """External callers cannot mutate the species-template registry."""
+    with pytest.raises(TypeError):
+        compute_module.SPECIES_TEMPLATES["impossible"] = None  # type: ignore[index]
 
 
 def test_recipes_proxy_reflects_register_recipe_mutations() -> None:

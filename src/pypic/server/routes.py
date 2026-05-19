@@ -17,8 +17,7 @@ Endpoints:
 
 from __future__ import annotations
 
-import importlib.metadata
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from fastapi import APIRouter, HTTPException, Query, Request
 
@@ -28,6 +27,7 @@ from pypic.io._serialize import (
     physics_to_dict,
     species_to_list,
 )
+from pypic.server.app import _pypic_version
 
 if TYPE_CHECKING:
     from pypic.server._state import SimulationRegistry
@@ -37,15 +37,7 @@ __all__ = ["register_routes"]
 
 def _registry(request: Request) -> SimulationRegistry:
     """Pull the SimulationRegistry out of the FastAPI app state."""
-    return request.app.state.registry  # type: ignore[no-any-return]
-
-
-def _pypic_version() -> str:
-    """Look up the installed pypic version (returns ``"unknown"`` if absent)."""
-    try:
-        return importlib.metadata.version("pypic")
-    except importlib.metadata.PackageNotFoundError:
-        return "unknown"
+    return cast("SimulationRegistry", request.app.state.registry)
 
 
 def register_routes(router: APIRouter) -> None:
