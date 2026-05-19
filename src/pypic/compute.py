@@ -26,6 +26,7 @@ from pypic._aliases import (
 )
 from pypic.coordinates import operators
 from pypic.coordinates.geometry import GeometryType
+from pypic.exceptions import GeometryUnsupportedError
 from pypic.fields import _FIELD_INFO, _SPECIES_QUANTITY_PATTERNS, QuantityType
 
 if TYPE_CHECKING:
@@ -1010,7 +1011,7 @@ def _execute_recipe(
                 f"which are only implemented for Cartesian geometry. "
                 f"Dataset has {dataset.grid.geometry.type.value} geometry."
             )
-            raise NotImplementedError(msg)
+            raise GeometryUnsupportedError(msg)
         args.extend(dataset.grid.spacing)
         # Operator-backed recipes get the dataset's geometry threaded
         # through as a kwarg. Today this is a no-op for the only

@@ -84,6 +84,21 @@ def test_sim_info_404_for_missing_sim(client: TestClient) -> None:
     assert response.status_code == 404
 
 
+def test_sim_info_404_carries_typed_error_kind(client: TestClient) -> None:
+    """Global PypicError handler emits ``{"kind", "detail"}`` body.
+
+    Mirrors the WebSocket :class:`ErrorFrame` shape so clients can
+    dispatch on ``kind`` identically across HTTP and WS transports.
+    The ``detail`` field stays back-compat with FastAPI's stock
+    ``HTTPException`` body shape, so existing clients that key only on
+    ``detail`` continue to work.
+    """
+    response = client.get("/sims/does_not_exist")
+    body = response.json()
+    assert body["kind"] == "unknown_sim"
+    assert "does_not_exist" in body["detail"]
+
+
 def test_sim_steps(client: TestClient) -> None:
     response = client.get("/sims/run0/steps")
     assert response.status_code == 200

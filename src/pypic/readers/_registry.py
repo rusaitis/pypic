@@ -320,10 +320,11 @@ class Simulation:
             that support selective I/O skip unwanted datasets; others
             read all fields then filter.
         strict_fields : bool
-            When ``True`` (default), raise :class:`KeyError` if any
-            name in *fields* matches no loaded field — the project's
-            fail-loud rule for selection APIs.  Pass ``False`` only
-            for exploratory scripts where some requested names are
+            When ``True`` (default), raise
+            :class:`~pypic.exceptions.UnknownFieldError` if any name in
+            *fields* matches no loaded field — the project's fail-loud
+            rule for selection APIs.  Pass ``False`` only for
+            exploratory scripts where some requested names are
             optional; missing names are then logged as warnings.
         **kwargs
             Forwarded to readers that accept extra parameters
@@ -424,12 +425,14 @@ class Simulation:
                     missing.append(name)
             if missing:
                 if strict_fields:
+                    from pypic.exceptions import UnknownFieldError
+
                     msg = (
                         f"fields={list(fields)!r}: "
                         f"{missing!r} matched no fields in the dataset. "
                         f"Available: {sorted(loaded)!r}"
                     )
-                    raise KeyError(msg)
+                    raise UnknownFieldError(msg)
                 for name in missing:
                     log.warning(
                         "fields=%r: %r matched no fields in the dataset",

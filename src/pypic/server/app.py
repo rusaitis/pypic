@@ -55,13 +55,15 @@ def create_app(
         single-process launch path.
     """
     try:
-        from fastapi import APIRouter, FastAPI
+        from fastapi import APIRouter, FastAPI, Request
         from fastapi.middleware.cors import CORSMiddleware
+        from fastapi.responses import JSONResponse
     except ImportError as exc:
         msg = "pypic.server requires FastAPI. Install with: pip install pypic[server]"
         raise ImportError(msg) from exc
 
     from pypic.server._state import SimulationRegistry
+    from pypic.server.exceptions import PypicError
     from pypic.server.routes import register_routes
     from pypic.server.stream import register_stream
 
@@ -81,6 +83,24 @@ def create_app(
         allow_methods=["GET"],
         allow_headers=["*"],
     )
+
+    @app.exception_handler(PypicError)
+    async def _pypic_error_handler(
+        request: Request,
+        exc: PypicError,
+    ) -> JSONResponse:
+        """Route every typed pypic error to its declared HTTP status.
+
+        Body shape is ``{"kind": <wire kind>, "detail": <message>}`` —
+        ``detail`` stays back-compat with the previous
+        ``HTTPException(detail=str(exc))`` shape; ``kind`` is additive
+        and matches the WebSocket :class:`ErrorFrame.kind` literal so
+        clients can dispatch identically across both transports.
+        """
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={"kind": exc.kind, "detail": str(exc).strip("'")},
+        )
 
     app.state.registry = SimulationRegistry(root)
 

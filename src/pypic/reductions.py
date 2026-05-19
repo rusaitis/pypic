@@ -40,6 +40,7 @@ from typing import TYPE_CHECKING, Literal, get_args
 import numpy as np
 
 from pypic.coordinates.geometry import GeometryType
+from pypic.exceptions import GeometryUnsupportedError
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -275,7 +276,7 @@ def reduce(
             f"spherical/cylindrical Jacobian-aware integration is "
             f"deferred to TASKS Step 43b"
         )
-        raise NotImplementedError(msg)
+        raise GeometryUnsupportedError(msg)
 
     if reduction in _INDEX_REDUCERS and len(axes) > 1:
         msg = (

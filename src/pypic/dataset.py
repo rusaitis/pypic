@@ -15,6 +15,7 @@ from pypic.coordinates.geometry import (
     SPHERICAL,  # noqa: F401 — used in doctests
 )
 from pypic.coordinates.transforms import FrameTransform
+from pypic.exceptions import UnknownFieldError
 from pypic.grid import (
     GridInfo,
     _build_grid_from_dataset,
@@ -572,7 +573,7 @@ class FieldDataset:
         suggestions = difflib.get_close_matches(key, candidates, n=3, cutoff=0.5)
         if suggestions:
             msg += f" Did you mean: {suggestions}?"
-        raise KeyError(msg)
+        raise UnknownFieldError(msg)
 
     def __getitem__(self, key: str) -> FloatArray:
         """Return field data as a NumPy array (zero-copy when possible).

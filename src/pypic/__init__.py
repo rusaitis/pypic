@@ -80,6 +80,13 @@ from pypic.diagnostics import (
     linf_error,
     max_div_b,
 )
+from pypic.exceptions import (
+    GeometryUnsupportedError,
+    PypicError,
+    UnknownFieldError,
+    UnknownSimulationError,
+    UnknownStepError,
+)
 from pypic.fields import (
     FieldInfo,
     QuantityType,
@@ -158,6 +165,7 @@ __all__ = [
     "FieldLine",
     "FrameTransform",
     "GeometryType",
+    "GeometryUnsupportedError",
     "GridInfo",
     "Normalization",
     "ParticleData",
@@ -167,6 +175,7 @@ __all__ = [
     "PlaneSelection",
     "PoincareSection",
     "PoincareSurface",
+    "PypicError",
     "QuantityType",
     "Recipe",
     "Reduction",
@@ -180,6 +189,9 @@ __all__ = [
     "StaggerInfo",
     "TabularData",
     "TerminationReason",
+    "UnknownFieldError",
+    "UnknownSimulationError",
+    "UnknownStepError",
     "VectorFieldInterpolator",
     "agyrotropy",
     "alfven_mach",

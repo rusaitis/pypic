@@ -30,8 +30,12 @@ from fastapi import WebSocket, WebSocketDisconnect
 from pydantic import ValidationError
 
 from pypic.reductions import reduce
-from pypic.server._state import UnknownSimulationError
 from pypic.server.arrow import field_dataset_to_arrow_ipc
+from pypic.server.exceptions import (
+    PypicError,
+    UnknownStepError,
+    ValidationFailedError,
+)
 from pypic.server.protocol import (
     Ack,
     ErrorFrame,
@@ -49,15 +53,6 @@ if TYPE_CHECKING:
 __all__ = ["register_stream"]
 
 log = logging.getLogger(__name__)
-
-
-class _UnknownStepError(KeyError):
-    """Raised when a subscribe targets a step the simulation does not have.
-
-    Subclass of ``KeyError`` so callers that catch the broader type still
-    work, but the dedicated subclass lets :func:`_handle_one` route to
-    the ``unknown_step`` error kind without inspecting message strings.
-    """
 
 
 def register_stream(router: APIRouter) -> None:
@@ -83,10 +78,10 @@ async def _handle_one(
 ) -> None:
     """Process one inbound JSON frame on the WebSocket.
 
-    Validation errors, unknown sims/fields/steps, and unsupported
-    geometries each become a typed :class:`ErrorFrame` text reply.
-    Internal exceptions are logged and surfaced as ``kind="internal"``
-    error frames — the connection survives so the client can retry.
+    Every :class:`PypicError` subclass carries its own ``kind`` (matching
+    the :class:`ErrorFrame` Literal), so error routing is a single
+    branch.  Anything else is logged and surfaced as ``kind="internal"``
+    — the connection survives so the client can retry.
     """
     # request_id is unknown until we successfully parse the payload;
     # a bare validation error before that uses an empty string so the
@@ -94,25 +89,15 @@ async def _handle_one(
     # request by ordinal position.
     request_id = ""
     try:
-        req = SubscribeRequest.model_validate_json(payload)
+        try:
+            req = SubscribeRequest.model_validate_json(payload)
+        except ValidationError as exc:
+            raise ValidationFailedError(str(exc)) from exc
         request_id = req.request_id
         sim_name = req.sim or path_sim
         await _serve_subscribe(ws, sim_name, req, registry)
-    except ValidationError as exc:
-        await _send_error(ws, request_id, "validation", str(exc))
-    except _UnknownStepError as exc:
-        await _send_error(ws, request_id, "unknown_step", str(exc).strip("'"))
-    except UnknownSimulationError as exc:
-        await _send_error(ws, request_id, "unknown_sim", str(exc).strip("'"))
-    except KeyError as exc:
-        # Only field-resolution KeyErrors reach this branch: step is
-        # already typed as _UnknownStepError, sim as UnknownSimulationError.
-        await _send_error(ws, request_id, "unknown_field", str(exc).strip("'"))
-    except NotImplementedError as exc:
-        await _send_error(ws, request_id, "geometry_unsupported", str(exc))
-    except ValueError as exc:
-        # Step out of range, bad axis name, etc.
-        await _send_error(ws, request_id, "validation", str(exc))
+    except PypicError as exc:
+        await _send_error(ws, request_id, exc.kind, str(exc).strip("'"))
     except Exception as exc:
         # Surface as a typed error frame and keep the connection alive
         # so the client can retry without reconnecting.
@@ -130,7 +115,7 @@ async def _serve_subscribe(
     simulation = registry.get(sim_name)
     if req.step not in simulation.steps:
         msg = f"Step {req.step} not available"
-        raise _UnknownStepError(msg)
+        raise UnknownStepError(msg)
 
     fields = req.fields if req.fields else None
     fds: FieldDataset = simulation.read(

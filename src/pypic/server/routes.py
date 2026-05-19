@@ -19,7 +19,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, cast
 
-from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi import APIRouter, Query, Request
 
 from pypic.io._serialize import (
     grid_to_dict,
@@ -28,6 +28,7 @@ from pypic.io._serialize import (
     species_to_list,
 )
 from pypic.server.app import _pypic_version
+from pypic.server.exceptions import UnknownStepError
 
 if TYPE_CHECKING:
     from pypic.server._state import SimulationRegistry
@@ -62,10 +63,7 @@ def register_routes(router: APIRouter) -> None:
     @router.get("/sims/{sim}")
     def sim_info(sim: str, request: Request) -> dict[str, Any]:
         """Identity + grid + normalization + species for one simulation."""
-        try:
-            simulation = _registry(request).get(sim)
-        except KeyError as exc:
-            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        simulation = _registry(request).get(sim)
         return {
             "name": sim,
             "model_name": simulation.model_name,
@@ -79,10 +77,7 @@ def register_routes(router: APIRouter) -> None:
     @router.get("/sims/{sim}/steps")
     def sim_steps(sim: str, request: Request) -> dict[str, list[int]]:
         """Available timestep indices for a simulation."""
-        try:
-            simulation = _registry(request).get(sim)
-        except KeyError as exc:
-            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        simulation = _registry(request).get(sim)
         return {"steps": list(simulation.steps)}
 
     @router.get("/sims/{sim}/fields")
@@ -95,19 +90,15 @@ def register_routes(router: APIRouter) -> None:
         ),
     ) -> dict[str, Any]:
         """Canonical field names + native-name mapping at one step."""
-        try:
-            simulation = _registry(request).get(sim)
-        except KeyError as exc:
-            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        simulation = _registry(request).get(sim)
         steps = simulation.steps
         if not steps:
-            raise HTTPException(status_code=404, detail="No timesteps available")
+            msg = "No timesteps available"
+            raise UnknownStepError(msg)
         chosen_step = steps[0] if step is None else step
         if chosen_step not in steps:
-            raise HTTPException(
-                status_code=404,
-                detail=f"Step {chosen_step} not available (have {steps[:3]}...)",
-            )
+            msg = f"Step {chosen_step} not available (have {steps[:3]}...)"
+            raise UnknownStepError(msg)
         return {
             "step": chosen_step,
             "fields": simulation.available_fields_mapping(chosen_step),

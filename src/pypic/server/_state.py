@@ -17,21 +17,14 @@ from threading import Lock
 from typing import TYPE_CHECKING
 
 from pypic.readers._registry import open_simulation
+from pypic.server.exceptions import UnknownSimulationError
 
 if TYPE_CHECKING:
     from pathlib import Path
 
     from pypic.readers._registry import Simulation
 
-
-class UnknownSimulationError(KeyError):
-    """No simulation with that name exists under the registry root.
-
-    Subclass of :class:`KeyError` so callers that catch the broader
-    type still work, but the dedicated subclass lets the WebSocket
-    handler route to the ``unknown_sim`` error kind without inspecting
-    message strings.
-    """
+__all__ = ["SimulationRegistry", "UnknownSimulationError"]
 
 
 class SimulationRegistry:
@@ -115,7 +108,15 @@ class SimulationRegistry:
                     "(directory missing or no simulation.toml)"
                 )
                 raise UnknownSimulationError(msg)
-            sim = open_simulation(path)
+            try:
+                sim = open_simulation(path)
+            except (KeyError, FileNotFoundError) as exc:
+                # Explicit-reader miss or auto-detect found no matching
+                # format. From the server's vantage point these are both
+                # "we couldn't open this simulation" — the underlying
+                # cause is preserved via ``__cause__`` for debugging.
+                msg = f"Could not open simulation {name!r}: {exc}"
+                raise UnknownSimulationError(msg) from exc
             self._cache[name] = sim
             return sim
 

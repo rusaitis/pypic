@@ -6,7 +6,8 @@ intersection grid at the finer resolution, and :func:`align_grids` as a
 convenience that regrids two datasets onto their common grid.
 
 Cartesian grids only — spherical and cylindrical geometries raise
-:class:`NotImplementedError`, matching the convention in
+:class:`~pypic.exceptions.GeometryUnsupportedError` (a subclass of
+:class:`NotImplementedError`), matching the convention in
 :mod:`pypic.coordinates.operators`.
 
 Examples
@@ -36,6 +37,7 @@ import numpy as np
 from scipy.interpolate import RegularGridInterpolator
 
 from pypic.coordinates.geometry import GeometryType
+from pypic.exceptions import GeometryUnsupportedError
 from pypic.grid import GridInfo
 
 if TYPE_CHECKING:
@@ -65,7 +67,7 @@ def _require_cartesian_grid(grid: GridInfo, label: str) -> None:
                 f"Regridding not implemented for "
                 f"{grid.geometry.type.value} geometry ({label})"
             )
-            raise NotImplementedError(msg)
+            raise GeometryUnsupportedError(msg)
         case _ as unreachable:
             assert_never(unreachable)
 

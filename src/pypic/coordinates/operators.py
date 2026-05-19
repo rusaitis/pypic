@@ -3,7 +3,9 @@
 Geometry-aware ``divergence``, ``curl``, and ``gradient`` using second-order
 central finite differences (interior) with second-order one-sided stencils
 at boundaries (``np.gradient`` convention). Cartesian geometry is fully
-implemented; spherical and cylindrical raise ``NotImplementedError``.
+implemented; spherical and cylindrical raise
+:class:`~pypic.exceptions.GeometryUnsupportedError` (a subclass of
+``NotImplementedError``).
 """
 
 from __future__ import annotations
@@ -13,6 +15,7 @@ from typing import TYPE_CHECKING, assert_never
 import numpy as np
 
 from pypic.coordinates.geometry import GeometryType
+from pypic.exceptions import GeometryUnsupportedError
 
 if TYPE_CHECKING:
     from pypic.types import FloatArray
@@ -32,7 +35,7 @@ def _require_cartesian(geometry: GeometryType, operation: str) -> None:
             return
         case GeometryType.SPHERICAL | GeometryType.CYLINDRICAL:
             msg = f"{operation} not implemented for {geometry.value} geometry"
-            raise NotImplementedError(msg)
+            raise GeometryUnsupportedError(msg)
         case _ as unreachable:
             assert_never(unreachable)
 
