@@ -22,6 +22,13 @@ The verb is ``reduce`` (not ``project``) deliberately: ``project()`` is
 already taken by Three.js (``Vector3.project(camera)``) for screen-space
 camera projection, and webpic is a Three.js viewer.  Server-side
 ``reduce`` keeps the cross-stack vocabulary clean.
+
+The ``length_axes`` attrs stamp is an interim mechanism shipped ahead of
+TASKS Step 43c's openPMD ``unit_dimension`` 7-tuple generalization.
+Today, after an unweighted ``integrate``, the displayed ``quantity_type``
+and ``si_unit`` strings are preserved but the numeric value through
+:meth:`FieldDataset.in_si` is corrected via ``length_ref ** length_axes``.
+Step 43c will subsume this with proper post-reduction tuple arithmetic.
 """
 
 from __future__ import annotations
@@ -150,6 +157,10 @@ def reduce(
         :class:`~pypic.selections.SphereSelection`, which NaN-masks
         outside-region cells.  ``"propagate"`` lets NaN poison the
         result.  ``"raise"`` errors when any input cell is NaN.
+        Same vocabulary and semantics as
+        :func:`pypic.diagnostics.l2_relative_error` — see
+        `conventions.md § Error Norms and Divergence` for the broader
+        rationale.
 
     Returns
     -------
