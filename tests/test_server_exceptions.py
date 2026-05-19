@@ -58,12 +58,36 @@ def test_subclass_routing_contract(
     """
     assert exc_cls.kind == kind
     assert exc_cls.status_code == status
-    exc = exc_cls("oops")
+    exc: PypicError = exc_cls("oops")
     assert isinstance(exc, PypicError)
     assert isinstance(exc, stdlib_base)
-    # The wire/HTTP code passes ``str(exc)`` straight into the response;
-    # the message must round-trip without surprises.
-    assert "oops" in str(exc).strip("'")
+    # ``exc.detail`` is what the HTTP body and the WebSocket
+    # :class:`ErrorFrame.message` carry; it must round-trip the message
+    # without ``KeyError``'s ``repr``-quoting.
+    assert exc.detail == "oops"
+
+
+def test_detail_unwraps_keyerror_quotes() -> None:
+    """``str()`` on KeyError-inheriting subclasses requotes; ``detail`` doesn't.
+
+    Pins the contract the HTTP-handler / WS-handler call sites rely on
+    after dropping the brittle ``str(exc).strip("'")`` workaround.
+    """
+    exc = UnknownFieldError("missing")
+    assert str(exc) == "'missing'"  # KeyError.__str__ behavior
+    assert exc.detail == "missing"
+
+
+def test_detail_preserves_embedded_quotes() -> None:
+    """Regression: the old ``.strip("'")`` workaround silently mangled this case.
+
+    When the message itself contains a single quote, ``KeyError.__str__``
+    switches to ``repr`` with surrounding double quotes, so a blanket
+    ``strip("'")`` no longer matches — junk like
+    ``"'foo' is reserved"`` (with literal ``"``) reached the wire.
+    """
+    exc = UnknownFieldError("'foo' is reserved")
+    assert exc.detail == "'foo' is reserved"
 
 
 def test_validation_failed_error_preserves_cause() -> None:

@@ -47,6 +47,21 @@ class PypicError(Exception):
     kind: ClassVar[str] = "internal"
     status_code: ClassVar[int] = 500
 
+    @property
+    def detail(self) -> str:
+        r"""Human-readable message, free of ``KeyError``-style requoting.
+
+        The :class:`KeyError`-inheriting subclasses (Unknown\*Error)
+        otherwise ``str()`` to ``"'msg'"`` because ``KeyError.__str__``
+        calls ``repr()`` on ``args[0]``.  Wire consumers (the HTTP body's
+        ``detail`` field, :class:`ErrorFrame.message`) want the bare
+        message, and the previous ``str(exc).strip("'")`` workaround
+        silently mangled legitimate-quote messages.
+        """
+        if self.args:
+            return str(self.args[0])
+        return super().__str__()
+
 
 class UnknownSimulationError(PypicError, KeyError):
     """No simulation with the requested name exists under the registry root.

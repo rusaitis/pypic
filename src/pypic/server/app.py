@@ -99,7 +99,7 @@ def create_app(
         """
         return JSONResponse(
             status_code=exc.status_code,
-            content={"kind": exc.kind, "detail": str(exc).strip("'")},
+            content={"kind": exc.kind, "detail": exc.detail},
         )
 
     app.state.registry = SimulationRegistry(root)

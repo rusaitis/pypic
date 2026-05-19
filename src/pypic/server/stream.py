@@ -97,7 +97,7 @@ async def _handle_one(
         sim_name = req.sim or path_sim
         await _serve_subscribe(ws, sim_name, req, registry)
     except PypicError as exc:
-        await _send_error(ws, request_id, exc.kind, str(exc).strip("'"))
+        await _send_error(ws, request_id, exc.kind, exc.detail)
     except Exception as exc:
         # Surface as a typed error frame and keep the connection alive
         # so the client can retry without reconnecting.
