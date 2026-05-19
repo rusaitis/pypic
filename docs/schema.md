@@ -1506,8 +1506,13 @@ my_store.zarr/                         # Zarr v3 group root
 **Per-array metadata.** Each field array under `/fields/` carries
 xarray-style attrs: `long_name`, `units`, `quantity_type`,
 `si_unit`, `latex`, and the openPMD-style `unit_dimension` 7-tuple
-when the field has a registered SI dimension. Default per-variable
-codec: `BloscCodec(cname="zstd", clevel=5, shuffle="bitshuffle")`.
+when the field has a registered SI dimension. Arrays produced by
+`pypic.reductions.reduce` additionally carry a `reduction` entry
+recording `{axis, op, result_kind?, weight?, length_axes?}` for
+provenance; the dict is absent on unreduced fields. Mirrors the
+`attrs["map"]` provenance block that `pypic.maps` outputs carry (§3
+*Field-line map quantities*). Default per-variable codec:
+`BloscCodec(cname="zstd", clevel=5, shuffle="bitshuffle")`.
 `dtype="float32"` downcasts on write; user-supplied `encoding=`
 overrides per variable.
 
