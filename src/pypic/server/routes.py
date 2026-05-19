@@ -17,9 +17,9 @@ Endpoints:
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Annotated, Any, cast
 
-from fastapi import APIRouter, Query, Request
+from fastapi import APIRouter, Depends, Query, Request
 
 from pypic.io.metadata import (
     grid_to_dict,
@@ -27,6 +27,7 @@ from pypic.io.metadata import (
     physics_to_dict,
     species_to_list,
 )
+from pypic.readers._registry import Simulation  # noqa: TC001 — runtime use in Depends
 from pypic.server.app import _pypic_version
 from pypic.server.exceptions import UnknownStepError
 
@@ -39,6 +40,16 @@ __all__ = ["register_routes"]
 def _registry(request: Request) -> SimulationRegistry:
     """Pull the SimulationRegistry out of the FastAPI app state."""
     return cast("SimulationRegistry", request.app.state.registry)
+
+
+def get_simulation(sim: str, request: Request) -> Simulation:
+    """FastAPI dependency: resolve the ``{sim}`` path param to a :class:`Simulation`.
+
+    Raises :class:`~pypic.exceptions.UnknownSimulationError` (typed
+    404 via :mod:`pypic.server.app`'s ``PypicError`` handler) when no
+    simulation matches.
+    """
+    return _registry(request).get(sim)
 
 
 def register_routes(router: APIRouter) -> None:
@@ -61,9 +72,11 @@ def register_routes(router: APIRouter) -> None:
         return {"sims": _registry(request).names()}
 
     @router.get("/sims/{sim}")
-    def sim_info(sim: str, request: Request) -> dict[str, Any]:
+    def sim_info(
+        sim: str,
+        simulation: Annotated[Simulation, Depends(get_simulation)],
+    ) -> dict[str, Any]:
         """Identity + grid + normalization + species for one simulation."""
-        simulation = _registry(request).get(sim)
         return {
             "name": sim,
             "model_name": simulation.model_name,
@@ -75,22 +88,21 @@ def register_routes(router: APIRouter) -> None:
         }
 
     @router.get("/sims/{sim}/steps")
-    def sim_steps(sim: str, request: Request) -> dict[str, list[int]]:
+    def sim_steps(
+        simulation: Annotated[Simulation, Depends(get_simulation)],
+    ) -> dict[str, list[int]]:
         """Available timestep indices for a simulation."""
-        simulation = _registry(request).get(sim)
         return {"steps": list(simulation.steps)}
 
     @router.get("/sims/{sim}/fields")
     def sim_fields(
-        sim: str,
-        request: Request,
+        simulation: Annotated[Simulation, Depends(get_simulation)],
         step: int | None = Query(
             default=None,
             description="Timestep index. Defaults to the first available step.",
         ),
     ) -> dict[str, Any]:
         """Canonical field names + native-name mapping at one step."""
-        simulation = _registry(request).get(sim)
         steps = simulation.steps
         if not steps:
             msg = "No timesteps available"
