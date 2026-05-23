@@ -68,25 +68,20 @@ A valid v1.0 document must declare these sections:
 Optional sections, listed in the order §2 walks them:
 
 ```toml
-[boundary_conditions]    # per-axis BC tags (lower/upper) + per-field overrides
+[boundary_conditions]    # per-axis BC tags + per-field overrides
 [physics]                # model-agnostic flags + .{pic,mhd,hybrid} sub-tables
 [[bodies]]               # registry of physical objects (planets, coils, ...)
 [initial_conditions]     # flat table: setup type + type-specific keys
 [[drivers]]              # ongoing external coupling (magnetograms, SW inflow, ...)
-[restart]                # continuation pointer (single file, glob, or list)
-[output.*]               # five fixed sub-sections plus the repeatable
-                         # [[output.streams]] array (six total), walked
-                         # together in §2:
-                         #   [output.checkpoints]   lossless full-state dumps
-                         #   [output.fields]        field output cadence + quantities
-                         #   [output.particles]     particle output cadence + selection
-                         #   [output.probes]        probe time-series cadence
-                         #   [output.diagnostics]   on-the-fly derived quantities
-                         #   [[output.streams]]     multi-cadence / ROI output groups
-[phase_space]            # >3D phase-space grid for gyrokinetic / full Vlasov
-                         #   (continuum-Vlasov sparse-block storage lives in
-                         #   the [phase_space.storage] sub-table)
-[[collisions]]           # per-pair collision declarations (Smilei, EPOCH, ...)
+[restart]                # continuation pointer
+[output.checkpoints]     # lossless full-state dumps
+[output.fields]          # field output cadence + quantities
+[output.particles]       # particle output cadence + selection
+[output.probes]          # probe time-series cadence
+[output.diagnostics]     # on-the-fly derived quantities
+[[output.streams]]       # multi-cadence / ROI output groups (repeatable)
+[phase_space]            # >3D phase-space (gyrokinetic / continuum Vlasov)
+[[collisions]]           # per-pair collision declarations
 [[probes]]               # fixed or trajectory samplers
 ```
 
@@ -226,19 +221,13 @@ hours    = 393216
 ```
 
 `[run]` is **typed run provenance**: the validator reads it when
-``simulation.toml`` is loaded, the loader stamps the result onto
+`simulation.toml` is loaded, the loader stamps the result onto
 `SimulationConfig.run`, and the Zarr writer lifts it to root
-`attrs.run` as a JSON-mode `Run.model_dump` so cross-tool consumers
-see it at the root group's attrs (see §4.2). Identity-stable across
-derivations — a regridded "MMS-event-1" run is still that run. The
-HDF5 §4.1 layout admits a `/run/` group (writer-side contract), but
-the current pypic HDF5 readers do not yet extract it into the typed
-`SimulationConfig.run`; until they do, tools whose artifacts must
-travel through HDF5 should ship the original ``simulation.toml``
-alongside the output store, or write through Zarr where `attrs.run`
-round-trips end-to-end. `[run]` lives alongside
-`attrs.simulation_toml` (verbatim text) — see §4.2 for the policy
-on each.
+`attrs.run` as a JSON-mode `Run.model_dump`. Identity-stable
+across derivations — a regridded "MMS-event-1" run is still that
+run. On-disk round-trip policy lives in §4 (Zarr round-trips
+end-to-end; HDF5 has writer-side support for `/run/` but no reader
+extraction yet — ship `simulation.toml` alongside HDF5 stores).
 
 ### [time]
 
@@ -327,16 +316,16 @@ B_3 = [0.0, 0.0, 0.5]               # B_z on the z-face
 E_1 = [0.0, 0.5, 0.5]               # E_x on the x-edge
 ```
 
-**Stagger layering.** All three tiers are optional and additive. The
-validator does not cross-check between tiers — a writer may populate
-any subset, a reader that consumes only Tier 1 still works, and
-readers that need ED-PIC-precise destagger reach for Tier 3
-(round-trips through `StaggerInfo.position`). Tier 1 is the semantic
-anchor: Tier 2 and Tier 3 values are not meaningful without it (a
-`position = [0.5, 0.0, 0.0]` is uninterpretable until you know whether
-the base grid is cell-centered or node-centered), so readers that
-consume Tier 2/3 must read Tier 1 too. Readers always destagger to a
-co-located grid on load.
+**Stagger layering.** Tier 1 is the semantic anchor. Tier 2 and
+Tier 3 are optional augmentations that require Tier 1 to be
+interpretable (a `position = [0.5, 0.0, 0.0]` is uninterpretable
+until you know whether the base grid is cell-centered or
+node-centered). The validator does not enforce this cross-tier
+link, so writers that emit Tier 2/3 without Tier 1 produce a
+parseable-but-meaningless stagger record. Readers that consume only
+Tier 1 still work; readers that need ED-PIC-precise destagger reach
+for Tier 3 (round-trips through `StaggerInfo.position`). Readers
+always destagger to a co-located grid on load.
 
 ### [boundary_conditions]
 
@@ -1033,48 +1022,43 @@ real/imaginary axes.
 component index (`J_s0_1`, `EF_s1_2`). The species *name* lives in
 `[[species]]`, not in the field name.
 
-**Species-name aliases:** For any species, the canonical `<prefix>_s<index>`
-form has an automatically-generated `<prefix>_<species_name>` alias when
-the species name is declared in `[[species]]`. `n_s0` becomes `n_electrons`
-when `species[0].name == "electrons"`; `EF_s1_1` becomes `EF_protons_1` when
-`species[1].name == "protons"` (the species token is substituted in place of
-`_s<N>`; the trailing component index, if any, stays at the end). The alias is
-added at `FieldDataset`
-construction time and only registered when the underlying canonical is
-actually present in the dataset, so missing data produces a clean
-`KeyError` rather than misdirection.
+**Species-name aliases:** For any species, the canonical
+`<prefix>_s<index>` form has an automatically-generated
+`<prefix>_<species_name>` alias when the species name is declared
+in `[[species]]`. `n_s0` becomes `n_electrons` when
+`species[0].name == "electrons"`; `EF_s1_1` becomes `EF_protons_1`
+when `species[1].name == "protons"` (the species token replaces
+`_s<N>`; the trailing component index, if any, stays at the end).
 
-For multi-species runs (H⁺ + He²⁺ + O⁺), the species-name form is the
-unambiguous way to reference per-species quantities — the integer index
-depends on declaration order.
-
-**Vector group shorthand in `read()`:** Passing a bare prefix like
-`"B"` to `read(fields=...)` expands to `B_1, B_2, B_3`. Per-species
-groups work the same way: `"EF_s0"` expands to
-`EF_s0_1, EF_s0_2, EF_s0_3`. Derived quantities expand to their
-dependencies: `"Pij_s1"` loads the six ion pressure tensor components,
-`"P_par"` loads the six total-pressure tensor components plus
-`B_1`..`B_3`. Note: `"P_s1"` (the per-species *scalar* pressure) is
-distinct from `"Pij_s1"` (the per-species tensor group); the tensor
-identifier always carries the `ij` infix.
-
-pypic also ships **library-side convenience aliases** for the common
-two-species electron/ion case (`Pe ↔ P_s0`, `n_i ↔ n_s1`,
-`beta_e ↔ beta_s0`, ...) — see [Aliases](aliases.md). Those forms
-are not part of the cross-tool schema contract; non-pypic consumers
-(Rust, JS) only need the canonical names listed here.
-
-What does *not* expand: already-resolved single-component aliases
-(`"Bx"`, `"Br"`, `"E_phi"`) and names whose prefix already ends in
-a digit (`"B_1"`, `"P_s1_11"`) are passed through as scalars. In
-particular, requesting `"P_11"` alone loads only `P_11` — if a later
-`compute("P_par")` / `"P_perp"` / `"agyrotropy"` needs the full
-tensor, request the tensor explicitly via `"Pij_s0"` / `"Pij_s1"` /
-`"Pij_sN"`, or request the derived quantity itself.
+For multi-species runs (H⁺ + He²⁺ + O⁺), the species-name form is
+the unambiguous way to reference per-species quantities — the
+integer index depends on declaration order.
 
 The same expansion rules apply to `[output.fields].quantities` —
 listing `"B"` writes `B_1`, `B_2`, `B_3`; listing `"P_s1"` writes the
 six second-species pressure tensor components.
+
+> **pypic-only.** Vector group shorthand in `read()`: passing a bare
+> prefix like `"B"` to `read(fields=...)` expands to `B_1, B_2, B_3`;
+> `"EF_s0"` expands to `EF_s0_1, EF_s0_2, EF_s0_3`; derived
+> quantities expand to their dependencies (`"Pij_s1"` loads the six
+> ion tensor components; `"P_par"` loads the six total-pressure
+> components plus `B_1..B_3`). `"P_s1"` (per-species *scalar*
+> pressure) is distinct from `"Pij_s1"` (per-species tensor group) —
+> the tensor identifier always carries the `ij` infix. Names that
+> are already resolved single components (`"Bx"`, `"Br"`, `"E_phi"`)
+> or whose prefix ends in a digit (`"B_1"`, `"P_s1_11"`) pass through
+> as scalars; request the full tensor via `"Pij_s0"` / `"Pij_s1"` if
+> a later `compute()` needs it. The species-name alias is registered
+> at `FieldDataset` construction time and only when the underlying
+> canonical is present, so missing data raises `KeyError` rather
+> than misdirecting.
+
+> **pypic-only.** Library-side convenience aliases for the common
+> two-species electron/ion case (`Pe ↔ P_s0`, `n_i ↔ n_s1`,
+> `beta_e ↔ beta_s0`, …) — see [Aliases](aliases.md). Not part of
+> the cross-tool contract; non-pypic consumers (Rust, JS) only need
+> the canonical names listed here.
 
 **Current limitations:**
 
@@ -1198,15 +1182,20 @@ convention and reference-vector choice.
 | `E_prime_par` | Field-aligned non-ideal residual $E'_\parallel = (\mathbf{E}+\mathbf{V}\times\mathbf{B})\cdot\hat{b}$ — the canonical reconnection-rate diagnostic | `E_1-E_3`, `V_1-V_3`, `B_1-B_3` |
 | `E_prime_perp_1`, `E_prime_perp_2`, `E_prime_perp_3` | Perpendicular non-ideal residual | `E_1-E_3`, `V_1-V_3`, `B_1-B_3` |
 | `\|E_prime_perp\|` | Perpendicular non-ideal residual magnitude | `E_1-E_3`, `V_1-V_3`, `B_1-B_3` |
-| `E_ideal_par` | Field-aligned ideal-MHD field — *analytically zero* ($\mathbf{E}^{\mathrm{ideal}} = -\mathbf{V}\times\mathbf{B} \perp \mathbf{B}$); kept as a numerical-precision diagnostic | `V_1-V_3`, `B_1-B_3` |
-| `E_ideal_perp_1`, `E_ideal_perp_2`, `E_ideal_perp_3` | Perpendicular ideal-MHD field (equals the full vector up to roundoff) | `V_1-V_3`, `B_1-B_3` |
-| `\|E_ideal_perp\|` | Perpendicular ideal-MHD field magnitude | `V_1-V_3`, `B_1-B_3` |
-| `E_Hall_par` | Field-aligned Hall field — *analytically zero* ($\mathbf{E}^{\mathrm{Hall}} \propto \mathbf{J}\times\mathbf{B} \perp \mathbf{B}$); numerical-precision diagnostic | `J_1-J_3`, `B_1-B_3`, `n_s0` |
-| `E_Hall_perp_1`, `E_Hall_perp_2`, `E_Hall_perp_3` | Perpendicular Hall field | `J_1-J_3`, `B_1-B_3`, `n_s0` |
-| `\|E_Hall_perp\|` | Perpendicular Hall field magnitude | `J_1-J_3`, `B_1-B_3`, `n_s0` |
+
+`E_ideal_*` ($-\mathbf{V}\times\mathbf{B}$) and `E_Hall_*`
+($\mathbf{J}\times\mathbf{B}/(n_e |q_e|)$) are registered for
+symmetry with the `E_par` / `E_prime_par` family: same `_par`,
+`_perp_{1,2,3}`, `|*_perp|` shape. The `_par` components are
+analytically zero (both vectors are cross products with
+$\mathbf{B}$, hence orthogonal to $\hat{b}$) and the `_perp`
+components equal the full vector up to roundoff; useful only as a
+numerical-precision check on the destaggered cross-product
+implementation. Inputs: `V_1-V_3, B_1-B_3` for `E_ideal_*`;
+`J_1-J_3, B_1-B_3, n_s0` for `E_Hall_*`.
 
 Two-species shorthand aliases `V_par_e ↔ V_s0_par`, `V_par_i ↔
-V_s1_par` are registered (mirrors `P_par_e`/`P_par_i`).  Vector-group
+V_s1_par` are registered (mirrors `P_par_e`/`P_par_i`). Vector-group
 expansion in `read()` resolves `"V_perp"` → `V_perp_1, V_perp_2,
 V_perp_3` and `"V_s0_perp"` → `V_s0_perp_1, V_s0_perp_2, V_s0_perp_3`.
 
@@ -1459,47 +1448,22 @@ name. Sub-keys mirror that section's TOML keys.
 ```
 my_store.zarr/                         # Zarr v3 group root
 │
-├── attrs (flat root metadata):
-│   ├── schema:        { version: "1.0" }   # mirrors [schema]
-│   ├── model:         { name, type, version?, description?, url?, doi?,
-│   │                    license?, authors? }                          # mirrors [model]
-│   ├── time:          { dt, t_start, t_end, n_steps, scheme,
-│   │                    splitting?, cfl?, dt_min?, dt_max?,
-│   │                    dt_field?, field_substeps? }                  # mirrors [time]
-│   ├── grid:          { dimensions, spacing, lower, upper,
-│   │                    ghost_cells?, surviving_axes,
-│   │                    stagger?: { convention, fields?, position? } } # mirrors [grid]
-│   ├── boundary_conditions: { lower, upper, drivers_lower?,
-│   │                          drivers_upper?, field_overrides? }      # mirrors [boundary_conditions]
-│   ├── coordinates:   { geometry, frame, axis_labels?,
-│   │                    physical_extent?, physical_extent_unit?,
-│   │                    modes?: { n_modes, mode_indices },
-│   │                    transforms?: { <name>: { origin, rotation,
-│   │                                             scale, from_frame?,
-│   │                                             parameter? }, ... } } # mirrors [coordinates]
-│   ├── normalization: { system, length_ref, time_ref, velocity_ref,
-│   │                    b_field_ref, e_field_ref, density_ref,
-│   │                    mass_ref, charge_ref, speed_of_light }        # mirrors [units]
-│   ├── species:       [ { name, charge, mass, ... }, ... ]            # mirrors [[species]]
-│   ├── physics:       { relativistic, pic?: {...}, mhd?: {...},
-│   │                    hybrid?: {...} }                              # mirrors [physics]
-│   ├── run:           (optional) { name, doi, license, authors,
-│   │                    git_sha, host, funding, embargo,
-│   │                    resources, ensemble, ... }                    # schema.Run.model_dump
-│   ├── simulation_toml: (optional) "verbatim TOML text from [run] config"
-│   └── metadata:      { time, step, ... other reader-specific scalars
-│                        not covered above ... }
-│                      # single-step writes only — multi-step writes
-│                      # promote `time` to a dimension under /fields
+├── attrs (flat root metadata, one key per §2 section):
+│   ├── schema, model, time, grid, boundary_conditions,
+│   ├── coordinates, normalization, species, physics
+│   ├── run                  # optional — typed Run.model_dump
+│   ├── simulation_toml      # optional — verbatim TOML text
+│   └── metadata             # snapshot scalars (time, step, ...);
+│                            #   single-step writes only — multi-step
+│                            #   writes promote `time` to a dimension
+│                            #   under /fields. See mapping table below
+│                            #   for sub-key contents of each section.
 │
 └── fields/                             # /fields child group
     ├── B_1, B_2, B_3, ...                 # field arrays
     ├── E_1, E_2, E_3, ..., rho_c, rho_m, J_1, ..., u_1, u_2, u_3
-    ├── x, y, z                         # 1-D coordinate arrays (xarray
-    │                                   #   dimension coords; names track
-    │                                   #   grid.surviving_axis_names, which
-    │                                   #   equals coordinates.axis_labels
-    │                                   #   for an un-sliced 3D dataset)
+    ├── x, y, z                         # 1-D dimension coords; names track
+    │                                   #   grid.surviving_axis_names
     └── time                            # only for multi-step writes
 ```
 
