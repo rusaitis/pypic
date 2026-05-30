@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Annotated, Literal
 
 import typer
 
+from pypic._codegen_cli import app as export_app
 from pypic.dataset import FieldDataset
 from pypic.schema.cli import app as schema_app
 
@@ -556,6 +557,7 @@ convert_app = typer.Typer(
 )
 app.add_typer(convert_app, name="convert")
 app.add_typer(schema_app, name="schema")
+app.add_typer(export_app, name="export")
 
 reduce_app = typer.Typer(
     name="reduce",
