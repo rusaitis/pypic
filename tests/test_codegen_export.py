@@ -6,8 +6,11 @@ import json
 
 from typer.testing import CliRunner
 
+from pypic._aliases import COMPUTE_ALIASES, GROUP_ALIASES
 from pypic._codegen_cli import app as export_app
 from pypic.codegen import export_aliases, export_bundle, export_fields, export_recipes
+from pypic.compute import RECIPES, SPECIES_TEMPLATES
+from pypic.fields import _FIELD_INFO
 
 runner = CliRunner()
 
@@ -19,8 +22,27 @@ def test_bundle_is_json_serializable() -> None:
 
 def test_bundle_has_all_sections() -> None:
     bundle = export_bundle()
-    for key in ("schemaVersion", "jsonSchema", "computeAliases", "recipes", "fields"):
+    for key in (
+        "schemaVersion",
+        "jsonSchema",
+        "computeAliases",
+        "groupAliases",
+        "speciesSuffixRe",
+        "recipes",
+        "speciesTemplates",
+        "fields",
+    ):
         assert key in bundle
+
+
+def test_bundle_covers_every_registry_entry() -> None:
+    # Guard against a silently-skipped entry during serialization.
+    bundle = export_bundle()
+    assert len(bundle["recipes"]) == len(RECIPES)
+    assert len(bundle["speciesTemplates"]) == len(SPECIES_TEMPLATES)
+    assert len(bundle["fields"]) == len(_FIELD_INFO)
+    assert len(bundle["computeAliases"]) == len(COMPUTE_ALIASES)
+    assert len(bundle["groupAliases"]) == len(GROUP_ALIASES)
 
 
 def test_recipe_magnitude_dependencies() -> None:

@@ -2,7 +2,7 @@
 
 __version__ = "0.1.0"
 
-from pypic import aliases
+from pypic import aliases, codegen
 from pypic.comparison import (
     compare_fields,
     field_comparison_report,
@@ -199,6 +199,7 @@ __all__ = [
     "aliases",
     "align_grids",
     "available_quantities",
+    "codegen",
     "common_grid",
     "compare_fields",
     "conserved_to_tabular",
