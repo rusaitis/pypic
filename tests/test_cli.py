@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 from typing import TYPE_CHECKING
 
 import h5py
@@ -1505,15 +1506,13 @@ def test_convert_fields_virtual_rejects_zarr_backend(tmp_path: Path) -> None:
     assert "icechunk" in result.output.lower()
 
 
-@zarr_required
-def test_convert_fields_virtual_reflects_source_mutations(tmp_path: Path) -> None:
-    pytest.importorskip("virtualizarr")
-    pytest.importorskip("icechunk")
-    from pypic.io import from_zarr
+def _write_virtual_source(tmp_path: Path) -> tuple[Path, Path]:
+    """Write a 4^3 HDF5 field and a virtual Icechunk store pointing at it.
 
-    # The reviewer's reproducer: write virtual refs, mutate the source,
-    # confirm the destination read sees the mutation (proving refs
-    # resolve at read time, not snapshots taken at write time).
+    Returns the ``(source, store)`` paths.  Shared by the two virtual-chunk
+    resolution tests below, which differ only in how they touch the source
+    file's mtime afterwards.
+    """
     h5_path = tmp_path / "src.h5"
     with h5py.File(h5_path, "w") as f:
         f.create_group("fields").create_dataset("B_1", data=np.full((4, 4, 4), 7.0))
@@ -1538,14 +1537,57 @@ def test_convert_fields_virtual_reflects_source_mutations(tmp_path: Path) -> Non
         ],
     )
     assert result.exit_code == 0, result.output
+    return h5_path, out
 
-    # Pre-mutation read: original values.
+
+@zarr_required
+def test_convert_fields_virtual_resolves_chunks_at_read_time(tmp_path: Path) -> None:
+    pytest.importorskip("virtualizarr")
+    pytest.importorskip("icechunk")
+    from pypic.io import from_zarr
+
+    # Virtual refs must resolve against the source file on every read, not
+    # snapshot its bytes at write time.  Rewriting the payload and restoring
+    # the original mtime isolates that: the integrity check below sees an
+    # unchanged file, so what comes back is whatever the source holds *now*.
+    h5_path, out = _write_virtual_source(tmp_path)
     np.testing.assert_array_equal(np.asarray(from_zarr(out)["B_1"]), 7.0)
 
-    # Mutate source HDF5; the virtual store must see the new value.
+    stat = h5_path.stat()
     with h5py.File(h5_path, "r+") as f:
         f["fields"]["B_1"][...] = 99.0
+    os.utime(h5_path, (stat.st_atime, stat.st_mtime))
+
     np.testing.assert_array_equal(np.asarray(from_zarr(out)["B_1"]), 99.0)
+
+
+@zarr_required
+def test_convert_fields_virtual_rejects_mutated_source(tmp_path: Path) -> None:
+    pytest.importorskip("virtualizarr")
+    pytest.importorskip("icechunk")
+    import icechunk
+
+    from pypic.io import from_zarr
+
+    # The other half of the contract: Icechunk stamps each virtual chunk with
+    # its source object's last-modified time and refuses the read when that
+    # moves.  Serving bytes whose provenance no longer matches the reference
+    # would be the worse failure, so a hard error here is correct.
+    #
+    # The mtime is advanced explicitly rather than by writing and hoping.
+    # Icechunk compares at one-second resolution, so a same-second rewrite
+    # goes undetected and the assertion would hold only when the test happened
+    # to straddle a second boundary.
+    h5_path, out = _write_virtual_source(tmp_path)
+    np.testing.assert_array_equal(np.asarray(from_zarr(out)["B_1"]), 7.0)
+
+    stat = h5_path.stat()
+    with h5py.File(h5_path, "r+") as f:
+        f["fields"]["B_1"][...] = 99.0
+    os.utime(h5_path, (stat.st_atime + 10.0, stat.st_mtime + 10.0))
+
+    with pytest.raises(icechunk.IcechunkError, match="checksum"):
+        np.asarray(from_zarr(out)["B_1"])
 
 
 @arrow_required
