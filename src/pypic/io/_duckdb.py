@@ -4,7 +4,7 @@ DuckDB automatically discovers Hive-partitioned layouts and applies
 predicate pushdown, partition pruning, and morsel-driven parallelism.
 
 Requires optional dependencies: ``duckdb>=1.4`` and ``pyarrow>=17.0``.
-Install with ``pip install pypic[duckdb]``.
+Install with ``pip install pypic-plasma[duckdb]``.
 """
 
 from __future__ import annotations

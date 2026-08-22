@@ -18,6 +18,6 @@ def ensure_matplotlib() -> None:
         _HAS_MATPLOTLIB = False
         msg = (
             "matplotlib is required for pypic.plotting. "
-            "Install it with: pip install pypic[plot]"
+            "Install it with: pip install pypic-plasma[plot]"
         )
         raise ImportError(msg) from None

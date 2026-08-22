@@ -8,7 +8,7 @@ over HTTP and one WebSocket endpoint that streams
 Install the optional dependencies:
 
 ```sh
-pip install 'pypic[server]'
+pip install 'pypic-plasma[server]'
 ```
 
 Run it:

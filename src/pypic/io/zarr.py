@@ -7,7 +7,7 @@ is serialized into ``xr.Dataset.attrs`` so the round-trip is fully
 self-describing.
 
 Requires optional dependencies: ``zarr>=3.1.0`` and ``numcodecs>=0.16.0``.
-Install with ``pip install pypic[zarr]``.
+Install with ``pip install pypic-plasma[zarr]``.
 """
 
 from __future__ import annotations

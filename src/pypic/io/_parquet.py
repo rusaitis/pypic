@@ -12,7 +12,7 @@ bounding boxes.  This enables ``pyarrow.dataset`` predicate pushdown
 to skip 95%+ of row groups for spatial box queries.
 
 Requires optional dependency: ``pyarrow>=17.0``.
-Install with ``pip install pypic[arrow]``.
+Install with ``pip install pypic-plasma[arrow]``.
 """
 
 from __future__ import annotations

@@ -18,7 +18,10 @@ def ensure_zarr() -> None:
     if _HAS_ZARR is True:
         return
     if _HAS_ZARR is False:
-        msg = "Missing dependencies for pypic.io. Install with: pip install pypic[zarr]"
+        msg = (
+            "Missing dependencies for pypic.io. "
+            "Install with: pip install pypic-plasma[zarr]"
+        )
         raise ImportError(msg) from None
     missing: list[str] = []
     try:
@@ -33,7 +36,7 @@ def ensure_zarr() -> None:
         _HAS_ZARR = False
         msg = (
             f"Missing dependencies for pypic.io: {', '.join(missing)}. "
-            "Install with: pip install pypic[zarr]"
+            "Install with: pip install pypic-plasma[zarr]"
         )
         raise ImportError(msg) from None
     _HAS_ZARR = True
@@ -47,7 +50,7 @@ def ensure_virtualizarr() -> None:
     if _HAS_VIRTUALIZARR is False:
         msg = (
             "Missing virtualizarr for pypic.io.open_virtual. "
-            "Install with: pip install pypic[zarr]"
+            "Install with: pip install pypic-plasma[zarr]"
         )
         raise ImportError(msg) from None
     try:
@@ -56,7 +59,7 @@ def ensure_virtualizarr() -> None:
         _HAS_VIRTUALIZARR = False
         msg = (
             "virtualizarr is required for pypic.io.open_virtual. "
-            "Install with: pip install pypic[zarr]"
+            "Install with: pip install pypic-plasma[zarr]"
         )
         raise ImportError(msg) from None
     _HAS_VIRTUALIZARR = True
@@ -70,7 +73,7 @@ def ensure_icechunk() -> None:
     if _HAS_ICECHUNK is False:
         msg = (
             "Missing icechunk for Icechunk backend. "
-            "Install with: pip install pypic[icechunk]"
+            "Install with: pip install pypic-plasma[icechunk]"
         )
         raise ImportError(msg) from None
     try:
@@ -79,7 +82,7 @@ def ensure_icechunk() -> None:
         _HAS_ICECHUNK = False
         msg = (
             "icechunk is required for the Icechunk storage backend. "
-            "Install with: pip install pypic[icechunk]"
+            "Install with: pip install pypic-plasma[icechunk]"
         )
         raise ImportError(msg) from None
     _HAS_ICECHUNK = True
@@ -107,7 +110,7 @@ def ensure_arrow() -> None:
     if _HAS_ARROW is False:
         msg = (
             "Missing pyarrow for pypic.io particle I/O. "
-            "Install with: pip install pypic[arrow]"
+            "Install with: pip install pypic-plasma[arrow]"
         )
         raise ImportError(msg) from None
     try:
@@ -116,7 +119,7 @@ def ensure_arrow() -> None:
         _HAS_ARROW = False
         msg = (
             "pyarrow is required for pypic.io particle I/O. "
-            "Install with: pip install pypic[arrow]"
+            "Install with: pip install pypic-plasma[arrow]"
         )
         raise ImportError(msg) from None
     _HAS_ARROW = True
@@ -144,7 +147,7 @@ def ensure_duckdb() -> None:
     if _HAS_DUCKDB is False:
         msg = (
             "Missing duckdb for pypic.io.query_sql. "
-            "Install with: pip install pypic[duckdb]"
+            "Install with: pip install pypic-plasma[duckdb]"
         )
         raise ImportError(msg) from None
     try:
@@ -153,7 +156,7 @@ def ensure_duckdb() -> None:
         _HAS_DUCKDB = False
         msg = (
             "duckdb is required for pypic.io.query_sql. "
-            "Install with: pip install pypic[duckdb]"
+            "Install with: pip install pypic-plasma[duckdb]"
         )
         raise ImportError(msg) from None
     _HAS_DUCKDB = True

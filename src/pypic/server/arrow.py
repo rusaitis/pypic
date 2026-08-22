@@ -87,7 +87,7 @@ def field_dataset_to_arrow_ipc(
     ------
     ImportError
         ``pyarrow`` is not installed (install with
-        ``pip install pypic[server]``).
+        ``pip install pypic-plasma[server]``).
     KeyError
         Any name in *fields* is absent from the dataset.
     ValueError

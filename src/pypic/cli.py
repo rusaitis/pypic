@@ -2380,14 +2380,14 @@ def serve(
     webpic and other Arrow-aware clients.  See ``docs/api/server.md``
     for the wire protocol.
 
-    Requires the ``server`` extra (pip install 'pypic[server]').
+    Requires the ``server`` extra (pip install 'pypic-plasma[server]').
     """
     try:
         from pypic.server.app import serve as _serve
     except ImportError as exc:
         typer.echo(
             "pypic serve requires the server extra. "
-            "Install with: pip install pypic[server]",
+            "Install with: pip install pypic-plasma[server]",
             err=True,
         )
         raise typer.Exit(1) from exc

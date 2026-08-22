@@ -4,7 +4,7 @@ Provides Git-like versioning (tags, snapshots, branches) and ACID
 transactions over Zarr v3 stores via the Icechunk Rust backend.
 
 Requires optional dependency ``icechunk>=1.1``.
-Install with ``pip install pypic[icechunk]``.
+Install with ``pip install pypic-plasma[icechunk]``.
 """
 
 from __future__ import annotations

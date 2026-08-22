@@ -6,7 +6,7 @@ store) so that consumers see a standard ``xr.open_zarr``-style dataset
 that resolves chunks by reading byte ranges from the source HDF5 files.
 
 Requires optional dependencies ``virtualizarr>=2.4`` and
-``icechunk>=1.1``; both are installed by ``pip install pypic[zarr]``.
+``icechunk>=1.1``; both are installed by ``pip install pypic-plasma[zarr]``.
 """
 
 from __future__ import annotations
@@ -251,7 +251,7 @@ def open_virtual(
     -----
     Virtual references are persisted via Icechunk's native Zarr v3
     backend (in-memory store).  Both ``virtualizarr`` and ``icechunk``
-    are installed by the ``zarr`` extra (``pip install pypic[zarr]``).
+    are installed by the ``zarr`` extra (``pip install pypic-plasma[zarr]``).
     """
     ensure_virtualizarr()
     ensure_icechunk()
@@ -365,7 +365,7 @@ def to_icechunk_virtual(
     Notes
     -----
     Both ``virtualizarr`` and ``icechunk`` are installed by the
-    ``zarr`` extra (``pip install pypic[zarr]``).  Moving or deleting
+    ``zarr`` extra (``pip install pypic-plasma[zarr]``).  Moving or deleting
     *source* after the write breaks the virtual refs in *output* — the
     on-disk repo is metadata only.
     """

@@ -59,7 +59,10 @@ def create_app(
         from fastapi.middleware.cors import CORSMiddleware
         from fastapi.responses import JSONResponse
     except ImportError as exc:
-        msg = "pypic.server requires FastAPI. Install with: pip install pypic[server]"
+        msg = (
+            "pypic.server requires FastAPI. "
+            "Install with: pip install pypic-plasma[server]"
+        )
         raise ImportError(msg) from exc
 
     from pypic.server._state import SimulationRegistry
@@ -129,12 +132,15 @@ def serve(
     Raises
     ------
     ImportError
-        uvicorn is not installed (``pip install pypic[server]``).
+        uvicorn is not installed (``pip install pypic-plasma[server]``).
     """
     try:
         import uvicorn
     except ImportError as exc:
-        msg = "pypic serve requires uvicorn. Install with: pip install pypic[server]"
+        msg = (
+            "pypic serve requires uvicorn. "
+            "Install with: pip install pypic-plasma[server]"
+        )
         raise ImportError(msg) from exc
 
     app = create_app(root, cors_origins=cors_origins)

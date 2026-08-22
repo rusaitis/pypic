@@ -16,6 +16,6 @@ def ensure_pyvista() -> None:
         _HAS_PYVISTA = False
         msg = (
             "pyvista is required for 3D rendering. "
-            "Install it with: pip install pypic[3d]"
+            "Install it with: pip install pypic-plasma[3d]"
         )
         raise ImportError(msg) from None
