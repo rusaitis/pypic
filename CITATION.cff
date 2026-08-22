@@ -13,7 +13,7 @@ authors:
     given-names: Liutauras
     email: liutauras.rusaitis@gmail.com
     # orcid: "https://orcid.org/0000-0000-0000-0000"  # TODO
-version: 0.1.1
+version: 0.1.2
 license: MIT
 date-released: 2026-08-22
 url: "https://github.com/rusaitis/pypic"

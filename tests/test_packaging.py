@@ -15,10 +15,14 @@ checkout and only surface once the package is installed cleanly:
 from __future__ import annotations
 
 import re
+import sys
 import tomllib
 from pathlib import Path
 
+import pytest
+
 import pypic
+from pypic import _cli_entry
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 _SRC_DIR = _REPO_ROOT / "src" / "pypic"
@@ -67,3 +71,65 @@ def test_no_metadata_lookup_uses_a_non_distribution_name() -> None:
         f"distribution metadata must be looked up as {dist_name!r} "
         f"(or better, read pypic.__version__):\n" + "\n".join(offenders)
     )
+
+
+def test_console_script_targets_the_guarded_entry_point() -> None:
+    """``[project.scripts]`` must not point straight at ``pypic.cli``.
+
+    Typer ships in the ``cli`` extra but the console script is always
+    installed, so a bare install would otherwise put a ``pypic`` command
+    on ``PATH`` that fails with a raw ``ModuleNotFoundError``.
+    """
+    script = _pyproject()["project"]["scripts"]["pypic"]
+    assert script == "pypic._cli_entry:main", (
+        f"console script points at {script!r}; it must go through "
+        f"pypic._cli_entry:main so a missing cli extra produces an "
+        f"install hint instead of a traceback."
+    )
+
+
+class _BlockTyper:
+    """Meta-path finder that makes ``import typer`` fail."""
+
+    def find_spec(self, name: str, path: object = None, target: object = None) -> None:
+        if name == "typer" or name.startswith("typer."):
+            raise ModuleNotFoundError(f"No module named {name!r}", name="typer")
+        return None
+
+
+def _block_typer(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Make the next ``import typer`` raise, restoring state afterwards."""
+    for cached in [m for m in sys.modules if m == "typer" or m.startswith("typer.")]:
+        monkeypatch.delitem(sys.modules, cached)
+    monkeypatch.delitem(sys.modules, "pypic.cli", raising=False)
+    monkeypatch.setattr(sys, "meta_path", [_BlockTyper(), *sys.meta_path])
+
+
+def test_missing_cli_extra_reports_install_hint(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A missing Typer yields an install hint, not a traceback."""
+    _block_typer(monkeypatch)
+
+    with pytest.raises(SystemExit) as excinfo:
+        _cli_entry.main()
+
+    assert "pypic-plasma[cli]" in str(excinfo.value), (
+        f"expected an install hint naming the cli extra, got: {excinfo.value}"
+    )
+
+
+def test_unrelated_import_error_is_not_swallowed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Only cli-extra modules get the hint; real breakage propagates.
+
+    Emptying the allow-list makes the same missing Typer look like an
+    unrelated failure, which must surface as-is rather than being
+    reported to the user as a missing extra.
+    """
+    _block_typer(monkeypatch)
+    monkeypatch.setattr(_cli_entry, "_CLI_EXTRA_MODULES", frozenset())
+
+    with pytest.raises(ModuleNotFoundError, match="typer"):
+        _cli_entry.main()

@@ -8,7 +8,7 @@ build-backend = "hatchling.build"
 # had no release since. See [tool.hatch.build.targets.wheel] below —
 # hatchling infers the package directory from this name and needs telling.
 name = "pypic-plasma"
-version = "0.1.1"
+version = "0.1.2"
 description = "Read, analyze, and plot plasma simulation output from PIC and MHD codes."
 readme = "README.md"
 license = "MIT"
@@ -55,7 +55,9 @@ Issues = "https://github.com/rusaitis/pypic/issues"
 Changelog = "https://github.com/rusaitis/pypic/releases"
 
 [project.scripts]
-pypic = "pypic.cli:app"
+# Guarded shim, not pypic.cli:app directly — the command is always
+# installed but Typer only ships in the `cli` extra.
+pypic = "pypic._cli_entry:main"
 
 [project.optional-dependencies]
 plot = ["matplotlib>=3.9"]
