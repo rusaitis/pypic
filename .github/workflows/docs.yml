@@ -21,8 +21,10 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
+      - uses: actions/checkout@v7
+      # setup-uv is pinned to a full version, not a major tag: it stopped
+      # publishing @vN tags at v8 to reduce supply-chain exposure.
+      - uses: astral-sh/setup-uv@v10.0.1
         with:
           enable-cache: true
           cache-dependency-glob: "uv.lock"
@@ -30,8 +32,8 @@ jobs:
       # the optional extras must be installed for those pages to build.
       - run: uv sync --all-extras --all-groups
       - run: uv run mkdocs build --strict
-      - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/configure-pages@v6
+      - uses: actions/upload-pages-artifact@v5
         with:
           path: site
 
@@ -43,4 +45,4 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
