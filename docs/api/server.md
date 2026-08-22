@@ -246,15 +246,16 @@ These belong to follow-up tickets, not the foundations:
 
 * **Authentication** — token validation in a middleware. Out of scope.
 * **Particle WebSocket** — analogous endpoint for `ParticleData` (the
-  `[Parquet](../api/particles.md)` interchange already exists; the WS
-  bridge would mirror `field_dataset_to_arrow_ipc` for particles).
+  [Parquet interchange](../schema.md#43-particle-layout-parquet) already
+  exists; the WS bridge would mirror `field_dataset_to_arrow_ipc` for
+  particles).
 * **Progressive / chunked transfer** — multiple `RecordBatch` frames
   per response for very large datasets. The current single-batch
   encoding scales to a few hundred MB of double precision; beyond
   that, switch to chunking.
 * **Server-side frame transforms** — accepting a `frame` field in the
   request and applying `FieldDataset.transform_to` before encoding.
-  Easy to add when [Time-dependent frame transforms](units.md) lands.
+  Easy to add when TASKS Step 40 (time-dependent frame transforms) lands.
 * **Selection-provenance round-trip** — TASKS Step 37b ships the
   `SelectionSpec` shape defined here into stored Zarr `attrs.selections`
   so reduced datasets can replay their region definition.

@@ -1,6 +1,6 @@
-# pypic.simulation.toml — annotated template (schema v1.0 proposal)
+# pypic.simulation.toml — annotated template (schema v1.0)
 #
-# Full shape of a pypic simulation.toml under the proposed v1.0 schema,
+# Full shape of a pypic simulation.toml under the v1.0 schema,
 # shown side-by-side for three very different runs:
 #
 #   Scenario A — kinetic PIC (ion-normalized, two-species, Earth double Harris)
@@ -112,7 +112,6 @@
 #   required for DataCite compliance and most funder mandates (NSF,
 #   NASA SMD, Horizon Europe). Placeholder `0000-0000-0000-0000` is
 #   intentional — replace with real ORCIDs before publishing.
-#   `0000-0002-1825-0097` is ORCID's published example (Josiah Carberry).
 #
 # Roadmap — non-breaking; the v1.0 structure already accommodates everything
 # below. New sub-tables slot in under existing namespaces; existing sub-tables
@@ -195,7 +194,7 @@ authors = [
 name        = "double_harris_demo"
 description = "Double Harris sheet reconnection, ion-normalized"
 authors = [
-    { name = "L. Rusaitis", orcid = "0000-0002-1825-0097", affiliation = "Independent Researcher", role = "PI" },
+    { name = "L. Rusaitis", orcid = "0000-0003-2904-3672", affiliation = "Independent Researcher", role = "PI" },
 ]
 date        = 2026-04-23               # TOML native date literal
 git_sha     = "ea3fdfa"                # commit of the input deck / code
@@ -651,7 +650,7 @@ created = 2026-04-23
 # name        = "ar13664_flux_rope_eruption"
 # description = "AR 13664 flux-rope eruption, HMI-driven photosphere (2024-05-11)"
 # authors = [
-#     { name = "L. Rusaitis", orcid = "0000-0002-1825-0097", affiliation = "Independent Researcher", role = "PI" },
+#     { name = "L. Rusaitis", orcid = "0000-0003-2904-3672", affiliation = "Independent Researcher", role = "PI" },
 # ]
 # date        = 2026-04-24
 # git_sha     = "8c1a5f3"
@@ -1001,7 +1000,7 @@ created = 2026-04-23
 # name        = "mercury_bepicolombo_2026_04"
 # description = "Mercury magnetosphere hybrid, BepiColombo MPO upstream monitor"
 # authors = [
-#     { name = "L. Rusaitis", orcid = "0000-0002-1825-0097", affiliation = "Independent Researcher", role = "PI" },
+#     { name = "L. Rusaitis", orcid = "0000-0003-2904-3672", affiliation = "Independent Researcher", role = "PI" },
 # ]
 # date        = 2026-04-24
 # git_sha     = "7e4b2d9"

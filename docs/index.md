@@ -46,6 +46,16 @@ b_si = fds.in_si("B_1")
 b_nT = fds.in_units("B_1", "nT")
 ```
 
+## Ecosystem
+
+pypic is the Python half of a three-part toolchain built around the shared
+[`simulation.toml` schema](schema.md): **rustpic** (a Rust PIC/MHD solver) writes
+the schema, pypic reads and analyzes it, and **webpic** (Three.js/WebGPU) renders
+it in the browser over the Arrow IPC server in [`pypic.server`](api/server.md).
+Both siblings are in development and not yet public -- you will see them named in
+a few docstrings and in the `[webpic]` block of the bundled plot themes. pypic is
+fully usable on its own; nothing here depends on either of them.
+
 ## Requirements
 
 Python 3.13+. Core dependencies: NumPy, SciPy, xarray, h5py.

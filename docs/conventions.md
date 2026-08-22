@@ -3,8 +3,6 @@
 Detailed physics conventions for derived quantities in pypic.
 These notes supplement the equation tables in [equations.md](equations.md)
 and the field name tables in [SCHEMA](schema.md).
-When TASKS.md Steps 7-8 are implemented, the relevant sections
-will migrate into function docstrings in `derived.py`.
 
 ## Gamma Convention for PIC Entropy
 

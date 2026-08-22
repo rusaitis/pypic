@@ -107,6 +107,17 @@ the call site instead of surfacing as missing data three steps downstream.
   `convert`, `reduce`, and `schema validate` for quick inspection without
   writing a script.
 
+## Ecosystem
+
+pypic is the Python half of a three-part toolchain built around the shared
+[`simulation.toml` schema](https://rusaitis.github.io/pypic/schema/):
+**rustpic** (a Rust PIC/MHD solver) writes the schema, pypic reads and analyzes
+it, and **webpic** (Three.js/WebGPU) renders it in the browser over the Arrow
+IPC server in `pypic.server`. Both siblings are in development and not yet
+public — you will see them named in the roadmap, in a few docstrings, and in
+the `[webpic]` block of the bundled plot themes. pypic is fully usable on its
+own; nothing here depends on either of them.
+
 ## Documentation
 
 Full documentation, including the physics reference, lives at
@@ -122,11 +133,11 @@ Full documentation, including the physics reference, lives at
 
 ## Status
 
-pypic is **0.1.0 research software under active development**. The core is in
-daily use — load data, compute derived quantities, compare runs, select
-subregions, convert units, make figures — and is covered by ~2750 tests
-including Hypothesis property tests, hand-calculated physics values, and
-NRL Formulary cross-checks.
+pypic is **early-stage research software (0.1.x) under active
+development**. The core is in daily use — load data, compute derived
+quantities, compare runs, select subregions, convert units, make figures — and
+is covered by ~2750 tests including Hypothesis property tests, hand-calculated
+physics values, and NRL Formulary cross-checks.
 
 The public API may still change before 1.0. Non-Cartesian operators, several
 additional readers (Vlasiator, VPIC, ARMS, openPMD), and the field-line mapping

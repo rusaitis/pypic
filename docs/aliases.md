@@ -97,8 +97,6 @@ For total pressure across N species, compute explicitly:
 P = sum(data.compute(f"P_s{i}") for i in range(n_species))
 ```
 
-See `examples/advanced_calculations.py`.
-
 ## Vector-group expansion with e/i forms
 
 The vector-group expansion rules in [Schema § 3](schema.md#3-canonical-field-names)

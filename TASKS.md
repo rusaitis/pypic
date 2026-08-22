@@ -169,9 +169,10 @@ Each step produces something testable. No step starts until the previous step's 
 
 > **Tier-3 canonical names (locked pre-v1.0).** Cross-tool work below uses `<field>[_s<N>][_<i>]` with species qualifier between field name and index (`B_1`, `V_s0_1`, `P_s0_11`, `q_s0_1`). HDF5 §4.1 and Zarr §4.2 stores must use these — `B1`, `V1_s0`, `P11_s0` are not emitted by any pypic-aware tool. rustpic and webpic wire directly to Tier-3; no migration shim since neither has shipped.
 
-- [ ] **Step 37: `pypic.server` — Arrow IPC streaming via Starlette/FastAPI**
+- [x] **Step 37: `pypic.server` — Arrow IPC streaming via Starlette/FastAPI**
   Zero-copy field serving to webpic. Arrow IPC over WebSocket — **not** Arrow Flight (no JS Flight client for browsers; gRPC-Web needs Envoy proxy and eliminates Flight's advantages). Pipeline: `pyarrow RecordBatch → IPC bytes → WebSocket → tableFromIPC() → Float32Array → Three.js BufferAttribute → GPU`. WebSocket = persistent bidirectional for streaming + time-series animation.
   Viewer-UI selections map to pypic `Selection` server-side. Lazy I/O via xarray/dask serves only requested slices. Arrow IPC carries structured metadata (names, coords, units, normalization) in a single response. Readable in JS (`apache-arrow`) and Rust (`arrow-rs`) — aligns all three projects on one interchange format. Derived quantities via `compute()`; unit conversion via `in_si()`/`in_units()`. Optional dep: `fastapi`, `uvicorn`, `pyarrow`, `websockets` under `server` extra. Separate entry point, not on library import path.
+  Shipped: `app` / `routes` (`/health`, `/sims`, `/sims/{sim}`, `/sims/{sim}/steps`, `/sims/{sim}/fields`) + `arrow` / `stream` / `protocol` / `_state` / `exceptions`, the `server` extra, the `pypic serve` CLI command, `docs/api/server.md`, and five `tests/test_server_*.py` modules.
   **Depends on:** Steps 24-25.
 
 - [x] **Step 37a:** Typed server exception hierarchy — `PypicError` base + `UnknownSimulationError` / `UnknownFieldError` / `UnknownStepError` / `GeometryUnsupportedError` in `pypic.exceptions`; server-only `ValidationFailedError` wraps Pydantic errors; single dispatcher unifies HTTP (`status_code`) and WebSocket (`ErrorFrame.kind`) transports.
@@ -200,7 +201,7 @@ Step 5 (FieldDataset)    ←── 24, 25 (Zarr/Arrow)    ←── 26 (convert 
                          ←── 23, 35, 36, 42 (readers)
                          ←── 27 (interop adapters)
 Step 11 + Step 5         ←── 43 (reductions) ←── 43b (Jacobian), 43c (units)
-Steps 24, 25             ←── 37 (Arrow IPC server) ←── 37a (typed exceptions, shipped)
+Steps 24, 25             ←── 37 (Arrow IPC server, shipped) ←── 37a (typed exceptions, shipped)
                                                    ←── 37b (selection provenance), 39 (docs)
 Step 20                  ←── 38 (rustpic reader)
 pypic.traces             ←── 44 (field-line tracer + pypic.maps)
@@ -211,4 +212,4 @@ pypic.traces             ←── 44 (field-line tracer + pypic.maps)
 traces/_sampling.py      ←── 41 (probes) ←── 41b (SPICE)
 ```
 
-Recommended order: 37b after 37 (37a shipped); 38 needs a rustpic dump; 39 follows 37; 23/35/36/42 anytime; 40 unblocks 41b; 43b/43c anytime after 43; 44a-g modular (44f is the kernel for 44g); 19b precedes 20b and 44d.
+Recommended order: 37b next (37 and 37a shipped); 38 needs a rustpic dump; 39 follows 37; 23/35/36/42 anytime; 40 unblocks 41b; 43b/43c anytime after 43; 44a-g modular (44f is the kernel for 44g); 19b precedes 20b and 44d.
