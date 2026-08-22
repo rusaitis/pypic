@@ -14,6 +14,7 @@ authors:
     email: liutauras.rusaitis@gmail.com
     # orcid: "https://orcid.org/0000-0000-0000-0000"  # TODO
 version: 0.1.0
+license: MIT
 # date-released: YYYY-MM-DD  # TODO: set when tagging the first release
 url: "https://github.com/rusaitis/pypic"
 repository-code: "https://github.com/rusaitis/pypic"

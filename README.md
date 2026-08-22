@@ -62,3 +62,7 @@ prints a small table:
 ```sh
 uv run python benchmarks/bench_batched_tracer.py  # batched vs scalar adaptive tracer
 ```
+
+## License
+
+MIT — see [LICENSE](LICENSE).
