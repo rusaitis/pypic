@@ -9,6 +9,7 @@
   <a href="https://rusaitis.github.io/pypic/"><img src="https://img.shields.io/badge/docs-mkdocs--material-blue" alt="Documentation"></a>
   <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.13%2B-blue" alt="Python 3.13+"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT License"></a>
+  <a href="https://doi.org/10.5281/zenodo.22059414"><img src="https://zenodo.org/badge/DOI/10.5281/zenodo.22059414.svg" alt="DOI"></a>
 </p>
 
 A Python toolkit for reading, analyzing, and plotting plasma simulation output
@@ -134,9 +135,11 @@ roadmap and what is already done.
 
 ## Citing
 
-If pypic contributes to work you publish, please cite it. Metadata lives in
-[CITATION.cff](CITATION.cff); GitHub renders it as a ready-to-paste citation
-via the *Cite this repository* button.
+If pypic contributes to work you publish, please cite it. The concept DOI
+[10.5281/zenodo.22059414](https://doi.org/10.5281/zenodo.22059414) always
+resolves to the latest release; each release also gets its own version DOI.
+Metadata lives in [CITATION.cff](CITATION.cff), which GitHub renders as a
+ready-to-paste citation via the *Cite this repository* button.
 
 ## Contributing
 

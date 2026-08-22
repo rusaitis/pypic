@@ -1,6 +1,6 @@
 """pypic: read, analyze, and plot plasma simulation output."""
 
-__version__ = "0.1.0"
+__version__ = "0.1.1"
 
 from pypic import aliases, codegen
 from pypic.comparison import (

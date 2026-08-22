@@ -13,9 +13,9 @@ authors:
     given-names: Liutauras
     email: liutauras.rusaitis@gmail.com
     # orcid: "https://orcid.org/0000-0000-0000-0000"  # TODO
-version: 0.1.0
+version: 0.1.1
 license: MIT
-# date-released: YYYY-MM-DD  # TODO: set when tagging the first release
+date-released: 2026-08-22
 url: "https://github.com/rusaitis/pypic"
 repository-code: "https://github.com/rusaitis/pypic"
 keywords:
@@ -25,8 +25,7 @@ keywords:
   - simulation analysis
   - heliophysics
   - python
-# TODO: register a Zenodo concept DOI and uncomment.
-# identifiers:
-#   - type: doi
-#     value: 10.5281/zenodo.XXXXXXX
-#     description: Zenodo concept DOI (all versions).
+identifiers:
+  - type: doi
+    value: 10.5281/zenodo.22059414
+    description: Zenodo concept DOI (resolves to the latest version).
