@@ -1,0 +1,14 @@
+# Actions only. Python dependencies are pinned through the committed uv.lock,
+# and the weekly `resolve` job in ci.yml already re-resolves from pyproject.toml
+# to catch upstream drift deliberately — see the rationale comment there.
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "chore"
+    groups:
+      actions:
+        patterns: ["*"]

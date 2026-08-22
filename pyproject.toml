@@ -52,7 +52,7 @@ Homepage = "https://github.com/rusaitis/pypic"
 Documentation = "https://rusaitis.github.io/pypic/"
 Repository = "https://github.com/rusaitis/pypic"
 Issues = "https://github.com/rusaitis/pypic/issues"
-Changelog = "https://github.com/rusaitis/pypic/releases"
+Changelog = "https://github.com/rusaitis/pypic/blob/main/CHANGELOG.md"
 
 [project.scripts]
 # Guarded shim, not pypic.cli:app directly — the command is always
