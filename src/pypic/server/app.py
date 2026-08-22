@@ -148,14 +148,14 @@ def serve(
 
 
 def _pypic_version() -> str:
-    """Look up the installed pypic version (returns ``"unknown"`` if absent).
+    """Return the pypic version.
 
     Shared by the ``/health`` probe and the FastAPI ``version`` field
-    so the two never drift.
+    so the two never drift. Reads the package attribute rather than
+    installed distribution metadata: the distribution is named
+    ``pypic-plasma`` while the package is ``pypic``, and a metadata
+    lookup keyed on the wrong name fails only outside a dev checkout.
     """
-    import importlib.metadata
+    from pypic import __version__
 
-    try:
-        return importlib.metadata.version("pypic")
-    except importlib.metadata.PackageNotFoundError:
-        return "unknown"
+    return __version__

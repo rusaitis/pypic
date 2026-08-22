@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import importlib.metadata
 import json
 import logging
 from pathlib import Path
@@ -10,6 +9,7 @@ from typing import TYPE_CHECKING, Annotated, Literal
 
 import typer
 
+from pypic import __version__
 from pypic._codegen_cli import app as export_app
 from pypic.dataset import FieldDataset
 from pypic.schema.cli import app as schema_app
@@ -56,8 +56,7 @@ ProgressOption = Annotated[
 
 def _version_callback(value: bool) -> None:
     if value:
-        ver = importlib.metadata.version("pypic")
-        typer.echo(f"pypic {ver}")
+        typer.echo(f"pypic {__version__}")
         raise typer.Exit
 
 
