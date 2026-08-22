@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING, Any, Literal
 
 from pypic.plotting.pyvista._guard import ensure_pyvista
@@ -11,6 +12,8 @@ if TYPE_CHECKING:
     from matplotlib.colors import Colormap
 
     from pypic.plotting.styles import PlotTheme
+
+logger = logging.getLogger(__name__)
 
 
 def _resolve_theme(theme: PlotTheme | None) -> PlotTheme:
@@ -246,7 +249,7 @@ def show_or_save(
         plotter.show(auto_close=False)
         plotter.screenshot(str(outfile), transparent_background=transparent_background)
         plotter.close()
-        print(f"Saved to {outfile}")
+        logger.info("Saved to %s", outfile)
     else:
         plotter.show()
 

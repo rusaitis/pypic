@@ -20,6 +20,9 @@ import numpy as np
 if TYPE_CHECKING:
     from numpy.typing import NDArray
 
+# Maintainer-only: a full-size OpenGGCM-UCLA run, not shipped with the
+# repo. Point this at a local .3df output directory to regenerate the
+# committed subsample in OUTPUT_DIR.
 EXAMPLE_DIR = Path("examples/uclamhd-example-3D")
 OUTPUT_DIR = Path("tests/data/openggcm-small")
 STEP = 25  # subsample stride

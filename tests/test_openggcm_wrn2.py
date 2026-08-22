@@ -17,6 +17,9 @@ from pypic.readers.openggcm._wrn2 import (
     decompress_field_vectorized,
 )
 
+# Full-size OpenGGCM output (~10^8 values per field), far too large to
+# commit. Maintainer-only; the committed subsample under
+# tests/data/openggcm-small/ drives every other test in this file.
 _EXAMPLE_3DF = Path("examples/uclamhd-example-3D/gc012.3df.006300")
 
 
@@ -354,7 +357,7 @@ class TestConvertFieldsPassthrough:
 
 @pytest.mark.skipif(
     not _EXAMPLE_3DF.exists(),
-    reason="Example data not available",
+    reason="needs a full-size OpenGGCM .3df run (not shipped with the repo)",
 )
 class TestRealData:
     """Integration tests against real .3df data."""

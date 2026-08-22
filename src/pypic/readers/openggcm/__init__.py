@@ -10,9 +10,11 @@ Quick start::
     from pypic.readers.openggcm import open_openggcm
     from pathlib import Path
 
-    reader, cfg = open_openggcm(Path("examples/uclamhd-example-3D"))
-    ds = reader.read_timestep(Path("examples/uclamhd-example-3D"), 6300)
-    print(ds.field_names)
+    path = Path("tests/data/openggcm-small")
+    reader, cfg = open_openggcm(path)
+    ds = reader.read_timestep(path, 6300)
+    sorted(ds.field_names())
+    # ['B_1', 'B_2', 'B_3', 'P', 'V_1', 'V_2', 'V_3', 'n_s0', ...]
 """
 
 from __future__ import annotations
