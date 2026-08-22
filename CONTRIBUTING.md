@@ -62,8 +62,9 @@ uv run python benchmarks/bench_batched_tracer.py   # batched vs scalar tracer
 
 ## Conventions
 
-The full architecture and style rules live in [CLAUDE.md](CLAUDE.md). The ones
-that most often trip up a first contribution:
+The full architecture and style rules live in
+[docs/architecture.md](docs/architecture.md). The ones that most often trip up
+a first contribution:
 
 - **xarray is the container, NumPy is the compute engine.** Functions in
   `derived.py` and `diagnostics.py` are pure: arrays in, arrays out, no

@@ -56,6 +56,7 @@ nav:
   - Home: index.md
   - Getting Started: getting-started.md
   - Tutorial: tutorial.md
+  - Architecture: architecture.md
   - Physics Reference:
     - Derivations: derivations.md
     - Equations: equations.md

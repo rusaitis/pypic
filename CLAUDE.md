@@ -4,6 +4,8 @@ See @README.md for the project information.
 
 ## Architecture
 
+Mirrored for contributors at @docs/architecture.md — update both when a rule changes.
+
 - **xarray as container, NumPy for computation.** `FieldDataset` wraps `xr.Dataset`. All derived/diagnostic functions take and return raw NumPy arrays. xarray never enters the computation path.
 - **Normalized internally, convert at boundaries.** All computation in code units. SI conversion only at I/O and display. See schema.md.
 - **Pure functions for physics.** `derived.py` and `diagnostics.py` functions are pure: arrays in, arrays out. No FieldDataset dependency. No side effects.
@@ -45,7 +47,7 @@ See @README.md for the project information.
 - **Functions:** Descriptive English — `magnetic_field_magnitude()`, `plasma_beta()`, `alfven_speed()`
 - **Parameters:** Short scientific — `bx`, `rho`, `dt`, `q_over_m`. The docstring provides the full description.
 - **Variables:** Descriptive in running code — `electron_density` not `ne`. Math symbols in docstrings.
-- **Field keys:** Short scientific strings — `"B1"`, `"rho_c"`, `"P"` (see schema.md)
+- **Field keys:** Short scientific strings — `"B_1"`, `"rho_c"`, `"P"` (see schema.md)
 - **Constants:** `UPPER_SNAKE_CASE`. Use `scipy.constants` for physical constants, not hand-typed values.
 - **Booleans:** Name as questions — `is_periodic`, `has_field`.
 
@@ -118,7 +120,7 @@ Docs built with MkDocs Material + mkdocstrings.
 ## Dependencies
 
 Core: `numpy`, `scipy`, `xarray`, `h5py`, `pydantic` (v2, for `simulation.toml` validation)
-Optional: `matplotlib` (2D plotting), `pyvista` (3D plotting), `dask` (lazy I/O for large files)
+Optional, each behind its own extra: `plot` (matplotlib), `3d` (pyvista), `lazy` (dask), `cli`, `zarr`, `icechunk`, `arrow`, `duckdb`, `server`
 Dev: `pytest`, `ruff`, `mypy`, `mkdocs-material`, `mkdocstrings`
 
 Do not add dependencies without justification. Prefer standard library where possible.
