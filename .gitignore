@@ -115,6 +115,7 @@ uv.lock
 *.dat
 *.log
 *.png
+!docs/assets/*.png
 examples/*
 !examples/.gitkeep
 # Reference examples used as test fixtures (tests/test_config.py and

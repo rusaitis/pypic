@@ -1,4 +1,12 @@
-# pypic
+---
+title: pypic
+---
+
+<p align="center">
+  <img src="assets/pypic-logo.png" alt="pypic" width="440">
+</p>
+
+<p align="center"><em>Python for Plasma In Cells</em></p>
 
 A Python toolkit for reading, analyzing, and plotting plasma simulation output from PIC and MHD codes.
 

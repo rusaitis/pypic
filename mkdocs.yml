@@ -3,6 +3,8 @@ site_description: Read, analyze, and plot plasma simulation output.
 
 theme:
   name: material
+  logo: assets/pypic-icon.png
+  favicon: assets/pypic-icon.png
   features:
     - content.code.copy
     - navigation.sections
