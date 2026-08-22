@@ -1,11 +1,19 @@
 site_name: pypic
-site_description: Read, analyze, and plot plasma simulation output.
+site_description: Read, analyze, and plot plasma simulation output from PIC and MHD codes.
+site_url: https://rusaitis.github.io/pypic/
+site_author: Liutauras Rusaitis
+copyright: Copyright &copy; 2026 Liutauras Rusaitis — MIT License
+
+repo_url: https://github.com/rusaitis/pypic
+repo_name: rusaitis/pypic
+edit_uri: edit/main/docs/
 
 theme:
   name: material
   logo: assets/pypic-icon.png
   favicon: assets/pypic-icon.png
   features:
+    - content.action.edit
     - content.code.copy
     - navigation.sections
     - navigation.tabs
