@@ -32,6 +32,14 @@ _TEST_SPECIES_INDICES = (0, 1, 2)
 # per-species tensor group analogous to ``Pij``.
 _GROUP_IDENTIFIERS = frozenset({"Pij", "Pij_s{N}"})
 
+# Subsections of § 3 whose tables document names produced by modules
+# that have not shipped yet, so ``field_info()`` cannot resolve them.
+# The schema labels these inline as planned; skipping by heading (rather
+# than by a hardcoded name list) means names added to a planned table
+# stay covered without touching this test. Delete an entry when its
+# producer lands.
+_PLANNED_SUBSECTIONS = frozenset({"### Field-line map quantities"})
+
 
 def _expand_species_template(name: str) -> list[str]:
     if "{N}" not in name:
@@ -43,7 +51,8 @@ def _parse_canonical_names() -> set[str]:
     """Extract first-column names from every table inside § 3.
 
     Stops at the per-particle subsection because that table documents
-    ``ParticleData`` columns, which live in a different schema.
+    ``ParticleData`` columns, which live in a different schema, and
+    skips the subsections listed in ``_PLANNED_SUBSECTIONS``.
     """
     text = _SCHEMA_MD.read_text()
     section_start = text.index("## 3. Canonical Field Names")
@@ -55,8 +64,12 @@ def _parse_canonical_names() -> set[str]:
 
     canonicals: set[str] = set()
     backtick_re = re.compile(r"`([^`]+)`")
+    planned = False
     for line in section.splitlines():
-        if not line.startswith("|") or "`" not in line:
+        if line.startswith("###"):
+            planned = line.strip() in _PLANNED_SUBSECTIONS
+            continue
+        if planned or not line.startswith("|") or "`" not in line:
             continue
         # Headers and divider rows carry no field data.
         if "Canonical" in line or set(line.strip()) <= set("|-: "):

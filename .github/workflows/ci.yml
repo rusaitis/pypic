@@ -5,11 +5,12 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  schedule:
+    - cron: "0 6 * * 1"
 
-# uv.lock is gitignored (library convention — let downstream resolve), so
-# every job re-resolves from pyproject.toml. setup-uv caches the resolver
-# and the wheel store keyed on pyproject.toml so the second run on a given
-# pyproject is fast.
+# uv.lock is committed, so every job installs the same resolved set and a
+# bad upstream release cannot turn CI red on its own. The weekly `resolve`
+# job re-resolves from pyproject.toml to catch that drift deliberately.
 
 jobs:
   lint:
@@ -19,7 +20,7 @@ jobs:
       - uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true
-          cache-dependency-glob: "pyproject.toml"
+          cache-dependency-glob: "uv.lock"
       - run: uv sync --all-extras --all-groups
       - run: uv run ruff check src tests
       - run: uv run ruff format --check src tests
@@ -40,7 +41,7 @@ jobs:
       - uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true
-          cache-dependency-glob: "pyproject.toml"
+          cache-dependency-glob: "uv.lock"
       # mypy needs matplotlib/pyvista/h5py to resolve imports across the
       # plotting and reader subpackages — they're optional at runtime but
       # required for the strict type check to pass.
@@ -49,14 +50,44 @@ jobs:
 
   test:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.13", "3.14"]
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true
-          cache-dependency-glob: "pyproject.toml"
+          cache-dependency-glob: "uv.lock"
       # pytest --doctest-modules walks every src file. _colormaps.py runs
       # _register_custom_colormaps() at import (matplotlib required), and
       # tests/test_plotting* import matplotlib/pyvista directly.
+      - run: uv sync --all-extras --all-groups --python ${{ matrix.python-version }}
+      - run: uv run pytest
+
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
       - run: uv sync --all-extras --all-groups
+      # --strict turns unresolved mkdocstrings cross-references and broken
+      # internal links into build failures, so docs rot is caught here
+      # rather than on the published site.
+      - run: uv run mkdocs build --strict
+
+  # Deliberate canary: ignore the lockfile and resolve fresh so an
+  # incompatible upstream release surfaces on a schedule instead of in
+  # the middle of someone's pull request.
+  resolve:
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv sync --all-extras --all-groups --upgrade
       - run: uv run pytest

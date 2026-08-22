@@ -44,7 +44,7 @@ _DOI_RE = re.compile(r"^10\.\d{4,9}/\S+$")
 def _cited_keys() -> set[str]:
     """Every ``[@Key]`` mentioned in docs prose or Python docstrings."""
     keys: set[str] = set()
-    for md in _DOCS_DIR.glob("*.md"):
+    for md in _DOCS_DIR.rglob("*.md"):
         keys.update(_CITATION_RE.findall(md.read_text()))
     for py in _SRC_DIR.rglob("*.py"):
         keys.update(_CITATION_RE.findall(py.read_text()))

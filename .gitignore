@@ -112,8 +112,7 @@ pypic-review.md
 # MkDocs
 site/
 
-# uv
-uv.lock
+# uv — uv.lock IS committed (see .github/workflows/ci.yml for why)
 
 # Output and data files
 *.h5

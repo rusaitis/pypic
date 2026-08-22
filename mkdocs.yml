@@ -34,6 +34,7 @@ markdown_extensions:
   - footnotes
   - toc:
       permalink: true
+      slugify: !!python/object/apply:pymdownx.slugs.slugify {kwds: {case: lower}}
   - pymdownx.arithmatex:
       generic: true
   - pymdownx.highlight
@@ -54,6 +55,7 @@ nav:
     - Schema: schema.md
     - Aliases (library): aliases.md
   - API Reference:
+    - Core Containers: api/containers.md
     - Derived Quantities: api/derived.md
     - Diagnostics: api/diagnostics.md
     - Spectral Analysis: api/spectral.md

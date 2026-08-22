@@ -9,6 +9,10 @@ here so they don't need to be re-extracted from their first caller.
 
 Public surface intentionally minimal — not re-exported from the
 top-level ``pypic`` namespace until a second consumer emerges.
+
+Structure-preserving (symplectic, variational) integrators follow
+[@HairerLubichWanner2006]; the current Dormand-Prince kernel is the
+classical embedded pair from [@HairerWanner1993].
 """
 
 from pypic.numerics._rk import (
