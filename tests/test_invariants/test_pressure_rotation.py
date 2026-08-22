@@ -12,8 +12,6 @@
 #   (d) Algebraic: ``(P_par + 2 P_perp)/3`` equals the trace/3, so the
 #       isotropic scalar pressure agrees whether derived from the tensor
 #       trace directly or via the parallel/perpendicular decomposition.
-# Fresh invariant proposed after the autoresearcher-pypic.md backlog
-# exhausted at iteration 9 (commit 46678ef).
 """Rotation invariance and CGL identity for pressure decomposition."""
 
 from __future__ import annotations

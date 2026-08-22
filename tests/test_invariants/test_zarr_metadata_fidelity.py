@@ -9,7 +9,6 @@
 #        (expected, lossy by ~7 decimal digits) but leaves *metadata*
 #        bit-exact: Normalization refs, StaggerInfo, species scalars,
 #        PhysicsParams, GridInfo dt/spacing/origin, frame, transforms.
-# Backlog #6 in autoresearcher-pypic.md.
 """Zarr float32 downcast preserves metadata bit-exact, arrays within 1e-6."""
 
 from __future__ import annotations

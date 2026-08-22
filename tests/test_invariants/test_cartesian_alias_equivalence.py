@@ -10,7 +10,7 @@
 #        pattern differs per prefix: "B" uses "B_1", "B0" uses "B0_1"
 #        (schema.md "The background field prefix B0 ends in a digit,
 #        so its components use an underscore separator").
-# Regression guard for the fix surfaced by autoresearcher iter 29.
+# Regression guard for a previously fixed alias-registration bug.
 """Cartesian letter alias resolves to the numbered canonical, bit-exact."""
 
 from __future__ import annotations

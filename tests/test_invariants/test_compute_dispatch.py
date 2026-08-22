@@ -1,8 +1,7 @@
 # Source: docs/schema.md § 3 ("Other derived quantities" table — magnitudes)
 #         + docs/equations.md § 6 ("Magnitudes and Differential Operators").
 # Claim: compute("|X|")² == X1² + X2² + X3² for every registered magnitude.
-# Covers sub-item 2a of the autoresearcher-pypic.md backlog (compute dispatch
-# parity, split by recipe category): the five magnitude recipes in _REGISTRY.
+# Covers compute-dispatch parity for the five magnitude recipes in _REGISTRY.
 """Algebraic identity for the magnitude recipes in ``compute._REGISTRY``."""
 
 from __future__ import annotations

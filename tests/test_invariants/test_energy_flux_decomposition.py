@@ -14,10 +14,8 @@
 #     equations.md [^ef] "HF = EF - KEF is exact" means *physically* exact
 #     (no closure assumption), not *float64*-exact. Weakening the assert
 #     to a tolerance would make the test tautological — just "addition
-#     partially inverts subtraction". Per autoresearcher fitness rule
-#     "do not weaken the property to make it pass", these sub-tests are
-#     dropped rather than softened.
-# Fresh invariant #16 after backlog exhaustion.
+#     partially inverts subtraction". Rather than weaken the property
+#     to make it pass, these sub-tests are dropped.
 """Scaling identities for the energy flux decomposition recipes."""
 
 from __future__ import annotations

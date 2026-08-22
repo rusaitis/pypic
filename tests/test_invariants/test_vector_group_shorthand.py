@@ -14,8 +14,7 @@
 #            component, NOT the whole group — the caller opted out of
 #            the group by naming one axis.
 #        (e) With ``strict_fields=True``, an unknown bare prefix raises
-#            ``KeyError`` (ties into backlog #8's fail-loud contract).
-# Backlog #9 in autoresearcher-pypic.md.
+#            ``KeyError`` (ties into the fail-loud contract).
 """Vector-group shorthand ``fields=[...]`` idempotence and coverage."""
 
 from __future__ import annotations

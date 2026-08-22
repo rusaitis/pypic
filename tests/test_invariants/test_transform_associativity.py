@@ -6,7 +6,7 @@
 #         of adjacent edges the graph traversal happens to fuse first.
 # Claim: compose(compose(T1, T2), T3) == compose(T1, compose(T2, T3)).
 # Inverse is already covered at tests/test_transforms.py:67; associativity
-# is the orthogonal algebraic property. Backlog #4 in autoresearcher-pypic.md.
+# is the orthogonal algebraic property.
 """Hypothesis property: ``compose_transforms`` is associative."""
 
 from __future__ import annotations

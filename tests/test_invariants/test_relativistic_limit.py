@@ -10,7 +10,6 @@
 # Excluded: ``enthalpy`` — its relativistic branch adds the rest-mass
 #        ``c²`` term by design (equations.md § 2), so the two branches
 #        diverge as C² rather than converge.
-# Backlog #7 in autoresearcher-pypic.md.
 """Non-relativistic limit of every derived function that accepts ``c``."""
 
 from __future__ import annotations

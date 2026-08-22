@@ -9,7 +9,6 @@
 # Claim: every user-facing selection API on FieldDataset raises KeyError
 #        (not log-and-skip, not silent empty return) for names that
 #        neither match a loaded field nor resolve via the alias map.
-# Backlog #8 in autoresearcher-pypic.md.
 """Selection APIs fail loud on unmatched names."""
 
 from __future__ import annotations

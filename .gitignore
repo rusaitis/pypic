@@ -103,6 +103,12 @@ CLAUDE.local.md
 .copilot/
 copilot-instructions.md
 
+# Internal development notes (agent loop specs, test-audit scoreboards).
+# Kept out of the public repo; local copies live outside the tree.
+autoresearcher-*.md
+scoreboard-*.tsv
+pypic-review.md
+
 # MkDocs
 site/
 

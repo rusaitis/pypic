@@ -5,7 +5,7 @@
 # that the discrete operators must preserve. With np.gradient's stencil
 # (linear along each axis independently), mixed partials commute bit-exactly
 # at every grid point, so the identity holds to *machine* precision, not
-# just truncation-error precision. Backlog #3 in autoresearcher-pypic.md.
+# just truncation-error precision.
 """Discrete vector identities for ``curl`` and ``divergence``."""
 
 from __future__ import annotations

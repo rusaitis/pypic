@@ -3,7 +3,7 @@
 Each strategy documents the source claim it helps test — schema.md, a
 CLAUDE.md rule, or a docstring invariant. Narrowing a strategy (shrinking
 its range to avoid a counterexample) requires citing the degenerate case
-in a comment; see ``autoresearcher-pypic.md`` for the loop rules.
+in a comment.
 """
 
 from __future__ import annotations

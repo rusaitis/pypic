@@ -24,8 +24,7 @@
 # two_perp_over_three`` already validates the same scalar through the
 # independent parallel/perpendicular decomposition). The
 # commutativity/associativity checks on ``total_pressure`` — a two-arg
-# addition — were < 1 ulp above noise. See
-# /Users/leo/.claude/plans/staged-dazzling-map.md.
+# addition — were < 1 ulp above noise.
 """Isotropic pressure via two independent paths."""
 
 from __future__ import annotations

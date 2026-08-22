@@ -5,7 +5,6 @@
 # Claim: ParticleData.macro_charge == species_charge * weight bit-exact;
 #        macro_mass == species_mass * weight bit-exact. Also guards the
 #        fail-loud contract: either scalar missing → ValueError.
-# Backlog #5 in autoresearcher-pypic.md.
 """Algebraic identity for ``ParticleData.macro_charge`` / ``macro_mass``."""
 
 from __future__ import annotations

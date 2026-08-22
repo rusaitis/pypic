@@ -11,7 +11,7 @@
 # that originally lived here were dropped in the 21st-iteration audit —
 # if linearity broke silently, the div(curl F) = 0 and curl(grad f) = 0
 # identities would fail first, making a separate linearity property
-# pure surface area. See /Users/leo/.claude/plans/staged-dazzling-map.md.
+# pure surface area.
 """The curl(grad f) = 0 vector identity (dual to div(curl F) = 0)."""
 
 from __future__ import annotations
