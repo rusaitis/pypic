@@ -38,6 +38,10 @@ venv/
 .pytest_cache/
 .coverage
 htmlcov/
+# Hypothesis writes its own nested .gitignore, but hatchling's sdist
+# builder only reads this root file — without this line `uv build` sweeps
+# the whole example database into the tarball.
+.hypothesis/
 
 # Linting / type-checking
 .mypy_cache/
@@ -132,4 +136,6 @@ examples/*
 # Test fixture data (small, committed)
 !tests/data/
 !tests/data/**
+# The negation above re-includes everything under tests/data/, which
+# overrides the blanket .DS_Store rule — so re-exclude it explicitly.
 tests/data/.DS_Store
