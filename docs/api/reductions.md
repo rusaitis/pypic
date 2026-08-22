@@ -196,10 +196,11 @@ volume to get total magnetic, kinetic, and thermal energy:
 ```python
 totals_by_step: list[tuple[float, dict[str, float]]] = []
 for step in sim.steps:
-    ds = sim.read(step).compute("e_B", "e_k", "e_th")
+    # compute() returns one array; with_derived() attaches several.
+    ds = sim.read(step).with_derived("e_B", "e_k", "e_th")
     totals = pypic.reduce(ds, ("x", "y", "z"), reduction="integrate")
     totals_by_step.append(
-        (sim.time_for(step), {
+        (step * sim.grid.dt, {
             "E_B": float(totals["e_B"]),
             "E_k": float(totals["e_k"]),
             "E_th": float(totals["e_th"]),

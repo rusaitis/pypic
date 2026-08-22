@@ -14,12 +14,15 @@ pypic provides a unified interface to multiple simulation formats (iPIC3D, BATSR
 
 ## Features
 
-- **Multi-code readers** -- iPIC3D (parallel HDF5, serial HDF5, H5hut), BATSRUS (IDL + HDF5 with AMR regridding), OpenGGCM (Fortran binary), and a generic HDF5 reader. Auto-detection via confidence-based probing.
-- **Derived quantities** -- field magnitudes, plasma beta, Alfvén speed, Mach numbers, Poynting flux, energy densities, pressure tensor decomposition, characteristic scales, entropy, and more. All as pure functions: arrays in, arrays out.
-- **Unit system** -- PIC (electron- or ion-referenced), MHD (Alfvén-speed-based), SI, or custom normalization. Round-trip `normalize()` / `to_si()`.
-- **Geometry-aware operators** -- divergence, curl, gradient with coordinate metric factors.
-- **Selections** -- `PlaneSelection` and `BoxSelection` for slicing 3D data into lower-dimensional views.
-- **Field registry** -- `compute("beta")`, `compute("|B|")`, `compute("v_A")` dispatches to the right derived function.
+- **Multi-code readers** -- iPIC3D (parallel HDF5, serial HDF5, H5hut), BATSRUS (IDL cell + HDF5 BATL with AMR regridding), OpenGGCM (Fortran binary 3df), and a generic HDF5 reader. Auto-detection via confidence-based probing.
+- **Derived quantities** -- field magnitudes, plasma beta, Alfvén speed, Mach numbers, Poynting flux, energy densities, pressure tensor decomposition, characteristic scales, entropy, reconnection diagnostics, and more. All as pure functions: arrays in, arrays out.
+- **Unit system** -- PIC (electron- or ion-referenced), MHD (Alfvén-speed-based), SI, or custom normalization. Round-trip `normalize()` / `to_si()` with display unit conversion.
+- **Geometry-aware operators** -- divergence, curl, gradient with coordinate metric factors. Cartesian implemented; spherical/cylindrical planned.
+- **Selections** -- `PlaneSelection`, `BoxSelection`, and `SphereSelection` slice 3D data into lower-dimensional views or masked subregions.
+- **Reductions** -- `pypic.reduce(ds, axis, reduction=...)` collapses fields along one or more axes: column densities, slab averages, density-weighted line averages, projected-peak maps.
+- **Field-line tracing** -- adaptive Dormand-Prince 5(4) tracer with PI step control, plus Poincaré sections.
+- **Modern I/O** -- Zarr v3 export/import, Icechunk versioned storage, VirtualiZarr views over legacy HDF5, and Parquet/Arrow for particle data.
+- **Field registry** -- `compute("beta")`, `compute("|B|")`, `compute("v_A")` dispatches to the right derived function. Extensible via `register_field()`.
 
 ## Quick start
 
@@ -28,7 +31,7 @@ from pypic import open_simulation, PlaneSelection
 
 # Load simulation data
 sim = open_simulation("path/to/output")
-fds = sim.read_step(0)
+fds = sim.read(step=0)
 
 # Compute derived quantities
 beta = fds.compute("beta")

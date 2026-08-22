@@ -1,0 +1,59 @@
+name: Bug report
+description: Something in pypic behaves incorrectly
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. For anything involving a physics formula, please
+        include the reference you are checking against (NRL Formulary, a
+        textbook, a paper) — conventions differ between sources and knowing
+        which one you expect makes the fix unambiguous.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What did you observe, and what did you expect instead?
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Reproduction
+      description: >
+        A minimal snippet. Synthetic arrays are ideal — please do not attach
+        large simulation files.
+      render: python
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: pypic version
+      description: "`python -c 'import pypic; print(pypic.__version__)'`, or the commit SHA."
+    validations:
+      required: true
+
+  - type: input
+    id: environment
+    attributes:
+      label: Python version and OS
+      placeholder: "Python 3.13.2, macOS 15.3"
+    validations:
+      required: true
+
+  - type: input
+    id: simulation-code
+    attributes:
+      label: Simulation code and format
+      description: Relevant only for reader issues.
+      placeholder: "iPIC3D, parallel HDF5"
+
+  - type: textarea
+    id: traceback
+    attributes:
+      label: Traceback
+      render: text

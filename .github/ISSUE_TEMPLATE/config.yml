@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Documentation
+    url: https://rusaitis.github.io/pypic/
+    about: Physics reference, conventions, and the API docs.

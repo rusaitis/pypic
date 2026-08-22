@@ -5,14 +5,19 @@
 pypic requires Python 3.13+. Install with [uv](https://docs.astral.sh/uv/):
 
 ```sh
-uv add pypic
+uv add pypic-plasma
 ```
 
+The distribution is named `pypic-plasma`; the import name is `pypic`.
+
 Core dependencies (NumPy, SciPy, xarray, h5py) are installed automatically.
-For plotting, add matplotlib:
+Heavier dependencies are optional extras:
 
 ```sh
-uv add pypic matplotlib
+uv add "pypic-plasma[plot]"    # matplotlib — 2D field plots
+uv add "pypic-plasma[3d]"      # pyvista — 3D rendering and field lines
+uv add "pypic-plasma[zarr]"    # Zarr v3 / Icechunk I/O
+uv add "pypic-plasma[cli]"     # the `pypic` command-line tool
 ```
 
 ## Loading simulation data
@@ -24,7 +29,7 @@ from pypic import open_simulation
 
 sim = open_simulation("path/to/output")
 print(sim.describe())           # metadata, grid, species
-print(sim.timesteps)            # available timesteps
+print(sim.steps)                # available timesteps
 
 data = sim.read(step=0)         # load fields for timestep 0
 print(data.field_names())       # canonical field names

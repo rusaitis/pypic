@@ -1,0 +1,40 @@
+name: Feature request
+description: Suggest a derived quantity, reader, or capability
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Check [TASKS.md](https://github.com/rusaitis/pypic/blob/main/TASKS.md)
+        first — several readers and features are already planned, and it is
+        useful to know you want one prioritized.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do
+      description: The analysis you want to perform, not just the API you have in mind.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: category
+    attributes:
+      label: Category
+      options:
+        - New reader (simulation code support)
+        - New derived quantity or diagnostic
+        - I/O format
+        - Plotting or visualization
+        - Performance
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: reference
+    attributes:
+      label: Reference
+      description: >
+        For a derived quantity: the defining equation and a citation. For a
+        reader: a link to the code and its output format documentation.
