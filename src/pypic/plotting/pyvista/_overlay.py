@@ -697,7 +697,7 @@ def add_colorbar(
     else:
         ticks_x = [gradient_x + (v - lo) / span * gradient_w for v in tick_values]
 
-    # --- Draw layers (back to front) ---
+    # Draw layers, back to front.
 
     # 1. Background
     rounding = min(base_rounding, bg_w * 0.2, bg_h * 0.2)

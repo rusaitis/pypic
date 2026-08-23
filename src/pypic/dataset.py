@@ -199,10 +199,9 @@ class FieldDataset:
         ------
         UnknownFieldError
             When ``strict_fields=True`` and one or more keys in *fields*
-            do not resolve through the field registry.  CLAUDE.md
-            §architecture requires injection points to fail loud on
-            unknown names so reader bugs surface at construction time
-            instead of later at ``compute()``.  Subclass of
+            do not resolve through the field registry.  Injection
+            points fail loud on unknown names so reader bugs surface at
+            construction time instead of later at ``compute()``.  Subclass of
             `KeyError`, so existing ``except KeyError`` callers
             keep working unchanged.
 

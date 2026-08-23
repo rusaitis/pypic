@@ -10,8 +10,8 @@ compose from this single primitive paired with an optional
 [`BoxSelection`][pypic.selections.BoxSelection] or
 [`SphereSelection`][pypic.selections.SphereSelection].
 
-Why no ``SlabSelection``? Selections describe regions, not data
-(CLAUDE.md §architecture).  A ``Slab`` would fuse "pick a thick slice"
+Why no ``SlabSelection``? Selections describe regions, not data.
+A ``Slab`` would fuse "pick a thick slice"
 (region) with "reduce along the thick axis" (data), which forces every
 caller to think about both at once.  Splitting them keeps the existing
 ``BoxSelection`` reusable for non-reduction workflows and gives
@@ -23,12 +23,12 @@ already taken by Three.js (``Vector3.project(camera)``) for screen-space
 camera projection, and webpic is a Three.js viewer.  Server-side
 ``reduce`` keeps the cross-stack vocabulary clean.
 
-The ``length_axes`` attrs stamp is an interim mechanism shipped ahead of
-TASKS Step 43c's openPMD ``unit_dimension`` 7-tuple generalization.
-Today, after an unweighted ``integrate``, the displayed ``quantity_type``
-and ``si_unit`` strings are preserved but the numeric value through
+The ``length_axes`` attrs stamp is an interim mechanism. After an
+unweighted ``integrate`` the displayed ``quantity_type`` and ``si_unit``
+strings are preserved but the numeric value through
 `FieldDataset.in_si` is corrected via ``length_ref ** length_axes``.
-Step 43c will subsume this with proper post-reduction tuple arithmetic.
+Generalizing the openPMD ``unit_dimension`` 7-tuple so the unit strings
+shift too would subsume this; it is on the roadmap, not implemented.
 """
 
 from __future__ import annotations
@@ -137,7 +137,7 @@ def reduce(
     fields : Iterable[str] | None
         Optional subset of field names (canonical or alias) to reduce.
         ``None`` reduces every data variable.  Unknown names raise
-        `KeyError` with the full list (CLAUDE.md §architecture).
+        `KeyError` with the full list rather than being skipped.
     weight : str | None
         Name of a field to weight the reduction by.  Only supported for
         ``reduction in {"mean", "integrate"}`` — other reductions raise
@@ -183,9 +183,9 @@ def reduce(
     ------
     NotImplementedError
         Non-Cartesian geometry combined with a spatial-axis reduction.
-        Spherical / cylindrical Jacobian-aware integration is deferred
-        to TASKS Step 43b.  Pure non-spatial reductions (e.g. along
-        ``time``) bypass this check.
+        Spherical / cylindrical Jacobian-aware integration is not yet
+        implemented.  Pure non-spatial reductions (e.g. along ``time``)
+        bypass this check.
     ValueError
         Unknown *axis* name, invalid *reduction* or *nan_policy*,
         multi-axis input passed with ``reduction="argmax"`` /
@@ -208,8 +208,8 @@ def reduce(
     length_axes`` factor at the boundary.  Weighted ``integrate``
     does not stamp ``length_axes`` because the length factor
     cancels between numerator and denominator.  The displayed
-    unit string and the openPMD 7-tuple are still authoritatively
-    fixed by TASKS Step 43c.
+    unit string and the openPMD 7-tuple do not yet shift with the
+    reduction.
 
     Examples
     --------
@@ -268,7 +268,7 @@ def reduce(
 
     # The Cartesian gate only fires when at least one *spatial* axis is
     # being reduced — Jacobian-aware integration on non-Cartesian grids
-    # is deferred to Step 43b.  Pure non-spatial reductions (e.g.
+    # is not implemented.  Pure non-spatial reductions (e.g.
     # ``reduce(ts, "time", "mean")``) are geometry-agnostic.
     reduces_spatial = any(ax in spatial_axes for ax in axes)
     if reduces_spatial and data.grid.geometry.type is not GeometryType.CARTESIAN:
@@ -276,7 +276,7 @@ def reduce(
             f"reduce() supports Cartesian grids only for spatial-axis "
             f"reductions (got {data.grid.geometry.type.value}); "
             f"spherical/cylindrical Jacobian-aware integration is "
-            f"deferred to TASKS Step 43b"
+            f"not implemented"
         )
         raise GeometryUnsupportedError(msg)
 

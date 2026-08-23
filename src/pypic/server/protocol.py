@@ -12,9 +12,10 @@ the JSON ↔ object conversion in this module preserves the architecture
 rule that selections are pure region descriptions — they get
 constructed from validated specs *outside* the dataclass definitions.
 
-Step 37b (``attrs.selections`` round-trip in stored Zarr) will reuse
-`SelectionSpec` directly; designing the wire shape here lets
-the storage side land as a pure write addition later.
+Recording selection provenance in a stored Zarr
+(``attrs.selections``) will reuse `SelectionSpec` directly; designing
+the wire shape here lets that storage side land later as a pure write
+addition.
 """
 
 from __future__ import annotations

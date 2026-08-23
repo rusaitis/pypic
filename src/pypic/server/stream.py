@@ -17,8 +17,8 @@ frame is one request/response exchange:
 The connection stays open across exchanges; the client is responsible
 for matching responses to requests via ``request_id``.  No
 server-pushed updates in the foundations — every payload is
-request-driven.  Streaming new timesteps as they appear is a TASKS
-Step 37 follow-up.
+request-driven.  Streaming new timesteps as they appear is a planned
+follow-up.
 """
 
 from __future__ import annotations

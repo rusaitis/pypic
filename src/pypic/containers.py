@@ -124,10 +124,11 @@ class SimulationConfig:
         Human-readable name for the simulation run.
     model_type : Literal["PIC", "MHD", "hybrid", "vlasov", "gyrokinetic"]
         Simulation type identifier — uppercase for fluid/PIC families,
-        lowercase for kinetic continuum codes. Matches ``[model].type`` in
-        :doc:`/docs/schema` and the Pydantic ``Model.type`` Literal. The
-        ``vlasov`` / ``gyrokinetic`` values land in v1.0.x ahead of the
-        readers that consume them — see ``TASKS-schema-extension.md``.
+        lowercase for kinetic continuum codes. Matches ``[model].type``
+        in the schema and the Pydantic ``Model.type`` Literal. The
+        ``vlasov`` / ``gyrokinetic`` values are accepted ahead of the
+        readers that consume them, so a conforming document from such a
+        code validates today.
     grid : GridInfo
         Grid metadata (includes coordinate geometry).
     normalization : Normalization

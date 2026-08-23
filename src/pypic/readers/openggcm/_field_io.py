@@ -32,7 +32,7 @@ def _parse_wrn2_header(line: bytes) -> tuple[int, float, float]:
 
     Returns ``(count, zmin, zmax)``.
     """
-    # did = line[0:4]  # "WRN2"
+    # line[0:4] is the "WRN2" tag, already matched by the caller.
     n = int(line[4:12])
     zmin = float(line[12:26])
     zmax = float(line[26:40])

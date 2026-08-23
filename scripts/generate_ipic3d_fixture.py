@@ -20,7 +20,7 @@ from __future__ import annotations
 import math
 from pathlib import Path
 
-import h5py  # type: ignore[import-untyped]
+import h5py
 import numpy as np
 
 OUTPUT_DIR = Path("tests/data/ipic3d-synthetic")
@@ -113,7 +113,7 @@ def _analytical_fields() -> dict[str, np.ndarray]:
         abs_rho = RHO_INIT[s]
         vths = (UTH[s], VTH[s], WTH[s])
         drifts = (U0[s], V0[s], W0[s])
-        for i, (v_th, drift) in enumerate(zip(vths, drifts)):
+        for i, (v_th, drift) in enumerate(zip(vths, drifts, strict=True)):
             fields[f"EF{i + 1}_s{s}"] = np.full((NX, NY, NZ), abs_rho * drift * v_th**2)
 
     # Totals
@@ -163,17 +163,17 @@ def _to_gaussian_storage(fields: dict[str, np.ndarray]) -> dict[str, np.ndarray]
 def _write_inp(path: Path) -> None:
     """Write a minimal .inp config file."""
     lines = [
-        f"Case                           = SyntheticTest",
-        f"SimulationName                 = SyntheticFixture",
-        f"WriteMethod                    = phdf5",
-        f"FieldOutputCycle               = 1",
-        f"FieldOutputTag                 = B + E + rho + J + J_s + rho_s + pressure + E_flux",
-        f"ParticlesOutputCycle           = 10",
+        "Case                           = SyntheticTest",
+        "SimulationName                 = SyntheticFixture",
+        "WriteMethod                    = phdf5",
+        "FieldOutputCycle               = 1",
+        "FieldOutputTag                 = B + E + rho + J + J_s + rho_s + pressure + E_flux",
+        "ParticlesOutputCycle           = 10",
         f"B0x                            = {B0X}",
-        f"B0y                            = 0.0",
-        f"B0z                            = 0.0",
+        "B0y                            = 0.0",
+        "B0z                            = 0.0",
         f"dt                             = {DT}",
-        f"ncycles                        = 1",
+        "ncycles                        = 1",
         f"th                             = {TH}",
         f"c                              = {C}",
         f"Lx                             = {LX}",
@@ -182,9 +182,9 @@ def _write_inp(path: Path) -> None:
         f"nxc                            = {NXC}",
         f"nyc                            = {NYC}",
         f"nzc                            = {NZC}",
-        f"XLEN                           = 1",
-        f"YLEN                           = 1",
-        f"ZLEN                           = 1",
+        "XLEN                           = 1",
+        "YLEN                           = 1",
+        "ZLEN                           = 1",
         f"ns                  = {NS}",
         f"rhoINIT             = {' '.join(str(r) for r in RHO_INIT)}",
         f"npcelx              = {' '.join(str(n) for n in NPCELX)}",
@@ -197,9 +197,9 @@ def _write_inp(path: Path) -> None:
         f"u0                  = {' '.join(str(u) for u in U0)}",
         f"v0                  = {' '.join(str(v) for v in V0)}",
         f"w0                  = {' '.join(str(w) for w in W0)}",
-        f"PERIODICX                      = 1",
-        f"PERIODICY                      = 1",
-        f"PERIODICZ                      = 1",
+        "PERIODICX                      = 1",
+        "PERIODICY                      = 1",
+        "PERIODICZ                      = 1",
     ]
     path.write_text("\n".join(lines) + "\n")
 
@@ -374,15 +374,15 @@ def _write_shdf5(base: Path, stored: dict[str, np.ndarray]) -> None:
 
     # Also write a .inp for the serial format (XLEN=2)
     lines = [
-        f"Case                           = SyntheticTest",
-        f"SimulationName                 = SyntheticFixture",
-        f"WriteMethod                    = shdf5",
-        f"FieldOutputCycle               = 1",
+        "Case                           = SyntheticTest",
+        "SimulationName                 = SyntheticFixture",
+        "WriteMethod                    = shdf5",
+        "FieldOutputCycle               = 1",
         f"B0x                            = {B0X}",
-        f"B0y                            = 0.0",
-        f"B0z                            = 0.0",
+        "B0y                            = 0.0",
+        "B0z                            = 0.0",
         f"dt                             = {DT}",
-        f"ncycles                        = 1",
+        "ncycles                        = 1",
         f"th                             = {TH}",
         f"c                              = {C}",
         f"Lx                             = {LX}",
@@ -406,9 +406,9 @@ def _write_shdf5(base: Path, stored: dict[str, np.ndarray]) -> None:
         f"u0                  = {' '.join(str(u) for u in U0)}",
         f"v0                  = {' '.join(str(v) for v in V0)}",
         f"w0                  = {' '.join(str(w) for w in W0)}",
-        f"PERIODICX                      = 1",
-        f"PERIODICY                      = 1",
-        f"PERIODICZ                      = 1",
+        "PERIODICX                      = 1",
+        "PERIODICY                      = 1",
+        "PERIODICZ                      = 1",
     ]
     (base / "synthetic_serial.inp").write_text("\n".join(lines) + "\n")
 
@@ -477,15 +477,15 @@ def _write_h5hut(base: Path, stored: dict[str, np.ndarray]) -> None:
 
     # Write .inp for h5hut (write_method = h5hut, but detection is file-based)
     lines = [
-        f"Case                           = SyntheticTest",
-        f"SimulationName                 = SyntheticFixture",
-        f"WriteMethod                    = h5hut  # uses H5hut format",
-        f"FieldOutputCycle               = 1",
+        "Case                           = SyntheticTest",
+        "SimulationName                 = SyntheticFixture",
+        "WriteMethod                    = h5hut  # uses H5hut format",
+        "FieldOutputCycle               = 1",
         f"B0x                            = {B0X}",
-        f"B0y                            = 0.0",
-        f"B0z                            = 0.0",
+        "B0y                            = 0.0",
+        "B0z                            = 0.0",
         f"dt                             = {DT}",
-        f"ncycles                        = 1",
+        "ncycles                        = 1",
         f"th                             = {TH}",
         f"c                              = {C}",
         f"Lx                             = {LX}",
@@ -494,9 +494,9 @@ def _write_h5hut(base: Path, stored: dict[str, np.ndarray]) -> None:
         f"nxc                            = {NXC}",
         f"nyc                            = {NYC}",
         f"nzc                            = {NZC}",
-        f"XLEN                           = 1",
-        f"YLEN                           = 1",
-        f"ZLEN                           = 1",
+        "XLEN                           = 1",
+        "YLEN                           = 1",
+        "ZLEN                           = 1",
         f"ns                  = {NS}",
         f"rhoINIT             = {' '.join(str(r) for r in RHO_INIT)}",
         f"npcelx              = {' '.join(str(n) for n in NPCELX)}",
@@ -509,9 +509,9 @@ def _write_h5hut(base: Path, stored: dict[str, np.ndarray]) -> None:
         f"u0                  = {' '.join(str(u) for u in U0)}",
         f"v0                  = {' '.join(str(v) for v in V0)}",
         f"w0                  = {' '.join(str(w) for w in W0)}",
-        f"PERIODICX                      = 1",
-        f"PERIODICY                      = 1",
-        f"PERIODICZ                      = 1",
+        "PERIODICX                      = 1",
+        "PERIODICY                      = 1",
+        "PERIODICZ                      = 1",
     ]
     (base / "SyntheticFixture.inp").write_text("\n".join(lines) + "\n")
 
@@ -666,11 +666,11 @@ def main() -> None:
 
     # ConservedQuantities
     _write_conserved_quantities(OUTPUT_DIR)
-    print(f"  ConservedQuantities: Format A + B")
+    print("  ConservedQuantities: Format A + B")
 
     # SpeciesQuantities
     _write_species_quantities(OUTPUT_DIR)
-    print(f"  SpeciesQuantities: phdf5")
+    print("  SpeciesQuantities: phdf5")
 
     # Round-trip verification
     print("\nVerifying round-trip...")

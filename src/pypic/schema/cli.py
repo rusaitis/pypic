@@ -284,7 +284,7 @@ def diff(
     raise typer.Exit(code=1 if has_diff else 0)
 
 
-# Helpers ---------------------------------------------------------------
+# Helpers.
 
 
 def _read_source(path: Path) -> bytes:

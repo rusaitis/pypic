@@ -259,7 +259,7 @@ def add_inset_colorbar(
     if extremes is None:
         extend = "neither"
 
-    # --- Pass 1: provisional colorbar at arbitrary position for measurement ---
+    # Pass 1: provisional colorbar at an arbitrary position, for measurement.
     _prov = 0.3  # arbitrary axes-fraction origin; overwritten in pass 2
     prov_cax = ax.inset_axes((_prov, _prov, width, height), zorder=5)
     cb = fig.colorbar(mappable, cax=prov_cax, orientation="horizontal", extend=extend)
@@ -315,7 +315,7 @@ def add_inset_colorbar(
     # Remove provisional colorbar axes
     prov_cax.remove()
 
-    # --- Pass 2: place at the correct position ---
+    # Pass 2: place at the correct position.
     if "right" in actual_loc:
         bg_x = 1.0 - pad - total_w
     elif "center" in actual_loc:

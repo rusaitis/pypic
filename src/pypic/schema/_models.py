@@ -52,7 +52,7 @@ SCHEMA_VERSION: Final[str] = "1.0"
 #     below are guidance for tooling and human readers; pypic does
 #     not dispatch on these values, it records them as provenance.
 
-# --- Strict (structural / format primitives) ---------------------------------
+# Strict vocabularies: structural / format primitives, closed enums.
 Precision = Literal["f32", "f64"]
 ModelType = Literal["PIC", "MHD", "hybrid", "vlasov", "gyrokinetic"]
 Geometry = Literal["cartesian", "spherical", "cylindrical", "thetaMode"]
@@ -80,7 +80,9 @@ PhysicalExtentUnit = Literal[
     "m", "km", "R_E", "R_S", "R_sun", "R_M", "R_J", "AU", "d_i"
 ]
 
-# --- Open (algorithm / method / closure vocabularies) ------------------------
+# Open vocabularies: algorithm / method / closure names. Research codes
+# invent new schemes faster than the schema can enumerate them, so unknown
+# strings pass validation; the values below are the v1.0 canonical set.
 # Aliased to ``str`` so research methods pass validation. Canonical v1.0
 # values listed in comments for tooling and documentation. Cross-field
 # rules (e.g. ``scheme = "subcycled"`` requires ``field_substeps``) still
@@ -1251,9 +1253,9 @@ class Probe(_StrictBase):
       them explicitly. The narrow default keeps probe time-series cheap
       on big runs.
     - ``fields = [...]`` — sample exactly this list. Names that don't
-      resolve at sample time should fail loudly (per CLAUDE.md "fail
-      loud on unmatched names" guidance); resolution against
-      ``available_fields()`` happens in the probe sampler, not here.
+      resolve at sample time should fail loudly rather than be
+      silently dropped; resolution against ``available_fields()``
+      happens in the probe sampler, not here.
     """
 
     name: str

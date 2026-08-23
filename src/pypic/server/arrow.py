@@ -15,8 +15,8 @@ JSON — mirroring the convention used by
 `pypic.io._arrow` for particles.
 
 Foundation scope: single ``RecordBatch`` per call.  Chunked /
-progressive transfer is a TASKS Step 37 follow-up that drops in
-without changing the schema metadata shape.
+progressive transfer is a planned follow-up that drops in without
+changing the schema metadata shape.
 """
 
 from __future__ import annotations

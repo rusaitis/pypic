@@ -28,7 +28,7 @@ from __future__ import annotations
 import tempfile
 from pathlib import Path
 
-import h5py  # type: ignore[import-untyped]
+import h5py
 import numpy as np
 
 from pypic import (
@@ -146,18 +146,17 @@ def main() -> None:
         class RootReader(SimpleReader):
             """Read root-level datasets, promote to float64."""
 
-            def _read_raw(  # type: ignore[override]
-                    self,
-                    filepath: Path,
-                    *,
-                    fields: set[str] | None = None,
-                ) -> dict[str, np.ndarray]:
+            def _read_raw(
+                self,
+                filepath: Path,
+                *,
+                fields: set[str] | None = None,
+            ) -> dict[str, np.ndarray]:
                 with h5py.File(filepath, "r") as f:
                     return {
                         name: np.asarray(f[name], dtype=np.float64)
                         for name in f
-                        if isinstance(f[name], h5py.Dataset)
-                        and f[name].ndim >= 2
+                        if isinstance(f[name], h5py.Dataset) and f[name].ndim >= 2
                     }
 
         reader3 = RootReader(

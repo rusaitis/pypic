@@ -789,7 +789,8 @@ def _try_species_recipe(name: str) -> Recipe | None:
 
 
 # Display unit conversion: unit string → SI value.
-# Hand-curated instead of a prefix parser — life's too short to rewrite pint.
+# Hand-curated rather than parsed from SI prefixes: the table is small,
+# closed, and a wrong factor here is a silent physics error.
 _DISPLAY_UNITS: dict[str, float] = {
     "T": 1.0,
     "nT": 1e-9,

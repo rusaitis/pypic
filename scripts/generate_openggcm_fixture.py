@@ -13,7 +13,7 @@ Usage::
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
@@ -28,7 +28,7 @@ OUTPUT_DIR = Path("tests/data/openggcm-small")
 STEP = 25  # subsample stride
 
 
-def wrn2_encode_field(values: NDArray[np.float64]) -> tuple[bytes, float, float]:
+def wrn2_encode_field(values: NDArray[np.floating[Any]]) -> tuple[bytes, float, float]:
     """Encode a flat float64 array to WRN2 format.
 
     Returns the encoded data bytes and the (zmin, zmax) log-range header
@@ -37,7 +37,7 @@ def wrn2_encode_field(values: NDArray[np.float64]) -> tuple[bytes, float, float]
 
     Parameters
     ----------
-    values : NDArray[np.float64]
+    values : NDArray[np.floating[Any]]
         Flat array of values to encode.
 
     Returns
@@ -110,7 +110,7 @@ def wrn2_encode_field(values: NDArray[np.float64]) -> tuple[bytes, float, float]
 
 def write_3df_file(
     path: Path,
-    fields: dict[str, NDArray[np.float64]],
+    fields: dict[str, NDArray[np.floating[Any]]],
     timestep: int,
     nx: int,
     ny: int,
@@ -146,9 +146,9 @@ def write_3df_file(
 
 def write_grid_file(
     path: Path,
-    x: NDArray[np.float64],
-    y: NDArray[np.float64],
-    z: NDArray[np.float64],
+    x: NDArray[np.floating[Any]],
+    y: NDArray[np.floating[Any]],
+    z: NDArray[np.floating[Any]],
     metadata: dict[str, str],
 ) -> None:
     """Write an ASCII grid file matching parse_grid_file() expectations."""
@@ -188,7 +188,9 @@ def write_grid_file(
     path.write_text("\n".join(lines) + "\n", encoding="ascii")
 
 
-def subsample_array(arr: NDArray[np.float64], step: int) -> NDArray[np.float64]:
+def subsample_array(
+    arr: NDArray[np.floating[Any]], step: int
+) -> NDArray[np.floating[Any]]:
     """Subsample a 1D coordinate array, always including first and last."""
     indices = list(range(0, len(arr), step))
     if indices[-1] != len(arr) - 1:
@@ -256,7 +258,7 @@ def main() -> None:
         )
 
         # Subsample fields
-        sub_fields: dict[str, NDArray[np.float64]] = {}
+        sub_fields: dict[str, NDArray[np.floating[Any]]] = {}
         for name, data in fields.items():
             sub_fields[name] = data[np.ix_(xi, yi, zi)]
             print(f"  {name}: {data.shape} -> {sub_fields[name].shape}")

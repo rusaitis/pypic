@@ -128,7 +128,7 @@ def _align_frames(
     first would compute a common domain across two incompatible
     coordinate systems.
 
-    *epoch* is reserved for Step 40 (time-dependent transforms): once
+    *epoch* is reserved for time-dependent transforms: once
     ``transform_to`` accepts an ``epoch`` kwarg for dipole-tilt-style
     rotations and SPICE ephemerides, this helper will forward it
     unchanged. Until then it is accepted but unused, so callers can
@@ -140,7 +140,7 @@ def _align_frames(
     target = a.frame if frame is None else frame
     if a.frame == target and b.frame == target:
         return a, b
-    del epoch  # Step 40 hook — see docstring.
+    del epoch  # Accepted for forward compatibility — see docstring.
     return (
         _transform_or_raise(a, target, label="A"),
         _transform_or_raise(b, target, label="B"),

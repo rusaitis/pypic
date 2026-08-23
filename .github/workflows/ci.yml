@@ -24,8 +24,13 @@ jobs:
           enable-cache: true
           cache-dependency-glob: "uv.lock"
       - run: uv sync --all-extras --all-groups
-      - run: uv run ruff check src tests
-      - run: uv run ruff format --check src tests
+      # scripts/, benchmarks/, examples/ and vulture_whitelist.py are tracked
+      # and read by contributors, but were outside every check: the one
+      # example a test imports did not satisfy `ruff format`, and four files
+      # carried type errors. examples/ is safe to name because .gitignore
+      # keeps it to the three committed files.
+      - run: uv run ruff check src tests scripts benchmarks examples vulture_whitelist.py
+      - run: uv run ruff format --check src tests scripts benchmarks examples vulture_whitelist.py
       # Drift guard for the bundled JSON Schema. The pytest layer
       # (tests/test_schema_export.py::test_on_disk_artifact_matches_current_models)
       # gives a precise diff on failure; this step catches the case
@@ -48,7 +53,7 @@ jobs:
       # plotting and reader subpackages — they're optional at runtime but
       # required for the strict type check to pass.
       - run: uv sync --all-extras --all-groups
-      - run: uv run mypy src
+      - run: uv run mypy src scripts benchmarks examples vulture_whitelist.py
 
   test:
     runs-on: ubuntu-latest
