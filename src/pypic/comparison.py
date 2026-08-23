@@ -326,12 +326,10 @@ def compare_fields(
     # step, turning a wasted multi-field regrid into an instant error.
     _validate_choice(nan_policy, _ALLOWED_NAN_POLICIES, "nan_policy")
     _validate_code_units_compatible(a, b, units)
-    # Resolve the field name against the *original* datasets — frame and
-    # grid alignment both rebuild datasets without forwarding custom
-    # aliases (transform_to drops aliases entirely; regrid only carries
-    # geometry-default ones), so resolving post-alignment would lose any
-    # alias from from_arrays(aliases=...). Canonical names survive both
-    # transforms, so the post-alignment _extract_values call still works.
+    # Resolve against the *original* datasets: alignment rebuilds them
+    # without custom aliases (``transform_to`` drops them, ``regrid`` keeps
+    # only geometry defaults), so a post-alignment lookup would lose anything
+    # from ``from_arrays(aliases=...)``.  Canonical names survive both.
     canonical = _resolve_common_field(a, b, field)
     a, b = _align_frames(a, b, frame=frame)
     _warn_if_coarse_mismatch(a.grid, b.grid)
@@ -556,12 +554,9 @@ def field_difference_dataset(
     from pypic.dataset import FieldDataset as _FieldDataset
     from pypic.units import Normalization
 
-    # When units="si" the stored arrays already carry SI values, so the
-    # result must use an identity normalization — otherwise calling
-    # in_si() on the returned dataset would re-apply the SI factor and
-    # silently double-convert. With identity, in_si() returns the same
-    # SI values and __getitem__ also returns SI (which is now both
-    # "code" and "SI" simultaneously, since the factors are 1.0).
+    # With units="si" the stored arrays are already SI, so the result needs
+    # an identity normalization — otherwise ``in_si()`` would re-apply the
+    # factor and silently double-convert.
     result_norm = Normalization.identity() if units == "si" else a_aligned.normalization
 
     return _FieldDataset.from_arrays(

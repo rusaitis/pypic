@@ -61,7 +61,7 @@ def create_app(
     except ImportError as exc:
         msg = (
             "pypic.server requires FastAPI. "
-            "Install with: pip install pypic-plasma[server]"
+            'Install with: pip install "pypic-plasma[server]"'
         )
         raise ImportError(msg) from exc
 
@@ -132,14 +132,14 @@ def serve(
     Raises
     ------
     ImportError
-        uvicorn is not installed (``pip install pypic-plasma[server]``).
+        uvicorn is not installed (``pip install "pypic-plasma[server]"``).
     """
     try:
         import uvicorn
     except ImportError as exc:
         msg = (
             "pypic serve requires uvicorn. "
-            "Install with: pip install pypic-plasma[server]"
+            'Install with: pip install "pypic-plasma[server]"'
         )
         raise ImportError(msg) from exc
 

@@ -22,7 +22,7 @@ Usage::
 
 Or via the bundled CLI: ``pypic serve /data/runs --port 8000``.
 
-The server package is optional — install with ``pip install pypic-plasma[server]``.
+The server package is optional — install with ``pip install "pypic-plasma[server]"``.
 """
 
 from __future__ import annotations

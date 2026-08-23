@@ -25,12 +25,9 @@ if TYPE_CHECKING:
 
 type NanPolicy = Literal["omit", "propagate", "raise"]
 
-# Anchor for ``warnings.warn(skip_file_prefixes=...)`` so NaN warnings
-# point at the user's call site regardless of how deeply pypic itself
-# wraps the diagnostic (direct, via ``compare_fields``, via CLI
-# commands, ...). Python walks up the stack until it exits the pypic
-# package prefix. Computed once at import time from this module's own
-# file location.
+# Anchor for ``warnings.warn(skip_file_prefixes=...)``: Python walks up the
+# stack until it leaves the pypic package, so a NaN warning points at the
+# user's call site however deeply pypic wrapped the diagnostic.
 _PYPIC_PREFIX = (str(Path(__file__).parent),)
 
 

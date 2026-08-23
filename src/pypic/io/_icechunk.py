@@ -4,7 +4,7 @@ Provides Git-like versioning (tags, snapshots, branches) and ACID
 transactions over Zarr v3 stores via the Icechunk Rust backend.
 
 Requires optional dependency ``icechunk>=1.1``.
-Install with ``pip install pypic-plasma[icechunk]``.
+Install with ``pip install "pypic-plasma[icechunk]"``.
 """
 
 from __future__ import annotations
@@ -184,13 +184,9 @@ def to_zarr_icechunk(
     ensure_icechunk()
     import shutil
 
-    # Same cleanup gating as ``to_zarr_timeseries``: a fresh-or-empty
-    # output directory means the half-initialized repo is ours to remove
-    # if anything between ``open_icechunk_repo(create=True)`` and
-    # ``session.commit`` raises.  Without this, callers see
-    # ``is_icechunk_store`` return True while ``from_zarr`` raises
-    # ``GroupNotFoundError`` — non-serializable metadata or an
-    # ``encode_pypic_attrs`` failure are the realistic triggers.
+    # Cleanup gating as in ``to_zarr``: anything raising between
+    # ``open_icechunk_repo(create=True)`` and ``session.commit`` leaves a repo
+    # that ``is_icechunk_store`` accepts but ``from_zarr`` cannot open.
     path_obj = Path(path)
     created_new = not path_obj.exists() or (
         path_obj.is_dir() and not any(path_obj.iterdir())
@@ -339,15 +335,10 @@ def to_zarr_timeseries_icechunk(
 
     import zarr
 
-    # Whether we created the repo directory on this call.  An existing
-    # repo's uncommitted session is transactional — nothing to clean —
-    # but ``open_icechunk_repo(create=True)`` on a fresh (or empty) path
-    # persists an initial snapshot before we know whether the source is
-    # usable.  If our pypic write then fails, ``is_icechunk_store``
-    # returns True but ``from_zarr`` raises ``GroupNotFoundError``.
-    # Remove the half-initialized directory so the filesystem state
-    # matches the error state.  An empty directory pre-existing on disk
-    # is treated the same as a missing one — we own its contents.
+    # Whether we created the repo on this call.  An existing repo's
+    # uncommitted session is transactional, but ``create=True`` on a fresh or
+    # empty path persists an initial snapshot before the source is known to be
+    # usable — remove it on failure so the filesystem matches the error state.
     path_obj = Path(path)
     created_new = not path_obj.exists() or (
         path_obj.is_dir() and not any(path_obj.iterdir())

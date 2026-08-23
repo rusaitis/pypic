@@ -769,15 +769,12 @@ def unregister_field(name: str) -> None:
             raise KeyError(msg) from None
 
 
-# Per-species field metadata built from a compact (prefix, qtype, long, latex)
-# table.  Tier-3 canonical: ``<base>_s<N>[_<index>]``.  The *prefix* is the
-# regex's anchor — when it contains a component capture (e.g. ``J([123])``),
-# the resulting full pattern is ``^J_s(\d+)_([123])$`` (vector form with
-# species before component); when it has no component capture, the pattern is
-# ``^<prefix>_s(\d+)$`` (scalar form).  ``P(\d{0,2})`` is the one tensor entry,
-# producing ``^P_s(\d+)(?:_(\d{2}))?$`` — a single tensor pattern that also
-# matches the scalar ``P_s0`` (empty component capture).
-# Templates use ``{C}`` for component, ``{N}`` for species index.
+# Per-species field metadata from a compact (prefix, qtype, long, latex)
+# table, Tier-3 canonical ``<base>_s<N>[_<index>]``.  The prefix anchors the
+# regex: a component capture (``J([123])``) yields the vector form
+# ``^J_s(\d+)_([123])$``, no capture yields the scalar ``^<prefix>_s(\d+)$``.
+# ``P(\d{0,2})`` is the lone tensor entry, whose pattern also matches the
+# scalar ``P_s0``.  Templates use ``{C}`` for component, ``{N}`` for species.
 _SPECIES_PATTERN_SPECS: list[tuple[str, str, str, str]] = [
     ("n", "density", "Number density (species {N})", r"$n_{{s{N}}}$"),
     ("rho_c", "charge_density", "Charge density (species {N})", r"$\rho_{{c,s{N}}}$"),

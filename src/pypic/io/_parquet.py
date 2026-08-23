@@ -12,7 +12,7 @@ bounding boxes.  This enables ``pyarrow.dataset`` predicate pushdown
 to skip 95%+ of row groups for spatial box queries.
 
 Requires optional dependency: ``pyarrow>=17.0``.
-Install with ``pip install pypic-plasma[arrow]``.
+Install with ``pip install "pypic-plasma[arrow]"``.
 """
 
 from __future__ import annotations
@@ -575,14 +575,10 @@ def particles_from_dataset(
     # Hive partitioning has flattened it to a directory name.  Raises
     # if the filter matched multiple species.
     payload = _matched_species_metadata(dataset, combined_filter)
-    # Empty-filter recovery: a pinned species still has its schema
-    # metadata on disk under ``species={name}/``, so adopt species
-    # identity rather than degrade to ``"unknown"``.  Per-step
-    # ``metadata`` (time, tag, ...) is *not* recoverable on an empty
-    # read — forwarding an arbitrary fragment's payload would stamp
-    # stale step-specific attrs onto a zero-row result.  Keep only
-    # species-level fields (index, name, charge, mass).  Mirrors the
-    # DuckDB empty-result recovery in ``_duckdb.query_sql``.
+    # Empty-filter recovery: a pinned species keeps its schema metadata on
+    # disk, so adopt species identity instead of ``"unknown"``.  Per-step
+    # ``metadata`` is dropped — an arbitrary fragment's time/tag stamped onto
+    # a zero-row result is corruption.  Mirrors ``_duckdb.query_sql``.
     if payload.get("species_name") == "unknown" and pinned_species_str is not None:
         pinned_payload = _payload_from_species_dir(Path(path), pinned_species_str)
         if pinned_payload is not None:

@@ -18,18 +18,11 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence
 
-# Matches the canonical ``_s<index>`` species qualifier in any
-# Tier-3 position:
-#   - End (scalar per-species): ``P_s0``, ``T_s1`` — no suffix.
-#   - Middle followed by a component / modifier (vector, tensor, or
-#     generic operator): ``V_s0_1``, ``P_s0_11``, ``P_s0_par``,
-#     ``V_s0_perp_1``.
-#   - Middle followed by closing pipe (per-species magnitude):
-#     ``|V_s0|``, ``|J_s1|``.
-#   - Middle followed by an operator + closing pipe (per-species
-#     operator magnitude): ``|V_s0_perp|``.
-# Captures (species, suffix); suffix is ``_<x>|`` (operator + pipe),
-# ``_<x>``, ``|``, or empty.
+# Matches the canonical ``_s<index>`` qualifier in any Tier-3 position: at
+# the end (``P_s0``), before a component or operator (``V_s0_1``,
+# ``P_s0_par``), before a closing pipe (``|V_s0|``), or before an operator
+# plus pipe (``|V_s0_perp|``).  Captures (species, suffix), where suffix is
+# ``_<x>|``, ``_<x>``, ``|``, or empty.
 SPECIES_SUFFIX_RE = re.compile(r"_s(\d+)(?P<suffix>_[^|]+\||_[^|]+|\|)?$")
 
 COMPUTE_ALIASES: dict[str, str] = {
@@ -211,12 +204,10 @@ COMPUTE_ALIASES: dict[str, str] = {
 }
 
 
-# Vector-group shorthand: aliases that expand to a three-component group
-# at read time (``read(fields=["EFe"]) → EF_s0_1, EF_s0_2, EF_s0_3``). These
-# are deliberately separate from ``COMPUTE_ALIASES`` because their target
-# is a *prefix*, not a single computable quantity — feeding ``EF_s0`` to
-# ``compute()`` would fail. Reader code consults this map after the
-# scalar alias map; see ``readers/_registry.py`` for the expansion logic.
+# Vector-group shorthand expanded at read time (``read(fields=["EFe"])`` →
+# ``EF_s0_1, EF_s0_2, EF_s0_3``).  Separate from ``COMPUTE_ALIASES`` because
+# the target is a *prefix*, not a computable quantity — ``compute("EF_s0")``
+# would fail.  Expansion logic lives in ``readers/_registry.py``.
 GROUP_ALIASES: dict[str, str] = {
     "EFe": "EF_s0",
     "EFi": "EF_s1",

@@ -65,13 +65,10 @@ class Recipe:
     needs_c: bool = False
     component: int | None = None
     species_args: SpeciesArgs | None = None
-    # When True, the dataset's geometry is passed to ``func`` as a
-    # ``geometry=`` kwarg. Used by operator-backed recipes
-    # (``div_B``, ``div_E``, ``curl_B*``, ``vort*``) so that the
-    # FieldDataset path is automatically correct when spherical /
-    # cylindrical operators are eventually implemented. ``psi`` opts
-    # out because ``magnetic_flux_function`` has its own (Cartesian-only)
-    # generalization path documented in its docstring.
+    # When True the dataset's geometry reaches ``func`` as a ``geometry=``
+    # kwarg — the operator-backed recipes (``div_B``, ``div_E``,
+    # ``curl_B*``, ``vort*``).  ``psi`` opts out: ``magnetic_flux_function``
+    # documents its own Cartesian-only generalization.
     passes_geometry: bool = False
     # When True and ``physics.relativistic`` is set on the dataset,
     # ``c`` is injected as a keyword argument, activating the
@@ -137,11 +134,9 @@ _REGISTRY: dict[str, Recipe] = {
     "|E|": Recipe(derived.electric_field_magnitude, ("E_1", "E_2", "E_3")),
     "|J|": Recipe(derived.current_density_magnitude, ("J_1", "J_2", "J_3")),
     "|V|": Recipe(derived.velocity_magnitude, ("V_1", "V_2", "V_3")),
-    # |Ve| is registered as an alias to |V_s0| in _aliases.py — both
-    # resolve through the "|V|" species template (Stage E).
-    # Plasma parameters.  Per-species ``beta_s0``/``beta_s1`` are produced
-    # by the species template ``"beta"``; the literature ``beta_e``/
-    # ``beta_i`` spellings alias to ``_sN`` via ``COMPUTE_ALIASES``.
+    # |Ve| aliases |V_s0|; both resolve through the "|V|" species template.
+    # Per-species ``beta_s0``/``beta_s1`` come from the ``"beta"`` template,
+    # with ``beta_e``/``beta_i`` aliasing to ``_sN``.
     "beta": Recipe(derived.plasma_beta, ("P", "|B|")),
     "v_A": Recipe(derived.alfven_speed, ("|B|", "rho_m"), supports_relativistic=True),
     "c_s": Recipe(
@@ -208,10 +203,9 @@ _REGISTRY: dict[str, Recipe] = {
         ("P", "V_{c}"),
         needs_gamma=True,
     ),
-    # Species-dependent: Tier-3 canonical recipe IDs.  Literature
-    # spellings (``omega_pe``, ``v_th_e``, ``lambda_D``) resolve here
-    # via ``COMPUTE_ALIASES``.  Species index >= 2 falls through to
-    # ``SPECIES_TEMPLATES`` for dynamic synthesis.
+    # Tier-3 canonical recipe IDs; literature spellings (``omega_pe``,
+    # ``v_th_e``, ``lambda_D``) alias in.  Species index >= 2 falls
+    # through to ``SPECIES_TEMPLATES`` for dynamic synthesis.
     "omega_p_s0": Recipe(
         derived.plasma_frequency,
         ("n_s0",),
@@ -297,10 +291,9 @@ _REGISTRY: dict[str, Recipe] = {
     # is the canonical default; these ship for literature comparison.
     "D_ng": Recipe(derived.aunai_nongyrotropy, _PRESSURE_TENSOR_AND_B),
     "A_phi": Recipe(derived.scudder_agyrotropy, _PRESSURE_TENSOR_AND_B),
-    # Field-aligned vector decomposition against b̂ = B/|B|.
-    # NaN propagates from ``_unit_vector`` where |B| = 0.
-    # Per-species V variants are produced by the ``"V_par"`` /
-    # ``"V_perp_{c}"`` / ``"|V_perp|"`` species templates below.
+    # Field-aligned decomposition against b̂ = B/|B|; NaN propagates from
+    # ``_unit_vector`` where |B| = 0.  Per-species V variants come from the
+    # ``"V_par"`` / ``"V_perp_{c}"`` / ``"|V_perp|"`` templates below.
     "J_par": Recipe(
         derived.parallel_component, ("J_1", "J_2", "J_3", "B_1", "B_2", "B_3")
     ),
@@ -325,10 +318,9 @@ _REGISTRY: dict[str, Recipe] = {
         derived.perpendicular_vector,
         ("E_1", "E_2", "E_3", "B_1", "B_2", "B_3"),
     ),
-    # Pythagorean form: |A_perp|² = |A|² - A_par², single pass over
-    # raw inputs.  Avoids the redundant ``perpendicular_vector`` call
-    # and materialization that the component-path recipe would do.
-    # Matches the per-species ``|V_perp|`` template below.
+    # Pythagorean form |A_perp|² = |A|² - A_par²: one pass over raw
+    # inputs, skipping the ``perpendicular_vector`` call and
+    # materialization the component path would need.
     "|J_perp|": Recipe(
         derived.perpendicular_magnitude,
         ("J_1", "J_2", "J_3", "B_1", "B_2", "B_3"),
@@ -357,10 +349,9 @@ _REGISTRY: dict[str, Recipe] = {
         derived.perpendicular_magnitude,
         ("E_prime_1", "E_prime_2", "E_prime_3", "B_1", "B_2", "B_3"),
     ),
-    # Ideal-MHD field decomposition (E_ideal = -V×B). Analytic identity:
-    # E_ideal · B = -(V×B) · B = 0, so ``E_ideal_par`` evaluates to zero
-    # up to floating-point roundoff. Kept for symmetry and as a
-    # cross-product numerical-precision diagnostic.
+    # E_ideal = -V×B, so E_ideal · B = 0 analytically and ``E_ideal_par``
+    # is zero up to roundoff.  Kept for symmetry with the E_par family and
+    # as a cross-product precision check.
     "E_ideal_par": Recipe(
         derived.parallel_component,
         ("E_ideal_1", "E_ideal_2", "E_ideal_3", "B_1", "B_2", "B_3"),
@@ -445,10 +436,9 @@ _REGISTRY: dict[str, Recipe] = {
         ),
         supports_relativistic=True,
     ),
-    # Comisso & Bhattacharjee normalized local reconnection rate
-    # |E'| / (v_A |B|).  Single-fluid V — the registry uses the total
-    # bulk velocity; for kinetic analysis at electron scales call
-    # ``derived.local_reconnection_rate`` directly with V_s0.
+    # Comisso & Bhattacharjee |E'| / (v_A |B|), on the total bulk V.
+    # For electron-scale analysis call ``derived.local_reconnection_rate``
+    # directly with V_s0.
     "R_recon": Recipe(
         derived.local_reconnection_rate,
         (
@@ -505,11 +495,9 @@ class SpeciesTemplate:
     species_args: SpeciesArgs
     needs_gamma: bool = False
     needs_c: bool = False
-    # Mirrors ``Recipe.component`` — for tuple-returning funcs like
-    # ``perpendicular_vector`` used in ``V_perp_{c}`` per-species
-    # templates.  The synthesized ``Recipe`` carries it through to the
-    # compute path so the right element of the returned tuple is
-    # selected.
+    # Mirrors ``Recipe.component`` for tuple-returning funcs like
+    # ``perpendicular_vector``.  The synthesized ``Recipe`` carries it
+    # through so the compute path selects the right tuple element.
     component: int | None = None
 
 
@@ -728,29 +716,20 @@ _SPECIES_TEMPLATES: dict[str, SpeciesTemplate] = {
     ),
 }
 
-# Match the species qualifier ``_s<N>`` in any of four positions:
-#   1. End (scalar per-species like ``omega_p_s2``, ``P_s0``, ``T_s1``).
-#   2. Middle followed by a component / modifier suffix (vector/tensor
-#      per-species or generic operator under Tier-3 canonical:
-#      ``V_s0_1``, ``q_s0_1``, ``P_s0_11``, ``P_s0_par``,
-#      ``P_s0_perp``, ``V_s0_perp_1``).
-#   3. Middle followed by a closing pipe (per-species magnitude:
-#      ``|V_s0|``, ``|J_s1|``).
-#   4. Middle followed by an operator + closing pipe (per-species
-#      operator magnitude: ``|V_s0_perp|``).
-# The template lookup key is ``<prefix><suffix>`` — for ``V_s0_1`` it's
-# ``"V_1"``, for ``P_s0_par`` it's ``"P_par"``, for ``|V_s0|`` it's
-# ``"|V|"``, for ``|V_s0_perp|`` it's ``"|V_perp|"``. The ``_[^|]+\|``
-# alternative comes first so the operator-plus-pipe form wins over the
-# bare ``_[^|]+`` form when both could match.
+# Match the species qualifier ``_s<N>`` in any of its four positions: at
+# the end (``P_s0``), before a component or operator suffix (``V_s0_1``,
+# ``P_s0_par``), before a closing pipe (``|V_s0|``), or before an operator
+# plus pipe (``|V_s0_perp|``).  The template key is ``<prefix><suffix>``:
+# ``V_s0_1`` → ``"V_1"``, ``|V_s0_perp|`` → ``"|V_perp|"``.  The
+# ``_[^|]+\|`` alternative comes first so the operator-plus-pipe form wins
+# when both could match.
 _SPECIES_SUFFIX_RE = re.compile(
     r"^(?P<prefix>.+?)_s(?P<idx>\d+)(?P<suffix>_[^|]+\||_[^|]+|\|)?$"
 )
 
-# Generic operator suffixes that must sit *after* the species qualifier
-# in Tier-3 canonical names (``P_s0_par`` is valid; ``P_par_s0`` is not).
-# When the regex puts these in the prefix (``P_par`` + ``_s0`` + ``""``),
-# reject so the legacy split-form (``P_par_s0``) raises ``KeyError``.
+# Generic operator suffixes sit *after* the species qualifier in Tier-3
+# names (``P_s0_par``, not ``P_par_s0``).  When the regex puts one in the
+# prefix, reject the match so the legacy form raises ``KeyError``.
 _INVALID_PREFIX_OPERATOR_ENDINGS: tuple[str, ...] = ("_par", "_perp", "|")
 
 
@@ -764,10 +743,9 @@ def _try_species_recipe(name: str) -> Recipe | None:
         return None
     raw_prefix = m.group("prefix")
     raw_suffix = m.group("suffix") or ""
-    # Tier-3 canonical names put generic operators *after* the species
-    # qualifier.  Anchor the rule by rejecting matches whose prefix
-    # ends with a generic operator and whose suffix is empty (the
-    # legacy ``P_par_s0`` / ``|V|_s0`` shape).
+    # Reject matches whose prefix ends in a generic operator and whose
+    # suffix is empty — the legacy ``P_par_s0`` / ``|V|_s0`` shape, which
+    # inverts the Tier-3 order.
     if not raw_suffix and raw_prefix.endswith(_INVALID_PREFIX_OPERATOR_ENDINGS):
         return None
     prefix = raw_prefix + raw_suffix
@@ -1014,14 +992,9 @@ def _execute_recipe(
             )
             raise GeometryUnsupportedError(msg)
         args.extend(dataset.grid.spacing)
-        # Operator-backed recipes get the dataset's geometry threaded
-        # through as a kwarg. Today this is a no-op for the only
-        # reachable code path (geometry is always Cartesian after the
-        # check above) but it pre-wires the FieldDataset → recipe →
-        # operator path so that when spherical/cylindrical operator
-        # implementations land, the recipe automatically passes the
-        # right geometry. At that point, the early raise above can be
-        # relaxed for ``passes_geometry`` recipes.
+        # A no-op while the check above admits Cartesian only, but it
+        # wires the FieldDataset → recipe → operator path so relaxing
+        # that raise is all a non-Cartesian operator would need.
         if recipe.passes_geometry:
             kwargs["geometry"] = dataset.grid.geometry.type
 
@@ -1334,12 +1307,9 @@ def unregister_recipe(name: str) -> None:
         raise
 
 
-# Public read-only view of the recipe registry. Codegen consumers
-# (webpic, rustpic tooling) iterate ``RECIPES.items()`` to generate
-# cross-language mirrors. The underlying ``_REGISTRY`` stays a mutable
-# dict because `register_recipe` / `unregister_recipe`
-# update it under ``_recipe_lock``; the proxy guarantees external
-# callers only see the read side.
+# Public read-only view of the recipe registry — codegen consumers iterate
+# ``RECIPES.items()``.  ``_REGISTRY`` stays mutable for `register_recipe` /
+# `unregister_recipe` under ``_recipe_lock``; the proxy hides the write side.
 RECIPES: MappingProxyType[str, Recipe] = MappingProxyType(_REGISTRY)
 SPECIES_TEMPLATES: MappingProxyType[str, SpeciesTemplate] = MappingProxyType(
     _SPECIES_TEMPLATES

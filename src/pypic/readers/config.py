@@ -393,12 +393,10 @@ def _build_species(sp: Species) -> SpeciesInfo:
 
 
 def _build_physics(physics: Physics | None) -> PhysicsParams:
-    # PhysicsParams.c is the speed of light in *normalized* units. For the
-    # PIC normalization (velocity_ref = c_SI) it is 1.0 by construction;
-    # `[units].speed_of_light` is an SI value already consumed by
-    # `_pic_norm` to set velocity_ref, not a code-unit override. MHD/hybrid
-    # would want c_SI / v_A here, but the v1.0 schema does not yet expose
-    # that knob — left at the default until a future schema field lands.
+    # PhysicsParams.c is the speed of light in *normalized* units: 1.0 by
+    # construction for PIC (velocity_ref = c_SI).  `[units].speed_of_light` is
+    # an SI value already consumed by `_pic_norm`, not a code-unit override.
+    # MHD/hybrid would want c_SI / v_A, which v1.0 does not express.
     if physics is None:
         return PhysicsParams()
 

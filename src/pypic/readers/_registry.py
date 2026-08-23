@@ -368,14 +368,10 @@ class Simulation:
                     COMPUTE_ALIASES.get(name, GROUP_ALIASES.get(name, name)),
                 )
                 expanded.add(resolved)
-                # Tier-3 vector group shorthand:
-                #   "B"    → "B_1","B_2","B_3"
-                #   "J_s0" → "J_s0_1","J_s0_2","J_s0_3" (species before component)
-                # Skip names already resolved as aliases (e.g. "Bx") and
-                # names that end in a component suffix (``_<digit>``);
-                # species-only suffixes (``_s<digits>``) are still
-                # expandable. ``P_s0_11`` and ``B_1`` skip; ``EF_s0`` and
-                # ``B`` expand.
+                # Tier-3 vector group shorthand: "B" → "B_1","B_2","B_3";
+                # "J_s0" → "J_s0_1","J_s0_2","J_s0_3".  Names already
+                # resolved as aliases ("Bx") or ending in a component suffix
+                # ("B_1", "P_s0_11") skip; species-only suffixes expand.
                 ends_with_species = re.search(r"_s\d+$", resolved) is not None
                 ends_with_component = (
                     re.search(r"_\d+$", resolved) is not None and not ends_with_species
@@ -383,12 +379,10 @@ class Simulation:
                 if name not in alias_map and not ends_with_component:
                     for c in ("1", "2", "3"):
                         expanded.add(f"{resolved}_{c}")
-                # Expand compute dependencies: "Pi" → all six P_s1 tensor
-                # components; "P_par" → all six P tensor components + B.
-                # Asking for P_11 alone *does not* implicitly load the
-                # off-diagonals — request "Pi"/"Pe"/"P_sN"/"P_par"
-                # explicitly when downstream P_par/P_perp/agyrotropy
-                # need the full tensor.
+                # Expand compute dependencies: "Pi" → the six P_s1 tensor
+                # components, "P_par" → the six P components plus B.  "P_11"
+                # alone does *not* pull the off-diagonals, so ask for the
+                # group when P_par/P_perp/agyrotropy need the full tensor.
                 expanded |= field_dependencies(resolved)
 
             canonical = expanded

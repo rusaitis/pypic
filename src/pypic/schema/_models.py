@@ -80,14 +80,10 @@ PhysicalExtentUnit = Literal[
     "m", "km", "R_E", "R_S", "R_sun", "R_M", "R_J", "AU", "d_i"
 ]
 
-# Open vocabularies: algorithm / method / closure names. Research codes
-# invent new schemes faster than the schema can enumerate them, so unknown
-# strings pass validation; the values below are the v1.0 canonical set.
-# Aliased to ``str`` so research methods pass validation. Canonical v1.0
-# values listed in comments for tooling and documentation. Cross-field
-# rules (e.g. ``scheme = "subcycled"`` requires ``field_substeps``) still
-# fire via model validators below — the openness is on *value*, not on
-# *semantics*.
+# Open vocabularies (see above): aliased to ``str``, with the v1.0 canonical
+# values listed per alias.  Cross-field rules — ``scheme = "subcycled"``
+# requires ``field_substeps``, say — still fire in the validators below;
+# the openness is on *value*, not on *semantics*.
 #
 # Time integrator: "fixed", "adaptive", "subcycled", "rk2", "rk3", "rk4",
 #   "vl2", "ssprk2", "ssprk3", "imex-rk2", "imex-rk3"

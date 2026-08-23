@@ -4,7 +4,7 @@ Provides theme-aware building blocks for interactive 3D visualization
 using pyvista/VTK. Fully independent from the matplotlib plotting
 modules — can be removed without affecting core pypic or 2D plotting.
 
-Requires: ``pip install pypic-plasma[3d]`` (installs pyvista).
+Requires: ``pip install "pypic-plasma[3d]"`` (installs pyvista).
 """
 
 from pypic.plotting.pyvista._axes import add_axis_triad, add_equatorial_grid

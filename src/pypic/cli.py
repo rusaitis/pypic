@@ -1132,12 +1132,9 @@ def reduce_apply(
     )
     compression_spec = _parse_compression(compression)
 
-    # Reduction reads from the field set + the weight field. When a weight is
-    # given and ``--fields`` restricts the load list, the weight field
-    # is added so the reader pulls it from disk; the output then drops
-    # everything except the requested fields via the ``fields=`` arg of
-    # reduce(). Without this, a user-restricted read would 404 on the
-    # weight at compute time.
+    # A weight field must be pulled from disk even when ``--fields`` narrows
+    # the load list; ``reduce(fields=...)`` drops it again on output.  Without
+    # this a restricted read fails on the missing weight at compute time.
     read_fields: list[str] | None = list(field_list) if field_list else None
     if read_fields is not None and weight is not None and weight not in read_fields:
         read_fields = [*read_fields, weight]
@@ -2400,7 +2397,7 @@ def serve(
     except ImportError as exc:
         typer.echo(
             "pypic serve requires the server extra. "
-            "Install with: pip install pypic-plasma[server]",
+            'Install with: pip install "pypic-plasma[server]"',
             err=True,
         )
         raise typer.Exit(1) from exc

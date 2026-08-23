@@ -16,13 +16,8 @@ Readers should also construct a fresh `StaggerInfo` with
 ``interpolation_order=1`` and a ``notes`` string recording the
 destagger provenance.
 
-Currently unwired in production readers: every shipping reader
-receives co-located data. It is pre-built infrastructure for the
-planned VPIC reader (which must destagger ``cbx/cby/cbz`` on faces
-and ``ex/ey/ez`` on edges) and the openPMD reader (which consumes
-the ED-PIC per-component ``position`` tuple).  The Cartesian-Yee
-algorithm is kept tested in ``tests/test_destagger.py`` so it is
-ready to wire up when those readers land.
+No shipping reader calls this — every one of them receives
+co-located data. Covered by ``tests/test_destagger.py``.
 """
 
 from __future__ import annotations

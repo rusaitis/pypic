@@ -7,7 +7,7 @@ is serialized into ``xr.Dataset.attrs`` so the round-trip is fully
 self-describing.
 
 Requires optional dependencies: ``zarr>=3.1.0`` and ``numcodecs>=0.16.0``.
-Install with ``pip install pypic-plasma[zarr]``.
+Install with ``pip install "pypic-plasma[zarr]"``.
 """
 
 from __future__ import annotations
@@ -441,13 +441,11 @@ def to_zarr(
     import shutil
     from pathlib import Path as _Path
 
-    # Cleanup gating: ``DataTree.to_zarr(mode="w")`` materializes a
-    # partial store (``zarr.json``, any chunks written before failure)
-    # into the destination before attribute serialization can reject
-    # — say — non-serializable metadata.  Without cleanup a later
-    # ``from_zarr`` on that path surfaces "No pypic metadata found"
-    # instead of the actual write error, misleading operators.  A
-    # pre-existing non-empty directory is left alone — user data.
+    # Cleanup gating.  ``DataTree.to_zarr(mode="w")`` materializes a partial
+    # store before attribute serialization can reject, say, non-serializable
+    # metadata; a later ``from_zarr`` then reports "No pypic metadata found"
+    # instead of the real write error.  Only a path that was fresh or empty
+    # when we started is ours to remove — a non-empty one is user data.
     path_obj = _Path(path)
     created_new = not path_obj.exists() or (
         path_obj.is_dir() and not any(path_obj.iterdir())
@@ -636,12 +634,9 @@ def to_zarr_timeseries(
 
     pairs = _resolve_timeseries_pairs(source, steps, fields)
     path_str = str(path)
-    # Cleanup gating mirrors the single-step + icechunk writers: if the
-    # output path was fresh or empty when we started, any failure
-    # inside the try is ours to clean up — including when xarray's
-    # *first* ``ds.to_zarr(mode='w')`` call fails partway through and
-    # leaves a stub store with just ``zarr.json``.  A pre-existing
-    # non-empty directory is left alone (user data).
+    # Cleanup gating as in ``to_zarr``, including the case where xarray's
+    # *first* ``ds.to_zarr(mode='w')`` fails partway and leaves a stub store
+    # holding only ``zarr.json``.
     path_obj = _Path(path)
     created_new = not path_obj.exists() or (
         path_obj.is_dir() and not any(path_obj.iterdir())

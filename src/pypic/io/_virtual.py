@@ -6,7 +6,7 @@ store) so that consumers see a standard ``xr.open_zarr``-style dataset
 that resolves chunks by reading byte ranges from the source HDF5 files.
 
 Requires optional dependencies ``virtualizarr>=2.4`` and
-``icechunk>=1.1``; both are installed by ``pip install pypic-plasma[zarr]``.
+``icechunk>=1.1``; both are installed by ``pip install "pypic-plasma[zarr]"``.
 """
 
 from __future__ import annotations
@@ -251,7 +251,7 @@ def open_virtual(
     -----
     Virtual references are persisted via Icechunk's native Zarr v3
     backend (in-memory store).  Both ``virtualizarr`` and ``icechunk``
-    are installed by the ``zarr`` extra (``pip install pypic-plasma[zarr]``).
+    are installed by the ``zarr`` extra (``pip install "pypic-plasma[zarr]"``).
     """
     ensure_virtualizarr()
     ensure_icechunk()
@@ -365,7 +365,7 @@ def to_icechunk_virtual(
     Notes
     -----
     Both ``virtualizarr`` and ``icechunk`` are installed by the
-    ``zarr`` extra (``pip install pypic-plasma[zarr]``).  Moving or deleting
+    ``zarr`` extra (``pip install "pypic-plasma[zarr]"``).  Moving or deleting
     *source* after the write breaks the virtual refs in *output* — the
     on-disk repo is metadata only.
     """
@@ -382,13 +382,9 @@ def to_icechunk_virtual(
     source_str = str(source_path)
     source_dir = str(source_path.parent)
     output_path = _Path(output)
-    # Detect whether the output directory is ours to clean up *before*
-    # we mkdir it.  Same gating as ``to_zarr_icechunk`` /
-    # ``to_zarr_timeseries`` — anything that fails between the repo
-    # init and ``session.commit`` (notably ``open_virtual`` raising
-    # because the source HDF5 lacks ``grid/``) leaves a half-
-    # initialized repo where ``is_icechunk_store`` returns True while
-    # ``from_zarr`` raises ``GroupNotFoundError``.
+    # Decide *before* the mkdir whether the directory is ours to clean up.
+    # Same gating as ``to_zarr``; here the realistic trigger is
+    # ``open_virtual`` raising because the source HDF5 lacks ``grid/``.
     created_new = not output_path.exists() or (
         output_path.is_dir() and not any(output_path.iterdir())
     )

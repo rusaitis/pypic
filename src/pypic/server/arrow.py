@@ -13,10 +13,6 @@ axis.  Original N-D shape, axis names, normalization, and per-field
 attrs travel in the schema metadata under the ``b"pypic"`` key as
 JSON — mirroring the convention used by
 `pypic.io._arrow` for particles.
-
-Foundation scope: single ``RecordBatch`` per call.  Chunked /
-progressive transfer is a planned follow-up that drops in without
-changing the schema metadata shape.
 """
 
 from __future__ import annotations
@@ -88,7 +84,7 @@ def field_dataset_to_arrow_ipc(
     ------
     ImportError
         ``pyarrow`` is not installed (install with
-        ``pip install pypic-plasma[server]``).
+        ``pip install "pypic-plasma[server]"``).
     UnknownFieldError
         Any name in *fields* is absent from the dataset.
         Subclasses ``KeyError``.
@@ -116,16 +112,11 @@ def field_dataset_to_arrow_ipc(
         columns[name] = pa.array(values.ravel(order="C"))
         field_attrs[name] = _serialize_field_attrs(dict(da.attrs))
 
-    # Coordinate arrays as additional named columns.  Each surviving
-    # axis becomes one column.  Length differs from the field columns
-    # (which are flattened products of dims), so they go into a
-    # separate batch — but to keep the foundations API single-shot,
-    # we pad coordinate columns into one schema metadata slot rather
-    # than emitting two batches.
-    #
-    # Coordinates must be finite: the schema_meta payload is later
-    # ``json.dumps``-ed, and NaN/inf would either emit non-strict JSON
-    # (``"NaN"``, ``"Infinity"``) or silently mislead JS/Rust clients.
+    # One column per surviving axis.  Their length differs from the field
+    # columns (flattened products of dims), so rather than emit a second
+    # batch they travel in the schema metadata and the call stays single-shot.
+    # Coordinates must be finite: the payload is ``json.dumps``-ed, and
+    # NaN/inf would emit non-strict JSON or mislead JS/Rust clients.
     coord_arrays: dict[str, list[float]] = {}
     for dim in dims:
         if dim in fds.xr.coords:

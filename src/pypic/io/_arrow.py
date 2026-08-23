@@ -5,7 +5,7 @@ Zero-copy (where possible) conversion between ``ParticleData`` and
 metadata under key ``b"pypic"``.
 
 Requires optional dependency: ``pyarrow>=17.0``.
-Install with ``pip install pypic-plasma[arrow]``.
+Install with ``pip install "pypic-plasma[arrow]"``.
 """
 
 from __future__ import annotations

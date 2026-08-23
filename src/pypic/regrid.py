@@ -162,13 +162,10 @@ def common_grid(a: GridInfo, b: GridInfo) -> GridInfo:
             raise ValueError(msg)
 
         dx = min(a.spacing[i], b.spacing[i])
-        # Number of samples on a closed interval [sample_lo, sample_hi]
-        # at uniform spacing dx. The 1e-9 tolerance absorbs FP rounding
-        # when ``(sample_hi - sample_lo) / dx`` is an exact integer;
-        # safe for all spacings PIC/MHD readers emit (typically 1e-6
-        # upward in code units). For pathologically small spacings
-        # (< ~1e-9) the slack would shadow a legitimate sub-step, but
-        # that regime does not arise in fluid/kinetic output.
+        # Samples on the closed interval [sample_lo, sample_hi] at spacing
+        # dx.  The 1e-9 slack absorbs FP rounding when the ratio is an exact
+        # integer; it would shadow a legitimate sub-step only below ~1e-9,
+        # far under the spacings PIC/MHD readers emit.
         n = max(1, int((sample_hi - sample_lo) / dx + 1e-9) + 1)
         new_origin.append(sample_lo - 0.5 * dx)
         new_spacing.append(dx)

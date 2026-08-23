@@ -193,12 +193,10 @@ _CARTESIAN_UNDERSCORE_ALIASES = _build_aliases(("x", "y", "z"), separator="_")
 _SPHERICAL_UNDERSCORE_ALIASES = _build_aliases(("r", "theta", "phi"), separator="_")
 _CYLINDRICAL_UNDERSCORE_ALIASES = _build_aliases(("r", "phi", "z"), separator="_")
 
-# Scalar underscore aliases (e.g. ``P_e`` is an alternate spelling of
-# ``Pe``).  The e/i form is what carries the rich electron/ion-specific
-# field metadata in ``_FIELD_INFO``; the universal-canonical flip from
-# v1.0.x lives at the compute layer (``COMPUTE_ALIASES``).  These
-# entries keep underscore-spellings working for both labeling and
-# storage lookup.
+# Scalar underscore aliases (``P_e`` for ``Pe``).  The e/i form carries the
+# electron/ion-specific metadata in ``_FIELD_INFO``, while the flip to
+# universal canonicals lives at the compute layer (``COMPUTE_ALIASES``);
+# these entries keep the underscore spellings working for both.
 _SCALAR_UNDERSCORE_ALIASES: dict[str, str] = {
     "P_e": "Pe",
     "P_i": "Pi",

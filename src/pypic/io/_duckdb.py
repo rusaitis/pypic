@@ -4,7 +4,7 @@ DuckDB automatically discovers Hive-partitioned layouts and applies
 predicate pushdown, partition pruning, and morsel-driven parallelism.
 
 Requires optional dependencies: ``duckdb>=1.4`` and ``pyarrow>=17.0``.
-Install with ``pip install pypic-plasma[duckdb]``.
+Install with ``pip install "pypic-plasma[duckdb]"``.
 """
 
 from __future__ import annotations
@@ -132,13 +132,10 @@ def query_sql(
         v for v in arrow_table.column("species").unique().to_pylist() if v is not None
     }
     if not species_values:
-        # Well-formed filter that matched zero rows.  Recover the
-        # intended species when possible: (a) only one species on disk
-        # → adopt it; (b) the SQL pins exactly one on-disk species via
-        # a literal ``species='NAME'`` clause → adopt that.  Anything
-        # else is genuinely ambiguous (no literal, multiple literals,
-        # subqueries) and falls through to the ``unknown`` placeholder
-        # so callers can still dispatch on ``n_particles``.
+        # Well-formed filter, zero rows.  Recover the intended species when
+        # one species is on disk, or when the SQL pins exactly one via a
+        # literal ``species='NAME'``.  Anything else is ambiguous and falls
+        # through to the ``unknown`` placeholder.
         on_disk = sorted(
             {p.name.split("=", 1)[1] for p in Path(path).glob("step=*/species=*")}
         )
@@ -153,12 +150,9 @@ def query_sql(
                 recovered_species = next(iter(on_disk_pinned))
         if recovered_species is not None:
             payload = _lookup_species_meta(path, recovered_species)
-            # Empty-result recovery keeps species identity (index /
-            # charge / mass) but drops per-step ``metadata``: the
-            # fragment we scanned is *some* step's schema, not the
-            # (zero-row) step the query asked about, so stamping its
-            # ``time``/``tag``/... scalars onto the empty result would
-            # be silent corruption.  Species-level scalars stay.
+            # Keep species identity (index / charge / mass) but drop
+            # per-step ``metadata``: the fragment scanned is *some* step's
+            # schema, not the zero-row step asked about.
             arrow_table = inject_species_meta(
                 arrow_table,
                 int(payload.get("species_index", 0)),

@@ -1,14 +1,10 @@
 """Pure-numerics kernels for pypic.
 
 Generic ODE integrators, step controllers, and related numerical
-methods, decoupled from any specific physics task. Today the only
-consumer is the adaptive field-line tracer
-(``pypic.traces.trace_field_line_adaptive``); future consumers
-(particle pushers, splitting helpers, higher-order quadrature) land
-here so they don't need to be re-extracted from their first caller.
-
-Public surface intentionally minimal — not re-exported from the
-top-level ``pypic`` namespace until a second consumer emerges.
+methods, decoupled from any specific physics task. The adaptive
+field-line tracer (``pypic.traces.trace_field_line_adaptive``) is the
+current consumer. Not re-exported from the top-level ``pypic``
+namespace.
 
 Structure-preserving (symplectic, variational) integrators follow
 [@HairerLubichWanner2006]; the current Dormand-Prince kernel is the

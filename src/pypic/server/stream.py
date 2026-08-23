@@ -15,10 +15,8 @@ frame is one request/response exchange:
    [`ErrorFrame`][pypic.server.protocol.ErrorFrame] text frame.
 
 The connection stays open across exchanges; the client is responsible
-for matching responses to requests via ``request_id``.  No
-server-pushed updates in the foundations — every payload is
-request-driven.  Streaming new timesteps as they appear is a planned
-follow-up.
+for matching responses to requests via ``request_id``.  Every payload
+is request-driven; the server never pushes on its own.
 """
 
 from __future__ import annotations

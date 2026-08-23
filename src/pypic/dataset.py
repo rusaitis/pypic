@@ -124,13 +124,10 @@ class FieldDataset:
                 [str(name) for name in self._ds.data_vars],
             )
         )
-        # Bidirectional alias filter.  First pass — forward direction:
-        # ``alias→canonical`` when the canonical is stored.  Reverse:
-        # ``canonical→alias`` when the data is stored under what's now
-        # considered the alias (e.g. ``Pe`` after the v1.0 cleanup made
-        # ``P_s0`` canonical).  Without the reverse direction, a recipe
-        # asking for the ``_sN`` form on a dataset that stores the
-        # ``e/i`` form would miss.
+        # Bidirectional alias filter: ``alias→canonical`` when the canonical
+        # is stored, and ``canonical→alias`` when the data sits under what is
+        # now the alias (``Pe``, since v1.0 made ``P_s0`` canonical).  Without
+        # the reverse pass a recipe asking for ``_sN`` would miss.
         data_vars_set = set(self._ds.data_vars)
         filtered: dict[str, str] = {}
         for alias_name, canonical_name in merged.items():

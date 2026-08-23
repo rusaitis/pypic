@@ -9,10 +9,10 @@ Particle data: ``particles_to_arrow`` / ``particles_from_arrow`` (Arrow),
 ``query_sql`` (DuckDB over Parquet).
 
 Optional dependencies per feature:
-    ``pip install pypic-plasma[zarr]`` — Zarr v3, VirtualiZarr
-    ``pip install pypic-plasma[icechunk]`` — Icechunk versioned storage
-    ``pip install pypic-plasma[arrow]`` — Arrow/Parquet particle I/O
-    ``pip install pypic-plasma[duckdb]`` — DuckDB SQL queries
+    ``pip install "pypic-plasma[zarr]"`` — Zarr v3, VirtualiZarr
+    ``pip install "pypic-plasma[icechunk]"`` — Icechunk versioned storage
+    ``pip install "pypic-plasma[arrow]"`` — Arrow/Parquet particle I/O
+    ``pip install "pypic-plasma[duckdb]"`` — DuckDB SQL queries
 """
 
 from pypic.io import metadata

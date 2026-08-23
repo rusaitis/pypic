@@ -33,13 +33,9 @@ if TYPE_CHECKING:
     from pypic.dataset import FieldDataset
 
 
-# Storage layout discriminator.  Mirrors ``[schema].version`` from
-# ``simulation.toml`` — the storage layout (Zarr DataTree with fields
-# under ``/fields`` and metadata flat at root) is part of the schema
-# v1.0 contract documented in schema.md §4.2.  Bumping the schema
-# version is the single coordinated way to evolve both vocabulary and
-# storage shape together.  On disk the value sits at the root attr
-# path ``schema.version`` so the key path mirrors the TOML form.
+# Storage layout discriminator, written to the root attr ``schema.version``
+# and mirroring ``[schema].version`` from ``simulation.toml``: one version
+# governs both vocabulary and storage shape (schema.md §4.2).
 SCHEMA_VERSION = "1.0"
 
 
@@ -391,15 +387,10 @@ def from_json_native(obj: Any) -> Any:  # noqa: ANN401
     return obj
 
 
-# Reserved metadata keys lifted to top-level root attrs on write.
-# ``run`` and ``simulation_toml`` are emitted as siblings of ``schema``,
-# ``grid``, etc. so cross-tool consumers (webpic, Rust) can read them
-# without going through pypic's open ``metadata`` bag.  On read, both
-# are re-stuffed into ``metadata`` so the Python-side API stays a
-# single bag (no new typed FieldDataset fields required).  ``stagger``
-# moves to ``grid.stagger`` (schema.md §4.2 finding 9); ``model`` is
-# scaffolded for the future typed ``schema.Model``.  See schema.md §4.2
-# for the on-disk contract.
+# Metadata keys lifted out of the open ``metadata`` bag into root attrs on
+# write, so non-pypic consumers can read them directly (schema.md §4.2);
+# ``stagger`` lands under ``grid.stagger``.  Read puts them all back into
+# ``metadata``, keeping the Python-side API a single bag.
 _RESERVED_METADATA_KEYS: tuple[str, ...] = (
     "model",
     "run",
@@ -522,9 +513,8 @@ def encode_pypic_attrs(fds: FieldDataset) -> dict[str, Any]:
     reserved = pop_reserved_metadata(metadata)
     lifted: dict[str, Any] = {}
 
-    # No reader sets ``metadata['model']`` today; the branch is kept
-    # so the future typed ``schema.Model`` swap is a one-line edit in
-    # ``_encode_model``.  See that function's docstring.
+    # No reader sets ``metadata['model']`` today; the branch keeps the
+    # encoding in one place.  See ``_encode_model``.
     if "model" in reserved:
         lifted["model"] = _encode_model(reserved["model"])
     if "run" in reserved:
@@ -646,10 +636,9 @@ def decode_pypic_attrs(
     if raw_toml is not None:
         metadata["simulation_toml"] = raw_toml
 
-    # Frame and transforms now live under ``coordinates``; fall back
-    # to top-level keys for old-layout stores.  Trailing ``or {}``
-    # guards against an explicit ``null`` in either location, which
-    # would otherwise crash ``dict_to_transforms``.
+    # Frame and transforms live under ``coordinates``; the top-level
+    # fallback covers old-layout stores.  Trailing ``or {}`` guards an
+    # explicit ``null``, which would crash ``dict_to_transforms``.
     frame = coords_attrs.get("frame") or d.get("frame", "simulation")
     raw_transforms = coords_attrs.get("transforms") or d.get("transforms", {}) or {}
     transforms = dict_to_transforms(raw_transforms)
@@ -759,10 +748,9 @@ def _attrs_to_grid(
 def _time_to_attrs(grid: GridInfo) -> dict[str, Any]:
     """Encode the time section per schema.md §4.2 ``attrs.time``.
 
-    Currently only ``dt`` is round-tripped — ``t_start`` / ``t_end`` /
-    ``n_steps`` / ``scheme`` live in the source ``simulation.toml``
-    but don't reach the typed in-memory FieldDataset. They will be
-    added when a typed [time] container lands.
+    Only ``dt`` round-trips: ``t_start`` / ``t_end`` / ``n_steps`` /
+    ``scheme`` live in the source ``simulation.toml`` and never reach
+    the typed in-memory FieldDataset.
     """
     out: dict[str, Any] = {}
     if grid.dt is not None:
@@ -774,8 +762,8 @@ def _boundary_conditions_to_attrs(grid: GridInfo) -> dict[str, Any]:
     """Encode the boundary_conditions section per schema.md §4.2.
 
     The in-memory GridInfo carries one boundary tag per axis; both
-    faces are emitted with the same value. Asymmetric per-face cases
-    require a typed [boundary_conditions] container (future work).
+    faces are emitted with the same value; asymmetric per-face cases
+    are not representable.
     """
     if grid.boundary is None:
         return {}
@@ -824,11 +812,9 @@ def _normalization_to_attrs(
 def _physics_to_attrs(physics: PhysicsParams) -> dict[str, Any]:
     """Encode physics without ``c`` (now in normalization) or top-level ``gamma``.
 
-    ``gamma`` becomes ``gamma_eos`` (the canonical schema name). This
-    is a recognized open-vocabulary key under [physics] per §1; in a
-    future typed-physics refactor it would move under ``physics.mhd
-    .gamma_eos`` (single-fluid) or per-species. ``extra`` carries
-    arbitrary code-specific knobs.
+    ``gamma`` becomes ``gamma_eos`` (the canonical schema name), a
+    recognized open-vocabulary key under [physics] per §1. ``extra``
+    carries arbitrary code-specific knobs.
     """
     return {
         "relativistic": physics.relativistic,

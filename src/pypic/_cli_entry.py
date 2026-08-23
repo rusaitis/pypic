@@ -34,7 +34,7 @@ def main() -> None:
             raise
         msg = (
             f"The 'pypic' command requires {exc.name}, which ships in the "
-            f"cli extra.\nInstall with: pip install 'pypic-plasma[cli]'"
+            'cli extra.\nInstall with: pip install "pypic-plasma[cli]"'
         )
         raise SystemExit(msg) from None
     app()

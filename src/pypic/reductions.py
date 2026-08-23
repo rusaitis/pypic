@@ -10,25 +10,15 @@ compose from this single primitive paired with an optional
 [`BoxSelection`][pypic.selections.BoxSelection] or
 [`SphereSelection`][pypic.selections.SphereSelection].
 
-Why no ``SlabSelection``? Selections describe regions, not data.
-A ``Slab`` would fuse "pick a thick slice"
-(region) with "reduce along the thick axis" (data), which forces every
-caller to think about both at once.  Splitting them keeps the existing
-``BoxSelection`` reusable for non-reduction workflows and gives
-webpic-style viewers a clean wire format:
-``{selection, axis, reduction}`` → one server-side ``reduce()`` call.
+There is deliberately no ``SlabSelection``: selections describe regions,
+not data, and a slab would fuse "pick a thick slice" with "reduce along
+it".  Kept separate, ``BoxSelection`` stays reusable outside reductions
+and a viewer request is just ``{selection, axis, reduction}``.
 
-The verb is ``reduce`` (not ``project``) deliberately: ``project()`` is
-already taken by Three.js (``Vector3.project(camera)``) for screen-space
-camera projection, and webpic is a Three.js viewer.  Server-side
-``reduce`` keeps the cross-stack vocabulary clean.
-
-The ``length_axes`` attrs stamp is an interim mechanism. After an
-unweighted ``integrate`` the displayed ``quantity_type`` and ``si_unit``
-strings are preserved but the numeric value through
-`FieldDataset.in_si` is corrected via ``length_ref ** length_axes``.
-Generalizing the openPMD ``unit_dimension`` 7-tuple so the unit strings
-shift too would subsume this; it is on the roadmap, not implemented.
+After an unweighted ``integrate`` the ``quantity_type`` and ``si_unit``
+strings are preserved unchanged, and `FieldDataset.in_si` corrects the
+value via ``length_ref ** length_axes`` from attrs.  The unit strings
+themselves do not shift by the reduced length factors.
 """
 
 from __future__ import annotations
@@ -385,14 +375,11 @@ def reduce(
         base_attr["weight"] = weight_canonical
 
     # Accumulate ``length_axes`` across chained reductions so ``in_si()``
-    # can apply the right number of ``length_ref`` factors.  Unweighted
-    # ``integrate`` adds ``len(axes)``; weighted ``integrate`` cancels
-    # the length factors between numerator and denominator (units of
-    # ``∫ f w dx / ∫ w dx`` equal units of ``f``); every other reduction
-    # is unit-preserving so it carries the prior count forward
-    # unchanged.  ``argmax``/``argmin`` overwrite ``quantity_type`` to
-    # ``"length"`` and reset the unit dimension entirely — the prior
-    # ``length_axes`` is moot and dropped.
+    # applies the right number of ``length_ref`` factors.  Unweighted
+    # ``integrate`` adds ``len(axes)``; weighted ``integrate`` cancels them
+    # between numerator and denominator; other reductions preserve units and
+    # carry the count forward.  ``argmax``/``argmin`` return a length, which
+    # resets the unit dimension and makes the prior count moot.
     for name in [str(n) for n in reduced.data_vars]:
         field_attr = dict(base_attr)
         if reduction not in _INDEX_REDUCERS:

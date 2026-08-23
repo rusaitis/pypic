@@ -77,6 +77,11 @@ The distribution is `pypic-plasma` on PyPI; the import name is `pypic`.
 - `pypic.plotting.pyvista` no longer writes to stdout when saving a screenshot;
   it logs instead.
 - Workflow actions moved off the deprecated Node 20 runtime.
+- Missing-extra errors come from one guard (`pypic._optional.require`) instead
+  of eight hand-written copies, so the message names the missing modules, the
+  feature, and the install command identically on the first failure and on
+  every call after it. Every install hint now quotes the extra
+  (`pip install "pypic-plasma[zarr]"`) — unquoted brackets are a zsh glob.
 
 ### Fixed
 

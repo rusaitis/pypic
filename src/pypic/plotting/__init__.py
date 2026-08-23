@@ -2,7 +2,7 @@
 
 Requires matplotlib (optional dependency). Install with::
 
-    pip install pypic-plasma[plot]
+    pip install "pypic-plasma[plot]"
 
 This module can be imported for type checking without matplotlib installed.
 Actual plotting functions call ``ensure_matplotlib()`` at entry.
