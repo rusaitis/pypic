@@ -9,6 +9,19 @@ The distribution is `pypic-plasma` on PyPI; the import name is `pypic`.
 
 ## [Unreleased]
 
+### Added
+
+- `SECURITY.md`, a pull-request template, and a Dependabot configuration
+  scoped to GitHub Actions.
+- API reference pages for `pypic.io`, `pypic.plotting`, `pypic.compute`,
+  `pypic.comparison`, `pypic.regrid`, `pypic.exceptions`, and
+  `pypic.schema` — ten public modules previously had none, including two
+  headline features.
+- A zero-data on-ramp in the getting-started guide: `FieldDataset.from_arrays`
+  is now documented with a runnable example, so pypic can be tried without
+  simulation output.
+- An ORCID for the author in `CITATION.cff`.
+
 ### Changed
 
 - Documentation and repository cleanup for the public release: added an
@@ -17,7 +30,7 @@ The distribution is `pypic-plasma` on PyPI; the import name is `pypic`.
   and corrected several stale references.
 - The feature and extras lists in `README.md`, `docs/index.md`, and
   `docs/getting-started.md` now agree with each other and with
-  `pyproject.toml`. All nine extras are documented in one table with what each
+  `pyproject.toml`. All eight extras are documented in one table with what each
   pulls in and what it enables, and the previously undocumented Arrow IPC
   server and the `validate` / `plot-compare` / `serve` / `export` CLI commands
   are listed.
@@ -61,7 +74,7 @@ First release published to PyPI.
 
 ## [0.1.0] — 2026-08-22
 
-Initial public release on GitHub and Zenodo, after 426 commits of development.
+Initial public release on GitHub and Zenodo, after 420 commits of development.
 Not published to PyPI — the release workflow failed on this tag, and `0.1.1` is
 the first version available from the index.
 

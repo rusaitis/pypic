@@ -1534,7 +1534,6 @@ plot = [
 ]
 server = [
     { name = "fastapi" },
-    { name = "httpx" },
     { name = "pyarrow" },
     { name = "uvicorn", extra = ["standard"] },
     { name = "websockets" },
@@ -1548,6 +1547,7 @@ zarr = [
 
 [package.dev-dependencies]
 dev = [
+    { name = "httpx" },
     { name = "hypothesis" },
     { name = "jsonschema" },
     { name = "mkdocs-bibtex" },
@@ -1567,7 +1567,6 @@ requires-dist = [
     { name = "duckdb", marker = "extra == 'duckdb'", specifier = ">=1.4" },
     { name = "fastapi", marker = "extra == 'server'", specifier = ">=0.115" },
     { name = "h5py", specifier = ">=3.11" },
-    { name = "httpx", marker = "extra == 'server'", specifier = ">=0.27" },
     { name = "icechunk", marker = "extra == 'icechunk'", specifier = ">=1.1" },
     { name = "icechunk", marker = "extra == 'zarr'", specifier = ">=1.1" },
     { name = "matplotlib", marker = "extra == 'plot'", specifier = ">=3.9" },
@@ -1593,6 +1592,7 @@ provides-extras = ["plot", "3d", "cli", "zarr", "icechunk", "arrow", "duckdb", "
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "httpx", specifier = ">=0.27" },
     { name = "hypothesis", specifier = ">=6.100" },
     { name = "jsonschema", specifier = ">=4.21" },
     { name = "mkdocs-bibtex", specifier = ">=2.16" },

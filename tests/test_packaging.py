@@ -133,3 +133,22 @@ def test_unrelated_import_error_is_not_swallowed(
 
     with pytest.raises(ModuleNotFoundError, match="typer"):
         _cli_entry.main()
+
+
+def test_citation_version_matches_pyproject() -> None:
+    """``CITATION.cff`` carries a third hand-written copy of the version.
+
+    ``pypic.__version__`` is already checked against ``pyproject.toml``,
+    and CI guards the bundled JSON Schema, but nothing tied the citation
+    metadata to either — so a release could ship a DOI record pointing at
+    the previous version.
+    """
+    declared = _pyproject()["project"]["version"]
+    citation = (_REPO_ROOT / "CITATION.cff").read_text()
+    match = re.search(r"^version:\s*(\S+)\s*$", citation, re.MULTILINE)
+    assert match is not None, "CITATION.cff has no version field"
+    assert match.group(1) == declared, (
+        f"CITATION.cff declares version {match.group(1)!r} but "
+        f"pyproject.toml declares {declared!r}. Both are hand-written; "
+        f"update them together at release time."
+    )

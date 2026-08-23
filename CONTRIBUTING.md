@@ -16,14 +16,17 @@ uv sync --all-extras --all-groups
 
 ## Checks
 
-These four are what CI runs; all must pass.
+CI gates six things; all must pass.
 
 ```sh
 uv run pytest -v                      # full suite (tests + doctests)
-uv run ruff check src tests           # lint
-uv run ruff format --check src tests  # format check
-uv run mypy src                       # type check (strict)
+uv run ruff check src tests scripts benchmarks vulture_whitelist.py examples/custom_reader_example.py examples/ex_schindler_xi.py
+uv run ruff format --check src tests scripts benchmarks vulture_whitelist.py examples/custom_reader_example.py examples/ex_schindler_xi.py
+uv run mypy src scripts benchmarks vulture_whitelist.py examples/custom_reader_example.py examples/ex_schindler_xi.py
 ```
+
+The lint job also regenerates the bundled JSON Schema and fails if the
+result differs from what is committed — see *Changing the schema* below.
 
 The docs build is also gated, because `--strict` turns unresolved
 cross-references and broken internal links into failures:
@@ -47,6 +50,7 @@ Some plotting behavior is easier to verify by eye than by assertion.
 ```sh
 uv run python tests/visual_plots.py                # all themes -> tests/output/
 uv run python tests/visual_plots.py --theme dark   # single theme
+uv run python tests/visual_poincare.py             # Poincaré sections
 uv run python tests/visual_dipole_3d.py            # interactive 3D dipole
 ```
 
@@ -54,7 +58,7 @@ uv run python tests/visual_dipole_3d.py            # interactive 3D dipole
 
 Manual performance benchmarks live in `benchmarks/`. Not run by CI — use them to
 confirm the batched/vectorized paths still pay off after a kernel change. Each
-script is self-contained, uses a seeded RNG, and prints a small table.
+is self-contained, uses a seeded RNG, and prints a small table.
 
 ```sh
 uv run python benchmarks/bench_batched_tracer.py   # batched vs scalar tracer
@@ -126,3 +130,9 @@ uv run pypic schema export -o src/pypic/schema/simulation.schema.v1.0.json
 Prefix commit subjects with `feat:`, `fix:`, `docs:`, `refactor:`, `test:`, or
 `chore:`, and say *why* the change is being made rather than restating the diff.
 Keep the four checks above green in each commit where practical.
+
+## Conduct and security
+
+By participating you agree to the [Code of Conduct](CODE_OF_CONDUCT.md). To
+report a security issue, follow [SECURITY.md](SECURITY.md) rather than opening
+a public issue. Notable changes are recorded in [CHANGELOG.md](CHANGELOG.md).

@@ -2,8 +2,6 @@
 
 Each step produces something testable. No step starts until the previous step's tests pass.
 
----
-
 ## Completed
 
 - [x] **Step 1:** Project skeleton (pyproject.toml, uv, ruff, pytest, mypy, CI)
@@ -34,6 +32,21 @@ Each step produces something testable. No step starts until the previous step's 
 - [x] **Step 32:** Separate four_velocity quantity type
 - [x] **Step 33:** specific_energy quantity type for enthalpy (fixed dimensional bug)
 - [x] **Step 34:** StaggerInfo provenance metadata
+- [x] **Step 45:** Spectral analysis — `power_spectrum_1d/2d/3d` with
+  Parseval-consistent normalization, Hann windowing, and radial/spherical
+  averaging (`pypic.spectral`).
+- [x] **Step 46:** Reconnection diagnostics — `find_saddle_points`,
+  `reconnection_rate`, and the 3D Schindler criterion `schindler_xi`
+  (`pypic.reconnection`), plus the per-cell registry entries `D_e`,
+  `R_recon`, `agyrotropy`, `D_ng`, `A_phi`.
+- [x] **Step 47:** Field-line tracing — `trace_field_line`,
+  `trace_field_line_adaptive` (Dormand-Prince 5(4) with PI step control),
+  the batched path, and `pypic.numerics` as the shared kernel package.
+- [x] **Step 48:** Poincaré sections — `PoincareSurface`, `poincare_section`,
+  `plane_crossings`, and `plot_poincare_section`.
+- [x] **Step 49:** Cross-language codegen — `pypic.codegen` exports the
+  aliases, recipe registry, species templates, and field metadata as one
+  JSON bundle for the webpic/rustpic toolchains; CLI `pypic export`.
 - [x] **M0-prep:** webpic API readiness — public `pypic.aliases`, `Recipe`, `RECIPES` (MappingProxyType); `[webpic]` block in bundled themes; aggregated public-API invariants test.
 
 ### Deferred
@@ -41,8 +54,6 @@ Each step produces something testable. No step starts until the previous step's 
 - **Step 31:** Remove default geometry from operators — revisit when non-Cartesian operators land.
 
 **Milestone: daily-use tool** — load data → compute derived quantities → compare runs → select subregions → convert units → make paper figures. ✅
-
----
 
 ## Phase 8: Modern I/O Formats
 
@@ -52,8 +63,6 @@ Each step produces something testable. No step starts until the previous step's 
 - [x] **Step 25:** Parquet/Arrow for ParticleData — two-tier API (`particles_to_arrow` in-memory, `particles_to_dataset` Hive-partitioned by step/species); Morton-sorted rows for spatial pushdown; optional DuckDB `query_sql` path.
 - [x] **Step 25b:** Canonical ParticleData — per-particle `weight` + scalar `species_charge` / `species_mass`; per-particle `charge` dropped; combined-storage codes (iPIC3D, OSIRIS) split at the reader boundary.
 - [x] **Step 26:** `pypic convert` CLI — `convert fields`, `convert particles`, `convert all`; reuses `parse_steps` + `open_simulation`; single-step → `to_zarr`, multi-step → `to_zarr_timeseries`; Icechunk tags supported.
-
----
 
 ## Phase 9: Additional Readers
 
@@ -76,8 +85,6 @@ Each step produces something testable. No step starts until the previous step's 
   **Geometry:** `cartesian` → ours; `thetaMode` (FBPIC RZ-mode) needs azimuthal-mode reconstruction before destagger — punt to Phase 2.
   **Code dispatch:** `software` attribute drives a small table for code-specific quirks (path conventions, mass/charge unit drift from ED-PIC). Auto-detect via `openPMD` root attribute.
   Optional dep: `openpmd-api>=0.17` under `openpmd` extra. Tests use synthetic openPMD via openpmd-api. **Depends on:** Tier 1 ED-PIC vocabulary, Tier 2 per-component stagger.
-
----
 
 ## Extensions
 
@@ -128,8 +135,6 @@ Each step produces something testable. No step starts until the previous step's 
 
   **Not in scope:** variational integrators; 2-stage order-4 Gauss-Legendre (until 1-stage benchmarked); Boozer/Hamada flux-coordinate Hamiltonians; full MapFL diagnostic surface beyond $Q$ (expansion factor, $K$-factor, magnetic dips — add piecewise when a concrete use case appears).
 
----
-
 ## Phase 10: Ecosystem Integration
 
 - [ ] **Step 27: `pypic.interop` — yt, PlasmaPy, SpacePy adapters**
@@ -143,8 +148,6 @@ Each step produces something testable. No step starts until the previous step's 
 
 - [ ] **Step 29: `pypic.interop.spase` — SPASE XML metadata export**
   `to_spase_xml(fds, *, resource_id, contact, description) -> str` generates a SPASE `NumericalData` XML. Maps `simulation.toml` sections to SPASE elements: `[model]` → `SimulationRun`, `[grid]` → `SpatialDescription`, `[units]` → `Units` on each Parameter, `[[species]]` → `Particle`, canonical fields → `Parameter` (`ParameterKey`/`Name`/`Description`/`Units`). `to_spase_file(fds, path, **kwargs)` writes to disk. No external deps (stdlib `xml.etree.ElementTree`). Enables publishing to CDAWEB/VHO/CCMC. Tests use synthetic FieldDatasets.
-
----
 
 ## Phase 11: Virtual Probes & Spacecraft
 
@@ -162,8 +165,6 @@ Each step produces something testable. No step starts until the previous step's 
 - [ ] **Step 41b: SPICE-driven probe trajectories**
   `ProbeTrajectory.from_spice(target, observer, frame, epochs)` builds a trajectory from NAIF SPICE kernels via `spiceypy`. Direct comparison: load sim, define trajectory matching MMS/Cluster/PSP orbit, sample fields along real path, compare with CDF observations (SpacePy adapter, Step 27). Optional dep: `spiceypy` under `spice` extra.
   **Depends on:** Step 41, Step 40.
-
----
 
 ## Phase 12: Cross-Project Integration
 
@@ -187,8 +188,6 @@ Each step produces something testable. No step starts until the previous step's 
 
 - [ ] **Step 39: webpic data pipeline documentation**
   End-to-end guide: rustpic (Rust sim) → HDF5 → pypic (Python analysis) → Starlette/FastAPI + Arrow IPC → webpic (Three.js/WebGPU). Documents schema.md contract syncing Python, Rust, JS. Selection round-trip: viewer UI → server `Selection` → `FieldDataset` slice → Arrow IPC → GPU buffer. Coordinate transform: viewer requests frame → server `transform_to()` → transformed data streamed. Covers auth model, chunked transfer, WebSocket option for time-series animation.
-
----
 
 ## Dependency Graph
 

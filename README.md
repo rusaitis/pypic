@@ -151,7 +151,7 @@ Full documentation, including the physics reference, lives at
 pypic is **early-stage research software (0.1.x) under active
 development**. The core is in daily use — load data, compute derived
 quantities, compare runs, select subregions, convert units, make figures — and
-is covered by ~2750 tests including Hypothesis property tests, hand-calculated
+is covered by ~2800 tests including Hypothesis property tests, hand-calculated
 physics values, and NRL Formulary cross-checks.
 
 The public API may still change before 1.0. Non-Cartesian operators, several
@@ -171,7 +171,13 @@ ready-to-paste citation via the *Cite this repository* button.
 
 Bug reports, reader contributions for new simulation codes, and physics
 corrections are all welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for the
-development setup, test commands, and code conventions.
+development setup, test commands, and code conventions, and
+[docs/architecture.md](https://rusaitis.github.io/pypic/architecture/) for the
+design rules behind the code.
+
+Participation is governed by the [Code of Conduct](CODE_OF_CONDUCT.md).
+Security issues go through [SECURITY.md](SECURITY.md), not public issues.
+Release notes live in [CHANGELOG.md](CHANGELOG.md).
 
 ## License
 

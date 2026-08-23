@@ -4,11 +4,6 @@ Debug*/
 Release*/
 data*/
 
-# Local build and notes
-#PLAN.md
-#NOTES.md
-#plan-*.md
-
 # Pixi / conda
 .pixi/
 *.conda
@@ -61,7 +56,6 @@ compile_commands.json
 CTestTestfile.cmake
 Testing/
 install_manifest.txt
-Makefile
 
 # Compiled output
 *.o
@@ -99,7 +93,6 @@ Session.vim
 .nvimrc.lua
 
 # LLM config
-#CLAUDE.md
 CLAUDE.local.md
 .claude/
 .cursorrules

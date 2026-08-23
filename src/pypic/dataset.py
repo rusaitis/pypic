@@ -1,4 +1,4 @@
-"""FieldDataset and re-exports from _grid, _containers, _protocols."""
+"""FieldDataset: the xarray-backed container every reader returns."""
 
 from __future__ import annotations
 

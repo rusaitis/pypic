@@ -14,17 +14,17 @@ pypic provides a unified interface to multiple simulation formats (iPIC3D, BATSR
 
 ## Features
 
-- **Multi-code readers** -- iPIC3D (parallel HDF5, serial HDF5, H5hut), BATSRUS (IDL cell + HDF5 BATL with AMR regridding), OpenGGCM (Fortran binary 3df), and a generic HDF5 reader. Auto-detection via confidence-based probing.
-- **Derived quantities** -- field magnitudes, plasma beta, Alfvén speed, Mach numbers, Poynting flux, energy densities, pressure tensor decomposition, characteristic scales, entropy, reconnection diagnostics, and more. All as pure functions: arrays in, arrays out.
-- **Unit system** -- PIC (electron- or ion-referenced), MHD (Alfvén-speed-based), SI, or custom normalization. Round-trip `normalize()` / `to_si()` with display unit conversion.
-- **Geometry-aware operators** -- divergence, curl, gradient with coordinate metric factors. Cartesian implemented; spherical/cylindrical planned.
-- **Selections** -- `PlaneSelection`, `BoxSelection`, and `SphereSelection` slice 3D data into lower-dimensional views or masked subregions.
-- **Reductions** -- `pypic.reduce(ds, axis, reduction=...)` collapses fields along one or more axes (trapezoidal `integrate`, `mean`/`median`/`sum`, `argmax`/`argmin` returning coordinate positions): column densities, slab averages, density-weighted line averages, projected-peak maps.
-- **Field-line tracing** -- adaptive Dormand-Prince 5(4) tracer with PI step control, batched and scalar paths, plus Poincaré sections.
-- **Modern I/O** -- Zarr v3 export/import (single-step and time-series), Icechunk versioned storage, VirtualiZarr views over legacy HDF5, and Parquet/Arrow for particle data with Morton-ordered spatial pushdown.
-- **Field registry** -- `compute("beta")`, `compute("|B|")`, `compute("v_A")` dispatches to the right derived function. Extensible via `register_field()`.
-- **Arrow IPC server** -- [`pypic serve`](api/server.md) exposes simulations over JSON HTTP plus a WebSocket that streams fields as Arrow record batches, with selections and derived quantities applied server-side.
-- **Command line** -- `pypic info`, `fields`, `stats`, `validate`, `compare`, `plot`, `plot-compare`, `convert`, `reduce`, `serve`, `export`, and `schema` (`export` / `validate` / `diff`) -- inspection, conversion, and publication figures without writing a script.
+- **Multi-code readers** — iPIC3D (parallel HDF5, serial HDF5, H5hut), BATSRUS (IDL cell + HDF5 BATL with AMR regridding), OpenGGCM (Fortran binary 3df), and a generic HDF5 reader. Auto-detection via confidence-based probing.
+- **Derived quantities** — field magnitudes, plasma beta, Alfvén speed, Mach numbers, Poynting flux, energy densities, pressure tensor decomposition, characteristic scales, entropy, reconnection diagnostics, and more. All as pure functions: arrays in, arrays out.
+- **Unit system** — PIC (electron- or ion-referenced), MHD (Alfvén-speed-based), SI, or custom normalization. Round-trip `normalize()` / `to_si()` with display unit conversion.
+- **Geometry-aware operators** — divergence, curl, gradient with coordinate metric factors. Cartesian implemented; spherical/cylindrical planned.
+- **Selections** — `PlaneSelection`, `BoxSelection`, and `SphereSelection` slice 3D data into lower-dimensional views or masked subregions.
+- **Reductions** — `pypic.reduce(ds, axis, reduction=...)` collapses fields along one or more axes (trapezoidal `integrate`, `mean`/`median`/`sum`, `argmax`/`argmin` returning coordinate positions): column densities, slab averages, density-weighted line averages, projected-peak maps.
+- **Field-line tracing** — adaptive Dormand-Prince 5(4) tracer with PI step control, batched and scalar paths, plus Poincaré sections.
+- **Modern I/O** — Zarr v3 export/import (single-step and time-series), Icechunk versioned storage, VirtualiZarr views over legacy HDF5, and Parquet/Arrow for particle data with Morton-ordered spatial pushdown.
+- **Field registry** — `compute("beta")`, `compute("|B|")`, `compute("v_A")` dispatches to the right derived function. Extensible via `register_field()`.
+- **Arrow IPC server** — [`pypic serve`](api/server.md) exposes simulations over JSON HTTP plus a WebSocket that streams fields as Arrow record batches, with selections and derived quantities applied server-side.
+- **Command line** — `pypic info`, `fields`, `stats`, `validate`, `compare`, `plot`, `plot-compare`, `convert`, `reduce`, `serve`, `export`, and `schema` (`export` / `validate` / `diff`) — inspection, conversion, and publication figures without writing a script.
 
 ## Quick start
 
@@ -54,7 +54,7 @@ pypic is the Python half of a three-part toolchain built around the shared
 [`simulation.toml` schema](schema.md): **rustpic** (a Rust PIC/MHD solver) writes
 the schema, pypic reads and analyzes it, and **webpic** (Three.js/WebGPU) renders
 it in the browser over the Arrow IPC server in [`pypic.server`](api/server.md).
-Both siblings are in development and not yet public -- you will see them named in
+Both siblings are in development and not yet public — you will see them named in
 a few docstrings and in the `[webpic]` block of the bundled plot themes. pypic is
 fully usable on its own; nothing here depends on either of them.
 
@@ -62,5 +62,5 @@ fully usable on its own; nothing here depends on either of them.
 
 Python 3.13+. The core install pulls in NumPy, SciPy, xarray, h5py, and
 pydantic; plotting, 3D rendering, the CLI, Zarr/Icechunk I/O, Parquet/Arrow
-particle data, and the server each sit behind their own extra -- see
+particle data, and the server each sit behind their own extra — see
 [Getting Started](getting-started.md#installation) for the full table.

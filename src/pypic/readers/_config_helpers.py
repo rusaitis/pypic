@@ -54,7 +54,7 @@ def merge_simulation_toml(
         return base
 
     # Local import keeps this module free of circular import risk: config.py
-    # depends on base.py, base.py depends on nothing reader-specific.
+    # depends on the core containers, which depend on nothing reader-specific.
     from pypic.readers.config import load_config
 
     toml_config = load_config(toml_path)

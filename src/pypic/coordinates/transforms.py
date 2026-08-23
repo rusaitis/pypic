@@ -313,7 +313,7 @@ def resolve_transform(
 
 
 def _build_vector_triplet_regex() -> re.Pattern[str]:
-    """Build regex from the canonical vector prefixes in readers.base.
+    """Build regex from the canonical vector prefixes in ``pypic.fields``.
 
     Tier-3 canonical: ``<prefix>[_s<N>]_<component>`` — every semantic
     boundary is an underscore, with optional species qualifier between
