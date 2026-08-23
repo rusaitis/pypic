@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import os
-from typing import TYPE_CHECKING
+from pathlib import Path
 
 import h5py
 import numpy as np
@@ -16,9 +16,6 @@ typer = pytest.importorskip("typer")
 from typer.testing import CliRunner  # noqa: E402
 
 from pypic.cli import app  # noqa: E402
-
-if TYPE_CHECKING:
-    from pathlib import Path
 
 try:
     import matplotlib
@@ -1963,3 +1960,30 @@ class TestHelpTextIsUserFacing:
             if token in output
         ]
         assert not leaks, f"`pypic {command} --help` leaks {leaks}"
+
+
+class TestValidateOnTwoDimensionalGrids:
+    """``pypic validate`` must not crash on 2D output.
+
+    ``div_b`` differentiates along axes 0/1/2 explicitly, so it needs
+    three spacings. The command splatted ``ds.grid.spacing`` unguarded,
+    which raised ``TypeError: max_div_b() missing 1 required positional
+    argument`` for every 2D dataset — the most common BATSRUS artifact,
+    and the shape of the committed fixtures.
+    """
+
+    def test_reports_rather_than_raising(self) -> None:
+        fixture = Path(__file__).parent / "data" / "batsrus-synthetic" / "idl-uniform"
+        result = runner.invoke(app, ["validate", str(fixture)])
+        assert result.exit_code == 0, result.output
+
+    def test_says_why_div_b_is_absent(self) -> None:
+        fixture = Path(__file__).parent / "data" / "batsrus-synthetic" / "idl-uniform"
+        result = runner.invoke(app, ["validate", str(fixture)])
+        assert "max |div B|: skipped (needs a 3D grid)" in result.output
+
+    def test_still_computes_div_b_on_3d_grids(self) -> None:
+        fixture = Path(__file__).parent / "data" / "openggcm-small"
+        result = runner.invoke(app, ["validate", str(fixture)])
+        assert "max |div B|: " in result.output
+        assert "skipped" not in result.output

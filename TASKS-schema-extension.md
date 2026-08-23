@@ -4,9 +4,8 @@ Readiness review for popular MHD / PIC / hybrid codes against the v1.0
 Pydantic validator (`src/pypic/schema/_models.py`). Organized as a
 release plan: two **v1.0.x additive batches** that land without
 invalidating any v1.0 document, a **deferred v1.1 set** of two
-genuinely-niche items, and **Tier 3 deferred** items. Pointers cite
-line numbers in `_models.py` relative to the v1.0 refactor (commit
-`8030876`).
+genuinely-niche items, and **Tier 3 deferred** items. Pointers name
+models in `src/pypic/schema/_models.py`.
 
 **Two surfaces, one document.** Items affect either the **TOML schema**
 (`pypic.schema._models`, versioned via `schema_version`) or **runtime
@@ -324,8 +323,8 @@ separately so they neither gate nor are gated by v1.1 shape work.
   file, not the config. Reader-side responsibility. Track only when an
   analyzer needs cross-snapshot tree continuity.
 
-- [ ] **Lorentz-boosted reference frames.** `FrameTransform`
-  (`_models.py:325`) covers rotation/translation/scale. WarpX
+- [ ] **Lorentz-boosted reference frames.** The `FrameTransform`
+  model covers rotation/translation/scale. WarpX
   boosted-frame runs need `gamma_boost` + `boost_direction`. Wait for
   the first WarpX boosted-frame user before adding a relativistic frame
   primitive.
@@ -336,7 +335,7 @@ separately so they neither gate nor are gated by v1.1 shape work.
   ring-current solver). SWMF/CCMC archives are full of these — but they
   need a separate framework-level schema, not a v1.x extension.
 
-- [ ] **Body orbital kinematics.** `Body` (`_models.py:421`) has
+- [ ] **Body orbital kinematics.** The `Body` model has
   `rotation_axis`/`rotation_period` but no orbital motion. Multi-body
   systems (Jupiter + Io + Europa) can't describe relative motion. Tied
   to TASKS.md Step 40 (time-dependent frame transforms) — pick up there.

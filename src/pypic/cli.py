@@ -1767,10 +1767,17 @@ def validate(
     b_energy: float | None = None
     e_energy: float | None = None
 
+    # div B needs all three axes: the operators differentiate along
+    # axis 0/1/2 explicitly, so a 2D dataset has no third axis to take
+    # the derivative over. Splatting a 2-tuple of spacings used to raise
+    # TypeError here and take the whole command down.
+    is_3d = len(ds.grid.spacing) == 3
+
     if has_b:
         b1, b2, b3 = ds["B_1"], ds["B_2"], ds["B_3"]
         b_mag = np.sqrt(b1**2 + b2**2 + b3**2)
-        div_b_val = float(max_div_b(b1, b2, b3, *ds.grid.spacing))
+        if is_3d:
+            div_b_val = float(max_div_b(b1, b2, b3, *ds.grid.spacing))
         b_energy = float(field_energy(magnetic_energy_density(b_mag), ds.grid.spacing))
     if has_e:
         e1, e2, e3 = ds["E_1"], ds["E_2"], ds["E_3"]
@@ -1804,6 +1811,8 @@ def validate(
         lines.append(f"  NaN census: {total_nan} total")
     if div_b_val is not None:
         lines.append(f"  max |div B|: {div_b_val:.6g}")
+    elif has_b:
+        lines.append("  max |div B|: skipped (needs a 3D grid)")
     if b_energy is not None:
         lines.append(f"  B energy:   {b_energy:.6g}")
     if e_energy is not None:

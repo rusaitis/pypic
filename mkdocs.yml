@@ -64,6 +64,7 @@ nav:
     - Schema: schema.md
     - Aliases (library): aliases.md
   - API Reference:
+    - Command Line: api/cli.md
     - Core Containers: api/containers.md
     - Derived Quantities: api/derived.md
     - Diagnostics: api/diagnostics.md

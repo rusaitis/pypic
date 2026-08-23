@@ -99,6 +99,20 @@ Each step produces something testable. No step starts until the previous step's 
 
 - [x] **Step 43:** `pypic.reductions` — `reduce(axis, reduction=..., *, weight=None)` collapses a FieldDataset along one or more axes; ops: `integrate | sum | mean | median | max | min | std | var | argmax | argmin`; optional `weight=` for yt-style density-weighted means; `attrs["reduction"]` carries provenance; composes with `BoxSelection`/`SphereSelection`; CLI `pypic reduce apply`. Carry-overs: Step 43b (Jacobian for spherical/cylindrical), Step 43c (unit-aware).
 
+- [ ] **Step 50: 2D support in the differential operators**
+  `divergence` / `curl` / `gradient` in `coordinates/operators.py`
+  differentiate along axes 0/1/2 explicitly, so they require 3D input and
+  three spacings. 2D output is the common case for BATSRUS `z=0` slices and
+  most published reconnection runs, where $\partial/\partial x_3 \equiv 0$
+  makes the third term vanish identically — the quantity is well-defined,
+  just not computable through the current signature. `pypic validate`
+  currently reports `max |div B|: skipped (needs a 3D grid)` for 2D data.
+  Options: an optional `d3: float | None = None` meaning "2D, third
+  derivative is zero", or dispatch on `ndim`. Whichever lands must keep
+  `div_b`, `max_div_b`, and `compute("div_B")` consistent.
+  Tests: div of a 2D curl field is zero to machine precision; 3D regression
+  unchanged.
+
 - [ ] **Step 43b: spherical / cylindrical Jacobian-aware `reduce(integrate)`**
   Wire `CoordinateGeometry.metric_factors(...)` into the `integrate` branch so reductions on spherical/cylindrical return $\int f \, h_i \, dx^i$ instead of raising `NotImplementedError`. Build Jacobian $J = \prod_i h_i$ over reduced axes (function of *surviving* coords — $r$ for spherical $\theta$-integration, $r\sin\theta$ for $\phi$), broadcast, multiply field by $J$ before trapezoidal. Cartesian unchanged ($h_i=1$). Tests: spherical shell volume = $\frac{4}{3}\pi(r_2^3 - r_1^3)$ at machine precision; cylindrical disc area = $\pi r^2$ to trapezoidal order; Cartesian regression unchanged. `metric_factors()` is already at `coordinates/geometry.py:73-116` for all three geometries, so no longer blocked on 19b.
   **Depends on:** Step 5, Step 43.
@@ -188,6 +202,13 @@ Each step produces something testable. No step starts until the previous step's 
 
 - [ ] **Step 39: webpic data pipeline documentation**
   End-to-end guide: rustpic (Rust sim) → HDF5 → pypic (Python analysis) → Starlette/FastAPI + Arrow IPC → webpic (Three.js/WebGPU). Documents schema.md contract syncing Python, Rust, JS. Selection round-trip: viewer UI → server `Selection` → `FieldDataset` slice → Arrow IPC → GPU buffer. Coordinate transform: viewer requests frame → server `transform_to()` → transformed data streamed. Covers auth model, chunked transfer, WebSocket option for time-series animation.
+
+## Schema extension backlog
+
+Proposed additions to the `simulation.toml` schema — code-readiness notes
+for MHD / PIC / hybrid codes not yet covered by the v1.0 validator — live
+in [TASKS-schema-extension.md](TASKS-schema-extension.md). Read it before
+changing `pypic/schema/_models.py`.
 
 ## Dependency Graph
 
