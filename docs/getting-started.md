@@ -20,7 +20,7 @@ uv add "pypic-plasma[plot,zarr,cli]"   # ... plus modern I/O
 
 | Extra | Pulls in | Enables |
 |---|---|---|
-| `plot` | matplotlib | 2D field slices and comparison figures |
+| `plot` | matplotlib | Field slices, comparisons, line plots, kymographs, quiver/streamlines, spectra, and the theme system |
 | `3d` | pyvista | 3D rendering and field-line visualization |
 | `cli` | typer, rich | the `pypic` command |
 | `zarr` | zarr, numcodecs, virtualizarr, icechunk | Zarr v3 export/import, VirtualiZarr views over legacy HDF5, Icechunk storage |
@@ -35,6 +35,53 @@ Working from a checkout instead:
 git clone https://github.com/rusaitis/pypic.git && cd pypic
 uv sync --all-extras --all-groups
 ```
+
+## Without simulation data
+
+Everything below works on a dataset you build yourself, so you can try
+pypic before you have output from a code. `FieldDataset.from_arrays`
+takes a dict of NumPy arrays plus a `GridInfo`:
+
+```python
+import numpy as np
+from pypic import CARTESIAN, FieldDataset, GridInfo
+
+nx, ny, nz = 32, 32, 1
+grid = GridInfo(
+    dimensions=(nx, ny, nz),
+    spacing=(0.5, 0.5, 1.0),
+    origin=(-8.0, -8.0, 0.0),
+    geometry=CARTESIAN,
+)
+
+# A Harris current sheet: B_x reverses across y, pressure balances it.
+y = grid.origin[1] + (np.arange(ny) + 0.5) * grid.spacing[1]
+bx = np.tanh(y / 2.0)[None, :, None] * np.ones((nx, ny, nz))
+
+data = FieldDataset.from_arrays(
+    {
+        "B_1": bx,
+        "B_2": np.zeros((nx, ny, nz)),
+        "B_3": np.zeros((nx, ny, nz)),
+        "rho_m": np.ones((nx, ny, nz)),
+        "P": 0.5 * (1.0 - bx**2) + 0.1,
+    },
+    grid,
+)
+
+print(data.compute("|B|").max())   # -> 0.999, saturating at the edges
+print(data.compute("beta").max())  # -> 76.6, pressure-dominated at the centre
+```
+
+Field names must resolve through the registry — see
+[Schema § 3](schema.md#3-canonical-field-names) for the canonical set.
+Pass `strict_fields=False` to allow unregistered names through.
+
+This is also the entry point a new reader uses:
+[`examples/custom_reader_example.py`](https://github.com/rusaitis/pypic/blob/main/examples/custom_reader_example.py)
+is a self-contained script that generates a synthetic HDF5 file, maps its
+native names onto canonical ones, and reads it back through
+`open_simulation`.
 
 ## Loading simulation data
 

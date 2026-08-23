@@ -16,7 +16,7 @@ from pypic.traces._analysis import (
     speed,
     tangent_vectors,
 )
-from pypic.traces._fieldline import FieldLine
+from pypic.traces._fieldline import FieldLine, TraceDirection
 from pypic.traces._particletrace import ParticleTrace
 from pypic.traces._poincare import (
     PoincareSection,
@@ -44,6 +44,7 @@ __all__ = [
     "PoincareSection",
     "PoincareSurface",
     "TerminationReason",
+    "TraceDirection",
     "VectorFieldInterpolator",
     "arc_length_cumulative",
     "arc_length_total",

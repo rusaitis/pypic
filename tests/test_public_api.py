@@ -97,3 +97,83 @@ def test_codegen_smoke_imports() -> None:
         SpeciesArgs,
         SpeciesTemplate,
     )
+
+
+# Modules a user is expected to reach as `pypic.<name>` after a bare
+# `import pypic`, without a separate import statement. Optional-extra
+# subpackages (plotting, server) are excluded on purpose: importing them
+# eagerly would pull matplotlib and fastapi into every core install.
+_ATTRIBUTE_REACHABLE_MODULES = [
+    "aliases",
+    "codegen",
+    "comparison",
+    "compute",
+    "coordinates",
+    "derived",
+    "diagnostics",
+    "exceptions",
+    "fields",
+    "io",
+    "reconnection",
+    "reductions",
+    "regrid",
+    "schema",
+    "selections",
+    "spectral",
+    "traces",
+    "units",
+]
+
+
+def test_headline_modules_are_reachable_after_importing_pypic() -> None:
+    """`import pypic` then `pypic.spectral` — no second import statement.
+
+    ``pypic.spectral`` and ``pypic.reconnection`` were unreachable this
+    way: ``pypic/__init__.py`` never imported them, so a user could plot
+    a power spectrum via ``pypic.plotting.plot_power_spectrum`` but had
+    to reach past the documented surface to compute one.
+    """
+    unreachable = [m for m in _ATTRIBUTE_REACHABLE_MODULES if not hasattr(pypic, m)]
+    assert not unreachable, f"not reachable as pypic.<name>: {sorted(unreachable)}"
+
+
+def test_top_level_all_entries_resolve() -> None:
+    """Nothing in ``pypic.__all__`` is a name that does not exist."""
+    unresolved = [name for name in pypic.__all__ if not hasattr(pypic, name)]
+    assert not unresolved, f"pypic.__all__ names nothing: {sorted(unresolved)}"
+
+
+_CROSS_CHECKED_SUBMODULES = [
+    "pypic.comparison",
+    "pypic.derived",
+    "pypic.diagnostics",
+    "pypic.io",
+    "pypic.reconnection",
+    "pypic.reductions",
+    "pypic.regrid",
+    "pypic.selections",
+    "pypic.spectral",
+    "pypic.traces",
+]
+
+
+def test_re_exported_names_agree_with_their_home_module() -> None:
+    """A name public at top level is public where it is defined.
+
+    ``quantity_dimension`` was in ``pypic.__all__`` but missing from
+    ``pypic.fields.__all__`` — the two disagreed about the same symbol.
+    """
+    import importlib
+
+    disagreements: list[str] = []
+    for mod_name in _CROSS_CHECKED_SUBMODULES:
+        module = importlib.import_module(mod_name)
+        module_all = set(getattr(module, "__all__", ()))
+        for name in module_all:
+            obj = getattr(module, name, None)
+            top = getattr(pypic, name, None)
+            if obj is not None and top is not None and obj is not top:
+                disagreements.append(f"{mod_name}.{name}")
+    assert not disagreements, (
+        f"top-level re-export is a different object: {sorted(disagreements)}"
+    )

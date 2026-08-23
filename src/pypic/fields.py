@@ -1205,6 +1205,7 @@ __all__ = [
     "FieldInfo",
     "QuantityType",
     "field_info",
+    "quantity_dimension",
     "quantity_units",
     "register_field",
     "unit_label",

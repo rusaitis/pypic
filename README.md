@@ -41,7 +41,7 @@ uv add "pypic-plasma[plot,zarr,cli]"   # ... plus modern I/O
 
 | Extra | Pulls in | Enables |
 |---|---|---|
-| `plot` | matplotlib | 2D field slices and comparison figures |
+| `plot` | matplotlib | Field slices, comparisons, line plots, kymographs, quiver/streamlines, spectra, and the theme system |
 | `3d` | pyvista | 3D rendering and field-line visualization |
 | `cli` | typer, rich | the `pypic` command |
 | `zarr` | zarr, numcodecs, virtualizarr, icechunk | Zarr v3 export/import, VirtualiZarr views over legacy HDF5, Icechunk storage |

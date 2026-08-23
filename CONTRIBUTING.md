@@ -94,8 +94,22 @@ Adding support for a simulation code is one new module under
 canonical field names in [docs/schema.md](docs/schema.md) § 3 and return a
 `FieldDataset`; everything downstream then works unchanged.
 
+[`examples/custom_reader_example.py`](examples/custom_reader_example.py) is the
+worked version: it generates a synthetic HDF5 file, declares a field map, and
+reads it back through `open_simulation`. It runs with no external data.
+
 Use small synthetic fixtures under `tests/data/`, not real simulation output —
-the test suite must not depend on network access or large files.
+the test suite must not depend on network access or large files. The generators
+in `scripts/` produce the committed fixtures (`generate_batsrus_fixture.py`,
+`generate_ipic3d_fixture.py`, `generate_openggcm_fixture.py`); extend one rather
+than hand-rolling a new binary blob.
+
+Reader tests that need a real, uncommittable run are gated behind `--sim-data`:
+
+```sh
+uv run pytest --sim-data                 # scan examples/
+uv run pytest --sim-data /path/to/runs   # scan a directory of simulations
+```
 
 ## Changing the schema
 

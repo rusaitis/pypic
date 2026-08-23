@@ -562,7 +562,11 @@ Three distinct Lorentz factors arise in plasma analysis:
     with $E_\parallel = \mathbf{E}\cdot\hat{b}$ trapezoid-integrated
     along arc length. Returns one scalar per seed — not a per-cell
     field, so dispatched outside the ``compute()`` registry as
-    ``pypic.reconnection.schindler_xi``. [@Schindler1988].
+    ``pypic.reconnection.schindler_xi``. A runnable worked example on a
+    guide-field Harris sheet — where no 3D null exists yet $\Xi$ still
+    localizes the X-line — is
+    [`examples/ex_schindler_xi.py`](https://github.com/rusaitis/pypic/blob/main/examples/ex_schindler_xi.py).
+    [@Schindler1988].
 
 
 ## 10. Spectral Analysis

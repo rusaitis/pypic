@@ -27,9 +27,15 @@ integral — that together tell the Schindler story:
 Run::
 
     uv run python examples/ex_schindler_xi.py
+
+The figure is written next to this script. Set
+``PYPIC_EXAMPLE_OUTPUT_DIR`` to send it elsewhere.
 """
 
 from __future__ import annotations
+
+import os
+from pathlib import Path
 
 import numpy as np
 
@@ -226,7 +232,11 @@ else:
         )
         fig.tight_layout()
 
-        out = "ex_schindler_xi.png"
+        out_dir = Path(
+            os.environ.get("PYPIC_EXAMPLE_OUTPUT_DIR", Path(__file__).parent)
+        )
+        out_dir.mkdir(parents=True, exist_ok=True)
+        out = out_dir / "ex_schindler_xi.png"
         fig.savefig(out, dpi=120, facecolor=fig.get_facecolor())
         print(f"Wrote {out}")
 
