@@ -27,38 +27,6 @@ _MOMENT_COMPONENT_MAP: dict[str, str] = {
 }
 
 
-def map_field_name(ipic3d_name: str) -> str:
-    """Map an iPIC3D field name to its canonical equivalent.
-
-    Parameters
-    ----------
-    ipic3d_name : str
-        Native iPIC3D field name (e.g. ``"Bx"``).
-
-    Returns
-    -------
-    str
-        Canonical field name (e.g. ``"B_1"``).
-
-    Raises
-    ------
-    KeyError
-        If the name has no known mapping.
-
-    Examples
-    --------
-    >>> map_field_name("Bx")
-    'B_1'
-    >>> map_field_name("Ez")
-    'E_3'
-    """
-    try:
-        return _FIELD_NAME_MAP[ipic3d_name]
-    except KeyError:
-        msg = f"Unknown iPIC3D field name: {ipic3d_name!r}"
-        raise KeyError(msg) from None
-
-
 def per_species_canonical(component: str, species_index: int) -> str:
     """Build canonical per-species field name.
 
@@ -114,10 +82,6 @@ _PHDF5_PRESSURE_MAP: dict[str, str] = {
     "pYZ": "P_23",
     "pZZ": "P_33",
 }
-
-_PHDF5_DIAGONAL_PRESSURE = {"pXX", "pYY", "pZZ"}
-
-_H5HUT_DIAGONAL_PRESSURE = {"Pxx", "Pyy", "Pzz"}
 
 _EFLUX_MAP: dict[str, str] = {
     "EFx": "EF_1",

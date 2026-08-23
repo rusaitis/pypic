@@ -88,20 +88,6 @@ def ensure_icechunk() -> None:
     _HAS_ICECHUNK = True
 
 
-def has_icechunk() -> bool:
-    """Return ``True`` if icechunk is importable (non-raising check)."""
-    global _HAS_ICECHUNK
-    if _HAS_ICECHUNK is not None:
-        return _HAS_ICECHUNK
-    try:
-        import icechunk  # noqa: F401
-    except ImportError:
-        _HAS_ICECHUNK = False
-        return False
-    _HAS_ICECHUNK = True
-    return True
-
-
 def ensure_arrow() -> None:
     """Raise ``ImportError`` with install hint if pyarrow is missing."""
     global _HAS_ARROW
@@ -125,20 +111,6 @@ def ensure_arrow() -> None:
     _HAS_ARROW = True
 
 
-def has_arrow() -> bool:
-    """Return ``True`` if pyarrow is importable (non-raising check)."""
-    global _HAS_ARROW
-    if _HAS_ARROW is not None:
-        return _HAS_ARROW
-    try:
-        import pyarrow  # noqa: F401
-    except ImportError:
-        _HAS_ARROW = False
-        return False
-    _HAS_ARROW = True
-    return True
-
-
 def ensure_duckdb() -> None:
     """Raise ``ImportError`` with install hint if duckdb is missing."""
     global _HAS_DUCKDB
@@ -160,17 +132,3 @@ def ensure_duckdb() -> None:
         )
         raise ImportError(msg) from None
     _HAS_DUCKDB = True
-
-
-def has_duckdb() -> bool:
-    """Return ``True`` if duckdb is importable (non-raising check)."""
-    global _HAS_DUCKDB
-    if _HAS_DUCKDB is not None:
-        return _HAS_DUCKDB
-    try:
-        import duckdb  # noqa: F401
-    except ImportError:
-        _HAS_DUCKDB = False
-        return False
-    _HAS_DUCKDB = True
-    return True

@@ -114,7 +114,6 @@ def _align_frames(
     b: FieldDataset,
     *,
     frame: str | None = None,
-    epoch: float | None = None,
 ) -> tuple[FieldDataset, FieldDataset]:
     """Bring both datasets into a common frame.
 
@@ -128,11 +127,10 @@ def _align_frames(
     first would compute a common domain across two incompatible
     coordinate systems.
 
-    *epoch* is reserved for time-dependent transforms: once
-    ``transform_to`` accepts an ``epoch`` kwarg for dipole-tilt-style
-    rotations and SPICE ephemerides, this helper will forward it
-    unchanged. Until then it is accepted but unused, so callers can
-    thread the kwarg today without a follow-up API change.
+    Frame transforms are static. When ``transform_to`` grows an
+    ``epoch`` kwarg for dipole-tilt-style rotations and SPICE
+    ephemerides, this helper forwards it; there is nothing to thread
+    through until then.
     """
     if frame is not None and not frame:
         msg = "frame must be a non-empty string"
@@ -140,7 +138,6 @@ def _align_frames(
     target = a.frame if frame is None else frame
     if a.frame == target and b.frame == target:
         return a, b
-    del epoch  # Accepted for forward compatibility — see docstring.
     return (
         _transform_or_raise(a, target, label="A"),
         _transform_or_raise(b, target, label="B"),

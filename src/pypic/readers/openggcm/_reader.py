@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import logging
 import re
 from typing import TYPE_CHECKING
 
@@ -28,7 +27,6 @@ if TYPE_CHECKING:
     from pypic.readers.openggcm._grid import OpenGGCMGrid
     from pypic.types import FloatArray
 
-log = logging.getLogger(__name__)
 
 _3DF_PATTERN = re.compile(r"\.3df\.(\d+)$")
 

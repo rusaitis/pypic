@@ -9,12 +9,6 @@ override pattern have a single canonical implementation.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    Rgb = tuple[float, float, float]
-    Rgba = tuple[float, float, float, float]
-
 # Shared overlay visibility threshold — any alpha below this is treated
 # as "no background".  Used by both matplotlib and pyvista overlay code.
 ALPHA_VISIBLE = 0.01

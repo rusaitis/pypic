@@ -566,3 +566,23 @@ class TestFieldDatasetTransformTo:
         assert_allclose(result["B_1"], fields["B_1"], atol=1e-14)
         assert_allclose(result["B_2"], fields["B_2"], atol=1e-14)
         assert_allclose(result["B_3"], fields["B_3"], atol=1e-14)
+
+
+def test_available_frames_lists_every_reachable_frame() -> None:
+    """``available_frames`` reports the native frame plus both ends of each transform.
+
+    A public property with no coverage: it is the only way to ask a
+    dataset what ``transform_to`` will accept.
+    """
+    grid = GridInfo(dimensions=(2, 2, 2), spacing=(1.0, 1.0, 1.0))
+    fields = {"B_1": np.zeros((2, 2, 2))}
+    ds = FieldDataset.from_arrays(
+        fields,
+        grid,
+        frame="simulation",
+        transforms={
+            "GSM": FrameTransform(source_frame="simulation", target_frame="GSM"),
+            "GSE": FrameTransform(source_frame="GSM", target_frame="GSE"),
+        },
+    )
+    assert ds.available_frames == ["GSE", "GSM", "simulation"]

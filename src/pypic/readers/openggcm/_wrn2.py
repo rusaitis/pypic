@@ -27,6 +27,9 @@ if TYPE_CHECKING:
     from pypic.types import FloatArray
 
 
+# DEPRECATED: superseded in production by decompress_field_vectorized;
+# kept as the readable reference implementation that the vectorized
+# decoder is cross-validated against in tests/test_openggcm_wrn2.py.
 def decode_rle(line: bytes) -> tuple[list[int], int]:
     r"""Decode one RLE-encoded WRN2 line into integer values.
 
@@ -100,6 +103,8 @@ def decode_rle(line: bytes) -> tuple[list[int], int]:
     return data, n
 
 
+# DEPRECATED: superseded in production by decompress_field_vectorized;
+# kept as the reference oracle for the cross-validation tests.
 def decompress_field(
     lines: Iterator[bytes], count: int, zmin: float, zmax: float
 ) -> FloatArray:
