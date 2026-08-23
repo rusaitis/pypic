@@ -62,7 +62,6 @@ pypic = "pypic._cli_entry:main"
 [project.optional-dependencies]
 plot = ["matplotlib>=3.9"]
 3d = ["pyvista>=0.44"]
-lazy = ["dask>=2024.6"]
 cli = ["typer>=0.12", "rich>=13.0"]
 zarr = [
     "zarr>=3.1.0,<4",

@@ -120,7 +120,7 @@ Docs built with MkDocs Material + mkdocstrings.
 ## Dependencies
 
 Core: `numpy`, `scipy`, `xarray`, `h5py`, `pydantic` (v2, for `simulation.toml` validation)
-Optional, each behind its own extra: `plot` (matplotlib), `3d` (pyvista), `lazy` (dask), `cli`, `zarr`, `icechunk`, `arrow`, `duckdb`, `server`
+Optional, each behind its own extra: `plot` (matplotlib), `3d` (pyvista), `cli`, `zarr`, `icechunk`, `arrow`, `duckdb`, `server`
 Dev: `pytest`, `ruff`, `mypy`, `mkdocs-material`, `mkdocstrings`
 
 Do not add dependencies without justification. Prefer standard library where possible.

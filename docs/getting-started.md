@@ -28,7 +28,6 @@ uv add "pypic-plasma[plot,zarr,cli]"   # ... plus modern I/O
 | `arrow` | pyarrow | Parquet/Arrow particle I/O |
 | `duckdb` | duckdb, pyarrow | SQL queries over particle Parquet |
 | `server` | fastapi, uvicorn, pyarrow, websockets | the Arrow IPC server behind `pypic serve` |
-| `lazy` | dask | reserved for the planned chunked-loading path — nothing imports it yet |
 
 Working from a checkout instead:
 

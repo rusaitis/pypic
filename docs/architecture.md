@@ -218,7 +218,7 @@ Core: `numpy`, `scipy`, `xarray`, `h5py`, `pydantic` (v2, for `simulation.toml`
 validation).
 
 Optional, each behind its own extra: `plot` (matplotlib), `3d` (pyvista),
-`lazy` (dask), `cli`, `zarr`, `icechunk`, `arrow`, `duckdb`, `server`.
+`cli`, `zarr`, `icechunk`, `arrow`, `duckdb`, `server`.
 
 Dev: `pytest`, `ruff`, `mypy`, `mkdocs-material`, `mkdocstrings`.
 

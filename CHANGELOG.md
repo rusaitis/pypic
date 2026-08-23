@@ -35,6 +35,12 @@ The distribution is `pypic-plasma` on PyPI; the import name is `pypic`.
   in CI were never affected.
 - A test that races icechunk's virtual-chunk checksum.
 
+### Removed
+
+- The `lazy` extra. It installed dask, but nothing under `src/` ever imported
+  it — the chunked-loading path it was reserved for is still unwritten. It will
+  come back when there is code behind it.
+
 ## [0.1.2] — 2026-08-22
 
 ### Fixed
