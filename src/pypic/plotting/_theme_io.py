@@ -309,9 +309,15 @@ def save_theme(theme: PlotTheme, path: str | Path) -> None:
 
     Examples
     --------
+    >>> import tempfile
+    >>> from pathlib import Path
     >>> from pypic.plotting._theme_io import _bundled_theme_dir, load_theme, save_theme
-    >>> t = load_theme(_bundled_theme_dir() / "light.toml")
-    >>> save_theme(t, "/tmp/_test_light.toml")
+    >>> theme = load_theme(_bundled_theme_dir() / "light.toml")
+    >>> with tempfile.TemporaryDirectory() as tmp:
+    ...     out = Path(tmp) / "light.toml"
+    ...     save_theme(theme, out)
+    ...     load_theme(out).name == theme.name
+    True
     """
     path = Path(path)
     lines: list[str] = [f'name = "{theme.name}"', ""]

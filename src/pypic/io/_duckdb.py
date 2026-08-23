@@ -70,9 +70,9 @@ def query_sql(
     -------
     ParticleData or pyarrow.Table
 
-    Examples
+    See Also
     --------
-    >>> # pcl = query_sql("/tmp/particles", "SELECT * FROM particles LIMIT 10")
+    pypic.io.particles_to_dataset : Writes the partitioned dataset this queries.
     """
     ensure_duckdb()
     ensure_arrow()

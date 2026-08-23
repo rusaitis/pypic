@@ -405,7 +405,13 @@ def to_zarr(
     >>> fds = FieldDataset.from_arrays(
     ...     {"B_1": np.ones((4, 3, 2))}, grid, Normalization.identity(),
     ... )
-    >>> # to_zarr(fds, "/tmp/test.zarr")  # writes to disk
+    >>> import tempfile
+    >>> from pathlib import Path
+    >>> with tempfile.TemporaryDirectory() as tmp:
+    ...     store = Path(tmp) / "test.zarr"
+    ...     to_zarr(fds, store)
+    ...     sorted(from_zarr(store).field_names())
+    ['B_1']
     """
     if backend == "icechunk":
         from pypic.io._icechunk import to_zarr_icechunk
@@ -495,9 +501,9 @@ def from_zarr(
     FieldDataset
         Reconstructed dataset with full metadata.
 
-    Examples
+    See Also
     --------
-    >>> # fds = from_zarr("/tmp/test.zarr")
+    to_zarr : The writer this reverses.
     """
     has_ref = any(x is not None for x in (branch, tag, snapshot_id))
 
@@ -585,7 +591,13 @@ def to_zarr_timeseries(
     ...     (1.0, FieldDataset.from_arrays(
     ...         {"B_1": np.ones((4, 3)) * 2}, grid, Normalization.identity())),
     ... ]
-    >>> # to_zarr_timeseries(pairs, "/tmp/ts.zarr")
+    >>> import tempfile
+    >>> from pathlib import Path
+    >>> with tempfile.TemporaryDirectory() as tmp:
+    ...     store = Path(tmp) / "ts.zarr"
+    ...     to_zarr_timeseries(pairs, store)
+    ...     from_zarr(store).xr.sizes["time"]
+    2
     """
     if backend == "icechunk":
         from pypic.io._icechunk import to_zarr_timeseries_icechunk

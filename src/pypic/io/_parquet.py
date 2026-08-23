@@ -227,7 +227,13 @@ def particles_to_parquet(
     ...     n_particles=5, metadata={},
     ...     weight=np.ones(5), species_charge=-1.0, species_mass=1.0,
     ... )
-    >>> # particles_to_parquet(pcl, "/tmp/pcl.parquet")
+    >>> import tempfile
+    >>> from pathlib import Path
+    >>> with tempfile.TemporaryDirectory() as tmp:
+    ...     out = Path(tmp) / "pcl.parquet"
+    ...     particles_to_parquet(pcl, out)
+    ...     particles_from_parquet(out).n_particles
+    5
     """
     ensure_arrow()
     import pyarrow.parquet as pq
@@ -269,9 +275,9 @@ def particles_from_parquet(path: str | Path) -> ParticleData:
     -------
     ParticleData
 
-    Examples
+    See Also
     --------
-    >>> # pcl = particles_from_parquet("/tmp/pcl.parquet")
+    particles_to_parquet : The writer this reverses.
     """
     ensure_arrow()
     import pyarrow.parquet as pq
@@ -393,12 +399,18 @@ def particles_to_dataset(
     sort_by : {"position", "weight"}
         Pre-write sort order; forwarded to ``particles_to_parquet``.
 
-    Examples
+    Notes
+    -----
+    Accepts either a `Simulation` or an iterable of
+    ``(step, species, ParticleData)`` triples, so custom pipelines can
+    feed it directly::
+
+        pairs = [(0, "electrons", pcl_e), (0, "ions", pcl_i)]
+        particles_to_dataset(pairs, out_dir)
+
+    See Also
     --------
-    >>> # particles_to_dataset(sim, "/tmp/particles")
-    >>> # Or with an iterable for custom pipelines:
-    >>> # pairs = [(0, "electrons", pcl_e), (0, "ions", pcl_i)]
-    >>> # particles_to_dataset(pairs, "/tmp/particles")
+    particles_from_dataset : Reads back one partition.
     """
     ensure_arrow()
     root = Path(path)
@@ -493,9 +505,9 @@ def particles_from_dataset(
     -------
     ParticleData
 
-    Examples
+    See Also
     --------
-    >>> # pcl = particles_from_dataset("/tmp/particles", step=0, species="electrons")
+    particles_to_dataset : The writer this reverses.
     """
     ensure_arrow()
     # Declare partition schema explicitly so step is read as string, not int

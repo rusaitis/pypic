@@ -135,7 +135,9 @@ def particles_to_arrow(
     ...     n_particles=5, metadata={},
     ...     weight=np.ones(5), species_charge=-1.0, species_mass=1.0,
     ... )
-    >>> # table = particles_to_arrow(pcl)
+    >>> table = particles_to_arrow(pcl)
+    >>> table.num_rows
+    5
     """
     ensure_arrow()
     import pyarrow as pa
@@ -185,7 +187,17 @@ def particles_from_arrow(table: pa.Table) -> ParticleData:
 
     Examples
     --------
-    >>> # pcl = particles_from_arrow(table)
+    >>> import numpy as np
+    >>> from pypic.containers import ParticleData
+    >>> pcl = ParticleData(
+    ...     species_index=0, species_name="electrons",
+    ...     position=np.zeros((5, 3)), velocity=np.ones((5, 3)),
+    ...     n_particles=5, metadata={},
+    ...     weight=np.ones(5), species_charge=-1.0, species_mass=1.0,
+    ... )
+    >>> back = particles_from_arrow(particles_to_arrow(pcl))
+    >>> (back.n_particles, back.species_charge, back.species_mass)
+    (5, -1.0, 1.0)
     """
     ensure_arrow()
 
