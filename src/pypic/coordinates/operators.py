@@ -80,7 +80,7 @@ def divergence(
 
     Raises
     ------
-    NotImplementedError
+    GeometryUnsupportedError
         If ``geometry`` is spherical or cylindrical.
 
     Examples
@@ -145,7 +145,7 @@ def curl(
 
     Raises
     ------
-    NotImplementedError
+    GeometryUnsupportedError
         If ``geometry`` is spherical or cylindrical.
 
     Examples
@@ -198,7 +198,7 @@ def gradient(
 
     Raises
     ------
-    NotImplementedError
+    GeometryUnsupportedError
         If ``geometry`` is spherical or cylindrical.
 
     Examples

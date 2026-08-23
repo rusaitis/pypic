@@ -205,7 +205,7 @@ def alfven_speed(
 - Derived quantities are tested against hand calculations and NRL Formulary
   values.
 - `np.testing.assert_allclose` with explicit `rtol` / `atol`.
-- Round-trip tests: `to_si(normalize(x)) == x`.
+- Round-trip tests: `norm.to_si(norm.normalize(x)) == x`.
 - Conservation tests: `div_b` of a curl field is zero to machine precision.
 - Small synthetic arrays as fixtures, not large data files.
 - Cover the edge cases: empty arrays, single elements, NaN handling.

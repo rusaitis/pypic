@@ -39,7 +39,7 @@ def _positive_array(
     [("beta", "P"), ("beta_e", "Pe"), ("beta_i", "Pi")],
 )
 @given(p=_positive_array(), b_mag=_positive_array())
-@settings(max_examples=40, deadline=None)
+@settings(max_examples=40)
 def test_beta_identity(
     name: str, pressure_field: str, p: np.ndarray, b_mag: np.ndarray
 ) -> None:
@@ -60,7 +60,7 @@ def test_beta_identity(
 
 
 @given(b_mag=_positive_array(), rho_m=_positive_array())
-@settings(max_examples=40, deadline=None)
+@settings(max_examples=40)
 def test_alfven_speed_identity(b_mag: np.ndarray, rho_m: np.ndarray) -> None:
     """v_A = |B| / sqrt(ρ_m) — equations.md § 5 (non-relativistic branch)."""
     ds = make_test_dataset(
@@ -78,7 +78,7 @@ def test_alfven_speed_identity(b_mag: np.ndarray, rho_m: np.ndarray) -> None:
 
 
 @given(v_mag=_positive_array(), b_mag=_positive_array(), rho_m=_positive_array())
-@settings(max_examples=40, deadline=None)
+@settings(max_examples=40)
 def test_alfven_mach_identity(
     v_mag: np.ndarray, b_mag: np.ndarray, rho_m: np.ndarray
 ) -> None:

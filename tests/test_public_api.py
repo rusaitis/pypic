@@ -177,3 +177,35 @@ def test_re_exported_names_agree_with_their_home_module() -> None:
     assert not disagreements, (
         f"top-level re-export is a different object: {sorted(disagreements)}"
     )
+
+
+_FULLY_RE_EXPORTED_MODULES = [
+    "pypic.compute",
+    "pypic.derived",
+    "pypic.diagnostics",
+    "pypic.fields",
+]
+
+
+def test_physics_modules_are_fully_re_exported() -> None:
+    """Every public name in the physics modules reaches the top level.
+
+    These four modules are rendered wholesale by ``docs/api/*.md``, so a
+    name public there is a name a reader will try to import from
+    ``pypic``. Twenty ``derived`` functions were reachable only as
+    ``pypic.derived.x`` while their thirty-eight siblings were not — an
+    arbitrary split with nothing enforcing it either way.
+    """
+    import importlib
+
+    top = set(pypic.__all__)
+    missing: dict[str, list[str]] = {}
+    for mod_name in _FULLY_RE_EXPORTED_MODULES:
+        module = importlib.import_module(mod_name)
+        gaps = sorted(n for n in getattr(module, "__all__", ()) if n not in top)
+        if gaps:
+            missing[mod_name] = gaps
+    assert not missing, (
+        f"public names not re-exported from pypic: {missing}. Add them to "
+        f"pypic/__init__.py, or drop them from the module's __all__."
+    )

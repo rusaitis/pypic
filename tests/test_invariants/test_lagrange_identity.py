@@ -50,7 +50,7 @@ def _bounded_array(
     b2=_bounded_array(),
     b3=_bounded_array(),
 )
-@settings(max_examples=60, deadline=None)
+@settings(max_examples=60)
 def test_lagrange_identity(
     e1: np.ndarray,
     e2: np.ndarray,

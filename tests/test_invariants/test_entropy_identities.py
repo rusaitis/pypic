@@ -65,7 +65,7 @@ def _positive_scalar() -> st.SearchStrategy[float]:
 
 
 @given(pressure=_positive_array(), density=_positive_array())
-@settings(max_examples=50, deadline=None)
+@settings(max_examples=50)
 def test_isotropy_identity_s_gyro_equals_three_s(
     pressure: np.ndarray, density: np.ndarray
 ) -> None:
@@ -89,7 +89,7 @@ def test_isotropy_identity_s_gyro_equals_three_s(
     alpha=_positive_scalar(),
     gamma=st.floats(min_value=1.01, max_value=3.0, allow_nan=False),
 )
-@settings(max_examples=50, deadline=None)
+@settings(max_examples=50)
 def test_entropy_pressure_scaling(
     pressure: np.ndarray, density: np.ndarray, alpha: float, gamma: float
 ) -> None:
@@ -110,7 +110,7 @@ def test_entropy_pressure_scaling(
     alpha=_positive_scalar(),
     gamma=st.floats(min_value=1.01, max_value=3.0, allow_nan=False),
 )
-@settings(max_examples=50, deadline=None)
+@settings(max_examples=50)
 def test_entropy_density_scaling(
     pressure: np.ndarray, density: np.ndarray, alpha: float, gamma: float
 ) -> None:
@@ -130,7 +130,7 @@ def test_entropy_density_scaling(
     density=_positive_array(),
     alpha=_positive_scalar(),
 )
-@settings(max_examples=50, deadline=None)
+@settings(max_examples=50)
 def test_gyrotropic_entropy_scaling_exponents(
     p_par: np.ndarray,
     p_perp: np.ndarray,

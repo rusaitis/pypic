@@ -58,7 +58,7 @@ def _bounded_array() -> st.SearchStrategy[np.ndarray]:
 
 @pytest.mark.parametrize(("alias_prefix", "canonical_pattern"), _PREFIX_CASES)
 @given(x_data=_bounded_array(), y_data=_bounded_array(), z_data=_bounded_array())
-@settings(max_examples=15, deadline=None)
+@settings(max_examples=15)
 def test_cartesian_alias_returns_canonical_data(
     alias_prefix: str,
     canonical_pattern: str,

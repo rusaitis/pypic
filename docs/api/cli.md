@@ -34,8 +34,9 @@ pypic compare run_a run_b --field B_1 --metric l2
 | `pypic plot PATH` | A 2D field slice |
 | `pypic plot-compare A B` | Three-panel A \| B \| difference |
 
-Both accept `--theme`, `--contours`, and `--animate`, and can batch over
-timesteps. Requires the `plot` extra.
+Both accept `--theme`, `--units`, and `--vmin` / `--vmax`. Overlaid contours
+(`--contour`, `--contour-levels`), animation (`--animate`, `--fps`) and
+parallel batching (`--jobs`) are `pypic plot` only. Requires the `plot` extra.
 
 ```sh
 pypic plot path/to/run --field "|B|" --plane xy --theme dark --output slice.png
@@ -71,11 +72,15 @@ pypic reduce apply path/to/run --axis z --reduction integrate \
 | `pypic schema export` | Emit the `simulation.toml` schema as JSON Schema 2020-12 |
 | `pypic schema validate` | Check `simulation.toml` files against v1.0 |
 | `pypic schema diff` | Diff two JSON Schema documents |
-| `pypic export` | Aliases, recipes, and field metadata as one JSON bundle |
+| `pypic export bundle` | Schema, aliases, recipes, and field metadata as one JSON bundle |
+| `pypic export aliases` | Compute aliases, group aliases, and the species regex |
+| `pypic export recipes` | Recipe registry and per-species templates (metadata only) |
+| `pypic export fields` | Static field metadata (units, LaTeX, long names) |
 
 `schema export` regenerates the bundled artifact; CI fails if the committed
-copy differs. `export` feeds the cross-language codegen described in
-[Compute & Recipes](compute.md).
+copy differs. `pypic export` is a command group — invoked bare it prints help.
+Its subcommands feed the cross-language codegen described in
+[Codegen](codegen.md).
 
 ```sh
 pypic schema validate path/to/simulation.toml

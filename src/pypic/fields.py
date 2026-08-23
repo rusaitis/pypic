@@ -16,6 +16,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 
 from pypic._aliases import COMPUTE_ALIASES, _get_field_alias_fallback
+from pypic.exceptions import UnknownFieldError
 
 log = logging.getLogger(__name__)
 
@@ -24,7 +25,7 @@ _lock = threading.Lock()
 
 @dataclass(frozen=True, slots=True)
 class FieldInfo:
-    """Metadata for a single field or derived quantity.
+    r"""Metadata for a single field or derived quantity.
 
     Parameters
     ----------
@@ -1133,7 +1134,7 @@ def field_info(
             return _maybe_localize(species_info)
 
     msg = f"No metadata for field {name!r}"
-    raise KeyError(msg)
+    raise UnknownFieldError(msg)
 
 
 def unit_label(name: str, *, to_si: bool = False) -> str:

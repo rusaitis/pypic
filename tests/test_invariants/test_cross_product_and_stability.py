@@ -68,7 +68,7 @@ def _positive_array(
     b2=_bounded_array(),
     b3=_bounded_array(),
 )
-@settings(max_examples=50, deadline=None)
+@settings(max_examples=50)
 def test_poynting_flux_anti_commutativity(
     e1: np.ndarray,
     e2: np.ndarray,
@@ -100,7 +100,7 @@ def test_poynting_flux_anti_commutativity(
     b2=_bounded_array(),
     b3=_bounded_array(),
 )
-@settings(max_examples=50, deadline=None)
+@settings(max_examples=50)
 def test_poynting_flux_dot_b_is_zero(
     e1: np.ndarray,
     e2: np.ndarray,
@@ -120,7 +120,7 @@ def test_poynting_flux_dot_b_is_zero(
 
 
 @given(p=_positive_array(), b=_positive_array())
-@settings(max_examples=50, deadline=None)
+@settings(max_examples=50)
 def test_firehose_stable_at_isotropy(p: np.ndarray, b: np.ndarray) -> None:
     r"""At isotropy ($P_\parallel = P_\perp = P$):
     $\mathcal{F} = (P - P)/(B^2/2) - 1 = -1 < 0$ — always stable.
@@ -132,7 +132,7 @@ def test_firehose_stable_at_isotropy(p: np.ndarray, b: np.ndarray) -> None:
 
 
 @given(p=_positive_array(), b=_positive_array())
-@settings(max_examples=50, deadline=None)
+@settings(max_examples=50)
 def test_mirror_stable_at_isotropy(p: np.ndarray, b: np.ndarray) -> None:
     r"""At isotropy ($P_\parallel = P_\perp = P$):
     $\mathcal{M} = P/P - 1 - 1/\beta_\perp = -1/\beta_\perp < 0$ —

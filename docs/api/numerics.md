@@ -34,22 +34,22 @@ The kernel's contract is pinned in `tests/test_numerics.py`:
   `err_norm` across a sweep that spans the unclamped middle and
   both growth clamps.
 
-## Planned additions (TASKS Step 44)
+## Planned additions
 
-- **Implicit-midpoint integrator** (44a) — single-stage Gauss-Legendre
+- **Implicit-midpoint integrator** — single-stage Gauss-Legendre
   Runge-Kutta for symplectic, bounded-drift field-line tracing.
-- **Tricubic interpolation kwarg** (44b) — non-periodic
+- **Tricubic interpolation kwarg** — non-periodic
   `RegularGridInterpolator(method="cubic")` passthrough.
-- **Periodic tricubic splines** (44d) — `periodic_axes=` kwarg using
+- **Periodic tricubic splines** — `periodic_axes=` kwarg using
   `scipy.interpolate.CubicSpline(..., bc_type="periodic")` per spline
   line; needed for seamless $\phi$-wrap on spherical PFSS grids.
-- **Curvature-based step control** (44e) — `step_control="curvature"`
-  alternative to the PI controller, keeping the unit-tangent rotation
+- **Curvature-based step control** — `step_control="curvature"`
+  alternative to the error-norm controller, keeping the unit-tangent rotation
   per step bounded by `over_rc` and clamped by the local mesh size.
 
-The first downstream consumer of the full bundle will be
-`pypic.maps` (Step 44g — squashing factor $Q$, footpoint maps,
-open-field classification). See [schema.md § Field-line map
+The first downstream consumer of the full bundle will be a planned
+`pypic.maps` module — squashing factor $Q$, footpoint maps, and
+open-field classification. See [schema.md § Field-line map
 quantities](../schema.md#field-line-map-quantities) for the canonical
 names of map outputs on disk.
 

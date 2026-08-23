@@ -152,9 +152,10 @@ client can retry. `kind` is one of:
 | `kind` | Cause |
 |---|---|
 | `validation` | The request frame failed Pydantic validation, or pypic raised `ValueError` (bad axis, malformed selection, ...). |
-| `unknown_field` | A requested field name didn't resolve. Same code is used when a requested step isn't available. |
+| `unknown_field` | A requested field name didn't resolve. |
+| `unknown_step` | The requested step isn't available in that simulation. |
 | `unknown_sim` | The path's `{sim}` doesn't exist or its directory lacks `simulation.toml`. |
-| `geometry_unsupported` | Spatial-axis reduction on a non-Cartesian grid (Jacobian-aware integration is deferred to TASKS Step 43b). |
+| `geometry_unsupported` | Spatial-axis reduction on a non-Cartesian grid (Jacobian-aware integration is not yet implemented). |
 | `internal` | Anything else. The server logs a full traceback; the client receives the exception message. |
 
 ## Schema metadata in the Arrow payload
@@ -236,13 +237,13 @@ pypic serve /data/runs \
     --cors-origin https://staging.example.org
 ```
 
-The wide-open default exists because foundations are for local dev;
-the production-only allowlist is the responsibility of whoever
-mounts the app behind a real ingress.
+The wide-open default exists because the server is aimed at local
+development; restricting origins in production is the responsibility of
+whoever mounts the app behind a real ingress.
 
-## What's deferred (TASKS Step 37 follow-ups)
+## Not implemented
 
-These belong to follow-up tickets, not the foundations:
+Deliberately out of scope for the current server:
 
 * **Authentication** — token validation in a middleware. Out of scope.
 * **Particle WebSocket** — analogous endpoint for `ParticleData` (the
@@ -255,10 +256,10 @@ These belong to follow-up tickets, not the foundations:
   that, switch to chunking.
 * **Server-side frame transforms** — accepting a `frame` field in the
   request and applying `FieldDataset.transform_to` before encoding.
-  Easy to add when TASKS Step 40 (time-dependent frame transforms) lands.
-* **Selection-provenance round-trip** — TASKS Step 37b ships the
-  `SelectionSpec` shape defined here into stored Zarr `attrs.selections`
-  so reduced datasets can replay their region definition.
+  Easy to add once time-dependent frame transforms land.
+* **Selection-provenance round-trip** — carrying the `SelectionSpec` shape
+  defined here into stored Zarr `attrs.selections`, so reduced datasets can
+  replay their region definition.
 * **Caching layer** — currently every request reads from disk. A
   per-step-per-field cache (with eviction) drops in cleanly because
   the encoding is a pure function of the resulting `FieldDataset`.

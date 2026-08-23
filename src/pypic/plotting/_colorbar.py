@@ -14,7 +14,7 @@ if TYPE_CHECKING:
 
 from pypic.plotting._overlay_common import ALPHA_VISIBLE
 
-ExtremesMode = Literal["darken", "semi", "transparent"] | None
+type ExtremesMode = Literal["darken", "semi", "transparent"] | None
 
 # Inset colorbar layout — conversion factors from theme points to axes fraction.
 _PAD_TO_AXES_FRAC = 0.05  # overlay_padding (points) → axes-fraction padding
@@ -128,11 +128,27 @@ def add_colorbar(
 
     Parameters
     ----------
+    fig : Figure
+        Figure the colorbar is drawn on.
+    ax : Axes
+        Axes the colorbar is attached to.
+    mappable : ScalarMappable
+        The image or collection the colorbar describes.
+    label : str
+        Colorbar label text.
+    extend : str
+        Which ends to draw out-of-range indicators on:
+        ``"neither"``, ``"both"``, ``"min"``, or ``"max"``.
     extremes : "semi", "transparent", "darken", or None
         ``"semi"`` (default) — semi-transparent extension colors.
         ``"transparent"`` — fully transparent extensions.
         ``"darken"`` — darkened endpoint colors.
         ``None`` — matplotlib defaults (no modification).
+
+    Returns
+    -------
+    Colorbar
+        The attached colorbar, already styled.
 
     Notes
     -----
@@ -217,6 +233,9 @@ def add_inset_colorbar(
         Tick and label color override.
     text_alpha : float
         Text opacity (default 0.85 for subtle softening).
+    ticks : Sequence[float] or None
+        Explicit tick positions. ``None`` (default) lets matplotlib
+        choose.
 
     Returns
     -------

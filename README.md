@@ -6,9 +6,10 @@
 
 <p align="center">
   <a href="https://github.com/rusaitis/pypic/actions/workflows/ci.yml"><img src="https://github.com/rusaitis/pypic/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://pypi.org/project/pypic-plasma/"><img src="https://img.shields.io/pypi/v/pypic-plasma?color=blue" alt="PyPI"></a>
   <a href="https://rusaitis.github.io/pypic/"><img src="https://img.shields.io/badge/docs-mkdocs--material-blue" alt="Documentation"></a>
   <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.13%2B-blue" alt="Python 3.13+"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT License"></a>
+  <a href="https://github.com/rusaitis/pypic/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT License"></a>
   <a href="https://doi.org/10.5281/zenodo.22059414"><img src="https://zenodo.org/badge/DOI/10.5281/zenodo.22059414.svg" alt="DOI"></a>
 </p>
 
@@ -96,7 +97,8 @@ the call site instead of surfacing as missing data three steps downstream.
   characteristic scales (skin depths, gyroradii, frequencies), entropy,
   reconnection diagnostics, and more. All pure functions: arrays in, arrays out.
 - **Unit system** — PIC (electron- or ion-referenced), MHD (Alfvén-speed-based),
-  SI, or custom normalization. Round-trip `normalize()` / `to_si()` with display
+  SI, or custom normalization. Round-trip `Normalization.normalize()` / `.to_si()`
+  with display
   unit conversion (`"nT"`, `"km/s"`, `"eV"`, ...).
 - **Geometry-aware operators** — divergence, curl, gradient with coordinate
   metric factors. Cartesian implemented; spherical/cylindrical planned.
@@ -106,13 +108,13 @@ the call site instead of surfacing as missing data three steps downstream.
   one or more axes (trapezoidal `integrate`, `mean`/`median`/`sum`,
   `argmax`/`argmin` returning coordinate positions). Pairs with selections for
   column densities, slab averages, and density-weighted line averages.
-- **Field-line tracing** — adaptive Dormand-Prince 5(4) tracer with PI step
-  control, batched and scalar paths, plus Poincaré sections.
+- **Field-line tracing** — adaptive Dormand-Prince 5(4) tracer with error-norm
+  step control, batched and scalar paths, plus Poincaré sections.
 - **Modern I/O** — Zarr v3 export/import (single-step and time-series),
   Icechunk versioned storage, VirtualiZarr views over legacy HDF5, and
   Parquet/Arrow for particle data with Morton-ordered spatial pushdown.
 - **Field registry** — `compute("beta")`, `compute("|B|")`, `compute("v_A")`
-  dispatch to the right derived function. Extensible via `register_field()`.
+  dispatch to the right derived function. Extensible via `register_recipe()`.
 - **Arrow IPC server** — `pypic serve` exposes simulations over JSON HTTP plus a
   WebSocket that streams fields as Arrow record batches, with selections and
   derived quantities applied server-side. Zero-copy into browser (`apache-arrow`)
@@ -146,6 +148,11 @@ Full documentation, including the physics reference, lives at
 | [Conventions](https://rusaitis.github.io/pypic/conventions/) | Thermal speed, γ, temperature-in-energy-units, and the other choices that differ between textbooks |
 | [Schema](https://rusaitis.github.io/pypic/schema/) | The `simulation.toml` contract and canonical field names |
 
+Runnable, self-contained scripts live in
+[`examples/`](https://github.com/rusaitis/pypic/blob/main/examples/README.md) —
+a numbered on-ramp from "arrays to `FieldDataset`" up to a full
+`simulation.toml`, plus a worked custom reader.
+
 ## Status
 
 pypic is **early-stage research software (0.1.x) under active
@@ -156,7 +163,7 @@ physics values, and NRL Formulary cross-checks.
 
 The public API may still change before 1.0. Non-Cartesian operators, several
 additional readers (Vlasiator, VPIC, ARMS, openPMD), and the field-line mapping
-module are planned rather than implemented — see [TASKS.md](TASKS.md) for the
+module are planned rather than implemented — see [TASKS.md](https://github.com/rusaitis/pypic/blob/main/TASKS.md) for the
 roadmap and what is already done.
 
 ## Citing
@@ -164,21 +171,21 @@ roadmap and what is already done.
 If pypic contributes to work you publish, please cite it. The concept DOI
 [10.5281/zenodo.22059414](https://doi.org/10.5281/zenodo.22059414) always
 resolves to the latest release; each release also gets its own version DOI.
-Metadata lives in [CITATION.cff](CITATION.cff), which GitHub renders as a
+Metadata lives in [CITATION.cff](https://github.com/rusaitis/pypic/blob/main/CITATION.cff), which GitHub renders as a
 ready-to-paste citation via the *Cite this repository* button.
 
 ## Contributing
 
 Bug reports, reader contributions for new simulation codes, and physics
-corrections are all welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for the
+corrections are all welcome. See [CONTRIBUTING.md](https://github.com/rusaitis/pypic/blob/main/CONTRIBUTING.md) for the
 development setup, test commands, and code conventions, and
-[docs/architecture.md](https://rusaitis.github.io/pypic/architecture/) for the
+the [architecture page](https://rusaitis.github.io/pypic/architecture/) for the
 design rules behind the code.
 
-Participation is governed by the [Code of Conduct](CODE_OF_CONDUCT.md).
-Security issues go through [SECURITY.md](SECURITY.md), not public issues.
-Release notes live in [CHANGELOG.md](CHANGELOG.md).
+Participation is governed by the [Code of Conduct](https://github.com/rusaitis/pypic/blob/main/CODE_OF_CONDUCT.md).
+Security issues go through [SECURITY.md](https://github.com/rusaitis/pypic/blob/main/SECURITY.md), not public issues.
+Release notes live in [CHANGELOG.md](https://github.com/rusaitis/pypic/blob/main/CHANGELOG.md).
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT — see [LICENSE](https://github.com/rusaitis/pypic/blob/main/LICENSE).

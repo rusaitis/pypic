@@ -1,6 +1,6 @@
 # Physics Equations Reference
 
-Complete equation reference for all derived quantities in pypic.
+Equation reference for the derived quantities in pypic.
 For canonical field names and data types, see [SCHEMA](schema.md).
 For detailed convention discussions, see [conventions.md](conventions.md).
 
@@ -365,8 +365,7 @@ for velocity variable choices and numerical considerations.
 
 [^10]: Several characteristic scales in Section 5 have relativistic
     generalizations listed here. When `physics.relativistic = true` in the
-    simulation config, `compute()` (Step 13) should use these forms
-    automatically. The non-relativistic limit is always recovered by setting
+    simulation config, `compute()` uses these forms automatically. The non-relativistic limit is always recovered by setting
     $\gamma_L = 1$ (or equivalently $v \ll c$, $\sigma \ll 1$).
 
 ### 8.1 Bulk-Flow Quantities

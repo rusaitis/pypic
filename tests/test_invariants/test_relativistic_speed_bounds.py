@@ -91,7 +91,7 @@ def _subc_speed(c: float) -> st.SearchStrategy[np.ndarray]:
 
 
 @given(b=_nonneg_array(), rho_m=_positive_array(), c=_speed_of_light())
-@settings(max_examples=50, deadline=None)
+@settings(max_examples=50)
 def test_relativistic_alfven_speed_bounded_by_c(
     b: np.ndarray, rho_m: np.ndarray, c: float
 ) -> None:
@@ -109,7 +109,7 @@ def test_relativistic_alfven_speed_bounded_by_c(
 
 
 @given(c=_speed_of_light(), data=st.data())
-@settings(max_examples=40, deadline=None)
+@settings(max_examples=40)
 def test_relativistic_magnetosonic_speed_bounded_by_c(
     c: float, data: st.DataObject
 ) -> None:
@@ -133,7 +133,7 @@ def test_relativistic_magnetosonic_speed_bounded_by_c(
 
 
 @given(c=_speed_of_light(), data=st.data())
-@settings(max_examples=40, deadline=None)
+@settings(max_examples=40)
 def test_magnetosonic_speed_exceeds_both_components(
     c: float, data: st.DataObject
 ) -> None:
@@ -160,7 +160,7 @@ def test_magnetosonic_speed_exceeds_both_components(
     mass=st.floats(min_value=1e-6, max_value=1e6, allow_nan=False),
     c=_speed_of_light(),
 )
-@settings(max_examples=40, deadline=None)
+@settings(max_examples=40)
 def test_relativistic_thermal_speed_bounded_by_c(
     temperature: np.ndarray, mass: float, c: float
 ) -> None:

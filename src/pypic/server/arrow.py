@@ -26,7 +26,6 @@ from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
-from pypic.exceptions import UnknownFieldError
 from pypic.io._guard import ensure_arrow
 from pypic.io.metadata import (
     SCHEMA_VERSION,
@@ -35,6 +34,7 @@ from pypic.io.metadata import (
     species_to_list,
     to_json_native,
 )
+from pypic.server.exceptions import UnknownFieldError
 
 if TYPE_CHECKING:
     from collections.abc import Iterable

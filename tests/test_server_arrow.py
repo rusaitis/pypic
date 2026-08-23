@@ -20,7 +20,10 @@ from pypic.units import Normalization  # noqa: E402
 
 
 @pytest.fixture
-def cartesian_3d() -> FieldDataset:
+def small_cartesian_3d() -> FieldDataset:
+    """4x3x2 Cartesian dataset — deliberately smaller and
+    differently seeded than the shared ``cartesian_3d`` in
+    conftest, to keep Arrow payload sizes assertable."""
     grid = GridInfo(
         dimensions=(4, 3, 2),
         spacing=(1.0, 1.0, 1.0),
@@ -36,29 +39,33 @@ def cartesian_3d() -> FieldDataset:
     return FieldDataset.from_arrays(fields, grid, Normalization.identity())
 
 
-def test_round_trip_preserves_values(cartesian_3d: FieldDataset) -> None:
-    ipc = field_dataset_to_arrow_ipc(cartesian_3d)
+def test_round_trip_preserves_values(small_cartesian_3d: FieldDataset) -> None:
+    ipc = field_dataset_to_arrow_ipc(small_cartesian_3d)
     decoded = decode_field_dataset_ipc(ipc)
-    np.testing.assert_array_equal(decoded["fields"]["B_1"], cartesian_3d["B_1"])
-    np.testing.assert_array_equal(decoded["fields"]["B_2"], cartesian_3d["B_2"])
-    np.testing.assert_array_equal(decoded["fields"]["B_3"], cartesian_3d["B_3"])
+    np.testing.assert_array_equal(decoded["fields"]["B_1"], small_cartesian_3d["B_1"])
+    np.testing.assert_array_equal(decoded["fields"]["B_2"], small_cartesian_3d["B_2"])
+    np.testing.assert_array_equal(decoded["fields"]["B_3"], small_cartesian_3d["B_3"])
 
 
-def test_round_trip_preserves_shape(cartesian_3d: FieldDataset) -> None:
-    ipc = field_dataset_to_arrow_ipc(cartesian_3d)
+def test_round_trip_preserves_shape(small_cartesian_3d: FieldDataset) -> None:
+    ipc = field_dataset_to_arrow_ipc(small_cartesian_3d)
     decoded = decode_field_dataset_ipc(ipc)
-    assert decoded["fields"]["B_1"].shape == cartesian_3d["B_1"].shape
+    assert decoded["fields"]["B_1"].shape == small_cartesian_3d["B_1"].shape
 
 
-def test_schema_metadata_carries_dims_and_shape(cartesian_3d: FieldDataset) -> None:
-    ipc = field_dataset_to_arrow_ipc(cartesian_3d)
+def test_schema_metadata_carries_dims_and_shape(
+    small_cartesian_3d: FieldDataset,
+) -> None:
+    ipc = field_dataset_to_arrow_ipc(small_cartesian_3d)
     meta = decode_field_dataset_ipc(ipc)["metadata"]
     assert meta["shape"] == [4, 3, 2]
     assert meta["dims"] == ["x", "y", "z"]
 
 
-def test_schema_metadata_carries_normalization(cartesian_3d: FieldDataset) -> None:
-    ipc = field_dataset_to_arrow_ipc(cartesian_3d)
+def test_schema_metadata_carries_normalization(
+    small_cartesian_3d: FieldDataset,
+) -> None:
+    ipc = field_dataset_to_arrow_ipc(small_cartesian_3d)
     meta = decode_field_dataset_ipc(ipc)["metadata"]
     norm = meta["normalization"]
     assert "length_ref" in norm
@@ -68,43 +75,43 @@ def test_schema_metadata_carries_normalization(cartesian_3d: FieldDataset) -> No
     assert norm["b_field_ref"] == 1.0
 
 
-def test_schema_metadata_carries_field_attrs(cartesian_3d: FieldDataset) -> None:
-    ipc = field_dataset_to_arrow_ipc(cartesian_3d)
+def test_schema_metadata_carries_field_attrs(small_cartesian_3d: FieldDataset) -> None:
+    ipc = field_dataset_to_arrow_ipc(small_cartesian_3d)
     meta = decode_field_dataset_ipc(ipc)["metadata"]
     b1_attrs = meta["fields"]["B_1"]
     assert b1_attrs["quantity_type"] == "b_field"
     assert b1_attrs["si_unit"] == "T"
 
 
-def test_coord_arrays_round_trip(cartesian_3d: FieldDataset) -> None:
-    ipc = field_dataset_to_arrow_ipc(cartesian_3d)
+def test_coord_arrays_round_trip(small_cartesian_3d: FieldDataset) -> None:
+    ipc = field_dataset_to_arrow_ipc(small_cartesian_3d)
     decoded = decode_field_dataset_ipc(ipc)
     assert set(decoded["coords"]) == {"x", "y", "z"}
     assert decoded["coords"]["x"].shape == (4,)
     assert decoded["coords"]["z"].shape == (2,)
 
 
-def test_fields_subset(cartesian_3d: FieldDataset) -> None:
-    ipc = field_dataset_to_arrow_ipc(cartesian_3d, fields=["B_1"])
+def test_fields_subset(small_cartesian_3d: FieldDataset) -> None:
+    ipc = field_dataset_to_arrow_ipc(small_cartesian_3d, fields=["B_1"])
     decoded = decode_field_dataset_ipc(ipc)
     assert set(decoded["fields"]) == {"B_1"}
 
 
-def test_fields_alias_resolves(cartesian_3d: FieldDataset) -> None:
+def test_fields_alias_resolves(small_cartesian_3d: FieldDataset) -> None:
     # "Bx" is an alias for "B_1" on Cartesian grids — the encoder
     # should resolve the alias and emit a column under "B_1".
-    ipc = field_dataset_to_arrow_ipc(cartesian_3d, fields=["Bx"])
+    ipc = field_dataset_to_arrow_ipc(small_cartesian_3d, fields=["Bx"])
     decoded = decode_field_dataset_ipc(ipc)
     assert "B_1" in decoded["fields"]
 
 
-def test_unknown_field_raises_keyerror(cartesian_3d: FieldDataset) -> None:
+def test_unknown_field_raises_keyerror(small_cartesian_3d: FieldDataset) -> None:
     with pytest.raises(KeyError, match="nope"):
-        field_dataset_to_arrow_ipc(cartesian_3d, fields=["B_1", "nope"])
+        field_dataset_to_arrow_ipc(small_cartesian_3d, fields=["B_1", "nope"])
 
 
-def test_nan_preserved(cartesian_3d: FieldDataset) -> None:
-    grid = cartesian_3d.grid
+def test_nan_preserved(small_cartesian_3d: FieldDataset) -> None:
+    grid = small_cartesian_3d.grid
     f = np.full((4, 3, 2), np.nan)
     f[0, 0, 0] = 1.5
     ds = FieldDataset.from_arrays({"B_1": f}, grid, Normalization.identity())
@@ -133,15 +140,17 @@ def test_units_si_applies_normalization() -> None:
     assert code["metadata"]["units"] == "code"
 
 
-def test_units_invalid_raises(cartesian_3d: FieldDataset) -> None:
+def test_units_invalid_raises(small_cartesian_3d: FieldDataset) -> None:
     with pytest.raises(ValueError, match="units"):
-        field_dataset_to_arrow_ipc(cartesian_3d, units="bogus")
+        field_dataset_to_arrow_ipc(small_cartesian_3d, units="bogus")
 
 
-def test_reduction_provenance_attr_round_trips(cartesian_3d: FieldDataset) -> None:
+def test_reduction_provenance_attr_round_trips(
+    small_cartesian_3d: FieldDataset,
+) -> None:
     # After reduce(integrate), each field carries reduction provenance
     # — must travel through the Arrow schema metadata intact.
-    column = reduce(cartesian_3d, "z", reduction="integrate")
+    column = reduce(small_cartesian_3d, "z", reduction="integrate")
     ipc = field_dataset_to_arrow_ipc(column)
     meta = decode_field_dataset_ipc(ipc)["metadata"]
     red = meta["fields"]["B_1"]["reduction"]
@@ -150,10 +159,10 @@ def test_reduction_provenance_attr_round_trips(cartesian_3d: FieldDataset) -> No
     assert red["length_axes"] == 1
 
 
-def test_reduced_dataset_2d_round_trip(cartesian_3d: FieldDataset) -> None:
+def test_reduced_dataset_2d_round_trip(small_cartesian_3d: FieldDataset) -> None:
     # A reduced FieldDataset has a 2-D shape — the encoder must follow
     # the surviving dims, not the original 3-D shape.
-    column = reduce(cartesian_3d, "z", reduction="mean")
+    column = reduce(small_cartesian_3d, "z", reduction="mean")
     ipc = field_dataset_to_arrow_ipc(column)
     decoded = decode_field_dataset_ipc(ipc)
     assert decoded["metadata"]["dims"] == ["x", "y"]
@@ -185,16 +194,16 @@ class TestUnknownFieldRouting:
     ``kind="internal"`` and over HTTP as a 500.
     """
 
-    def test_raises_typed_error(self, cartesian_3d) -> None:
+    def test_raises_typed_error(self, small_cartesian_3d) -> None:
         with pytest.raises(UnknownFieldError):
-            field_dataset_to_arrow_ipc(cartesian_3d, fields=["not_a_field"])
+            field_dataset_to_arrow_ipc(small_cartesian_3d, fields=["not_a_field"])
 
-    def test_still_catchable_as_keyerror(self, cartesian_3d) -> None:
+    def test_still_catchable_as_keyerror(self, small_cartesian_3d) -> None:
         """Behaviour-preserving: the typed class subclasses ``KeyError``."""
         with pytest.raises(KeyError):
-            field_dataset_to_arrow_ipc(cartesian_3d, fields=["not_a_field"])
+            field_dataset_to_arrow_ipc(small_cartesian_3d, fields=["not_a_field"])
 
-    def test_carries_server_routing_metadata(self, cartesian_3d) -> None:
+    def test_carries_server_routing_metadata(self, small_cartesian_3d) -> None:
         with pytest.raises(UnknownFieldError) as excinfo:
-            field_dataset_to_arrow_ipc(cartesian_3d, fields=["not_a_field"])
+            field_dataset_to_arrow_ipc(small_cartesian_3d, fields=["not_a_field"])
         assert (excinfo.value.kind, excinfo.value.status_code) == ("unknown_field", 404)

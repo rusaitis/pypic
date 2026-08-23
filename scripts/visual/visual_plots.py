@@ -3,9 +3,9 @@
 Generates PNG files exercising every plot type, including crowded
 multi-panel layouts.  Run with::
 
-    uv run python tests/visual_plots.py              # all themes
-    uv run python tests/visual_plots.py --theme dark  # dark only
-    uv run python tests/visual_plots.py --theme 4     # dark by number
+    uv run python scripts/visual/visual_plots.py              # all themes
+    uv run python scripts/visual/visual_plots.py --theme dark  # dark only
+    uv run python scripts/visual/visual_plots.py --theme 4     # dark by number
 
 Output goes to ``tests/output/``.
 """
@@ -21,9 +21,9 @@ import numpy as np
 
 matplotlib.use("Agg")
 
-# Allow running as `python tests/visual_plots.py` from any cwd by adding
+# Allow running as `python scripts/visual/visual_plots.py` from any cwd by adding
 # the project root to sys.path so `tests._helpers` resolves.
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 import matplotlib.pyplot as plt
 
@@ -55,7 +55,8 @@ from pypic.plotting import (
 from pypic.plotting.styles import apply_rounding
 from tests._helpers import make_harris_dataset
 
-OUTPUT_DIR = Path(__file__).parent / "output"
+_REPO_ROOT = Path(__file__).resolve().parent.parent.parent
+OUTPUT_DIR = _REPO_ROOT / "tests" / "output"
 
 
 def _make_tabular() -> TabularData:
@@ -89,6 +90,7 @@ def _save(fig: plt.Figure, plot_name: str, theme: PlotTheme) -> None:
 
 
 def generate(theme: PlotTheme) -> None:
+    """Write every reference figure for one theme into OUTPUT_DIR."""
     print(f"Generating {theme.name} theme plots...")
 
     ds_a = make_harris_dataset(y_center=7.5)
@@ -677,6 +679,7 @@ def generate(theme: PlotTheme) -> None:
 
 
 def main() -> None:
+    """Parse arguments and generate figures for the selected themes."""
     parser = argparse.ArgumentParser(
         description="Generate visual test plots for manual inspection."
     )

@@ -103,9 +103,9 @@ def export(
 ) -> None:
     """Export the simulation.toml schema as JSON Schema 2020-12.
 
-    The default ``--pretty`` form is what gets committed to
-    ``src/pypic/schema/simulation.schema.v{SCHEMA_VERSION}.json``;
-    ``--compact`` is for piping into transport (HTTP responses,
+    The default --pretty form is what gets committed to
+    src/pypic/schema/simulation.schema.v{SCHEMA_VERSION}.json;
+    --compact is for piping into transport (HTTP responses,
     fixture-comparison harnesses).
     """
     schema = build_schema(
@@ -238,13 +238,13 @@ def diff(
 ) -> None:
     """Diff two JSON Schema documents; second defaults to bundled current.
 
-    Direction is left → right: lines prefixed ``-`` and entries under
-    ``removed`` are in the first document, lines prefixed ``+`` and
-    entries under ``added`` are in the second.
+    Direction is left → right: lines prefixed - and entries under
+    removed are in the first document, lines prefixed + and
+    entries under added are in the second.
 
     Exit codes follow git diff: 0 if the documents are identical, 1
     if they differ, 2 on hard errors (file not found, malformed JSON,
-    unknown ``--format``).
+    unknown --format).
     """
     if fmt not in ("text", "json"):
         typer.echo(f"--format must be 'text' or 'json' (got {fmt!r})", err=True)

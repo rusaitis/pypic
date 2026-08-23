@@ -87,7 +87,7 @@ def _perpendicularity_atol(
     b2=_bounded_array(),
     b3=_bounded_array(),
 )
-@settings(max_examples=50, deadline=None)
+@settings(max_examples=50)
 def test_ideal_electric_field_perpendicular_to_v(
     v1: np.ndarray,
     v2: np.ndarray,
@@ -120,7 +120,7 @@ def test_ideal_electric_field_perpendicular_to_v(
         lambda q: abs(q) > 0.1
     ),
 )
-@settings(max_examples=50, deadline=None)
+@settings(max_examples=50)
 def test_hall_electric_field_perpendicular_to_j(
     j1: np.ndarray,
     j2: np.ndarray,
@@ -158,7 +158,7 @@ def test_hall_electric_field_perpendicular_to_j(
         lambda q: abs(q) > 0.1
     ),
 )
-@settings(max_examples=50, deadline=None)
+@settings(max_examples=50)
 def test_hall_electric_field_perpendicular_to_b(
     j1: np.ndarray,
     j2: np.ndarray,
@@ -189,7 +189,7 @@ def test_hall_electric_field_perpendicular_to_b(
     n=_positive_array(),
     charge_mag=st.floats(min_value=0.1, max_value=5.0, allow_nan=False),
 )
-@settings(max_examples=40, deadline=None)
+@settings(max_examples=40)
 def test_hall_electric_field_uses_charge_magnitude(
     j1: np.ndarray,
     j2: np.ndarray,

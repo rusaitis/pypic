@@ -73,8 +73,11 @@ def plot_field_grid(
         Shared color limits across all panels. ``None`` for auto.
     colorbar : bool or "inset"
         Colorbar mode for each panel.
-    extremes : "darken" or "transparent"
-        How to style values outside ``[vmin, vmax]``.
+    extremes : "semi", "transparent", "darken", or None
+        Colorbar out-of-range indicator style. ``"semi"`` (default)
+        uses semi-transparent extension colors; ``"transparent"``
+        hides them; ``"darken"`` darkens the endpoint colors;
+        ``None`` leaves matplotlib defaults untouched.
     log_scale : bool
         Use logarithmic color mapping for all panels.
     step : int | None
@@ -87,6 +90,20 @@ def plot_field_grid(
         Add ``(a)``, ``(b)``, … labels to each panel.
     suptitle : str | None
         Figure super-title. ``None`` generates from step/time.
+    vmin : float or None
+        Lower color limit. ``None`` (default) autoscales.
+    vmax : float or None
+        Upper color limit. ``None`` (default) autoscales.
+    alpha : float
+        Opacity of the field image, in ``[0, 1]``.
+    symmetric : bool or None
+        Force symmetric color limits about zero. ``None``
+        (default) decides from whether the field is
+        positive-definite.
+    save : str or Path or None
+        Path to write the figure to. When given, the figure is saved
+        and closed; when ``None`` (default) it is left open for the
+        caller to display or modify further.
 
     Returns
     -------

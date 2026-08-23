@@ -171,6 +171,17 @@ class FrameTransform:
 def identity_transform(frame: str) -> FrameTransform:
     """Return a no-op transform within a single frame.
 
+    Parameters
+    ----------
+    frame : str
+        Frame name used as both source and target.
+
+    Returns
+    -------
+    FrameTransform
+        Transform with no translation, rotation, or scaling, for which
+        ``is_identity`` is ``True``.
+
     Examples
     --------
     >>> identity_transform("sim").is_identity

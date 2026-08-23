@@ -73,7 +73,7 @@ def _positive_array(
     mass=st.floats(min_value=0.1, max_value=10.0, allow_nan=False),
     alpha=st.floats(min_value=0.1, max_value=5.0, allow_nan=False),
 )
-@settings(max_examples=40, deadline=None)
+@settings(max_examples=40)
 def test_kinetic_energy_flux_scales_as_velocity_cubed(
     v_comp: np.ndarray,
     v1: np.ndarray,
@@ -108,7 +108,7 @@ def test_kinetic_energy_flux_scales_as_velocity_cubed(
     alpha=st.floats(min_value=0.1, max_value=10.0, allow_nan=False),
     beta=st.floats(min_value=0.1, max_value=10.0, allow_nan=False),
 )
-@settings(max_examples=40, deadline=None)
+@settings(max_examples=40)
 def test_enthalpy_flux_is_bilinear_in_pressure_and_velocity(
     pressure: np.ndarray,
     v_comp: np.ndarray,

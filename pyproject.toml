@@ -30,7 +30,9 @@ keywords = [
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Science/Research",
+    "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
     "Programming Language :: Python :: 3.13",
     "Programming Language :: Python :: 3.14",
     "Topic :: Scientific/Engineering :: Physics",
@@ -95,7 +97,6 @@ dev = [
     "mkdocstrings[python]>=0.27",
     "mkdocs-bibtex>=2.16",
     "scipy-stubs>=1.17.1.1",
-    "vulture>=2.15",
     "typer>=0.12",
     "rich>=13.0",
     "jsonschema>=4.21",
@@ -133,6 +134,7 @@ select = [
     "D",              # pydocstyle
     "ANN",            # flake8-annotations
     "PT",             # flake8-pytest-style
+    "T20",            # flake8-print — the "no print() in library code" rule
     "NPY",            # numpy-specific
 ]
 ignore = [
@@ -161,15 +163,13 @@ convention = "numpy"
 "tests/*" = ["D", "ANN", "N"]
 # pyvista wraps the untyped vtk C-API; helpers must accept Any.
 "src/pypic/plotting/pyvista/*" = ["ANN401"]
-# A vulture whitelist *is* a list of bare attribute references — B018
-# ("useless expression") is the file's entire mechanism.
-"vulture_whitelist.py" = ["B018"]
-# Fixture generators and examples are scripts: they print progress and are
-# read top-to-bottom, so stdout is the point. Generators additionally embed
-# fixed-width records (iPIC3D ConservedQuantities columns, settings.hdf
-# lines) that must stay on one line to remain valid fixtures, and use
-# capitalized physics names (meshgrid Y) like the tests do.
+# Fixture generators, benchmarks and examples are scripts: they print
+# progress and are read top-to-bottom, so stdout is the point. Generators
+# additionally embed fixed-width records (iPIC3D ConservedQuantities
+# columns, settings.hdf lines) that must stay on one line to remain valid
+# fixtures, and use capitalized physics names (meshgrid Y) like the tests.
 "scripts/*" = ["T201", "E501", "N806"]
+"benchmarks/*" = ["T201"]
 "examples/*" = ["T201"]
 
 [tool.mypy]
@@ -180,14 +180,13 @@ python_version = "3.13"
 # scientific packages without stubs (vtk, pyvista, mpl_toolkits, ...).
 # Real "module not found" errors are separate (import-not-found).
 disable_error_code = ["import-untyped"]
-
-[[tool.mypy.overrides]]
-# vulture_whitelist.py is a linter directive file, not code: it names
-# slotted dataclass fields on the class to mark them as intentionally
-# unreferenced, which is exactly what mypy's "conflicts with class
-# variable access" check exists to flag.
-module = "vulture_whitelist"
-disable_error_code = ["misc"]
+# scripts/visual/* are manual, run-by-eye figure generators driving
+# matplotlib and pyvista interactively: linted and formatted, but not
+# type-checked — strict mode on throwaway plotting code is all noise.
+# examples/*/
+# subdirectories are local simulation data that .gitignore already keeps
+# out of the repo, but mypy (unlike ruff) does not read .gitignore.
+exclude = ["^scripts/visual/", "^examples/[^/]+/"]
 
 [[tool.mypy.overrides]]
 # Untyped third-party packages — no py.typed marker upstream.

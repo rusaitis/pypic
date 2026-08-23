@@ -46,7 +46,7 @@ def _signal(n: int) -> st.SearchStrategy[np.ndarray]:
     dx=st.floats(min_value=0.01, max_value=10.0, allow_nan=False),
     data=st.data(),
 )
-@settings(max_examples=30, deadline=None)
+@settings(max_examples=30)
 def test_parseval_boxcar_integral_equals_variance(
     n: int, dx: float, data: st.DataObject
 ) -> None:
@@ -75,7 +75,7 @@ def test_parseval_boxcar_integral_equals_variance(
     ),
     period_cells=st.integers(min_value=4, max_value=16),
 )
-@settings(max_examples=30, deadline=None)
+@settings(max_examples=30)
 def test_parseval_boxcar_pure_sinusoid(
     n: int, amplitude: float, period_cells: int
 ) -> None:

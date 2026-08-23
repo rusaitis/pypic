@@ -71,7 +71,7 @@ def _nonzero_array(
     b2=_bounded_array(),
     b3=_bounded_array(),
 )
-@settings(max_examples=50, deadline=None)
+@settings(max_examples=50)
 def test_non_ideal_plus_ideal_equals_total_e(
     e1: np.ndarray,
     e2: np.ndarray,
@@ -107,7 +107,7 @@ def test_non_ideal_plus_ideal_equals_total_e(
     b2=_bounded_array(),
     b3=_bounded_array(),
 )
-@settings(max_examples=50, deadline=None)
+@settings(max_examples=50)
 def test_ideal_e_perpendicular_to_b(
     v1: np.ndarray,
     v2: np.ndarray,
@@ -131,7 +131,7 @@ def test_ideal_e_perpendicular_to_b(
     b2=_nonzero_array(),
     b3=_nonzero_array(),
 )
-@settings(max_examples=50, deadline=None)
+@settings(max_examples=50)
 def test_shear_angle_self_is_zero(
     b1: np.ndarray, b2: np.ndarray, b3: np.ndarray
 ) -> None:
@@ -152,7 +152,7 @@ def test_shear_angle_self_is_zero(
     b2=_nonzero_array(),
     b3=_nonzero_array(),
 )
-@settings(max_examples=50, deadline=None)
+@settings(max_examples=50)
 def test_shear_angle_antiparallel_is_pi(
     b1: np.ndarray, b2: np.ndarray, b3: np.ndarray
 ) -> None:

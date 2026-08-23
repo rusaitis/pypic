@@ -24,7 +24,7 @@ from tests.strategies import frame_transforms
     t2=frame_transforms("B", "C"),
     t3=frame_transforms("C", "D"),
 )
-@settings(max_examples=100, deadline=None)
+@settings(max_examples=100)
 def test_compose_is_associative(
     t1: FrameTransform, t2: FrameTransform, t3: FrameTransform
 ) -> None:
@@ -49,7 +49,7 @@ def test_compose_is_associative(
     t2=frame_transforms("B", "C"),
     t3=frame_transforms("C", "D"),
 )
-@settings(max_examples=100, deadline=None)
+@settings(max_examples=100)
 def test_compose_matches_sequential_application(
     t1: FrameTransform, t2: FrameTransform, t3: FrameTransform
 ) -> None:

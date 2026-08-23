@@ -84,7 +84,7 @@ def _finite_array() -> st.SearchStrategy[np.ndarray]:
     [pytest.param(n, c, id=n) for n, c in DIRECT_MAGNITUDE_RECIPES],
 )
 @given(x1=_finite_array(), x2=_finite_array(), x3=_finite_array())
-@settings(max_examples=50, deadline=None)
+@settings(max_examples=50)
 def test_magnitude_algebraic_identity(
     name: str,
     components: tuple[str, str, str],

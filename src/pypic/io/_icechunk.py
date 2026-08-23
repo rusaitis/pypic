@@ -32,14 +32,14 @@ if TYPE_CHECKING:
     from pypic.dataset import FieldDataset
     from pypic.readers._registry import Simulation
 
+# Only the repo/version-management helpers are public API; the four
+# ``*_icechunk`` read/write entry points are dispatch targets of
+# ``to_zarr(backend="icechunk")`` and ``from_zarr``, not names a caller
+# reaches for directly.
 __all__ = [
-    "from_zarr_icechunk",
     "icechunk_ancestry",
     "icechunk_create_tag",
-    "is_icechunk_store",
     "open_icechunk_repo",
-    "to_zarr_icechunk",
-    "to_zarr_timeseries_icechunk",
 ]
 
 _log = logging.getLogger(__name__)
@@ -170,6 +170,11 @@ def to_zarr_icechunk(
         Commit message.  Defaults to ``"pypic: write <n> fields"``.
     branch : str
         Branch to commit to.  Default ``"main"``.
+    simulation_toml : str or Path or None
+        Source ``simulation.toml`` to stamp verbatim into
+        ``attrs.simulation_toml``. Carries the schema sections
+        the typed FieldDataset boundary drops. ``None``
+        (default) stamps whatever the dataset already knows.
 
     Returns
     -------
@@ -318,6 +323,11 @@ def to_zarr_timeseries_icechunk(
         Commit message.  Defaults to ``"pypic: write timeseries"``.
     branch : str
         Branch to commit to.  Default ``"main"``.
+    simulation_toml : str or Path or None
+        Source ``simulation.toml`` to stamp verbatim into
+        ``attrs.simulation_toml``. Carries the schema sections
+        the typed FieldDataset boundary drops. ``None``
+        (default) stamps whatever the dataset already knows.
 
     Returns
     -------

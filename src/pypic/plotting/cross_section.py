@@ -83,8 +83,11 @@ def plot_cross_section(
         Simulation time.
     colorbar : bool or "inset"
         Colorbar mode.
-    extremes : "darken" or "transparent"
-        How to style values outside ``[vmin, vmax]``.
+    extremes : "semi", "transparent", "darken", or None
+        Colorbar out-of-range indicator style. ``"semi"`` (default)
+        uses semi-transparent extension colors; ``"transparent"``
+        hides them; ``"darken"`` darkens the endpoint colors;
+        ``None`` leaves matplotlib defaults untouched.
     cut_color : str or None
         Color for the cut line marker on the 2D panel. ``None`` uses
         the theme's accent color.
@@ -92,6 +95,20 @@ def plot_cross_section(
         Line style for the cut marker.
     figsize : tuple[float, float] | None
         Figure size override. ``None`` uses ``(7, 8)``.
+    vmin : float or None
+        Lower color limit. ``None`` (default) autoscales.
+    vmax : float or None
+        Upper color limit. ``None`` (default) autoscales.
+    alpha : float
+        Opacity of the field image, in ``[0, 1]``.
+    symmetric : bool or None
+        Force symmetric color limits about zero. ``None``
+        (default) decides from whether the field is
+        positive-definite.
+    save : str or Path or None
+        Path to write the figure to. When given, the figure is saved
+        and closed; when ``None`` (default) it is left open for the
+        caller to display or modify further.
 
     Returns
     -------

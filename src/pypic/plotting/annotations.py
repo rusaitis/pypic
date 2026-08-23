@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 
     from pypic.plotting._badge import OverlayVariant
 
-SunDirection = Literal["left", "right", "up", "down"]
+type SunDirection = Literal["left", "right", "up", "down"]
 
 # Sun direction → angle (degrees, CCW from +x) where the day-side center points
 _SUN_ANGLES: dict[str, float] = {

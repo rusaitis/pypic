@@ -34,7 +34,7 @@ species is heated.
 
 ## Thermal Speed Convention
 
-We adopt $v_{th} = \sqrt{T/m}$ (with $T$ in energy units), following
+pypic adopts $v_{th} = \sqrt{T/m}$ (with $T$ in energy units), following
 the NRL Plasma Formulary [@NRL] convention. This is the 1D Maxwellian
 standard deviation $\sigma$ where
 $f(v_x) \propto \exp(-v_x^2 / (2\sigma^2))$ with $\sigma^2 = T/m$.
@@ -92,7 +92,7 @@ $\omega_{ce}$ and $\omega_{ci}$ are defined as positive (magnitudes),
 following NRL [@NRL], Chen [@Chen], and Fitzpatrick [@Fitz]. Bellan uses the signed convention
 $\omega_{c\sigma} = q_\sigma B / m_\sigma$ (so $\omega_{ce} < 0$ for
 electrons). The signed form is needed in the Stix cold plasma dielectric
-tensor. Our stored values are always positive.
+tensor. Stored values in pypic are always positive.
 
 ## Debye Length
 
@@ -129,7 +129,7 @@ Maxwell's equations carry explicit $4\pi$ factors: $\nabla \cdot \mathbf{E}
 **SI-rationalized** normalization ($\mu_0 = \epsilon_0 = 1$, no $4\pi$):
 $\nabla \cdot \mathbf{E} = \rho_c$, energy density $= B^2/2$. The physics
 is identical — dimensionless quantities (beta, Mach numbers, entropy) are
-the same in both systems. We chose SI-rationalized as canonical because
+the same in both systems. SI-rationalized is canonical here because
 it eliminates $4\pi$ from every derived quantity ($B^2/2$ not $B^2/(8\pi)$,
 $\mathbf{E} \times \mathbf{B}$ not $\mathbf{E} \times \mathbf{B}/(4\pi)$),
 keeping the pure-function physics code free of bookkeeping constants.

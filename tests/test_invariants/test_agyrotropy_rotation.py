@@ -103,7 +103,7 @@ def _b_component() -> st.SearchStrategy[np.ndarray]:
     b3=st.floats(min_value=0.5, max_value=3.0, allow_nan=False, allow_infinity=False),
     rotation=rotations(),
 )
-@settings(max_examples=40, deadline=None)
+@settings(max_examples=40)
 def test_agyrotropy_is_rotation_invariant(
     p11: np.ndarray,
     p22: np.ndarray,
@@ -154,7 +154,7 @@ def test_agyrotropy_is_rotation_invariant(
     b2=_b_component(),
     b3=st.floats(min_value=0.5, max_value=3.0, allow_nan=False, allow_infinity=False),
 )
-@settings(max_examples=30, deadline=None)
+@settings(max_examples=30)
 def test_isotropic_pressure_is_gyrotropic_for_any_b(
     p_scalar: float, b1: np.ndarray, b2: np.ndarray, b3: float
 ) -> None:

@@ -14,12 +14,32 @@ The distribution is `pypic-plasma` on PyPI; the import name is `pypic`.
 - `SECURITY.md`, a pull-request template, and a Dependabot configuration
   scoped to GitHub Actions.
 - API reference pages for `pypic.io`, `pypic.plotting`, `pypic.compute`,
-  `pypic.comparison`, `pypic.regrid`, `pypic.exceptions`, and
-  `pypic.schema` — ten public modules previously had none, including two
-  headline features.
+  `pypic.comparison`, `pypic.regrid`, `pypic.exceptions`, and `pypic.schema` —
+  seven public modules previously had none, including two headline features —
+  plus a command-line reference covering every subcommand.
+- Eleven names are now reachable straight from `pypic`: `power_spectrum_1d`,
+  `power_spectrum_2d`, `power_spectrum_3d`, `schindler_xi`,
+  `parallel_component`, `perpendicular_vector`, `perpendicular_magnitude`,
+  `to_icechunk_virtual`, `trace_field_lines_adaptive`, `TraceDirection`, and
+  `quantity_dimension`.
 - A zero-data on-ramp in the getting-started guide: `FieldDataset.from_arrays`
   is now documented with a runnable example, so pypic can be tried without
   simulation output.
+- A numbered example series in `examples/` — arrays to `FieldDataset`,
+  canonical HDF5, non-canonical field mapping, and a full `simulation.toml` —
+  with an `examples/README.md` index. Four of these existed but were hidden
+  from the repository by an over-broad `.gitignore` rule and had rotted onto
+  pre-`B_1` field names and the pre-v1.0 schema; `tests/test_examples.py` now
+  runs every committed example and fails if one is not listed.
+- `scripts/check.sh` runs the six checks CI gates, over the paths CI covers.
+  CI, `CONTRIBUTING.md`, the pull-request template and `CLAUDE.md` reference it
+  instead of each carrying its own path list — three of them under-claimed
+  `src tests`, so touching `scripts/` or `benchmarks/` gave a green local run
+  and a red pull request.
+- Parity tests pinning the documented extras table to
+  `[project.optional-dependencies]`, the documented CLI commands to the Typer
+  app, `pypic.__all__` to the physics modules' own `__all__`, and the bundled
+  data files (themes, JSON Schema) to `importlib.resources`.
 - An ORCID for the author in `CITATION.cff`.
 
 ### Changed
@@ -34,12 +54,48 @@ The distribution is `pypic-plasma` on PyPI; the import name is `pypic`.
   pulls in and what it enables, and the previously undocumented Arrow IPC
   server and the `validate` / `plot-compare` / `serve` / `export` CLI commands
   are listed.
+- `docs/index.md` is a landing page rather than a second copy of the README's
+  feature list — the two had already drifted apart in wording.
+- `README.md` links are absolute, so they resolve on PyPI where the file is the
+  package long description.
+- Twenty-five public names — twenty in `pypic.derived`, three in
+  `pypic.diagnostics`, plus `quantity_units` and `SPECIES_TEMPLATES` — are
+  re-exported from `pypic`. They were public in their own modules and rendered
+  in the API reference, but reachable only as `pypic.derived.x`.
+- Name resolution failures raise `UnknownFieldError` rather than a bare
+  `KeyError` in `reduce`, `compute`, and `field_info`. It subclasses
+  `KeyError`, so existing handlers are unaffected; the server can now return
+  404 instead of 500 for a bad `fields=` over the wire.
+- `FieldDataset.from_arrays` accepts any `Mapping`, not only `dict` — `dict`
+  is invariant, so a `dict[str, NDArray[float64]]` was rejected.
+- `pypic.readers.ipic3d` raises `UnknownFieldError` on an unrecognized
+  `columns=` entry instead of silently returning fewer columns.
+- The visual-inspection scripts moved from `tests/` to `scripts/visual/`.
+  They collected zero tests but `--doctest-modules` imported them anyway,
+  making a matplotlib backend switch a session-wide side effect and pyvista a
+  hard requirement for collecting the suite.
 - `pypic.plotting.pyvista` no longer writes to stdout when saving a screenshot;
   it logs instead.
 - Workflow actions moved off the deprecated Node 20 runtime.
 
 ### Fixed
 
+- The BATSRUS `.out` read path was unreachable: `available_fields()` dispatched
+  to the wrong parser and a binary `.out` raised `UnicodeDecodeError`. That path
+  also skipped SI conversion and computed the wrong grid spacing. OpenGGCM's
+  stagger metadata was corrected at the same time.
+- `pypic validate` raised `TypeError: max_div_b() missing 1 required positional
+  argument: 'd3'` on any 2D dataset — the shape of most BATSRUS output. It now
+  reports that ∇·B needs a 3D grid and carries on.
+- Documented examples that raised when run: `plane="xy"` passed where a
+  `PlaneSelection` is required, a three-value unpack of `plot_field_slice`'s
+  two-tuple return, `Simulation.read(steps=...)`, and a `"|u|"` lookup for a
+  quantity that is not registered.
+- Docs claimed PI step control for the adaptive tracer; the shipped controller
+  is an error-norm (I) controller. `register_field()` was named as the
+  extension point for `compute()` dispatch, which is `register_recipe()`.
+  `docs/api/exceptions.md` listed the `unknown_simulation` error kind, which is
+  spelled `unknown_sim` on the wire.
 - Dead pointers in the docs and in the OpenGGCM reader docstring, which
   referenced example data that is not distributed with the repository. The
   OpenGGCM quick-start now runs against the committed fixture.
@@ -50,6 +106,12 @@ The distribution is `pypic-plasma` on PyPI; the import name is `pypic`.
 
 ### Removed
 
+- `vulture_whitelist.py`, the `vulture` dev dependency, and their two
+  `pyproject.toml` config blocks. Under the invocation `CONTRIBUTING.md`
+  documented, the whitelist suppressed 0 of 136 findings — it was linted,
+  formatted and type-checked in CI while doing nothing.
+- `examples/ex5_custom_reader.py`, which imported a module that no longer
+  exists and duplicated the tested `examples/custom_reader_example.py`.
 - The `lazy` extra. It installed dask, but nothing under `src/` ever imported
   it — the chunked-loading path it was reserved for is still unwritten. It will
   come back when there is code behind it.
@@ -90,13 +152,13 @@ the first version available from the index.
   characteristic scales, entropy, and reconnection diagnostics, all as pure
   array-in / array-out functions.
 - **Unit system** — PIC, MHD, SI, and custom normalizations with round-trip
-  `normalize()` / `to_si()` and display-unit conversion.
+  `Normalization.normalize()` / `.to_si()` and display-unit conversion.
 - **Selections and reductions** — `PlaneSelection`, `BoxSelection`,
   `SphereSelection`, and `pypic.reduce`.
 - **Geometry-aware operators** — divergence, curl, and gradient with metric
   factors (Cartesian implemented).
-- **Field-line tracing** — adaptive Dormand-Prince 5(4) tracer with PI step
-  control, plus Poincaré sections.
+- **Field-line tracing** — adaptive Dormand-Prince 5(4) tracer with error-norm
+  step control, plus Poincaré sections.
 - **Modern I/O** — Zarr v3, Icechunk versioned storage, VirtualiZarr views over
   legacy HDF5, and Parquet/Arrow for particle data.
 - **Arrow IPC server** — `pypic.server`, behind the `server` extra.

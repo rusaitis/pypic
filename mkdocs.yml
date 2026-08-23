@@ -4,6 +4,11 @@ site_url: https://rusaitis.github.io/pypic/
 site_author: Liutauras Rusaitis
 copyright: Copyright &copy; 2026 Liutauras Rusaitis — MIT License
 
+# Unresolved cross-references and broken internal links are build
+# failures, not warnings — set here so a local build matches CI without
+# having to remember the --strict flag.
+strict: true
+
 repo_url: https://github.com/rusaitis/pypic
 repo_name: rusaitis/pypic
 edit_uri: edit/main/docs/
@@ -73,6 +78,7 @@ nav:
     - Units & Normalization: api/units.md
     - Field Registry: api/fields.md
     - Compute & Recipes: api/compute.md
+    - Codegen Export: api/codegen.md
     - Selections: api/selections.md
     - Reductions: api/reductions.md
     - Coordinates & Operators: api/coordinates.md

@@ -60,7 +60,7 @@ def _adiabatic_index() -> st.SearchStrategy[float]:
 
 
 @given(p=_positive_array(), rho=_positive_array(), gamma=_adiabatic_index())
-@settings(max_examples=40, deadline=None)
+@settings(max_examples=40)
 def test_enthalpy_minus_internal_equals_pressure_over_density(
     p: np.ndarray, rho: np.ndarray, gamma: float
 ) -> None:
@@ -77,7 +77,7 @@ def test_enthalpy_minus_internal_equals_pressure_over_density(
 
 
 @given(p=_positive_array(), rho=_positive_array(), gamma=_adiabatic_index())
-@settings(max_examples=40, deadline=None)
+@settings(max_examples=40)
 def test_enthalpy_equals_gamma_times_internal_energy(
     p: np.ndarray, rho: np.ndarray, gamma: float
 ) -> None:
@@ -94,7 +94,7 @@ def test_enthalpy_equals_gamma_times_internal_energy(
 
 
 @given(p=_positive_array(), rho=_positive_array(), gamma=_adiabatic_index())
-@settings(max_examples=40, deadline=None)
+@settings(max_examples=40)
 def test_thermal_energy_density_is_internal_energy_times_mass_density(
     p: np.ndarray, rho: np.ndarray, gamma: float
 ) -> None:
@@ -113,7 +113,7 @@ def test_thermal_energy_density_is_internal_energy_times_mass_density(
 
 
 @given(p=_positive_array(), rho=_positive_array(), gamma=_adiabatic_index())
-@settings(max_examples=40, deadline=None)
+@settings(max_examples=40)
 def test_sound_speed_squared_equals_gamma_gamma_minus_one_e_int(
     p: np.ndarray, rho: np.ndarray, gamma: float
 ) -> None:

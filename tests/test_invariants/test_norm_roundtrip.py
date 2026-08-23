@@ -22,7 +22,7 @@ from tests.strategies import (
 
 
 @given(norm=normalizations(), quantity=base_quantities(), x=finite_physical_floats())
-@settings(max_examples=400, deadline=None)
+@settings(max_examples=400)
 def test_base_quantity_round_trip(norm: Normalization, quantity: str, x: float) -> None:
     """``to_si(q, normalize(q, x)) ≈ x`` for every base quantity and system."""
     round_tripped = norm.to_si(quantity, norm.normalize(quantity, x))
@@ -58,7 +58,7 @@ def test_every_system_covers_every_base_quantity(
     quantity=st.sampled_from(COMPOUND_QUANTITIES),
     x=finite_physical_floats(),
 )
-@settings(max_examples=400, deadline=None)
+@settings(max_examples=400)
 def test_compound_quantity_si_factor_round_trip(
     norm: Normalization, quantity: str, x: float
 ) -> None:

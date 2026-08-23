@@ -24,7 +24,8 @@ import numpy as np
 from pypic import PoincareSurface, poincare_section, open_simulation
 from pypic.plotting import plot_poincare_section
 
-ds = open_simulation("/path/to/run").read(steps="last")
+sim = open_simulation("/path/to/run")
+ds = sim.read(sim.steps[-1])
 
 # Φ = 0 cut: poloidal plane normal is the toroidal direction (ŷ here)
 surf = PoincareSurface.from_axis("y", 0.0, name="φ = 0 poloidal")
@@ -55,7 +56,7 @@ boundary layer fill 2D regions.
 import numpy as np
 from pypic import PoincareSurface, poincare_section, open_simulation
 
-ds = open_simulation("/path/to/mhd_run").read(steps=120)
+ds = open_simulation("/path/to/mhd_run").read(step=120)
 
 # x-z plane in GSM (the standard reconnection-geometry view)
 surf = PoincareSurface.from_axis("y", 0.0, name="meridional (GSM)")
@@ -115,7 +116,7 @@ field-mapping tools.
 
 `poincare_section` forces `loop_tol=None` on the adaptive tracer.
 The default auto closed-loop detector would otherwise terminate the
-very orbits we want to sample after their first revolution, leaving a
+very orbits of interest after their first revolution, leaving a
 single puncture per seed instead of an entire ring.
 
 Punctures are extracted **post-hoc** via

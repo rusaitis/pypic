@@ -20,7 +20,7 @@ if TYPE_CHECKING:
 
 @dataclass(frozen=True, slots=True)
 class OpenGGCMGrid:
-    """Non-uniform grid definition from an OpenGGCM grid file.
+    r"""Non-uniform grid definition from an OpenGGCM grid file.
 
     Parameters
     ----------

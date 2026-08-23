@@ -2,7 +2,7 @@
 
 Run with::
 
-    uv run python tests/visual_poincare.py
+    uv run python scripts/visual/visual_poincare.py
 
 Output goes to ``tests/output/poincare_*.png``. Generates four scenes:
 
@@ -22,7 +22,7 @@ import numpy as np
 
 matplotlib.use("Agg")
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 import matplotlib.pyplot as plt
 
@@ -32,7 +32,8 @@ from pypic.grid import GridInfo
 from pypic.plotting import plot_poincare_section, use_theme
 from pypic.units import Normalization
 
-OUTPUT_DIR = Path(__file__).parent / "output"
+_REPO_ROOT = Path(__file__).resolve().parent.parent.parent
+OUTPUT_DIR = _REPO_ROOT / "tests" / "output"
 OUTPUT_DIR.mkdir(exist_ok=True)
 
 
@@ -172,7 +173,7 @@ def _abc_field(
 
 
 def scene_abc_flow(theme: str = "dark") -> Path:
-    """ABC flow Poincaré section: classic KAM tori + chaotic sea.
+    r"""ABC flow Poincaré section: classic KAM tori + chaotic sea.
 
     Seeds along the $y = \\pi/2$ midline at $z = 0$; punctures gathered
     on the $z = 0$ plane (a period midplane). Different starting $x$
@@ -272,6 +273,7 @@ def scene_tilted_plane(theme: str = "dark") -> Path:
 
 
 def main() -> None:
+    """Render every Poincaré scene into OUTPUT_DIR."""
     theme = "dark"
     print("Generating Poincaré section visuals...")
     for scene_fn in (

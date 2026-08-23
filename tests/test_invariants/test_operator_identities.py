@@ -53,7 +53,7 @@ SHAPE = (5, 6, 7)
     d2=_positive_spacing(),
     d3=_positive_spacing(),
 )
-@settings(max_examples=50, deadline=None)
+@settings(max_examples=50)
 def test_div_curl_is_zero_to_machine_precision(
     f1: np.ndarray,
     f2: np.ndarray,

@@ -53,7 +53,7 @@ def _positive_array(
     pi=_positive_array(),
     b_mag=_positive_array(),
 )
-@settings(max_examples=40, deadline=None)
+@settings(max_examples=40)
 def test_beta_equals_sum_of_species_betas(
     pe: np.ndarray, pi: np.ndarray, b_mag: np.ndarray
 ) -> None:
@@ -91,7 +91,7 @@ def test_beta_equals_sum_of_species_betas(
     b_mag=_positive_array(),
     alpha=st.floats(min_value=0.1, max_value=10.0, allow_nan=False),
 )
-@settings(max_examples=30, deadline=None)
+@settings(max_examples=30)
 def test_beta_is_linear_in_pressure_split(
     pe: np.ndarray, pi: np.ndarray, b_mag: np.ndarray, alpha: float
 ) -> None:

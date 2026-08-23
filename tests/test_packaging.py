@@ -152,3 +152,97 @@ def test_citation_version_matches_pyproject() -> None:
         f"pyproject.toml declares {declared!r}. Both are hand-written; "
         f"update them together at release time."
     )
+
+
+def _documented_extras(path: Path) -> set[str]:
+    """Extras named in the first Markdown table whose header is ``| Extra |``."""
+    rows = re.findall(r"^\|\s*`([a-z0-9]+)`\s*\|", path.read_text(), re.MULTILINE)
+    return set(rows)
+
+
+@pytest.mark.parametrize("doc", ["README.md", "docs/getting-started.md"])
+def test_documented_extras_match_pyproject(doc: str) -> None:
+    """Every optional-dependency extra is documented, and vice versa.
+
+    The extras table is duplicated between the README (which is also the
+    PyPI long description) and the getting-started page. Adding an extra
+    to ``pyproject.toml`` without touching both leaves users unable to
+    discover it; removing one leaves an install line that errors.
+    """
+    declared = set(_pyproject()["project"]["optional-dependencies"])
+    documented = _documented_extras(_REPO_ROOT / doc)
+    assert documented == declared, (
+        f"{doc} documents extras {sorted(documented)} but pyproject.toml "
+        f"declares {sorted(declared)}."
+    )
+
+
+def _cli_command_names() -> set[str]:
+    """Top-level ``pypic`` command and group names, from the Typer app."""
+    pytest.importorskip("typer")
+    from pypic.cli import app
+
+    names = {
+        c.name or c.callback.__name__.replace("_", "-") for c in app.registered_commands
+    }
+    for group in app.registered_groups:
+        sub = group.typer_instance
+        assert sub is not None
+        name = group.name or sub.info.name
+        assert name is not None
+        names.add(name)
+    return names
+
+
+def test_cli_reference_documents_only_real_commands() -> None:
+    """Every `pypic <cmd>` invocation in the CLI reference is registered.
+
+    The reference is hand-maintained tables of invocations; a renamed
+    command otherwise leaves a documented line that exits with "No such
+    command".
+    """
+    text = (_REPO_ROOT / "docs" / "api" / "cli.md").read_text()
+    promised = {m.group(1) for m in re.finditer(r"`pypic ([a-z][a-z-]*)", text)}
+    assert len(promised) > 5, "regex stopped matching the reference's invocations"
+    unknown = promised - _cli_command_names()
+    assert not unknown, (
+        f"docs/api/cli.md documents `pypic {sorted(unknown)}`, which the "
+        f"Typer app does not register."
+    )
+
+
+def test_readme_command_bullet_lists_every_top_level_command() -> None:
+    """The README's feature bullet is the full top-level command set.
+
+    Readers treat that bullet as the inventory, so a command missing from
+    it is a command nobody finds — and one listed but unregistered is a
+    promise the CLI breaks.
+    """
+    readme = (_REPO_ROOT / "README.md").read_text()
+    match = re.search(r"- \*\*Command line\*\* — (.+?) — ", readme, re.DOTALL)
+    assert match is not None, "README has no '**Command line** — ...' bullet"
+    bullet = re.sub(r"\([^)]*\)", "", match.group(1))  # drop the schema sub-list
+    listed = {m.group(1) for m in re.finditer(r"`(?:pypic )?([a-z][a-z-]*)`", bullet)}
+    assert listed == _cli_command_names(), (
+        f"README lists {sorted(listed)} but the app registers "
+        f"{sorted(_cli_command_names())}."
+    )
+
+
+def test_bundled_data_files_resolve_from_the_package() -> None:
+    """Non-Python payload ships in the wheel and is reachable at runtime.
+
+    Two mechanisms are in play — an explicit ``force-include`` for the
+    JSON Schema and hatchling's implicit inclusion for the themes — and
+    neither was covered. A packaging change that drops either one fails
+    only at import time on a clean install.
+    """
+    from importlib.resources import files
+
+    schema = files("pypic.schema") / "simulation.schema.v1.0.json"
+    themes = files("pypic.plotting") / "themes"
+    missing = [str(p) for p in (schema, themes) if not p.is_file() and not p.is_dir()]
+    assert not missing, f"bundled data missing from the package: {missing}"
+    assert any(t.name.endswith(".toml") for t in themes.iterdir()), (
+        "pypic/plotting/themes ships no .toml theme files"
+    )

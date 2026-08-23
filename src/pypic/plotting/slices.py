@@ -107,6 +107,26 @@ def plot_field_slice(
         ``None`` — matplotlib default (no modification).
     figsize : tuple[float, float] | None
         Figure size override.
+    vmin : float or None
+        Lower color limit. ``None`` (default) autoscales.
+    vmax : float or None
+        Upper color limit. ``None`` (default) autoscales.
+    colorbar_label : str or None
+        Override the colorbar label. ``None`` (default) builds
+        one from the field's registry metadata and units.
+    colorbar_variant : str or None
+        Colorbar placement variant. ``None`` (default) uses
+        the active theme's choice.
+    colorbar_ticks : Sequence[float] or None
+        Explicit colorbar tick positions. ``None`` (default)
+        lets matplotlib choose.
+    badge : str or None
+        Corner badge text (run label, timestamp, ...). ``None``
+        (default) draws no badge.
+    save : str or Path or None
+        Path to write the figure to. When given, the figure is saved
+        and closed; when ``None`` (default) it is left open for the
+        caller to display or modify further.
 
     Returns
     -------

@@ -77,7 +77,7 @@ def _nonzero_b_component() -> st.SearchStrategy[np.ndarray]:
     p23=_symmetric_tensor_component(),
     rotation=rotations(),
 )
-@settings(max_examples=40, deadline=None)
+@settings(max_examples=40)
 def test_pressure_trace_is_rotation_invariant(
     p11: np.ndarray,
     p22: np.ndarray,
@@ -112,7 +112,7 @@ def test_pressure_trace_is_rotation_invariant(
     b3=st.floats(min_value=0.5, max_value=5.0, allow_nan=False, allow_infinity=False),
     rotation=rotations(),
 )
-@settings(max_examples=40, deadline=None)
+@settings(max_examples=40)
 def test_parallel_pressure_is_rotation_invariant(
     p11: np.ndarray,
     p22: np.ndarray,
@@ -157,7 +157,7 @@ def test_parallel_pressure_is_rotation_invariant(
     b3=st.floats(min_value=0.5, max_value=5.0, allow_nan=False, allow_infinity=False),
     rotation=rotations(),
 )
-@settings(max_examples=40, deadline=None)
+@settings(max_examples=40)
 def test_perpendicular_pressure_is_rotation_invariant(
     p11: np.ndarray,
     p22: np.ndarray,
@@ -196,7 +196,7 @@ def test_perpendicular_pressure_is_rotation_invariant(
     b2=_nonzero_b_component(),
     b3=st.floats(min_value=0.5, max_value=5.0, allow_nan=False, allow_infinity=False),
 )
-@settings(max_examples=40, deadline=None)
+@settings(max_examples=40)
 def test_isotropic_pressure_equals_par_plus_two_perp_over_three(
     p11: np.ndarray,
     p22: np.ndarray,

@@ -16,42 +16,48 @@ uv sync --all-extras --all-groups
 
 ## Checks
 
-CI gates six things; all must pass.
+CI gates six things, and `scripts/check.sh` runs all six in CI's order.
+It is the single source of truth for *which paths* each check covers —
+scripts/, benchmarks/ and the committed examples are covered too, not
+just `src` and `tests`.
 
 ```sh
-uv run pytest -v                      # full suite (tests + doctests)
-uv run ruff check src tests scripts benchmarks vulture_whitelist.py examples/custom_reader_example.py examples/ex_schindler_xi.py
-uv run ruff format --check src tests scripts benchmarks vulture_whitelist.py examples/custom_reader_example.py examples/ex_schindler_xi.py
-uv run mypy src scripts benchmarks vulture_whitelist.py examples/custom_reader_example.py examples/ex_schindler_xi.py
+./scripts/check.sh          # everything
+./scripts/check.sh lint     # ruff check
+./scripts/check.sh format   # ruff format --check
+./scripts/check.sh schema   # bundled JSON Schema is in sync
+./scripts/check.sh types    # mypy, strict
+./scripts/check.sh test     # pytest (suite + doctests)
+./scripts/check.sh docs     # mkdocs build --strict
 ```
 
-The lint job also regenerates the bundled JSON Schema and fails if the
-result differs from what is committed — see *Changing the schema* below.
-
-The docs build is also gated, because `--strict` turns unresolved
-cross-references and broken internal links into failures:
+`--strict` turns unresolved cross-references and broken internal links
+into build failures, so docs rot is caught here rather than on the
+published site. For a live preview while editing:
 
 ```sh
-uv run mkdocs build --strict
-uv run mkdocs serve                   # live preview at localhost:8000
+uv run mkdocs serve                   # localhost:8000
 ```
 
 Optional analyses, not run by CI:
 
 ```sh
-uv run vulture src/ tests/ vulture_whitelist.py   # dead code
-uvx sloppylint src/ tests/                        # sloppy-code heuristics
+uvx sloppylint src/ tests/            # sloppy-code heuristics
 ```
 
 ## Visual checks
 
 Some plotting behavior is easier to verify by eye than by assertion.
 
+They live in `scripts/visual/` rather than `tests/` — pytest collects
+`tests/` with `--doctest-modules`, so a module there is imported at
+collection time, and these force a matplotlib backend and require pyvista.
+
 ```sh
-uv run python tests/visual_plots.py                # all themes -> tests/output/
-uv run python tests/visual_plots.py --theme dark   # single theme
-uv run python tests/visual_poincare.py             # Poincaré sections
-uv run python tests/visual_dipole_3d.py            # interactive 3D dipole
+uv run python scripts/visual/visual_plots.py                # all themes -> tests/output/
+uv run python scripts/visual/visual_plots.py --theme dark   # single theme
+uv run python scripts/visual/visual_poincare.py             # Poincaré sections
+uv run python scripts/visual/visual_dipole_3d.py            # interactive 3D dipole
 ```
 
 ## Benchmarks
@@ -91,6 +97,22 @@ a first contribution:
 - **Type hints** are required on public signatures, in modern syntax
   (`X | None`, `list[int]`). mypy runs in strict mode.
 
+## Test layout
+
+The flat modules under `tests/` are worked examples and regressions —
+a specific input with a specific expected number, often hand-calculated
+or cross-checked against the NRL Formulary. `tests/test_invariants/` is
+the complementary half: Hypothesis property tests asserting identities
+that must hold for every input in a generated domain, drawing on the
+strategies in `tests/strategies.py`. Each module there opens with a
+`# Source:` and a `# Claim:` line, and inherits `deadline=None` from the
+`pypic` Hypothesis profile registered in `tests/conftest.py`.
+
+Fixtures shared across suites live in `tests/conftest.py`
+(`cartesian_3d`, `spherical_3d`), with synthetic-data factories in
+`tests/_helpers.py` and on-disk simulation trees in
+`tests/_sim_fixtures.py`.
+
 ## Adding a reader
 
 Adding support for a simulation code is one new module under
@@ -100,7 +122,13 @@ canonical field names in [docs/schema.md](docs/schema.md) § 3 and return a
 
 [`examples/custom_reader_example.py`](examples/custom_reader_example.py) is the
 worked version: it generates a synthetic HDF5 file, declares a field map, and
-reads it back through `open_simulation`. It runs with no external data.
+reads it back through `open_simulation`. It runs with no external data, and
+[`examples/README.md`](examples/README.md) indexes the numbered on-ramp that
+builds up to it.
+
+Anything you add under `examples/` is picked up automatically — but
+`tests/test_examples.py` asserts that every committed script is listed there,
+so add the filename when you add the file.
 
 Use small synthetic fixtures under `tests/data/`, not real simulation output —
 the test suite must not depend on network access or large files. The generators
@@ -129,7 +157,7 @@ uv run pypic schema export -o src/pypic/schema/simulation.schema.v1.0.json
 
 Prefix commit subjects with `feat:`, `fix:`, `docs:`, `refactor:`, `test:`, or
 `chore:`, and say *why* the change is being made rather than restating the diff.
-Keep the four checks above green in each commit where practical.
+Keep `./scripts/check.sh` green in each commit where practical.
 
 ## Conduct and security
 

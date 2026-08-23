@@ -7,7 +7,7 @@ the typed class carries the extra routing metadata.
 
 | Exception | Also a | `kind` | HTTP |
 |---|---|---|---|
-| `UnknownSimulationError` | `KeyError` | `unknown_simulation` | 404 |
+| `UnknownSimulationError` | `KeyError` | `unknown_sim` | 404 |
 | `UnknownFieldError` | `KeyError` | `unknown_field` | 404 |
 | `UnknownStepError` | `KeyError` | `unknown_step` | 404 |
 | `GeometryUnsupportedError` | `NotImplementedError` | `geometry_unsupported` | 400 |

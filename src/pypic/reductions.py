@@ -40,7 +40,7 @@ from typing import TYPE_CHECKING, Literal, get_args
 import numpy as np
 
 from pypic.coordinates.geometry import GeometryType
-from pypic.exceptions import GeometryUnsupportedError
+from pypic.exceptions import GeometryUnsupportedError, UnknownFieldError
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -181,7 +181,7 @@ def reduce(
 
     Raises
     ------
-    NotImplementedError
+    GeometryUnsupportedError
         Non-Cartesian geometry combined with a spatial-axis reduction.
         Spherical / cylindrical Jacobian-aware integration is not yet
         implemented.  Pure non-spatial reductions (e.g. along ``time``)
@@ -299,7 +299,7 @@ def reduce(
                 unresolved.append(name)
         if unresolved:
             msg = f"reduce(): unknown fields {unresolved!r}"
-            raise KeyError(msg)
+            raise UnknownFieldError(msg)
         ds_to_reduce = data.xr[canonicals]
 
     weight_canonical: str | None = None
@@ -309,7 +309,7 @@ def reduce(
             weight_canonical = data.resolve_key(weight)
         except KeyError as exc:
             msg = f"reduce(): unknown weight field {weight!r}"
-            raise KeyError(msg) from exc
+            raise UnknownFieldError(msg) from exc
         weight_da = data.xr[weight_canonical]
 
     if nan_policy == "raise":

@@ -111,7 +111,7 @@ Docs built with MkDocs Material + mkdocstrings.
 - `@pytest.mark.parametrize` for numerical validation.
 - Derived quantities: test against hand calculations and NRL Formulary values.
 - `np.testing.assert_allclose` with explicit `rtol`/`atol`.
-- Round-trip tests: `to_si(normalize(x)) == x`.
+- Round-trip tests: `norm.to_si(norm.normalize(x)) == x`.
 - Conservation tests: `div_b` of a curl field should be zero to machine precision.
 - Small synthetic arrays as fixtures, not large data files.
 - Test edge cases: empty arrays, single elements, NaN handling.
@@ -128,10 +128,15 @@ Do not add dependencies without justification. Prefer standard library where pos
 ## Dev Commands
 
 ```
-uv run pytest -v                      # full suite (tests + doctests)
-uv run ruff check src tests           # lint
-uv run ruff format --check src tests  # format check
-uv run mypy src                       # type check
+# scripts/check.sh owns the path list CI covers — don't inline `src tests`,
+# it under-covers scripts/, benchmarks/ and the committed examples.
+./scripts/check.sh                    # everything CI gates, in CI order
+./scripts/check.sh lint               # ruff check
+./scripts/check.sh format             # ruff format --check
+./scripts/check.sh types              # mypy, strict
+./scripts/check.sh test               # pytest (suite + doctests)
+./scripts/check.sh docs               # mkdocs build --strict
+./scripts/check.sh schema             # bundled JSON Schema is in sync
 
 # Regenerate the bundled JSON Schema after any change to
 # pypic/schema/_models.py. The drift test in

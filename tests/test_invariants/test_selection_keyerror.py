@@ -56,7 +56,7 @@ def _make_dataset():
 
 
 @given(name=_unknown_names())
-@settings(max_examples=100, deadline=None)
+@settings(max_examples=100)
 def test_resolve_key_raises_keyerror(name: str) -> None:
     """``resolve_key`` must raise ``KeyError`` on any unmatched name —
     never ``ValueError`` (which would imply bad input type rather than
@@ -70,7 +70,7 @@ def test_resolve_key_raises_keyerror(name: str) -> None:
 
 
 @given(name=_unknown_names())
-@settings(max_examples=100, deadline=None)
+@settings(max_examples=100)
 def test_getitem_raises_keyerror(name: str) -> None:
     """``ds[key]`` delegates to ``resolve_key`` — must raise ``KeyError``
     on unknown names rather than xarray's more generic ``ValueError`` or
@@ -83,7 +83,7 @@ def test_getitem_raises_keyerror(name: str) -> None:
 
 
 @given(name=_unknown_names())
-@settings(max_examples=100, deadline=None)
+@settings(max_examples=100)
 def test_select_fields_raises_keyerror(name: str) -> None:
     """``select_fields`` with at least one unknown name raises ``KeyError``
     — the documented contract forbids silent skip, so even a single bad
@@ -96,7 +96,7 @@ def test_select_fields_raises_keyerror(name: str) -> None:
 
 
 @given(name=_unknown_names())
-@settings(max_examples=100, deadline=None)
+@settings(max_examples=100)
 def test_compute_raises_keyerror(name: str) -> None:
     """``ds.compute(name)`` raises ``KeyError`` when the name is neither
     a loaded field nor a registered recipe. Guards the second half of

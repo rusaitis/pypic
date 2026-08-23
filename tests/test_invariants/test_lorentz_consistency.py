@@ -75,7 +75,7 @@ def _positive_array() -> st.SearchStrategy[np.ndarray]:
     c=st.floats(min_value=0.5, max_value=100.0, allow_nan=False),
     data=st.data(),
 )
-@settings(max_examples=40, deadline=None)
+@settings(max_examples=40)
 def test_lorentz_factor_from_v_and_u_agree(
     v: np.ndarray, c: float, data: st.DataObject
 ) -> None:
@@ -102,7 +102,7 @@ def test_lorentz_factor_from_v_and_u_agree(
 @given(
     c=st.floats(min_value=0.5, max_value=100.0, allow_nan=False),
 )
-@settings(max_examples=10, deadline=None)
+@settings(max_examples=10)
 def test_lorentz_factor_at_rest_is_one(c: float) -> None:
     r"""$\gamma(v=0) = 1$ — rest frame. Both formulas must give
     exactly 1.0 regardless of the chosen speed of light.
@@ -117,7 +117,7 @@ def test_lorentz_factor_at_rest_is_one(c: float) -> None:
     v=_sub_c_velocity(1.0),
     c=st.floats(min_value=0.5, max_value=100.0, allow_nan=False),
 )
-@settings(max_examples=40, deadline=None)
+@settings(max_examples=40)
 def test_lorentz_factor_is_even_in_velocity(v: np.ndarray, c: float) -> None:
     r"""$\gamma(-v) = \gamma(+v)$ — Lorentz factor depends only on $v^2$,
     so the sign of the velocity does not matter.
@@ -135,7 +135,7 @@ def test_lorentz_factor_is_even_in_velocity(v: np.ndarray, c: float) -> None:
     v=_sub_c_velocity(1.0),
     c=st.floats(min_value=0.5, max_value=100.0, allow_nan=False),
 )
-@settings(max_examples=40, deadline=None)
+@settings(max_examples=40)
 def test_lorentz_factor_is_at_least_one(v: np.ndarray, c: float) -> None:
     r"""$\gamma \geq 1$ for all physical velocities — the docstring
     claim at derived.py:2002 ("Bounded $[1, \infty)$").
@@ -149,7 +149,7 @@ def test_lorentz_factor_is_at_least_one(v: np.ndarray, c: float) -> None:
     rho=_positive_array(),
     c=st.floats(min_value=0.5, max_value=100.0, allow_nan=False),
 )
-@settings(max_examples=30, deadline=None)
+@settings(max_examples=30)
 def test_magnetization_is_non_negative(
     b: np.ndarray, rho: np.ndarray, c: float
 ) -> None:
@@ -161,7 +161,7 @@ def test_magnetization_is_non_negative(
     rho=_positive_array(),
     c=st.floats(min_value=0.5, max_value=100.0, allow_nan=False),
 )
-@settings(max_examples=20, deadline=None)
+@settings(max_examples=20)
 def test_magnetization_vanishes_at_zero_b(rho: np.ndarray, c: float) -> None:
     r"""$\sigma(B=0) = 0$ — no magnetic energy, no magnetization."""
     b = np.zeros(SHAPE)

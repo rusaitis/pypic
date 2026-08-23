@@ -389,6 +389,11 @@ def to_zarr(
         Commit message (Icechunk only).
     branch : str
         Branch to commit to (Icechunk only).  Default ``"main"``.
+    simulation_toml : str or Path or None
+        Source ``simulation.toml`` to stamp verbatim into
+        ``attrs.simulation_toml``. Carries the schema sections
+        the typed FieldDataset boundary drops. ``None``
+        (default) stamps whatever the dataset already knows.
 
     Returns
     -------
@@ -572,6 +577,11 @@ def to_zarr_timeseries(
         Commit message (Icechunk only).
     branch : str
         Branch to commit to (Icechunk only).  Default ``"main"``.
+    simulation_toml : str or Path or None
+        Source ``simulation.toml`` to stamp verbatim into
+        ``attrs.simulation_toml``. Carries the schema sections
+        the typed FieldDataset boundary drops. ``None``
+        (default) stamps whatever the dataset already knows.
 
     Returns
     -------

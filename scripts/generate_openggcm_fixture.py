@@ -12,6 +12,7 @@ Usage::
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -23,8 +24,15 @@ if TYPE_CHECKING:
 # Maintainer-only: a full-size OpenGGCM-UCLA run, not shipped with the
 # repo. Point this at a local .3df output directory to regenerate the
 # committed subsample in OUTPUT_DIR.
-EXAMPLE_DIR = Path("examples/uclamhd-example-3D")
-OUTPUT_DIR = Path("tests/data/openggcm-small")
+_REPO_ROOT = Path(__file__).resolve().parent.parent
+
+# The source run is a full-size OpenGGCM output that is far too large to
+# commit, so it lives outside the tree. Point PYPIC_OPENGGCM_RUN at a
+# directory holding grid.gc012.dat and gc012.3df.NNNNNN to regenerate.
+EXAMPLE_DIR = Path(
+    os.environ.get("PYPIC_OPENGGCM_RUN", _REPO_ROOT / "examples" / "openggcm-run")
+)
+OUTPUT_DIR = _REPO_ROOT / "tests" / "data" / "openggcm-small"
 STEP = 25  # subsample stride
 
 
@@ -201,7 +209,8 @@ def subsample_array(
 def main() -> None:
     """Read real OpenGGCM data, subsample, and write small fixtures."""
     if not EXAMPLE_DIR.exists():
-        print(f"Example data not found at {EXAMPLE_DIR}")
+        print(f"Source run not found at {EXAMPLE_DIR}")
+        print("Set PYPIC_OPENGGCM_RUN to a directory holding a full .3df run.")
         print("Download the OpenGGCM example data first.")
         raise SystemExit(1)
 

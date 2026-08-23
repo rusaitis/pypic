@@ -8,49 +8,12 @@ import numpy as np
 import pytest
 from numpy.testing import assert_allclose, assert_array_equal
 
-from pypic.coordinates import CARTESIAN, CoordinateGeometry, GeometryType
+from pypic.coordinates import CARTESIAN
 from pypic.dataset import FieldDataset
 from pypic.grid import GridInfo
 from pypic.reductions import Reduction, reduce
 from pypic.selections import BoxSelection, PlaneSelection, SphereSelection
 from pypic.units import Normalization
-
-
-@pytest.fixture
-def cartesian_3d() -> FieldDataset:
-    """8x6x4 Cartesian dataset with B_1, B_2, B_3 — same shape as
-    ``test_selections.cartesian_3d`` so reduction composition tests
-    line up with the selection conventions."""
-    grid = GridInfo(
-        dimensions=(8, 6, 4),
-        spacing=(1.0, 1.0, 1.0),
-        origin=(0.0, 0.0, 0.0),
-        geometry=CARTESIAN,
-    )
-    rng = np.random.default_rng(42)
-    fields = {
-        "B_1": rng.standard_normal((8, 6, 4)),
-        "B_2": rng.standard_normal((8, 6, 4)),
-        "B_3": rng.standard_normal((8, 6, 4)),
-    }
-    return FieldDataset.from_arrays(fields, grid, Normalization.identity())
-
-
-@pytest.fixture
-def spherical_3d() -> FieldDataset:
-    geom = CoordinateGeometry(
-        type=GeometryType.SPHERICAL,
-        axis_names=("r", "θ", "φ"),
-        axis_units=("length", "angle", "angle"),
-    )
-    grid = GridInfo(
-        dimensions=(4, 3, 2),
-        spacing=(0.5, 0.1, 0.2),
-        origin=(1.0, 0.0, 0.0),
-        geometry=geom,
-    )
-    fields = {"B_1": np.arange(24, dtype=float).reshape(4, 3, 2)}
-    return FieldDataset.from_arrays(fields, grid, Normalization.identity())
 
 
 def test_integrate_constant_field_matches_trapezoid(

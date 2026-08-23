@@ -17,7 +17,7 @@ from pypic.readers.ipic3d import (
     read_phdf5_particles,
 )
 
-FIXTURE_DIR = Path("tests/data/ipic3d-synthetic/phdf5")
+FIXTURE_DIR = Path(__file__).resolve().parent / "data" / "ipic3d-synthetic" / "phdf5"
 
 
 class TestParticleData:

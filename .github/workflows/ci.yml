@@ -24,23 +24,18 @@ jobs:
           enable-cache: true
           cache-dependency-glob: "uv.lock"
       - run: uv sync --all-extras --all-groups
-      # scripts/, benchmarks/, the committed examples and vulture_whitelist.py
-      # are tracked and read by contributors, but were outside every check:
-      # the one example a test imports did not satisfy `ruff format`, and
-      # four files carried type errors. The two example scripts are named
-      # individually rather than globbing examples/, which is otherwise a
-      # scratch directory for local simulation data.
-      - run: uv run ruff check src tests scripts benchmarks vulture_whitelist.py examples/custom_reader_example.py examples/ex_schindler_xi.py
-      - run: uv run ruff format --check src tests scripts benchmarks vulture_whitelist.py examples/custom_reader_example.py examples/ex_schindler_xi.py
+      # The path list lives in scripts/check.sh so CI, CONTRIBUTING.md, the
+      # pull-request template and CLAUDE.md cannot drift apart on which
+      # directories are covered — three of them used to claim `src tests`
+      # while CI also covered scripts/, benchmarks/ and the examples.
+      - run: ./scripts/check.sh lint
+      - run: ./scripts/check.sh format
       # Drift guard for the bundled JSON Schema. The pytest layer
       # (tests/test_schema_export.py::test_on_disk_artifact_matches_current_models)
       # gives a precise diff on failure; this step catches the case
       # where someone regenerates locally and forgets to commit.
       - name: JSON Schema artifact in sync with Pydantic models
-        run: |
-          uv run pypic schema export \
-            -o src/pypic/schema/simulation.schema.v1.0.json
-          git diff --exit-code -- src/pypic/schema/
+        run: ./scripts/check.sh schema
 
   type-check:
     runs-on: ubuntu-latest
@@ -54,7 +49,7 @@ jobs:
       # plotting and reader subpackages — they're optional at runtime but
       # required for the strict type check to pass.
       - run: uv sync --all-extras --all-groups
-      - run: uv run mypy src scripts benchmarks vulture_whitelist.py examples/custom_reader_example.py examples/ex_schindler_xi.py
+      - run: ./scripts/check.sh types
 
   test:
     runs-on: ubuntu-latest
@@ -75,6 +70,9 @@ jobs:
       - run: uv run pytest
 
   docs:
+    # docs.yml builds and deploys on push to main; this job covers pull
+    # requests, where that workflow does not run.
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -86,7 +84,7 @@ jobs:
       # --strict turns unresolved mkdocstrings cross-references and broken
       # internal links into build failures, so docs rot is caught here
       # rather than on the published site.
-      - run: uv run mkdocs build --strict
+      - run: ./scripts/check.sh docs
 
   # Deliberate canary: ignore the lockfile and resolve fresh so an
   # incompatible upstream release surfaces on a schedule instead of in

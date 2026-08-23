@@ -72,7 +72,7 @@ def _species_scalar(
     m=_species_scalar(),
     c=st.floats(min_value=0.5, max_value=100.0, allow_nan=False),
 )
-@settings(max_examples=40, deadline=None)
+@settings(max_examples=40)
 def test_skin_depth_times_plasma_frequency_is_c(
     n: np.ndarray, q: float, m: float, c: float
 ) -> None:
@@ -88,7 +88,7 @@ def test_skin_depth_times_plasma_frequency_is_c(
     q=_species_scalar(),
     m=_species_scalar(),
 )
-@settings(max_examples=40, deadline=None)
+@settings(max_examples=40)
 def test_gyroradius_times_gyrofrequency_is_thermal_speed(
     temperature: np.ndarray, b: np.ndarray, q: float, m: float
 ) -> None:
@@ -105,7 +105,7 @@ def test_gyroradius_times_gyrofrequency_is_thermal_speed(
     q=_species_scalar(),
     m=_species_scalar(),
 )
-@settings(max_examples=40, deadline=None)
+@settings(max_examples=40)
 def test_debye_length_is_thermal_speed_over_plasma_frequency(
     temperature: np.ndarray, n: np.ndarray, q: float, m: float
 ) -> None:

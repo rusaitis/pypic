@@ -563,6 +563,8 @@ class Simulation:
         ------
         TypeError
             If the reader does not support particle data.
+        UnknownFieldError
+            If *columns* names a column the reader does not recognize.
         """
         from pypic.readers._protocols import ParticleDataReader
 
@@ -706,6 +708,10 @@ def open_simulation(
         If *reader* is a string not found in the registry.
     FileNotFoundError
         If auto-detection finds no matching reader.
+    ExceptionGroup
+        If every candidate reader was tried and each one failed — the
+        usual outcome for a corrupt or ambiguous directory. The group
+        carries one sub-exception per candidate.
     """
     path = Path(path)
 

@@ -75,7 +75,7 @@ def _nonzero_scalar() -> st.SearchStrategy[float]:
     spacing=_positive_spacing(),
     alpha=_nonzero_scalar(),
 )
-@settings(max_examples=40, deadline=None)
+@settings(max_examples=40)
 def test_field_energy_is_linear_in_field(
     f: np.ndarray, spacing: tuple[float, float, float], alpha: float
 ) -> None:
@@ -98,7 +98,7 @@ def test_field_energy_is_linear_in_field(
     spacing=_positive_spacing(),
     alpha=st.floats(min_value=0.1, max_value=5.0, allow_nan=False),
 )
-@settings(max_examples=40, deadline=None)
+@settings(max_examples=40)
 def test_field_energy_scales_as_alpha_cubed_in_spacing(
     f: np.ndarray, spacing: tuple[float, float, float], alpha: float
 ) -> None:
@@ -121,7 +121,7 @@ def test_field_energy_scales_as_alpha_cubed_in_spacing(
     alpha=_nonzero_scalar(),
     beta=_nonzero_scalar(),
 )
-@settings(max_examples=40, deadline=None)
+@settings(max_examples=40)
 def test_spatial_mean_is_linear(
     f: np.ndarray, g: np.ndarray, alpha: float, beta: float
 ) -> None:
@@ -141,7 +141,7 @@ def test_spatial_mean_is_linear(
     f=_bounded_array(),
     alpha=_nonzero_scalar(),
 )
-@settings(max_examples=40, deadline=None)
+@settings(max_examples=40)
 def test_spatial_rms_is_homogeneous_in_magnitude(f: np.ndarray, alpha: float) -> None:
     r"""$f_{rms}(\alpha f) = |\alpha| \cdot f_{rms}(f)$.
 
@@ -157,7 +157,7 @@ def test_spatial_rms_is_homogeneous_in_magnitude(f: np.ndarray, alpha: float) ->
 
 
 @given(f=_bounded_array())
-@settings(max_examples=40, deadline=None)
+@settings(max_examples=40)
 def test_spatial_rms_squared_equals_mean_of_squares(f: np.ndarray) -> None:
     r"""$f_{rms}^2 = \langle f^2 \rangle$ to float64 precision.
 

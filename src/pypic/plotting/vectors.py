@@ -198,9 +198,11 @@ def plot_streamlines(
         Existing axes to draw on. ``None`` creates a new figure.
     colorbar : bool
         Whether to add a colorbar. Ignored when *color* is set.
-    extremes : "darken" or "transparent"
-        How to style values outside ``[vmin, vmax]``.
-        ``"transparent"`` makes them invisible.
+    extremes : "semi", "transparent", "darken", or None
+        Colorbar out-of-range indicator style. ``"semi"`` (default)
+        uses semi-transparent extension colors; ``"transparent"``
+        hides them; ``"darken"`` darkens the endpoint colors;
+        ``None`` leaves matplotlib defaults untouched.
     legend : bool or str
         When *color* is set (uniform mode), add a vector legend overlay.
         ``True`` uses the field prefix as label, a string overrides it.
@@ -211,6 +213,23 @@ def plot_streamlines(
         Passed to ``ax.streamplot()`` (``minlength``, ``maxlength``,
         ``start_points``, ``integration_direction``,
         ``broken_streamlines``, etc.).
+    vmin : float or None
+        Lower color limit. ``None`` (default) autoscales.
+    vmax : float or None
+        Upper color limit. ``None`` (default) autoscales.
+    magnitude_min : float or None
+        Lower bound on vector magnitude; weaker vectors are
+        masked out. ``None`` (default) keeps all.
+    magnitude_max : float or None
+        Upper bound on vector magnitude; stronger vectors are
+        masked out. ``None`` (default) keeps all.
+    badge : str or None
+        Corner badge text (run label, timestamp, ...). ``None``
+        (default) draws no badge.
+    save : str or Path or None
+        Path to write the figure to. When given, the figure is saved
+        and closed; when ``None`` (default) it is left open for the
+        caller to display or modify further.
 
     Returns
     -------
@@ -509,9 +528,11 @@ def plot_quiver(
         Existing axes to draw on. ``None`` creates a new figure.
     colorbar : bool
         Whether to add a colorbar. Ignored when *color* is set.
-    extremes : "darken" or "transparent"
-        How to style values outside ``[vmin, vmax]``.
-        ``"transparent"`` makes them invisible.
+    extremes : "semi", "transparent", "darken", or None
+        Colorbar out-of-range indicator style. ``"semi"`` (default)
+        uses semi-transparent extension colors; ``"transparent"``
+        hides them; ``"darken"`` darkens the endpoint colors;
+        ``None`` leaves matplotlib defaults untouched.
     legend : bool or str
         When *color* is set (uniform mode), add a vector legend overlay.
         ``True`` uses the field prefix as label, a string overrides it.
@@ -522,6 +543,13 @@ def plot_quiver(
         Passed to ``ax.quiver()`` (``headwidth``, ``headlength``,
         ``headaxislength``, ``pivot``, ``minshaft``, ``minlength``,
         ``units``, ``angles``, ``width``, etc.).
+    badge : str or None
+        Corner badge text (run label, timestamp, ...). ``None``
+        (default) draws no badge.
+    save : str or Path or None
+        Path to write the figure to. When given, the figure is saved
+        and closed; when ``None`` (default) it is left open for the
+        caller to display or modify further.
 
     Returns
     -------

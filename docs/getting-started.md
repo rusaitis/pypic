@@ -77,6 +77,10 @@ Field names must resolve through the registry — see
 [Schema § 3](schema.md#3-canonical-field-names) for the canonical set.
 Pass `strict_fields=False` to allow unregistered names through.
 
+The same ground is covered by runnable scripts in
+[`examples/`](https://github.com/rusaitis/pypic/blob/main/examples/README.md),
+numbered so each one adds a layer over the last.
+
 This is also the entry point a new reader uses:
 [`examples/custom_reader_example.py`](https://github.com/rusaitis/pypic/blob/main/examples/custom_reader_example.py)
 is a self-contained script that generates a synthetic HDF5 file, maps its
@@ -85,7 +89,8 @@ native names onto canonical ones, and reads it back through
 
 ## Loading simulation data
 
-pypic auto-detects simulation formats (iPIC3D, BATSRUS, OpenGGCM):
+pypic auto-detects simulation formats (iPIC3D, BATSRUS, OpenGGCM, and
+generic HDF5):
 
 ```python
 from pypic import open_simulation
@@ -119,8 +124,9 @@ mach = data.compute("M_A")        # Alfvén Mach number
 data = data.with_derived("|B|", "beta", "v_A")
 ```
 
-See the [field registry](api/fields.md) for the full list of
-computable quantities.
+See [Compute & Recipes](api/compute.md) for the full list of computable
+quantities, and the [field registry](api/fields.md) for their display
+metadata and SI units.
 
 ## Unit conversion
 
@@ -165,13 +171,15 @@ Basic 2D field visualization:
 ```python
 from pypic.plotting import plot_field_slice
 
-plot_field_slice(data, field="|B|", plane="xy")
+# `plane=` takes a PlaneSelection; omit it to slice the midplane.
+plot_field_slice(data, field="|B|")
 ```
 
 For comparison of two simulations:
 
 ```python
+from pypic import PlaneSelection
 from pypic.plotting import plot_comparison
 
-plot_comparison(data_a, data_b, field="beta", plane="xz")
+plot_comparison(data_a, data_b, field="beta", plane=PlaneSelection(normal="y"))
 ```

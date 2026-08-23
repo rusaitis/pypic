@@ -72,7 +72,7 @@ def _bounded_velocity(upper: float = 10.0) -> st.SearchStrategy[np.ndarray]:
 
 
 @given(b=_positive_array(), rho_m=_positive_array())
-@settings(max_examples=40, deadline=None)
+@settings(max_examples=40)
 def test_alfven_speed_limit(b: np.ndarray, rho_m: np.ndarray) -> None:
     r"""$v_A^{rel}(c \to \infty) \to B/\sqrt{\rho_m}$ — equations.md § 8.1."""
     rel = alfven_speed(b, rho_m, c=C_LARGE)
@@ -84,7 +84,7 @@ def test_alfven_speed_limit(b: np.ndarray, rho_m: np.ndarray) -> None:
 
 
 @given(p=_positive_array(), rho_m=_positive_array())
-@settings(max_examples=40, deadline=None)
+@settings(max_examples=40)
 def test_sound_speed_limit(p: np.ndarray, rho_m: np.ndarray) -> None:
     r"""$c_s^{rel}(c \to \infty) \to \sqrt{\gamma P / \rho_m}$."""
     rel = sound_speed(p, rho_m, c=C_LARGE)
@@ -93,7 +93,7 @@ def test_sound_speed_limit(p: np.ndarray, rho_m: np.ndarray) -> None:
 
 
 @given(v_a=_positive_array(), c_s=_positive_array())
-@settings(max_examples=40, deadline=None)
+@settings(max_examples=40)
 def test_magnetosonic_speed_limit(v_a: np.ndarray, c_s: np.ndarray) -> None:
     r"""$v_{ms}^{rel}(c \to \infty) \to \sqrt{v_A^2 + c_s^2}$.
 
@@ -109,7 +109,7 @@ def test_magnetosonic_speed_limit(v_a: np.ndarray, c_s: np.ndarray) -> None:
     temperature=_positive_array(),
     mass=st.floats(min_value=0.1, max_value=10.0),
 )
-@settings(max_examples=40, deadline=None)
+@settings(max_examples=40)
 def test_thermal_speed_limit(temperature: np.ndarray, mass: float) -> None:
     r"""$v_{th}^{rel}(c \to \infty) \to \sqrt{T/m}$."""
     rel = thermal_speed(temperature, mass, c=C_LARGE)
@@ -118,7 +118,7 @@ def test_thermal_speed_limit(temperature: np.ndarray, mass: float) -> None:
 
 
 @given(rho_m=_positive_array(), v=_bounded_velocity())
-@settings(max_examples=40, deadline=None)
+@settings(max_examples=40)
 def test_kinetic_energy_density_limit(rho_m: np.ndarray, v: np.ndarray) -> None:
     r"""$(\gamma - 1)\rho_m c^2 \to \tfrac{1}{2}\rho_m v^2$ as $v/c \to 0$.
 

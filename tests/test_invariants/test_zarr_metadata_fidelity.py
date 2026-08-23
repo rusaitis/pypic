@@ -77,7 +77,6 @@ def _physics_params() -> st.SearchStrategy[PhysicsParams]:
 )
 @settings(
     max_examples=15,
-    deadline=None,
     suppress_health_check=[HealthCheck.function_scoped_fixture],
 )
 def test_float32_preserves_metadata_bit_exact(

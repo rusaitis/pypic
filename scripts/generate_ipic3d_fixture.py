@@ -23,7 +23,8 @@ from pathlib import Path
 import h5py
 import numpy as np
 
-OUTPUT_DIR = Path("tests/data/ipic3d-synthetic")
+_REPO_ROOT = Path(__file__).resolve().parent.parent
+OUTPUT_DIR = _REPO_ROOT / "tests" / "data" / "ipic3d-synthetic"
 
 NXC, NYC, NZC = 4, 4, 2
 LX, LY, LZ = 4.0, 4.0, 2.0

@@ -11,9 +11,9 @@ Controls:
 
 Run with::
 
-    uv run python tests/visual_dipole_3d.py
-    uv run python tests/visual_dipole_3d.py --theme light
-    uv run python tests/visual_dipole_3d.py --save
+    uv run python scripts/visual/visual_dipole_3d.py
+    uv run python scripts/visual/visual_dipole_3d.py --theme light
+    uv run python scripts/visual/visual_dipole_3d.py --save
 """
 
 from __future__ import annotations
@@ -25,9 +25,9 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-# Allow running as `python tests/visual_dipole_3d.py` from any cwd by adding
+# Allow running as `python scripts/visual/visual_dipole_3d.py` from any cwd by adding
 # the project root to sys.path so `tests._helpers` resolves.
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 from pypic.plotting import available_themes, set_theme
 from pypic.plotting.pyvista import (
@@ -150,7 +150,7 @@ class _InteractiveTracer:
             self.plotter.remove_actor("_cross_dot", render=False)  # type: ignore[union-attr]
 
     def on_move(self, center: np.ndarray) -> None:
-        """Called when the sphere widget is released. Snaps to z=0 unless 3D."""
+        """Handle sphere-widget release; snap to z=0 unless in 3D mode."""
         x, y, z = float(center[0]), float(center[1]), float(center[2])
 
         if not self._free_3d:
@@ -247,6 +247,7 @@ class _InteractiveTracer:
 
 
 def main() -> None:
+    """Parse arguments and open the interactive dipole viewer."""
     parser = argparse.ArgumentParser(description="3D dipole field line viewer.")
     all_available = available_themes()
     names = sorted(all_available)
@@ -335,7 +336,12 @@ def main() -> None:
     if args.save:
         from pathlib import Path
 
-        outfile = Path(__file__).parent / "output" / "visual_dipole_3d.png"
+        outfile = (
+            Path(__file__).resolve().parent.parent.parent
+            / "tests"
+            / "output"
+            / "visual_dipole_3d.png"
+        )
         outfile.parent.mkdir(exist_ok=True)
         plotter.show(auto_close=False)
         plotter.screenshot(str(outfile), transparent_background=True)

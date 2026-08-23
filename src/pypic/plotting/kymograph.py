@@ -82,6 +82,10 @@ def plot_kymograph(
         Save figure to this path.
     figsize : tuple[float, float] | None
         Figure size override.
+    vmin : float or None
+        Lower color limit. ``None`` (default) autoscales.
+    vmax : float or None
+        Upper color limit. ``None`` (default) autoscales.
 
     Returns
     -------

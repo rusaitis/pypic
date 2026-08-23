@@ -9,6 +9,7 @@ import h5py
 import numpy as np
 
 from pypic.containers import ParticleData
+from pypic.exceptions import UnknownFieldError
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -40,6 +41,9 @@ def detect_particle_steps(path: Path) -> list[int]:
     return sorted(steps)
 
 
+_PARTICLE_COLUMNS = frozenset({"position", "velocity"})
+
+
 def read_phdf5_particles(
     path: Path,
     step: int,
@@ -69,12 +73,25 @@ def read_phdf5_particles(
     Returns
     -------
     ParticleData
+
+    Raises
+    ------
+    UnknownFieldError
+        If *columns* names anything outside ``{"position", "velocity"}``.
+        A typo fails here rather than silently dropping the column.
     """
     step_str = f"{step:05d}"
     h5_path = path / f"Particles_{step_str}" / f"species_{species}_{step_str}.h5"
     group_name = f"Particles/species_{species}"
 
-    want = set(columns) if columns is not None else {"position", "velocity"}
+    want = set(columns) if columns is not None else set(_PARTICLE_COLUMNS)
+    unknown = want - _PARTICLE_COLUMNS
+    if unknown:
+        msg = (
+            f"Unknown particle column(s) {sorted(unknown)}. "
+            f"Available: {sorted(_PARTICLE_COLUMNS)}."
+        )
+        raise UnknownFieldError(msg)
 
     with h5py.File(h5_path, "r") as f:
         group = f[group_name]

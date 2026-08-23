@@ -69,8 +69,9 @@ class PlotTheme:
         Colormap preference list for positive-definite fields (first is default).
     diverging_cmaps : tuple[str, ...]
         Colormap preference list for signed fields (first is default).
-    grid_color : str
-        Color for grid lines (``"0.0"`` black, ``"1.0"`` white).
+    grid_color : tuple[float, float, float, float]
+        RGBA color for grid lines; the alpha channel carries the
+        built-in opacity (default ``(0.0, 0.0, 0.0, 0.08)``).
     color_cycle : tuple[str, ...]
         Hex color wheel for sequential visual elements (lines, scatter,
         categories). Built into ``axes.prop_cycle`` at theme-application
@@ -226,7 +227,7 @@ _DEFAULT_THEME_NAME = "light"
 DEFAULT: PlotTheme | None = None
 """Current default theme.  Loaded lazily on first access."""
 
-ThemeArg = PlotTheme | str | None
+type ThemeArg = PlotTheme | str | None
 """Accepted type for the ``theme`` parameter across all plotting functions."""
 
 

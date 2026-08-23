@@ -1,7 +1,7 @@
 """Shared test fixtures and synthetic-data factories.
 
 These helpers eliminate boilerplate when constructing ``GridInfo`` and
-``FieldDataset`` instances from tests. The four factories below cover
+``FieldDataset`` instances from tests. The factories below cover
 the common patterns; reach for them before writing yet another inline
 ``GridInfo(...)`` + ``FieldDataset.from_arrays(...)`` pair.
 """

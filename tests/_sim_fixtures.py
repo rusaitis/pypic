@@ -1,10 +1,9 @@
-"""Shared fixture builders for ``pypic.server`` tests.
+"""Synthetic on-disk simulation trees for the CLI and server suites.
 
-Both the HTTP-route and WebSocket-stream test modules need to spin up a
-minimal on-disk simulation tree (one ``simulation.toml`` plus a few
-HDF5 timesteps) to drive ``create_app`` against. Centralizing the
-helper keeps the two test files from drifting on schema or shape
-conventions.
+Both need the same thing: a minimal ``simulation.toml`` plus a few
+HDF5 timesteps that ``SimpleReader`` can auto-detect. They had two
+copies whose ``simulation.toml`` differed by two lines, which is
+exactly how schema conventions drift apart between suites.
 """
 
 from __future__ import annotations
@@ -18,7 +17,7 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 
-SIM_TOML = """\
+SIM_TOML_TEMPLATE = """\
 [schema]
 version = "1.0"
 
@@ -27,14 +26,14 @@ name = "test_sim"
 type = "MHD"
 
 [run]
-name = "server_test_run"
+name = "{run_name}"
 
 [time]
 scheme = "fixed"
 dt = 0.1
 t_start = 0.0
 t_end = 1.0
-n_steps = 3
+n_steps = {n_steps}
 
 [grid]
 dimensions = [4, 4, 4]
@@ -59,11 +58,24 @@ mass = 1.0
 """
 
 
-def make_sim_dir(parent: Path, name: str = "run0", *, n_steps: int = 3) -> Path:
-    """Create a synthetic single-sim tree under *parent* with *n_steps* HDF5 outputs."""
+def sim_toml(*, run_name: str = "test_run", n_steps: int = 3) -> str:
+    """Render the shared ``simulation.toml`` template."""
+    return SIM_TOML_TEMPLATE.format(run_name=run_name, n_steps=n_steps)
+
+
+def make_sim_dir(
+    parent: Path,
+    name: str = "run0",
+    *,
+    n_steps: int = 3,
+    run_name: str = "test_run",
+) -> Path:
+    """Create a synthetic sim tree under *parent* with *n_steps* HDF5 outputs."""
     d = parent / name
     d.mkdir()
-    (d / "simulation.toml").write_text(SIM_TOML, encoding="utf-8")
+    (d / "simulation.toml").write_text(
+        sim_toml(run_name=run_name, n_steps=n_steps), encoding="utf-8"
+    )
     rng = np.random.default_rng(42)
     shape = (4, 4, 4)
     for i in range(n_steps):

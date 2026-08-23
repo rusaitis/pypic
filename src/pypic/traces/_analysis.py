@@ -420,6 +420,15 @@ def gyroradius_estimate(
     FloatArray
         Estimated gyroradius at each point, shape ``(N,)``.
         NaN where $B = 0$.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> points = np.array([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [2.0, 0.0, 0.0]])
+    >>> velocity = np.tile([0.0, 3.0, 0.0], (3, 1))
+    >>> b = np.full(3, 2.0)
+    >>> gyroradius_estimate(points, velocity, b, charge=1.0, mass=1.0)
+    array([1.5, 1.5, 1.5])
     """
     t_hat = tangent_vectors(points)
     v_par = np.sum(velocity * t_hat, axis=1, keepdims=True) * t_hat
@@ -456,6 +465,14 @@ def drift_velocity(
     -------
     FloatArray
         Smoothed velocity, shape ``(N, 3)``.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> points = np.zeros((5, 3))
+    >>> points[:, 0] = np.arange(5.0)
+    >>> drift_velocity(points, np.arange(5.0), window=1)[0]
+    array([1., 0., 0.])
     """
     if window < 1:
         msg = f"window must be >= 1, got {window}"

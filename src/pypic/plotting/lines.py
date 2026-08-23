@@ -70,6 +70,10 @@ def plot_line(
         Figure size override.
     **kwargs
         Passed to ``ax.plot()`` (color, linestyle, linewidth, etc.).
+    save : str or Path or None
+        Path to write the figure to. When given, the figure is saved
+        and closed; when ``None`` (default) it is left open for the
+        caller to display or modify further.
 
     Returns
     -------
@@ -376,6 +380,10 @@ def plot_time_series(
         Whether to show a legend (default ``True``).
     **kwargs
         Passed to ``ax.plot()`` (color, linestyle, linewidth, etc.).
+    save : str or Path or None
+        Path to write the figure to. When given, the figure is saved
+        and closed; when ``None`` (default) it is left open for the
+        caller to display or modify further.
 
     Returns
     -------

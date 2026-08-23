@@ -51,7 +51,7 @@ def _positive_spacing() -> st.SearchStrategy[float]:
     dy=_positive_spacing(),
     dz=_positive_spacing(),
 )
-@settings(max_examples=40, deadline=None)
+@settings(max_examples=40)
 def test_curl_of_gradient_is_zero(
     f: np.ndarray, dx: float, dy: float, dz: float
 ) -> None:

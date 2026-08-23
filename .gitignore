@@ -1,19 +1,11 @@
 # Build directories
-build*/
-Debug*/
-Release*/
-data*/
-
-# Pixi / conda
-.pixi/
-*.conda
-*.tar.bz2
+build/
+dist/
 
 # Test artifacts
 tests/*.png
 tests/*.csv
 tests/output/
-tests/test_petsc_*/
 
 # Python
 __pycache__/
@@ -43,34 +35,9 @@ htmlcov/
 .dmypy.json
 .ruff_cache/
 
-# Eclipse IDE
-.cproject
-.project
-.settings/
-
-# CMake
-CMakeCache.txt
-CMakeFiles/
-cmake_install.cmake
-compile_commands.json
-CTestTestfile.cmake
-Testing/
-install_manifest.txt
-
-# Compiled output
-*.o
-*.a
-*.so
-*.dylib
-
 # Scratch / local directories
 scratch*/
 .cache/
-
-# Tags files (ctags/gtags)
-tags
-TAGS
-.tags
 
 # macOS
 .DS_Store
@@ -118,13 +85,20 @@ site/
 *.log
 *.png
 !docs/assets/*.png
-examples/*
-!examples/.gitkeep
-# Reference examples used as test fixtures (tests/test_config.py and
-# tests/test_examples.py import these directly).
-!examples/ipic3d-double-harris.toml
-!examples/custom_reader_example.py
-!examples/ex_schindler_xi.py
+# examples/ holds both committed example scripts and local scratch
+# simulation data. Ignore the data, not the directory — a blanket
+# `examples/*` allowlist meant a new example was silently untracked and
+# `git add` failed without saying why.
+examples/*/
+examples/*.h5
+examples/*.hdf5
+examples/*.dat
+examples/*.out
+examples/*.m
+# Local working notes, kept out of the public tree.
+examples/NOTES-*.md
+examples/ipic3d-grid.md
+examples/ipic3d-double-harris-setup.md
 
 # Test fixture data (small, committed)
 !tests/data/

@@ -52,7 +52,7 @@ def _bounded_array() -> st.SearchStrategy[np.ndarray]:
     v3=_bounded_array(),
     rotation=rotations(),
 )
-@settings(max_examples=60, deadline=None)
+@settings(max_examples=60)
 def test_vector_magnitude_is_rotation_invariant(
     v1: np.ndarray, v2: np.ndarray, v3: np.ndarray, rotation: tuple
 ) -> None:
@@ -78,7 +78,7 @@ def test_vector_magnitude_is_rotation_invariant(
     v3=_bounded_array(),
     rotation=rotations(),
 )
-@settings(max_examples=60, deadline=None)
+@settings(max_examples=60)
 def test_vector_rotation_inverse_is_transpose(
     v1: np.ndarray, v2: np.ndarray, v3: np.ndarray, rotation: tuple
 ) -> None:
@@ -104,7 +104,7 @@ def test_vector_rotation_inverse_is_transpose(
     p23=_bounded_array(),
     rotation=rotations(),
 )
-@settings(max_examples=40, deadline=None)
+@settings(max_examples=40)
 def test_pressure_tensor_rotation_inverse_is_transpose(
     p11: np.ndarray,
     p22: np.ndarray,
@@ -144,7 +144,7 @@ def test_pressure_tensor_rotation_inverse_is_transpose(
     p23=_bounded_array(),
     rotation=rotations(),
 )
-@settings(max_examples=40, deadline=None)
+@settings(max_examples=40)
 def test_pressure_tensor_frobenius_norm_is_rotation_invariant(
     p11: np.ndarray,
     p22: np.ndarray,

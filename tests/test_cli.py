@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import importlib.util
 import json
 import logging
 import os
@@ -16,6 +17,7 @@ typer = pytest.importorskip("typer")
 from typer.testing import CliRunner  # noqa: E402
 
 from pypic.cli import app  # noqa: E402
+from tests._sim_fixtures import make_sim_dir, sim_toml  # noqa: E402
 
 try:
     import matplotlib
@@ -29,67 +31,27 @@ mpl_required = pytest.mark.skipif(not _HAS_MPL, reason="matplotlib required")
 
 runner = CliRunner()
 
+
+def _all_command_paths() -> list[list[str]]:
+    """Every invocable ``pypic`` command path, groups expanded one level."""
+    paths = [
+        [c.name or c.callback.__name__.replace("_", "-")]
+        for c in app.registered_commands
+    ]
+    for group in app.registered_groups:
+        sub = group.typer_instance
+        assert sub is not None
+        name = group.name or sub.info.name
+        assert name is not None
+        paths.append([name])
+        paths.extend(
+            [name, c.name or c.callback.__name__.replace("_", "-")]
+            for c in sub.registered_commands
+        )
+    return sorted(paths)
+
+
 # Minimal simulation.toml for a SimpleReader-compatible dataset (schema v1.0).
-_TOML = """\
-[schema]
-version = "1.0"
-
-[model]
-name = "test_sim"
-type = "MHD"
-
-[run]
-name = "cli_test_run"
-
-[time]
-scheme = "fixed"
-dt = 0.1
-t_start = 0.0
-t_end = 1.0
-n_steps = 10
-
-[grid]
-dimensions = [4, 4, 4]
-spacing = [1.0, 1.0, 1.0]
-lower = [0.0, 0.0, 0.0]
-upper = [4.0, 4.0, 4.0]
-
-[units]
-system = "SI"
-
-[coordinates]
-geometry = "cartesian"
-frame = "simulation"
-
-[physics.mhd]
-gamma = 1.6667
-
-[[species]]
-name = "p"
-charge = 1.0
-mass = 1.0
-"""
-
-
-def _make_sim_dir(tmp_path: Path, *, n_steps: int = 1) -> Path:
-    """Create a minimal SimpleReader-compatible simulation directory."""
-    d = tmp_path / "sim"
-    d.mkdir()
-    (d / "simulation.toml").write_text(_TOML, encoding="utf-8")
-
-    rng = np.random.default_rng(42)
-    shape = (4, 4, 4)
-    for i in range(n_steps):
-        with h5py.File(d / f"output_{i:06d}.h5", "w") as f:
-            grp = f.create_group("fields")
-            grp.create_dataset("B_1", data=rng.standard_normal(shape))
-            grp.create_dataset("B_2", data=rng.standard_normal(shape))
-            grp.create_dataset("B_3", data=rng.standard_normal(shape))
-            f.attrs["model"] = "test_sim"
-            f.attrs["step"] = i
-    return d
-
-
 # -- version -----------------------------------------------------------------
 
 
@@ -103,7 +65,7 @@ def test_version():
 
 
 def test_info_text(tmp_path):
-    d = _make_sim_dir(tmp_path)
+    d = make_sim_dir(tmp_path, "sim")
     result = runner.invoke(app, ["info", str(d)])
     assert result.exit_code == 0, result.output
     assert "test_sim" in result.output
@@ -113,7 +75,7 @@ def test_info_text(tmp_path):
 
 
 def test_info_json(tmp_path):
-    d = _make_sim_dir(tmp_path)
+    d = make_sim_dir(tmp_path, "sim")
     result = runner.invoke(app, ["info", str(d), "--json"])
     assert result.exit_code == 0, result.output
     data = json.loads(result.output)
@@ -129,7 +91,7 @@ def test_info_json(tmp_path):
 
 
 def test_fields_default(tmp_path):
-    d = _make_sim_dir(tmp_path)
+    d = make_sim_dir(tmp_path, "sim")
     result = runner.invoke(app, ["fields", str(d)])
     assert result.exit_code == 0, result.output
     assert "B_1" in result.output
@@ -138,7 +100,7 @@ def test_fields_default(tmp_path):
 
 
 def test_fields_mapping(tmp_path):
-    d = _make_sim_dir(tmp_path)
+    d = make_sim_dir(tmp_path, "sim")
     result = runner.invoke(app, ["fields", str(d), "--mapping"])
     assert result.exit_code == 0, result.output
     # Native on the left, → arrow, canonical on the right
@@ -147,7 +109,7 @@ def test_fields_mapping(tmp_path):
 
 
 def test_fields_mapping_json_preserves_null(tmp_path):
-    d = _make_sim_dir(tmp_path)
+    d = make_sim_dir(tmp_path, "sim")
     result = runner.invoke(app, ["fields", str(d), "--mapping", "--json"])
     assert result.exit_code == 0, result.output
     data = json.loads(result.output)
@@ -159,7 +121,7 @@ def test_fields_mapping_json_preserves_null(tmp_path):
 
 
 def test_fields_derived(tmp_path):
-    d = _make_sim_dir(tmp_path)
+    d = make_sim_dir(tmp_path, "sim")
     result = runner.invoke(app, ["fields", str(d), "--derived"])
     assert result.exit_code == 0, result.output
     # |B| should be computable from B_1, B_2, B_3
@@ -167,14 +129,14 @@ def test_fields_derived(tmp_path):
 
 
 def test_fields_aux(tmp_path):
-    d = _make_sim_dir(tmp_path)
+    d = make_sim_dir(tmp_path, "sim")
     result = runner.invoke(app, ["fields", str(d), "--aux"])
     assert result.exit_code == 0, result.output
     assert "(none)" in result.output
 
 
 def test_fields_json(tmp_path):
-    d = _make_sim_dir(tmp_path)
+    d = make_sim_dir(tmp_path, "sim")
     result = runner.invoke(app, ["fields", str(d), "--json"])
     assert result.exit_code == 0, result.output
     data = json.loads(result.output)
@@ -183,7 +145,7 @@ def test_fields_json(tmp_path):
 
 
 def test_fields_all(tmp_path):
-    d = _make_sim_dir(tmp_path)
+    d = make_sim_dir(tmp_path, "sim")
     result = runner.invoke(app, ["fields", str(d), "--all"])
     assert result.exit_code == 0, result.output
     # --all combines native, derived, aux
@@ -195,7 +157,7 @@ def test_fields_all(tmp_path):
 
 
 def test_stats_single_step(tmp_path):
-    d = _make_sim_dir(tmp_path)
+    d = make_sim_dir(tmp_path, "sim")
     result = runner.invoke(app, ["stats", str(d), "--field", "B_1"])
     assert result.exit_code == 0, result.output
     assert "min:" in result.output
@@ -206,14 +168,14 @@ def test_stats_single_step(tmp_path):
 
 
 def test_stats_derived(tmp_path):
-    d = _make_sim_dir(tmp_path)
+    d = make_sim_dir(tmp_path, "sim")
     result = runner.invoke(app, ["stats", str(d), "--field", "|B|"])
     assert result.exit_code == 0, result.output
     assert "min:" in result.output
 
 
 def test_stats_json(tmp_path):
-    d = _make_sim_dir(tmp_path)
+    d = make_sim_dir(tmp_path, "sim")
     result = runner.invoke(app, ["stats", str(d), "--field", "B_1", "--json"])
     assert result.exit_code == 0, result.output
     data = json.loads(result.output)
@@ -226,7 +188,7 @@ def test_stats_json(tmp_path):
 
 
 def test_stats_multi_step(tmp_path):
-    d = _make_sim_dir(tmp_path, n_steps=3)
+    d = make_sim_dir(tmp_path, "sim", n_steps=3)
     result = runner.invoke(app, ["stats", str(d), "--field", "B_1", "--step", "all"])
     assert result.exit_code == 0, result.output
     # Field-header + table-header + 3 data rows = 5 non-blank lines.
@@ -237,7 +199,7 @@ def test_stats_multi_step(tmp_path):
 
 
 def test_stats_multi_step_json(tmp_path):
-    d = _make_sim_dir(tmp_path, n_steps=3)
+    d = make_sim_dir(tmp_path, "sim", n_steps=3)
     result = runner.invoke(
         app,
         ["stats", str(d), "--field", "B_1", "--step", "all", "--json"],
@@ -252,7 +214,7 @@ def test_stats_multi_step_json(tmp_path):
 
 
 def test_compare_single_field(tmp_path):
-    d = _make_sim_dir(tmp_path)
+    d = make_sim_dir(tmp_path, "sim")
     result = runner.invoke(app, ["compare", str(d), str(d), "--field", "B_1"])
     assert result.exit_code == 0, result.output
     assert "L2 relative error:" in result.output
@@ -263,7 +225,7 @@ def test_compare_single_field(tmp_path):
 
 
 def test_compare_all_fields(tmp_path):
-    d = _make_sim_dir(tmp_path)
+    d = make_sim_dir(tmp_path, "sim")
     result = runner.invoke(app, ["compare", str(d), str(d)])
     assert result.exit_code == 0, result.output
     assert "B_1" in result.output
@@ -283,7 +245,7 @@ def test_compare_all_fields(tmp_path):
 
 
 def test_compare_json(tmp_path):
-    d = _make_sim_dir(tmp_path)
+    d = make_sim_dir(tmp_path, "sim")
     result = runner.invoke(
         app,
         ["compare", str(d), str(d), "--field", "B_1", "--json"],
@@ -299,7 +261,7 @@ def test_compare_json(tmp_path):
 
 
 def test_bad_step(tmp_path):
-    d = _make_sim_dir(tmp_path)
+    d = make_sim_dir(tmp_path, "sim")
     result = runner.invoke(app, ["fields", str(d), "--step", "banana"])
     assert result.exit_code != 0
     # Error message must name the offending value so users can fix typos.
@@ -310,7 +272,7 @@ def test_bad_step(tmp_path):
 
 
 def test_step_not_available(tmp_path):
-    d = _make_sim_dir(tmp_path)
+    d = make_sim_dir(tmp_path, "sim")
     # Only step 0 exists
     result = runner.invoke(app, ["fields", str(d), "--step", "999"])
     assert result.exit_code != 0
@@ -318,7 +280,7 @@ def test_step_not_available(tmp_path):
 
 
 def test_empty_step_range(tmp_path):
-    d = _make_sim_dir(tmp_path)
+    d = make_sim_dir(tmp_path, "sim")
     # Only step 0 exists; range 10:20 matches nothing
     result = runner.invoke(app, ["fields", str(d), "--step", "10:20"])
     assert result.exit_code != 0
@@ -341,28 +303,28 @@ def test_parse_steps_resolves_against_provided_list():
 
 
 def test_multi_step_rejected_by_fields(tmp_path):
-    d = _make_sim_dir(tmp_path, n_steps=3)
+    d = make_sim_dir(tmp_path, "sim", n_steps=3)
     result = runner.invoke(app, ["fields", str(d), "--step", "all"])
     assert result.exit_code != 0
     assert "single step" in result.output
 
 
 def test_multi_step_rejected_by_compare(tmp_path):
-    d = _make_sim_dir(tmp_path, n_steps=3)
+    d = make_sim_dir(tmp_path, "sim", n_steps=3)
     result = runner.invoke(app, ["compare", str(d), str(d), "--step", "all"])
     assert result.exit_code != 0
     assert "single step" in result.output
 
 
 def test_bad_log_level(tmp_path):
-    d = _make_sim_dir(tmp_path)
+    d = make_sim_dir(tmp_path, "sim")
     result = runner.invoke(app, ["--log-level", "banana", "info", str(d)])
     assert result.exit_code != 0
     assert "Invalid --log-level" in result.output
 
 
 def test_bad_metric(tmp_path):
-    d = _make_sim_dir(tmp_path)
+    d = make_sim_dir(tmp_path, "sim")
     result = runner.invoke(
         app, ["compare", str(d), str(d), "--field", "B_1", "--metric", "oops"]
     )
@@ -371,7 +333,7 @@ def test_bad_metric(tmp_path):
 
 
 def test_bad_units(tmp_path):
-    d = _make_sim_dir(tmp_path)
+    d = make_sim_dir(tmp_path, "sim")
     result = runner.invoke(
         app, ["compare", str(d), str(d), "--field", "B_1", "--units", "cgs"]
     )
@@ -380,7 +342,7 @@ def test_bad_units(tmp_path):
 
 
 def test_bad_nan_policy(tmp_path):
-    d = _make_sim_dir(tmp_path)
+    d = make_sim_dir(tmp_path, "sim")
     result = runner.invoke(
         app,
         ["compare", str(d), str(d), "--field", "B_1", "--nan-policy", "ignore"],
@@ -391,7 +353,7 @@ def test_bad_nan_policy(tmp_path):
 
 def test_log_level_not_sticky(tmp_path):
     """Verify logging config resets between invocations (force=True)."""
-    d = _make_sim_dir(tmp_path)
+    d = make_sim_dir(tmp_path, "sim")
     # First call with debug level
     runner.invoke(app, ["--log-level", "debug", "info", str(d)])
     # Second call with quiet — should not inherit debug
@@ -401,14 +363,14 @@ def test_log_level_not_sticky(tmp_path):
 
 
 def test_missing_field_stats(tmp_path):
-    d = _make_sim_dir(tmp_path)
+    d = make_sim_dir(tmp_path, "sim")
     result = runner.invoke(app, ["stats", str(d), "--field", "nonexistent_field"])
     assert result.exit_code != 0
     assert "Error:" in result.output
 
 
 def test_missing_field_compare(tmp_path):
-    d = _make_sim_dir(tmp_path)
+    d = make_sim_dir(tmp_path, "sim")
     result = runner.invoke(
         app, ["compare", str(d), str(d), "--field", "nonexistent_field"]
     )
@@ -417,7 +379,7 @@ def test_missing_field_compare(tmp_path):
 
 
 def test_quiet_flag(tmp_path):
-    d = _make_sim_dir(tmp_path)
+    d = make_sim_dir(tmp_path, "sim")
     result = runner.invoke(app, ["-q", "info", str(d)])
     assert result.exit_code == 0, result.output
 
@@ -426,7 +388,7 @@ def test_quiet_suppresses_warnings(tmp_path):
     """Verify -q routes warnings.warn through logging and suppresses them."""
     d = tmp_path / "sim_nan"
     d.mkdir()
-    (d / "simulation.toml").write_text(_TOML, encoding="utf-8")
+    (d / "simulation.toml").write_text(sim_toml(), encoding="utf-8")
     shape = (4, 4, 4)
     data = np.ones(shape)
     data[0, 0, 0] = np.nan  # triggers NaN-omit warning in diagnostics
@@ -452,14 +414,14 @@ def test_quiet_suppresses_warnings(tmp_path):
 @mpl_required
 class TestPlot:
     def test_minimal(self, tmp_path: Path) -> None:
-        d = _make_sim_dir(tmp_path)
+        d = make_sim_dir(tmp_path, "sim")
         out = str(tmp_path / "out.png")
         result = runner.invoke(app, ["plot", str(d), "--field", "B_1", "--output", out])
         assert result.exit_code == 0, result.output
         assert (tmp_path / "out.png").exists()
 
     def test_plane_xy(self, tmp_path: Path) -> None:
-        d = _make_sim_dir(tmp_path)
+        d = make_sim_dir(tmp_path, "sim")
         out = str(tmp_path / "xy.png")
         result = runner.invoke(
             app, ["plot", str(d), "--field", "B_1", "--plane", "xy", "--output", out]
@@ -470,7 +432,7 @@ class TestPlot:
         assert (tmp_path / "xy.png").exists()
 
     def test_plane_xz(self, tmp_path: Path) -> None:
-        d = _make_sim_dir(tmp_path)
+        d = make_sim_dir(tmp_path, "sim")
         out = str(tmp_path / "xz.png")
         result = runner.invoke(
             app, ["plot", str(d), "--field", "B_1", "--plane", "xz", "--output", out]
@@ -480,7 +442,7 @@ class TestPlot:
 
     def test_plane_normal_axis_name(self, tmp_path: Path) -> None:
         """--plane accepts a single axis name as the normal (e.g. 'z')."""
-        d = _make_sim_dir(tmp_path)
+        d = make_sim_dir(tmp_path, "sim")
         out = str(tmp_path / "norm.png")
         result = runner.invoke(
             app, ["plot", str(d), "--field", "B_1", "--plane", "z", "--output", out]
@@ -489,7 +451,7 @@ class TestPlot:
         assert (tmp_path / "norm.png").exists()
 
     def test_with_index(self, tmp_path: Path) -> None:
-        d = _make_sim_dir(tmp_path)
+        d = make_sim_dir(tmp_path, "sim")
         out = str(tmp_path / "idx.png")
         result = runner.invoke(
             app, ["plot", str(d), "--field", "B_1", "--index", "2", "--output", out]
@@ -498,7 +460,7 @@ class TestPlot:
         assert (tmp_path / "idx.png").exists()
 
     def test_with_coord(self, tmp_path: Path) -> None:
-        d = _make_sim_dir(tmp_path)
+        d = make_sim_dir(tmp_path, "sim")
         out = str(tmp_path / "coord.png")
         result = runner.invoke(
             app, ["plot", str(d), "--field", "B_1", "--coord", "1.5", "--output", out]
@@ -507,7 +469,7 @@ class TestPlot:
         assert (tmp_path / "coord.png").exists()
 
     def test_index_and_coord_conflict(self, tmp_path: Path) -> None:
-        d = _make_sim_dir(tmp_path)
+        d = make_sim_dir(tmp_path, "sim")
         out = str(tmp_path / "err.png")
         result = runner.invoke(
             app,
@@ -531,14 +493,14 @@ class TestPlot:
         assert "--coord" in result.output
 
     def test_derived_field(self, tmp_path: Path) -> None:
-        d = _make_sim_dir(tmp_path)
+        d = make_sim_dir(tmp_path, "sim")
         out = str(tmp_path / "mag.png")
         result = runner.invoke(app, ["plot", str(d), "--field", "|B|", "--output", out])
         assert result.exit_code == 0, result.output
         assert (tmp_path / "mag.png").exists()
 
     def test_log_scale(self, tmp_path: Path) -> None:
-        d = _make_sim_dir(tmp_path)
+        d = make_sim_dir(tmp_path, "sim")
         out = str(tmp_path / "log.png")
         result = runner.invoke(
             app, ["plot", str(d), "--field", "|B|", "--scale", "log", "--output", out]
@@ -547,7 +509,7 @@ class TestPlot:
         assert (tmp_path / "log.png").exists()
 
     def test_symlog_scale(self, tmp_path: Path) -> None:
-        d = _make_sim_dir(tmp_path)
+        d = make_sim_dir(tmp_path, "sim")
         out = str(tmp_path / "sym.png")
         result = runner.invoke(
             app,
@@ -557,7 +519,7 @@ class TestPlot:
         assert (tmp_path / "sym.png").exists()
 
     def test_symlog_with_linthresh(self, tmp_path: Path) -> None:
-        d = _make_sim_dir(tmp_path)
+        d = make_sim_dir(tmp_path, "sim")
         out = str(tmp_path / "sym_lt.png")
         result = runner.invoke(
             app,
@@ -578,7 +540,7 @@ class TestPlot:
         assert (tmp_path / "sym_lt.png").exists()
 
     def test_custom_clim(self, tmp_path: Path) -> None:
-        d = _make_sim_dir(tmp_path)
+        d = make_sim_dir(tmp_path, "sim")
         out = str(tmp_path / "clim.png")
         result = runner.invoke(
             app,
@@ -599,7 +561,7 @@ class TestPlot:
         assert (tmp_path / "clim.png").exists()
 
     def test_colormap(self, tmp_path: Path) -> None:
-        d = _make_sim_dir(tmp_path)
+        d = make_sim_dir(tmp_path, "sim")
         out = str(tmp_path / "cmap.png")
         result = runner.invoke(
             app,
@@ -618,7 +580,7 @@ class TestPlot:
         assert (tmp_path / "cmap.png").exists()
 
     def test_dpi(self, tmp_path: Path) -> None:
-        d = _make_sim_dir(tmp_path)
+        d = make_sim_dir(tmp_path, "sim")
         out = str(tmp_path / "dpi.png")
         result = runner.invoke(
             app,
@@ -628,7 +590,7 @@ class TestPlot:
         assert (tmp_path / "dpi.png").exists()
 
     def test_format_override(self, tmp_path: Path) -> None:
-        d = _make_sim_dir(tmp_path)
+        d = make_sim_dir(tmp_path, "sim")
         out = str(tmp_path / "out.pdf")
         result = runner.invoke(
             app,
@@ -641,7 +603,7 @@ class TestPlot:
         assert (tmp_path / "out.pdf").read_bytes().startswith(b"%PDF")
 
     def test_res_downsample(self, tmp_path: Path) -> None:
-        d = _make_sim_dir(tmp_path)
+        d = make_sim_dir(tmp_path, "sim")
         out = str(tmp_path / "lo.png")
         result = runner.invoke(
             app,
@@ -651,7 +613,7 @@ class TestPlot:
         assert (tmp_path / "lo.png").exists()
 
     def test_batch_steps(self, tmp_path: Path) -> None:
-        d = _make_sim_dir(tmp_path, n_steps=3)
+        d = make_sim_dir(tmp_path, "sim", n_steps=3)
         tpl = str(tmp_path / "frames" / "B_{step:06d}.png")
         result = runner.invoke(
             app, ["plot", str(d), "--field", "B_1", "--step", "all", "--output", tpl]
@@ -661,7 +623,7 @@ class TestPlot:
             assert (tmp_path / "frames" / f"B_{i:06d}.png").exists()
 
     def test_batch_no_output_error(self, tmp_path: Path) -> None:
-        d = _make_sim_dir(tmp_path, n_steps=3)
+        d = make_sim_dir(tmp_path, "sim", n_steps=3)
         result = runner.invoke(app, ["plot", str(d), "--field", "B_1", "--step", "all"])
         assert result.exit_code != 0
         # Error must name --output so users know which flag to add —
@@ -669,7 +631,7 @@ class TestPlot:
         assert "--output" in result.output
 
     def test_bad_scale(self, tmp_path: Path) -> None:
-        d = _make_sim_dir(tmp_path)
+        d = make_sim_dir(tmp_path, "sim")
         out = str(tmp_path / "err.png")
         result = runner.invoke(
             app,
@@ -679,7 +641,7 @@ class TestPlot:
         assert "Invalid --scale" in result.output
 
     def test_bad_plane(self, tmp_path: Path) -> None:
-        d = _make_sim_dir(tmp_path)
+        d = make_sim_dir(tmp_path, "sim")
         out = str(tmp_path / "err.png")
         result = runner.invoke(
             app, ["plot", str(d), "--field", "B_1", "--plane", "ab", "--output", out]
@@ -688,7 +650,7 @@ class TestPlot:
         assert "Invalid --plane" in result.output
 
     def test_missing_field(self, tmp_path: Path) -> None:
-        d = _make_sim_dir(tmp_path)
+        d = make_sim_dir(tmp_path, "sim")
         out = str(tmp_path / "err.png")
         result = runner.invoke(
             app, ["plot", str(d), "--field", "nonexistent", "--output", out]
@@ -703,7 +665,7 @@ class TestPlot:
 @mpl_required
 class TestPlotCompare:
     def test_minimal(self, tmp_path: Path) -> None:
-        d = _make_sim_dir(tmp_path)
+        d = make_sim_dir(tmp_path, "sim")
         out = str(tmp_path / "cmp.png")
         result = runner.invoke(
             app,
@@ -713,7 +675,7 @@ class TestPlotCompare:
         assert (tmp_path / "cmp.png").exists()
 
     def test_with_plane(self, tmp_path: Path) -> None:
-        d = _make_sim_dir(tmp_path)
+        d = make_sim_dir(tmp_path, "sim")
         out = str(tmp_path / "cmp_xz.png")
         result = runner.invoke(
             app,
@@ -733,7 +695,7 @@ class TestPlotCompare:
         assert (tmp_path / "cmp_xz.png").exists()
 
     def test_diff_limits(self, tmp_path: Path) -> None:
-        d = _make_sim_dir(tmp_path)
+        d = make_sim_dir(tmp_path, "sim")
         out = str(tmp_path / "cmp_dl.png")
         result = runner.invoke(
             app,
@@ -755,7 +717,7 @@ class TestPlotCompare:
         assert (tmp_path / "cmp_dl.png").exists()
 
     def test_bad_units(self, tmp_path: Path) -> None:
-        d = _make_sim_dir(tmp_path)
+        d = make_sim_dir(tmp_path, "sim")
         out = str(tmp_path / "err.png")
         result = runner.invoke(
             app,
@@ -775,7 +737,7 @@ class TestPlotCompare:
         assert "Invalid --units" in result.output
 
     def test_missing_field(self, tmp_path: Path) -> None:
-        d = _make_sim_dir(tmp_path)
+        d = make_sim_dir(tmp_path, "sim")
         out = str(tmp_path / "err.png")
         result = runner.invoke(
             app,
@@ -789,7 +751,7 @@ class TestPlotCompare:
 
 
 def test_stats_field_all(tmp_path: Path) -> None:
-    d = _make_sim_dir(tmp_path)
+    d = make_sim_dir(tmp_path, "sim")
     result = runner.invoke(app, ["stats", str(d), "--field", "all"])
     assert result.exit_code == 0, result.output
     assert "B_1" in result.output
@@ -798,7 +760,7 @@ def test_stats_field_all(tmp_path: Path) -> None:
 
 
 def test_stats_field_all_json(tmp_path: Path) -> None:
-    d = _make_sim_dir(tmp_path)
+    d = make_sim_dir(tmp_path, "sim")
     result = runner.invoke(app, ["stats", str(d), "--field", "all", "--json"])
     assert result.exit_code == 0, result.output
     data = json.loads(result.output)
@@ -811,7 +773,7 @@ def test_stats_field_all_json(tmp_path: Path) -> None:
 
 
 def test_validate_text(tmp_path: Path) -> None:
-    d = _make_sim_dir(tmp_path)
+    d = make_sim_dir(tmp_path, "sim")
     result = runner.invoke(app, ["validate", str(d)])
     assert result.exit_code == 0, result.output
     assert "Validation:" in result.output
@@ -821,7 +783,7 @@ def test_validate_text(tmp_path: Path) -> None:
 
 
 def test_validate_json(tmp_path: Path) -> None:
-    d = _make_sim_dir(tmp_path)
+    d = make_sim_dir(tmp_path, "sim")
     result = runner.invoke(app, ["validate", str(d), "--json"])
     assert result.exit_code == 0, result.output
     data = json.loads(result.output)
@@ -840,7 +802,7 @@ def test_validate_json(tmp_path: Path) -> None:
 @mpl_required
 class TestPlotTheme:
     def test_theme_dark(self, tmp_path: Path) -> None:
-        d = _make_sim_dir(tmp_path)
+        d = make_sim_dir(tmp_path, "sim")
         out = str(tmp_path / "dark.png")
         result = runner.invoke(
             app,
@@ -856,7 +818,7 @@ class TestPlotTheme:
 @mpl_required
 class TestPlotContour:
     def test_contour_overlay(self, tmp_path: Path) -> None:
-        d = _make_sim_dir(tmp_path)
+        d = make_sim_dir(tmp_path, "sim")
         out = str(tmp_path / "contour.png")
         result = runner.invoke(
             app,
@@ -883,7 +845,7 @@ class TestPlotContour:
 @mpl_required
 class TestPlotCompareTheme:
     def test_theme(self, tmp_path: Path) -> None:
-        d = _make_sim_dir(tmp_path)
+        d = make_sim_dir(tmp_path, "sim")
         out = str(tmp_path / "cmp_dark.png")
         result = runner.invoke(
             app,
@@ -909,7 +871,7 @@ class TestPlotCompareTheme:
 @mpl_required
 class TestPlotAnimate:
     def test_animate_requires_multistep(self, tmp_path: Path) -> None:
-        d = _make_sim_dir(tmp_path)
+        d = make_sim_dir(tmp_path, "sim")
         out = str(tmp_path / "out.png")
         result = runner.invoke(
             app,
@@ -997,7 +959,7 @@ def test_stats_2d_dataset(tmp_path: Path) -> None:
 
 
 def test_compare_bad_method(tmp_path: Path) -> None:
-    d = _make_sim_dir(tmp_path)
+    d = make_sim_dir(tmp_path, "sim")
     result = runner.invoke(
         app, ["compare", str(d), str(d), "--field", "B_1", "--method", "banana"]
     )
@@ -1006,7 +968,7 @@ def test_compare_bad_method(tmp_path: Path) -> None:
 
 
 def test_compare_bad_frame(tmp_path: Path) -> None:
-    d = _make_sim_dir(tmp_path)
+    d = make_sim_dir(tmp_path, "sim")
     result = runner.invoke(
         app, ["compare", str(d), str(d), "--field", "B_1", "--frame", "banana"]
     )
@@ -1016,7 +978,7 @@ def test_compare_bad_frame(tmp_path: Path) -> None:
 
 @mpl_required
 def test_plot_compare_bad_method(tmp_path: Path) -> None:
-    d = _make_sim_dir(tmp_path)
+    d = make_sim_dir(tmp_path, "sim")
     out = str(tmp_path / "err.png")
     result = runner.invoke(
         app,
@@ -1038,14 +1000,16 @@ def test_plot_compare_bad_method(tmp_path: Path) -> None:
 
 # -- convert fields ---------------------------------------------------------
 
+# importorskip() never returns None, so a `skipif` on it is always False —
+# and at module scope it would skip the whole CLI suite, not the zarr tests.
 zarr_required = pytest.mark.skipif(
-    pytest.importorskip("zarr", reason="zarr required") is None, reason="zarr required"
+    importlib.util.find_spec("zarr") is None, reason="zarr required"
 )
 
 
 @zarr_required
 def test_convert_fields_dry_run(tmp_path: Path) -> None:
-    d = _make_sim_dir(tmp_path)
+    d = make_sim_dir(tmp_path, "sim")
     out = tmp_path / "out.zarr"
     result = runner.invoke(
         app,
@@ -1060,7 +1024,7 @@ def test_convert_fields_dry_run(tmp_path: Path) -> None:
 def test_convert_fields_single_step_round_trip(tmp_path: Path) -> None:
     from pypic.io import from_zarr
 
-    d = _make_sim_dir(tmp_path)
+    d = make_sim_dir(tmp_path, "sim")
     out = tmp_path / "single.zarr"
     result = runner.invoke(
         app,
@@ -1078,7 +1042,7 @@ def test_convert_fields_single_step_round_trip(tmp_path: Path) -> None:
 def test_convert_fields_multi_step_timeseries(tmp_path: Path) -> None:
     from pypic.io import from_zarr
 
-    d = _make_sim_dir(tmp_path, n_steps=3)
+    d = make_sim_dir(tmp_path, "sim", n_steps=3)
     out = tmp_path / "ts.zarr"
     result = runner.invoke(
         app,
@@ -1094,7 +1058,7 @@ def test_convert_fields_multi_step_timeseries(tmp_path: Path) -> None:
 def test_convert_fields_subset(tmp_path: Path) -> None:
     from pypic.io import from_zarr
 
-    d = _make_sim_dir(tmp_path)
+    d = make_sim_dir(tmp_path, "sim")
     out = tmp_path / "subset.zarr"
     result = runner.invoke(
         app,
@@ -1121,7 +1085,7 @@ def test_convert_fields_subset(tmp_path: Path) -> None:
 def test_convert_fields_box_crop(tmp_path: Path) -> None:
     from pypic.io import from_zarr
 
-    d = _make_sim_dir(tmp_path)
+    d = make_sim_dir(tmp_path, "sim")
     out = tmp_path / "cropped.zarr"
     result = runner.invoke(
         app,
@@ -1144,7 +1108,7 @@ def test_convert_fields_box_crop(tmp_path: Path) -> None:
 
 @zarr_required
 def test_convert_fields_bad_backend(tmp_path: Path) -> None:
-    d = _make_sim_dir(tmp_path)
+    d = make_sim_dir(tmp_path, "sim")
     out = tmp_path / "nope.zarr"
     result = runner.invoke(
         app,
@@ -1164,7 +1128,7 @@ def test_convert_fields_bad_backend(tmp_path: Path) -> None:
 
 @zarr_required
 def test_convert_fields_tag_requires_icechunk(tmp_path: Path) -> None:
-    d = _make_sim_dir(tmp_path)
+    d = make_sim_dir(tmp_path, "sim")
     out = tmp_path / "tagged.zarr"
     result = runner.invoke(
         app,
@@ -1185,13 +1149,12 @@ def test_convert_fields_tag_requires_icechunk(tmp_path: Path) -> None:
 # -- convert particles ------------------------------------------------------
 
 arrow_required = pytest.mark.skipif(
-    pytest.importorskip("pyarrow", reason="pyarrow required") is None,
-    reason="pyarrow required",
+    importlib.util.find_spec("pyarrow") is None, reason="pyarrow required"
 )
 
-from pathlib import Path as _RuntimePath  # noqa: E402
-
-_IPIC3D_FIXTURE = _RuntimePath("tests/data/ipic3d-synthetic/phdf5")
+_IPIC3D_FIXTURE = (
+    Path(__file__).resolve().parent / "data" / "ipic3d-synthetic" / "phdf5"
+)
 
 
 @arrow_required
@@ -1282,7 +1245,7 @@ def test_convert_particles_bad_sort_by(tmp_path: Path) -> None:
 
 
 def test_convert_particles_no_particle_output(tmp_path: Path) -> None:
-    d = _make_sim_dir(tmp_path)
+    d = make_sim_dir(tmp_path, "sim")
     out = tmp_path / "empty"
     result = runner.invoke(
         app,
@@ -1299,7 +1262,7 @@ def test_convert_particles_no_particle_output(tmp_path: Path) -> None:
 def test_convert_fields_plane_slice(tmp_path: Path) -> None:
     from pypic.io import from_zarr
 
-    d = _make_sim_dir(tmp_path)
+    d = make_sim_dir(tmp_path, "sim")
     out = tmp_path / "plane.zarr"
     result = runner.invoke(
         app,
@@ -1326,7 +1289,7 @@ def test_convert_fields_compression_zstd(tmp_path: Path) -> None:
     from pypic.io import from_zarr
     from pypic.readers import open_simulation
 
-    d = _make_sim_dir(tmp_path)
+    d = make_sim_dir(tmp_path, "sim")
     out = tmp_path / "zstd.zarr"
     result = runner.invoke(
         app,
@@ -1355,7 +1318,7 @@ def test_convert_fields_compression_zstd(tmp_path: Path) -> None:
 
 @zarr_required
 def test_convert_fields_compression_bad_spec(tmp_path: Path) -> None:
-    d = _make_sim_dir(tmp_path)
+    d = make_sim_dir(tmp_path, "sim")
     out = tmp_path / "bad.zarr"
     result = runner.invoke(
         app,
@@ -1420,7 +1383,7 @@ def test_convert_fields_virtual(tmp_path: Path) -> None:
 
 @zarr_required
 def test_convert_fields_virtual_rejects_directory(tmp_path: Path) -> None:
-    d = _make_sim_dir(tmp_path)
+    d = make_sim_dir(tmp_path, "sim")
     out = tmp_path / "nope.zarr"
     result = runner.invoke(
         app,
@@ -1622,7 +1585,7 @@ def test_convert_all_fields_only(tmp_path: Path) -> None:
     # Sim without particle output: `convert all` should write fields only.
     from pypic.io import from_zarr
 
-    d = _make_sim_dir(tmp_path)
+    d = make_sim_dir(tmp_path, "sim")
     out = tmp_path / "all_out"
     result = runner.invoke(
         app,
@@ -1666,7 +1629,7 @@ def test_convert_all_dry_run_particles(tmp_path: Path) -> None:
 
 
 def test_reduce_apply_dry_run(tmp_path: Path) -> None:
-    d = _make_sim_dir(tmp_path)
+    d = make_sim_dir(tmp_path, "sim")
     out = tmp_path / "reduced.zarr"
     result = runner.invoke(
         app,
@@ -1694,7 +1657,7 @@ def test_reduce_apply_dry_run(tmp_path: Path) -> None:
 def test_reduce_apply_single_step_zarr(tmp_path: Path) -> None:
     from pypic.io import from_zarr
 
-    d = _make_sim_dir(tmp_path)
+    d = make_sim_dir(tmp_path, "sim")
     out = tmp_path / "reduced.zarr"
     result = runner.invoke(
         app,
@@ -1723,7 +1686,7 @@ def test_reduce_apply_single_step_zarr(tmp_path: Path) -> None:
 def test_reduce_apply_multi_step_timeseries(tmp_path: Path) -> None:
     from pypic.io import from_zarr
 
-    d = _make_sim_dir(tmp_path, n_steps=3)
+    d = make_sim_dir(tmp_path, "sim", n_steps=3)
     out = tmp_path / "reduced_ts.zarr"
     result = runner.invoke(
         app,
@@ -1751,7 +1714,7 @@ def test_reduce_apply_multi_step_timeseries(tmp_path: Path) -> None:
 def test_reduce_apply_multi_axis(tmp_path: Path) -> None:
     from pypic.io import from_zarr
 
-    d = _make_sim_dir(tmp_path)
+    d = make_sim_dir(tmp_path, "sim")
     out = tmp_path / "lineout.zarr"
     result = runner.invoke(
         app,
@@ -1781,7 +1744,7 @@ def test_reduce_apply_with_weight(tmp_path: Path) -> None:
     """--weight flag produces a weighted mean (different from unweighted)."""
     from pypic.io import from_zarr
 
-    d = _make_sim_dir(tmp_path)
+    d = make_sim_dir(tmp_path, "sim")
     weighted_out = tmp_path / "weighted.zarr"
     unweighted_out = tmp_path / "unweighted.zarr"
     # Use B_2 as the weight (just a positive-ish field; values include
@@ -1841,7 +1804,7 @@ def test_reduce_apply_with_box(tmp_path: Path) -> None:
     """--box restricts the reduction to a sub-volume (axis ranges, index-based)."""
     from pypic.io import from_zarr
 
-    d = _make_sim_dir(tmp_path)
+    d = make_sim_dir(tmp_path, "sim")
     out = tmp_path / "boxed.zarr"
     result = runner.invoke(
         app,
@@ -1868,7 +1831,7 @@ def test_reduce_apply_with_box(tmp_path: Path) -> None:
 
 
 def test_reduce_apply_unknown_axis(tmp_path: Path) -> None:
-    d = _make_sim_dir(tmp_path)
+    d = make_sim_dir(tmp_path, "sim")
     out = tmp_path / "bad.zarr"
     result = runner.invoke(
         app,
@@ -1892,7 +1855,7 @@ def test_reduce_apply_unknown_axis(tmp_path: Path) -> None:
 
 
 def test_reduce_apply_weight_rejected_for_max(tmp_path: Path) -> None:
-    d = _make_sim_dir(tmp_path)
+    d = make_sim_dir(tmp_path, "sim")
     out = tmp_path / "bad.zarr"
     result = runner.invoke(
         app,
@@ -1930,36 +1893,23 @@ class TestHelpTextIsUserFacing:
         result = runner.invoke(app, ["serve", "--help"])
         assert "pypic-plasma[server]" in result.output
 
-    @pytest.mark.parametrize(
-        "command",
-        [
-            "info",
-            "fields",
-            "stats",
-            "compare",
-            "validate",
-            "plot",
-            "plot-compare",
-            "serve",
-            "convert",
-            "schema",
-            "export",
-            "reduce",
-        ],
-    )
-    def test_help_carries_no_markup_or_repo_paths(self, command: str) -> None:
+    def test_help_carries_no_markup_or_repo_paths(self) -> None:
         """No Sphinx roles, RST literals, roadmap numbers, or repo-only paths.
 
         These come from docstrings written for the docs site; Typer prints
         them verbatim, where they are noise at best and misleading at worst.
+
+        Enumerated from the app rather than listed by hand, so a new
+        subcommand is covered the day it lands.
         """
-        output = runner.invoke(app, [command, "--help"]).output
-        leaks = [
-            token
-            for token in (":class:", ":func:", ":mod:", ":meth:", "``", "docs/api/")
-            if token in output
-        ]
-        assert not leaks, f"`pypic {command} --help` leaks {leaks}"
+        markup = (":class:", ":func:", ":mod:", ":meth:", "``", "docs/api/")
+        leaks: dict[str, list[str]] = {}
+        for argv in _all_command_paths():
+            output = runner.invoke(app, [*argv, "--help"]).output
+            found = [token for token in markup if token in output]
+            if found:
+                leaks[" ".join(argv)] = found
+        assert not leaks, f"docs-site markup leaked into --help: {leaks}"
 
 
 class TestValidateOnTwoDimensionalGrids:

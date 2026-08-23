@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-BadgeLoc = Literal[
+type BadgeLoc = Literal[
     "upper left", "upper right", "lower left", "lower right", "upper center"
 ]
 """Canonical overlay location strings shared by both plotting backends.

@@ -67,10 +67,9 @@ forward unchanged. **Weighted** `integrate` does **not** stamp
 `length_axes` because the length factor cancels in
 `∫ f w dx / ∫ w dx`.
 
-The displayed `si_unit` string and the openPMD 7-tuple are still
-authoritatively fixed by TASKS Step 43c; the `length_axes` mechanism
-here is the interim fix that gets `in_si()` returning the right
-*number* today.
+Post-reduction `si_unit` strings and openPMD 7-tuples are not yet
+generalized; the `length_axes` mechanism here is the interim fix that gets
+`in_si()` returning the right *number* today.
 
 ## Weight semantics
 
@@ -124,7 +123,9 @@ A reduced `FieldDataset` is just a smaller-dimension `FieldDataset` —
 all existing plotting helpers work unchanged:
 
 ```python
-fig, ax = pypic.plot_field_slice(
+from pypic.plotting import plot_field_slice
+
+fig, ax = plot_field_slice(
     ds.reduce("z", reduction="integrate"),
     "rho_c",
     title="Column density",
@@ -149,7 +150,7 @@ B_mean = pypic.reduce(ts, "time", reduction="mean")
 Pure non-spatial reductions bypass the Cartesian-grid gate — the
 Jacobian only matters when integrating over a spatial axis. A
 mixed `("time", "r")` reduction on a spherical grid still raises
-`NotImplementedError` until Step 43b lands.
+`GeometryUnsupportedError`, pending Jacobian-aware integration.
 
 ## Worked examples
 
@@ -162,7 +163,7 @@ inside the electron diffusion region. Per-column z-position of the
 peak gives an EDR centroid map:
 
 ```python
-ds_with_De = ds.compute("D_e")
+ds_with_De = ds.with_derived("D_e")
 # argmax returns the *coordinate value* of the maximum along z,
 # not an integer index — the result is one z-position per (x, y).
 z_peak = pypic.reduce(ds_with_De, "z", reduction="argmax", fields=["D_e"])

@@ -648,10 +648,10 @@ def convert_fields(
 ) -> None:
     """Convert simulation fields to a Zarr v3 store.
 
-    Writes one timestep via ``to_zarr`` or a multi-step time-series via
-    ``to_zarr_timeseries``.  Optionally crops, slices, regrids, and/or
-    converts to SI units.  Pass ``--backend icechunk`` for versioned
-    storage, or ``--virtual`` to persist HDF5 byte-range references
+    Writes one timestep via to_zarr or a multi-step time-series via
+    to_zarr_timeseries.  Optionally crops, slices, regrids, and/or
+    converts to SI units.  Pass --backend icechunk for versioned
+    storage, or --virtual to persist HDF5 byte-range references
     without copying data.
     """
     from pypic.io import to_zarr, to_zarr_timeseries
@@ -876,7 +876,7 @@ def convert_particles(
 ) -> None:
     """Convert particle output to a partitioned Parquet dataset.
 
-    Layout: ``{output}/step=000000/species=electrons/part-00000.parquet``.
+    Layout: {output}/step=000000/species=electrons/part-00000.parquet.
     Particles are Morton-sorted (or weight-sorted) for spatial predicate
     pushdown on read.
     """
@@ -962,9 +962,9 @@ def convert_all(
 ) -> None:
     """Run both fields and particles pipelines with defaults.
 
-    Writes fields to ``{output}/fields.zarr`` and particles (when the
-    simulation has them) to ``{output}/particles/``.  Use the
-    ``fields`` or ``particles`` subcommand directly for full control
+    Writes fields to {output}/fields.zarr and particles (when the
+    simulation has them) to {output}/particles/.  Use the
+    fields or particles subcommand directly for full control
     over flags.
     """
     fields_out = output / "fields.zarr"
@@ -1096,10 +1096,10 @@ def reduce_apply(
 ) -> None:
     """Reduce simulation fields along one or more axes.
 
-    Writes one timestep via ``to_zarr`` or a multi-step time-series via
-    ``to_zarr_timeseries``.  Composes with ``--plane`` and ``--box``
-    (applied before the reduction) and ``--weight`` (yt-style
-    density-weighted average; ``mean`` / ``integrate`` only).
+    Writes one timestep via to_zarr or a multi-step time-series via
+    to_zarr_timeseries.  Composes with --plane and --box
+    (applied before the reduction) and --weight (yt-style
+    density-weighted average; mean / integrate only).
     """
     from pypic.io import to_zarr, to_zarr_timeseries
     from pypic.reductions import reduce as reduce_fn

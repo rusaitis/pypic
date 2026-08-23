@@ -1,4 +1,4 @@
-# schema.md — Shared Data Contract
+# Schema — Shared Data Contract
 
 ## Purpose
 
@@ -1063,7 +1063,7 @@ six second-species pressure tensor components.
 **Current limitations:**
 
 - **Split-B naming.** `B0` is the universal plasma-physics name for the
-  background/asymptotic magnetic field, so we preserve it. Because the
+  background/asymptotic magnetic field, and pypic keeps it. Because the
   prefix already ends in a digit, components use an underscore separator:
   `B0_1`, `B0_2`, `B0_3` (Cartesian aliases: `B0x`, `B0y`, `B0z`). The
   underscore-after-digit rule generalizes to any future canonical whose
@@ -1258,7 +1258,7 @@ the same name regardless of geometry.
 
 ### Field-line map quantities
 
-Outputs of `pypic.maps` (Step 44g — planned). Derived from
+Outputs of the planned `pypic.maps` module. Derived from
 **field-line tracing** rather than per-cell pointwise computation,
 so they live on a 2D *footpoint* / *seed* grid $(\theta_0, \phi_0)$
 or an arbitrary slice surface — not the simulation cell grid.
@@ -1335,7 +1335,7 @@ is analysis, not restart regeneration.
 
 **openPMD record → canonical mapping.** The four most-used codes in
 the *Separate* camp (WarpX, PIConGPU, Smilei, FBPIC) emit the
-openPMD ED-PIC layout, where the Phase-9 reader (TASKS Step 42)
+openPMD ED-PIC layout, where the planned openPMD reader
 translates each record into the canonical form above:
 
 | openPMD record | Canonical destination |
@@ -1594,16 +1594,14 @@ archival). Row groups: 500K–1M particles each. Down-cast knobs:
 `position_dtype="float32"`, `velocity_dtype="float32"`. `weight` and
 `id` stay at full source precision (float64 / int64); scalar
 `species_charge` and `species_mass` round-trip through Arrow schema
-metadata at full precision. See TASKS.md Step 25 (Arrow/Parquet
-foundation) and Step 25b (canonical `weight` + species-scalar form)
-for the full I/O contract.
+metadata at full precision.
 
 ## 5. Extensibility
 
 - **New simulation code:** Write a reader that maps native output to `FieldDataset` with canonical field names. No schema changes needed.
 - **New field:** Add the name to the canonical table (this document), add to relevant readers, add derived functions if applicable.
 - **New derived map output:** Add the name to the *Field-line map quantities* table in §3, write the producer in `pypic.maps`, persist via `pypic.io.to_zarr`. Map outputs are 2D arrays on a footpoint grid, not 3D fields — schema accommodates either without changing the layout contract.
-- **New numerical method:** Land integrators / step controllers / interpolators in `pypic.numerics` (one shared kernel package — the adaptive tracer is the current consumer; future particle pushers and the Step 44 symplectic / periodic-tricubic / curvature-step paths land in the same module). The vocabulary surfaces as free-form strings in the map `attrs["map"]` provenance block.
+- **New numerical method:** Land integrators / step controllers / interpolators in `pypic.numerics` (one shared kernel package — the adaptive tracer is the current consumer; future particle pushers and the planned symplectic / periodic-tricubic / curvature-step paths land in the same module). The vocabulary surfaces as free-form strings in the map `attrs["map"]` provenance block.
 - **New model type:** Add a `[physics.NEW_TYPE]` subsection convention, document expected fields and species.
 - **New output format:** Define the layout mapping, write a reader. Everything downstream works unchanged via `FieldDataset`.
 - **Code-specific knobs:** Park them under an `x-<code>` namespace — see §1 *Sections and extensions*.

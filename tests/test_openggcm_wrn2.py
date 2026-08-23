@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+import os
 from pathlib import Path
 
 import numpy as np
@@ -21,13 +22,14 @@ from pypic.readers.openggcm._wrn2 import (
 # commit. Maintainer-only: the vectorized-vs-original cross-validation that
 # matters runs on synthetic data in TestDecompressFieldVectorized, and the
 # committed subsample under tests/data/openggcm-small/ drives every other
-# test in this file. Resolved against the repo root, not the cwd, so the
-# class skips for the same reason no matter where pytest is invoked from.
+# test in this file. Point PYPIC_OPENGGCM_RUN at a directory holding a real
+# .3df run to enable it — the same variable scripts/generate_openggcm_fixture.py
+# reads, so the fixture and the test that validates it share one source.
+_OPENGGCM_RUN = os.environ.get("PYPIC_OPENGGCM_RUN")
 _EXAMPLE_3DF = (
-    Path(__file__).resolve().parent.parent
-    / "examples"
-    / "uclamhd-example-3D"
-    / "gc012.3df.006300"
+    Path(_OPENGGCM_RUN) / "gc012.3df.006300"
+    if _OPENGGCM_RUN
+    else Path(__file__).resolve().parent.parent / "examples" / "openggcm-run"
 )
 
 
@@ -365,7 +367,7 @@ class TestConvertFieldsPassthrough:
 
 @pytest.mark.skipif(
     not _EXAMPLE_3DF.exists(),
-    reason="needs a full-size OpenGGCM .3df run (not shipped with the repo)",
+    reason="set PYPIC_OPENGGCM_RUN to a full-size .3df run (not shipped)",
 )
 class TestRealData:
     """Integration tests against real .3df data."""

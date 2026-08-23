@@ -93,7 +93,7 @@ def _nonzero_scalar() -> st.SearchStrategy[float]:
     b=_nonzero_reference(),
     alpha=_nonzero_scalar(),
 )
-@settings(max_examples=50, deadline=None)
+@settings(max_examples=50)
 def test_l2_relative_error_is_scale_invariant(
     a: np.ndarray, b: np.ndarray, alpha: float
 ) -> None:
@@ -117,7 +117,7 @@ def test_l2_relative_error_is_scale_invariant(
     b=_bounded_array(),
     alpha=_nonzero_scalar(),
 )
-@settings(max_examples=50, deadline=None)
+@settings(max_examples=50)
 def test_linf_error_scales_with_alpha_magnitude(
     a: np.ndarray, b: np.ndarray, alpha: float
 ) -> None:

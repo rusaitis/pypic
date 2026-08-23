@@ -11,8 +11,9 @@ read-only.
 
 `field_dependencies` reports what a quantity needs, which is what lets
 `Simulation.read` load exactly the fields a later `compute()` call will
-require. `available_quantities` lists everything computable from a given
-dataset.
+require. `available_quantities()` takes no arguments and lists every registered
+quantity name and alias, excluding the per-species names synthesized on
+demand.
 
 Recipes marked `supports_relativistic=True` receive `c` automatically when
 `physics.relativistic` is set in the dataset config — see

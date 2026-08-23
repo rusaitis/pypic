@@ -29,7 +29,7 @@ from pypic.readers.ipic3d import (
 from pypic.readers.ipic3d._conserved import load_ipic3d_auxiliary
 from tests._helpers import per_species
 
-DATA = Path("tests/data/ipic3d-synthetic")
+DATA = Path(__file__).resolve().parent / "data" / "ipic3d-synthetic"
 PHDF5_DIR = DATA / "phdf5"
 SHDF5_DIR = DATA / "shdf5"
 H5HUT_DIR = DATA / "h5hut"

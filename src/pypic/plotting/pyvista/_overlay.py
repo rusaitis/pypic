@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
@@ -44,15 +45,15 @@ def _rounded_rect_points(
     """Compute corner-arc points for a rounded rectangle."""
     r = min(rounding, w * 0.3, h * 0.3)
     corners = [
-        (x + r, y + r, -np.pi, -np.pi / 2),
-        (x + w - r, y + r, -np.pi / 2, 0),
-        (x + w - r, y + h - r, 0, np.pi / 2),
-        (x + r, y + h - r, np.pi / 2, np.pi),
+        (x + r, y + r, -math.pi, -math.pi / 2),
+        (x + w - r, y + r, -math.pi / 2, 0),
+        (x + w - r, y + h - r, 0, math.pi / 2),
+        (x + r, y + h - r, math.pi / 2, math.pi),
     ]
     pts: list[tuple[float, float]] = []
     for cx, cy, a0, a1 in corners:
         for ang in np.linspace(a0, a1, n_arc):
-            pts.append((cx + r * np.cos(ang), cy + r * np.sin(ang)))
+            pts.append((cx + r * math.cos(ang), cy + r * math.sin(ang)))
     return pts
 
 

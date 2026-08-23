@@ -139,12 +139,23 @@ class SimulationConfig:
         Physics parameters (frozen dataclass).
     frame : str
         Reference frame label (e.g. ``"GSM"``, ``"simulation"``).
+    transforms : dict[str, FrameTransform]
+        Validated ``[coordinates.transforms]`` entries, keyed by
+        target-frame name. Chains resolve breadth-first from *frame*.
     initial_conditions : InitialConditions | None
         Validated ``[initial_conditions]`` object from the v1.0 schema,
         or ``None`` when the section is absent.
     output : Output | None
         Validated ``[output]`` umbrella object from the v1.0 schema, or
         ``None`` when the section is absent.
+    bodies : tuple[Body, ...]
+        Validated ``[[bodies]]`` registry — planets, stars, coils.
+        Drivers and initial conditions reference these by name.
+    drivers : tuple[Driver, ...]
+        Validated ``[[drivers]]`` registry — magnetograms, solar-wind
+        inflows, coupled models, and other ongoing external input.
+    restart : Restart | None
+        Validated ``[restart]`` continuation pointer, or ``None``.
     run : Run | None
         Validated ``[run]`` provenance object — authors, DOI, license,
         funding, embargo, ensemble, resource accounting. ``None`` only

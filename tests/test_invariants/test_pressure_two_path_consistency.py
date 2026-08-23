@@ -64,7 +64,7 @@ def _tensor_component() -> st.SearchStrategy[np.ndarray]:
     p22_i=_tensor_component(),
     p33_i=_tensor_component(),
 )
-@settings(max_examples=50, deadline=None)
+@settings(max_examples=50)
 def test_total_pressure_from_per_species_tensors_two_paths(
     p11_e: np.ndarray,
     p22_e: np.ndarray,

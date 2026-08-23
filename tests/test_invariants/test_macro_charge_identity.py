@@ -79,7 +79,7 @@ def _make_particle_data(
     species_mass=_species_scalar(),
     data=st.data(),
 )
-@settings(max_examples=60, deadline=None)
+@settings(max_examples=60)
 def test_macro_charge_and_mass_bit_exact(
     n: int,
     species_charge: float,
@@ -104,7 +104,7 @@ def test_macro_charge_and_mass_bit_exact(
 
 
 @given(weight=_weight_array(4))
-@settings(max_examples=20, deadline=None)
+@settings(max_examples=20)
 def test_macro_raises_when_species_scalar_missing(weight: np.ndarray) -> None:
     """Missing ``species_charge`` or ``species_mass`` must raise
     ``ValueError`` with a message naming the missing fields — not
@@ -125,7 +125,7 @@ def test_macro_raises_when_species_scalar_missing(weight: np.ndarray) -> None:
     species_charge=_species_scalar(),
     data=st.data(),
 )
-@settings(max_examples=40, deadline=None)
+@settings(max_examples=40)
 def test_macro_raises_when_weight_missing(
     n: int, species_charge: float, data: st.DataObject
 ) -> None:

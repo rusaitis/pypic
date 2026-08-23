@@ -91,9 +91,11 @@ def plot_comparison(
     colorbar : bool or "inset"
         ``True`` for side colorbars, ``"inset"`` for overlay colorbars,
         ``False`` to disable.
-    extremes : "darken" or "transparent"
-        How to style values outside ``[vmin, vmax]``.
-        ``"transparent"`` makes them invisible.
+    extremes : "semi", "transparent", "darken", or None
+        Colorbar out-of-range indicator style. ``"semi"`` (default)
+        uses semi-transparent extension colors; ``"transparent"``
+        hides them; ``"darken"`` darkens the endpoint colors;
+        ``None`` leaves matplotlib defaults untouched.
     show_error : bool
         When ``True``, display the relative L2 error on the difference
         panel as a text annotation.
@@ -101,6 +103,30 @@ def plot_comparison(
         Figure size override. Defaults to ``(14, 4)``.
     title : str | None
         Override auto-generated suptitle.
+    data_a : FieldDataset
+        Left-hand dataset (panel A).
+    data_b : FieldDataset
+        Right-hand dataset (panel B); must share A's grid.
+    vmin : float or None
+        Lower color limit. ``None`` (default) autoscales.
+    vmax : float or None
+        Upper color limit. ``None`` (default) autoscales.
+    diff_vmin : float or None
+        Lower color limit for the difference panel. ``None``
+        (default) autoscales symmetrically about zero.
+    diff_vmax : float or None
+        Upper color limit for the difference panel. ``None``
+        (default) autoscales symmetrically about zero.
+    symlog : bool
+        Use a symmetric-log color scale, for signed fields
+        spanning several decades.
+    linthresh : float or None
+        Linear threshold for ``symlog``. ``None`` (default)
+        auto-detects from the data.
+    save : str or Path or None
+        Path to write the figure to. When given, the figure is saved
+        and closed; when ``None`` (default) it is left open for the
+        caller to display or modify further.
 
     Returns
     -------

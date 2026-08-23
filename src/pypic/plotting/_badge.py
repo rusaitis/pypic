@@ -126,7 +126,7 @@ def _make_overlay_box(
     return box
 
 
-OverlayVariant = Literal["darker", "lighter", "alt"]
+type OverlayVariant = Literal["darker", "lighter", "alt"]
 
 
 def _detect_overlay_defaults(

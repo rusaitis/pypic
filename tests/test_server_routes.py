@@ -11,7 +11,7 @@ pytest.importorskip("fastapi")
 from fastapi.testclient import TestClient
 
 from pypic.server.app import create_app
-from tests._server_helpers import make_sim_dir
+from tests._sim_fixtures import make_sim_dir
 
 if TYPE_CHECKING:
     from pathlib import Path

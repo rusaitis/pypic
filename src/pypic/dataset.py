@@ -24,7 +24,7 @@ from pypic.grid import (
 from pypic.units import PhysicsParams
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable, Sequence
+    from collections.abc import Iterable, Mapping, Sequence
 
     from xarray import Dataset
 
@@ -65,6 +65,13 @@ class FieldDataset:
         Extra field-name aliases merged with geometry defaults.
         Aliases whose canonical target is absent from the dataset
         are silently dropped (they become inactive).
+    frame : str
+        Name of the reference frame these arrays are expressed in.
+        Defaults to ``"simulation"``.
+    transforms : dict[str, FrameTransform] | None
+        Frame transforms reachable from *frame*, keyed by target-frame
+        name.  Consumed by `transform_to` and `available_frames`;
+        chains resolve by breadth-first search.
 
     Examples
     --------
@@ -150,7 +157,7 @@ class FieldDataset:
     @classmethod
     def from_arrays(
         cls,
-        fields: dict[str, FloatArray],
+        fields: Mapping[str, FloatArray],
         grid: GridInfo,
         normalization: Normalization | None = None,
         *,
@@ -166,7 +173,7 @@ class FieldDataset:
 
         Parameters
         ----------
-        fields : dict[str, FloatArray]
+        fields : Mapping[str, FloatArray]
             Mapping of field names to arrays. Shapes must match
             ``grid.dimensions``.  Names must resolve through the field
             registry (canonical names, registered aliases, or
@@ -183,6 +190,12 @@ class FieldDataset:
             Arbitrary metadata.
         aliases : dict[str, str] | None
             Extra field-name aliases.
+        frame : str
+            Name of the reference frame these arrays are expressed in.
+            Defaults to ``"simulation"``.
+        transforms : dict[str, FrameTransform] | None
+            Frame transforms reachable from *frame*, keyed by
+            target-frame name.  Consumed by `transform_to`.
         strict_fields : bool
             When ``True`` (default), every key in *fields* must resolve
             through ``pypic.fields.field_info`` — any unknown name
