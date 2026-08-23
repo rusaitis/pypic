@@ -593,7 +593,7 @@ class TestConservedToTabular:
 class TestAuxiliaryErrors:
     """Error-type contract for ``load_ipic3d_auxiliary``.
 
-    Convention (see Unit 6 in TASKS-cleanup.md):
+    Convention:
     - ``KeyError``        → unknown dataset name
     - ``FileNotFoundError`` → recognized name, missing files on disk
     """

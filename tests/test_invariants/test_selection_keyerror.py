@@ -1,4 +1,4 @@
-# Source: CLAUDE.md "Selection APIs fail loud on unmatched names. Functions
+# Source: docs/architecture.md "Selection APIs fail loud on unmatched names. Functions
 #         that accept a user-supplied list of field/column/component names
 #         (fields=, columns=, ...) must raise KeyError on names that match
 #         nothing, or expose an explicit strict_fields: bool = False kwarg
@@ -86,7 +86,7 @@ def test_getitem_raises_keyerror(name: str) -> None:
 @settings(max_examples=100, deadline=None)
 def test_select_fields_raises_keyerror(name: str) -> None:
     """``select_fields`` with at least one unknown name raises ``KeyError``
-    — the CLAUDE.md contract forbids silent skip, so even a single bad
+    — the documented contract forbids silent skip, so even a single bad
     entry in a longer list must fail loud.
     """
     ds = _make_dataset()
@@ -100,7 +100,7 @@ def test_select_fields_raises_keyerror(name: str) -> None:
 def test_compute_raises_keyerror(name: str) -> None:
     """``ds.compute(name)`` raises ``KeyError`` when the name is neither
     a loaded field nor a registered recipe. Guards the second half of
-    the CLAUDE.md contract — the dispatch layer is also a selection API.
+    the documented contract — the dispatch layer is also a selection API.
     """
     ds = _make_dataset()
     assume(not ds.has_field(name))
@@ -113,7 +113,7 @@ def test_resolve_key_error_suggests_close_matches() -> None:
     """The error message must include a close-match suggestion when one
     exists. This is the mechanism that turns typos ("rho_c" → "rhoc",
     "Bx" → "B_x") into actionable feedback rather than silent puzzlement
-    — the specific behavior CLAUDE.md calls out as the failure mode of
+    — the specific behavior docs/architecture.md calls out as the failure mode of
     log-only warnings.
     """
     ds = _make_dataset()

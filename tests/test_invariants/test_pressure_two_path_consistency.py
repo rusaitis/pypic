@@ -17,14 +17,12 @@
 # add-then-divide paths must agree: any factor-of-3 or sign bug in
 # either recipe would break the identity.
 #
-# Audit note: two sub-tests were dropped in the 21st-iteration audit:
-# ``test_isotropic_pressure_equals_trace_over_three`` was a literal
-# tautology of the one-line ``isotropic_pressure`` body at
-# derived.py:1348 (iter 10's ``test_isotropic_pressure_equals_par_plus_
-# two_perp_over_three`` already validates the same scalar through the
-# independent parallel/perpendicular decomposition). The
-# commutativity/associativity checks on ``total_pressure`` — a two-arg
-# addition — were < 1 ulp above noise.
+# Deliberately not tested here: a ``P == Tr(P)/3`` check would be a
+# literal tautology of the one-line ``isotropic_pressure`` body, and
+# ``test_pressure_rotation.py`` already validates the same scalar
+# through the independent parallel/perpendicular decomposition.
+# Commutativity and associativity of ``total_pressure`` — a two-arg
+# addition — sit < 1 ulp above noise.
 """Isotropic pressure via two independent paths."""
 
 from __future__ import annotations

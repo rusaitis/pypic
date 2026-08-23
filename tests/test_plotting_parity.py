@@ -5,8 +5,6 @@ as data and assert their symmetric difference is contained in a curated
 "intentional gap" allowlist. When a parameter is added to one backend,
 the test fails until the author either lifts it to the other backend or
 documents it here as a backend-specific gap.
-
-Unit 9 of the cleanup sweep — see ``TASKS-cleanup.md``.
 """
 
 from __future__ import annotations

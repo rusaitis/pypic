@@ -8,10 +8,7 @@ every recipe references known dependencies.
 
 Each test is a single structural invariant ("every entry in X satisfies
 Y"). Failures are collected and reported in one assertion message rather
-than fanned out across hundreds of parametrized cases — see the
-"Testing" section of ``CLAUDE.md``.
-
-Unit 11 of the cleanup sweep — see ``TASKS-cleanup.md``.
+than fanned out across hundreds of parametrized cases.
 
 When schema.md grows a new canonical name, add it to ``CANONICAL_NAMES``
 below. When a test fails, the fix is usually one of: register it in

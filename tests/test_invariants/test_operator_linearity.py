@@ -3,15 +3,13 @@
 #         ``np.gradient``, a linear finite-difference operator along
 #         a single axis.
 # Claim: the vector identity ``curl(grad f) = 0`` holds bit-exactly
-#        everywhere, not just in the interior. Dual to iteration 3's
-#        ``div(curl F) = 0`` (commit 218d9d1): linear operators along
-#        distinct axes commute even where the boundary one-sided
-#        stencils apply, because they never read across axes.
-# Audit note: the α F + β G linearity sub-tests (gradient/curl/divergence)
-# that originally lived here were dropped in the 21st-iteration audit —
-# if linearity broke silently, the div(curl F) = 0 and curl(grad f) = 0
-# identities would fail first, making a separate linearity property
-# pure surface area.
+#        everywhere, not just in the interior. Dual to the
+#        ``div(curl F) = 0`` identity in ``test_operator_identities.py``:
+#        linear operators along distinct axes commute even where the
+#        boundary one-sided stencils apply, because they never read
+#        across axes.
+# No separate α F + β G linearity test: if linearity broke silently,
+# div(curl F) = 0 and curl(grad f) = 0 would fail first.
 """The curl(grad f) = 0 vector identity (dual to div(curl F) = 0)."""
 
 from __future__ import annotations
@@ -59,8 +57,9 @@ def test_curl_of_gradient_is_zero(
 ) -> None:
     r"""$\nabla \times \nabla f = \mathbf{0}$ bit-exactly everywhere.
 
-    Dual to the ``div(curl F) = 0`` identity tested in iteration 3
-    (commit 218d9d1). Same argument: ``np.gradient`` along distinct
+    Dual to the ``div(curl F) = 0`` identity in
+    ``test_operator_identities.py``. Same argument: ``np.gradient``
+    along distinct
     axes commutes exactly (each call reads only its own axis), so the
     three curl components reduce to pairwise differences of identical
     mixed partials and cancel at every grid point — including the

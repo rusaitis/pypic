@@ -1,4 +1,4 @@
-# Source: CLAUDE.md "transform-chaining rule" + docs/schema.md § 2
+# Source: docs/architecture.md transform-chaining rule + docs/schema.md § 2
 #         ("Transforms can chain"). The chain operation is implemented by
 #         ``compose_transforms`` in src/pypic/coordinates/transforms.py:182;
 #         associativity is required for ``resolve_transform`` (same file,

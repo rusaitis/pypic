@@ -13,9 +13,9 @@
 #        (e.g. hardcoding ẑ as the perpendicular-plane normal) would
 #        break this test while still passing the single-axis unit tests
 #        at derived.py:1525-1530 and in tests/test_derived.py::TestAgyrotropy.
-# Complements iter 10's Tr/P_par/P_perp rotation invariance: this one
-# exercises the agyrotropy compound formula, one level further.
-# Fresh invariant #17 after backlog exhaustion.
+# Complements the Tr/P_par/P_perp rotation invariance in
+# test_pressure_rotation.py: this one exercises the agyrotropy compound
+# formula, one level further.
 """Rotation invariance of the agyrotropy measure Q."""
 
 from __future__ import annotations

@@ -125,7 +125,7 @@ class TestPlotFieldSlice:
     def test_returns_figure_and_axes(self, ds_2d: FieldDataset) -> None:
         """Plotted ``B_1`` data equals the input field (transposed).
 
-        Hardened (iter 17): the pcolormesh-backed image is in
+        The pcolormesh-backed image is in
         ``ax.collections[0]``; its ``get_array()`` carries the plotted
         values with axes swapped relative to the input. Pinning the
         array prevents silent regressions where the colorbar renders
@@ -174,8 +174,7 @@ class TestPlotFieldSlice:
     def test_options(self, ds_2d: FieldDataset, kwargs: dict) -> None:
         """Option kwargs leave observable traces on the resulting figure.
 
-        Hardened (iter 17): the pre-hardening assertion was
-        ``isinstance(fig, Figure)`` — a tautology that passes if
+        Asserting only ``isinstance(fig, Figure)`` is a tautology that passes if
         matplotlib doesn't crash. Each option now pins a concrete
         visible effect: ``colorbar=False`` leaves a single axes,
         ``colorbar='inset'`` adds a child axes, ``alpha`` pins the
@@ -231,7 +230,7 @@ class TestPlotFieldSlice:
     def test_3d_auto_and_explicit(self, ds_3d: FieldDataset) -> None:
         """Explicit ``plane=`` selects the requested slice from a 3D dataset.
 
-        Hardened (iter 17): the pre-hardening body created two figures
+        The weaker form created two figures
         and closed them with no assertions. The explicit slice at
         ``x=3`` is pinned to the corresponding ``B_2[3, :, :]`` plane
         (transposed for pcolormesh). Prevents silent regressions where
@@ -253,9 +252,9 @@ class TestPlotComparison:
     def test_returns_figure_and_axes_dict(self, ds_2d: FieldDataset) -> None:
         """Three-panel layout; diff panel vanishes for identical inputs.
 
-        Hardened (iter 17): when both inputs are the same dataset the
+        When both inputs are the same dataset the
         elementwise difference must be zero everywhere. The panel keys
-        were already pinned; we now also pin the numerical content of
+        were already pinned; this also pins the numerical content of
         the ``diff`` panel (guards against a regression where the diff
         panel silently plots one of the inputs instead of ``a - b``).
         """
@@ -276,7 +275,7 @@ class TestPlotComparison:
     def test_3d_and_derived(self, ds_3d: FieldDataset) -> None:
         """3D + derived field (``|B|``) renders with non-negative panels.
 
-        Hardened (iter 17): was ``isinstance(fig, Figure)``. Now also
+        A weaker form asserted ``isinstance(fig, Figure)``. Now also
         asserts the ``a`` and ``b`` panels carry non-negative data (as
         required for a magnitude) and the diff panel has zero content.
         """
@@ -305,8 +304,8 @@ class TestPlotComparison:
     def test_options(self, ds_2d: FieldDataset, kwargs: dict) -> None:
         """Option kwargs leave observable traces on the comparison figure.
 
-        Hardened (iter 17): pre-hardening body only asserted
-        ``isinstance(fig, Figure)``. Each option now pins a concrete
+        Asserting only ``isinstance(fig, Figure)`` would be tautological. Each
+        option instead pins a concrete
         visible effect: ``colorbar=False`` yields 3 total axes (one
         per panel, no colorbar); ``colorbar='inset'`` yields 3 total
         axes plus 3 inset child axes; ``vmin/vmax`` pin the norm
@@ -544,8 +543,7 @@ class TestPlotLine:
     def test_1d(self, ds_1d: FieldDataset) -> None:
         """1D line plot draws the full B_1 vector as a single line.
 
-        Hardened (iter 18): the pre-hardening body asserted only
-        isinstance(fig, Figure) — tautological. We now pin the
+        Asserting only isinstance(fig, Figure) would be tautological. This pins the
         drawn ydata to equal the input array and xdata to be the
         grid coordinate, so a regression that plots a slice or the
         wrong field is caught.
@@ -564,9 +562,9 @@ class TestPlotLine:
     def test_2d_with_axis(self, ds_2d: FieldDataset) -> None:
         """2D slice along x sets ydata to the mid-y row of B_1.
 
-        Hardened (iter 18): the line-count-only assertion let a
+        A line-count-only assertion let a
         regression that sliced the wrong axis or the wrong index pass
-        silently. We now pin the ydata to the explicit
+        silently. This pins the ydata to the explicit
         ``B_1[:, ny // 2]`` slice that ``plot_line`` uses by default.
         """
         fig, ax = plot_line(ds_2d, "B_1", axis="x")
@@ -579,7 +577,7 @@ class TestPlotLine:
     def test_custom_axes_overlay(self, ds_2d: FieldDataset) -> None:
         """Overlaying a second call onto ``ax`` adds a distinct B_2 line.
 
-        Hardened (iter 18): in addition to the line-count check we pin
+        In addition to the line-count check we pin
         each line's ydata to the correct field's midplane row, so a
         regression where the second call overwrote the first or
         plotted the wrong field is caught.
@@ -604,8 +602,8 @@ class TestPlotLine:
         """Supplying ``label=`` creates a legend whose single entry
         matches the supplied label string.
 
-        Hardened (iter 18): the pre-hardening body only checked that a
-        legend object was present; we now pin the legend text to the
+        Checking only that a
+        legend object was present; this pins the legend text to the
         user-supplied ``"test"`` so a regression that injects the
         wrong label (e.g. the raw field name) is caught.
         """
@@ -621,7 +619,7 @@ class TestPlotTimeSeries:
     def test_single_column(self, tabular: TabularData) -> None:
         """Drawn ydata equals the named column and xdata equals the index.
 
-        Hardened (iter 18): the line-count-only assertion let a
+        A line-count-only assertion let a
         regression that swapped x/y or plotted the wrong column pass.
         Pinning both axes to the TabularData entries catches a
         column-alias drift (``total_energy`` vs ``kinetic_energy``).
@@ -636,8 +634,8 @@ class TestPlotTimeSeries:
         """Each column becomes its own line with a legend entry matching
         the column name.
 
-        Hardened (iter 18): the pre-hardening body asserted line count
-        and legend-present. We now pin each line's ydata to the
+        Asserting only line count
+        and legend-present. This pins each line's ydata to the
         matching tabular column and assert the legend labels equal
         the column names in order — catches a mis-ordering that
         would relabel lines silently.
@@ -659,7 +657,7 @@ class TestPlotTimeSeries:
     def test_custom_x_column(self, tabular: TabularData) -> None:
         """Custom ``x_column`` drives xlabel and xdata.
 
-        Hardened (iter 18): added xdata-equals-column and line-count
+        Pins xdata-equals-column and line-count
         assertions alongside the xlabel check, so a regression that
         set the label correctly but plotted the wrong x-axis values
         is caught.
@@ -688,7 +686,7 @@ class TestVectorPlots:
         """Vector plot draws a LineCollection (streamlines) or Quiver
         (quiver) into the axes.
 
-        Hardened (iter 18): the isinstance-only assertion let a no-op
+        An isinstance-only assertion let a no-op
         plot pass. Pinning ``ax.collections[0]`` ensures at least one
         vector primitive was drawn — a regression that returned an
         empty axes is caught.
@@ -705,7 +703,7 @@ class TestVectorPlots:
     def test_custom_axes(self, ds_2d: FieldDataset, plot_fn: object) -> None:
         """Passing ``ax=ax_ext`` draws onto the supplied axes.
 
-        Hardened (iter 18): in addition to the identity check, we now
+        In addition to the identity check, this pins
         pin that at least one collection ends up on ``ax_ext``, so a
         regression that returned ``ax_ext`` without drawing onto it
         is caught.
@@ -723,7 +721,7 @@ class TestVectorPlots:
     def test_uniform_color(self, ds_2d: FieldDataset, plot_fn: object) -> None:
         """Uniform ``color="black"`` bypasses the colormap path.
 
-        Hardened (iter 18): pre-hardening only asserted isinstance. We
+        Asserting only isinstance would be tautological. This
         now pin that no colorbar axes was created (the colormap branch
         attaches one, the uniform-color branch does not) so a regression
         that silently reverts to colormap mode is caught.
@@ -791,8 +789,7 @@ class TestVectorPlots:
         """Each ``plot_streamlines`` / ``plot_quiver`` option leaves a
         concrete observable trace on the returned figure.
 
-        Hardened (iter 18): the pre-hardening body asserted only
-        isinstance — any regression that silently ignored the kwarg
+        Asserting only isinstance — any regression that silently ignored the kwarg
         passed. Each option now pins a concrete effect:
         ``colorbar=False`` leaves a single axes, ``alpha`` pins the
         collection alpha, and the vector primitive is verified drawn
@@ -905,8 +902,8 @@ class TestOverlayVariant:
     def test_default_uses_theme_color(self) -> None:
         """``variant=None`` returns an RGB triple and a valid alpha.
 
-        Hardened (iter 18): the pre-hardening bound ``0 < alpha <= 1``
-        admitted any alpha >= next-representable-zero. We tighten to
+        The looser bound ``0 < alpha <= 1``
+        admitted any alpha >= next-representable-zero. Tightened to
         alpha strictly less than 1 (overlays are never fully opaque)
         and pin each RGB component to the valid ``[0, 1]`` range, so
         a regression that returned unclamped colors is caught.
@@ -921,9 +918,9 @@ class TestOverlayVariant:
     def test_alt_variant_returns_alt_colors(self) -> None:
         """``variant="alt"`` returns a distinct bg, fg, or alpha.
 
-        Hardened (iter 18): the prior ``!= alpha_default or !=
+        The looser ``!= alpha_default or !=
         bg_default`` permitted identical output in both attributes.
-        We now require at least one of {bg, fg, alpha} differs
+        Requires at least one of {bg, fg, alpha} to differ
         from the ``None`` variant so a regression that silently
         degenerated ``"alt"`` to the default is caught.
         """
@@ -965,8 +962,8 @@ class TestInsetColorbar:
         """Every supported ``loc`` attaches the colorbar as a child of
         the host axes (inset mode), not as a sibling figure axes.
 
-        Hardened (iter 18): ``cb is not None`` was tautological once
-        the function signature declared ``-> Colorbar``. We now pin
+        ``cb is not None`` was tautological once
+        the function signature declared ``-> Colorbar``. This pins
         the inset-specific structural invariant — exactly one
         ``ax.child_axes`` entry — which catches a regression that
         degenerates to the non-inset (sibling-axes) colorbar path.
@@ -991,8 +988,8 @@ class TestInsetColorbar:
         """``colorbar="inset"`` produces a single-axes figure with the
         colorbar rendered as an inset child.
 
-        Hardened (iter 18): pre-hardening only asserted isinstance.
-        We now pin the inset invariant — one figure axes, one
+        Asserting only isinstance would be tautological.
+        This pins the inset invariant — one figure axes, one
         ``ax.child_axes`` — which catches a regression that silently
         fell back to a separate colorbar axes (``fig.axes >= 2``).
         """
@@ -1048,8 +1045,8 @@ class TestAddContours:
         """``add_contours`` adds a ContourSet to an existing axes
         without replacing the underlying pcolormesh.
 
-        Hardened (iter 18): the pre-hardening ``cs is not None`` was
-        a function-signature tautology. We now pin:
+        The weaker form ``cs is not None`` was
+        a function-signature tautology. This pins:
         1. ``ax.collections`` grows by at least one (a new
            ``LineCollection`` per contour line), and
         2. the ContourSet exposes the requested number of levels
@@ -1069,7 +1066,7 @@ class TestAddContours:
     def test_contour_with_labels(self, ds_2d: FieldDataset) -> None:
         """``labels=True`` attaches label texts to the contour set.
 
-        Hardened (iter 18): prior body had no assertions. We now
+        An earlier form had no assertions. This
         pin ``len(cs.labelTexts) > 0`` (clabel populates this list)
         so a regression that silently drops the label path is caught.
         """
@@ -1087,7 +1084,7 @@ class TestLogScale:
     def test_log_scale_positive_field(self, ds_2d: FieldDataset) -> None:
         """``log_scale=True`` wraps the pcolormesh norm in LogNorm.
 
-        Hardened (iter 18): isinstance(fig, Figure) didn't guard the
+        An ``isinstance(fig, Figure)`` check did not guard the
         log path at all — a silently-linear plot would pass. Pinning
         the collection's norm to ``matplotlib.colors.LogNorm`` catches
         a regression that forgets to apply log scaling.
@@ -1105,7 +1102,7 @@ class TestComposedFieldAndVectors:
         """Overlaying streamlines on a field slice produces exactly
         one QuadMesh (slice) plus one LineCollection (streamlines).
 
-        Hardened (iter 18): the isinstance-only assertions ignored
+        An isinstance-only assertion ignored
         whether the second call actually drew anything. We pin the
         collection types so a regression that silently replaces the
         slice, skips the streamlines, or draws the wrong primitive
@@ -1126,7 +1123,7 @@ class TestComposedFieldAndVectors:
         """Overlaying a quiver on a field slice yields QuadMesh +
         Quiver collections on the same axes.
 
-        Hardened (iter 18): pre-hardening only asserted isinstance.
+        Asserting only isinstance would be tautological.
         We pin both collections' types to catch a regression that
         drops either the slice or the quiver silently.
         """
@@ -1145,7 +1142,7 @@ class TestComposedFieldAndVectors:
         """Overlaying slice + streamlines on an externally supplied
         axes draws both onto that axes.
 
-        Hardened (iter 18): in addition to the identity check, we
+        In addition to the identity check, we
         pin that exactly two collections end up on ``ax_ext`` —
         catches a regression where the second call detaches or
         creates a new axes silently.
@@ -1162,8 +1159,8 @@ class TestPlotFieldGrid:
     def test_basic_grid(self, ds_2d: FieldDataset) -> None:
         """Requesting N fields yields N axes, each with a pcolormesh.
 
-        Hardened (iter 18): pre-hardening only checked
-        ``len(axes) == 4``. We now pin that every panel has at least
+        Checking only ``len(axes) == 4`` is weak. This pins that every panel has
+        at least
         one collection drawn — a regression that returned N empty
         axes passed the prior assertion.
         """
@@ -1180,7 +1177,7 @@ class TestPlotFieldGrid:
     def test_single_field(self, ds_2d: FieldDataset) -> None:
         """A 1-field grid yields one axes with one pcolormesh.
 
-        Hardened (iter 18): added the ``len(collections) == 1``
+        Pins the ``len(collections) == 1``
         invariant alongside the panel-count check.
         """
         from pypic.plotting import plot_field_grid
@@ -1193,7 +1190,7 @@ class TestPlotFieldGrid:
     def test_panel_labels_disabled(self, ds_2d: FieldDataset) -> None:
         """``panel_labels=False`` suppresses the panel-label artists.
 
-        Hardened (iter 18): prior body had no assertion. We now
+        An earlier form had no assertion. This
         scan every panel's ``ax.artists`` and assert no
         ``AnchoredOffsetbox`` (the panel-label container) is
         present — catches a regression that ignores the kwarg.
@@ -1213,8 +1210,8 @@ class TestPlotCrossSection:
     def test_basic(self, ds_2d: FieldDataset) -> None:
         """Cross-section returns (2D ax with pcolormesh, 1D ax with line).
 
-        Hardened (iter 18): pre-hardening only did isinstance checks.
-        We now pin the 2D panel has exactly one collection
+        The weaker form did isinstance checks only.
+        This pins that the 2D panel has exactly one collection
         (the pcolormesh) and the 1D panel has at least one line
         drawn — a regression that leaves either panel empty is
         caught.
@@ -1233,7 +1230,7 @@ class TestPlotCrossSection:
         """Custom ``cut_index`` drives the 1D line's ydata to the
         B_1 row at that cut index.
 
-        Hardened (iter 18): the prior body had no assertion. ``cut_axis
+        An earlier form had no assertion. ``cut_axis
         ="y"`` means slice AT y-index 2, yielding ``B_1[2, :]``. Pinning
         this catches a regression that silently ignores ``cut_index``
         (defaulting to midplane) or swaps the slicing axis.
@@ -1258,8 +1255,8 @@ class TestComparisonShowError:
         """``show_error=True`` overlays the L2 relative error as a
         text annotation on the diff panel.
 
-        Hardened (iter 18): the pre-hardening isinstance(fig, Figure)
-        would pass even if show_error was silently ignored. We now
+        The weaker form isinstance(fig, Figure)
+        would pass even if show_error was silently ignored. This
         assert a text artist containing ``"L_2"`` (LaTeX ``$L_2$``)
         exists on the diff panel — catches a regression that drops
         the error annotation.

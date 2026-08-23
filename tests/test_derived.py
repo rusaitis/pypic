@@ -68,7 +68,7 @@ class TestMagnitudes:
     """Structural invariants every $|X| = \\sqrt{X_1^2 + X_2^2 + X_3^2}$
     function must satisfy.
 
-    Aggregated rather than parametrized per CLAUDE.md guidance — the
+    Aggregated rather than parametrized per the project's testing conventions — the
     failure message lists every offending function, so a regression
     in one or all four surfaces in a single test run.
     """
@@ -1605,7 +1605,7 @@ class TestMagneticFluxFunction:
 # Each test below is one structural invariant ("every callable in this list
 # satisfies property P"). Failures are aggregated into a descriptive
 # message rather than fanned out across N parametrized cases — the
-# project's CLAUDE.md guidance prefers aggregation for invariant checks.
+# project's testing conventions prefer aggregation for invariant checks.
 #
 # The lists are kept in this section so adding a new derived function only
 # requires one append, not edits across multiple test classes.
@@ -1671,7 +1671,7 @@ _CHARGE_INVARIANT: list[tuple[str, Callable[..., Any], Callable[..., Any]]] = [
 
 
 class TestEdgeCaseInvariants:
-    """Aggregated edge-case sweep — Unit 12 of the cleanup."""
+    """Aggregated edge-case sweep: empty arrays, singletons, NaN."""
 
     def test_empty_arrays_propagate(self) -> None:
         """Empty input → empty output, preserving shape (0,)."""

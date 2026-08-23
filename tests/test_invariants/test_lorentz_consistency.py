@@ -40,7 +40,7 @@ def _sub_c_velocity(c: float, max_ratio: float = 0.99) -> st.SearchStrategy[np.n
     """Velocity magnitudes in $[0, max_ratio \\cdot c]$.
 
     Bounded below c to keep γ finite and avoid the catastrophic-cancellation
-    regime tested separately in iteration 7. Tight enough that γ stays
+    regime is tested separately. Tight enough that γ stays
     under ~7 for max_ratio=0.99, so scalar × array products stay comfortably
     inside float64.
     """

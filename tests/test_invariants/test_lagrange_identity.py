@@ -7,10 +7,10 @@
 #        squared Poynting magnitude, the second Lorentz invariant
 #        (E·B), and the two field magnitudes into a single algebraic
 #        relation. Any sign error in the cross-product expansion that
-#        leaves S·B = 0 intact (iter 15) could still break this — the
-#        two constraints are independent and both are needed to pin
-#        down the cross product up to the right-hand-rule convention.
-# Fresh invariant #14 after backlog exhaustion.
+#        leaves S·B = 0 intact (test_ohms_law_decomposition.py) could
+#        still break this — the two constraints are independent and
+#        both are needed to pin down the cross product up to the
+#        right-hand-rule convention.
 """Lagrange identity for the Poynting flux."""
 
 from __future__ import annotations
@@ -63,10 +63,10 @@ def test_lagrange_identity(
     = |\mathbf{E}|^2 |\mathbf{B}|^2$ — Lagrange's identity.
 
     A pure vector-algebra identity. Any sign error in the cross-product
-    expansion (``derived.py:421-423``) that leaves ``S·B = 0`` intact
-    (iter 15) could still break this — the two constraints are
-    independent. Both are needed to fully pin down the cross product up
-    to the right-hand-rule convention.
+    expansion that leaves ``S·B = 0`` intact (covered in
+    ``test_ohms_law_decomposition.py``) could still break this — the two
+    constraints are independent. Both are needed to fully pin down the
+    cross product up to the right-hand-rule convention.
 
     Tolerance: the LHS sums three squared products (six multiplications,
     two subtractions) plus $(\mathbf{E}\cdot\mathbf{B})^2$ — roughly

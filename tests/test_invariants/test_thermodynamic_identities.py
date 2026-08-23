@@ -9,9 +9,7 @@
 #   (iii) e_th = ρ_m · e_int            (volumetric thermal = mass × specific internal)
 #   (iv) c_s² = γ · (γ - 1) · e_int     (sound speed from specific energy)
 # None of the four recipes knows about the others — if any drifts
-# (bad factor, sign, swapped arg), these identities break. Fresh
-# invariant proposed after the numbered backlog exhausted at
-# iteration 9 (commit 46678ef).
+# (bad factor, sign, swapped arg), these identities break.
 """Cross-consistency of enthalpy / internal energy / thermal density / c_s."""
 
 from __future__ import annotations
@@ -51,7 +49,7 @@ def _adiabatic_index() -> st.SearchStrategy[float]:
     """γ ∈ (1, 3]: excludes γ = 1 (the (γ-1) denominator would blow up)
     and stays inside the physical range — monoatomic 5/3, diatomic 7/5,
     isothermal → 1⁺, ultra-relativistic 4/3 — the span equations.md
-    and CLAUDE.md both treat as canonical.
+    and docs/conventions.md both treat as canonical.
     """
     return st.floats(
         min_value=1.01,

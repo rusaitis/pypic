@@ -118,7 +118,8 @@ def test_ideal_e_perpendicular_to_b(
 ) -> None:
     r"""$\mathbf{E}_{ideal} \cdot \mathbf{B} = 0$ — the convective
     electric field $-\mathbf{V} \times \mathbf{B}$ is always perpendicular
-    to $\mathbf{B}$. Companion to iteration 15's Poynting S·B = 0.
+    to $\mathbf{B}$. Companion to the Poynting S·B = 0 orthogonality
+    in ``test_lagrange_identity.py``.
     """
     ei1, ei2, ei3 = ideal_electric_field(v1, v2, v3, b1, b2, b3)
     dot = ei1 * b1 + ei2 * b2 + ei3 * b3

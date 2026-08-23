@@ -1,7 +1,7 @@
 # Source: docs/equations.md § 8.1 ("recovers (1/2) ρ_m v² for v ≪ c" for
 #         e_k; "recovers B/√ρ_m for σ ≪ 1" for v_A; "practical cap at c"
 #         for v_th; and the composition of the relativistic v_ms reducing
-#         to v_A² + c_s² when v_A, c_s ≪ c) + CLAUDE.md "Relativistic via
+#         to v_A² + c_s² when v_A, c_s ≪ c) + docs/architecture.md "Relativistic via
 #         c=None kwarg" ("When None, the non-relativistic formula is used.
 #         When provided, the relativistic branch activates").
 # Claim: for each derived function with ``c: float | None``, the

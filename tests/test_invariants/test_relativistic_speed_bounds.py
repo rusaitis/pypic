@@ -177,7 +177,7 @@ def test_relativistic_thermal_speed_bounded_by_c(
     $+1$ underflows, giving $\sqrt{x^2} = x$ and the division
     $x/x$ in float64 rounds to the bit-exact $c$ — but with a
     possible $\pm$ 1-ulp overshoot from IEEE 754 sqrt (same
-    property that drove iter 22's $v_{ms}$ atol). Absorb 4·eps·c.
+    property behind the $v_{ms}$ atol). Absorb 4·eps·c.
     """
     v_th = thermal_speed(temperature, mass, c=c)
     atol = 4.0 * np.finfo(np.float64).eps * c

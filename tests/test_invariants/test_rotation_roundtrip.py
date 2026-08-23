@@ -157,7 +157,7 @@ def test_pressure_tensor_frobenius_norm_is_rotation_invariant(
     r"""$\|P\|_F^2 = \sum_{ij} P_{ij}^2$ is the second symmetric-tensor
     invariant. For a 3×3 symmetric tensor:
     $\|P\|_F^2 = P_{11}^2 + P_{22}^2 + P_{33}^2 + 2(P_{12}^2 + P_{13}^2 + P_{23}^2)$.
-    Complementing the trace invariance covered in iteration 10 at
+    Complementing the trace invariance covered at
     tests/test_invariants/test_pressure_rotation.py:79.
     """
     r = np.asarray(rotation, dtype=np.float64)
