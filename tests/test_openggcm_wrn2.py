@@ -18,9 +18,17 @@ from pypic.readers.openggcm._wrn2 import (
 )
 
 # Full-size OpenGGCM output (~10^8 values per field), far too large to
-# commit. Maintainer-only; the committed subsample under
-# tests/data/openggcm-small/ drives every other test in this file.
-_EXAMPLE_3DF = Path("examples/uclamhd-example-3D/gc012.3df.006300")
+# commit. Maintainer-only: the vectorized-vs-original cross-validation that
+# matters runs on synthetic data in TestDecompressFieldVectorized, and the
+# committed subsample under tests/data/openggcm-small/ drives every other
+# test in this file. Resolved against the repo root, not the cwd, so the
+# class skips for the same reason no matter where pytest is invoked from.
+_EXAMPLE_3DF = (
+    Path(__file__).resolve().parent.parent
+    / "examples"
+    / "uclamhd-example-3D"
+    / "gc012.3df.006300"
+)
 
 
 class TestDecodeRle:

@@ -181,9 +181,15 @@ class OpenGGCMReader:
                 "prefix": self._prefix,
                 "is_uniform_grid": False,
                 "stagger": StaggerInfo(
-                    convention="staggered",
-                    field_locations={"B": "face", "E": "edge"},
-                    notes="Yee mesh, B on cell faces, E on cell edges",
+                    convention="cell",
+                    notes=(
+                        "OpenGGCM integrates on a Yee mesh (B on faces, E on "
+                        "edges) under Evans-Hawley constrained transport, but "
+                        "writes .3df diagnostic output at cell centres: every "
+                        "field record carries the same nx*ny*nz count as rho "
+                        "and P, where a face-centred B would carry nx+1 along "
+                        "its normal. Nothing to destagger on load."
+                    ),
                 ),
             },
         )

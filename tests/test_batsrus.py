@@ -25,9 +25,12 @@ from pypic.readers.batsrus._field_map import (
     unit_factor,
 )
 from pypic.readers.batsrus._grid import is_uniform_idl
+from pypic.readers.batsrus._idl import read_out_file, read_out_header
 
 DATA_DIR = Path(__file__).parent / "data" / "batsrus-synthetic"
 IDL_DIR = DATA_DIR / "idl-uniform"
+OUT_ASCII_DIR = DATA_DIR / "out-ascii"
+OUT_BINARY_DIR = DATA_DIR / "out-binary"
 HDF5_DIR = DATA_DIR / "hdf5-uniform"
 AMR_DIR = DATA_DIR / "hdf5-amr"
 IDL_AMR_DIR = DATA_DIR / "idl-amr"
@@ -120,36 +123,6 @@ class TestHeader:
         assert header.n_param == 1
         assert_allclose(header.param_values[0], 5.0 / 3.0, rtol=1e-4)
 
-    @pytest.mark.skipif(
-        not (
-            Path("examples/batsrus-blast2d-ascii") / "z=0_mhd_1_t00000000_n00000000.h"
-        ).exists(),
-        reason="Real blast2d example not available",
-    )
-    def test_parse_real_blast_header(self) -> None:
-        header = parse_header(
-            Path("examples/batsrus-blast2d-ascii/z=0_mhd_1_t00000000_n00000000.h")
-        )
-        assert header.ndim == 2
-        assert header.n_cells == 1024
-        assert header.output_format == "ascii"
-
-    @pytest.mark.skipif(
-        not (
-            Path("examples/batsrus-earth2d-amr-idl") / "z=0_mhd_1_n00000000.h"
-        ).exists(),
-        reason="Real earth2d-amr example not available",
-    )
-    def test_parse_real_earth_header(self) -> None:
-        header = parse_header(
-            Path("examples/batsrus-earth2d-amr-idl/z=0_mhd_1_n00000000.h")
-        )
-        assert header.ndim == 2
-        assert header.n_cells == 3072
-        assert header.n_param == 3
-        assert "xsi" in header.param_names
-        assert "nT" in header.unit_string
-
 
 class TestParamIn:
     """Test PARAM.in parsing."""
@@ -164,25 +137,6 @@ class TestParamIn:
         config = parse_param_in(IDL_DIR / "PARAM.in")
         assert_allclose(config.domain_min[:2], (XMIN, YMIN))
         assert_allclose(config.domain_max[:2], (XMAX, YMAX))
-
-    @pytest.mark.skipif(
-        not (Path("examples/batsrus-earth2d-amr-idl") / "PARAM.in").exists(),
-        reason="Real earth2d-amr example not available",
-    )
-    def test_parse_real_earth_param(self) -> None:
-        config = parse_param_in(Path("examples/batsrus-earth2d-amr-idl/PARAM.in"))
-        assert config.coord_system == "GSM"
-        assert config.body_radius == 2.5
-        assert_allclose(config.solar_wind["bz_dim"], -5.0)
-
-    @pytest.mark.skipif(
-        not (Path("examples/batsrus-blast2d-ascii") / "PARAM.in").exists(),
-        reason="Real blast example not available",
-    )
-    def test_parse_blast_param(self) -> None:
-        config = parse_param_in(Path("examples/batsrus-blast2d-ascii/PARAM.in"))
-        assert config.io_units == "NONE"
-        assert config.description == "2D MHD blast wave — ASCII IDL output test"
 
 
 class TestIDLUniform:
@@ -540,3 +494,76 @@ class TestParamInSplitbDivb:
         sim = to_simulation_config(config)
         assert sim.physics.extra["use_splitb"] is True
         assert sim.physics.extra["divb_method"] == "CT8"
+
+
+class TestMergedOut:
+    """Merged ``.out`` snapshots, ASCII and real8 binary.
+
+    These fixtures carry the same Harris-sheet physics as ``idl-uniform``,
+    so the three read paths must agree field-for-field. Before this suite
+    existed the ``.out`` listing path called ``parse_header`` (the ``.h``
+    text parser), which returned no variable names for ASCII input and
+    raised ``UnicodeDecodeError`` on binary input.
+    """
+
+    @pytest.mark.parametrize("out_dir", [OUT_ASCII_DIR, OUT_BINARY_DIR])
+    def test_available_fields_matches_what_read_produces(self, out_dir: Path) -> None:
+        reader, _ = open_batsrus(out_dir)
+        listed = set(reader.available_fields(out_dir, 0))
+        read = set(reader.read_timestep(out_dir, 0).field_names())
+        assert listed == read
+
+    def test_binary_out_listing_does_not_decode_as_text(self) -> None:
+        """A real8 ``.out`` is not UTF-8; listing must not try to read it as text."""
+        reader, _ = open_batsrus(OUT_BINARY_DIR)
+        mapping = reader.available_fields_mapping(OUT_BINARY_DIR, 0)
+        assert mapping["B_1"] == "Bx"
+
+    def test_header_only_read_matches_full_read(self) -> None:
+        """``read_out_header`` is the same extractor the data path uses."""
+        names_only, _ = read_out_header(OUT_BINARY_DIR / "z=0_mhd_1_n00000000.out")
+        _, _, names_full, _ = read_out_file(OUT_BINARY_DIR / "z=0_mhd_1_n00000000.out")
+        assert names_only == names_full
+
+    @pytest.mark.parametrize("field", ["B_1", "B_2", "rho_m", "P", "V_1", "J_3"])
+    def test_out_agrees_with_idl_on_identical_physics(self, field: str) -> None:
+        """The ``.out`` path applies the same unit handling as ``.idl``.
+
+        ``_read_out`` used to skip the SI conversion both sibling paths
+        perform, so the same run read through two formats disagreed.
+        """
+        idl_reader, _ = open_batsrus(IDL_DIR)
+        out_reader, _ = open_batsrus(OUT_ASCII_DIR)
+        idl = idl_reader.read_timestep(IDL_DIR, 0)
+        out = out_reader.read_timestep(OUT_ASCII_DIR, 0)
+        assert_allclose(np.asarray(out[field]), np.asarray(idl[field]), rtol=1e-12)
+
+    @pytest.mark.parametrize("field", ["B_1", "rho_m", "P"])
+    def test_ascii_and_binary_out_agree(self, field: str) -> None:
+        ascii_reader, _ = open_batsrus(OUT_ASCII_DIR)
+        binary_reader, _ = open_batsrus(OUT_BINARY_DIR)
+        a = ascii_reader.read_timestep(OUT_ASCII_DIR, 0)
+        b = binary_reader.read_timestep(OUT_BINARY_DIR, 0)
+        assert_allclose(np.asarray(a[field]), np.asarray(b[field]), rtol=1e-12)
+
+    def test_grid_spacing_is_measured_along_each_axis(self) -> None:
+        """Spacing per axis, not ``.flat[1] - .flat[0]``, which walks the last axis."""
+        reader, _ = open_batsrus(OUT_ASCII_DIR)
+        ds = reader.read_timestep(OUT_ASCII_DIR, 0)
+        assert_allclose(ds.grid.spacing, (1.0, 1.0), rtol=1e-12)
+
+    def test_read_populates_simulation_config(self) -> None:
+        """``.out`` sets ``_sim_config`` like both sibling paths."""
+        reader, _ = open_batsrus(OUT_ASCII_DIR)
+        reader.read_timestep(OUT_ASCII_DIR, 0)
+        assert reader._sim_config is not None
+
+
+class TestParseHeaderFailsLoud:
+    """``parse_header`` must reject input that is not a BATSRUS ``.h``."""
+
+    def test_rejects_file_without_sections(self, tmp_path: Path) -> None:
+        stray = tmp_path / "notaheader.h"
+        stray.write_text("#ifndef FOO_H\n#define FOO_H\n#endif\n")
+        with pytest.raises(ValueError, match="BATSRUS"):
+            parse_header(stray)

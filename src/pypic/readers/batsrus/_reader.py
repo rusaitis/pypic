@@ -18,6 +18,7 @@ from pypic.readers.batsrus._field_map import (
     SKIP_FIELDS,
     convert_fields_to_si,
     is_normalized,
+    parse_unit_names,
 )
 from pypic.readers.batsrus._grid import (
     assemble_uniform_hdf5,
@@ -28,7 +29,11 @@ from pypic.readers.batsrus._grid import (
 )
 from pypic.readers.batsrus._hdf5 import read_batl
 from pypic.readers.batsrus._header import BATSRUSHeader, parse_header
-from pypic.readers.batsrus._idl import read_idl_cells, read_out_file
+from pypic.readers.batsrus._idl import (
+    read_idl_cells,
+    read_out_file,
+    read_out_header,
+)
 from pypic.units import Normalization, PhysicsParams
 
 log = logging.getLogger(__name__)
@@ -117,7 +122,10 @@ class BATSRUSReader:
                     return tuple(x.decode().strip() for x in f["NamePlotVar_V"][:])
             case BATSRUSOutputFormat.OUT:
                 out_file = self._find_file(path, step, ".out")
-                return parse_header(out_file).var_names
+                # Not parse_header: that reads the `#SECTION`-delimited .h
+                # text format. A .out carries its own header, and binary
+                # variants are not text at all.
+                return read_out_header(out_file)[0]
             case _ as unreachable:
                 assert_never(unreachable)
 
@@ -389,9 +397,11 @@ class BATSRUSReader:
                 continue
             field_data[canonical] = state[iv]
 
-        # Build grid from coordinate arrays
+        # Build grid from coordinate arrays. Step along axis *d* specifically:
+        # `.flat[1]` walks the last axis, so it reads 0 for every axis but the
+        # innermost one.
         spacing = tuple(
-            float(coord[d].flat[1] - coord[d].flat[0]) if dims[d] > 1 else 1.0
+            float(np.diff(coord[d], axis=d).flat[0]) if dims[d] > 1 else 1.0
             for d in range(ndim)
         )
         origin = tuple(float(coord[d].flat[0] - spacing[d] / 2) for d in range(ndim))
@@ -403,7 +413,19 @@ class BATSRUSReader:
             geometry=geo,
         )
 
+        # Unit conversion, as in _read_idl / _read_hdf5. The .out head line
+        # carries the same unit string the .h header exposes.
+        head_line = str(out_meta.get("head", ""))
+        unit_names = parse_unit_names(head_line, len(var_names))
+        if unit_names and not is_normalized(head_line):
+            field_data = convert_fields_to_si(field_data, var_names, unit_names)
+
         normalization = Normalization.identity()
+        if self._sim_config is None:
+            self._sim_config = to_simulation_config(
+                self._config, None, grid=grid, sim_dir=path
+            )
+
         physics = PhysicsParams(gamma=self._config.gamma)
         metadata_out: dict[str, Any] = {
             "step": out_meta.get("step", step),
@@ -463,21 +485,5 @@ class BATSRUSReader:
         return files
 
     def _parse_unit_names(self, header: BATSRUSHeader) -> tuple[str, ...]:
-        """Extract per-variable unit strings from header.
-
-        The unit string in the header has format:
-        ``"timestamp; unit1 unit2 ... unitN"`` or just ``"unit1 unit2 ..."``.
-        There are also units for scalar parameters appended at the end.
-        """
-        raw = header.unit_string.strip()
-        if not raw or is_normalized(raw):
-            return ()
-        # Strip optional leading timestamp
-        if ";" in raw:
-            raw = raw.split(";", 1)[1].strip()
-        from itertools import takewhile
-
-        parts = raw.split()
-        n_coord_units = sum(1 for _ in takewhile(lambda p: p == "R", parts))
-        var_units = parts[n_coord_units : n_coord_units + header.n_plot_var]
-        return tuple(var_units)
+        """Extract per-variable unit strings from a parsed ``.h`` header."""
+        return parse_unit_names(header.unit_string, header.n_plot_var)

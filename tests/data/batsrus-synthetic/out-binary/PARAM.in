@@ -1,0 +1,41 @@
+Begin session: 1
+
+#DESCRIPTION
+Synthetic Harris current sheet fixture
+
+#PLANET
+NONE			NamePlanet
+
+#IOUNITS
+NONE			TypeIoUnit
+
+#NORMALIZATION
+NONE			TypeNormalization
+
+#GRID
+2			nRootBlockX
+2			nRootBlockY
+1			nRootBlockZ
+-8.0			xMin
+8.0			xMax
+-8.0			yMin
+8.0			yMax
+-0.5			zMin
+ 0.5			zMax
+
+#OUTERBOUNDARY
+periodic		TypeBc1
+periodic		TypeBc2
+periodic		TypeBc3
+periodic		TypeBc4
+
+#SCHEME
+2			nOrder
+Rusanov			TypeFlux
+minmod			TypeLimiter
+
+#STOP
+-1			MaxIteration
+1.0			tSimulationMax
+
+#END

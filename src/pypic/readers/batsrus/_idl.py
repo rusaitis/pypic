@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import struct
+from dataclasses import dataclass
 from typing import IO, TYPE_CHECKING, Any
 
 import numpy as np
@@ -128,6 +129,106 @@ def _detect_out_format(path: Path) -> str:
         return "ascii"
 
 
+@dataclass(frozen=True, slots=True)
+class _OutHeader:
+    """Parsed header of one ``.out`` snapshot, plus what the data phase needs.
+
+    ``var_names`` and ``metadata`` are exactly what `read_out_file` returns,
+    so a caller that only needs the field listing can stop here instead of
+    reading the state arrays.
+    """
+
+    var_names: tuple[str, ...]
+    metadata: dict[str, Any]
+    ndim: int
+    nvar: int
+    dims: tuple[int, ...]
+    nreal: int
+    dtype: type[np.floating[Any]]
+
+
+def _build_out_header(
+    *,
+    head_line: str,
+    name_line: str,
+    step_val: int,
+    time_val: float,
+    ndim: int,
+    nvar: int,
+    npar: int,
+    dims: tuple[int, ...],
+    pars: FloatArray,
+    is_cartesian: bool,
+    nreal: int = 8,
+    dtype: type[np.floating[Any]] = np.float64,
+) -> _OutHeader:
+    """Assemble the `_OutHeader` shared by the ASCII and binary parsers."""
+    all_names = name_line.split()
+    var_names = tuple(all_names[ndim : ndim + nvar])
+    param_names = tuple(all_names[ndim + nvar :])
+
+    metadata: dict[str, Any] = {
+        "head": head_line,
+        "step": step_val,
+        "time": time_val,
+        "ndim": ndim,
+        "dims": dims,
+        "is_cartesian": is_cartesian,
+    }
+    if npar > 0:
+        metadata["pars"] = pars
+        metadata["param_names"] = param_names
+
+    return _OutHeader(
+        var_names=var_names,
+        metadata=metadata,
+        ndim=ndim,
+        nvar=nvar,
+        dims=dims,
+        nreal=nreal,
+        dtype=dtype,
+    )
+
+
+def read_out_header(
+    path: Path,
+    *,
+    skip: int = 0,
+) -> tuple[tuple[str, ...], dict[str, Any]]:
+    """Read only the header of a ``.out`` / ``.outs`` snapshot.
+
+    Same variable names and metadata `read_out_file` returns, without
+    reading the state arrays. Field listing (`available_fields`) goes
+    through this so it cannot drift from the read path.
+
+    Parameters
+    ----------
+    path
+        Path to the ``.out`` or ``.outs`` file.
+    skip
+        Number of snapshots to skip (for multi-snapshot ``.outs`` files).
+
+    Returns
+    -------
+    var_names : tuple[str, ...]
+        Native variable names, in on-disk order.
+    metadata : dict
+        Snapshot metadata (``head``, ``step``, ``time``, ``ndim``,
+        ``dims``, ``is_cartesian``, and the parameter block when present).
+    """
+    if _detect_out_format(path) == "ascii":
+        with path.open("r") as f:
+            for _ in range(skip):
+                _skip_ascii_snapshot(f)
+            head = _parse_out_ascii_header(f)
+    else:
+        with path.open("rb") as f:
+            for _ in range(skip):
+                _skip_binary_snapshot(f)
+            head = _parse_out_binary_header(f)
+    return head.var_names, head.metadata
+
+
 def _read_out_ascii(
     path: Path, *, skip: int = 0
 ) -> tuple[FloatArray, FloatArray, tuple[str, ...], dict[str, Any]]:
@@ -135,49 +236,49 @@ def _read_out_ascii(
         for _ in range(skip):
             _skip_ascii_snapshot(f)
 
-        head = f.readline().rstrip()
-        parts = f.readline().split()
-        step_val = int(parts[0])
-        time_val = float(parts[1])
-        ndim_raw = int(parts[2])
-        is_cart = ndim_raw > 0
-        ndim = abs(ndim_raw)
-        npar = int(parts[3])
-        nvar = int(parts[4])
+        head = _parse_out_ascii_header(f)
 
-        dims = np.flip(np.array(f.readline().split(), dtype=np.int32))
-        pars = (
-            np.array(f.readline().split(), dtype=np.float64)
-            if npar > 0
-            else np.array([])
-        )
-        name_line = f.readline().rstrip()
-
-        ngrid = int(np.prod(dims))
+        ngrid = int(np.prod(head.dims))
         lines_data = "".join(f.readline() for _ in range(ngrid))
         griddata = np.array(lines_data.split(), dtype=np.float64)
-        griddata = griddata.reshape(ngrid, ndim + nvar).T
+        griddata = griddata.reshape(ngrid, head.ndim + head.nvar).T
 
-        coord = griddata[:ndim].reshape([ndim, *list(dims)])
-        state = griddata[ndim:].reshape([nvar, *list(dims)])
+        coord = griddata[: head.ndim].reshape([head.ndim, *head.dims])
+        state = griddata[head.ndim :].reshape([head.nvar, *head.dims])
 
-    all_names = name_line.split()
-    var_names = tuple(all_names[ndim : ndim + nvar])
-    param_names = tuple(all_names[ndim + nvar :])
+    return coord, state, head.var_names, head.metadata
 
-    metadata: dict[str, Any] = {
-        "head": head,
-        "step": step_val,
-        "time": time_val,
-        "ndim": ndim,
-        "dims": tuple(int(d) for d in dims),
-        "is_cartesian": is_cart,
-    }
-    if npar > 0:
-        metadata["pars"] = pars
-        metadata["param_names"] = param_names
 
-    return coord, state, var_names, metadata
+def _parse_out_ascii_header(f: IO[str]) -> _OutHeader:
+    """Consume the header block of an ASCII snapshot, leaving *f* at the data."""
+    head_line = f.readline().rstrip()
+    parts = f.readline().split()
+    step_val = int(parts[0])
+    time_val = float(parts[1])
+    ndim_raw = int(parts[2])
+    is_cart = ndim_raw > 0
+    ndim = abs(ndim_raw)
+    npar = int(parts[3])
+    nvar = int(parts[4])
+
+    dims = np.flip(np.array(f.readline().split(), dtype=np.int32))
+    pars = (
+        np.array(f.readline().split(), dtype=np.float64) if npar > 0 else np.array([])
+    )
+    name_line = f.readline().rstrip()
+
+    return _build_out_header(
+        head_line=head_line,
+        name_line=name_line,
+        step_val=step_val,
+        time_val=time_val,
+        ndim=ndim,
+        nvar=nvar,
+        npar=npar,
+        dims=tuple(int(d) for d in dims),
+        pars=pars,
+        is_cartesian=is_cart,
+    )
 
 
 def _read_out_binary(
@@ -187,42 +288,14 @@ def _read_out_binary(
         for _ in range(skip):
             _skip_binary_snapshot(f)
 
-        string_length = struct.unpack("<i", f.read(4))[0]
-        head = f.read(string_length).decode().rstrip()
-        f.read(4)  # trailing marker
-
-        len2 = struct.unpack("<i", f.read(4))[0]
-        if len2 == 20:
-            nreal = 4
-            dtype: type[np.floating[Any]] = np.float32
-        else:
-            nreal = 8
-            dtype = np.float64
-
-        step_val = struct.unpack("<i", f.read(4))[0]
-        time_val = float(np.frombuffer(f.read(nreal), dtype=dtype)[0])
-        ndim_raw = np.frombuffer(f.read(4), dtype=np.int32)[0]
-        is_cart = ndim_raw > 0
-        ndim = abs(int(ndim_raw))
-        npar = struct.unpack("<i", f.read(4))[0]
-        nvar = struct.unpack("<i", f.read(4))[0]
-        f.read(8)  # markers
-
-        dims = np.flip(np.frombuffer(f.read(4 * ndim), dtype=np.int32))
-        f.read(8)  # markers
-
-        pars = np.array([])
-        if npar > 0:
-            pars = np.frombuffer(f.read(nreal * npar), dtype=dtype).astype(np.float64)
-            f.read(8)
-
-        name_line = f.read(string_length).decode().rstrip()
-        f.read(8)  # markers
+        head = _parse_out_binary_header(f)
+        nreal, dtype = head.nreal, head.dtype
+        ndim, nvar, dims = head.ndim, head.nvar, head.dims
 
         ngrid = int(np.prod(dims))
         coord = (
             np.frombuffer(f.read(nreal * ngrid * ndim), dtype=dtype)
-            .reshape([ndim, *list(dims)])
+            .reshape([ndim, *dims])
             .astype(np.float64)
         )
 
@@ -234,25 +307,59 @@ def _read_out_binary(
             )
         f.read(4)  # trailing marker
 
-        state = state.reshape([nvar, *list(dims)])
+        state = state.reshape([nvar, *dims])
 
-    all_names = name_line.split()
-    var_names = tuple(all_names[ndim : ndim + nvar])
-    param_names = tuple(all_names[ndim + nvar :])
+    return coord, state, head.var_names, head.metadata
 
-    metadata: dict[str, Any] = {
-        "head": head,
-        "step": step_val,
-        "time": time_val,
-        "ndim": ndim,
-        "dims": tuple(int(d) for d in dims),
-        "is_cartesian": is_cart,
-    }
+
+def _parse_out_binary_header(f: IO[bytes]) -> _OutHeader:
+    """Consume the header block of a binary snapshot, leaving *f* at the data."""
+    string_length = struct.unpack("<i", f.read(4))[0]
+    head_line = f.read(string_length).decode().rstrip()
+    f.read(4)  # trailing marker
+
+    len2 = struct.unpack("<i", f.read(4))[0]
+    if len2 == 20:
+        nreal = 4
+        dtype: type[np.floating[Any]] = np.float32
+    else:
+        nreal = 8
+        dtype = np.float64
+
+    step_val = struct.unpack("<i", f.read(4))[0]
+    time_val = float(np.frombuffer(f.read(nreal), dtype=dtype)[0])
+    ndim_raw = np.frombuffer(f.read(4), dtype=np.int32)[0]
+    is_cart = ndim_raw > 0
+    ndim = abs(int(ndim_raw))
+    npar = struct.unpack("<i", f.read(4))[0]
+    nvar = struct.unpack("<i", f.read(4))[0]
+    f.read(8)  # markers
+
+    dims = np.flip(np.frombuffer(f.read(4 * ndim), dtype=np.int32))
+    f.read(8)  # markers
+
+    pars = np.array([])
     if npar > 0:
-        metadata["pars"] = pars
-        metadata["param_names"] = param_names
+        pars = np.frombuffer(f.read(nreal * npar), dtype=dtype).astype(np.float64)
+        f.read(8)
 
-    return coord, state, var_names, metadata
+    name_line = f.read(string_length).decode().rstrip()
+    f.read(8)  # markers
+
+    return _build_out_header(
+        head_line=head_line,
+        name_line=name_line,
+        step_val=step_val,
+        time_val=time_val,
+        ndim=ndim,
+        nvar=nvar,
+        npar=npar,
+        dims=tuple(int(d) for d in dims),
+        pars=pars,
+        is_cartesian=is_cart,
+        nreal=nreal,
+        dtype=dtype,
+    )
 
 
 def _skip_ascii_snapshot(f: IO[str]) -> None:

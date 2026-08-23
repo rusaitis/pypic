@@ -15,7 +15,7 @@ from pypic.coordinates.geometry import (
     SPHERICAL,  # noqa: F401 — used in doctests
 )
 from pypic.coordinates.transforms import FrameTransform
-from pypic.exceptions import UnknownFieldError
+from pypic.exceptions import GeometryUnsupportedError, UnknownFieldError
 from pypic.grid import (
     GridInfo,
     _build_grid_from_dataset,
@@ -388,7 +388,10 @@ class FieldDataset:
             np.allclose(np.sum(abs_rotation, axis=1), 1.0, atol=1e-6)
             and np.allclose(np.sum(abs_rotation, axis=0), 1.0, atol=1e-6)
         ):
-            raise NotImplementedError(
+            # GeometryUnsupportedError subclasses NotImplementedError, so
+            # existing handlers still catch it, and the server maps it to
+            # 400 rather than a 500 "internal" frame.
+            raise GeometryUnsupportedError(
                 "transform_to() only supports axis-swap/reflection "
                 "rotation matrices (signed permutations). General "
                 "rotations require grid interpolation (not yet implemented)."

@@ -9,6 +9,7 @@ pa = pytest.importorskip("pyarrow")
 
 from pypic.coordinates import CARTESIAN  # noqa: E402
 from pypic.dataset import FieldDataset  # noqa: E402
+from pypic.exceptions import UnknownFieldError  # noqa: E402
 from pypic.grid import GridInfo  # noqa: E402
 from pypic.reductions import reduce  # noqa: E402
 from pypic.server.arrow import (  # noqa: E402
@@ -172,3 +173,28 @@ def test_decode_rejects_non_pypic_stream() -> None:
         )
     with pytest.raises(ValueError, match="missing pypic schema metadata"):
         decode_field_dataset_ipc(bytes(sink.getvalue().to_pybytes()))
+
+
+class TestUnknownFieldRouting:
+    """Unknown names must keep their typed identity through the encoder.
+
+    ``_resolve_fields`` caught the ``UnknownFieldError`` that
+    ``resolve_key`` raises and re-raised a bare ``KeyError``, discarding
+    the 404 / ``"unknown_field"`` routing at the one boundary that
+    consumes it — the request surfaced to a WebSocket client as
+    ``kind="internal"`` and over HTTP as a 500.
+    """
+
+    def test_raises_typed_error(self, cartesian_3d) -> None:
+        with pytest.raises(UnknownFieldError):
+            field_dataset_to_arrow_ipc(cartesian_3d, fields=["not_a_field"])
+
+    def test_still_catchable_as_keyerror(self, cartesian_3d) -> None:
+        """Behaviour-preserving: the typed class subclasses ``KeyError``."""
+        with pytest.raises(KeyError):
+            field_dataset_to_arrow_ipc(cartesian_3d, fields=["not_a_field"])
+
+    def test_carries_server_routing_metadata(self, cartesian_3d) -> None:
+        with pytest.raises(UnknownFieldError) as excinfo:
+            field_dataset_to_arrow_ipc(cartesian_3d, fields=["not_a_field"])
+        assert (excinfo.value.kind, excinfo.value.status_code) == ("unknown_field", 404)

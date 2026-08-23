@@ -6,6 +6,8 @@ Creates small self-contained datasets in each supported format:
 - **idl-uniform**: 16x16 2D grid, per-cell IDL binary, code units
 - **hdf5-uniform**: same physics, 4 blocks of 8x8, HDF5 BATL format
 - **hdf5-amr**: 2 refinement levels (2 coarse + 8 fine blocks), HDF5 BATL
+- **out-ascii** / **out-binary**: merged .out snapshots, same physics as
+  idl-uniform so the two read paths can be compared directly
 
 Physics: Harris current sheet ``Bx = B0 * tanh(y / delta)`` with
 uniform density and pressure. No unit conversion (code units).
@@ -214,6 +216,87 @@ def generate_idl_uniform() -> None:
                 f.write(marker + data + marker)
 
     print(f"  IDL uniform: {idl_path} ({idl_path.stat().st_size} bytes)")
+
+
+def _out_snapshot_arrays() -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Cell-centre coordinates and state arrays shared by both .out writers."""
+    x_centers = XMIN + (np.arange(NX) + 0.5) * DX
+    y_centers = YMIN + (np.arange(NY) + 0.5) * DY
+    xx, yy = np.meshgrid(x_centers, y_centers, indexing="ij")
+    fields = harris_fields(xx, yy)
+    state = np.stack([fields[v] for v in VAR_NAMES])
+    return xx, yy, state
+
+
+def generate_out_ascii() -> None:
+    """Write a merged ASCII .out fixture (same physics as idl-uniform)."""
+    out_dir = OUTPUT_DIR / "out-ascii"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    write_param_in(out_dir / "PARAM.in")
+
+    xx, yy, state = _out_snapshot_arrays()
+    out_path = out_dir / "z=0_mhd_1_n00000000.out"
+
+    lines = [
+        "synthetic_batsrus_fixture normalized units",
+        f"       0  {0.0:.8E}       2       1{N_VAR:>8d}",
+        # dims are written fastest-axis-first; the reader flips them back.
+        f"{NY:>8d}{NX:>8d}",
+        f" {GAMMA:.8E}",
+        f"x y {' '.join(VAR_NAMES)} g",
+    ]
+    # Row order must match the reader's reshape: C order over (nvar, *dims)
+    # with dims = flip(on-disk dims) == (NX, NY).
+    for ix in range(NX):
+        for iy in range(NY):
+            vals = [xx[ix, iy], yy[ix, iy], *[state[v, ix, iy] for v in range(N_VAR)]]
+            # Full float64 precision: the fixture exists to prove the ASCII
+            # and binary read paths agree, so text rounding must not be the
+            # thing the comparison measures.
+            lines.append(" ".join(f"{v:.17E}" for v in vals))
+    out_path.write_text("\n".join(lines) + "\n")
+
+    print(f"  OUT ascii: {out_path} ({out_path.stat().st_size} bytes)")
+
+
+def generate_out_binary() -> None:
+    """Write a merged real8 binary .out fixture (same physics as out-ascii)."""
+    out_dir = OUTPUT_DIR / "out-binary"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    write_param_in(out_dir / "PARAM.in")
+
+    xx, yy, state = _out_snapshot_arrays()
+    out_path = out_dir / "z=0_mhd_1_n00000000.out"
+
+    head = "synthetic_batsrus_fixture normalized units".ljust(79)
+    names = f"x y {' '.join(VAR_NAMES)} g".ljust(79)
+
+    def record(payload: bytes) -> bytes:
+        marker = struct.pack("<i", len(payload))
+        return marker + payload + marker
+
+    coord = np.stack([xx, yy]).astype(np.float64)
+
+    with out_path.open("wb") as f:
+        f.write(record(head.encode()))
+        # reclen 24 selects the real8 branch in _detect_out_format
+        f.write(
+            record(
+                struct.pack("<i", 0)
+                + np.float64(0.0).tobytes()
+                + np.int32(2).tobytes()
+                + struct.pack("<i", 1)
+                + struct.pack("<i", N_VAR)
+            )
+        )
+        f.write(record(np.array([NY, NX], dtype=np.int32).tobytes()))
+        f.write(record(np.array([GAMMA], dtype=np.float64).tobytes()))
+        f.write(record(names.encode()))
+        f.write(record(coord.tobytes()))
+        for iv in range(N_VAR):
+            f.write(record(state[iv].astype(np.float64).tobytes()))
+
+    print(f"  OUT binary: {out_path} ({out_path.stat().st_size} bytes)")
 
 
 def generate_hdf5_uniform() -> None:
@@ -509,4 +592,6 @@ if __name__ == "__main__":
     generate_hdf5_uniform()
     generate_hdf5_amr()
     generate_idl_amr()
+    generate_out_ascii()
+    generate_out_binary()
     print("Done.")

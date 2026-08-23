@@ -22,14 +22,11 @@ from pypic.readers.openggcm._field_map import (
 )
 
 FIXTURE_DIR = Path(__file__).parent / "data" / "openggcm-small"
-_HAS_DATA = FIXTURE_DIR.exists() and (FIXTURE_DIR / "grid.gc012.dat").exists()
 
 
 @pytest.fixture(scope="session")
 def all_fields():
     """Read 8 fields from the small .3df fixture."""
-    if not _HAS_DATA:
-        pytest.skip("Fixture data not available")
     from pypic.readers.openggcm._field_io import read_3df_file
 
     return read_3df_file(
@@ -41,8 +38,6 @@ def all_fields():
 @pytest.fixture(scope="session")
 def reader_cfg_ds():
     """Create reader and read timestep 6300 once for all tests."""
-    if not _HAS_DATA:
-        pytest.skip("Fixture data not available")
     reader, cfg = open_openggcm(FIXTURE_DIR)
     ds = reader.read_timestep(FIXTURE_DIR, 6300)
     return reader, cfg, ds
@@ -93,7 +88,6 @@ class TestFieldNameMap:
         assert FIELD_NAME_MAP["pp"] == "P"
 
 
-@pytest.mark.skipif(not _HAS_DATA, reason="Fixture data not available")
 class TestGridParser:
     """Tests for parsing the OpenGGCM grid file."""
 
@@ -134,7 +128,6 @@ class TestGridParser:
         assert grid.metadata["BASETIME"].strip().startswith("1967:01:01")
 
 
-@pytest.mark.skipif(not _HAS_DATA, reason="Fixture data not available")
 class TestFieldIO:
     """Tests for reading .3df field files."""
 
@@ -170,7 +163,6 @@ class TestFieldIO:
         assert 5e4 < b_mag.max() < 1e5
 
 
-@pytest.mark.skipif(not _HAS_DATA, reason="Fixture data not available")
 class TestOpenGGCMReader:
     """Integration tests for the full reader pipeline."""
 
@@ -228,3 +220,29 @@ class TestOpenGGCMReader:
         reader, _cfg, _ds = reader_cfg_ds
         with pytest.raises(FileNotFoundError):
             reader.read_timestep(FIXTURE_DIR, 999999)
+
+
+class TestStaggerProvenance:
+    """``.3df`` output is cell-centred, and the metadata must say so.
+
+    The reader used to stamp ``convention="staggered"`` with
+    ``field_locations={"B": "face", "E": "edge"}`` while returning the raw
+    arrays and never destaggering. That claim was wrong twice over: it
+    named a location for ``E``, which ``.3df`` does not emit, and it told
+    every downstream operator that a co-located stencil was invalid.
+    """
+
+    def test_convention_is_cell_centred(self, reader_cfg_ds) -> None:
+        _, _, ds = reader_cfg_ds
+        assert ds.metadata["stagger"].convention == "cell"
+
+    def test_no_destagger_was_performed(self, reader_cfg_ds) -> None:
+        """``interpolation_order`` stays None: nothing was interpolated."""
+        _, _, ds = reader_cfg_ds
+        assert ds.metadata["stagger"].interpolation_order is None
+
+    def test_every_field_shares_one_shape(self, reader_cfg_ds) -> None:
+        """The evidence for co-location: B carries rho's cell count, not nx+1."""
+        _, _, ds = reader_cfg_ds
+        shapes = {np.asarray(ds[name]).shape for name in ds.field_names()}
+        assert len(shapes) == 1, f"co-located grid requires one shape, got {shapes}"

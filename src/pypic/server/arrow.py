@@ -26,6 +26,7 @@ from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
+from pypic.exceptions import UnknownFieldError
 from pypic.io._guard import ensure_arrow
 from pypic.io.metadata import (
     SCHEMA_VERSION,
@@ -88,8 +89,9 @@ def field_dataset_to_arrow_ipc(
     ImportError
         ``pyarrow`` is not installed (install with
         ``pip install pypic-plasma[server]``).
-    KeyError
+    UnknownFieldError
         Any name in *fields* is absent from the dataset.
+        Subclasses ``KeyError``.
     ValueError
         ``units`` is not one of ``"code"`` or ``"si"``.
     """
@@ -227,8 +229,11 @@ def _resolve_fields(
         except KeyError:
             unresolved.append(name)
     if unresolved:
+        # UnknownFieldError, not bare KeyError: it subclasses KeyError, so
+        # callers are unaffected, but it keeps the 404 / "unknown_field"
+        # routing that app.py and stream.py dispatch on.
         msg = f"Unknown field(s) in Arrow encoder: {unresolved!r}"
-        raise KeyError(msg)
+        raise UnknownFieldError(msg)
     return canonical
 
 

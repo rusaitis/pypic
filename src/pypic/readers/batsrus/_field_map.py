@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from itertools import takewhile
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -118,3 +119,43 @@ def convert_fields_to_si(
         if factor != 1.0:
             fields[canonical] = np.asarray(fields[canonical] * factor, dtype=np.float64)
     return fields
+
+
+def parse_unit_names(unit_string: str, n_var: int) -> tuple[str, ...]:
+    r"""Extract per-variable unit strings from a BATSRUS unit line.
+
+    The line reads ``"timestamp; unit1 unit2 ... unitN"`` or bare
+    ``"unit1 unit2 ..."``, optionally prefixed by one ``R`` per coordinate
+    axis and followed by units for the scalar parameter block. Both the
+    ``.h`` header (`BATSRUSHeader.unit_string`) and the ``.out`` head line
+    use this format, so both read paths share this parser.
+
+    Parameters
+    ----------
+    unit_string : str
+        Raw unit line from the header.
+    n_var : int
+        Number of plot variables, used to bound the returned slice.
+
+    Returns
+    -------
+    tuple[str, ...]
+        One unit string per variable, empty when the data is normalized.
+
+    Examples
+    --------
+    >>> parse_unit_names("nT km/s nPa", 3)
+    ('nT', 'km/s', 'nPa')
+    >>> parse_unit_names("2024-01-01; R R nT km/s", 2)
+    ('nT', 'km/s')
+    >>> parse_unit_names("normalized variables", 3)
+    ()
+    """
+    raw = unit_string.strip()
+    if not raw or is_normalized(raw):
+        return ()
+    if ";" in raw:
+        raw = raw.split(";", 1)[1].strip()
+    parts = raw.split()
+    n_coord_units = sum(1 for _ in takewhile(lambda p: p == "R", parts))
+    return tuple(parts[n_coord_units : n_coord_units + n_var])

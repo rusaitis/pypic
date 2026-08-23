@@ -72,7 +72,17 @@ def parse_header(path: Path) -> BATSRUSHeader:
     if section is not None:
         sections[section] = section_lines
 
-    # --- Parse each section ---
+    # Every field below has a default, so without this guard any text file
+    # yields a plausible-looking header (ndim=3, n_step=0, var_names=())
+    # instead of an error. #HEADFILE and #NDIM are written by every BATSRUS
+    # plot header.
+    if not sections.keys() & {"#HEADFILE", "#NDIM"}:
+        msg = (
+            f"{path} is not a BATSRUS .h header: no #HEADFILE or #NDIM "
+            f"section found (got {sorted(sections) or 'no sections'})"
+        )
+        raise ValueError(msg)
+
 
     head_lines = sections.get("#HEADFILE", [])
     is_binary = True
