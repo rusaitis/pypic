@@ -8,7 +8,7 @@ build-backend = "hatchling.build"
 # had no release since. See [tool.hatch.build.targets.wheel] below —
 # hatchling infers the package directory from this name and needs telling.
 name = "pypic-plasma"
-version = "0.1.2"
+version = "0.1.3"
 description = "Read, analyze, and plot plasma simulation output from PIC and MHD codes."
 readme = "README.md"
 license = "MIT"

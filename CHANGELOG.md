@@ -7,7 +7,7 @@ that the public API may still change before 1.0.
 
 The distribution is `pypic-plasma` on PyPI; the import name is `pypic`.
 
-## [Unreleased]
+## [0.1.3] — 2026-08-23
 
 ### Added
 
@@ -178,7 +178,8 @@ the first version available from the index.
 - **Command line** — `pypic info`, `fields`, `stats`, `compare`, `plot`,
   `convert`, `reduce`, `serve`, and `schema validate`.
 
-[Unreleased]: https://github.com/rusaitis/pypic/compare/v0.1.2...HEAD
+[Unreleased]: https://github.com/rusaitis/pypic/compare/v0.1.3...HEAD
+[0.1.3]: https://github.com/rusaitis/pypic/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/rusaitis/pypic/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/rusaitis/pypic/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/rusaitis/pypic/releases/tag/v0.1.0
