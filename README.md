@@ -129,11 +129,12 @@ the call site instead of surfacing as missing data three steps downstream.
 pypic is the Python half of a three-part toolchain built around the shared
 [`simulation.toml` schema](https://rusaitis.github.io/pypic/schema/):
 **rustpic** (a Rust PIC/MHD solver) writes the schema, pypic reads and analyzes
-it, and **webpic** (Three.js/WebGPU) renders it in the browser over the Arrow
-IPC server in `pypic.server`. Both siblings are in development and not yet
-public — you will see them named in the roadmap, in a few docstrings, and in
-the `[webpic]` block of the bundled plot themes. pypic is fully usable on its
-own; nothing here depends on either of them.
+it, and [**webpic**](https://github.com/rusaitis/webpic) (Three.js/WebGPU)
+renders it in the browser over the Arrow IPC server in `pypic.server` — try the
+[live demo](https://rusaitis.github.io/webpic/), which needs no data or install.
+webpic consumes pypic's canonical field names and the `[webpic]` block of the
+bundled plot themes; rustpic is still in development. pypic is fully usable on
+its own; nothing here depends on either of them.
 
 ## Documentation
 
