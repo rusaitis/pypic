@@ -30,15 +30,26 @@ Requires Python 3.13+.
 uv add pypic-plasma        # or: pip install pypic-plasma
 ```
 
-The distribution is named `pypic-plasma`; the import name is `pypic`. Optional
-extras cover the heavier dependencies:
+The distribution is named `pypic-plasma`; the import name is `pypic`. The core
+install pulls in NumPy, SciPy, xarray, h5py, and pydantic — everything heavier
+sits behind an extra, and extras compose:
 
 ```sh
-uv add "pypic-plasma[plot]"    # matplotlib — 2D field plots
-uv add "pypic-plasma[3d]"      # pyvista — 3D rendering and field lines
-uv add "pypic-plasma[zarr]"    # Zarr v3 / Icechunk I/O
-uv add "pypic-plasma[cli]"     # the `pypic` command-line tool
+uv add "pypic-plasma[plot,cli]"        # what most installs want
+uv add "pypic-plasma[plot,zarr,cli]"   # ... plus modern I/O
 ```
+
+| Extra | Pulls in | Enables |
+|---|---|---|
+| `plot` | matplotlib | 2D field slices and comparison figures |
+| `3d` | pyvista | 3D rendering and field-line visualization |
+| `cli` | typer, rich | the `pypic` command |
+| `zarr` | zarr, numcodecs, virtualizarr, icechunk | Zarr v3 export/import, VirtualiZarr views over legacy HDF5, Icechunk storage |
+| `icechunk` | icechunk, zarr, numcodecs | Icechunk versioned storage without the VirtualiZarr dependency |
+| `arrow` | pyarrow | Parquet/Arrow particle I/O |
+| `duckdb` | duckdb, pyarrow | SQL queries over particle Parquet |
+| `server` | fastapi, uvicorn, pyarrow, websockets | the Arrow IPC server behind `pypic serve` |
+| `lazy` | dask | reserved for the planned chunked-loading path — nothing imports it yet |
 
 To work from a checkout instead:
 
@@ -103,9 +114,14 @@ the call site instead of surfacing as missing data three steps downstream.
   Parquet/Arrow for particle data with Morton-ordered spatial pushdown.
 - **Field registry** — `compute("beta")`, `compute("|B|")`, `compute("v_A")`
   dispatch to the right derived function. Extensible via `register_field()`.
-- **Command line** — `pypic info`, `fields`, `stats`, `compare`, `plot`,
-  `convert`, `reduce`, and `schema validate` for quick inspection without
-  writing a script.
+- **Arrow IPC server** — `pypic serve` exposes simulations over JSON HTTP plus a
+  WebSocket that streams fields as Arrow record batches, with selections and
+  derived quantities applied server-side. Zero-copy into browser (`apache-arrow`)
+  and Rust (`arrow-rs`) clients.
+- **Command line** — `pypic info`, `fields`, `stats`, `validate`, `compare`,
+  `plot`, `plot-compare`, `convert`, `reduce`, `serve`, `export`, and `schema`
+  (`export` / `validate` / `diff`) — inspection, conversion, and publication
+  figures without writing a script.
 
 ## Ecosystem
 

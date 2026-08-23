@@ -15,6 +15,12 @@ The distribution is `pypic-plasma` on PyPI; the import name is `pypic`.
   Ecosystem section explaining the rustpic / webpic siblings, extracted the
   architecture and style rules into `docs/architecture.md` for contributors,
   and corrected several stale references.
+- The feature and extras lists in `README.md`, `docs/index.md`, and
+  `docs/getting-started.md` now agree with each other and with
+  `pyproject.toml`. All nine extras are documented in one table with what each
+  pulls in and what it enables, and the previously undocumented Arrow IPC
+  server and the `validate` / `plot-compare` / `serve` / `export` CLI commands
+  are listed.
 - `pypic.plotting.pyvista` no longer writes to stdout when saving a screenshot;
   it logs instead.
 - Workflow actions moved off the deprecated Node 20 runtime.

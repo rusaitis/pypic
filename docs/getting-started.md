@@ -10,14 +10,31 @@ uv add pypic-plasma
 
 The distribution is named `pypic-plasma`; the import name is `pypic`.
 
-Core dependencies (NumPy, SciPy, xarray, h5py) are installed automatically.
-Heavier dependencies are optional extras:
+Core dependencies (NumPy, SciPy, xarray, h5py, pydantic) are installed
+automatically. Everything heavier sits behind an extra, and extras compose:
 
 ```sh
-uv add "pypic-plasma[plot]"    # matplotlib — 2D field plots
-uv add "pypic-plasma[3d]"      # pyvista — 3D rendering and field lines
-uv add "pypic-plasma[zarr]"    # Zarr v3 / Icechunk I/O
-uv add "pypic-plasma[cli]"     # the `pypic` command-line tool
+uv add "pypic-plasma[plot,cli]"        # what most installs want
+uv add "pypic-plasma[plot,zarr,cli]"   # ... plus modern I/O
+```
+
+| Extra | Pulls in | Enables |
+|---|---|---|
+| `plot` | matplotlib | 2D field slices and comparison figures |
+| `3d` | pyvista | 3D rendering and field-line visualization |
+| `cli` | typer, rich | the `pypic` command |
+| `zarr` | zarr, numcodecs, virtualizarr, icechunk | Zarr v3 export/import, VirtualiZarr views over legacy HDF5, Icechunk storage |
+| `icechunk` | icechunk, zarr, numcodecs | Icechunk versioned storage without the VirtualiZarr dependency |
+| `arrow` | pyarrow | Parquet/Arrow particle I/O |
+| `duckdb` | duckdb, pyarrow | SQL queries over particle Parquet |
+| `server` | fastapi, uvicorn, pyarrow, websockets | the Arrow IPC server behind `pypic serve` |
+| `lazy` | dask | reserved for the planned chunked-loading path — nothing imports it yet |
+
+Working from a checkout instead:
+
+```sh
+git clone https://github.com/rusaitis/pypic.git && cd pypic
+uv sync --all-extras --all-groups
 ```
 
 ## Loading simulation data

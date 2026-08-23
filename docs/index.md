@@ -19,10 +19,12 @@ pypic provides a unified interface to multiple simulation formats (iPIC3D, BATSR
 - **Unit system** -- PIC (electron- or ion-referenced), MHD (Alfvén-speed-based), SI, or custom normalization. Round-trip `normalize()` / `to_si()` with display unit conversion.
 - **Geometry-aware operators** -- divergence, curl, gradient with coordinate metric factors. Cartesian implemented; spherical/cylindrical planned.
 - **Selections** -- `PlaneSelection`, `BoxSelection`, and `SphereSelection` slice 3D data into lower-dimensional views or masked subregions.
-- **Reductions** -- `pypic.reduce(ds, axis, reduction=...)` collapses fields along one or more axes: column densities, slab averages, density-weighted line averages, projected-peak maps.
-- **Field-line tracing** -- adaptive Dormand-Prince 5(4) tracer with PI step control, plus Poincaré sections.
-- **Modern I/O** -- Zarr v3 export/import, Icechunk versioned storage, VirtualiZarr views over legacy HDF5, and Parquet/Arrow for particle data.
+- **Reductions** -- `pypic.reduce(ds, axis, reduction=...)` collapses fields along one or more axes (trapezoidal `integrate`, `mean`/`median`/`sum`, `argmax`/`argmin` returning coordinate positions): column densities, slab averages, density-weighted line averages, projected-peak maps.
+- **Field-line tracing** -- adaptive Dormand-Prince 5(4) tracer with PI step control, batched and scalar paths, plus Poincaré sections.
+- **Modern I/O** -- Zarr v3 export/import (single-step and time-series), Icechunk versioned storage, VirtualiZarr views over legacy HDF5, and Parquet/Arrow for particle data with Morton-ordered spatial pushdown.
 - **Field registry** -- `compute("beta")`, `compute("|B|")`, `compute("v_A")` dispatches to the right derived function. Extensible via `register_field()`.
+- **Arrow IPC server** -- [`pypic serve`](api/server.md) exposes simulations over JSON HTTP plus a WebSocket that streams fields as Arrow record batches, with selections and derived quantities applied server-side.
+- **Command line** -- `pypic info`, `fields`, `stats`, `validate`, `compare`, `plot`, `plot-compare`, `convert`, `reduce`, `serve`, `export`, and `schema` (`export` / `validate` / `diff`) -- inspection, conversion, and publication figures without writing a script.
 
 ## Quick start
 
@@ -58,4 +60,7 @@ fully usable on its own; nothing here depends on either of them.
 
 ## Requirements
 
-Python 3.13+. Core dependencies: NumPy, SciPy, xarray, h5py.
+Python 3.13+. The core install pulls in NumPy, SciPy, xarray, h5py, and
+pydantic; plotting, 3D rendering, the CLI, Zarr/Icechunk I/O, Parquet/Arrow
+particle data, and the server each sit behind their own extra -- see
+[Getting Started](getting-started.md#installation) for the full table.
