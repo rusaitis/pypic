@@ -82,6 +82,14 @@ The distribution is `pypic-plasma` on PyPI; the import name is `pypic`.
   feature, and the install command identically on the first failure and on
   every call after it. Every install hint now quotes the extra
   (`pip install "pypic-plasma[zarr]"`) — unquoted brackets are a zsh glob.
+- `docs/architecture.md` is the single source for the design rules and style
+  conventions; `CLAUDE.md` points at it rather than restating them in a second
+  wording. The docstring rule now says what the code does: a runnable doctest
+  where the function works on synthetic arrays alone, exempt where it needs a
+  file, a display backend, or a server.
+- `TASKS.md` and `TASKS-schema-extension.md` record shipped work as one line
+  each; the design detail behind it lives in this changelog, the docs, and the
+  code.
 
 ### Fixed
 

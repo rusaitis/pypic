@@ -25,124 +25,68 @@ v1.0 documents we can't perturb.
 
 ### TOML-schema additions
 
-- [x] **PIC field solver vocabulary — PSATD vs PS.** Shipped: `psatd`,
-  `spectral-azimuthal` added to `PICFieldSolver` (and the ED-PIC stencils
-  below).
+- [x] **PIC field solver vocabulary — PSATD vs PS.** `psatd` and
+  `spectral-azimuthal` added to `PICFieldSolver`.
 
-- [x] **PIC current/charge smoothing knobs.** Shipped: `current_smoothing`
-  and `charge_smoothing` are optional `NonNegativeInt | None` fields on
-  `PICSolver` (matching the long-standing `HybridSolver.current_smoothing`).
+- [x] **PIC current/charge smoothing knobs.** Optional `current_smoothing` /
+  `charge_smoothing` on `PICSolver`.
 
-- [x] **Adopt openPMD ED-PIC vocabulary across PIC literals.** Shipped:
-  - `PICFieldSolver` += `lehe`, `ck`, `ckc`, `pstd`, `gpstd`
-    (and `psatd` / `spectral-azimuthal` from the entry above).
-  - `PICPusher` += `llrk4`, `free-streaming`.
-  - New `ChargeCorrection` literal exposed via the optional
-    `PICSolver.charge_correction` field.
-  - New `CurrentDeposition` literal exposed via the optional
-    `PICSolver.current_deposition` field.
-  - New `ParticleShape` literal exposed via the optional
-    `Species.shape` field (per-species — WarpX and Smilei vary the
-    deposition order by species).
+- [x] **Adopt openPMD ED-PIC vocabulary across PIC literals.**
+  `PICFieldSolver` and `PICPusher` extended, plus new
+  `ChargeCorrection`, `CurrentDeposition` and per-species
+  `ParticleShape` literals.
 
-- [x] **`ModelType` — admit Vlasov / gyrokinetic.** Shipped:
-  `ModelType` += `vlasov`, `gyrokinetic`.
-  `_check_physics_matches_model_type` skips the typed-branch
-  cross-check for these new types — their physics knobs route through
-  the `[physics]` extras namespace until typed sub-tables land in
-  v1.1+.
+- [x] **`ModelType` — admit Vlasov / gyrokinetic.** `ModelType` += `vlasov`,
+  `gyrokinetic`; their physics knobs route through the `[physics]`
+  extras namespace until typed sub-tables land.
 
-- [x] **Tracer flag on `[[species]]`.** Shipped: `tracer: bool = False`
-  on `Species`. Test-particle vs tagged-tracer semantics may need a
-  follow-up `tracer_kind` field; the boolean is the additive starting
-  point and any later refinement remains additive.
+- [x] **Tracer flag on `[[species]]`.** `Species.tracer: bool = False`; a
+  finer `tracer_kind` would remain additive.
 
-- [x] **Time-integration vocabulary expansion.** Shipped: `TimeScheme`
-  += `rk2`, `rk3`, `rk4`, `vl2`, `ssprk2`, `ssprk3`, `imex-rk2`,
-  `imex-rk3`. New optional `Time.splitting: 'strang' | 'lie' | 'godunov'
-  | None` field. The `dt > 0` requirement now applies to every scheme
-  except `adaptive` (the only CFL-driven mode where `dt` is a
-  placeholder).
+- [x] **Time-integration vocabulary expansion.** `TimeScheme` += the RK /
+  SSPRK / IMEX values, new optional `Time.splitting`, and `dt > 0`
+  required for every scheme except `adaptive`.
 
-- [x] **Stochasticity / ensemble metadata on `[run]`.** Shipped:
-  optional `Run.random_seed: int | None` and `Run.ensemble: Ensemble |
-  None` fields. The `Ensemble` model validates `1 <= member_id <= total`.
+- [x] **Stochasticity / ensemble metadata on `[run]`.** Optional
+  `Run.random_seed` and `Run.ensemble`, the latter validating `1 <=
+  member_id <= total`.
 
-- [x] **AMR kind discriminator.** Shipped: `GridAMR.amr_kind: 'block' |
-  'patch' | 'octree' = 'block'` — preserves current implicit behavior
-  while admitting RAMSES / MPI-AMRVAC octree codes.
+- [x] **AMR kind discriminator.** `GridAMR.amr_kind: 'block' | 'patch' |
+  'octree' = 'block'`, admitting octree codes.
 
-- [x] **AMR temporal subcycling flag.** Shipped:
-  `GridAMR.level_subcycling: bool = False`. A per-level `dt_factor`
-  array remains a v1.1 candidate.
+- [x] **AMR temporal subcycling flag.** `GridAMR.level_subcycling: bool =
+  False`; a per-level `dt_factor` array stays a v1.1 candidate.
 
-- [x] **Ghost cell counts.** Shipped: `Grid.ghost_cells: list[int] |
-  None`, axis count enforced against `grid.dimensions` by the root
-  validator.
+- [x] **Ghost cell counts.** `Grid.ghost_cells`, axis count enforced against
+  `grid.dimensions`.
 
-- [x] **Per-rank / multi-file output layout.** Shipped: optional
-  `file_pattern`, `files_per_step`, `partition` (`'by_rank' |
-  'by_field' | 'monolithic'`) on every `[output.*]` sub-table via
+- [x] **Per-rank / multi-file output layout.** Optional `file_pattern`,
+  `files_per_step` and `partition` on every `[output.*]` via
   `_OutputBase`.
 
-- [x] **Anisotropic closure enum values.** Shipped: `Closure` += `cgl`,
-  `10moment`, `14moment`. Codes can declare multi-moment closures on
-  `[[species]]` even before the v1.1 anisotropic `gamma_eos` tuple.
+- [x] **Anisotropic closure enum values.** `Closure` += `cgl`, `10moment`,
+  `14moment`.
 
-- [x] **Restart granularity (additive fields).** Shipped:
-  `Restart.restore: list['fields' | 'particles' | 'auxiliary'] | None`
-  (entries must be distinct and non-empty when present) and
-  `Restart.mode: 'hot' | 'cold' | None`. The `from: str → str |
-  list[str]` widening remains v1.1.
+- [x] **Restart granularity (additive fields).** `Restart.restore` and
+  `Restart.mode`; `from` was widened by the round-2 `from_files` field
+  rather than retyped.
 
-- [x] **`thetaMode` / RZ azimuthal-mode geometry.** Shipped:
-  `Geometry` += `thetaMode`. New required `[coordinates.modes]`
-  sub-table (`CoordinatesModes`) with `n_modes: PositiveInt` and
-  optional `mode_indices: list[NonNegativeInt]`. The
-  `Coordinates._check_modes_geometry` validator enforces
-  `geometry = 'thetaMode' ⇔ modes is set`. The reader-side
-  `_build_geometry` maps `thetaMode → CYLINDRICAL` (post-reconstruction
-  physical grid); the openPMD reader (TASKS.md Step 42 Phase 2) will
-  consume the modal metadata when it lands.
+- [x] **`thetaMode` / RZ azimuthal-mode geometry.** `Geometry` +=
+  `thetaMode` with a required `[coordinates.modes]` sub-table; the
+  reader maps it to `CYLINDRICAL`.
 
 ### Runtime-metadata additions (FieldDataset / StaggerInfo)
 
 Not versioned by `schema_version`; land independently of the
 TOML-schema additions above.
 
-- [x] **`unitDimension` per-field metadata.**
-  openPMD records each array's dimensional fingerprint as a 7-tuple
-  `[L, M, T, I, Θ, N, J]` (powers of SI base units). Adopt this as a
-  derivable property on `FieldDataset` per-field metadata, sitting
-  alongside the existing `quantity_type` / `si_unit` / `latex` keys.
-  Two design questions before landing:
-  - **Compute or store?** For canonical fields the 7-tuple is fully
-    determined by `quantity_type` (e.g. `magnetic_field` →
-    `[0, 1, -2, -1, 0, 0, 0]`). Recommend a static lookup table per
-    `QuantityType` enum value; user-registered custom fields supply
-    an explicit tuple at registration time.
-  - **Serialize through HDF5/Zarr?** Step 24's `to_zarr` already
-    persists `dataset.attrs` automatically — recommend compute on
-    read, write on output, so an openPMD ↔ pypic round-trip
-    preserves the attribute without adding a schema-config-level
-    entry.
-  Not a replacement for `[units]`: `[units]` encodes the
-  *normalization paradigm* (PIC reference species, MHD reference
-  quantities); `unitDimension` encodes the *dimensional fingerprint*.
-  Both useful, different questions. Prerequisite for any openPMD
-  reader that needs to honor per-record `unitDimension` / `unitSI`
-  attributes (TASKS.md Step 42).
+- [x] **`unitDimension` per-field metadata.** The openPMD 7-tuple derives
+  from `quantity_type` (explicit at registration for custom fields) and
+  round-trips through the Zarr attrs.
 
-- [x] **Per-component stagger via `position` array.** Shipped: optional
-  `StaggerInfo.position: dict[str, tuple[float, ...]] | None` carrying
-  per-component cell offsets in ``[0.0, 1.0)``. The constructor coerces
-  list inputs to `tuple[float, ...]`, freezes the dict via
-  `MappingProxyType`, and rejects out-of-range offsets. Round-trips
-  through the Zarr serializer (`_serialize._stagger_to_dict` /
-  `_dict_to_stagger`). The existing `convention` enum stays as the
-  top-level shorthand; the `position` map is the precise form for
-  Yee-mesh PIC, BATSRUS face-centered B, and the openPMD reader
-  (TASKS.md Step 42).
+- [x] **Per-component stagger via `position` array.** Optional
+  `StaggerInfo.position` map of per-component cell offsets, frozen,
+  range-checked, and round-tripped by the Zarr serializer.
 
 ## v1.0.x — additive batch round 2 (ship now)
 
@@ -168,75 +112,37 @@ Recommended pairing of round-2 work to reader rollouts:
 | PIC PML on E + B; thermal-bath particles | per-field BC overrides + per-face driver foreign keys |
 | Multi-cadence / ROI runs (production cross-cutting) | `[[output.streams]]` |
 
-- [x] **`[velocity_mesh]` for continuum-Vlasov codes.** Shipped: new
-  optional top-level section. `VelocityMesh` model with
-  `dimensions: list[PositiveInt]` (1..3), `extent: list[list[float]]`
-  (per-axis `[v_min, v_max]`), optional `block_size` (must evenly
-  divide each `dimensions[i]`), optional `sparsity_threshold`,
-  `coordinate_system: "cartesian" | "spherical-velocity"`. Validator
-  enforces extent shape and block-size divisibility. Unblocks the
-  Vlasiator reader's lossless-VDF mode (TASKS.md Step 23).
+- [x] **`[velocity_mesh]` for continuum-Vlasov codes.** Optional top-level
+  section with extent-shape and block-size validation — unblocks
+  Vlasiator lossless VDFs (Step 23).
 
-- [x] **Stretched / non-uniform grids.** Shipped: new optional
-  `[grid.stretched]` sub-table. `GridStretched.axis_widths: dict[str,
-  list[PositiveFloat]]`, sparse — only stretched axes appear, keyed by
-  axis index as a string. The `Grid` validator enforces that listed
-  cell widths sum to `upper[i] - lower[i]` (within `sum_rtol`) and
-  that the list length equals `dimensions[i]`. Uniform grids
-  validate unchanged; metric-aware operators are out of scope until
-  Step 19b. Unblocks ARMS spherical-r (TASKS.md Step 36).
+- [x] **Stretched / non-uniform grids.** Optional `[grid.stretched]`, sparse
+  per-axis `axis_widths` validated against the extent — unblocks ARMS
+  spherical-r (Step 36).
 
-- [x] **`Restart.from_files` widening.** Shipped: new optional
-  `from_files: list[str] | None` field on `Restart`. Validator:
-  distinct & non-empty when present. The existing `from` field stays
-  required (typically a manifest path or canonical checkpoint).
-  Unblocks VPIC per-rank restart manifest (TASKS.md Step 35).
+- [x] **`Restart.from_files` widening.** Optional `from_files` list,
+  distinct and non-empty — unblocks the VPIC per-rank restart manifest
+  (Step 35).
 
-- [x] **Anisotropic `gamma_eos` on `[[species]]`.** Shipped: new
-  optional `Species.gamma_eos_par`, `Species.gamma_eos_perp` fields.
-  Validator: par and perp must both be present or both absent;
-  cannot mix with the scalar `gamma_eos`. Unblocks Gkeyll / Hakim
-  two-fluid 10-moment hybrids without retyping the existing scalar.
+- [x] **Anisotropic `gamma_eos` on `[[species]]`.** Optional `gamma_eos_par`
+  / `gamma_eos_perp`, required together and exclusive with the scalar —
+  unblocks 10-moment hybrids.
 
-- [x] **`[[collisions]]` table for collisional PIC.** Shipped: new
-  optional repeatable section. `Collision` model with
-  `species_pair: list[str]` (length 2), `model: 'coulomb' | 'bgk' |
-  'monte-carlo'`, optional `coulomb_log`, `temperature_ref`,
-  `description`. Root validator enforces that both species names
-  resolve against `[[species]].name`; self-collisions (same species
-  twice) are permitted. Unblocks Smilei collisional, EPOCH,
-  OSIRIS-collisional, PIConGPU.
+- [x] **`[[collisions]]` table for collisional PIC.** Optional repeatable
+  section; both `species_pair` names must resolve against `[[species]]`,
+  self-collisions allowed.
 
-- [x] **Multi-cadence / region-of-interest output.** Shipped: new
-  optional repeatable `[[output.streams]]` section, alongside the
-  existing singleton `[output.fields]`. `OutputStream` extends
-  `_OutputBase` with required `name`, `quantities`, optional
-  `region: BoxRegion | PlaneRegion` (discriminated by `kind = "box" |
-  "plane"`), and `precision_overrides`. Output validator enforces
-  unique stream names; the root validator cross-checks region axis
-  counts against `[grid].dimensions`. Cross-cutting production-run
-  benefit; works for any reader.
+- [x] **Multi-cadence / region-of-interest output.** Optional repeatable
+  `[[output.streams]]` with box/plane regions, unique names, and
+  per-quantity precision overrides.
 
 - [x] **Per-field boundary conditions + BC ↔ driver linkage.**
-  Shipped: refactored `BoundaryConditions` into
-  `BoundaryConditionsBase` (carries `lower`/`upper`/`drivers_lower`/
-  `drivers_upper`) and `BoundaryConditions(BoundaryConditionsBase)`
-  with optional `field_overrides: dict['E' | 'B' | 'particles',
-  BoundaryConditionsBase]`. The driver foreign keys are sparse dicts
-  keyed by axis index (TOML can't represent `null` inside lists).
-  Root validator enforces that every driver name resolves against
-  `[[drivers]].name`. Unblocks PIC PML and solar-wind-driven runs.
+  `BoundaryConditions.field_overrides` for E / B / particles, plus
+  sparse per-face driver foreign keys resolved against `[[drivers]]`.
 
-- [x] **`[phase_space]` for >3D kinetic codes.** Shipped: new
-  optional top-level `PhaseSpace` model with
-  `dimensions: list[PositiveInt]` (2..6), optional `axis_labels`,
-  `extents`, and `coordinate_system: 'cartesian' | 'guiding-center'
-  | 'field-aligned' | 'spherical-velocity'`. Root validator enforces
-  that the first `n` dimensions match `[grid].dimensions` exactly —
-  the spatial sub-grid stays owned by `[grid]`; phase space extends
-  it. Unblocks gyrokinetic codes (GENE, GS2, GX, Gkeyll-GK) and full
-  6D Vlasov phase space without lifting the `AxisInt` cap on
-  `Grid.dimensions`.
+- [x] **`[phase_space]` for >3D kinetic codes.** Optional top-level section
+  whose first `n` dimensions must match `[grid].dimensions` — unblocks
+  gyrokinetic and 6D Vlasov codes.
 
 ## v1.1 — deferred items
 
@@ -256,9 +162,9 @@ later without disturbing v1.0.x consumers.
 - [ ] **QED / radiation-reaction module.**
   EPOCH-QED, Smilei-QED, OSIRIS, Zeltron support synchrotron radiation
   reaction, Breit-Wheeler pair production, Compton scattering. Needs
-  photon species + cross-section table identifiers. CLAUDE.md mentions
-  `radiative` as a future top-level flag; here is the actual shape
-  needed. Defer until a QED-capable reader lands.
+  photon species + cross-section table identifiers. `docs/schema.md`
+  names `radiative` as an anticipated `[physics]` flag; here is the
+  actual shape needed. Defer until a QED-capable reader lands.
 
 ## Documentation backlog (no model changes)
 

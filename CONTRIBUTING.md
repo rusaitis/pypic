@@ -91,9 +91,11 @@ a first contribution:
 - **Scan sibling readers when fixing a pattern in one.** iPIC3D has three reader
   variants and BATSRUS two; duplicated sign conventions and drifted docstrings
   tend to travel together.
-- **Docstrings** are NumPy-style with `r"""` raw strings, carry the LaTeX
-  equation where one applies, and include a runnable doctest. Doctests are part
-  of the suite (`--doctest-modules`).
+- **Docstrings** are NumPy-style with `r"""` raw strings and carry the LaTeX
+  equation where one applies. Include a runnable doctest wherever the function
+  works on synthetic arrays alone; functions needing a file, a display backend,
+  or a server are exempt. Doctests are part of the suite
+  (`--doctest-modules`).
 - **Type hints** are required on public signatures, in modern syntax
   (`X | None`, `list[int]`). mypy runs in strict mode.
 

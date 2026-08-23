@@ -32,37 +32,27 @@ Each step produces something testable. No step starts until the previous step's 
 - [x] **Step 32:** Separate four_velocity quantity type
 - [x] **Step 33:** specific_energy quantity type for enthalpy (fixed dimensional bug)
 - [x] **Step 34:** StaggerInfo provenance metadata
-- [x] **Step 45:** Spectral analysis — `power_spectrum_1d/2d/3d` with
-  Parseval-consistent normalization, Hann windowing, and radial/spherical
-  averaging (`pypic.spectral`).
-- [x] **Step 46:** Reconnection diagnostics — `find_saddle_points`,
-  `reconnection_rate`, and the 3D Schindler criterion `schindler_xi`
-  (`pypic.reconnection`), plus the per-cell registry entries `D_e`,
-  `R_recon`, `agyrotropy`, `D_ng`, `A_phi`.
-- [x] **Step 47:** Field-line tracing — `trace_field_line`,
-  `trace_field_line_adaptive` (Dormand-Prince 5(4) with PI step control),
-  the batched path, and `pypic.numerics` as the shared kernel package.
-- [x] **Step 48:** Poincaré sections — `PoincareSurface`, `poincare_section`,
-  `plane_crossings`, and `plot_poincare_section`.
-- [x] **Step 49:** Cross-language codegen — `pypic.codegen` exports the
-  aliases, recipe registry, species templates, and field metadata as one
-  JSON bundle for the webpic/rustpic toolchains; CLI `pypic export`.
-- [x] **M0-prep:** webpic API readiness — public `pypic.aliases`, `Recipe`, `RECIPES` (MappingProxyType); `[webpic]` block in bundled themes; aggregated public-API invariants test.
+- [x] **Step 45:** Spectral analysis — `power_spectrum_1d/2d/3d` in `pypic.spectral`, Parseval-consistent, Hann-windowed, radially/spherically averaged
+- [x] **Step 46:** Reconnection diagnostics — `pypic.reconnection` (`find_saddle_points`, `reconnection_rate`, `schindler_xi`) plus the `D_e` / `R_recon` / `agyrotropy` / `D_ng` / `A_phi` registry entries
+- [x] **Step 47:** Field-line tracing — `trace_field_line`, `trace_field_line_adaptive` (Dormand-Prince 5(4) with PI step control), the batched path, and `pypic.numerics`
+- [x] **Step 48:** Poincaré sections — `PoincareSurface`, `poincare_section`, `plane_crossings`, `plot_poincare_section`
+- [x] **Step 49:** Cross-language codegen — `pypic.codegen` exports aliases, recipes, species templates and field metadata as one JSON bundle; CLI `pypic export`
+- [x] **M0-prep:** webpic API readiness — public `pypic.aliases`, `Recipe`, `RECIPES`, a `[webpic]` block in the bundled themes, and public-API invariants tests
 
 ### Deferred
 
-- **Step 31:** Remove default geometry from operators — revisit when non-Cartesian operators land.
+- [ ] **Step 31:** Remove default geometry from operators — revisit when non-Cartesian operators land.
 
 **Milestone: daily-use tool** — load data → compute derived quantities → compare runs → select subregions → convert units → make paper figures. ✅
 
 ## Phase 8: Modern I/O Formats
 
-- [x] **Step 24:** Zarr v3 export/import for FieldDataset — `to_zarr` (single step), `to_zarr_timeseries` (multi-step, leading time dim), `from_zarr`; canonical numbered names on disk; default codec bitshuffle+zstd; `dtype="float32"` downcast and `shards=` kwargs.
-- [x] **Step 24b:** VirtualiZarr for legacy HDF5 — `open_virtual(path) -> FieldDataset` builds a virtual Zarr view over existing HDF5 by extracting byte-range metadata, no conversion.
-- [x] **Step 24c:** Icechunk storage backend — Git-like versioning + ACID over Zarr v3; `to_zarr(..., backend="icechunk")` writes, `from_zarr` auto-detects; Icechunk is also the native v3 virtual-store path (replaces Kerchunk).
-- [x] **Step 25:** Parquet/Arrow for ParticleData — two-tier API (`particles_to_arrow` in-memory, `particles_to_dataset` Hive-partitioned by step/species); Morton-sorted rows for spatial pushdown; optional DuckDB `query_sql` path.
-- [x] **Step 25b:** Canonical ParticleData — per-particle `weight` + scalar `species_charge` / `species_mass`; per-particle `charge` dropped; combined-storage codes (iPIC3D, OSIRIS) split at the reader boundary.
-- [x] **Step 26:** `pypic convert` CLI — `convert fields`, `convert particles`, `convert all`; reuses `parse_steps` + `open_simulation`; single-step → `to_zarr`, multi-step → `to_zarr_timeseries`; Icechunk tags supported.
+- [x] **Step 24:** Zarr v3 export/import — `to_zarr`, `to_zarr_timeseries`, `from_zarr`; canonical names on disk, bitshuffle+zstd, `dtype="float32"` and `shards=`
+- [x] **Step 24b:** VirtualiZarr — `open_virtual(path)` builds a virtual Zarr view over legacy HDF5 with no conversion
+- [x] **Step 24c:** Icechunk backend — versioned ACID storage over Zarr v3, written via `to_zarr(..., backend="icechunk")` and auto-detected on read
+- [x] **Step 25:** Parquet/Arrow particles — in-memory `particles_to_arrow` and Hive-partitioned `particles_to_dataset`, Morton-sorted for spatial pushdown, optional DuckDB `query_sql`
+- [x] **Step 25b:** Canonical ParticleData — per-particle `weight` plus scalar `species_charge` / `species_mass`; combined-storage codes split at the reader boundary
+- [x] **Step 26:** `pypic convert` CLI — `fields`, `particles`, `all`; single-step writes `to_zarr`, multi-step `to_zarr_timeseries`, Icechunk tags supported
 
 ## Phase 9: Additional Readers
 
@@ -97,7 +87,7 @@ Each step produces something testable. No step starts until the previous step's 
   Add metric-factor integration to `compare_fields()` / `field_comparison_report()` so L2/L∞ weight each cell by $\sqrt{|g|}\,d^n x$. Step 20 is correct on uniform Cartesian ($\Delta V$ cancels) but wrong on spherical (poles, $r=0$). API: `compare_fields(..., weighted: bool = False)` — defaults preserve Cartesian behavior. L∞ unaffected (pointwise). Tests: radial shell L2 = analytic shell volume; Cartesian regression unchanged.
   **Depends on:** Step 19b.
 
-- [x] **Step 43:** `pypic.reductions` — `reduce(axis, reduction=..., *, weight=None)` collapses a FieldDataset along one or more axes; ops: `integrate | sum | mean | median | max | min | std | var | argmax | argmin`; optional `weight=` for yt-style density-weighted means; `attrs["reduction"]` carries provenance; composes with `BoxSelection`/`SphereSelection`; CLI `pypic reduce apply`. Carry-overs: Step 43b (Jacobian for spherical/cylindrical), Step 43c (unit-aware).
+- [x] **Step 43:** `pypic.reductions` — `reduce(axis, reduction=..., *, weight=None)` over ten ops, `attrs["reduction"]` provenance, composes with selections; CLI `pypic reduce apply`. Carry-overs: Steps 43b, 43c
 
 - [ ] **Step 50: 2D support in the differential operators**
   `divergence` / `curl` / `gradient` in `coordinates/operators.py`
@@ -184,13 +174,9 @@ Each step produces something testable. No step starts until the previous step's 
 
 > **Tier-3 canonical names (locked pre-v1.0).** Cross-tool work below uses `<field>[_s<N>][_<i>]` with species qualifier between field name and index (`B_1`, `V_s0_1`, `P_s0_11`, `q_s0_1`). HDF5 §4.1 and Zarr §4.2 stores must use these — `B1`, `V1_s0`, `P11_s0` are not emitted by any pypic-aware tool. rustpic and webpic wire directly to Tier-3; no migration shim since neither has shipped.
 
-- [x] **Step 37: `pypic.server` — Arrow IPC streaming via Starlette/FastAPI**
-  Zero-copy field serving to webpic. Arrow IPC over WebSocket — **not** Arrow Flight (no JS Flight client for browsers; gRPC-Web needs Envoy proxy and eliminates Flight's advantages). Pipeline: `pyarrow RecordBatch → IPC bytes → WebSocket → tableFromIPC() → Float32Array → Three.js BufferAttribute → GPU`. WebSocket = persistent bidirectional for streaming + time-series animation.
-  Viewer-UI selections map to pypic `Selection` server-side. Lazy I/O via xarray/dask serves only requested slices. Arrow IPC carries structured metadata (names, coords, units, normalization) in a single response. Readable in JS (`apache-arrow`) and Rust (`arrow-rs`) — aligns all three projects on one interchange format. Derived quantities via `compute()`; unit conversion via `in_si()`/`in_units()`. Optional dep: `fastapi`, `uvicorn`, `pyarrow`, `websockets` under `server` extra. Separate entry point, not on library import path.
-  Shipped: `app` / `routes` (`/health`, `/sims`, `/sims/{sim}`, `/sims/{sim}/steps`, `/sims/{sim}/fields`) + `arrow` / `stream` / `protocol` / `_state` / `exceptions`, the `server` extra, the `pypic serve` CLI command, `docs/api/server.md`, and five `tests/test_server_*.py` modules.
-  **Depends on:** Steps 24-25.
+- [x] **Step 37:** `pypic.server` — Arrow IPC over WebSocket (`app` / `routes` / `arrow` / `stream` / `protocol`), the `server` extra, and the `pypic serve` command
 
-- [x] **Step 37a:** Typed server exception hierarchy — `PypicError` base + `UnknownSimulationError` / `UnknownFieldError` / `UnknownStepError` / `GeometryUnsupportedError` in `pypic.exceptions`; server-only `ValidationFailedError` wraps Pydantic errors; single dispatcher unifies HTTP (`status_code`) and WebSocket (`ErrorFrame.kind`) transports.
+- [x] **Step 37a:** Typed server exceptions — `PypicError` and its subclasses in `pypic.exceptions`, one dispatcher unifying HTTP status codes and WebSocket `ErrorFrame` kinds
 
 - [ ] **Step 37b: selection provenance — `attrs.selections` round-trip**
   Symmetric counterpart to `attrs["reduction"]`. Today `BoxSelection`/`PlaneSelection`/`SphereSelection` produce datasets with no recorded region — box/plane partly recoverable from post-slice `grid.lower/upper/dimensions`, but `SphereSelection` loses centre, radius, keep-direction once NaN mask lands. Webpic's `{selection, axis, reduction}` wire format round-trippable only when selection state survives `to_zarr`/`from_zarr`. Design: (a) **list** at root (`attrs.selections`), not per-field — selections apply globally and chained `Box → Sphere → reduce` needs ordered composition; (b) entries typed by `kind` (`"box"`|`"plane"`|`"sphere"`) with parameters in code units + pointer to active normalization (radii interpretable across normalizations); (c) Pydantic `[[selection]]` records in `pypic.schema._models`, JSON Schema regen + drift test; (d) replay via `Selection.from_attrs(record)` classmethods. Defer until 37 forces the wire-format contract.

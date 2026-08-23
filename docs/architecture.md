@@ -149,8 +149,14 @@ dataclasses. PEP 695 `type` statements are available from 3.12.
 
 NumPy-style, in `r"""` raw strings so LaTeX survives. `$...$` inline and
 `$$...$$` display, rendered by MkDocs Material + MathJax. Required sections: a
-one-line summary, the LaTeX equation where one applies, Parameters, Returns, and
-a runnable doctest under Examples — doctests are part of the suite via
+one-line summary, the LaTeX equation where one applies, Parameters, and Returns.
+
+Add a runnable doctest under Examples wherever the function can be exercised on
+synthetic arrays alone — that is every pure physics function, and it is what
+makes `derived.py` and `diagnostics.py` verifiable. Functions that need a file
+on disk, a display backend, or a running server are exempt: the reader `open_*`
+entry points, the plotting surface, and most of `pypic.io` and `pypic.server`
+carry no Examples for that reason. Doctests run as part of the suite via
 `--doctest-modules`.
 
 ```python
