@@ -129,7 +129,7 @@ def _require_vector_columns(columns: Sequence[str]) -> None:
 def _payload_from_species_dir(root: Path, species_name: str) -> dict[str, Any] | None:
     """Read the ``pypic`` payload from any fragment under ``species={name}/``.
 
-    Fallback for the empty-filter case in :func:`particles_from_dataset`:
+    Fallback for the empty-filter case in `particles_from_dataset`:
     when no fragments match the caller's step/spatial/id filters but the
     caller pinned a species, its schema metadata is still on disk and
     should be adopted rather than degraded to the ``"unknown"``

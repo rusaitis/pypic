@@ -12,7 +12,7 @@ scheme rather than the per-component linear average implemented here.
 Output arrays are one element shorter along each shifted axis — the
 natural outcome of a half-cell average.  Readers that need uniform-shape
 fields handle boundary completion (cropping or extrapolation) themselves.
-Readers should also construct a fresh :class:`StaggerInfo` with
+Readers should also construct a fresh `StaggerInfo` with
 ``interpolation_order=1`` and a ``notes`` string recording the
 destagger provenance.
 
@@ -76,7 +76,7 @@ def _destagger_one(
     Composes a half-cell average along every axis where ``source`` and
     ``target`` differ.  Each offset must be either 0.0 or 0.5;
     mixed-fractional positions (e.g. 0.25) require higher-order
-    interpolation and are rejected with :class:`ValueError`.
+    interpolation and are rejected with `ValueError`.
     """
     if len(source) != arr.ndim:
         msg = (
@@ -150,7 +150,7 @@ def destagger_arrays_to_cell_centers(
         Map from canonical field name to its ED-PIC ``position`` tuple,
         each offset in ``{0.0, 0.5}`` (only half-cell offsets are
         supported by linear interpolation).  Matches the shape of
-        :attr:`pypic.containers.StaggerInfo.position`.
+        [`pypic.containers.StaggerInfo.position`][pypic.containers.StaggerInfo.position].
 
     Returns
     -------
@@ -185,7 +185,7 @@ def destagger_arrays_to_nodes(
 ) -> dict[str, FloatArray]:
     r"""Linearly interpolate Yee-staggered arrays to grid nodes.
 
-    Mirror of :func:`destagger_arrays_to_cell_centers` with target
+    Mirror of `destagger_arrays_to_cell_centers` with target
     position ``(0.0, ..., 0.0)``.  See that function for parameter and
     error semantics.
 

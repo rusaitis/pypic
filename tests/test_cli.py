@@ -1918,3 +1918,48 @@ def test_reduce_apply_weight_rejected_for_max(tmp_path: Path) -> None:
     assert result.exit_code != 0
     assert isinstance(result.exception, ValueError)
     assert "weight=" in str(result.exception)
+
+
+class TestHelpTextIsUserFacing:
+    """``--help`` is read by people who have not cloned the repo.
+
+    Typer renders help with ``rich_markup_mode="rich"``, so a bare
+    ``[server]`` is parsed as a style tag and silently dropped — the
+    ``serve`` command used to print ``pip install 'pypic-plasma'``, which
+    installs the core package and leaves the command still broken.
+    """
+
+    def test_serve_help_names_the_extra_it_needs(self) -> None:
+        result = runner.invoke(app, ["serve", "--help"])
+        assert "pypic-plasma[server]" in result.output
+
+    @pytest.mark.parametrize(
+        "command",
+        [
+            "info",
+            "fields",
+            "stats",
+            "compare",
+            "validate",
+            "plot",
+            "plot-compare",
+            "serve",
+            "convert",
+            "schema",
+            "export",
+            "reduce",
+        ],
+    )
+    def test_help_carries_no_markup_or_repo_paths(self, command: str) -> None:
+        """No Sphinx roles, RST literals, roadmap numbers, or repo-only paths.
+
+        These come from docstrings written for the docs site; Typer prints
+        them verbatim, where they are noise at best and misleading at worst.
+        """
+        output = runner.invoke(app, [command, "--help"]).output
+        leaks = [
+            token
+            for token in (":class:", ":func:", ":mod:", ":meth:", "``", "docs/api/")
+            if token in output
+        ]
+        assert not leaks, f"`pypic {command} --help` leaks {leaks}"

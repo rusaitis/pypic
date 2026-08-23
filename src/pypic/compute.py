@@ -50,7 +50,7 @@ class SpeciesArgs(StrEnum):
 class Recipe:
     """Describes how to derive one quantity from existing fields.
 
-    Mapped from a canonical name in :data:`RECIPES`. ``func`` consumes
+    Mapped from a canonical name in `RECIPES`. ``func`` consumes
     the dependency arrays declared in ``fields`` (in order) and returns
     the derived array. The remaining attributes describe what extras
     the dispatcher should inject (grid, gamma, species args, …) before
@@ -118,7 +118,7 @@ def _scalar_component_recipes(
     """Three per-component scalar recipes (``EHF{c}`` style).
 
     ``fields_tmpl`` entries containing ``{c}`` are expanded per component;
-    the rest pass through unchanged.  Unlike :func:`_vector_recipes`, the
+    the rest pass through unchanged.  Unlike `_vector_recipes`, the
     function returns a scalar so ``component`` is not set.
     """
     return {
@@ -955,8 +955,8 @@ def _execute_recipe(
     vorticity) and a scalar array otherwise. Callers that want a single
     component should index into the result via ``recipe.component``.
 
-    Shared between :func:`compute_field` (single-component path) and
-    :meth:`FieldDataset._attach_vector_siblings` (multi-component path)
+    Shared between `compute_field` (single-component path) and
+    `FieldDataset._attach_vector_siblings` (multi-component path)
     so the two cannot drift on argument construction or geometry handling.
     Dependency resolution recurses through ``compute_field`` to benefit
     from its alias handling and cycle guard.
@@ -1056,7 +1056,7 @@ def compute_field(name: str, dataset: FieldDataset, _depth: int = 0) -> FloatArr
     GeometryUnsupportedError
         If the recipe requires Cartesian geometry but the dataset
         grid is spherical or cylindrical.  Subclass of
-        :class:`NotImplementedError`.
+        `NotImplementedError`.
     RecursionError
         If dependency chain exceeds depth limit.
     """
@@ -1154,7 +1154,7 @@ def available_quantities() -> list[str]:
 
     Does not include dynamically synthesized per-species quantities
     (e.g. ``"omega_p_s2"``, ``"T_s3"``), which are also computable
-    via :func:`compute_field`.
+    via `compute_field`.
 
     Returns
     -------
@@ -1336,7 +1336,7 @@ def unregister_recipe(name: str) -> None:
 # Public read-only view of the recipe registry. Codegen consumers
 # (webpic, rustpic tooling) iterate ``RECIPES.items()`` to generate
 # cross-language mirrors. The underlying ``_REGISTRY`` stays a mutable
-# dict because :func:`register_recipe` / :func:`unregister_recipe`
+# dict because `register_recipe` / `unregister_recipe`
 # update it under ``_recipe_lock``; the proxy guarantees external
 # callers only see the read side.
 RECIPES: MappingProxyType[str, Recipe] = MappingProxyType(_REGISTRY)

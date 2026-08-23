@@ -83,7 +83,6 @@ def parse_header(path: Path) -> BATSRUSHeader:
         )
         raise ValueError(msg)
 
-
     head_lines = sections.get("#HEADFILE", [])
     is_binary = True
     n_byte_real = 8

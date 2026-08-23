@@ -58,7 +58,8 @@ def add_badge(
 
     Renders simulation step, time, or custom text in a themed rounded
     rectangle overlay. A progress bar is shown when *progress* or
-    *step_range* is set. Mirrors :func:`pypic.plotting.add_badge` for
+    *step_range* is set. Mirrors [`pypic.plotting.add_badge`][pypic.plotting.add_badge]
+    for
     API parity between the matplotlib and pyvista paths — the parameter
     names match so backend-independent code can pass the same kwargs.
 
@@ -128,7 +129,8 @@ def add_badge(
 
     Notes
     -----
-    Unlike :func:`pypic.plotting.add_badge` (matplotlib), this function
+    Unlike [`pypic.plotting.add_badge`][pypic.plotting.add_badge] (matplotlib), this
+    function
     returns ``None``. The underlying VTK actors are drawn directly into
     the plotter's renderer and are not exposed for post-hoc
     customization — re-call with the desired keyword arguments instead.
@@ -309,8 +311,9 @@ def add_label(
     r"""Add a panel-letter or short-phrase overlay.
 
     Styled with the same rounded box, border, and theme variant system
-    as :func:`add_badge` and :func:`add_colorbar`. Mirrors
-    :func:`pypic.plotting.add_label` for parity between the matplotlib
+    as `add_badge` and `add_colorbar`. Mirrors
+    [`pypic.plotting.add_label`][pypic.plotting.add_label] for parity between the
+    matplotlib
     and pyvista paths — parameter names match so backend-independent
     code can pass the same kwargs.
 
@@ -341,7 +344,7 @@ def add_label(
     fontweight : str
         Font weight (e.g. ``"bold"``, ``"normal"``). Default ``"bold"``
         is auto-downgraded to ``"normal"`` for multi-word phrases to
-        match :func:`pypic.plotting.add_label`.
+        match [`pypic.plotting.add_label`][pypic.plotting.add_label].
     ha : str
         Horizontal text alignment within the box: ``"left"``,
         ``"center"`` (default), or ``"right"``. The pyvista default
@@ -367,7 +370,8 @@ def add_label(
 
     Notes
     -----
-    Unlike :func:`pypic.plotting.add_label` (matplotlib), this function
+    Unlike [`pypic.plotting.add_label`][pypic.plotting.add_label] (matplotlib), this
+    function
     returns ``None``. The underlying VTK actors are drawn directly into
     the plotter's renderer and are not exposed for post-hoc
     customization — re-call with the desired keyword arguments instead.

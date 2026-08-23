@@ -203,7 +203,7 @@ class FieldDataset:
             §architecture requires injection points to fail loud on
             unknown names so reader bugs surface at construction time
             instead of later at ``compute()``.  Subclass of
-            :class:`KeyError`, so existing ``except KeyError`` callers
+            `KeyError`, so existing ``except KeyError`` callers
             keep working unchanged.
 
         Examples
@@ -535,7 +535,7 @@ class FieldDataset:
 
         Returns the canonical (data-vars) name for *key*, which may itself
         be a canonical name or an alias from this dataset's alias table.
-        Raises :class:`KeyError` (with close-match suggestions) if *key*
+        Raises `KeyError` (with close-match suggestions) if *key*
         matches neither.
 
         Parameters
@@ -934,7 +934,7 @@ class FieldDataset:
         Delegates to the shared ``_execute_recipe`` helper so argument
         construction, dependency resolution, and the Cartesian-only
         geometry guard cannot drift from the single-component path in
-        :func:`compute_field`.
+        `compute_field`.
         """
         from pypic.compute import _execute_recipe, _resolve_name
 
@@ -985,7 +985,8 @@ class FieldDataset:
         or ``from_arrays()``), then falls back to the global registry.
 
         For fields that have been reduced via
-        :func:`pypic.reductions.reduce` with ``reduction="integrate"``,
+        [`pypic.reductions.reduce`][pypic.reductions.reduce] with
+        ``reduction="integrate"``,
         the ``attrs["reduction"]["length_axes"]`` provenance stamp
         records how many length-dimension factors the integration
         added; ``in_si`` multiplies the registry SI factor by
@@ -1086,7 +1087,7 @@ class FieldDataset:
     def where(self, cond: np.ndarray, other: float = np.nan) -> FieldDataset:
         r"""Mask fields where *cond* is ``False``.
 
-        Returns a new :class:`FieldDataset` with the same grid shape.
+        Returns a new `FieldDataset` with the same grid shape.
         Points where *cond* is ``False`` are set to *other* (default
         ``NaN``).  Useful for spatial masks (spherical cutouts, boundary
         regions) without reducing dimensions.
@@ -1112,9 +1113,9 @@ class FieldDataset:
         axis: str | tuple[str, ...],
         **kwargs: Any,  # noqa: ANN401
     ) -> FieldDataset:
-        r"""Reduce this dataset along one or more axes (see :func:`pypic.reduce`).
+        r"""Reduce this dataset along one or more axes.
 
-        Convenience method equivalent to
+        See [`pypic.reduce`][pypic.reduce]. Convenience method equivalent to
         ``pypic.reduce(self, axis, **kwargs)``.  Enables fluent
         chaining: ``ds.where(mask).reduce("z", reduction="integrate")``.
 
@@ -1123,7 +1124,7 @@ class FieldDataset:
         axis : str or tuple of str
             Surviving-axis name(s) to reduce away.
         **kwargs
-            Forwarded to :func:`pypic.reductions.reduce`:
+            Forwarded to [`pypic.reductions.reduce`][pypic.reductions.reduce]:
             ``reduction``, ``selection``, ``fields``, ``nan_policy``.
 
         Returns

@@ -1,18 +1,18 @@
 """Diff helpers for JSON Schema documents.
 
-Pure-Python, no dependencies beyond stdlib + :mod:`pypic.schema._export`
+Pure-Python, no dependencies beyond stdlib + `pypic.schema._export`
 for stable serialization. Used by ``pypic schema diff`` and importable
 directly by library consumers that want to compare two checked-in
 schemas (e.g., to draft migration notes when v1.1 ships).
 
 Two output shapes:
 
-- :func:`schema_text_diff` — unified text diff over pretty-printed JSON.
+- `schema_text_diff` — unified text diff over pretty-printed JSON.
   Human-readable, fit for migration docs and PR descriptions.
-- :func:`schema_structured_diff` — ``{added, removed, changed}`` with
+- `schema_structured_diff` — ``{added, removed, changed}`` with
   RFC 6901 JSON Pointer paths. Machine-readable for tooling.
 
-Both inputs are serialized through :func:`pypic.schema._export.dump_schema`
+Both inputs are serialized through `pypic.schema._export.dump_schema`
 with ``pretty=True`` so key ordering is identical on each side and
 differences reflect real shape changes, not formatting noise.
 """

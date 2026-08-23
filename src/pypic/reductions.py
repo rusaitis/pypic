@@ -1,14 +1,14 @@
 """Axis reductions: collapse a FieldDataset along one or more dimensions.
 
-The :func:`reduce` function collapses a :class:`~pypic.dataset.FieldDataset`
+The `reduce` function collapses a [`FieldDataset`][pypic.dataset.FieldDataset]
 along one axis (``axis="z"``) or several (``axis=("y", "z")``) using a
 chosen reduction.  Supported reductions: ``"integrate"``, ``"sum"``,
 ``"mean"``, ``"median"``, ``"max"``, ``"min"``, ``"std"``, ``"var"``,
 ``"argmax"``, ``"argmin"``.  Column densities, line-of-sight integrals,
 slab averages, projected-max diagnostics, and peak-position maps all
 compose from this single primitive paired with an optional
-:class:`~pypic.selections.BoxSelection` or
-:class:`~pypic.selections.SphereSelection`.
+[`BoxSelection`][pypic.selections.BoxSelection] or
+[`SphereSelection`][pypic.selections.SphereSelection].
 
 Why no ``SlabSelection``? Selections describe regions, not data
 (CLAUDE.md §architecture).  A ``Slab`` would fuse "pick a thick slice"
@@ -27,7 +27,7 @@ The ``length_axes`` attrs stamp is an interim mechanism shipped ahead of
 TASKS Step 43c's openPMD ``unit_dimension`` 7-tuple generalization.
 Today, after an unweighted ``integrate``, the displayed ``quantity_type``
 and ``si_unit`` strings are preserved but the numeric value through
-:meth:`FieldDataset.in_si` is corrected via ``length_ref ** length_axes``.
+`FieldDataset.in_si` is corrected via ``length_ref ** length_axes``.
 Step 43c will subsume this with proper post-reduction tuple arithmetic.
 """
 
@@ -109,7 +109,8 @@ def reduce(
         Dimension name(s) to reduce away (e.g. ``"x"``, ``("y", "z")``,
         ``"time"``).  Validated against the underlying xarray dataset's
         dims so non-grid dims like ``time`` (added by
-        :func:`pypic.io.to_zarr_timeseries`) are accepted alongside the
+        [`pypic.io.to_zarr_timeseries`][pypic.io.to_zarr_timeseries]) are accepted
+        alongside the
         spatial ``grid.surviving_axis_names``.  Multi-axis reduction
         collapses several dimensions in one call — useful for going
         from 3D to 1D without chaining.  ``"argmax"`` and ``"argmin"``
@@ -136,7 +137,7 @@ def reduce(
     fields : Iterable[str] | None
         Optional subset of field names (canonical or alias) to reduce.
         ``None`` reduces every data variable.  Unknown names raise
-        :class:`KeyError` with the full list (CLAUDE.md §architecture).
+        `KeyError` with the full list (CLAUDE.md §architecture).
     weight : str | None
         Name of a field to weight the reduction by.  Only supported for
         ``reduction in {"mean", "integrate"}`` — other reductions raise
@@ -148,18 +149,19 @@ def reduce(
         $\int f w \, dx / \int w \, dx$ (yt's emission-weighted /
         density-weighted column average).  Resolves via
         ``data.resolve_key`` (aliases accepted); unknown names raise
-        :class:`KeyError`.  NaN handling under ``nan_policy="omit"``
+        `KeyError`.  NaN handling under ``nan_policy="omit"``
         uses a joint mask: cells where the field *or* weight is NaN
         contribute zero to both the numerator and denominator and are
         skipped consistently.
     nan_policy : {"omit", "propagate", "raise"}
         ``"omit"`` (default) → ``skipna=True``: NaN cells are dropped
         from each reduction.  Pairs naturally with
-        :class:`~pypic.selections.SphereSelection`, which NaN-masks
+        [`SphereSelection`][pypic.selections.SphereSelection], which NaN-masks
         outside-region cells.  ``"propagate"`` lets NaN poison the
         result.  ``"raise"`` errors when any input cell is NaN.
         Same vocabulary and semantics as
-        :func:`pypic.diagnostics.l2_relative_error` — see
+        [`pypic.diagnostics.l2_relative_error`][pypic.diagnostics.l2_relative_error] —
+        see
         `conventions.md § Error Norms and Divergence` for the broader
         rationale.
 
@@ -445,7 +447,7 @@ def _weighted_integrate(
     every named axis in turn (the integration is associative and
     commutative for trapezoidal-rule integration of a smooth product).
     Joint NaN-masking under ``nan_policy="omit"`` matches
-    :func:`_weighted_mean`.
+    `_weighted_mean`.
     """
     coords = list(axes)
 

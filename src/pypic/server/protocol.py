@@ -7,13 +7,13 @@ do not need wrappers here.
 
 The selection / reduction wire shapes are tagged-union dicts that
 map onto the established ``BoxSelection`` / ``PlaneSelection`` /
-``SphereSelection`` dataclasses + :func:`pypic.reduce` kwargs.  Keeping
+``SphereSelection`` dataclasses + [`pypic.reduce`][pypic.reduce] kwargs.  Keeping
 the JSON ↔ object conversion in this module preserves the architecture
 rule that selections are pure region descriptions — they get
 constructed from validated specs *outside* the dataclass definitions.
 
 Step 37b (``attrs.selections`` round-trip in stored Zarr) will reuse
-:class:`SelectionSpec` directly; designing the wire shape here lets
+`SelectionSpec` directly; designing the wire shape here lets
 the storage side land as a pure write addition later.
 """
 
@@ -56,7 +56,7 @@ class _StrictModel(BaseModel):
 
 
 class BoxSpec(_StrictModel):
-    """Wire form of :class:`~pypic.selections.BoxSelection`."""
+    """Wire form of [`BoxSelection`][pypic.selections.BoxSelection]."""
 
     kind: Literal["box"] = "box"
     ranges: dict[str, tuple[int, int]] = Field(
@@ -67,7 +67,7 @@ class BoxSpec(_StrictModel):
 
 
 class PlaneSpec(_StrictModel):
-    """Wire form of :class:`~pypic.selections.PlaneSelection`."""
+    """Wire form of [`PlaneSelection`][pypic.selections.PlaneSelection]."""
 
     kind: Literal["plane"] = "plane"
     normal: str
@@ -78,7 +78,7 @@ class PlaneSpec(_StrictModel):
 
 
 class SphereSpec(_StrictModel):
-    """Wire form of :class:`~pypic.selections.SphereSelection`."""
+    """Wire form of [`SphereSelection`][pypic.selections.SphereSelection]."""
 
     kind: Literal["sphere"] = "sphere"
     center: tuple[float, float, float]
@@ -109,7 +109,7 @@ def to_selection(
 
 
 class ReductionSpec(_StrictModel):
-    """Wire form of a :func:`pypic.reduce` call."""
+    """Wire form of a [`pypic.reduce`][pypic.reduce] call."""
 
     axis: str | list[str] = Field(
         description="Single axis name or list of axes (e.g. ['y', 'z']).",
@@ -126,7 +126,7 @@ class ReductionSpec(_StrictModel):
 
 
 def to_reduction_kwargs(spec: ReductionSpec) -> dict[str, Any]:
-    """Translate a ``ReductionSpec`` to kwargs for :func:`pypic.reduce`.
+    """Translate a ``ReductionSpec`` to kwargs for [`pypic.reduce`][pypic.reduce].
 
     The ``axis`` field accepts either a single string or a list; the
     list form gets passed through as a tuple (which pypic.reduce

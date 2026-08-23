@@ -1,11 +1,11 @@
 """Typer CLI for codegen export — JSON bundle for cross-language tooling.
 
-Mirrors :mod:`pypic.schema.cli`: thin commands delegating to the pure
-helpers in :mod:`pypic.codegen`, with stable ``sort_keys`` JSON output.
+Mirrors [`pypic.schema.cli`][pypic.schema.cli]: thin commands delegating to the pure
+helpers in [`pypic.codegen`][pypic.codegen], with stable ``sort_keys`` JSON output.
 ``bundle`` is the one webpic's codegen consumes; the per-table commands
 (``aliases``, ``recipes``, ``fields``) exist for inspection and debugging.
 
-typer is imported here only so library users of :mod:`pypic.codegen`
+typer is imported here only so library users of [`pypic.codegen`][pypic.codegen]
 don't pull the optional CLI dependency into their working set.
 """
 

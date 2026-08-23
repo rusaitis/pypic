@@ -71,11 +71,18 @@ nav:
     - Reconnection: api/reconnection.md
     - Units & Normalization: api/units.md
     - Field Registry: api/fields.md
+    - Compute & Recipes: api/compute.md
     - Selections: api/selections.md
     - Reductions: api/reductions.md
     - Coordinates & Operators: api/coordinates.md
+    - Regridding: api/regrid.md
+    - Comparison: api/comparison.md
     - Numerics: api/numerics.md
     - Readers: api/readers.md
     - Field Line Tracing: api/traces.md
     - Poincaré Sections: api/poincare.md
+    - Modern I/O: api/io.md
+    - Plotting: api/plotting.md
     - Server: api/server.md
+    - Schema Validation: api/schema.md
+    - Exceptions: api/exceptions.md

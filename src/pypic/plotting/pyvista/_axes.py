@@ -57,7 +57,7 @@ def add_axis_triad(
 ) -> None:
     r"""Draw axis arrows from *center* with themed colors and labels.
 
-    When *data* (a :class:`FieldDataset`) is provided and *labels* is
+    When *data* (a `FieldDataset`) is provided and *labels* is
     ``None``, axis labels are auto-generated from the coordinate frame
     (e.g. ``"$x_{GSM}$"``).
 
@@ -169,7 +169,7 @@ def add_equatorial_grid(
     Grid lines use a uniform spacing in 1-2-5 multiples, identical
     in both x and y directions. Labels are placed at grid edges as
     plain numeric values (no units appended). Limits can be derived
-    automatically from a 2D :class:`FieldDataset`.
+    automatically from a 2D `FieldDataset`.
 
     Parameters
     ----------

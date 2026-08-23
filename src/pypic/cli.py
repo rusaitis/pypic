@@ -106,7 +106,7 @@ def parse_steps(raw: str, available: Sequence[int]) -> list[int]:
     and ``sim.particle_steps`` for particle commands so aliases like
     ``last`` resolve to the right cadence.
 
-    Raises :class:`typer.BadParameter` on invalid syntax, on an empty
+    Raises `typer.BadParameter` on invalid syntax, on an empty
     ``available`` list, or when the resolved list is empty.
     """
     raw = raw.strip()
@@ -278,7 +278,7 @@ def _resolve_plane(
     index: int | None,
     coord: float | None,
 ) -> PlaneSelection | None:
-    """Build a :class:`PlaneSelection` from CLI flags.
+    """Build a `PlaneSelection` from CLI flags.
 
     Returns ``None`` for 2D grids when the user didn't request a
     specific plane — the plotting layer handles 2D data directly.
@@ -398,7 +398,7 @@ def _parse_compression(
     """Parse ``zstd[:level]`` / ``blosc[:clevel]`` into a zarr encoding dict.
 
     Returns ``{_ENCODING_BLANKET_KEY: {...}}`` — caller passes the result
-    through :func:`_expand_encoding_for_vars` to fan out to every
+    through `_expand_encoding_for_vars` to fan out to every
     ``data_var`` before handing to ``to_zarr``.
     """
     if spec is None:
@@ -2371,15 +2371,20 @@ def serve(
         ),
     ] = None,
 ) -> None:
-    """Run the Arrow IPC + JSON HTTP server (Step 37 foundations).
+    # The backslash before [server] is for typer's rich help renderer,
+    # which otherwise parses the bracket as a style tag and silently
+    # drops it — printing an install command that does not install the
+    # extra. tests/test_cli.py pins the rendered output.
+    r"""Run the Arrow IPC + JSON HTTP server.
 
-    Exposes JSON discovery routes (``/health``, ``/sims``, ...) and one
-    WebSocket endpoint (``/sims/{sim}/stream``) that streams
-    :class:`~pypic.dataset.FieldDataset` slices as Arrow IPC bytes to
-    webpic and other Arrow-aware clients.  See ``docs/api/server.md``
-    for the wire protocol.
+    Exposes JSON discovery routes (/health, /sims, ...) and one WebSocket
+    endpoint (/sims/{sim}/stream) that streams field slices as Arrow IPC
+    bytes to webpic and other Arrow-aware clients.
 
-    Requires the ``server`` extra (pip install 'pypic-plasma[server]').
+    Requires the server extra: pip install "pypic-plasma\[server]"
+
+    The wire protocol is documented at
+    https://rusaitis.github.io/pypic/api/server/
     """
     try:
         from pypic.server.app import serve as _serve

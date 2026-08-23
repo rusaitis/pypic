@@ -134,6 +134,8 @@ def add_colorbar(
         ``"darken"`` — darkened endpoint colors.
         ``None`` — matplotlib defaults (no modification).
 
+    Notes
+    -----
     Colors for the outline, ticks, and label are read from the active
     matplotlib rcParams so that custom themes propagate automatically.
     """
@@ -180,7 +182,7 @@ def add_inset_colorbar(
 
     Uses ``ax.inset_axes()`` for the colorbar with a rounded background
     patch. Visually matches the badge style from
-    :func:`~pypic.plotting.add_badge`.
+    [`add_badge`][pypic.plotting.add_badge].
 
     Parameters
     ----------

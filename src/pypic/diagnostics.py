@@ -44,7 +44,7 @@ def _apply_nan_policy_single(
 
     Returns the (possibly NaN-stripped) flat array to feed into the
     reduction, or ``None`` to signal "all cells masked, result
-    undefined".  Mirrors :func:`_apply_nan_policy` for the
+    undefined".  Mirrors `_apply_nan_policy` for the
     paired-array case but operates on one array.
     """
     if nan_policy not in ("omit", "propagate", "raise"):
@@ -95,7 +95,7 @@ def _apply_nan_policy(
     For ``"omit"``, NaN cells in either input are dropped from both
     arrays via a joint mask, so downstream relative norms compare the
     same set of points in numerator and denominator. Emits a
-    :class:`UserWarning` reporting the dropped count when masking
+    `UserWarning` reporting the dropped count when masking
     occurs (no warning when both inputs are NaN-free).
     """
     if nan_policy not in ("omit", "propagate", "raise"):
@@ -155,7 +155,7 @@ def l2_relative_error(
         How to handle NaN cells in either input. ``"omit"`` masks them
         out (both numerator and denominator restricted to the same valid
         set, so the relative error stays mathematically coherent) and
-        emits a :class:`UserWarning` reporting the dropped count.
+        emits a `UserWarning` reporting the dropped count.
         ``"propagate"`` is the unaltered NumPy reduction — any NaN
         poisons the result. ``"raise"`` errors on any NaN.
 
@@ -207,7 +207,7 @@ def linf_error(
         Reference (exact or baseline) field values.
     nan_policy : {"omit", "propagate", "raise"}, default "omit"
         How to handle NaN cells in either input. See
-        :func:`l2_relative_error` for the full semantics.
+        `l2_relative_error` for the full semantics.
 
     Returns
     -------
@@ -296,7 +296,7 @@ def field_energy(
         array dimensions.
     nan_policy : {"omit", "propagate", "raise"}, default "omit"
         How to handle NaN cells.  ``"omit"`` integrates over the valid
-        region and emits a :class:`UserWarning` reporting the dropped
+        region and emits a `UserWarning` reporting the dropped
         count; ``"propagate"`` is the unaltered ``np.sum`` (NaN
         poisons the integral); ``"raise"`` errors on any NaN.
 
@@ -424,7 +424,7 @@ def max_div_b(
     nan_policy : {"omit", "propagate", "raise"}, default "omit"
         How to handle NaN cells in the divergence array (typically
         from upstream NaN-masked input — e.g. ``SphereSelection``).
-        See :func:`field_energy` for full semantics.
+        See `field_energy` for full semantics.
 
     Returns
     -------
@@ -516,7 +516,7 @@ def spatial_mean(
         Scalar field (any dimensionality).
     nan_policy : {"omit", "propagate", "raise"}, default "omit"
         How to handle NaN cells. ``"omit"`` averages over the valid
-        region and emits a :class:`UserWarning` reporting the dropped
+        region and emits a `UserWarning` reporting the dropped
         count; ``"propagate"`` is the unaltered ``np.mean`` (any NaN
         poisons the result); ``"raise"`` errors on any NaN.
 
@@ -556,7 +556,7 @@ def spatial_rms(
     field : NDArray
         Scalar field (any dimensionality).
     nan_policy : {"omit", "propagate", "raise"}, default "omit"
-        How to handle NaN cells. See :func:`spatial_mean` for full
+        How to handle NaN cells. See `spatial_mean` for full
         semantics.
 
     Returns
@@ -590,7 +590,7 @@ def field_extrema(
     field : NDArray
         Scalar field (any dimensionality).
     nan_policy : {"omit", "propagate", "raise"}, default "omit"
-        How to handle NaN cells. See :func:`spatial_mean` for full
+        How to handle NaN cells. See `spatial_mean` for full
         semantics. Under ``"propagate"``, any NaN yields
         ``(nan, nan)``.
 

@@ -123,11 +123,11 @@ def _iter_theme_files() -> list[Path]:
 
 
 def load_theme(path: str | Path) -> PlotTheme:
-    r"""Load a :class:`PlotTheme` from a TOML file.
+    r"""Load a `PlotTheme` from a TOML file.
 
     Only ``name`` and ``[colors]`` (with at least ``background`` and
     ``text``) are required.  All other sections fall back to
-    :class:`PlotTheme` defaults.  App-specific settings live under
+    `PlotTheme` defaults.  App-specific settings live under
     ``[pypic]``; other sections (``[webpic]``, etc.) are ignored.
 
     Parameters
@@ -296,7 +296,7 @@ def load_theme(path: str | Path) -> PlotTheme:
 
 
 def save_theme(theme: PlotTheme, path: str | Path) -> None:
-    r"""Save a :class:`PlotTheme` to a TOML file.
+    r"""Save a `PlotTheme` to a TOML file.
 
     The output uses the cross-project schema with RGBA color tuples.
 

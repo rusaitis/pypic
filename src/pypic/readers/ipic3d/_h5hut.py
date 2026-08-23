@@ -65,8 +65,8 @@ class IPic3DH5hutReader:
     transpose, and H5hut-specific field naming (uppercase axis letters
     in ``_PRESSURE_COMPONENT_MAP``). Field-name mapping for everything
     else, the Gaussian conversions, pressure-tensor mass correction, and
-    config translation live in :mod:`pypic.readers.ipic3d._field_map` and
-    :mod:`pypic.readers.ipic3d._config`, shared with the parallel and
+    config translation live in `pypic.readers.ipic3d._field_map` and
+    `pypic.readers.ipic3d._config`, shared with the parallel and
     serial readers.
 
     Parameters
@@ -108,7 +108,7 @@ class IPic3DH5hutReader:
 
         Opens the H5hut fields file and inspects ``Step#0/Block/``
         keys. Unknown native keys pass through with the same name as
-        both key and value, matching :meth:`read_timestep`.
+        both key and value, matching `read_timestep`.
 
         Parameters
         ----------

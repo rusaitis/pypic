@@ -137,7 +137,7 @@ class BoxSelection:
 class SphereSelection:
     r"""Mask fields inside or outside a sphere with NaN.
 
-    Unlike :class:`PlaneSelection` and :class:`BoxSelection`, this
+    Unlike `PlaneSelection` and `BoxSelection`, this
     preserves the grid shape — masked points become ``NaN`` rather than
     being removed.
 

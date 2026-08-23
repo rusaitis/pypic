@@ -152,7 +152,7 @@ def _draw_filled_polygon(
     """Draw a filled 2D polygon through *points_2d* (uniform color).
 
     Returns the ``vtkActor2D``. Used as the building block for
-    :func:`draw_rounded_rect`, :func:`_draw_triangle`, and any other
+    `draw_rounded_rect`, `_draw_triangle`, and any other
     convex single-color filled shape in normalized viewport coordinates.
     """
     import vtk
@@ -429,7 +429,7 @@ def _fit_fonts_to_strip(
 ) -> tuple[int, int]:
     """Shrink *tick_fs* and *title_fs* if labels would overflow the strip width.
 
-    Measures actual rendered widths via :func:`_measure_text_width_px` and
+    Measures actual rendered widths via `_measure_text_width_px` and
     scales each font down only when its content exceeds the allowed budget
     fraction of the strip width. Never scales above the requested sizes.
     """
@@ -519,9 +519,11 @@ def add_colorbar(
     drawn in normalized viewport coordinates for pixel-perfect
     positioning independent of window size.
 
-    Parameters match :func:`pypic.plotting.add_inset_colorbar` (matplotlib)
+    Parameters match
+    [`pypic.plotting.add_inset_colorbar`][pypic.plotting.add_inset_colorbar]
+    (matplotlib)
     where possible: *label* aligns with matplotlib's colorbar ``label=``
-    convention, and *loc* matches :func:`add_badge` / :func:`add_label`.
+    convention, and *loc* matches `add_badge` / `add_label`.
 
     Parameters
     ----------
@@ -546,7 +548,8 @@ def add_colorbar(
         renders them at ~30% opacity; ``"darken"`` multiplies the
         endpoint RGB by 0.75; ``"transparent"`` skips the triangles
         entirely; ``None`` uses the cmap's under/over colors at full
-        opacity. Mirrors :func:`pypic.plotting.add_inset_colorbar`.
+        opacity. Mirrors
+        [`pypic.plotting.add_inset_colorbar`][pypic.plotting.add_inset_colorbar].
     variant : str or None
         ``None`` uses the primary overlay colors; ``"alt"`` uses
         ``theme.overlay_alt_*`` (matching the matplotlib badge variant).
@@ -565,7 +568,8 @@ def add_colorbar(
     ticks : list[float] or None
         Explicit tick positions in data units. ``None`` (default)
         auto-generates ticks from *clim* and *n_labels*. Mirrors the
-        ``ticks`` parameter on :func:`pypic.plotting.add_inset_colorbar`.
+        ``ticks`` parameter on
+        [`pypic.plotting.add_inset_colorbar`][pypic.plotting.add_inset_colorbar].
     theme : PlotTheme or None
         Theme for colors and fonts.
     """

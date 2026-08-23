@@ -1,4 +1,4 @@
-"""Arrow IPC encoding of a :class:`~pypic.dataset.FieldDataset`.
+"""Arrow IPC encoding of a [`FieldDataset`][pypic.dataset.FieldDataset].
 
 Produces a self-contained Arrow IPC byte stream that webpic (or any
 Arrow-aware consumer in JS / Rust / Python) can decode with one call:
@@ -12,7 +12,7 @@ Each call returns a single ``RecordBatch`` with one column per field
 axis.  Original N-D shape, axis names, normalization, and per-field
 attrs travel in the schema metadata under the ``b"pypic"`` key as
 JSON — mirroring the convention used by
-:mod:`pypic.io._arrow` for particles.
+`pypic.io._arrow` for particles.
 
 Foundation scope: single ``RecordBatch`` per call.  Chunked /
 progressive transfer is a TASKS Step 37 follow-up that drops in
@@ -69,11 +69,11 @@ def field_dataset_to_arrow_ipc(
     fields : iterable of str, optional
         Subset of canonical field names to encode.  ``None`` encodes
         every data variable on the dataset.  Unknown names raise
-        :class:`KeyError`.
+        `KeyError`.
     units : {"code", "si"}
         ``"code"`` (default) preserves the dataset's stored numeric
         values (code units, the round-trippable form).  ``"si"`` walks
-        each requested field, calls :meth:`FieldDataset.in_si` to
+        each requested field, calls `FieldDataset.in_si` to
         produce SI values, and stamps ``units="si"`` on the schema
         metadata so the consumer knows not to multiply by the
         normalization references again.
@@ -165,7 +165,7 @@ def field_dataset_to_arrow_ipc(
 
 
 def decode_field_dataset_ipc(ipc_bytes: bytes) -> dict[str, Any]:
-    """Decode an IPC stream produced by :func:`field_dataset_to_arrow_ipc`.
+    """Decode an IPC stream produced by `field_dataset_to_arrow_ipc`.
 
     Convenience helper for tests and Python consumers.  Returns a dict
     with reconstructed N-D field arrays, the schema metadata, and the
@@ -175,7 +175,7 @@ def decode_field_dataset_ipc(ipc_bytes: bytes) -> dict[str, Any]:
     Parameters
     ----------
     ipc_bytes : bytes
-        Output of :func:`field_dataset_to_arrow_ipc`.
+        Output of `field_dataset_to_arrow_ipc`.
 
     Returns
     -------
@@ -242,7 +242,8 @@ def _serialize_field_attrs(attrs: dict[str, Any]) -> dict[str, Any]:
 
     Drops xarray-internal keys that have no cross-tool meaning (e.g.
     chunk encoding state) and passes the documented metadata through
-    via the shared :func:`pypic.io.metadata.to_json_native` coercer so
+    via the shared
+    [`pypic.io.metadata.to_json_native`][pypic.io.metadata.to_json_native] coercer so
     NumPy scalars, tuples, and the ``reduction`` provenance dict
     round-trip cleanly.
     """

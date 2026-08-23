@@ -1,9 +1,9 @@
 r"""Grid-aware cross-model comparison utilities.
 
 These three functions are the only place in pypic where diagnostic
-math touches :class:`~pypic.dataset.FieldDataset`. Everything in
-:mod:`pypic.diagnostics` stays pure (NumPy in, NumPy out); the
-functions here add the glue layer — alignment via :mod:`pypic.regrid`,
+math touches [`FieldDataset`][pypic.dataset.FieldDataset]. Everything in
+[`pypic.diagnostics`][pypic.diagnostics] stays pure (NumPy in, NumPy out); the
+functions here add the glue layer — alignment via [`pypic.regrid`][pypic.regrid],
 alias resolution through both datasets, and SI conversion at the
 comparison boundary — then delegate the actual norm evaluation back
 to the pure helpers.
@@ -189,7 +189,7 @@ def _extract_values(ds: FieldDataset, canonical_name: str, units: str) -> FloatA
     """Return the field array in the requested units.
 
     *units* is assumed pre-validated by the public function — see
-    :func:`_validate_choice`.
+    `_validate_choice`.
     """
     if units == "si":
         return ds.in_si(canonical_name)
@@ -207,7 +207,7 @@ def _warn_if_coarse_mismatch(a: GridInfo, b: GridInfo) -> None:
     """Warn at most once per call if any axis spacing ratio exceeds the threshold.
 
     The warning fires for the first axis that crosses
-    :data:`_RESOLUTION_WARNING_THRESHOLD` and then returns, by design:
+    `_RESOLUTION_WARNING_THRESHOLD` and then returns, by design:
     a user running ``compare_fields(kinetic, mhd)`` wants one heads-up
     about the cross-scale comparison, not three redundant ones when all
     axes are 50× off. ``skip_file_prefixes`` routes the warning past
@@ -238,16 +238,17 @@ def compare_fields(
 ) -> float:
     r"""Compute an error norm between one field of two datasets.
 
-    Aligns *a* and *b* onto their common grid via :func:`pypic.regrid.align_grids`,
+    Aligns *a* and *b* onto their common grid via
+    [`pypic.regrid.align_grids`][pypic.regrid.align_grids],
     resolves *field* through both datasets' aliases to a shared canonical
     name, converts to SI (by default) or leaves in code units, and
-    delegates to the pure diagnostic in :mod:`pypic.diagnostics`.
+    delegates to the pure diagnostic in [`pypic.diagnostics`][pypic.diagnostics].
 
     When the two datasets are in different frames, *b* is transformed to
-    *a*'s frame via :meth:`FieldDataset.transform_to` before alignment.
+    *a*'s frame via `FieldDataset.transform_to` before alignment.
     Pass an explicit *frame* to compare in a third reference frame —
     both inputs are then transformed to that frame instead. A clear
-    :class:`ValueError` is raised if any required transform is missing.
+    `ValueError` is raised if any required transform is missing.
 
     Parameters
     ----------
@@ -258,17 +259,18 @@ def compare_fields(
         Field name; canonical or alias. Must resolve to the same
         canonical name in both datasets.
     metric : {"l2", "linf"}
-        Error norm. ``"l2"`` uses :func:`~pypic.diagnostics.l2_relative_error`
-        (relative to *b*); ``"linf"`` uses :func:`~pypic.diagnostics.linf_error`
+        Error norm. ``"l2"`` uses
+        [`l2_relative_error`][pypic.diagnostics.l2_relative_error]
+        (relative to *b*); ``"linf"`` uses [`linf_error`][pypic.diagnostics.linf_error]
         (absolute max).
     units : {"si", "code"}
-        ``"si"`` converts both fields through :meth:`FieldDataset.in_si`
+        ``"si"`` converts both fields through `FieldDataset.in_si`
         before comparing — the default, safe for cross-model runs.
         ``"code"`` compares raw code-unit values; valid only when both
         datasets share a normalization.
     method : str
         Interpolation method passed through to
-        :func:`pypic.regrid.align_grids` (e.g. ``"linear"``,
+        [`pypic.regrid.align_grids`][pypic.regrid.align_grids] (e.g. ``"linear"``,
         ``"nearest"``, ``"cubic"``). Default ``"linear"``.
     nan_policy : {"omit", "propagate", "raise"}
         Forwarded to the pure diagnostic. Default ``"omit"`` masks NaN
@@ -293,13 +295,13 @@ def compare_fields(
     ------
     KeyError
         If *field* is missing in either dataset (message from
-        :meth:`FieldDataset.resolve_key` includes close-match suggestions).
+        `FieldDataset.resolve_key` includes close-match suggestions).
     ValueError
         If *metric* or *units* is unknown, if *field* resolves to
         different canonical names in the two datasets, or if the grids
         do not overlap.
     NotImplementedError
-        If either grid is non-Cartesian (propagated from :func:`align_grids`).
+        If either grid is non-Cartesian (propagated from `align_grids`).
 
     Warns
     -----
@@ -374,14 +376,14 @@ def field_comparison_report(
         of canonical field names present in both datasets. Explicit names
         may be aliases; they resolve through both datasets.
     units : {"si", "code"}
-        Unit convention; see :func:`compare_fields`.
+        Unit convention; see `compare_fields`.
     method : str
         Interpolation method passed through to
-        :func:`pypic.regrid.align_grids`. Default ``"linear"``.
+        [`pypic.regrid.align_grids`][pypic.regrid.align_grids]. Default ``"linear"``.
     nan_policy : {"omit", "propagate", "raise"}
-        Forwarded to the pure diagnostics; see :func:`compare_fields`.
+        Forwarded to the pure diagnostics; see `compare_fields`.
     frame : str | None
-        Reference frame to compare in; see :func:`compare_fields`.
+        Reference frame to compare in; see `compare_fields`.
 
     Returns
     -------
@@ -462,12 +464,13 @@ def field_difference_dataset(
     Each requested field is computed as ``a[name] - b[name]`` after the
     two datasets are aligned. The returned dataset inherits *a*'s
     species, physics, and frame metadata, so the result plugs directly
-    into :func:`pypic.plotting.plot_field_slice`. For the three-panel
-    A | B | diff layout, run :func:`pypic.regrid.align_grids` yourself
-    and pass the pair to :func:`pypic.plotting.plot_comparison` — that
-    path does not need this helper.
+    into [`plot_field_slice`][pypic.plotting.plot_field_slice]. For the
+    three-panel A | B | diff layout, run
+    [`align_grids`][pypic.regrid.align_grids] yourself and pass the pair to
+    [`plot_comparison`][pypic.plotting.plot_comparison] — that path does not
+    need this helper.
 
-    Unlike :func:`pypic.regrid.regrid`, which preserves *a*'s original
+    Unlike [`pypic.regrid.regrid`][pypic.regrid.regrid], which preserves *a*'s original
     metadata dict verbatim, this function **replaces** ``.metadata``
     with a fresh ``{"comparison": {"source_frames": ..., "units": ...}}``
     record — the diff is a new artifact, not a regrid of *a*, and any
@@ -475,14 +478,14 @@ def field_difference_dataset(
 
     NaN cells in either input pass through the difference array
     unchanged (NaN minus anything = NaN). There is no ``nan_policy``
-    parameter because :func:`field_difference` itself is pure
-    subtraction; use :func:`compare_fields` with ``nan_policy=...`` or
-    :func:`~pypic.diagnostics.l2_relative_error` directly if you need
+    parameter because `field_difference` itself is pure
+    subtraction; use `compare_fields` with ``nan_policy=...`` or
+    [`l2_relative_error`][pypic.diagnostics.l2_relative_error] directly if you need
     masked reductions.
 
     When ``units="si"``, the stored arrays carry SI values but the
-    dataset's normalization is set to :meth:`Normalization.identity`
-    so that :meth:`FieldDataset.in_si` returns the same values instead
+    dataset's normalization is set to `Normalization.identity`
+    so that `FieldDataset.in_si` returns the same values instead
     of re-applying the SI factor. The actual unit choice is recorded
     in ``metadata["comparison"]["units"]`` for provenance.
 
@@ -494,12 +497,12 @@ def field_difference_dataset(
         Field names to include. ``None`` uses the full intersection of
         canonical names.
     units : {"si", "code"}
-        Unit convention; see :func:`compare_fields`.
+        Unit convention; see `compare_fields`.
     method : str
         Interpolation method passed through to
-        :func:`pypic.regrid.align_grids`. Default ``"linear"``.
+        [`pypic.regrid.align_grids`][pypic.regrid.align_grids]. Default ``"linear"``.
     frame : str | None
-        Reference frame for the result; see :func:`compare_fields`. The
+        Reference frame for the result; see `compare_fields`. The
         returned dataset's ``frame`` attribute reflects this choice
         (``a.frame`` when ``None``, otherwise the requested frame).
 

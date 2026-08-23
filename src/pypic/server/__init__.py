@@ -5,7 +5,7 @@ The server exposes:
 * JSON HTTP routes for discovery (``/health``, ``/sims`` and children).
 * A WebSocket endpoint (``/sims/{sim}/stream``) that consumes a JSON
   ``SubscribeRequest`` frame and replies with one Arrow IPC binary frame
-  carrying the requested :class:`~pypic.dataset.FieldDataset` slice.
+  carrying the requested [`FieldDataset`][pypic.dataset.FieldDataset] slice.
 
 The Arrow-IPC choice is deliberate: it has a browser-native reader in
 the ``apache-arrow`` npm package (``tableFromIPC``), a Rust reader in

@@ -280,7 +280,7 @@ def add_contours(
 ) -> object:
     r"""Add contour lines to existing axes from a scalar field.
 
-    Works as an overlay on :func:`plot_field_slice` or any other 2D plot.
+    Works as an overlay on `plot_field_slice` or any other 2D plot.
 
     Parameters
     ----------

@@ -426,7 +426,7 @@ def to_simulation_config(
 
     If a ``simulation.toml`` exists in *sim_dir*, its normalization, frame,
     transforms, and metadata are merged in via
-    :func:`pypic.readers._config_helpers.merge_simulation_toml`.
+    `pypic.readers._config_helpers.merge_simulation_toml`.
 
     Parameters
     ----------
@@ -491,7 +491,7 @@ def to_simulation_config(
 def to_toml(cfg: IPic3DConfig) -> str:
     """Generate a ``simulation.toml`` string from iPIC3D config.
 
-    Emits v1.0 schema output (validated by :mod:`pypic.schema`). Because
+    Emits v1.0 schema output (validated by [`pypic.schema`][pypic.schema]). Because
     ``IPic3DConfig`` does not carry total-runtime information (iPIC3D's
     ``ncycles`` is not parsed into the native config struct), the
     ``[time]`` section is emitted with ``t_end = 0.0`` and ``n_steps = 0``
@@ -506,7 +506,7 @@ def to_toml(cfg: IPic3DConfig) -> str:
     -------
     str
         TOML content conforming to schema v1.0. Round-trips through
-        :func:`pypic.schema.validate_simulation_toml`.
+        [`pypic.schema.validate_simulation_toml`][pypic.schema.validate_simulation_toml].
     """
     sim_config = to_simulation_config(cfg)
     lines: list[str] = ["[schema]", 'version = "1.0"', ""]

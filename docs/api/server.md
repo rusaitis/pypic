@@ -277,6 +277,8 @@ These belong to follow-up tickets, not the foundations:
         - field_dataset_to_arrow_ipc
         - decode_field_dataset_ipc
 
+::: pypic.server.exceptions
+
 ::: pypic.server.protocol
     options:
       members:

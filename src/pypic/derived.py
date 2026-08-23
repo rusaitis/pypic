@@ -931,7 +931,7 @@ def skin_depth(
         Speed of light in normalized units. Default is 1.0.
     lorentz_factor : NDArray or None
         Mean thermal Lorentz factor. Passed through to
-        :func:`plasma_frequency`.
+        `plasma_frequency`.
 
     Returns
     -------
@@ -2450,7 +2450,7 @@ def lorentz_factor(
     $$\gamma = \frac{1}{\sqrt{1 - v^2/c^2}}$$
 
     Bounded $[1, \infty)$. Suffers from catastrophic cancellation when
-    $v \approx c$; prefer :func:`lorentz_factor_from_four_velocity` when
+    $v \approx c$; prefer `lorentz_factor_from_four_velocity` when
     four-velocity data is available.
 
     Parameters

@@ -89,7 +89,7 @@ def add_field_line(
     scalar_bar_position: str = "lower_left",
     theme: PlotTheme | None = None,
 ) -> pv.Actor | None:
-    r"""Render a :class:`FieldLine` as a colored tube.
+    r"""Render a `FieldLine` as a colored tube.
 
     When *data* is provided with *scalar*, the field is automatically
     sampled along the line via ``attach_scalars()``. When *units* is
@@ -311,7 +311,7 @@ def add_trajectory(
     scalar_bar_position: str = "lower_left",
     theme: PlotTheme | None = None,
 ) -> pv.Actor | None:
-    r"""Render a :class:`ParticleTrace` as a colored tube.
+    r"""Render a `ParticleTrace` as a colored tube.
 
     Supports coloring by any scalar in ``trace.scalars``, or by the
     built-in ``"time"`` or ``"speed"`` keys (derived automatically).
@@ -336,7 +336,7 @@ def add_trajectory(
     opacity : float
         Tube opacity (0–1).
     show_scalar_bar : bool
-        Whether to show a themed scalar bar via :func:`add_colorbar`.
+        Whether to show a themed scalar bar via `add_colorbar`.
     scalar_bar_position : str
         Scalar bar corner: ``"lower_left"``, ``"lower_right"``, etc.
     theme : PlotTheme or None
@@ -416,7 +416,7 @@ def add_trajectories(
     traces : list[ParticleTrace]
         Particle trajectories to render.
     scalar : str or None
-        Scalar name for coloring (see :func:`add_trajectory`).
+        Scalar name for coloring (see `add_trajectory`).
     cmap : str, Colormap, or None
         Colormap. ``None`` selects from theme.
     clim : tuple[float, float] or None
@@ -426,7 +426,7 @@ def add_trajectories(
     opacity : float
         Tube opacity (0–1).
     show_scalar_bar : bool
-        Whether to show a single themed scalar bar via :func:`add_colorbar`.
+        Whether to show a single themed scalar bar via `add_colorbar`.
     scalar_bar_position : str
         Scalar bar corner: ``"lower_left"``, ``"lower_right"``, etc.
     theme : PlotTheme or None

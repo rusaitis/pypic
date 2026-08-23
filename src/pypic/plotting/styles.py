@@ -182,7 +182,7 @@ class PlotTheme:
     def customize(self, **overrides: Any) -> PlotTheme:  # noqa: ANN401
         r"""Return a new theme with selected fields overridden.
 
-        Pass any :class:`PlotTheme` field name as a keyword argument.
+        Pass any `PlotTheme` field name as a keyword argument.
         Unknown keys with underscores are converted to matplotlib
         rcParam keys and merged into ``rcparams``
         (``figure_dpi=200`` → ``"figure.dpi": 200``).
@@ -233,7 +233,7 @@ ThemeArg = PlotTheme | str | None
 def _resolve_theme_arg(theme: ThemeArg) -> PlotTheme:
     """Normalize a theme argument to a PlotTheme instance.
 
-    Accepts a :class:`PlotTheme` object, a theme name (looked up from
+    Accepts a `PlotTheme` object, a theme name (looked up from
     the user and package theme directories), a ``.toml`` file path, or
     ``None`` (falls back to the current default).
     """
@@ -292,7 +292,7 @@ _active_theme: PlotTheme | None = None
 
 
 def get_active_theme() -> PlotTheme | None:
-    """Return the theme set by the innermost :func:`use_theme` context, or ``None``."""
+    """Return the theme set by the innermost `use_theme` context, or ``None``."""
     return _active_theme
 
 
@@ -332,7 +332,7 @@ def _available_fonts(families: tuple[str, ...]) -> list[str]:
 def use_theme(theme: ThemeArg) -> Generator[None]:
     """Temporarily apply *theme* rcParams, restoring originals on exit.
 
-    Accepts a :class:`PlotTheme`, a theme name string, a ``.toml``
+    Accepts a `PlotTheme`, a theme name string, a ``.toml``
     file path, or ``None`` (uses the current default).
     """
     global _active_theme

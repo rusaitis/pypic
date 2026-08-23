@@ -46,7 +46,7 @@ def plot_field_grid(
 
     Creates a figure with ``ceil(len(fields) / ncols)`` rows and
     *ncols* columns. Each panel shows one field via
-    :func:`plot_field_slice`, with optional ``(a)``, ``(b)``, ``(c)``
+    `plot_field_slice`, with optional ``(a)``, ``(b)``, ``(c)``
     labels.
 
     Parameters

@@ -262,12 +262,13 @@ def add_equatorial_surface(
     extremes : "semi", "transparent", "darken", or None
         How to style the colorbar's under/over extension triangles.
         ``"semi"`` (default) renders them at reduced opacity, mirroring
-        :func:`pypic.plotting.plot_field_slice`. ``None`` keeps full
+        [`pypic.plotting.plot_field_slice`][pypic.plotting.plot_field_slice]. ``None``
+        keeps full
         opacity.
     colorbar_ticks : list[float] or None
         Explicit colorbar tick positions. ``None`` auto-generates from
         *clim*. Mirrors the ``colorbar_ticks`` parameter on
-        :func:`pypic.plotting.plot_field_slice`.
+        [`pypic.plotting.plot_field_slice`][pypic.plotting.plot_field_slice].
     theme : PlotTheme or None
         Theme for colors and fonts.
 

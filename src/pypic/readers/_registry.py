@@ -126,7 +126,7 @@ class Simulation:
     Returned by `open_simulation`.  Provides direct access to config
     properties and reads timesteps without repeating the data path.
 
-    Supports tuple unpacking for backwards compatibility::
+    Also unpacks as a ``(reader, config)`` tuple::
 
         sim = open_simulation(path)            # preferred
         reader, config = open_simulation(path) # still works
@@ -135,8 +135,8 @@ class Simulation:
 
     1. Open both simulations via ``open_simulation()``.
     2. Read matching timesteps from each.
-    3. Regrid to a common grid via ``align_grids()`` (Step 19, not yet
-       implemented — until then, datasets must share the same grid shape).
+    3. Regrid to a common grid via [`align_grids`][pypic.regrid.align_grids]
+       when the two runs do not already share one.
     4. Compare fields: use ``in_si()`` for cross-model comparison
        (different normalizations make code units incomparable), or
        compare in code units for same-model parameter studies (identical
@@ -321,7 +321,7 @@ class Simulation:
             read all fields then filter.
         strict_fields : bool
             When ``True`` (default), raise
-            :class:`~pypic.exceptions.UnknownFieldError` if any name in
+            [`UnknownFieldError`][pypic.exceptions.UnknownFieldError] if any name in
             *fields* matches no loaded field — the project's fail-loud
             rule for selection APIs.  Pass ``False`` only for
             exploratory scripts where some requested names are
@@ -472,9 +472,9 @@ class Simulation:
         """List canonical field names at *step* without loading arrays.
 
         Uses the reader's lightweight probe when available (via
-        :class:`~pypic.readers._protocols.FieldListingReader`);
-        otherwise falls back to a full :meth:`read` and extracts
-        :meth:`~pypic.dataset.FieldDataset.field_names`.
+        `FieldListingReader`);
+        otherwise falls back to a full `read` and extracts
+        [`field_names`][pypic.dataset.FieldDataset.field_names].
 
         Parameters
         ----------
@@ -496,7 +496,7 @@ class Simulation:
         """Map canonical field names to native (on-disk) names at *step*.
 
         Uses the reader's lightweight probe when available; otherwise
-        falls back to :meth:`available_fields` with ``None`` for all
+        falls back to `available_fields` with ``None`` for all
         native names (native mapping unknown without reader support).
 
         Parameters
@@ -667,7 +667,7 @@ def open_simulation(
         sim.steps               # [0, 100, 200, ...]
         ds = sim.read(step=100)
 
-    Also supports tuple unpacking for backwards compatibility::
+    Also unpacks as a ``(reader, config)`` tuple::
 
         reader, config = open_simulation(path)
 

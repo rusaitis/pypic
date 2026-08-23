@@ -1,8 +1,8 @@
 """Pure-function overlay helpers shared across plotting backends.
 
 These helpers are deliberately backend-agnostic — no matplotlib or
-pyvista imports at module load. The matplotlib :mod:`pypic.plotting._badge`
-and pyvista :mod:`pypic.plotting.pyvista._badge` modules both import from
+pyvista imports at module load. The matplotlib `pypic.plotting._badge`
+and pyvista `pypic.plotting.pyvista._badge` modules both import from
 here so the WCAG luminance/contrast logic and the ``(color, alpha) → RGBA``
 override pattern have a single canonical implementation.
 """

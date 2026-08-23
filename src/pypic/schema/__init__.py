@@ -4,9 +4,9 @@ Designed to be decoupled from pypic itself — the only imports are
 stdlib and pydantic, so this subpackage can be lifted into a
 standalone distribution without modification.
 
-Entry point: :func:`validate_simulation_toml`, which accepts a path,
+Entry point: `validate_simulation_toml`, which accepts a path,
 a TOML text blob, or a pre-parsed dict and returns a fully typed
-:class:`SimulationSchema` root model.
+`SimulationSchema` root model.
 
 Examples
 --------

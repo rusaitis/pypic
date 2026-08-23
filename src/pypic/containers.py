@@ -340,8 +340,8 @@ class ParticleData:
     a ``weight`` (number of physical particles it represents); the species
     as a whole carries scalar ``species_charge`` and ``species_mass``. The
     per-macroparticle charge and mass that enter moments and the equations
-    of motion are derived on demand via :attr:`macro_charge` and
-    :attr:`macro_mass`. This shape is code-agnostic — readers for combined-
+    of motion are derived on demand via `macro_charge` and
+    `macro_mass`. This shape is code-agnostic — readers for combined-
     storage codes (iPIC3D, OSIRIS) split the native ``q_s × w`` column into
     ``weight`` + scalars on load; separate-storage codes (VPIC, WarpX,
     Smilei, PIConGPU, TRISTAN-MP) populate the same fields directly.
@@ -364,7 +364,7 @@ class ParticleData:
     weight : FloatArray | None
         Per-macroparticle weight $w$ (number of physical particles per
         macroparticle), shape ``(N,)``, float64. Required for
-        :attr:`macro_charge` and :attr:`macro_mass`.
+        `macro_charge` and `macro_mass`.
     species_charge : float | None
         Scalar species charge $q_s$ in code units (e.g. ``-1.0`` for
         electrons in iPIC3D normalization).

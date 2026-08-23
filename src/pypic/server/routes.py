@@ -1,7 +1,7 @@
 """HTTP routes for the pypic server.
 
 Discovery-layer endpoints only — the binary data path is the
-WebSocket in :mod:`pypic.server.stream`.  All responses are JSON.
+WebSocket in [`pypic.server.stream`][pypic.server.stream].  All responses are JSON.
 
 Endpoints:
 
@@ -43,10 +43,10 @@ def _registry(request: Request) -> SimulationRegistry:
 
 
 def get_simulation(sim: str, request: Request) -> Simulation:
-    """FastAPI dependency: resolve the ``{sim}`` path param to a :class:`Simulation`.
+    """FastAPI dependency: resolve the ``{sim}`` path param to a `Simulation`.
 
-    Raises :class:`~pypic.exceptions.UnknownSimulationError` (typed
-    404 via :mod:`pypic.server.app`'s ``PypicError`` handler) when no
+    Raises [`UnknownSimulationError`][pypic.exceptions.UnknownSimulationError] (typed
+    404 via [`pypic.server.app`][pypic.server.app]'s ``PypicError`` handler) when no
     simulation matches.
     """
     return _registry(request).get(sim)
@@ -56,7 +56,8 @@ def register_routes(router: APIRouter) -> None:
     """Attach all HTTP routes to *router*.
 
     Kept as a single registration function (rather than module-level
-    decorators) so :func:`pypic.server.app.create_app` can choose
+    decorators) so [`pypic.server.app.create_app`][pypic.server.app.create_app] can
+    choose
     where the routes live — e.g. mount them under a prefix later
     without restructuring.
     """

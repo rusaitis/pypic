@@ -241,7 +241,7 @@
     },
     "BoundaryConditions": {
       "additionalProperties": false,
-      "description": "``[boundary_conditions]`` \u2014 per-face tag arrays.\n\nThe default form: one tag per face per axis applied uniformly to\nevery field. ``field_overrides`` lets PIC PML simulations and\nsolar-wind-driven runs declare *different* BCs for E (PML), B (PML),\nand particles (reflecting / absorbing / thermal-bath) at the same\nface. Each entry is a :class:`BoundaryConditionsBase` matching the\nsame axis count as the default.",
+      "description": "``[boundary_conditions]`` \u2014 per-face tag arrays.\n\nThe default form: one tag per face per axis applied uniformly to\nevery field. ``field_overrides`` lets PIC PML simulations and\nsolar-wind-driven runs declare *different* BCs for E (PML), B (PML),\nand particles (reflecting / absorbing / thermal-bath) at the same\nface. Each entry is a `BoundaryConditionsBase` matching the\nsame axis count as the default.",
       "properties": {
         "drivers_lower": {
           "anyOf": [
@@ -849,7 +849,7 @@
     },
     "Grid": {
       "additionalProperties": false,
-      "description": "``[grid]`` \u2014 computational grid in code units.\n\n``ghost_cells`` records the number of ghost cells per axis used by the\ncode's halo exchange. Optional metadata for downstream edge-derivative\nanalysis; readers strip ghosts before populating ``FieldDataset``.\n\n``stretched`` describes per-axis non-uniform cell widths. Sparse \u2014\nonly axes with non-uniform spacing appear in\n``[grid.stretched.axis_widths]``; the remaining axes inherit\n``spacing``. The validator enforces that any listed axis widths sum\nto ``upper[i] - lower[i]`` and that the list length equals\n``dimensions[i]``.\n\n``stagger`` consolidates the three field-placement-inside-cell\ntiers (``convention``, ``fields``, ``position``) under a single\nsub-table \u2014 see :class:`GridStagger`.",
+      "description": "``[grid]`` \u2014 computational grid in code units.\n\n``ghost_cells`` records the number of ghost cells per axis used by the\ncode's halo exchange. Optional metadata for downstream edge-derivative\nanalysis; readers strip ghosts before populating ``FieldDataset``.\n\n``stretched`` describes per-axis non-uniform cell widths. Sparse \u2014\nonly axes with non-uniform spacing appear in\n``[grid.stretched.axis_widths]``; the remaining axes inherit\n``spacing``. The validator enforces that any listed axis widths sum\nto ``upper[i] - lower[i]`` and that the list length equals\n``dimensions[i]``.\n\n``stagger`` consolidates the three field-placement-inside-cell\ntiers (``convention``, ``fields``, ``position``) under a single\nsub-table \u2014 see `GridStagger`.",
       "properties": {
         "amr": {
           "anyOf": [
@@ -1044,7 +1044,7 @@
     },
     "GridStagger": {
       "additionalProperties": false,
-      "description": "``[grid.stagger]`` \u2014 where fields live inside each cell.\n\nThree tiers, all optional and additive \u2014 same fact at increasing\nprecision:\n\n1. ``convention`` \u2014 single-string summary (``\"cell\"`` / ``\"node\"``\n   / ``\"staggered\"``). Defaults to ``\"cell\"``.\n2. ``fields`` \u2014 per-field-group location map, e.g.\n   ``{B = \"face\", E = \"edge\"}``. Captures the Yee-mesh truth that\n   a single string cannot.\n3. ``position`` \u2014 per-component openPMD ED-PIC offsets in\n   ``[0, 1)`` along each axis, e.g. ``{B_1 = [0.5, 0.0, 0.0]}``.\n   Lossless representation of the source mesh; consumed by readers\n   that need ED-PIC-precise destaggering.\n\nAll three are informational \u2014 readers destagger to co-located grids\non load. They round-trip through :class:`StaggerInfo` in\n``pypic.containers``. The validator does not cross-check between\ntiers; a writer may populate any subset.",
+      "description": "``[grid.stagger]`` \u2014 where fields live inside each cell.\n\nThree tiers, all optional and additive \u2014 same fact at increasing\nprecision:\n\n1. ``convention`` \u2014 single-string summary (``\"cell\"`` / ``\"node\"``\n   / ``\"staggered\"``). Defaults to ``\"cell\"``.\n2. ``fields`` \u2014 per-field-group location map, e.g.\n   ``{B = \"face\", E = \"edge\"}``. Captures the Yee-mesh truth that\n   a single string cannot.\n3. ``position`` \u2014 per-component openPMD ED-PIC offsets in\n   ``[0, 1)`` along each axis, e.g. ``{B_1 = [0.5, 0.0, 0.0]}``.\n   Lossless representation of the source mesh; consumed by readers\n   that need ED-PIC-precise destaggering.\n\nAll three are informational \u2014 readers destagger to co-located grids\non load. They round-trip through `StaggerInfo` in\n``pypic.containers``. The validator does not cross-check between\ntiers; a writer may populate any subset.",
       "properties": {
         "convention": {
           "default": "cell",
@@ -2017,7 +2017,7 @@
     },
     "PICSolver": {
       "additionalProperties": true,
-      "description": "``[physics.pic.solver]``. Extra keys accepted \u2014 vocabulary evolves.\n\n``current_smoothing`` / ``charge_smoothing`` count the binomial /\ncompensator filter passes per step (standard in WarpX, Smilei,\nPIConGPU, OSIRIS \u2014 already exposed on ``HybridSolver``).\n``charge_correction``, ``current_deposition`` adopt the openPMD\nED-PIC vocabulary; see :class:`ChargeCorrection`,\n:class:`CurrentDeposition`.",
+      "description": "``[physics.pic.solver]``. Extra keys accepted \u2014 vocabulary evolves.\n\n``current_smoothing`` / ``charge_smoothing`` count the binomial /\ncompensator filter passes per step (standard in WarpX, Smilei,\nPIConGPU, OSIRIS \u2014 already exposed on ``HybridSolver``).\n``charge_correction``, ``current_deposition`` adopt the openPMD\nED-PIC vocabulary; see `ChargeCorrection`,\n`CurrentDeposition`.",
       "properties": {
         "charge_correction": {
           "anyOf": [
@@ -2198,7 +2198,7 @@
     },
     "PhaseSpaceStorage": {
       "additionalProperties": false,
-      "description": "``[phase_space.storage]`` \u2014 sparse-block velocity-grid storage.\n\nContinuum-Vlasov codes (Vlasiator, Gkeyll-Vlasov-Maxwell) subdivide\nthe velocity sub-grid into blocks for adaptive memory use, dropping\nblocks whose distribution-function density falls below a threshold.\n``block_size`` records the per-velocity-axis block factor;\n``sparsity_threshold`` records the density floor.\n\nOptional sub-table on :class:`PhaseSpace`. Gyrokinetic codes\n(GENE, GS2, GX, Gkeyll-GK) emit dense 5-D grids and omit this\nblock entirely. The validator checks that ``block_size`` length\nmatches the velocity sub-axes of the parent ``dimensions`` \u2014\nenforced on the parent :class:`PhaseSpace` once the spatial\ndimension count is known at the root level.",
+      "description": "``[phase_space.storage]`` \u2014 sparse-block velocity-grid storage.\n\nContinuum-Vlasov codes (Vlasiator, Gkeyll-Vlasov-Maxwell) subdivide\nthe velocity sub-grid into blocks for adaptive memory use, dropping\nblocks whose distribution-function density falls below a threshold.\n``block_size`` records the per-velocity-axis block factor;\n``sparsity_threshold`` records the density floor.\n\nOptional sub-table on `PhaseSpace`. Gyrokinetic codes\n(GENE, GS2, GX, Gkeyll-GK) emit dense 5-D grids and omit this\nblock entirely. The validator checks that ``block_size`` length\nmatches the velocity sub-axes of the parent ``dimensions`` \u2014\nenforced on the parent `PhaseSpace` once the spatial\ndimension count is known at the root level.",
       "properties": {
         "block_size": {
           "anyOf": [

@@ -55,7 +55,8 @@ def i_step_controller(
         Current step size.
     err_norm : float
         Scaled error norm from
-        :func:`pypic.numerics.embedded_error_norm`. Values
+        [`pypic.numerics.embedded_error_norm`][pypic.numerics.embedded_error_norm].
+        Values
         ``<= 1`` indicate an acceptable step.
     min_step, max_step : float
         Lower / upper bounds on the returned step magnitude.
@@ -105,7 +106,7 @@ def i_step_controller_batched(
 ) -> FloatArray:
     r"""Per-seed step-size update for a batched embedded RK integration.
 
-    Vectorized form of :func:`i_step_controller`. Applies the elementary
+    Vectorized form of `i_step_controller`. Applies the elementary
     order-$p$ formula $h_{new} = h \cdot S \cdot \mathrm{err}^{-1/p}$
     independently per seed, with the same safety factor, growth clamps,
     and absolute-step clamps as the scalar version.
@@ -116,7 +117,8 @@ def i_step_controller_batched(
         Current per-seed step sizes, shape ``(N,)``.
     err_norm : NDArray
         Per-seed scaled error norms from
-        :func:`pypic.numerics.embedded_error_norm_batched`, shape
+        [`pypic.numerics.embedded_error_norm_batched`][pypic.numerics.embedded_error_norm_batched],
+        shape
         ``(N,)``. Values ``<= 1`` indicate acceptable steps.
     min_step, max_step : float
         Lower / upper bounds on each returned step (shared across seeds;

@@ -1,7 +1,7 @@
 """JSON Schema export for the pypic ``simulation.toml`` v1.0 schema.
 
 Generates a stable, post-processed JSON Schema 2020-12 document from the
-Pydantic v2 models in :mod:`pypic.schema._models`. Pydantic's raw
+Pydantic v2 models in `pypic.schema._models`. Pydantic's raw
 ``model_json_schema()`` output is correct but verbose: class-name titles
 on every sub-schema, ``"description": "An enumeration."`` on enums, and
 no guarantee of stable key order. The post-processing here strips that
@@ -15,7 +15,7 @@ regenerable via ``uv run pypic schema export``; the drift test in
 ``tests/test_schema_export.py`` and a CI step guard against staleness.
 
 Cross-field invariants (``model_validator(mode="after")`` decorators in
-:mod:`pypic.schema._models`) cannot be expressed in JSON Schema and are
+`pypic.schema._models`) cannot be expressed in JSON Schema and are
 documented in the top-level ``$comment``. Consumers that need the full
 contract use ``pypic.schema.validate_simulation_toml`` at runtime.
 """

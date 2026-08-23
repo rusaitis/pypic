@@ -1,4 +1,4 @@
-"""Scatter plot of a :class:`PoincareSection` in plane coordinates."""
+"""Scatter plot of a `PoincareSection` in plane coordinates."""
 
 from __future__ import annotations
 
@@ -26,7 +26,7 @@ def plot_poincare_section(
     title: str | None = None,
     figsize: tuple[float, float] | None = None,
 ) -> tuple[Figure, Axes]:
-    r"""Scatter the puncture cloud of a :class:`PoincareSection`.
+    r"""Scatter the puncture cloud of a `PoincareSection`.
 
     Each seed's punctures get a distinct color from the active theme's
     cycle when ``color_by_seed`` is true — co-orbital points appear as
@@ -36,7 +36,7 @@ def plot_poincare_section(
     Parameters
     ----------
     section : PoincareSection
-        Output of :func:`pypic.traces.poincare_section`.
+        Output of [`pypic.traces.poincare_section`][pypic.traces.poincare_section].
     ax : Axes | None
         Existing axes. ``None`` creates a new figure.
     theme : PlotTheme | None

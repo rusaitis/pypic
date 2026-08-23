@@ -126,3 +126,8 @@ orbit radius. For sharp topology rendering, set
 `max_step <= circumference / 50`.
 
 ::: pypic.traces._poincare
+    options:
+      # Rendered from the private module because that is where the code
+      # lives, but every name below is re-exported from `pypic` and
+      # `pypic.traces` — import from those, not from this path.
+      show_root_heading: false

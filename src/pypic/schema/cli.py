@@ -9,7 +9,7 @@ Exposes three subcommands:
 - ``diff`` — diffs two JSON Schema documents (the second defaults to
   the bundled current schema); text or structured JSON output.
 
-Imports typer inside this module only — :mod:`pypic.schema` itself
+Imports typer inside this module only — [`pypic.schema`][pypic.schema] itself
 stays free of the optional CLI dependency so library users who only
 need ``validate_simulation_toml`` don't pull typer into the working
 set. The same commands are reachable as ``python -m pypic.schema.cli``

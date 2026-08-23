@@ -29,7 +29,7 @@ def apply_theme(
     plotter: pv.Plotter,
     theme: PlotTheme | None = None,
 ) -> None:
-    r"""Apply pypic :class:`PlotTheme` colors to a pyvista Plotter.
+    r"""Apply pypic `PlotTheme` colors to a pyvista Plotter.
 
     Sets background color based on theme text luminance and hides
     the default corner orientation axes widget.
@@ -116,7 +116,7 @@ def create_plotter(
       most useful way to re-center rotation on something interesting.
     - A **corner orientation widget** is shown in the bottom-left,
       colored with the theme's ``axis_x_color`` / ``axis_y_color`` /
-      ``axis_z_color`` so it matches :func:`add_axis_triad` at the
+      ``axis_z_color`` so it matches `add_axis_triad` at the
       data origin. Two styles are available via *orientation_style*:
       ``"cube"`` (default) is the 3D rotation cube with ±X/±Y/±Z
       clickable face labels — handle rings and label texts are

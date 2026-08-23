@@ -1,6 +1,6 @@
 """FastAPI app factory for the pypic server.
 
-:func:`create_app` builds a ready-to-mount ``FastAPI`` instance with
+`create_app` builds a ready-to-mount ``FastAPI`` instance with
 the discovery HTTP routes and the streaming WebSocket endpoint
 wired up against a single simulation root.
 
@@ -51,7 +51,7 @@ def create_app(
     -------
     FastAPI
         The configured application.  Mount it under uvicorn /
-        gunicorn / hypercorn; see :func:`serve` for the simple
+        gunicorn / hypercorn; see `serve` for the simple
         single-process launch path.
     """
     try:
@@ -97,7 +97,7 @@ def create_app(
         Body shape is ``{"kind": <wire kind>, "detail": <message>}`` —
         ``detail`` stays back-compat with the previous
         ``HTTPException(detail=str(exc))`` shape; ``kind`` is additive
-        and matches the WebSocket :class:`ErrorFrame.kind` literal so
+        and matches the WebSocket `ErrorFrame.kind` literal so
         clients can dispatch identically across both transports.
         """
         return JSONResponse(
@@ -123,10 +123,10 @@ def serve(
     reload: bool = False,
     cors_origins: Sequence[str] = ("*",),
 ) -> None:
-    """Launch a uvicorn server hosting :func:`create_app`.
+    """Launch a uvicorn server hosting `create_app`.
 
     Convenience wrapper for ``pypic serve``; production deployments
-    typically construct the app via :func:`create_app` and invoke
+    typically construct the app via `create_app` and invoke
     their own ASGI server.
 
     Raises

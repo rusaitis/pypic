@@ -1,10 +1,10 @@
 """Load simulation configuration from a TOML file.
 
-The Pydantic validator in :mod:`pypic.schema` is the authoritative
+The Pydantic validator in [`pypic.schema`][pypic.schema] is the authoritative
 source of the v1.0 schema — this module is a thin translator from a
-validated :class:`~pypic.schema.SimulationSchema` to the internal
-dataclasses (:class:`~pypic.containers.SimulationConfig`, :class:`GridInfo`,
-:class:`Normalization`, :class:`SpeciesInfo`). All shape validation
+validated [`SimulationSchema`][pypic.schema.SimulationSchema] to the internal
+dataclasses ([`SimulationConfig`][pypic.containers.SimulationConfig], `GridInfo`,
+`Normalization`, `SpeciesInfo`). All shape validation
 happens in the Pydantic layer; this module only maps fields.
 """
 
@@ -198,7 +198,7 @@ def load_config(path: Path) -> SimulationConfig:
     """Parse a ``simulation.toml`` file into a SimulationConfig.
 
     Validates the file against the v1.0 schema
-    (:mod:`pypic.schema`) and builds the internal :class:`SimulationConfig`
+    ([`pypic.schema`][pypic.schema]) and builds the internal `SimulationConfig`
     from the result.  The raw TOML text is captured and attached to
     ``metadata["simulation_toml"]`` so downstream FieldDataset writers
     can round-trip it verbatim into ``attrs.simulation_toml`` (schema.md

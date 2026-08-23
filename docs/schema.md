@@ -21,7 +21,7 @@ parameters live in open-ended sections that each code fills as needed.
 A TOML file that travels with the simulation output. Describes what
 the data contains, how it's normalized, and what coordinate system it
 uses. The canonical source of truth for the v1.0 schema is the Pydantic
-validator in :mod:`pypic.schema` — `validate_simulation_toml()` returns
+validator in [`pypic.schema`][pypic.schema] — `validate_simulation_toml()` returns
 a strictly typed `SimulationSchema`, and `load_config()` builds the
 internal `SimulationConfig` from that. An annotated reference template
 lives at `pypic.simulation.toml` at the repo root.

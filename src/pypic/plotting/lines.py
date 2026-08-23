@@ -180,7 +180,7 @@ def plot_lines(
 ) -> tuple[Figure, Axes]:
     r"""Plot multiple fields overlaid on the same axes.
 
-    Convenience wrapper around :func:`plot_line` that handles axes
+    Convenience wrapper around `plot_line` that handles axes
     reuse, automatic color cycling, and legend display.
 
     Parameters

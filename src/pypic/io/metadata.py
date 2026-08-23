@@ -1,16 +1,16 @@
 """JSON-compatible metadata encoders/decoders for pypic stores.
 
 The public surface here is the shared contract between three internal
-consumers: the Zarr writer (:mod:`pypic.io.zarr`), the Arrow IPC server
-(:mod:`pypic.server.arrow`), and the HTTP discovery routes
-(:mod:`pypic.server.routes`). Each emits or reads the same JSON shapes
+consumers: the Zarr writer ([`pypic.io.zarr`][pypic.io.zarr]), the Arrow IPC server
+([`pypic.server.arrow`][pypic.server.arrow]), and the HTTP discovery routes
+([`pypic.server.routes`][pypic.server.routes]). Each emits or reads the same JSON shapes
 documented in :doc:`schema.md` §4.2, so the encode/decode pair lives in
 one place to keep round-trip fidelity tight and the storage layout
 discriminator (``SCHEMA_VERSION``) single-sourced.
 
 Round-trip fidelity is the design goal: every ``encode`` → ``decode``
-cycle must reconstruct an identical object. :func:`to_json_native` and
-:func:`from_json_native` handle the value-level coercions (NumPy
+cycle must reconstruct an identical object. `to_json_native` and
+`from_json_native` handle the value-level coercions (NumPy
 scalars, tuples, typed ``StaggerInfo``, non-string-keyed dicts) that
 sit underneath the named typed encoders.
 """
@@ -309,7 +309,7 @@ def to_json_native(obj: Any) -> Any:  # noqa: ANN401
     * Dicts with non-string keys — JSON has only string keys, so plain
       stringification silently collides ``{1: ..., "1": ...}``.
 
-    Decode is the inverse via :func:`from_json_native`.
+    Decode is the inverse via `from_json_native`.
     """
     from pypic.containers import StaggerInfo
 
@@ -368,7 +368,7 @@ def _dict_to_stagger(d: dict[str, Any]) -> Any:  # noqa: ANN401
 
 
 def from_json_native(obj: Any) -> Any:  # noqa: ANN401
-    """Inverse of :func:`to_json_native`: rebuild tagged typed values.
+    """Inverse of `to_json_native`: rebuild tagged typed values.
 
     Walks dicts/lists recursively.  Plain JSON values pass through
     unchanged.  Only the ``__pypic_class__`` marker triggers
@@ -415,8 +415,8 @@ def pop_reserved_metadata(
 
     Returned dict contains the popped values keyed by name; the input
     is mutated in place so the caller is left with the open-bag
-    portion safe to pass through :func:`to_json_native`.  Used by both
-    :func:`encode_pypic_attrs` and the Zarr timeseries writer so the
+    portion safe to pass through `to_json_native`.  Used by both
+    `encode_pypic_attrs` and the Zarr timeseries writer so the
     two paths agree on which keys are JSON-typed-elsewhere.
     """
     out: dict[str, Any] = {}
@@ -516,7 +516,7 @@ def encode_pypic_attrs(fds: FieldDataset) -> dict[str, Any]:
 
     Sections lifted from ``fds.metadata`` if present (popped, not
     duplicated): ``model``, ``run``, ``simulation_toml``. ``run`` is
-    re-encoded through :class:`pypic.schema.Run` to a JSON-mode dump.
+    re-encoded through [`pypic.schema.Run`][pypic.schema.Run] to a JSON-mode dump.
     """
     metadata = dict(fds.metadata)
     reserved = pop_reserved_metadata(metadata)
@@ -663,7 +663,7 @@ def _encode_model(model: Any) -> dict[str, Any]:  # noqa: ANN401
     strings under ``metadata['model_name']`` / ``metadata['model_type']``);
     this hook accepts a plain dict and normalizes it. When a typed
     ``schema.Model`` lands, swap this for ``Model.model_dump(mode='json')``
-    by analogy with :func:`_encode_run`.
+    by analogy with `_encode_run`.
     """
     if not isinstance(model, dict):
         msg = f"metadata['model'] must be a dict, got {type(model).__name__}"

@@ -10,8 +10,10 @@ same construction for stellarator / divertor footprint analysis
 [@Frerichs2024].
 
 This module is a thin orchestrator on top of two existing primitives:
-:func:`pypic.traces.trace_field_lines_adaptive` (integration) and
-:func:`pypic.traces.plane_crossings` (sign-change + linear interp on
+[`pypic.traces.trace_field_lines_adaptive`][pypic.traces.trace_field_lines_adaptive]
+(integration) and
+[`pypic.traces.plane_crossings`][pypic.traces.plane_crossings] (sign-change + linear
+interp on
 the plane). Punctures are extracted post-hoc from full traces;
 ``loop_tol=None`` is forced so closed orbits don't self-terminate
 before they can be sampled.
@@ -60,9 +62,9 @@ class PoincareSurface:
     $\Sigma = \{\mathbf{x} : \hat{\mathbf{n}} \cdot
     (\mathbf{x} - \mathbf{p}) = 0\}$, parameterized by an outward
     normal $\mathbf{n}$ and an in-plane reference point $\mathbf{p}$.
-    The 2D plane coordinates $(u, v)$ produced by :meth:`project` are
+    The 2D plane coordinates $(u, v)$ produced by `project` are
     measured relative to $\mathbf{p}$ in an orthonormal basis
-    :attr:`basis_2d` spanning $\Sigma$.
+    `basis_2d` spanning $\Sigma$.
 
     Parameters
     ----------
@@ -142,7 +144,8 @@ class PoincareSurface:
     def offset(self) -> float:
         r"""Signed scalar $d = \hat{\mathbf{n}} \cdot \mathbf{p}$.
 
-        The form consumed by :func:`pypic.traces.plane_crossings`.
+        The form consumed by
+        [`pypic.traces.plane_crossings`][pypic.traces.plane_crossings].
         """
         return float(self._normal_arr @ self._point_arr)
 
@@ -209,11 +212,11 @@ class PoincareSurface:
 # the instance __dict__.
 @dataclass(frozen=True)
 class PoincareSection:
-    r"""Result of :func:`poincare_section`: per-seed punctures and provenance.
+    r"""Result of `poincare_section`: per-seed punctures and provenance.
 
     Holds both the 3D crossing positions (for re-projection onto a
     different surface) and the projected 2D coordinates (for plotting).
-    The underlying :class:`FieldLine` traces are retained so the same
+    The underlying `FieldLine` traces are retained so the same
     trajectories can be re-punctured against a different surface without
     re-integrating.
 
@@ -355,7 +358,7 @@ def poincare_section(
     Raises
     ------
     ValueError
-        Propagated from :func:`trace_field_lines_adaptive` (bad seed,
+        Propagated from `trace_field_lines_adaptive` (bad seed,
         invalid direction, bad tolerances).
 
     Notes
@@ -368,7 +371,7 @@ def poincare_section(
 
     Examples
     --------
-    See :class:`PoincareSection` for a closed-circle example.
+    See `PoincareSection` for a closed-circle example.
     """
     seeds_arr = np.asarray(seeds, dtype=np.float64).reshape(-1, 3)
 

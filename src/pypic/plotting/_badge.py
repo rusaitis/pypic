@@ -134,7 +134,7 @@ def _detect_overlay_defaults(
 ) -> tuple[tuple[float, float, float], tuple[float, float, float], float]:
     """Derive overlay bg, fg colors and alpha from the active theme.
 
-    When a :func:`~pypic.plotting.use_theme` context is active and the
+    When a [`use_theme`][pypic.plotting.use_theme] context is active and the
     theme defines an ``overlay_color``, that color is used directly.
     Otherwise the overlay background is the axes facecolor blended toward
     black (``"darker"``) or white (``"lighter"``).
@@ -480,7 +480,7 @@ def add_label(
 ) -> AnchoredOffsetbox:
     r"""Add a bold panel letter (a, b, c, ...) overlay to an axes.
 
-    Styled with the same rounded box as :func:`add_badge`.
+    Styled with the same rounded box as `add_badge`.
 
     Parameters
     ----------
@@ -498,7 +498,7 @@ def add_label(
     fontweight : str
         Font weight (default ``"bold"``).
     bg_color, bg_alpha, text_color
-        Color overrides; same semantics as :func:`add_badge`.
+        Color overrides; same semantics as `add_badge`.
     text_alpha : float
         Text opacity (default 0.85 for subtle softening).
 
@@ -559,7 +559,7 @@ def add_legend(
 
     Each entry renders as a short line segment (using the entry's color,
     linewidth, linestyle, alpha) next to its label text.  Multiple entries
-    are stacked vertically.  The box style matches :func:`add_badge`.
+    are stacked vertically.  The box style matches `add_badge`.
 
     For a single entry, pass a string label directly::
 
@@ -587,7 +587,7 @@ def add_legend(
     sample_width : float
         Width of the sample line in points.
     bg_color, bg_alpha, text_color
-        Color overrides; same semantics as :func:`add_badge`.
+        Color overrides; same semantics as `add_badge`.
     text_alpha : float
         Text opacity (default 0.85 for subtle softening).
 

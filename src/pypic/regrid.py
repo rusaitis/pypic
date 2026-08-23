@@ -1,14 +1,14 @@
 """Uniform-to-uniform grid interpolation.
 
-Provides :func:`regrid` for interpolating a :class:`FieldDataset` from one
-uniform Cartesian grid onto another, :func:`common_grid` for computing the
-intersection grid at the finer resolution, and :func:`align_grids` as a
+Provides `regrid` for interpolating a `FieldDataset` from one
+uniform Cartesian grid onto another, `common_grid` for computing the
+intersection grid at the finer resolution, and `align_grids` as a
 convenience that regrids two datasets onto their common grid.
 
 Cartesian grids only — spherical and cylindrical geometries raise
-:class:`~pypic.exceptions.GeometryUnsupportedError` (a subclass of
-:class:`NotImplementedError`), matching the convention in
-:mod:`pypic.coordinates.operators`.
+[`GeometryUnsupportedError`][pypic.exceptions.GeometryUnsupportedError] (a subclass of
+`NotImplementedError`), matching the convention in
+`pypic.coordinates.operators`.
 
 Examples
 --------
@@ -120,7 +120,7 @@ def common_grid(a: GridInfo, b: GridInfo) -> GridInfo:
     ------
     GeometryUnsupportedError
         If either grid is non-Cartesian.  Subclass of
-        :class:`NotImplementedError`.
+        `NotImplementedError`.
     ValueError
         If dimensionalities differ or sample ranges do not overlap.
 
@@ -193,7 +193,7 @@ def regrid(
     r"""Interpolate fields from *source* onto *target_grid*.
 
     Each field array is interpolated independently using
-    :class:`~scipy.interpolate.RegularGridInterpolator`.  Points in
+    `RegularGridInterpolator`.  Points in
     *target_grid* that fall outside the source domain are filled with NaN
     (override via ``fill_value`` kwarg).
 
@@ -210,7 +210,7 @@ def regrid(
         a large dataset — the stacked-field interpolator is still built
         once, but only over the requested subset. Raises ``KeyError`` on
         unknown names (including close-match suggestions from
-        :meth:`FieldDataset.resolve_key`).
+        `FieldDataset.resolve_key`).
     method : str
         Interpolation method forwarded to ``RegularGridInterpolator``
         (e.g. ``"linear"``, ``"nearest"``, ``"cubic"``).
@@ -224,14 +224,14 @@ def regrid(
         New dataset on *target_grid* with the selected fields
         interpolated and all metadata (normalization, species, physics,
         frame, transforms) preserved from *source*. Metadata survives
-        the regrid unchanged — see :func:`field_difference_dataset` for
+        the regrid unchanged — see `field_difference_dataset` for
         the comparison helper that deliberately replaces it.
 
     Raises
     ------
     GeometryUnsupportedError
         If either grid is non-Cartesian.  Subclass of
-        :class:`NotImplementedError`.
+        `NotImplementedError`.
     ValueError
         If source and target dimensionalities differ.
     KeyError
@@ -341,8 +341,8 @@ def align_grids(
     r"""Regrid both datasets onto their common intersection grid.
 
     Computes the intersection domain at the finer per-axis resolution
-    via :func:`common_grid`, then regrids each dataset onto it via
-    :func:`regrid`.
+    via `common_grid`, then regrids each dataset onto it via
+    `regrid`.
 
     Parameters
     ----------
@@ -358,7 +358,7 @@ def align_grids(
     method : str
         Interpolation method (default ``"linear"``).
     **kwargs
-        Extra arguments forwarded to :func:`regrid`.
+        Extra arguments forwarded to `regrid`.
 
     Returns
     -------
@@ -369,7 +369,7 @@ def align_grids(
     ------
     GeometryUnsupportedError
         If either grid is non-Cartesian.  Subclass of
-        :class:`NotImplementedError`.
+        `NotImplementedError`.
     ValueError
         If dimensionalities differ or domains do not overlap.
     KeyError

@@ -126,7 +126,7 @@ def dormand_prince_step(
     failure point is reported back for caller-side classification.
 
     Operates on a 1-D state ``y`` of shape ``(n,)``. See
-    :func:`dormand_prince_step_batched` for the vectorized form over
+    `dormand_prince_step_batched` for the vectorized form over
     a leading seed axis.
 
     Parameters
@@ -148,7 +148,7 @@ def dormand_prince_step(
     Returns
     -------
     DPStepResult
-        Step outcome. See :class:`DPStepResult`.
+        Step outcome. See `DPStepResult`.
 
     Examples
     --------
@@ -225,7 +225,7 @@ def embedded_error_norm(
     ----------
     err_vec : NDArray
         Embedded error vector from
-        :func:`dormand_prince_step`.
+        `dormand_prince_step`.
     y_new : NDArray
         Proposed solution at the new time (used for the relative
         tolerance scale).
@@ -255,7 +255,7 @@ def embedded_error_norm(
 class DPStepResultBatched:
     """Outcome of one batched Dormand-Prince 5(4) step over N seeds.
 
-    Same FSAL/embedded-error contract as :class:`DPStepResult`, lifted
+    Same FSAL/embedded-error contract as `DPStepResult`, lifted
     over an N-seed batch. ``y_new`` / ``err_vec`` / ``k_last`` are
     always populated as ``(N, n)`` arrays; per-seed validity is read
     from ``failed_stage`` (``-1`` = success, ``0..6`` = first stage at
@@ -299,7 +299,7 @@ def dormand_prince_step_batched(
 ) -> DPStepResultBatched:
     r"""Batched Dormand-Prince 5(4) step over N independent seeds.
 
-    Vectorized form of :func:`dormand_prince_step` — each of the seven
+    Vectorized form of `dormand_prince_step` — each of the seven
     Butcher stages becomes a single ``f`` call on the whole ``(N, n)``
     batch instead of N calls on individual ``(n,)`` vectors. The
     arithmetic for each seed is identical to the single-step kernel;
@@ -400,7 +400,7 @@ def embedded_error_norm_batched(
 ) -> FloatArray:
     r"""Per-seed RMS error norm for a batched embedded RK step.
 
-    Vectorized form of :func:`embedded_error_norm`. Same mixed
+    Vectorized form of `embedded_error_norm`. Same mixed
     absolute/relative scaling and RMS reduction as the scalar form
     ([@HairerWanner1993] §II.4), averaged over the *component* axis
     (``axis=-1``) so each seed gets its own scalar error norm.

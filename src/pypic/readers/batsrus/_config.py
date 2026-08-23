@@ -224,7 +224,7 @@ def to_simulation_config(
 
     If a ``simulation.toml`` exists in *sim_dir*, its normalization, frame,
     transforms, and metadata are merged in via
-    :func:`pypic.readers._config_helpers.merge_simulation_toml`.
+    `pypic.readers._config_helpers.merge_simulation_toml`.
 
     Parameters
     ----------

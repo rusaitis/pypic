@@ -401,7 +401,7 @@ class GridStagger(_StrictBase):
        that need ED-PIC-precise destaggering.
 
     All three are informational — readers destagger to co-located grids
-    on load. They round-trip through :class:`StaggerInfo` in
+    on load. They round-trip through `StaggerInfo` in
     ``pypic.containers``. The validator does not cross-check between
     tiers; a writer may populate any subset.
     """
@@ -427,7 +427,7 @@ class Grid(_StrictBase):
 
     ``stagger`` consolidates the three field-placement-inside-cell
     tiers (``convention``, ``fields``, ``position``) under a single
-    sub-table — see :class:`GridStagger`.
+    sub-table — see `GridStagger`.
     """
 
     dimensions: AxisInt
@@ -556,7 +556,7 @@ class BoundaryConditions(BoundaryConditionsBase):
     every field. ``field_overrides`` lets PIC PML simulations and
     solar-wind-driven runs declare *different* BCs for E (PML), B (PML),
     and particles (reflecting / absorbing / thermal-bath) at the same
-    face. Each entry is a :class:`BoundaryConditionsBase` matching the
+    face. Each entry is a `BoundaryConditionsBase` matching the
     same axis count as the default.
     """
 
@@ -751,8 +751,8 @@ class PICSolver(_ExtensibleBase):
     compensator filter passes per step (standard in WarpX, Smilei,
     PIConGPU, OSIRIS — already exposed on ``HybridSolver``).
     ``charge_correction``, ``current_deposition`` adopt the openPMD
-    ED-PIC vocabulary; see :class:`ChargeCorrection`,
-    :class:`CurrentDeposition`.
+    ED-PIC vocabulary; see `ChargeCorrection`,
+    `CurrentDeposition`.
     """
 
     scheme: PICSolverScheme
@@ -1088,7 +1088,7 @@ def _validate_precision_overrides(
 ) -> None:
     """Reject precision_overrides keys that don't appear in ``quantities``.
 
-    Shared between :class:`OutputFields` and :class:`OutputStream` — the
+    Shared between `OutputFields` and `OutputStream` — the
     semantics are identical; only the error prefix differs.
     """
     unknown = set(overrides).difference(quantities)
@@ -1320,11 +1320,11 @@ class PhaseSpaceStorage(_StrictBase):
     ``block_size`` records the per-velocity-axis block factor;
     ``sparsity_threshold`` records the density floor.
 
-    Optional sub-table on :class:`PhaseSpace`. Gyrokinetic codes
+    Optional sub-table on `PhaseSpace`. Gyrokinetic codes
     (GENE, GS2, GX, Gkeyll-GK) emit dense 5-D grids and omit this
     block entirely. The validator checks that ``block_size`` length
     matches the velocity sub-axes of the parent ``dimensions`` —
-    enforced on the parent :class:`PhaseSpace` once the spatial
+    enforced on the parent `PhaseSpace` once the spatial
     dimension count is known at the root level.
     """
 

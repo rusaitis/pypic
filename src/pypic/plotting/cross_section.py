@@ -45,7 +45,7 @@ def plot_cross_section(
 ) -> tuple[Figure, tuple[Axes, Axes]]:
     r"""Two-panel figure: 2D field slice with a 1D cut profile below.
 
-    The top panel shows the scalar field via :func:`plot_field_slice`
+    The top panel shows the scalar field via `plot_field_slice`
     with a dashed line marking the cut location. The bottom panel
     shows the 1D profile along that cut.
 

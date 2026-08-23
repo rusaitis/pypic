@@ -71,7 +71,7 @@ def plot_comparison(
         Color limits for A/B panels. ``None`` for auto.
     diff_vmin, diff_vmax : float | None
         Color limits for the difference panel. ``None`` uses symmetric
-        limits from :func:`~pypic.plotting._colormaps.symmetric_clim`.
+        limits from `symmetric_clim`.
     labels : tuple[str, str]
         Panel labels for A and B.
     alpha : float

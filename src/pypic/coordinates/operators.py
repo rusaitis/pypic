@@ -4,7 +4,7 @@ Geometry-aware ``divergence``, ``curl``, and ``gradient`` using second-order
 central finite differences (interior) with second-order one-sided stencils
 at boundaries (``np.gradient`` convention). Cartesian geometry is fully
 implemented; spherical and cylindrical raise
-:class:`~pypic.exceptions.GeometryUnsupportedError` (a subclass of
+[`GeometryUnsupportedError`][pypic.exceptions.GeometryUnsupportedError] (a subclass of
 ``NotImplementedError``).
 """
 

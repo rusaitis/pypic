@@ -150,8 +150,8 @@ def resolve_field_colormap(
 
     Single source of truth for "given a field, pick the right colormap":
     matplotlib backends consume the string name, pyvista needs the
-    :class:`~matplotlib.colors.Colormap` object. Wraps
-    :func:`resolve_colormap` (which only returns the name) and looks up
+    `Colormap` object. Wraps
+    `resolve_colormap` (which only returns the name) and looks up
     the matching Colormap so both backends route every overlay through
     one dispatcher with identical positive-definite detection.
 

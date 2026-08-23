@@ -1,7 +1,7 @@
 """Process-wide simulation registry shared by HTTP and WebSocket routes.
 
 Multiple readers / large outputs can be expensive to open repeatedly,
-so the registry caches one :class:`~pypic.readers._registry.Simulation`
+so the registry caches one `Simulation`
 per simulation name.  Discovery is by directory listing under ``root``;
 anything containing a ``simulation.toml`` qualifies.  Open succeeds
 lazily on first access and is then memoized.
@@ -40,7 +40,7 @@ class SimulationRegistry:
 
     Notes
     -----
-    The lock guards the cache dict only — :func:`open_simulation`
+    The lock guards the cache dict only — `open_simulation`
     itself can run concurrently for different names.  For the same
     name, the first request opens and others wait, which is the
     right behavior given that opening is typically I/O-bound (file
@@ -74,7 +74,7 @@ class SimulationRegistry:
         return sorted(out)
 
     def get(self, name: str) -> Simulation:
-        """Return the opened :class:`Simulation` named *name*.
+        """Return the opened `Simulation` named *name*.
 
         Opens on the first call and caches for subsequent calls.
         Concurrent first-time opens for the same name serialize on
@@ -85,7 +85,7 @@ class SimulationRegistry:
         UnknownSimulationError
             *name* is not present under ``root``, or its directory
             lacks a ``simulation.toml`` file. Subclass of
-            :class:`KeyError`.
+            `KeyError`.
         """
         cached = self._cache.get(name)
         if cached is not None:
@@ -126,7 +126,7 @@ class SimulationRegistry:
         With *name* set, evict that one entry; with *name* ``None``,
         clear the whole cache.  Useful for tests and for picking up
         new timesteps without a server restart (when paired with
-        :meth:`Simulation.refresh_steps`, callers can avoid evicting
+        `Simulation.refresh_steps`, callers can avoid evicting
         the whole reader).
         """
         with self._lock:

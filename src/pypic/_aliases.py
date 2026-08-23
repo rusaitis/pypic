@@ -4,9 +4,9 @@ Central location for name-resolution data used by both ``compute`` and
 ``fields``.  Kept separate to avoid the circular dependency that would
 arise if either module imported the other at top level.
 
-The public surface (:data:`COMPUTE_ALIASES`, :data:`GROUP_ALIASES`,
-:data:`SPECIES_SUFFIX_RE`, :func:`species_name_aliases`) is re-exported
-through :mod:`pypic.aliases` for codegen consumers.
+The public surface (`COMPUTE_ALIASES`, `GROUP_ALIASES`,
+`SPECIES_SUFFIX_RE`, `species_name_aliases`) is re-exported
+through [`pypic.aliases`][pypic.aliases] for codegen consumers.
 """
 
 from __future__ import annotations

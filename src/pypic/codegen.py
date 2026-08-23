@@ -1,12 +1,12 @@
 """JSON export of pypic's canonical tables for cross-language codegen.
 
-The schema is already exported via :mod:`pypic.schema._export`; this module
+The schema is already exported via `pypic.schema._export`; this module
 adds the rest of the name/physics authority — compute aliases, the recipe
 registry, species templates, and field metadata — as a single JSON bundle.
 Cross-language consumers (webpic's Zod/TS codegen, rustpic tooling) read the
 bundle instead of re-typing the tables by hand.
 
-Pure (stdlib only, no typer): the thin CLI lives in :mod:`pypic._codegen_cli`,
+Pure (stdlib only, no typer): the thin CLI lives in `pypic._codegen_cli`,
 mirroring the ``schema._export`` / ``schema.cli`` split. JSON keys are camelCase
 for ergonomic consumption by the TypeScript side.
 """
@@ -111,7 +111,7 @@ def export_bundle(
     """Return the unified bundle: schema + aliases + recipes + field metadata.
 
     ``inline_single_use_defs`` / ``include_x_extensions`` pass through to
-    :func:`pypic.schema._export.build_schema` (the former yields flatter Zod).
+    `pypic.schema._export.build_schema` (the former yields flatter Zod).
     """
     return {
         "schemaVersion": schema_version,

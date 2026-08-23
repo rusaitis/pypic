@@ -32,8 +32,8 @@ def plot_power_spectrum(
 ) -> tuple[Figure, Axes]:
     r"""Plot a power spectrum on log-log axes.
 
-    Designed for output from :func:`~pypic.spectral.power_spectrum_1d`
-    or :func:`~pypic.spectral.power_spectrum_2d`.
+    Designed for output from [`power_spectrum_1d`][pypic.spectral.power_spectrum_1d]
+    or [`power_spectrum_2d`][pypic.spectral.power_spectrum_2d].
 
     Parameters
     ----------

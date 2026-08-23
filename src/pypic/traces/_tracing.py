@@ -111,7 +111,7 @@ class VectorFieldInterpolator:
 
         Used by the batched adaptive tracer so all seeds in a step share
         a single ``RegularGridInterpolator`` dispatch. Roughly N× faster
-        than calling :meth:`__call__` N times because per-call Python /
+        than calling `__call__` N times because per-call Python /
         argument-marshaling overhead amortizes over the batch.
 
         Parameters
@@ -273,7 +273,7 @@ def _trace_single_direction_adaptive(
     Bookkeeping (buffer, signed direction, null/out-of-domain
     classification, termination callback) lives here; the pure
     Dormand-Prince step + error estimator + step-size controller
-    live in :mod:`pypic.numerics`.
+    live in [`pypic.numerics`][pypic.numerics].
     """
     buf = np.empty((max_steps + 1, 3), dtype=np.float64)
     buf[0] = seed
@@ -392,7 +392,7 @@ def _trace_batch_single_direction_adaptive(
     trajectory written in-place; ``n_steps[i]`` is the number of
     *accepted* steps for seed ``i`` (so ``buf[i, :n_steps[i] + 1]`` is
     the seed's trace, always at least one point — the seed itself);
-    ``reasons_int[i]`` is the encoded :class:`TerminationReason`;
+    ``reasons_int[i]`` is the encoded `TerminationReason`;
     ``max_local_error[i]`` is the worst per-step error norm for seed
     ``i``.
     """
@@ -768,7 +768,7 @@ def trace_field_line_adaptive(
     loop_tol : float, None, or ``"auto"``
         Proximity threshold for closed-loop detection, in code units.
         The trace terminates with
-        :attr:`TerminationReason.CLOSED_LOOP` as soon as it re-enters a
+        `TerminationReason.CLOSED_LOOP` as soon as it re-enters a
         ``loop_tol``-radius ball around any previously visited point
         separated by more than ``loop_min_arclen`` of arc length. The
         canonical use case is mirror-mode magnetic holes and O-type
@@ -937,10 +937,10 @@ def trace_field_lines_adaptive(
 ) -> list[FieldLine]:
     r"""Trace ``N`` field lines adaptively in parallel via the batched DP kernel.
 
-    Functionally equivalent to calling :func:`trace_field_line_adaptive`
+    Functionally equivalent to calling `trace_field_line_adaptive`
     ``N`` times in a Python loop, but each Butcher-stage RHS evaluation
     is amortized across all seeds in one
-    :class:`VectorFieldInterpolator` dispatch — ~10× faster for
+    `VectorFieldInterpolator` dispatch — ~10× faster for
     moderate ``N``, larger speedups for ``N`` in the thousands. Memory
     cost is ``N * (max_steps + 1) * 24`` bytes per direction; pick
     ``max_steps`` accordingly for large seed arrays.
@@ -959,7 +959,7 @@ def trace_field_lines_adaptive(
         Starting points, shape ``(N, 3)``.
     atol, rtol, step_size_init, min_step, max_step, max_steps : float
         Adaptive integration controls; semantics identical to
-        :func:`trace_field_line_adaptive`. Applied per-seed.
+        `trace_field_line_adaptive`. Applied per-seed.
     direction : str
         ``"forward"``, ``"backward"``, or ``"both"``.
     field_components : tuple[str, str, str]
@@ -972,12 +972,12 @@ def trace_field_lines_adaptive(
     loop_tol : float, None, or ``"auto"``
         Proximity threshold for closed-loop detection, in code units.
         Applied per-seed: each trace terminates with
-        :attr:`TerminationReason.CLOSED_LOOP` as soon as it re-enters
+        `TerminationReason.CLOSED_LOOP` as soon as it re-enters
         a ``loop_tol``-radius ball around one of its own previously
         visited points separated by more than ``loop_min_arclen`` of
         arc length. Default ``"auto"`` derives
         ``0.5 * min(data.grid.spacing)``; pass ``None`` to disable or
-        a float to override. See :func:`trace_field_line_adaptive` for
+        a float to override. See `trace_field_line_adaptive` for
         the underlying rationale (mirror-mode magnetic holes, O-type
         islands).
     loop_min_arclen : float or None
@@ -990,7 +990,7 @@ def trace_field_lines_adaptive(
     Returns
     -------
     list[FieldLine]
-        One :class:`FieldLine` per input seed, in seed order.
+        One `FieldLine` per input seed, in seed order.
 
     Raises
     ------

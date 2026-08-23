@@ -3,7 +3,7 @@
 This module consolidates helpers that were previously duplicated across
 the matplotlib (`pypic.plotting._badge`) and pyvista
 (`pypic.plotting.pyvista._badge`) backends. Both backends import the
-same :data:`BadgeLoc` type alias and the same formatters so badge
+same `BadgeLoc` type alias and the same formatters so badge
 content and positioning stay in lockstep.
 """
 
@@ -18,7 +18,7 @@ BadgeLoc = Literal[
 
 Space-separated form (e.g. ``"upper right"``) matches matplotlib's own
 ``AnchoredOffsetbox`` convention. The legacy pyvista underscore form
-(``"upper_right"``) is still accepted by :func:`_normalize_loc` for
+(``"upper_right"``) is still accepted by `_normalize_loc` for
 backward compatibility.
 """
 
@@ -77,7 +77,7 @@ def _format_status_text(
     - *label* overrides the auto-prefix (``"step"`` / ``"t"``); ``""``
       suppresses the prefix entirely.
     - *step_range* + *show_max* renders ``"step X / Y"``.
-    - *time* may be a float (auto-formatted via :func:`_format_time_value`)
+    - *time* may be a float (auto-formatted via `_format_time_value`)
       or a string (used verbatim).
     """
     if text is not None:

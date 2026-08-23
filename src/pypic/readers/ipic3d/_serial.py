@@ -45,8 +45,8 @@ class IPic3DSerialReader:
     Unique to this reader: the per-process patch reassembly. Field-name
     mapping, Gaussian-CGS unit conversions, pressure-tensor mass
     correction, and config translation live in
-    :mod:`pypic.readers.ipic3d._field_map` and
-    :mod:`pypic.readers.ipic3d._config`, shared with the parallel and
+    `pypic.readers.ipic3d._field_map` and
+    `pypic.readers.ipic3d._config`, shared with the parallel and
     H5hut readers.
 
     Parameters

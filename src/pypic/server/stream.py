@@ -3,16 +3,16 @@
 One persistent WS connection per webpic tab.  Each ``subscribe``
 frame is one request/response exchange:
 
-1. Client sends a JSON :class:`~pypic.server.protocol.SubscribeRequest`.
+1. Client sends a JSON [`SubscribeRequest`][pypic.server.protocol.SubscribeRequest].
 2. Server validates → opens simulation → reads step → applies selection
    → applies reduction → optional SI conversion → encodes the
-   resulting :class:`~pypic.dataset.FieldDataset` as one Arrow IPC
+   resulting [`FieldDataset`][pypic.dataset.FieldDataset] as one Arrow IPC
    binary frame.
-3. Server replies with a JSON :class:`~pypic.server.protocol.Ack`
+3. Server replies with a JSON [`Ack`][pypic.server.protocol.Ack]
    (text frame, announces shape / dims / units) followed by the
    binary IPC frame.
 4. On failure, server replies with a JSON
-   :class:`~pypic.server.protocol.ErrorFrame` text frame.
+   [`ErrorFrame`][pypic.server.protocol.ErrorFrame] text frame.
 
 The connection stays open across exchanges; the client is responsible
 for matching responses to requests via ``request_id``.  No
@@ -78,8 +78,8 @@ async def _handle_one(
 ) -> None:
     """Process one inbound JSON frame on the WebSocket.
 
-    Every :class:`PypicError` subclass carries its own ``kind`` (matching
-    the :class:`ErrorFrame` Literal), so error routing is a single
+    Every `PypicError` subclass carries its own ``kind`` (matching
+    the `ErrorFrame` Literal), so error routing is a single
     branch.  Anything else is logged and surfaced as ``kind="internal"``
     — the connection survives so the client can retry.
     """
