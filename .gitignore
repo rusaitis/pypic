@@ -96,6 +96,7 @@ examples/*.dat
 examples/*.out
 examples/*.m
 # Local working notes, kept out of the public tree.
+note*.md
 examples/NOTES-*.md
 examples/ipic3d-grid.md
 examples/ipic3d-double-harris-setup.md
