@@ -95,8 +95,6 @@ def open_openggcm(
     # Detect prefix from .3df files
     prefix = _detect_prefix(path)
 
-    reader = OpenGGCMReader(grid, prefix, normalization)
-
     grid_info = _make_grid_info(grid)
     base_config = SimulationConfig(
         model_name="OpenGGCM",
@@ -113,7 +111,7 @@ def open_openggcm(
     )
 
     config = merge_simulation_toml(path, base_config)
-    return reader, config
+    return OpenGGCMReader(grid, prefix, config), config
 
 
 def _detect_prefix(path: Path) -> str:

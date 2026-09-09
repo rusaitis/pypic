@@ -1785,17 +1785,14 @@ def validate(
     energy_drift_total: float | None = None
     energy_drift_last: float | None = None
     if "conserved_quantities" in sim.auxiliary_names:
-        try:
-            tab = sim.auxiliary("conserved_quantities")
-            if "total_energy" in tab and len(tab) >= 2:
-                e_arr = tab["total_energy"]
-                e0 = float(e_arr[0])
-                if e0 != 0:
-                    abs_e0 = abs(e0)
-                    energy_drift_total = float((e_arr[-1] - e0) / abs_e0 * 100)
-                    energy_drift_last = float((e_arr[-1] - e_arr[-2]) / abs_e0 * 100)
-        except (KeyError, TypeError, IndexError):
-            pass
+        tab = sim.auxiliary("conserved_quantities")
+        if "total_energy" in tab and len(tab) >= 2:
+            e_arr = tab["total_energy"]
+            e0 = float(e_arr[0])
+            if e0 != 0:
+                abs_e0 = abs(e0)
+                energy_drift_total = float((e_arr[-1] - e0) / abs_e0 * 100)
+                energy_drift_last = float((e_arr[-1] - e_arr[-2]) / abs_e0 * 100)
 
     lines = [
         f"Validation: {sim.model_name} ({sim.model_type})  Step: {step_val}",

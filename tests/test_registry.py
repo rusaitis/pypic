@@ -73,14 +73,50 @@ class TestRegisterUnregister:
         with pytest.raises(KeyError, match="no_such_reader"):
             unregister_reader("no_such_reader")
 
-    def test_register_overwrites_with_warning(
-        self,
-        caplog: pytest.LogCaptureFixture,
-    ) -> None:
+    def test_register_duplicate_raises(self) -> None:
         register_reader("dup", lambda _: 0.1, _mock_factory)
-        with caplog.at_level("WARNING"):
-            register_reader("dup", lambda _: 0.9, _mock_factory)
-        assert "Overwriting" in caplog.text
+        try:
+            with pytest.raises(ValueError, match="already registered"):
+                register_reader("dup", lambda _: 0.9, _mock_factory)
+        finally:
+            unregister_reader("dup")
+
+
+class TestSimpleReaderThroughRegistry:
+    def test_open_with_reader_name_simple(self, tmp_path: Path) -> None:
+        from tests._sim_fixtures import make_sim_dir
+
+        sim = open_simulation(make_sim_dir(tmp_path), reader="simple")
+        assert isinstance(sim, Simulation)
+        assert sim.steps == [0, 1, 2]
+
+    def test_read_group_alias_loads_components(self, tmp_path: Path) -> None:
+        from tests._sim_fixtures import make_sim_dir
+
+        d = make_sim_dir(tmp_path, fields=("B_1", "EF_s0_1", "EF_s0_2", "EF_s0_3"))
+        ds = open_simulation(d).read(0, fields=["EFe"])
+        assert sorted(ds.field_names()) == ["EF_s0_1", "EF_s0_2", "EF_s0_3"]
+
+    def test_read_unmatched_group_alias_raises(self, tmp_path: Path) -> None:
+        from tests._sim_fixtures import make_sim_dir
+
+        sim = open_simulation(make_sim_dir(tmp_path))
+        with pytest.raises(KeyError, match="EFi"):
+            sim.read(0, fields=["EFi"])
+
+
+class TestReadOptionsNeedSelectiveReader:
+    def test_kwargs_to_basic_reader_raise(self, tmp_path: Path) -> None:
+        class Basic:
+            def read_timestep(self, path: Path, step: int) -> None:
+                raise AssertionError("must not be called")
+
+            def available_timesteps(self, path: Path) -> list[int]:
+                return [0]
+
+        sim = Simulation(Basic(), MagicMock(spec=SimulationConfig), tmp_path)
+        with pytest.raises(TypeError, match="target_resolution"):
+            sim.read(0, target_resolution=0.5)
 
 
 class TestOpenSimulationExplicitName:

@@ -43,6 +43,13 @@ def reader_cfg_ds():
     return reader, cfg, ds
 
 
+class TestConfigReachesDataset:
+    def test_frame_and_physics_come_from_config(self, reader_cfg_ds) -> None:
+        _, cfg, ds = reader_cfg_ds
+        assert ds.frame == cfg.frame == "GSM"
+        assert ds.physics == cfg.physics
+
+
 class TestUnitConversions:
     """Unit conversion functions produce correct SI values."""
 

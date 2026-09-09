@@ -9,7 +9,6 @@ from pypic.readers.ipic3d._config import (
     parse_inp,
     parse_settings_hdf,
     to_simulation_config,
-    to_toml,
 )
 from pypic.readers.ipic3d._conserved import (
     ConservedQuantities,
@@ -45,7 +44,6 @@ __all__ = [
     "parse_settings_hdf",
     "read_phdf5_particles",
     "to_simulation_config",
-    "to_toml",
 ]
 
 

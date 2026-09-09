@@ -7,6 +7,7 @@ committed to ``tests/data/ipic3d-synthetic/`` (~200 KB).
 
 from __future__ import annotations
 
+import copy
 import math
 from pathlib import Path
 
@@ -311,6 +312,14 @@ class TestShdf5MatchesPhdf5:
                     phdf5_ds[per_species(comp, s)],
                     atol=1e-12,
                 )
+
+
+class TestH5hutSpeciesCount:
+    def test_mismatch_with_config_raises(self):
+        cfg = parse_inp(H5HUT_DIR / "SyntheticFixture.inp")
+        bad = copy.replace(cfg, ns=cfg.ns - 1)
+        with pytest.raises(ValueError, match="nspec"):
+            IPic3DH5hutReader(bad).read_timestep(H5HUT_DIR, 0)
 
 
 class TestH5hutMatchesPhdf5:

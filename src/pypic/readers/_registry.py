@@ -3,11 +3,18 @@
 from __future__ import annotations
 
 import logging
+import re
 import threading
 from dataclasses import dataclass
 from pathlib import Path
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Any
+
+from pypic._aliases import COMPUTE_ALIASES, GROUP_ALIASES
+from pypic.compute import field_dependencies
+from pypic.exceptions import UnknownFieldError
+from pypic.grid import _default_aliases
+from pypic.readers._protocols import supports_selective_read
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable, Iterator
@@ -24,6 +31,30 @@ if TYPE_CHECKING:
 log = logging.getLogger(__name__)
 
 _lock = threading.Lock()
+
+
+def _expand_requested(name: str, alias_map: dict[str, str]) -> set[str]:
+    """Return the canonical names one requested field name may load.
+
+    Resolves geometry aliases (``Bx`` → ``B_1``), then compute aliases
+    (``energy_flux_x`` → ``EF_1``), then vector-group aliases (``EFe`` →
+    ``EF_s0``); adds the three Tier-3 components for vector prefixes
+    (``B`` → ``B_1``..``B_3``, ``J_s0`` → ``J_s0_1``..``J_s0_3``) and every
+    compute dependency (``P_par`` → the six tensor components plus B).
+    Names already resolved as aliases or ending in a component suffix
+    (``B_1``, ``P_s0_11``) stay scalar.
+    """
+    resolved = alias_map.get(
+        name, COMPUTE_ALIASES.get(name, GROUP_ALIASES.get(name, name))
+    )
+    expanded = {resolved}
+    ends_with_species = re.search(r"_s\d+$", resolved) is not None
+    ends_with_component = (
+        re.search(r"_\d+$", resolved) is not None and not ends_with_species
+    )
+    if name not in alias_map and not ends_with_component:
+        expanded.update(f"{resolved}_{c}" for c in "123")
+    return expanded | field_dependencies(resolved)
 
 
 @dataclass(frozen=True, slots=True)
@@ -75,9 +106,6 @@ def register_reader(
 ) -> None:
     """Register a reader for auto-detection.
 
-    If *name* is already registered, the existing entry is overwritten
-    and a warning is logged.
-
     Parameters
     ----------
     name : str
@@ -88,10 +116,16 @@ def register_reader(
         (filesystem glob only, no actual I/O).
     factory : ReaderFactory
         ``factory(path, **kwargs) -> (reader, config)``.
+
+    Raises
+    ------
+    ValueError
+        If *name* is already registered; call `unregister_reader` first.
     """
     with _lock:
         if name in _REGISTRY:
-            log.warning("Overwriting existing reader %r", name)
+            msg = f"Reader {name!r} is already registered"
+            raise ValueError(msg)
         _REGISTRY[name] = ReaderEntry(
             name=name,
             can_read_confidence=can_read_confidence,
@@ -272,34 +306,6 @@ class Simulation:
         """Last available timestep index."""
         return self.steps[-1]
 
-    @staticmethod
-    def _expanded_names(
-        name: str, alias_map: dict[str, str], canonical: set[str]
-    ) -> set[str]:
-        """Return the canonical names that *name* could have expanded to."""
-        import re
-
-        from pypic._aliases import COMPUTE_ALIASES
-
-        resolved = alias_map.get(name, COMPUTE_ALIASES.get(name, name))
-        candidates = {resolved}
-        # Tier-3 vector expansion: append ``_<component>`` to the resolved
-        # name. ``B`` → ``B_1``..``B_3``; ``J_s0`` → ``J_s0_1``..``J_s0_3``.
-        # Skip names ending in a component suffix (``_<digit>``);
-        # species-only suffixes (``_s<digit>``) are still expandable.
-        ends_with_species = re.search(r"_s\d+$", resolved) is not None
-        ends_with_component = (
-            re.search(r"_\d+$", resolved) is not None and not ends_with_species
-        )
-        if not ends_with_component:
-            for c in ("1", "2", "3"):
-                candidates.add(f"{resolved}_{c}")
-        # Compute deps
-        from pypic.compute import field_dependencies
-
-        candidates |= field_dependencies(resolved)
-        return candidates & canonical
-
     def read(
         self,
         step: int,
@@ -340,9 +346,6 @@ class Simulation:
             If *strict_fields* is true (the default) and any requested
             field name yielded nothing.
         """
-        from pypic.grid import _default_aliases
-        from pypic.readers._protocols import supports_selective_read
-
         if fields is None and not kwargs:
             return self._attach_config_provenance(
                 self._reader.read_timestep(self._path, step)
@@ -351,41 +354,10 @@ class Simulation:
         canonical: set[str] | None = None
         alias_map: dict[str, str] = {}
         if fields is not None:
-            import re
-
-            from pypic._aliases import COMPUTE_ALIASES, GROUP_ALIASES
-            from pypic.compute import field_dependencies
-
             alias_map = _default_aliases(self._config.grid.geometry)
-            expanded: set[str] = set()
+            canonical = set()
             for name in fields:
-                # Resolve geometry aliases (Bx→B_1), then compute aliases
-                # (energy_flux_x→EF_1), then vector-group aliases
-                # (EFe→EF_s0). Group aliases are checked last because
-                # their target is a vector prefix, not a scalar name.
-                resolved = alias_map.get(
-                    name,
-                    COMPUTE_ALIASES.get(name, GROUP_ALIASES.get(name, name)),
-                )
-                expanded.add(resolved)
-                # Tier-3 vector group shorthand: "B" → "B_1","B_2","B_3";
-                # "J_s0" → "J_s0_1","J_s0_2","J_s0_3".  Names already
-                # resolved as aliases ("Bx") or ending in a component suffix
-                # ("B_1", "P_s0_11") skip; species-only suffixes expand.
-                ends_with_species = re.search(r"_s\d+$", resolved) is not None
-                ends_with_component = (
-                    re.search(r"_\d+$", resolved) is not None and not ends_with_species
-                )
-                if name not in alias_map and not ends_with_component:
-                    for c in ("1", "2", "3"):
-                        expanded.add(f"{resolved}_{c}")
-                # Expand compute dependencies: "Pi" → the six P_s1 tensor
-                # components, "P_par" → the six P components plus B.  "P_11"
-                # alone does *not* pull the off-diagonals, so ask for the
-                # group when P_par/P_perp/agyrotropy need the full tensor.
-                expanded |= field_dependencies(resolved)
-
-            canonical = expanded
+                canonical |= _expand_requested(name, alias_map)
 
         if supports_selective_read(self._reader):
             ds = self._reader.read_timestep(  # type: ignore[call-arg]
@@ -395,6 +367,12 @@ class Simulation:
                 **kwargs,
             )
         else:
+            if kwargs:
+                msg = (
+                    f"{type(self._reader).__name__} takes no read options; "
+                    f"got {sorted(kwargs)}"
+                )
+                raise TypeError(msg)
             ds = self._reader.read_timestep(self._path, step)
             if canonical is not None:
                 # Filter to names actually present before narrowing the
@@ -407,20 +385,13 @@ class Simulation:
         # that yielded no loaded fields.
         if fields is not None:
             loaded = set(ds.field_names())
-            missing: list[str] = []
-            for name in fields:
-                # A request is satisfied if any expansion of it was loaded
-                expanded = self._expanded_names(
-                    name,
-                    alias_map,
-                    canonical or set(),
-                )
-                if not loaded & expanded:
-                    missing.append(name)
+            missing = [
+                name
+                for name in fields
+                if not loaded & _expand_requested(name, alias_map)
+            ]
             if missing:
                 if strict_fields:
-                    from pypic.exceptions import UnknownFieldError
-
                     msg = (
                         f"fields={list(fields)!r}: "
                         f"{missing!r} matched no fields in the dataset. "
@@ -777,8 +748,6 @@ def open_simulation(
                 path,
             )
             result = registry_snapshot[name].factory(path, **kwargs)
-            if isinstance(result, Simulation):
-                return result
             return Simulation(
                 result[0],
                 _maybe_apply_extent(result[1]),

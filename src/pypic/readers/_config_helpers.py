@@ -1,23 +1,32 @@
-"""Shared post-processing helpers for reader ``to_simulation_config()`` builders.
+"""Shared helpers for readers: the ``simulation.toml`` merge and SI normalization.
 
 Each reader assembles its own ``SimulationConfig`` from native config files
 (``.inp``, ``PARAM.in``, OpenGGCM grid files, ...). The grid construction,
 species inference, and physics dicts are reader-specific and intentionally
-*not* abstracted. The one piece they can all share is the optional
-``simulation.toml`` override layer: every reader directory may carry a
-``simulation.toml`` that supplies normalization, frame, transforms, and
-extra metadata that the native config doesn't encode.
+*not* abstracted. What they all share is the optional ``simulation.toml``
+override layer and the step from SI-valued arrays to code units.
 """
 
 from __future__ import annotations
 
 import copy
+import dataclasses
 from typing import TYPE_CHECKING
+
+from pypic.containers import SimulationConfig
+from pypic.exceptions import UnknownFieldError
+from pypic.fields import field_info
 
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from pypic.containers import SimulationConfig
+    from pypic.types import FloatArray
+    from pypic.units import Normalization
+
+# Owned by the native config files; ``simulation.toml`` never overrides them.
+READER_OWNED_FIELDS = frozenset(
+    {"model_name", "model_type", "grid", "species", "physics"}
+)
 
 
 def merge_simulation_toml(
@@ -25,12 +34,12 @@ def merge_simulation_toml(
 ) -> SimulationConfig:
     """Merge ``simulation.toml`` overrides into *base* if present.
 
-    If *sim_dir* contains a ``simulation.toml`` file, parse it and override
-    the ``normalization``, ``frame``, and ``transforms`` fields of *base*
-    with the values from the TOML, and merge the TOML's ``metadata`` into
-    *base.metadata* (TOML keys win on conflict). All other fields
-    (``model_name``, ``model_type``, ``grid``, ``species``, ``physics``)
-    are taken from *base* unchanged.
+    Every ``SimulationConfig`` field outside `READER_OWNED_FIELDS` is taken
+    from the TOML when it is set there (``normalization``, ``frame``,
+    ``transforms``, ``run``, ``probes``, ...); ``metadata`` is merged with
+    TOML keys winning on conflict. Reader-owned fields come from *base*
+    unchanged, so the native config stays authoritative for the grid and
+    species the data was actually produced with.
 
     Returns *base* unmodified if *sim_dir* is ``None`` or has no
     ``simulation.toml``.
@@ -58,20 +67,40 @@ def merge_simulation_toml(
     from pypic.readers.config import load_config
 
     toml_config = load_config(toml_path)
-    merged_metadata = {**dict(base.metadata), **dict(toml_config.metadata)}
-    return copy.replace(
-        base,
-        normalization=toml_config.normalization,
-        frame=toml_config.frame,
-        transforms=dict(toml_config.transforms),
-        initial_conditions=toml_config.initial_conditions
-        if toml_config.initial_conditions is not None
-        else base.initial_conditions,
-        output=toml_config.output if toml_config.output is not None else base.output,
-        bodies=toml_config.bodies if toml_config.bodies else base.bodies,
-        drivers=toml_config.drivers if toml_config.drivers else base.drivers,
-        restart=toml_config.restart
-        if toml_config.restart is not None
-        else base.restart,
-        metadata=merged_metadata,
-    )
+    overrides: dict[str, object] = {
+        "metadata": {**dict(base.metadata), **dict(toml_config.metadata)}
+    }
+    for spec in dataclasses.fields(SimulationConfig):
+        if spec.name in READER_OWNED_FIELDS or spec.name == "metadata":
+            continue
+        value = getattr(toml_config, spec.name)
+        if value is not None and value != () and value != {}:
+            overrides[spec.name] = value
+    return copy.replace(base, **overrides)
+
+
+def normalize_fields(
+    fields: dict[str, FloatArray], normalization: Normalization
+) -> dict[str, FloatArray]:
+    """Convert SI-valued canonical fields to code units.
+
+    Each field is divided by the SI factor of its registered quantity
+    type. Identity normalization returns *fields* unchanged.
+
+    Raises
+    ------
+    UnknownFieldError
+        If a field has no registered metadata and *normalization* is not
+        the identity — its unit is unknown, so it cannot be normalized.
+    """
+    if normalization.is_identity:
+        return fields
+    out: dict[str, FloatArray] = {}
+    for name, data in fields.items():
+        try:
+            quantity = field_info(name).quantity_type
+        except UnknownFieldError:
+            msg = f"Cannot normalize {name!r}: no registered quantity type"
+            raise UnknownFieldError(msg) from None
+        out[name] = data / normalization.si_factor(quantity)
+    return out

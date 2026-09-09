@@ -69,6 +69,7 @@ def make_sim_dir(
     *,
     n_steps: int = 3,
     run_name: str = "test_run",
+    fields: tuple[str, ...] = ("B_1", "B_2", "B_3"),
 ) -> Path:
     """Create a synthetic sim tree under *parent* with *n_steps* HDF5 outputs."""
     d = parent / name
@@ -81,9 +82,8 @@ def make_sim_dir(
     for i in range(n_steps):
         with h5py.File(d / f"output_{i:06d}.h5", "w") as f:
             grp = f.create_group("fields")
-            grp.create_dataset("B_1", data=rng.standard_normal(shape))
-            grp.create_dataset("B_2", data=rng.standard_normal(shape))
-            grp.create_dataset("B_3", data=rng.standard_normal(shape))
+            for field in fields:
+                grp.create_dataset(field, data=rng.standard_normal(shape))
             f.attrs["model"] = "test_sim"
             f.attrs["step"] = i
     return d

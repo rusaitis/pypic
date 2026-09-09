@@ -287,13 +287,10 @@ class IPic3DSerialReader:
                     if expanded is not None and canon not in expanded:
                         continue
                     group_path = f"moments/species_{s}/{phdf5_name}"
-                    # Check if the dataset exists in proc0
-                    try:
-                        with h5py.File(proc_files[0], "r") as f:
-                            if group_path not in f or cycle_key not in f[group_path]:
-                                continue
-                    except (KeyError, OSError):
-                        continue
+                    # Optional moment: skip when proc0 does not carry it
+                    with h5py.File(proc_files[0], "r") as f:
+                        if group_path not in f or cycle_key not in f[group_path]:
+                            continue
                     field_data[canon] = correct_pressure_tensor_component(
                         self._assemble_field(proc_files, group_path, cycle_key),
                         canonical_base=canon_base,
@@ -311,12 +308,9 @@ class IPic3DSerialReader:
                     if expanded is not None and canon not in expanded:
                         continue
                     group_path = f"moments/species_{s}/{ef_name}"
-                    try:
-                        with h5py.File(proc_files[0], "r") as f:
-                            if group_path not in f or cycle_key not in f[group_path]:
-                                continue
-                    except (KeyError, OSError):
-                        continue
+                    with h5py.File(proc_files[0], "r") as f:
+                        if group_path not in f or cycle_key not in f[group_path]:
+                            continue
                     data = self._assemble_field(proc_files, group_path, cycle_key)
                     field_data[canon] = gaussian_pressure_to_si(data)
 

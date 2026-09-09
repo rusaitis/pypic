@@ -12,20 +12,20 @@ from pypic.containers import StaggerInfo
 from pypic.coordinates.geometry import CARTESIAN
 from pypic.dataset import FieldDataset
 from pypic.grid import GridInfo
+from pypic.readers._config_helpers import normalize_fields
 from pypic.readers.openggcm._field_io import read_3df_file
 from pypic.readers.openggcm._field_map import (
     DEFAULT_SKIP,
     FIELD_NAME_MAP,
     convert_fields_to_si,
 )
-from pypic.units import Normalization
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
     from pathlib import Path
 
+    from pypic.containers import SimulationConfig
     from pypic.readers.openggcm._grid import OpenGGCMGrid
-    from pypic.types import FloatArray
 
 
 _3DF_PATTERN = re.compile(r"\.3df\.(\d+)$")
@@ -40,20 +40,20 @@ class OpenGGCMReader:
         Parsed grid definition.
     prefix : str
         Filename prefix (e.g. ``"gc012"`` for ``gc012.3df.006300``).
-    normalization : Normalization | None
-        If provided, data is normalized from SI to code units.  If
-        ``None``, data is returned in SI.
+    sim_config : SimulationConfig
+        Merged run configuration. Its normalization converts the SI
+        values on disk to code units; identity leaves them in SI.
     """
 
     def __init__(
         self,
         grid: OpenGGCMGrid,
         prefix: str,
-        normalization: Normalization | None = None,
+        sim_config: SimulationConfig,
     ) -> None:
         self._grid = grid
         self._prefix = prefix
-        self._normalization = normalization
+        self._sim_config = sim_config
 
     @property
     def grid(self) -> OpenGGCMGrid:
@@ -142,12 +142,8 @@ class OpenGGCMReader:
             )
             raise ValueError(msg)
 
-        si_fields = convert_fields_to_si(raw_fields)
-
-        if self._normalization is not None:
-            norm = self._normalization
-            for name, data in si_fields.items():
-                si_fields[name] = _normalize_field(name, data, norm)
+        sc = self._sim_config
+        si_fields = normalize_fields(convert_fields_to_si(raw_fields), sc.normalization)
 
         # Filter to requested canonical fields
         if wanted_canonical is not None:
@@ -172,7 +168,11 @@ class OpenGGCMReader:
         return FieldDataset(
             dataset,
             grid_info,
-            self._normalization or Normalization.identity(),
+            sc.normalization,
+            species=sc.species,
+            physics=sc.physics,
+            frame=sc.frame,
+            transforms=sc.transforms or None,
             metadata={
                 "step": step,
                 "timestep": ts,
@@ -210,24 +210,3 @@ def _make_grid_info(grid: OpenGGCMGrid) -> GridInfo:
         origin=(float(grid.x[0]), float(grid.y[0]), float(grid.z[0])),
         geometry=CARTESIAN,
     )
-
-
-def _normalize_field(
-    name: str,
-    data: FloatArray,
-    norm: Normalization,
-) -> FloatArray:
-    """Normalize a single SI field to code units."""
-    match name:
-        case "V_1" | "V_2" | "V_3":
-            return norm.normalize("velocity", data)  # type: ignore[return-value]
-        case "B_1" | "B_2" | "B_3":
-            return norm.normalize("b_field", data)  # type: ignore[return-value]
-        case "rho_m":
-            return data / (norm.density_ref * norm.mass_ref)
-        case "n_s0":
-            return norm.normalize("density", data)  # type: ignore[return-value]
-        case "P":
-            return data / (norm.density_ref * norm.mass_ref * norm.velocity_ref**2)
-        case _:
-            return data

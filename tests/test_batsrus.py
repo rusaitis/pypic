@@ -567,3 +567,78 @@ class TestParseHeaderFailsLoud:
         stray.write_text("#ifndef FOO_H\n#define FOO_H\n#endif\n")
         with pytest.raises(ValueError, match="BATSRUS"):
             parse_header(stray)
+
+
+class TestSimulationTomlReachesDataset:
+    """The merged ``simulation.toml`` must shape what ``read`` returns."""
+
+    TOML = """\
+[schema]
+version = "1.0"
+
+[model]
+name = "BATSRUS"
+type = "MHD"
+
+[run]
+name = "toml-run"
+
+[time]
+dt = 0.1
+t_start = 0.0
+t_end = 1.0
+n_steps = 10
+
+[grid]
+dimensions = [16, 16]
+spacing = [1.0, 1.0]
+lower = [-8.0, -8.0]
+upper = [8.0, 8.0]
+
+[units]
+system = "MHD"
+reference_length = 6.371e6
+reference_density = 1.67e-17
+reference_b_field = 5.0e-9
+
+[coordinates]
+geometry = "cartesian"
+frame = "GSE"
+
+[[species]]
+name = "p"
+charge = 1.0
+mass = 1.0
+"""
+
+    @pytest.fixture
+    def toml_dir(self, tmp_path: Path) -> Path:
+        import shutil
+
+        d = tmp_path / "idl"
+        shutil.copytree(IDL_DIR, d)
+        (d / "simulation.toml").write_text(self.TOML)
+        return d
+
+    def test_frame_normalization_and_run_flow_to_dataset(self, toml_dir: Path):
+        from pypic import open_simulation
+
+        plain = open_batsrus(IDL_DIR)[0].read_timestep(IDL_DIR, 0)
+        sim = open_simulation(toml_dir)
+        ds = sim.read(0)
+        assert ds.frame == "GSE"
+        assert ds.normalization.b_field_ref == 5.0e-9
+        assert ds.metadata["run"].name == "toml-run"
+        # SI arrays are normalized into code units by the declared references
+        assert_allclose(ds["B_1"], plain["B_1"] / 5.0e-9, rtol=1e-12)
+
+    def test_ambiguous_step_files_raise(self, tmp_path: Path):
+        import shutil
+
+        d = tmp_path / "idl"
+        shutil.copytree(IDL_DIR, d)
+        header = next(d.glob("*.h"))
+        shutil.copy(header, d / header.name.replace("mhd_1", "mhd_2"))
+        reader, _ = open_batsrus(d)
+        with pytest.raises(ValueError, match="Ambiguous"):
+            reader.read_timestep(d, 0)

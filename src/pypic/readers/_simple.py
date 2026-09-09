@@ -32,6 +32,7 @@ When they don't, pass ``config`` explicitly.
 from __future__ import annotations
 
 import logging
+import pathlib
 import re
 from typing import TYPE_CHECKING, Any, cast
 
@@ -690,9 +691,33 @@ def open_simple(
         Wraps the reader, config, and path.
     """
     # Deferred to avoid circular import: _registry imports _simple at module level
-    import pathlib
-
     from pypic.readers._registry import Simulation
+
+    reader, resolved = _open_reader(
+        path,
+        file_pattern=file_pattern,
+        field_map=field_map,
+        grid=grid,
+        normalization=normalization,
+        config=config,
+        config_path=config_path,
+        fields_group=fields_group,
+    )
+    return Simulation(reader, resolved, pathlib.Path(path))
+
+
+def _open_reader(
+    path: Path,
+    *,
+    file_pattern: str = "output_{step:06d}.h5",
+    field_map: dict[str, str] | None = None,
+    grid: GridInfo | None = None,
+    normalization: Normalization | None = None,
+    config: SimulationConfig | None = None,
+    config_path: Path | None = None,
+    fields_group: str = "fields",
+) -> tuple[SimpleReader, SimulationConfig]:
+    """Build the reader and config behind `open_simple`; the registry factory."""
     from pypic.readers.config import load_config
 
     path_obj = pathlib.Path(path)
@@ -715,7 +740,7 @@ def open_simple(
             config=config,
             fields_group=fields_group,
         )
-        return Simulation(reader, config, path_obj)
+        return reader, config
 
     # Auto-detect from first HDF5 file + explicit args
     glob_pat, _ = _parse_file_pattern(file_pattern)
@@ -761,10 +786,10 @@ def open_simple(
         config=auto_config,
         fields_group=fields_group,
     )
-    return Simulation(reader, auto_config, path_obj)
+    return reader, auto_config
 
 
 # Self-register with the reader registry
 from pypic.readers._registry import register_reader as _register_reader  # noqa: E402
 
-_register_reader("simple", can_read_confidence, open_simple)  # type: ignore[arg-type]
+_register_reader("simple", can_read_confidence, _open_reader)

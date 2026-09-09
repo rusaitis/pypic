@@ -7,6 +7,53 @@ that the public API may still change before 1.0.
 
 The distribution is `pypic-plasma` on PyPI; the import name is `pypic`.
 
+## [Unreleased]
+
+### Fixed
+
+- Derived quantities that divide (`temperature`, `alfven_speed`, `plasma_beta`,
+  ...) crashed on integer arrays because the output was allocated with the
+  input dtype; inputs now promote to float. `entropy` and `gyrotropic_entropy`
+  no longer emit `RuntimeWarning` on non-positive ratios.
+- `compute("div_B")` — and `div_E`, `curl_B_*`, `vort_*` — on 2D data died
+  with a bare `TypeError` from the operator signature. It now raises
+  `GeometryUnsupportedError` naming the quantity and the grid dimensionality.
+- `v_th_s2` and higher skipped the relativistic cap that `v_th_s0` and
+  `v_th_s1` applied: the species-0/1 characteristic-scale recipes are now
+  generated from the same templates as every other species index, and
+  `SpeciesTemplate` gained `supports_relativistic`.
+- A missing dependency deep in a recipe chain was reported against the wrong
+  quantity and lost its "did you mean" suggestions; the error now names both
+  the requested quantity and the missing leaf.
+- `Simulation.read(fields=["EFe"])` — any vector-group alias — loaded the
+  three components and then raised `UnknownFieldError`, because the post-read
+  check resolved compute aliases but not group aliases. One expansion funnel
+  now serves both the read and the check.
+- `open_simulation(path, reader="simple")` raised `TypeError`: the simple
+  reader's registered factory returned a `Simulation` where every other
+  factory returns `(reader, config)`.
+- BATSRUS assigned its merged `simulation.toml` to a field it never read and
+  OpenGGCM ignored its own, so `frame`, `normalization`, `species` and
+  `physics` never reached their datasets. Both now build datasets from the
+  merged config, normalizing SI-valued arrays by the declared references.
+- `merge_simulation_toml` copied a hand-maintained field list that omitted
+  `run`, `probes`, `collisions` and `phase_space`; it now walks
+  `SimulationConfig`'s fields, so `attrs.run` provenance is written for
+  reader-opened simulations.
+
+### Changed
+
+- Fail loud instead of warn-and-continue: duplicate `register_field` /
+  `register_reader` calls, read options passed to a reader without selective
+  read, an H5hut species count that disagrees with the config, and ambiguous
+  BATSRUS step files now raise. The serial iPIC3D reader no longer swallows
+  HDF5 errors while probing optional moments.
+
+### Removed
+
+- `pypic.readers.ipic3d.to_toml`: unused, untested, and it emitted a document
+  the schema rejects (`n_steps = 0`).
+
 ## [0.1.3] — 2026-08-23
 
 ### Added

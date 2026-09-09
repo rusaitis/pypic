@@ -126,8 +126,6 @@ def open_batsrus(
 
     batsrus_config = copy.replace(batsrus_config, geometry=geometry)
 
-    reader = BATSRUSReader(batsrus_config, output_format, prefix, geometry=geometry)
-
     if batl_files and header is None:
         batl = read_batl(batl_files[0])
         is_uniform = len(set(batl.refine_level)) <= 1
@@ -137,6 +135,9 @@ def open_batsrus(
             _, grid = regrid_amr_hdf5(batl)
 
     sim_config = to_simulation_config(batsrus_config, header, grid=grid, sim_dir=path)
+    reader = BATSRUSReader(
+        batsrus_config, output_format, prefix, geometry=geometry, sim_config=sim_config
+    )
     return reader, sim_config
 
 

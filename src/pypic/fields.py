@@ -726,8 +726,8 @@ def register_field(
     Raises
     ------
     ValueError
-        If *quantity_type* is not recognized, or *unit_dimension* is
-        not a length-7 sequence of ints.
+        If *quantity_type* is not recognized, *unit_dimension* is not a
+        length-7 sequence of ints, or *name* is already registered.
     """
     if quantity_type not in _QUANTITY_UNITS:
         valid = sorted(_QUANTITY_UNITS)
@@ -749,7 +749,8 @@ def register_field(
 
     with _lock:
         if name in _FIELD_INFO:
-            log.warning("Overwriting existing field metadata for %r", name)
+            msg = f"Field metadata for {name!r} is already registered"
+            raise ValueError(msg)
         _FIELD_INFO[name] = info
 
 

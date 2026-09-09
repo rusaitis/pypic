@@ -529,6 +529,34 @@ class TestMergeSimulationToml:
         assert result.grid.dimensions == (4, 3, 2)
         assert result.normalization.length_ref == 6.371e6
 
+    def test_run_provenance_flows_through_merge(
+        self, tmp_path: Path, base_config: Any
+    ) -> None:
+        from pypic.readers._config_helpers import merge_simulation_toml
+        from tests._sim_fixtures import sim_toml
+
+        (tmp_path / "simulation.toml").write_text(sim_toml(run_name="MMS-event-1"))
+        result = merge_simulation_toml(tmp_path, base_config)
+        assert result.run is not None
+        assert result.run.name == "MMS-event-1"
+
+    def test_reader_owned_fields_are_never_overridden(
+        self, tmp_path: Path, base_config: Any
+    ) -> None:
+        from pypic.readers._config_helpers import (
+            READER_OWNED_FIELDS,
+            merge_simulation_toml,
+        )
+        from tests._sim_fixtures import sim_toml
+
+        (tmp_path / "simulation.toml").write_text(sim_toml())
+        result = merge_simulation_toml(tmp_path, base_config)
+        assert {
+            name
+            for name in READER_OWNED_FIELDS
+            if getattr(result, name) != getattr(base_config, name)
+        } == set()
+
     def test_toml_metadata_wins_on_key_conflict(
         self, tmp_path: Path, base_config: Any
     ) -> None:

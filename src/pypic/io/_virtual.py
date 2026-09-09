@@ -405,7 +405,7 @@ def to_icechunk_virtual(
         # container can handle the chunk location".
         try:
             persisted = icechunk.Repository.fetch_config(storage)
-        except Exception:
+        except icechunk.IcechunkError:
             # Fresh repo: fetch_config raises before any commit exists.
             persisted = None
         if persisted is not None:

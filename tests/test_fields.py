@@ -379,6 +379,15 @@ class TestFieldRegistration:
         finally:
             unregister_field(name)
 
+    def test_register_duplicate_raises(self) -> None:
+        name = "_test_reg_dup"
+        register_field(name, "velocity")
+        try:
+            with pytest.raises(ValueError, match="already registered"):
+                register_field(name, "pressure")
+        finally:
+            unregister_field(name)
+
     def test_register_invalid_quantity_type(self) -> None:
         with pytest.raises(ValueError, match="Unknown quantity_type"):
             register_field("_test_bad_qtype", "nonexistent_type")
@@ -393,17 +402,6 @@ class TestFieldRegistration:
     def test_unregister_nonexistent(self) -> None:
         with pytest.raises(KeyError, match="No field metadata"):
             unregister_field("_test_does_not_exist_xyz")
-
-    def test_overwrite_warns(self, caplog: pytest.LogCaptureFixture) -> None:
-        name = "_test_overwrite"
-        try:
-            register_field(name, "velocity")
-            with caplog.at_level("WARNING", logger="pypic.fields"):
-                register_field(name, "pressure")
-            assert "Overwriting" in caplog.text
-            assert field_info(name).quantity_type == "pressure"
-        finally:
-            unregister_field(name)
 
     def test_register_visible_to_si_factor(self) -> None:
         name = "_test_si_visible"

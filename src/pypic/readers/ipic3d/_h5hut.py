@@ -244,13 +244,11 @@ class IPic3DH5hutReader:
             step_group = f["Step#0"]
             nspec = int(step_group.attrs["nspec"][0])
             if nspec != self._config.ns:
-                log.warning(
-                    "Species count mismatch: HDF5 has nspec=%d but "
-                    "config has ns=%d; using config value",
-                    nspec,
-                    self._config.ns,
+                msg = (
+                    f"Species count mismatch in {fields_file.name}: HDF5 has "
+                    f"nspec={nspec} but the config declares ns={self._config.ns}"
                 )
-                nspec = self._config.ns
+                raise ValueError(msg)
             block = step_group["Block"]
             available = set(block.keys())
 
