@@ -203,79 +203,8 @@ _REGISTRY: dict[str, Recipe] = {
         ("P", "V_{c}"),
         needs_gamma=True,
     ),
-    # Tier-3 canonical recipe IDs; literature spellings (``omega_pe``,
-    # ``v_th_e``, ``lambda_D``) alias in.  Species index >= 2 falls
-    # through to ``SPECIES_TEMPLATES`` for dynamic synthesis.
-    "omega_p_s0": Recipe(
-        derived.plasma_frequency,
-        ("n_s0",),
-        species_index=0,
-        species_args=SpeciesArgs.CHARGE_MASS,
-    ),
-    "omega_c_s0": Recipe(
-        derived.gyrofrequency,
-        ("|B|",),
-        species_index=0,
-        species_args=SpeciesArgs.CHARGE_MASS,
-    ),
-    "d_s0": Recipe(
-        derived.skin_depth,
-        ("n_s0",),
-        species_index=0,
-        needs_c=True,
-        species_args=SpeciesArgs.CHARGE_MASS,
-    ),
-    "v_th_s0": Recipe(
-        derived.thermal_speed,
-        ("T_s0",),
-        species_index=0,
-        species_args=SpeciesArgs.MASS_ONLY,
-        supports_relativistic=True,
-    ),
-    "r_s0": Recipe(
-        derived.gyroradius,
-        ("T_s0", "|B|"),
-        species_index=0,
-        species_args=SpeciesArgs.CHARGE_MASS,
-    ),
-    "lambda_D_s0": Recipe(
-        derived.debye_length,
-        ("T_s0", "n_s0"),
-        species_index=0,
-        species_args=SpeciesArgs.CHARGE_ONLY,
-    ),
-    "omega_p_s1": Recipe(
-        derived.plasma_frequency,
-        ("n_s1",),
-        species_index=1,
-        species_args=SpeciesArgs.CHARGE_MASS,
-    ),
-    "omega_c_s1": Recipe(
-        derived.gyrofrequency,
-        ("|B|",),
-        species_index=1,
-        species_args=SpeciesArgs.CHARGE_MASS,
-    ),
-    "d_s1": Recipe(
-        derived.skin_depth,
-        ("n_s1",),
-        species_index=1,
-        needs_c=True,
-        species_args=SpeciesArgs.CHARGE_MASS,
-    ),
-    "v_th_s1": Recipe(
-        derived.thermal_speed,
-        ("T_s1",),
-        species_index=1,
-        species_args=SpeciesArgs.MASS_ONLY,
-        supports_relativistic=True,
-    ),
-    "r_s1": Recipe(
-        derived.gyroradius,
-        ("T_s1", "|B|"),
-        species_index=1,
-        species_args=SpeciesArgs.CHARGE_MASS,
-    ),
+    # Characteristic scales for species 0 and 1 (``omega_p_s0``, ``d_s1``,
+    # ...) are generated from ``_SPECIES_TEMPLATES`` below the templates.
     # Total pressure from partial pressures.  ``P_s0``/``P_s1`` each resolve
     # via the species template ``"P"`` (trace of the diagonal tensor) when
     # not stored directly; ``Pe``/``Pi`` continue to work via the alias map.
@@ -499,6 +428,7 @@ class SpeciesTemplate:
     # ``perpendicular_vector``.  The synthesized ``Recipe`` carries it
     # through so the compute path selects the right tuple element.
     component: int | None = None
+    supports_relativistic: bool = False
 
 
 _SPECIES_TEMPLATES: dict[str, SpeciesTemplate] = {
@@ -511,7 +441,12 @@ _SPECIES_TEMPLATES: dict[str, SpeciesTemplate] = {
     "d": SpeciesTemplate(
         derived.skin_depth, ("n_s{N}",), SpeciesArgs.CHARGE_MASS, needs_c=True
     ),
-    "v_th": SpeciesTemplate(derived.thermal_speed, ("T_s{N}",), SpeciesArgs.MASS_ONLY),
+    "v_th": SpeciesTemplate(
+        derived.thermal_speed,
+        ("T_s{N}",),
+        SpeciesArgs.MASS_ONLY,
+        supports_relativistic=True,
+    ),
     "r": SpeciesTemplate(
         derived.gyroradius, ("T_s{N}", "|B|"), SpeciesArgs.CHARGE_MASS
     ),
@@ -748,22 +683,37 @@ def _try_species_recipe(name: str) -> Recipe | None:
     # inverts the Tier-3 order.
     if not raw_suffix and raw_prefix.endswith(_INVALID_PREFIX_OPERATOR_ENDINGS):
         return None
-    prefix = raw_prefix + raw_suffix
-    idx_str = m.group("idx")
-    species_index = int(idx_str)
-    template = _SPECIES_TEMPLATES.get(prefix)
+    template = _SPECIES_TEMPLATES.get(raw_prefix + raw_suffix)
     if template is None:
         return None
-    fields = tuple(f.replace("{N}", idx_str) for f in template.field_pattern)
+    return _species_recipe(template, int(m.group("idx")))
+
+
+def _species_recipe(template: SpeciesTemplate, species_index: int) -> Recipe:
+    """Instantiate *template* for one species index."""
+    idx = str(species_index)
     return Recipe(
         func=template.func,
-        fields=fields,
+        fields=tuple(f.replace("{N}", idx) for f in template.field_pattern),
         species_index=species_index,
         needs_gamma=template.needs_gamma,
         needs_c=template.needs_c,
         species_args=template.species_args,
         component=template.component,
+        supports_relativistic=template.supports_relativistic,
     )
+
+
+# Species 0 and 1 of the characteristic scales are registered so that
+# ``available_quantities()`` and the codegen bundle list them; higher
+# indices synthesize on demand from the same templates.
+_REGISTRY.update(
+    {
+        f"{prefix}_s{n}": _species_recipe(_SPECIES_TEMPLATES[prefix], n)
+        for prefix in ("omega_p", "omega_c", "d", "v_th", "r", "lambda_D")
+        for n in (0, 1)
+    }
+)
 
 
 # Display unit conversion: unit string → SI value.
@@ -943,18 +893,9 @@ def _execute_recipe(
     recipe = _get_recipe(canonical)
 
     # Resolve field dependencies (recursive)
-    args: list[Any] = []
-    for field_name in recipe.fields:
-        try:
-            args.append(compute_field(field_name, dataset, _depth + 1))
-        except KeyError:
-            available = sorted(dataset.field_names())
-            msg = (
-                f"Cannot compute {canonical!r}: "
-                f"requires {field_name!r} which is not available. "
-                f"Available fields: {available}"
-            )
-            raise KeyError(msg) from None
+    args: list[Any] = [
+        compute_field(field_name, dataset, _depth + 1) for field_name in recipe.fields
+    ]
 
     # Append species charge/mass
     species_args = _get_species_args(dataset, recipe)
@@ -989,6 +930,13 @@ def _execute_recipe(
                 f"Derived quantity {canonical!r} requires spatial derivatives, "
                 f"which are only implemented for Cartesian geometry. "
                 f"Dataset has {dataset.grid.geometry.type.value} geometry."
+            )
+            raise GeometryUnsupportedError(msg)
+        if len(dataset.grid.spacing) != 3:
+            msg = (
+                f"Derived quantity {canonical!r} requires spatial derivatives, "
+                f"which are only implemented for 3D grids. "
+                f"Dataset grid is {len(dataset.grid.spacing)}D."
             )
             raise GeometryUnsupportedError(msg)
         args.extend(dataset.grid.spacing)
@@ -1028,8 +976,8 @@ def compute_field(name: str, dataset: FieldDataset, _depth: int = 0) -> FloatArr
     ValueError
         If required species or physics info is missing.
     GeometryUnsupportedError
-        If the recipe requires Cartesian geometry but the dataset
-        grid is spherical or cylindrical.  Subclass of
+        If the recipe requires spatial derivatives and the dataset
+        grid is non-Cartesian or not three-dimensional.  Subclass of
         `NotImplementedError`.
     RecursionError
         If dependency chain exceeds depth limit.
@@ -1048,7 +996,13 @@ def compute_field(name: str, dataset: FieldDataset, _depth: int = 0) -> FloatArr
     if dataset.has_field(canonical):
         return dataset[canonical]
 
-    recipe, result = _execute_recipe(canonical, dataset, _depth)
+    try:
+        recipe, result = _execute_recipe(canonical, dataset, _depth)
+    except UnknownFieldError as exc:
+        if _depth:
+            raise
+        msg = f"Cannot compute {name!r}: {exc.args[0]}"
+        raise UnknownFieldError(msg) from exc
 
     if recipe.component is not None:
         return result[recipe.component]  # type: ignore[no-any-return]
@@ -1154,7 +1108,8 @@ def field_dependencies(name: str, _depth: int = 0) -> set[str]:
         Leaf field names that must be present in the dataset.
     """
     if _depth > _MAX_DEPTH:
-        return {name}
+        msg = f"Dependency chain too deep (>{_MAX_DEPTH}) while resolving {name!r}"
+        raise RecursionError(msg)
 
     canonical = _resolve_name(name)
     try:

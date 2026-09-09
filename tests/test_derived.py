@@ -1,3 +1,4 @@
+import warnings
 from collections.abc import Callable
 from typing import Any
 
@@ -51,6 +52,7 @@ from pypic.derived import (
     scudder_agyrotropy,
     skin_depth,
     sound_speed,
+    temperature,
     thermal_energy_density,
     thermal_speed,
     velocity_magnitude,
@@ -335,6 +337,34 @@ class TestEdgeCases:
         assert np.isnan(
             gyrotropic_entropy(np.array([np.nan]), np.array([1.0]), np.array([1.0]))[0]
         )
+
+    @pytest.mark.parametrize(
+        ("func", "expected"),
+        [
+            (lambda: temperature(np.array([2, 4]), np.array([1, 2])), [2.0, 2.0]),
+            (lambda: alfven_speed(np.array([1, 2]), np.array([1, 4])), [1.0, 1.0]),
+            (lambda: plasma_beta(np.array([1, 2]), np.array([1, 2])), [2.0, 1.0]),
+            (lambda: entropy(np.array([1, 1]), np.array([1, 1])), [0.0, 0.0]),
+        ],
+    )
+    def test_integer_inputs_promote_to_float(self, func, expected):
+        result = func()
+        assert result.dtype == np.float64
+        np.testing.assert_allclose(result, expected, rtol=1e-12)
+
+    def test_zero_density_entropy_is_nan_without_warning(self):
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            result = entropy(np.array([1.0, 1.0]), np.array([1.0, 0.0]))
+        np.testing.assert_allclose(result, [0.0, np.nan], atol=1e-15)
+
+    def test_nonpositive_ratio_entropy_is_nan_without_warning(self):
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            result = gyrotropic_entropy(
+                np.array([-1.0, 1.0]), np.array([1.0, 1.0]), np.array([1.0, 1.0])
+            )
+        np.testing.assert_allclose(result, [np.nan, 0.0], atol=1e-15)
 
 
 class TestThermalSpeed:

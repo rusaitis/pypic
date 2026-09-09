@@ -427,6 +427,26 @@ def test_all_species_template_dependencies_resolve() -> None:
     )
 
 
+def test_registered_species_scale_recipes_match_templates() -> None:
+    """Every ``<template>_s0`` / ``_s1`` registry entry equals its synthesis."""
+    failures: list[str] = []
+    for prefix in sorted(SPECIES_TEMPLATES):
+        for idx in (0, 1):
+            name = _template_canonical_form(prefix, idx)
+            static = _REGISTRY.get(name)
+            if static is None:
+                continue
+            synthesized = _try_species_recipe(name)
+            if static != synthesized:
+                failures.append(
+                    f"{name!r}: registry {static} != template {synthesized}"
+                )
+    assert not failures, _format_failures(
+        "Static species recipes drifted from their templates",
+        failures,
+    )
+
+
 # ---------------------------------------------------------------------------
 # Test 6 — every compute alias points at a reachable target
 # ---------------------------------------------------------------------------

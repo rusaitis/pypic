@@ -61,6 +61,7 @@ def _template_dict(template: SpeciesTemplate) -> dict[str, Any]:
         "needsGamma": template.needs_gamma,
         "needsC": template.needs_c,
         "component": template.component,
+        "supportsRelativistic": template.supports_relativistic,
     }
 
 

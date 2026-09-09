@@ -22,9 +22,17 @@ def _safe_divide(
 
     What we cannot change, we let pass through.
     """
-    out = np.full_like(numerator, np.nan)
-    nonzero = denominator != 0
-    np.divide(numerator, denominator, out=out, where=nonzero)
+    num = np.asarray(numerator, dtype=float)
+    den = np.asarray(denominator, dtype=float)
+    out = np.full(np.broadcast_shapes(num.shape, den.shape), np.nan)
+    np.divide(num, den, out=out, where=den != 0)
+    return out
+
+
+def _safe_log(x: FloatArray) -> FloatArray:
+    """Natural logarithm, returning nan where *x* is not positive."""
+    out = np.full(x.shape, np.nan)
+    np.log(x, out=out, where=x > 0)
     return out
 
 
@@ -562,8 +570,7 @@ def entropy(
     >>> entropy(np.array([1.0]), np.array([1.0]))
     array([0.])
     """
-    ratio = _safe_divide(pressure, density**gamma)
-    return np.where(ratio > 0, np.log(ratio), np.nan)
+    return _safe_log(_safe_divide(pressure, density**gamma))
 
 
 def gyrotropic_entropy(
@@ -599,8 +606,7 @@ def gyrotropic_entropy(
     >>> gyrotropic_entropy(np.array([1.0]), np.array([1.0]), np.array([1.0]))
     array([0.])
     """
-    ratio = _safe_divide(p_par * p_perp**2, density**5)
-    return np.where(ratio > 0, np.log(ratio), np.nan)
+    return _safe_log(_safe_divide(p_par * p_perp**2, density**5))
 
 
 def _unit_vector(

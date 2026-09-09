@@ -14,8 +14,9 @@ from pypic.compute import (
 )
 from pypic.coordinates.geometry import SPHERICAL
 from pypic.dataset import FieldDataset
+from pypic.exceptions import UnknownFieldError
 from pypic.grid import GridInfo
-from pypic.units import Normalization, PhysicsParams
+from pypic.units import Normalization, PhysicsParams, SpeciesInfo
 from tests._helpers import ELECTRONS, IONS, make_test_dataset
 
 
@@ -329,6 +330,27 @@ class TestSpeciesDependent:
             compute_field("omega_pe", ds)
 
 
+class TestSpeciesTemplateRelativistic:
+    def test_species_two_gets_relativistic_cap_like_species_zero(self):
+        shape = (2, 2, 2)
+        alphas = SpeciesInfo(name="alphas", charge=2.0, mass=4.0)
+        ds = make_test_dataset(
+            {"T_s0": np.ones(shape), "T_s2": np.full(shape, 4.0)},
+            shape=shape,
+            species=[ELECTRONS, IONS, alphas],
+            physics=PhysicsParams(c=1.0, relativistic=True),
+        )
+        # v_th = sqrt(T/m) capped as v_th / sqrt(1 + v_th^2 / c^2)
+        v0 = np.sqrt(1.0 / ELECTRONS.mass)
+        v2 = np.sqrt(4.0 / alphas.mass)
+        np.testing.assert_allclose(
+            compute_field("v_th_s0", ds), v0 / np.sqrt(1 + v0**2), rtol=1e-12
+        )
+        np.testing.assert_allclose(
+            compute_field("v_th_s2", ds), v2 / np.sqrt(1 + v2**2), rtol=1e-12
+        )
+
+
 class TestGridDependent:
     def test_div_b_uniform(self):
         shape = (4, 4, 4)
@@ -610,10 +632,17 @@ class TestErrorMessages:
         with pytest.raises(KeyError, match="Did you mean"):
             compute_field("bta", ds)
 
-    def test_missing_dependency_lists_available(self):
+    def test_missing_dependency_names_request_and_leaf(self):
         ds = make_test_dataset({"B_1": np.ones((2, 2, 2))}, shape=(2, 2, 2))
-        with pytest.raises(KeyError, match="requires"):
+        with pytest.raises(UnknownFieldError, match=r"Cannot compute '\|B\|'.*'B_2'"):
             compute_field("|B|", ds)
+
+    def test_nested_missing_dependency_keeps_suggestions(self):
+        ds = make_test_dataset({"B_1": np.ones((2, 2, 2))}, shape=(2, 2, 2))
+        with pytest.raises(
+            UnknownFieldError, match=r"Cannot compute 'beta'.*Did you mean"
+        ):
+            compute_field("beta", ds)
 
     def test_recursion_depth(self):
         ds = make_test_dataset({}, shape=(2, 2, 2))
@@ -1137,6 +1166,22 @@ class TestGeometryGuard:
         data = {name: np.ones(shape) for name in components}
         ds = FieldDataset.from_arrays(data, grid, Normalization.identity())
         with pytest.raises(NotImplementedError, match="Cartesian"):
+            compute_field(field, ds)
+
+    @pytest.mark.parametrize(
+        ("field", "components"),
+        [
+            ("div_B", {"B_1", "B_2", "B_3"}),
+            ("div_E", {"E_1", "E_2", "E_3"}),
+            ("curl_B_1", {"B_1", "B_2", "B_3"}),
+            ("vort_1", {"V_1", "V_2", "V_3"}),
+        ],
+    )
+    def test_compute_rejects_2d_grid(self, field, components):
+        shape = (4, 4)
+        data = {name: np.ones(shape) for name in components}
+        ds = make_test_dataset(data, shape=shape)
+        with pytest.raises(NotImplementedError, match=rf"{field}.*2D"):
             compute_field(field, ds)
 
 

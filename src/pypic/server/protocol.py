@@ -20,7 +20,7 @@ addition.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Annotated, Literal
+from typing import TYPE_CHECKING, Annotated, Literal, assert_never
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -104,6 +104,8 @@ def to_selection(
             return PlaneSelection(normal=n, index=i)
         case SphereSpec(center=c, radius=r, keep=k):
             return SphereSelection(center=c, radius=r, keep=k)
+        case _ as unreachable:
+            assert_never(unreachable)
 
 
 # -- Reduction spec ----------------------------------------------------------
