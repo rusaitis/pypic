@@ -128,6 +128,7 @@ from pypic.fields import (
     register_field,
     unit_label,
     unregister_field,
+    vector_component,
 )
 from pypic.grid import GridInfo
 from pypic.io import (
@@ -371,5 +372,6 @@ __all__ = [
     "unregister_reader",
     "unregister_recipe",
     "validate_simulation_toml",
+    "vector_component",
     "velocity_magnitude",
 ]

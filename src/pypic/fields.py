@@ -1135,6 +1135,48 @@ def field_info(
     raise UnknownFieldError(msg)
 
 
+_COMPONENT_SUFFIX_RE = re.compile(r"^(?P<base>.+)_(?P<component>[123])$")
+
+
+def vector_component(name: str) -> tuple[str, int] | None:
+    """Split a registered vector component name into ``(base, component)``.
+
+    The Tier-3 form ``<base>_<component>`` with a registered metadata
+    entry marks a vector component: ``B_1``, ``KEF_s0_2``, ``E_prime_3``.
+    Scalars, tensor components (``P_s0_11``) and unregistered names
+    return ``None``.
+
+    Parameters
+    ----------
+    name : str
+        Field or derived quantity name.
+
+    Returns
+    -------
+    tuple[str, int] | None
+        Vector base name and 1-based component, or ``None``.
+
+    Examples
+    --------
+    >>> vector_component("B_1")
+    ('B', 1)
+    >>> vector_component("KEF_s0_2")
+    ('KEF_s0', 2)
+    >>> vector_component("P_s0_11") is None
+    True
+    >>> vector_component("rho_c") is None
+    True
+    """
+    m = _COMPONENT_SUFFIX_RE.match(name)
+    if m is None:
+        return None
+    try:
+        field_info(name)
+    except UnknownFieldError:
+        return None
+    return m.group("base"), int(m.group("component"))
+
+
 def unit_label(name: str, *, to_si: bool = False) -> str:
     r"""Return a unit label string for a field, suitable for plot axes.
 
@@ -1209,4 +1251,5 @@ __all__ = [
     "register_field",
     "unit_label",
     "unregister_field",
+    "vector_component",
 ]

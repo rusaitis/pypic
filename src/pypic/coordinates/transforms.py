@@ -28,6 +28,8 @@ from typing import TYPE_CHECKING, cast
 
 import numpy as np
 
+from pypic.fields import vector_component
+
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
@@ -323,35 +325,15 @@ def resolve_transform(
     raise ValueError(msg)
 
 
-def _build_vector_triplet_regex() -> re.Pattern[str]:
-    """Build regex from the canonical vector prefixes in ``pypic.fields``.
-
-    Tier-3 canonical: ``<prefix>[_s<N>]_<component>`` — every semantic
-    boundary is an underscore, with optional species qualifier between
-    prefix and component (``B_1``, ``V_s0_1``, ``B0_1``, ``B0_s0_1``).
-    """
-    from pypic.grid import _FIELD_PREFIX_PAIRS
-
-    prefixes = sorted(
-        {canon for _, canon in _FIELD_PREFIX_PAIRS},
-        key=len,
-        reverse=True,
-    )
-    parts = [re.escape(p) for p in prefixes]
-    return re.compile(rf"^({'|'.join(parts)})(?:_s(\d+))?_([123])$")
-
-
-_VECTOR_TRIPLET_RE = _build_vector_triplet_regex()
-
-
 def find_vector_triplets(
     field_names: Iterable[str],
 ) -> list[tuple[str, str, str]]:
     """Group field names into vector triplets needing rotation.
 
-    Returns a list of ``(name1, name2, name3)`` tuples for each
-    complete vector field. Handles both total fields (``B_1, B_2, B_3``)
-    and per-species fields (``J_s0_1, J_s0_2, J_s0_3``).
+    Returns a list of ``(name1, name2, name3)`` tuples for each complete
+    vector field, stored or derived, that the field registry knows as a
+    vector: total fields (``B_1, B_2, B_3``), per-species fields
+    (``J_s0_1, J_s0_2, J_s0_3``) and derived vectors (``E_prime_1, ...``).
 
     Parameters
     ----------
@@ -372,12 +354,11 @@ def find_vector_triplets(
     """
     groups: dict[str, dict[int, str]] = {}
     for name in field_names:
-        m = _VECTOR_TRIPLET_RE.match(name)
-        if m:
-            prefix, species, component = m.groups()
-            key = f"{prefix}_s{species}" if species else prefix
-            groups.setdefault(key, {})[int(component)] = name
-    return [(g[1], g[2], g[3]) for g in groups.values() if 1 in g and 2 in g and 3 in g]
+        parts = vector_component(name)
+        if parts is not None:
+            base, component = parts
+            groups.setdefault(base, {})[component] = name
+    return [(g[1], g[2], g[3]) for g in groups.values() if len(g) == 3]
 
 
 # Tier-3 pressure tensor: ``P_<ij>`` (bare) or ``P_s<N>_<ij>`` (per-species).

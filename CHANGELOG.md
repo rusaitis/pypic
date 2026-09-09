@@ -9,6 +9,12 @@ The distribution is `pypic-plasma` on PyPI; the import name is `pypic`.
 
 ## [Unreleased]
 
+### Added
+
+- `pypic.vector_component(name)` splits a registered Tier-3 vector component
+  name into ``(base, component)`` — the single source `transform_to` now uses
+  to decide what rotates.
+
 ### Fixed
 
 - Derived quantities that divide (`temperature`, `alfven_speed`, `plasma_beta`,
@@ -40,6 +46,14 @@ The distribution is `pypic-plasma` on PyPI; the import name is `pypic`.
   `run`, `probes`, `collisions` and `phase_space`; it now walks
   `SimulationConfig`'s fields, so `attrs.run` provenance is written for
   reader-opened simulations.
+- `FieldDataset.transform_to` rotated only eight hard-coded vector prefixes
+  (`B`, `B0`, `E`, `EF`, `J`, `V`, `S`, `u`). Every derived vector stored in a
+  dataset — `E_prime_*`, `E_ideal_*`, `E_Hall_*`, `curl_B_*`, `vort_*`,
+  `V_perp_*`, `J_perp_*`, `KEF_s0_*`, `q_s0_*`, ... — was reoriented in space
+  but kept its old-frame components. Vector triplets are now detected through
+  the field registry (`pypic.fields.vector_component`), so anything registered
+  as a vector rotates; an invariants test pins every registered component to
+  a complete, detectable triplet.
 
 ### Changed
 
