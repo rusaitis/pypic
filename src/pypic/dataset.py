@@ -1059,7 +1059,7 @@ class FieldDataset:
         plasma working unit, or ``in_units(name, "K")`` for the
         Boltzmann-factor-converted form. Magnetic field defaults to
         T in SI; ``in_units(name, "nT")`` is the space-physics
-        idiom. See ``_DISPLAY_UNITS`` in ``pypic.compute`` for the
+        idiom. See ``_DISPLAY_UNITS`` in ``pypic.units`` for the
         full vocabulary.
         """
         from pypic.compute import display_unit_factor  # layered above dataset
