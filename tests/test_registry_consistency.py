@@ -12,7 +12,7 @@ than fanned out across hundreds of parametrized cases.
 
 When schema.md grows a new canonical name, add it to ``CANONICAL_NAMES``
 below. When a test fails, the fix is usually one of: register it in
-``_FIELD_INFO``, add a recipe to ``compute._REGISTRY``, add an alias,
+``_FIELD_INFO``, add a recipe to ``_recipes._REGISTRY``, add an alias,
 or extend a species pattern.
 """
 

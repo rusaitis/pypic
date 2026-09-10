@@ -103,6 +103,20 @@ The distribution is `pypic-plasma` on PyPI; the import name is `pypic`.
   what they used to import inside functions; only the calls from
   `FieldDataset` up into `compute` and `reductions` stay deferred, and
   `docs/architecture.md` now states that rule.
+- The recipe tables (`_REGISTRY`, the species templates) live in
+  `pypic._recipes` and the field metadata literal in `pypic._field_table`;
+  `compute` and `fields` keep the lookup, execution and registration API,
+  and every public name still imports from where it did. The display-unit
+  vocabulary moved from `compute` to `units`.
+- `pypic.cli` is a package: one module per command group, shared helpers
+  and option types in `_shared` and `_options`, commands registered in one
+  list in the package init. Closed-vocabulary options (`--metric`, `--scale`,
+  `--format`, `--reduction`, `--nan-policy`, comparison `--units`) are
+  Typer choices now: `--help` lists them and a bad value fails before the
+  command runs, with Typer's own message. `convert fields` and
+  `reduce apply` share one write path.
+- `pypic.reduce` is split into validation, dispatch and provenance helpers;
+  behaviour and messages are unchanged.
 
 ### Removed
 
