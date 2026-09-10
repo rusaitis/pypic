@@ -10,10 +10,9 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Any
 
-from pypic._aliases import COMPUTE_ALIASES, GROUP_ALIASES
+from pypic._aliases import COMPUTE_ALIASES, GROUP_ALIASES, _default_aliases
 from pypic.compute import field_dependencies
 from pypic.exceptions import UnknownFieldError
-from pypic._aliases import _default_aliases
 from pypic.readers._protocols import supports_selective_read
 
 if TYPE_CHECKING:

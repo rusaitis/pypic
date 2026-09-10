@@ -36,6 +36,7 @@ from __future__ import annotations
 import warnings
 from typing import TYPE_CHECKING, Any
 
+from pypic.dataset import FieldDataset
 from pypic.diagnostics import (
     _PYPIC_PREFIX,
     NanPolicy,
@@ -43,7 +44,6 @@ from pypic.diagnostics import (
     l2_relative_error,
     linf_error,
 )
-from pypic.dataset import FieldDataset
 from pypic.regrid import align_grids
 from pypic.units import Normalization
 

@@ -15,12 +15,12 @@ from typing import TYPE_CHECKING, Any
 import numpy as np
 import xarray as xr
 
+from pypic._aliases import _default_aliases, species_name_aliases
 from pypic.coordinates.geometry import (
     CARTESIAN,  # noqa: F401 — used in doctests
     CYLINDRICAL,  # noqa: F401 — used in doctests
     SPHERICAL,  # noqa: F401 — used in doctests
 )
-from pypic._aliases import _default_aliases, species_name_aliases
 from pypic.coordinates.transforms import (
     FrameTransform,
     find_pressure_tensor_groups,
