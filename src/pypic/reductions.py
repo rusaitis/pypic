@@ -222,6 +222,38 @@ def reduce(
     >>> line.grid.dimensions
     (4,)
     """
+    axes: tuple[str, ...] = (axis,) if isinstance(axis, str) else tuple(axis)
+    _validate_reduce(axes, reduction=reduction, weight=weight, nan_policy=nan_policy)
+    if selection is not None:
+        data = selection.apply(data)
+    _validate_axes(data, axes, reduction)
+
+    ds_to_reduce = data.xr if fields is None else data.xr[_resolve_fields(data, fields)]
+    weight_canonical = None if weight is None else _resolve_weight(data, weight)
+    weight_da = None if weight_canonical is None else data.xr[weight_canonical]
+    if nan_policy == "raise":
+        _reject_nan(ds_to_reduce, weight_da, weight_canonical)
+
+    reduced = _collapse(
+        ds_to_reduce,
+        axes,
+        reduction,
+        weight_da=weight_da,
+        nan_policy=nan_policy,
+        source=data.xr,
+    )
+    _stamp_provenance(reduced, data.xr, axes, reduction, weight_canonical)
+    return data._wrap_sliced(reduced)
+
+
+def _validate_reduce(
+    axes: tuple[str, ...],
+    *,
+    reduction: str,
+    weight: str | None,
+    nan_policy: str,
+) -> None:
+    """Reject argument combinations `reduce` cannot honour, before any I/O."""
     if reduction not in _VALID_REDUCTIONS:
         msg = f"reduction must be one of {_VALID_REDUCTIONS}, got {reduction!r}"
         raise ValueError(msg)
@@ -234,24 +266,27 @@ def reduce(
             f"{sorted(_WEIGHTABLE_REDUCERS)!r}, got {reduction!r}"
         )
         raise ValueError(msg)
-
-    if selection is not None:
-        data = selection.apply(data)
-
-    axes: tuple[str, ...] = (axis,) if isinstance(axis, str) else tuple(axis)
     if not axes:
         msg = "reduce(): axis must name at least one dimension"
         raise ValueError(msg)
     if len(set(axes)) != len(axes):
         msg = f"reduce(): duplicate axis names in {axes!r}"
         raise ValueError(msg)
+    if reduction in _INDEX_REDUCERS and len(axes) > 1:
+        msg = (
+            f"reduction={reduction!r} requires a single axis "
+            f"(got {axes!r}); idxmax/idxmin have no multi-axis form"
+        )
+        raise ValueError(msg)
 
-    spatial_axes = data.grid.surviving_axis_names
+
+def _validate_axes(data: FieldDataset, axes: tuple[str, ...], reduction: str) -> None:
+    """Check *axes* against the (possibly selection-cropped) dataset."""
+    # Accept any name present on the underlying xarray dataset, so
+    # non-grid dims like ``time`` (added by ``to_zarr_timeseries``)
+    # can be reduced too — not just the spatial ``surviving_axis_names``.
     xr_dims = tuple(str(d) for d in data.xr.dims)
     for ax in axes:
-        # Accept any name present on the underlying xarray dataset, so
-        # non-grid dims like ``time`` (added by ``to_zarr_timeseries``)
-        # can be reduced too — not just the spatial ``surviving_axis_names``.
         if ax not in xr_dims:
             msg = f"Axis {ax!r} not found in dataset dimensions {xr_dims!r}"
             raise ValueError(msg)
@@ -260,7 +295,7 @@ def reduce(
     # being reduced — Jacobian-aware integration on non-Cartesian grids
     # is not implemented.  Pure non-spatial reductions (e.g.
     # ``reduce(ts, "time", "mean")``) are geometry-agnostic.
-    reduces_spatial = any(ax in spatial_axes for ax in axes)
+    reduces_spatial = any(ax in data.grid.surviving_axis_names for ax in axes)
     if reduces_spatial and data.grid.geometry.type is not GeometryType.CARTESIAN:
         msg = (
             f"reduce() supports Cartesian grids only for spatial-axis "
@@ -270,103 +305,110 @@ def reduce(
         )
         raise GeometryUnsupportedError(msg)
 
-    if reduction in _INDEX_REDUCERS and len(axes) > 1:
-        msg = (
-            f"reduction={reduction!r} requires a single axis "
-            f"(got {axes!r}); idxmax/idxmin have no multi-axis form"
-        )
-        raise ValueError(msg)
 
-    if fields is None:
-        ds_to_reduce = data.xr
-    else:
-        canonicals: list[str] = []
-        unresolved: list[str] = []
-        for name in fields:
-            try:
-                canonicals.append(data.resolve_key(name))
-            except KeyError:
-                unresolved.append(name)
-        if unresolved:
-            msg = f"reduce(): unknown fields {unresolved!r}"
-            raise UnknownFieldError(msg)
-        ds_to_reduce = data.xr[canonicals]
-
-    weight_canonical: str | None = None
-    weight_da = None
-    if weight is not None:
+def _resolve_fields(data: FieldDataset, fields: Iterable[str]) -> list[str]:
+    """Canonical names for *fields*, raising once with every unknown name."""
+    canonicals: list[str] = []
+    unresolved: list[str] = []
+    for name in fields:
         try:
-            weight_canonical = data.resolve_key(weight)
-        except KeyError as exc:
-            msg = f"reduce(): unknown weight field {weight!r}"
-            raise UnknownFieldError(msg) from exc
-        weight_da = data.xr[weight_canonical]
+            canonicals.append(data.resolve_key(name))
+        except KeyError:
+            unresolved.append(name)
+    if unresolved:
+        msg = f"reduce(): unknown fields {unresolved!r}"
+        raise UnknownFieldError(msg)
+    return canonicals
 
-    if nan_policy == "raise":
-        for name in [str(n) for n in ds_to_reduce.data_vars]:
-            arr = ds_to_reduce[name].values
-            n_nan = int(np.isnan(arr).sum())
-            if n_nan > 0:
-                msg = f"reduce: input contains {n_nan} NaN cell(s) in {name!r}"
-                raise ValueError(msg)
-        if weight_da is not None:
-            n_nan = int(np.isnan(weight_da.values).sum())
-            if n_nan > 0:
-                msg = (
-                    f"reduce: weight field {weight_canonical!r} contains "
-                    f"{n_nan} NaN cell(s)"
-                )
-                raise ValueError(msg)
 
+def _resolve_weight(data: FieldDataset, weight: str) -> str:
+    try:
+        return data.resolve_key(weight)
+    except KeyError as exc:
+        msg = f"reduce(): unknown weight field {weight!r}"
+        raise UnknownFieldError(msg) from exc
+
+
+def _reject_nan(
+    ds: xr.Dataset, weight_da: xr.DataArray | None, weight_name: str | None
+) -> None:
+    """Raise on any NaN in the reduced fields or the weight (``nan_policy="raise"``)."""
+    for name in [str(n) for n in ds.data_vars]:
+        n_nan = int(np.isnan(ds[name].values).sum())
+        if n_nan > 0:
+            msg = f"reduce: input contains {n_nan} NaN cell(s) in {name!r}"
+            raise ValueError(msg)
+    if weight_da is not None:
+        n_nan = int(np.isnan(weight_da.values).sum())
+        if n_nan > 0:
+            msg = f"reduce: weight field {weight_name!r} contains {n_nan} NaN cell(s)"
+            raise ValueError(msg)
+
+
+def _collapse(
+    ds: xr.Dataset,
+    axes: tuple[str, ...],
+    reduction: str,
+    *,
+    weight_da: xr.DataArray | None,
+    nan_policy: NanPolicy,
+    source: xr.Dataset,
+) -> xr.Dataset:
+    """Apply *reduction* over *axes*: the per-operation dispatch of `reduce`."""
     skipna = nan_policy == "omit"
-
+    reduced: xr.Dataset
     if reduction == "integrate":
         if weight_da is None:
-            reduced = ds_to_reduce.integrate(coord=list(axes))
+            reduced = ds.integrate(coord=list(axes))
         else:
-            reduced = _weighted_integrate(
-                ds_to_reduce, weight_da, axes, nan_policy=nan_policy
-            )
+            reduced = _weighted_integrate(ds, weight_da, axes, nan_policy=nan_policy)
         # xarray's Dataset.integrate doesn't expose keep_attrs; restore
         # per-DataArray attrs from the source so quantity_type / si_unit
         # / latex survive for downstream in_si()/field_info() lookups.
         for name in [str(n) for n in reduced.data_vars]:
-            reduced[name].attrs = dict(data.xr[name].attrs)
-    elif reduction == "mean" and weight_da is not None:
-        reduced = _weighted_mean(ds_to_reduce, weight_da, axes, nan_policy=nan_policy)
-    elif reduction in _MULTI_AXIS_DIM_REDUCERS:
-        method = getattr(ds_to_reduce, reduction)
-        reduced = method(dim=list(axes), skipna=skipna, keep_attrs=True)
-    else:  # argmax / argmin (single-axis enforced above)
-        method_name = "idxmax" if reduction == "argmax" else "idxmin"
-        method = getattr(ds_to_reduce, method_name)
-        match axes:
-            case (single_axis,):
-                reduced = method(dim=single_axis, skipna=skipna, keep_attrs=True)
-            case _:  # unreachable — guarded above
-                raise AssertionError(f"argmax/argmin single-axis invariant: {axes!r}")
-        # Override metadata: the result is a coordinate position along
-        # the reduced axis, not a value of the original field.
-        for name in [str(n) for n in reduced.data_vars]:
-            attrs = dict(reduced[name].attrs)
-            attrs["quantity_type"] = "length"
-            attrs["si_unit"] = "m"
-            attrs["unit_dimension"] = (1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
-            # The array now holds coordinate positions, not field values —
-            # clear field-specific descriptors so downstream tooling doesn't
-            # mislabel the result as the original quantity.
-            attrs.pop("latex", None)
-            attrs.pop("long_name", None)
-            reduced[name].attrs = attrs
+            reduced[name].attrs = dict(source[name].attrs)
+        return reduced
+    if reduction == "mean" and weight_da is not None:
+        return _weighted_mean(ds, weight_da, axes, nan_policy=nan_policy)
+    if reduction in _MULTI_AXIS_DIM_REDUCERS:
+        reduced = getattr(ds, reduction)(dim=list(axes), skipna=skipna, keep_attrs=True)
+        return reduced
 
-    reduction_axis: str | tuple[str, ...]
-    match axes:
-        case (single,):
-            reduction_axis = single
-        case _:
-            reduction_axis = axes
+    # argmax / argmin: single axis, enforced by _validate_reduce.
+    method = ds.idxmax if reduction == "argmax" else ds.idxmin
+    reduced = method(dim=axes[0], skipna=skipna, keep_attrs=True)
+    # The result is a coordinate position along the reduced axis, not a
+    # value of the original field, so the field-specific descriptors
+    # would mislabel it downstream.
+    for name in [str(n) for n in reduced.data_vars]:
+        attrs = dict(reduced[name].attrs)
+        attrs["quantity_type"] = "length"
+        attrs["si_unit"] = "m"
+        attrs["unit_dimension"] = (1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+        attrs.pop("latex", None)
+        attrs.pop("long_name", None)
+        reduced[name].attrs = attrs
+    return reduced
+
+
+def _stamp_provenance(
+    reduced: xr.Dataset,
+    source: xr.Dataset,
+    axes: tuple[str, ...],
+    reduction: str,
+    weight_canonical: str | None,
+) -> None:
+    """Record ``attrs["reduction"]`` on every reduced field.
+
+    ``length_axes`` accumulates across chained reductions so ``in_si()``
+    applies the right number of ``length_ref`` factors: unweighted
+    ``integrate`` adds ``len(axes)``, weighted ``integrate`` cancels them
+    between numerator and denominator, other reductions carry the count
+    forward, and ``argmax``/``argmin`` return a length, which resets the
+    unit dimension and makes the prior count moot.
+    """
     base_attr: dict[str, str | int | tuple[str, ...]] = {
-        "axis": reduction_axis,
+        "axis": axes[0] if len(axes) == 1 else axes,
         "op": reduction,
     }
     if reduction in _INDEX_REDUCERS:
@@ -374,24 +416,20 @@ def reduce(
     if weight_canonical is not None:
         base_attr["weight"] = weight_canonical
 
-    # Accumulate ``length_axes`` across chained reductions so ``in_si()``
-    # applies the right number of ``length_ref`` factors.  Unweighted
-    # ``integrate`` adds ``len(axes)``; weighted ``integrate`` cancels them
-    # between numerator and denominator; other reductions preserve units and
-    # carry the count forward.  ``argmax``/``argmin`` return a length, which
-    # resets the unit dimension and makes the prior count moot.
     for name in [str(n) for n in reduced.data_vars]:
         field_attr = dict(base_attr)
         if reduction not in _INDEX_REDUCERS:
-            prior = data.xr[name].attrs.get("reduction") or {}
+            prior = source[name].attrs.get("reduction") or {}
             prior_length_axes = int(prior.get("length_axes", 0))
-            added = len(axes) if (reduction == "integrate" and weight is None) else 0
+            added = (
+                len(axes)
+                if reduction == "integrate" and weight_canonical is None
+                else 0
+            )
             total = prior_length_axes + added
             if total:
                 field_attr["length_axes"] = total
         reduced[name].attrs["reduction"] = field_attr
-
-    return data._wrap_sliced(reduced)
 
 
 def _weighted_mean(
