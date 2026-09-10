@@ -2,7 +2,7 @@
 #         (Bx, By, Bz) are preferred for readability and access the
 #         same data as B_1, B_2, B_3") + docs/schema.md § "Split-B naming"
 #         ("B0_1, B0_2, B0_3 (aliases: B0x, B0y, B0z)") +
-#         src/pypic/grid.py:148-159 (_FIELD_PREFIX_PAIRS enumerates every
+#         src/pypic/_aliases.py (_FIELD_PREFIX_PAIRS enumerates every
 #         vector prefix that must have Cartesian aliases registered).
 # Claim: for every registered vector prefix, the Cartesian alias
 #        (prefix + x/y/z) must return bit-exact the same array as the
@@ -72,7 +72,7 @@ def test_cartesian_alias_returns_canonical_data(
 
     Registers the dataset with canonical names only; relies on the
     FieldDataset's default alias table (generated from
-    ``_FIELD_PREFIX_PAIRS`` in ``grid.py``) to make the Cartesian letter
+    ``_FIELD_PREFIX_PAIRS`` in ``_aliases.py``) to make the Cartesian letter
     access work. Catches any mismatch between the alias table's
     canonical-side format and the actual canonical field names used by
     readers and the fields.py registry.

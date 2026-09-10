@@ -20,7 +20,12 @@ from __future__ import annotations
 
 import inspect
 
-from pypic._aliases import COMPUTE_ALIASES, _get_field_alias_fallback
+from pypic._aliases import (
+    _COMPONENT_SUFFIXES,
+    COMPUTE_ALIASES,
+    OPERATOR_SUFFIXES,
+    _get_field_alias_fallback,
+)
 from pypic.compute import (
     _REGISTRY,
     SPECIES_TEMPLATES,
@@ -29,6 +34,7 @@ from pypic.compute import (
     SpeciesTemplate,
     _try_species_recipe,
 )
+from pypic.coordinates.geometry import GeometryType
 from pypic.fields import _FIELD_INFO, _SPECIES_INFO_PATTERNS, field_info
 from pypic.units import Normalization
 
@@ -286,9 +292,6 @@ def test_all_schema_fields_are_reachable() -> None:
 # ---------------------------------------------------------------------------
 
 
-_GENERIC_OPERATOR_SUFFIXES: frozenset[str] = frozenset({"par", "perp"})
-
-
 def _per_species_form(prefix: str, idx: int) -> str:
     """Construct a Tier-3 per-species name from a prefix.
 
@@ -309,7 +312,7 @@ def _per_species_form(prefix: str, idx: int) -> str:
     base, sep, comp = prefix.partition("_")
     if sep and comp[:1].isdigit():
         return f"{base}_s{idx}_{comp}"
-    if sep and comp in _GENERIC_OPERATOR_SUFFIXES:
+    if sep and comp in OPERATOR_SUFFIXES:
         return f"{base}_s{idx}_{comp}"
     return f"{prefix}_s{idx}"
 
@@ -404,7 +407,7 @@ def _template_canonical_form(prefix: str, idx: int) -> str:
     if prefix.startswith("|") and prefix.endswith("|"):
         return f"|{prefix[1:-1]}_s{idx}|"
     base, sep, comp = prefix.partition("_")
-    if sep and (comp[:1].isdigit() or comp in _GENERIC_OPERATOR_SUFFIXES):
+    if sep and (comp[:1].isdigit() or comp in OPERATOR_SUFFIXES):
         return f"{base}_s{idx}_{comp}"
     return f"{prefix}_s{idx}"
 
@@ -616,3 +619,16 @@ def test_registry_func_signatures_match_recipe_metadata() -> None:
         "Recipe/func signature mismatches",
         failures,
     )
+
+
+def test_every_geometry_type_has_component_aliases() -> None:
+    """``_default_aliases`` resolves for every ``GeometryType`` member.
+
+    The suffix table is keyed by geometry name rather than matched
+    exhaustively, so a new geometry must be added here or ``FieldDataset``
+    construction raises ``KeyError`` on it.
+    """
+    missing = sorted(
+        g.value for g in GeometryType if g.value not in _COMPONENT_SUFFIXES
+    )
+    assert not missing, f"no component suffixes for geometry: {missing}"

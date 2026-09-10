@@ -18,6 +18,8 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
+from pypic.traces import VectorFieldInterpolator, sample_fields, trace_field_line
+
 if TYPE_CHECKING:
     from pypic.dataset import FieldDataset
     from pypic.traces._fieldline import TraceDirection
@@ -265,12 +267,6 @@ def schindler_xi(
     >>> bool(xi[0] > 0 and np.isfinite(xi[0]))
     True
     """
-    from pypic.traces import (
-        VectorFieldInterpolator,
-        sample_fields,
-        trace_field_line,
-    )
-
     seeds_arr = np.asarray(seeds, dtype=np.float64)
     if seeds_arr.ndim == 1:
         seeds_arr = seeds_arr[np.newaxis, :]

@@ -43,12 +43,13 @@ from pypic.diagnostics import (
     l2_relative_error,
     linf_error,
 )
+from pypic.dataset import FieldDataset
 from pypic.regrid import align_grids
+from pypic.units import Normalization
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
-    from pypic.dataset import FieldDataset
     from pypic.grid import GridInfo
     from pypic.types import FloatArray
 
@@ -551,15 +552,12 @@ def field_difference_dataset(
         vb = _extract_values(b_aligned, name, units)
         diff_fields[name] = field_difference(va, vb)
 
-    from pypic.dataset import FieldDataset as _FieldDataset
-    from pypic.units import Normalization
-
     # With units="si" the stored arrays are already SI, so the result needs
     # an identity normalization — otherwise ``in_si()`` would re-apply the
     # factor and silently double-convert.
     result_norm = Normalization.identity() if units == "si" else a_aligned.normalization
 
-    return _FieldDataset.from_arrays(
+    return FieldDataset.from_arrays(
         diff_fields,
         a_aligned.grid,
         result_norm,

@@ -1,4 +1,10 @@
-"""FieldDataset: the xarray-backed container every reader returns."""
+"""FieldDataset: the xarray-backed container every reader returns.
+
+``compute`` and ``reductions`` sit above this module in the dependency
+order (``grid ← containers ← dataset ← everything else``), so the methods
+that delegate to them import inside the method body. Every other import
+is at module scope.
+"""
 
 from __future__ import annotations
 
@@ -14,23 +20,29 @@ from pypic.coordinates.geometry import (
     CYLINDRICAL,  # noqa: F401 — used in doctests
     SPHERICAL,  # noqa: F401 — used in doctests
 )
-from pypic.coordinates.transforms import FrameTransform
-from pypic.exceptions import GeometryUnsupportedError, UnknownFieldError
-from pypic.grid import (
-    GridInfo,
-    _build_grid_from_dataset,
-    _default_aliases,
+from pypic._aliases import _default_aliases, species_name_aliases
+from pypic.coordinates.transforms import (
+    FrameTransform,
+    find_pressure_tensor_groups,
+    find_vector_triplets,
+    resolve_transform,
+    rotate_pressure_tensor,
+    rotate_vector_components,
 )
-from pypic.units import PhysicsParams
+from pypic.exceptions import GeometryUnsupportedError, UnknownFieldError
+from pypic.fields import _QUANTITY_UNITS, FieldInfo, quantity_dimension
+from pypic.fields import field_info as _field_info
+from pypic.grid import GridInfo, _build_grid_from_dataset
+from pypic.units import Normalization, PhysicsParams
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Mapping, Sequence
 
     from xarray import Dataset
 
-    from pypic.fields import FieldInfo, QuantityType
+    from pypic.fields import QuantityType
     from pypic.types import FloatArray
-    from pypic.units import Normalization, SpeciesInfo
+    from pypic.units import SpeciesInfo
 
 
 class FieldDataset:
@@ -116,10 +128,8 @@ class FieldDataset:
             merged.update(aliases)
         # Generate species-name aliases for every per-species canonical
         # actually in the dataset (n_electrons→n_s0, P_ions→P_s1, etc.).
-        from pypic._aliases import species_name_aliases as _species_name_aliases
-
         merged.update(
-            _species_name_aliases(
+            species_name_aliases(
                 tuple(sp.name for sp in self._species),
                 [str(name) for name in self._ds.data_vars],
             )
@@ -232,9 +242,7 @@ class FieldDataset:
         array([1., 2.])
         """
         if normalization is None:
-            from pypic.units import Normalization as _Norm
-
-            normalization = _Norm.identity()
+            normalization = Normalization.identity()
         dim_names = list(grid.surviving_axis_names)
         coord_arrays = grid.coordinate_arrays()
         axis_coords = dict(zip(dim_names, coord_arrays, strict=True))
@@ -243,9 +251,6 @@ class FieldDataset:
                 msg = f"coords name axes the grid lacks: {unknown}; axes: {dim_names}"
                 raise ValueError(msg)
             axis_coords.update(coords)
-
-        from pypic.fields import field_info as _field_info
-        from pypic.fields import quantity_dimension as _quantity_dimension
 
         data_vars: dict[str, xr.DataArray] = {}
         unresolved: list[str] = []
@@ -259,7 +264,7 @@ class FieldDataset:
                 da.attrs["si_unit"] = info.si_unit
                 if info.latex:
                     da.attrs["latex"] = info.latex
-                ud = info.unit_dimension or _quantity_dimension(info.quantity_type)
+                ud = info.unit_dimension or quantity_dimension(info.quantity_type)
                 da.attrs["unit_dimension"] = list(ud)
             except KeyError:
                 if strict_fields:
@@ -394,14 +399,6 @@ class FieldDataset:
         KeyError
             If *target* is a string and no transforms are registered.
         """
-        from pypic.coordinates.transforms import (
-            find_pressure_tensor_groups,
-            find_vector_triplets,
-            resolve_transform,
-            rotate_pressure_tensor,
-            rotate_vector_components,
-        )
-
         if isinstance(target, FrameTransform):
             transform = target
             target_frame = transform.target_frame
@@ -810,7 +807,7 @@ class FieldDataset:
         >>> ds.compute("|B|")[0, 0, 0]
         np.float64(5.0)
         """
-        from pypic.compute import compute_field
+        from pypic.compute import compute_field  # layered above dataset
 
         return compute_field(name, self)
 
@@ -858,10 +855,6 @@ class FieldDataset:
             If *quantity_type* is not recognized, or is ``None`` and
             the field name is not in the registry.
         """
-        from pypic.fields import _QUANTITY_UNITS
-        from pypic.fields import field_info as _field_info
-        from pypic.fields import quantity_dimension as _quantity_dimension
-
         expected = tuple(self._grid.dimensions)
         if data.shape != expected:
             msg = f"Array shape {data.shape} doesn't match grid dimensions {expected}"
@@ -896,7 +889,7 @@ class FieldDataset:
         da.attrs["units"] = "normalized"
         da.attrs["long_name"] = long_name
         da.attrs["latex"] = latex
-        da.attrs["unit_dimension"] = list(info_ud or _quantity_dimension(qt))
+        da.attrs["unit_dimension"] = list(info_ud or quantity_dimension(qt))
 
         new_ds = self._ds.assign({name: da})
         return FieldDataset(
@@ -952,47 +945,15 @@ class FieldDataset:
         >>> ds["|B|"][0, 0, 0]
         np.float64(5.0)
         """
-        from pypic.compute import (
-            _find_sibling_components,
-            compute_field,
-        )
+        from pypic.compute import compute_with_siblings  # layered above dataset
 
         result = self
         for name in names:
             if result.has_field(name):
                 continue
-
-            # Check for vector-component siblings (e.g. S_1→S_2,S_3)
-            siblings = _find_sibling_components(name)
-            if siblings:
-                # Compute the full vector result once, store all components
-                result = result._attach_vector_siblings(name, siblings)
-            else:
-                data = compute_field(name, result)
-                result = result.with_field(name, data)
-        return result
-
-    def _attach_vector_siblings(
-        self,
-        trigger_name: str,
-        siblings: dict[str, int],
-    ) -> FieldDataset:
-        """Compute a tuple-returning function once, store all components.
-
-        Delegates to the shared ``_execute_recipe`` helper so argument
-        construction, dependency resolution, and the Cartesian-only
-        geometry guard cannot drift from the single-component path in
-        `compute_field`.
-        """
-        from pypic.compute import _execute_recipe, _resolve_name
-
-        canonical = _resolve_name(trigger_name)
-        _recipe, full_result = _execute_recipe(canonical, self)
-
-        result = self
-        for sibling_name, component_index in siblings.items():
-            if not result.has_field(sibling_name):
-                result = result.with_field(sibling_name, full_result[component_index])
+            for field, data in compute_with_siblings(name, result).items():
+                if not result.has_field(field):
+                    result = result.with_field(field, data)
         return result
 
     def field_info(self, name: str) -> FieldInfo:
@@ -1010,15 +971,12 @@ class FieldDataset:
         -------
         FieldInfo
         """
-        from pypic.fields import FieldInfo as _FieldInfo
-        from pypic.fields import field_info as _field_info
-
         if self.has_field(name):
             resolved = self.resolve_key(name)
             attrs = self._ds[resolved].attrs
             qt = attrs.get("quantity_type")
             if qt is not None:
-                return _FieldInfo(
+                return FieldInfo(
                     quantity_type=qt,
                     long_name=attrs.get("long_name", ""),
                     si_unit=attrs.get("si_unit", ""),
@@ -1055,7 +1013,7 @@ class FieldDataset:
         FloatArray
             Values in SI units.
         """
-        from pypic.compute import compute_field, field_si_factor
+        from pypic.compute import compute_field, field_si_factor  # above dataset
 
         length_axes = 0
         if self.has_field(name):
@@ -1104,7 +1062,7 @@ class FieldDataset:
         idiom. See ``_DISPLAY_UNITS`` in ``pypic.compute`` for the
         full vocabulary.
         """
-        from pypic.compute import display_unit_factor
+        from pypic.compute import display_unit_factor  # layered above dataset
 
         return self.in_si(name) / display_unit_factor(unit_str)
 
@@ -1180,6 +1138,6 @@ class FieldDataset:
         FieldDataset
             With *axis* (or every name in the tuple) removed from the grid.
         """
-        from pypic.reductions import reduce as _reduce
+        from pypic.reductions import reduce as _reduce  # layered above dataset
 
         return _reduce(self, axis, **kwargs)

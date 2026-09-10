@@ -104,6 +104,13 @@ The dependency direction is one-way:
 grid ← containers ← dataset ← everything else
 ```
 
+`compute` and `reductions` sit above `dataset`, yet `FieldDataset.compute`,
+`with_derived`, `in_si`, `in_units` and `reduce` delegate to them. Those
+methods import inside the body so the arrow stays one-way; that is the only
+sanctioned function-local import. Everything else imports at module scope,
+and `tests/test_public_api.py` checks that the modules below `dataset` never
+import anything above it.
+
 **Explicit public API.** Every package `__init__.py` re-exports its public names
 and declares `__all__`. Users import from `pypic` or `pypic.coordinates`, never
 from internal modules.

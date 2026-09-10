@@ -37,13 +37,13 @@ import numpy as np
 from scipy.interpolate import RegularGridInterpolator
 
 from pypic.coordinates.geometry import GeometryType
+from pypic.dataset import FieldDataset
 from pypic.exceptions import GeometryUnsupportedError
 from pypic.grid import GridInfo
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
-    from pypic.dataset import FieldDataset
     from pypic.types import FloatArray
 
 __all__ = ["align_grids", "common_grid", "regrid"]
@@ -312,9 +312,7 @@ def regrid(
         for i, name in enumerate(names):
             new_fields[name] = sampled[..., i]
 
-    from pypic.dataset import FieldDataset as _FieldDataset
-
-    return _FieldDataset.from_arrays(
+    return FieldDataset.from_arrays(
         new_fields,
         target_grid,
         source.normalization,

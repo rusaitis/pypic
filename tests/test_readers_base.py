@@ -8,8 +8,9 @@ import xarray as xr
 from numpy.testing import assert_allclose
 
 from pypic import open_simulation
+from pypic._aliases import _default_aliases
 from pypic.coordinates import CARTESIAN, CYLINDRICAL, SPHERICAL
-from pypic.dataset import FieldDataset, _default_aliases
+from pypic.dataset import FieldDataset
 from pypic.grid import GridInfo
 from pypic.readers import ReaderBase
 from pypic.readers._protocols import SimulationReader
@@ -479,6 +480,29 @@ class TestWithDerived:
         assert ds.has_field("S_1")
         assert ds.has_field("S_2")
         assert ds.has_field("S_3")
+
+    def test_synthesized_species_vector_siblings(self):
+        """A per-species component beyond the registry batches its siblings too."""
+        shape = (4, 3, 2)
+        rng = np.random.default_rng(7)
+        fields = {
+            name: rng.standard_normal(shape)
+            for name in ("V_s2_1", "V_s2_2", "V_s2_3", "B_1", "B_2", "B_3")
+        }
+        ds = FieldDataset.from_arrays(
+            fields,
+            GridInfo(dimensions=shape, spacing=(1.0, 1.0, 1.0)),
+            Normalization.identity(),
+            species=[
+                SpeciesInfo("e", charge=-1.0, mass=1.0),
+                SpeciesInfo("p", charge=1.0, mass=100.0),
+                SpeciesInfo("o", charge=1.0, mass=1600.0),
+            ],
+        )
+        ds = ds.with_derived("V_s2_perp_1")
+        assert ds.has_field("V_s2_perp_2")
+        assert ds.has_field("V_s2_perp_3")
+        assert_allclose(ds["V_s2_perp_3"], ds.compute("V_s2_perp_3"), rtol=1e-15)
 
 
 class TestWithFieldAutoFill:

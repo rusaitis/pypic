@@ -1,8 +1,10 @@
 """Alias tables for field names and derived quantities.
 
-Central location for name-resolution data used by both ``compute`` and
-``fields``.  Kept separate to avoid the circular dependency that would
-arise if either module imported the other at top level.
+Every name-resolution table lives here: the geometry component aliases
+(``Bx``, ``B_r`` → ``B_1``), the two-species e/i conveniences, the
+descriptive spellings ``compute`` accepts, and the vector-group shorthand
+``read`` expands. The module imports nothing from pypic, so ``grid``,
+``fields`` and ``compute`` all sit above it.
 
 The public surface (`COMPUTE_ALIASES`, `GROUP_ALIASES`,
 `SPECIES_SUFFIX_RE`, `species_name_aliases`) is re-exported
@@ -18,12 +20,20 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence
 
+    from pypic.coordinates.geometry import CoordinateGeometry
+
 # Matches the canonical ``_s<index>`` qualifier in any Tier-3 position: at
 # the end (``P_s0``), before a component or operator (``V_s0_1``,
 # ``P_s0_par``), before a closing pipe (``|V_s0|``), or before an operator
 # plus pipe (``|V_s0_perp|``).  Captures (species, suffix), where suffix is
 # ``_<x>|``, ``_<x>``, ``|``, or empty.
 SPECIES_SUFFIX_RE = re.compile(r"_s(\d+)(?P<suffix>_[^|]+\||_[^|]+|\|)?$")
+
+# Generic operator suffixes: the species qualifier sits between the field
+# root and the operator (``P_s0_par``, not ``P_par_s0``).  Compound-name
+# descriptors (``_m``, ``_th``, ``_gyro``, ...) stay glued to the root and
+# the species goes at the end (``rho_m_s0``).
+OPERATOR_SUFFIXES: frozenset[str] = frozenset({"par", "perp"})
 
 COMPUTE_ALIASES: dict[str, str] = {
     "curl_Bx": "curl_B_1",
@@ -222,40 +232,81 @@ GROUP_ALIASES: dict[str, str] = {
 }
 
 
-def _build_field_alias_fallback() -> dict[str, str]:
-    """Build a flat field alias lookup for SI conversion fallback.
+# Vector prefixes that get geometry component aliases; the alias spelling
+# may differ from the canonical (``vx`` → ``V_1``).
+_FIELD_PREFIX_PAIRS = (
+    ("B", "B"),
+    ("B0", "B0"),  # split-B background field (BATSRUS)
+    ("E", "E"),
+    ("EF", "EF"),  # per-species energy flux (iPIC3D H5hut)
+    ("J", "J"),
+    ("V", "V"),
+    ("v", "V"),  # lowercase convenience alias
+    ("S", "S"),
+    ("u", "u"),  # four-velocity
+)
 
-    Merges all geometry alias dicts plus species and scalar aliases.
-    This is safe because all B-field components map to the same SI
-    quantity type regardless of which coordinate index they represent.
-    """
-    from pypic.grid import (
-        _CARTESIAN_ALIASES,
-        _CARTESIAN_UNDERSCORE_ALIASES,
-        _CYLINDRICAL_ALIASES,
-        _CYLINDRICAL_UNDERSCORE_ALIASES,
-        _SCALAR_UNDERSCORE_ALIASES,
-        _SPECIES_ALIASES,
-        _SPHERICAL_ALIASES,
-        _SPHERICAL_UNDERSCORE_ALIASES,
-    )
+# Component suffixes per geometry; the numbered canonical is geometry-free.
+_COMPONENT_SUFFIXES: dict[str, tuple[str, str, str]] = {
+    "cartesian": ("x", "y", "z"),
+    "spherical": ("r", "theta", "phi"),
+    "cylindrical": ("r", "phi", "z"),
+}
 
-    merged: dict[str, str] = {}
-    merged.update(_CARTESIAN_ALIASES)
-    merged.update(_SPHERICAL_ALIASES)
-    merged.update(_CYLINDRICAL_ALIASES)
-    merged.update(_CARTESIAN_UNDERSCORE_ALIASES)
-    merged.update(_SPHERICAL_UNDERSCORE_ALIASES)
-    merged.update(_CYLINDRICAL_UNDERSCORE_ALIASES)
-    merged.update(_SCALAR_UNDERSCORE_ALIASES)
-    merged.update(_SPECIES_ALIASES)
-    return merged
+# Scalar underscore spellings (``P_e`` for ``Pe``).  The e/i form carries
+# the electron/ion-specific metadata in ``_FIELD_INFO``; the flip to the
+# universal ``_sN`` canonical happens in ``COMPUTE_ALIASES``.
+_SCALAR_UNDERSCORE_ALIASES: dict[str, str] = {
+    "P_e": "Pe",
+    "P_i": "Pi",
+    "T_e": "Te",
+    "T_i": "Ti",
+}
+
+# Two-species conveniences, storage-equivalent: ``Pe`` and ``P_s0`` name
+# the same array, and the dataset's bidirectional resolver serves recipes
+# asking for either form.
+_SPECIES_ALIASES: dict[str, str] = {
+    "n_e": "n_s0",
+    "n_i": "n_s1",
+    "Pe": "P_s0",
+    "Pi": "P_s1",
+    "Te": "T_s0",
+    "Ti": "T_s1",
+}
+
+
+def _component_aliases(suffixes: tuple[str, str, str]) -> dict[str, str]:
+    """Compact and underscored component aliases (``Bx``, ``B_x`` → ``B_1``)."""
+    return {
+        f"{alias_prefix}{separator}{suffix}": f"{canonical_prefix}_{i}"
+        for separator in ("", "_")
+        for alias_prefix, canonical_prefix in _FIELD_PREFIX_PAIRS
+        for i, suffix in enumerate(suffixes, 1)
+    }
+
+
+def _default_aliases(geometry: CoordinateGeometry) -> dict[str, str]:
+    """Return the geometry's component aliases plus the species conveniences."""
+    aliases = _component_aliases(_COMPONENT_SUFFIXES[geometry.type])
+    aliases.update(_SCALAR_UNDERSCORE_ALIASES)
+    aliases.update(_SPECIES_ALIASES)
+    return aliases
 
 
 @functools.cache
 def _get_field_alias_fallback() -> dict[str, str]:
-    """Return the field alias fallback dict (cached, thread-safe)."""
-    return _build_field_alias_fallback()
+    """Every alias of every geometry, for metadata lookup by alias.
+
+    Safe to merge across geometries: ``B_1`` carries the same quantity
+    type whether it was spelled ``Bx`` or ``Br``.
+    """
+    merged: dict[str, str] = {}
+    for suffixes in _COMPONENT_SUFFIXES.values():
+        merged.update(_component_aliases(suffixes))
+    merged.update(_SCALAR_UNDERSCORE_ALIASES)
+    merged.update(_SPECIES_ALIASES)
+    return merged
 
 
 def species_name_aliases(

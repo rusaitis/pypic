@@ -1,10 +1,10 @@
-"""Grid metadata and geometry-aware field name aliases."""
+"""GridInfo: the structured-grid metadata every FieldDataset carries."""
 
 from __future__ import annotations
 
 import copy
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, assert_never
+from typing import TYPE_CHECKING
 
 import numpy as np
 
@@ -13,7 +13,6 @@ from pypic.coordinates.geometry import (
     CYLINDRICAL,  # noqa: F401 — used in doctests
     SPHERICAL,  # noqa: F401 — used in doctests
     CoordinateGeometry,
-    GeometryType,
 )
 
 if TYPE_CHECKING:
@@ -143,105 +142,6 @@ class GridInfo:
             self.origin[i] + (np.arange(self.dimensions[i]) + 0.5) * self.spacing[i]
             for i in range(len(self.dimensions))
         )
-
-
-_FIELD_PREFIX_PAIRS = (
-    ("B", "B"),
-    ("B0", "B0"),  # split-B background field (BATSRUS)
-    ("E", "E"),
-    ("EF", "EF"),  # per-species energy flux (iPIC3D H5hut)
-    ("J", "J"),
-    ("V", "V"),
-    ("v", "V"),  # lowercase convenience alias
-    ("S", "S"),
-    ("u", "u"),  # four-velocity
-)
-
-
-def _build_aliases(
-    suffixes: tuple[str, str, str], *, separator: str = ""
-) -> dict[str, str]:
-    """Generate field name aliases for a coordinate system.
-
-    The canonical RHS is always the Tier-3 form ``<prefix>_<component>``
-    (`B_1`, `V_2`, `B0_1`). The alias LHS uses *separator* between
-    prefix and coordinate suffix: ``""`` produces the compact form
-    ``Bx`` and ``"_"`` produces the underscored form ``B_x``; both
-    are user-facing convenience aliases for the same canonical.
-
-    Parameters
-    ----------
-    suffixes : tuple[str, str, str]
-        Coordinate suffixes (e.g. ``("x", "y", "z")``).
-    separator : str
-        Separator between alias prefix and suffix.
-    """
-    aliases: dict[str, str] = {}
-    for alias_prefix, canonical_prefix in _FIELD_PREFIX_PAIRS:
-        for i, suffix in enumerate(suffixes, 1):
-            aliases[f"{alias_prefix}{separator}{suffix}"] = f"{canonical_prefix}_{i}"
-    return aliases
-
-
-# Short-form geometry aliases (``Bx → B_1``, ``Br → B_1``).
-_CARTESIAN_ALIASES = _build_aliases(("x", "y", "z"))
-_SPHERICAL_ALIASES = _build_aliases(("r", "theta", "phi"))
-_CYLINDRICAL_ALIASES = _build_aliases(("r", "phi", "z"))
-
-# Underscored geometry aliases (``B_x → B_1``, ``B_r → B_1``).
-_CARTESIAN_UNDERSCORE_ALIASES = _build_aliases(("x", "y", "z"), separator="_")
-_SPHERICAL_UNDERSCORE_ALIASES = _build_aliases(("r", "theta", "phi"), separator="_")
-_CYLINDRICAL_UNDERSCORE_ALIASES = _build_aliases(("r", "phi", "z"), separator="_")
-
-# Scalar underscore aliases (``P_e`` for ``Pe``).  The e/i form carries the
-# electron/ion-specific metadata in ``_FIELD_INFO``, while the flip to
-# universal canonicals lives at the compute layer (``COMPUTE_ALIASES``);
-# these entries keep the underscore spellings working for both.
-_SCALAR_UNDERSCORE_ALIASES: dict[str, str] = {
-    "P_e": "Pe",
-    "P_i": "Pi",
-    "T_e": "Te",
-    "T_i": "Ti",
-    "P_11": "P_11",
-    "P_12": "P_12",
-    "P_13": "P_13",
-    "P_22": "P_22",
-    "P_23": "P_23",
-    "P_33": "P_33",
-}
-
-# Species-convenience aliases (geometry-independent).
-# Storage-equivalent: same data under two names.  ``Pe`` and ``P_s0`` (etc.)
-# refer to the same array — readers that emit one form (e.g. iPIC3D writes
-# ``Pe``/``Pi``) satisfy recipes that ask for the other via the dataset's
-# bidirectional resolver.
-_SPECIES_ALIASES: dict[str, str] = {
-    "n_e": "n_s0",
-    "n_i": "n_s1",
-    "Pe": "P_s0",
-    "Pi": "P_s1",
-    "Te": "T_s0",
-    "Ti": "T_s1",
-}
-
-
-def _default_aliases(geometry: CoordinateGeometry) -> dict[str, str]:
-    """Return geometry-specific field name aliases plus species aliases."""
-    match geometry.type:
-        case GeometryType.CARTESIAN:
-            aliases = dict(_CARTESIAN_ALIASES)
-            aliases.update(_CARTESIAN_UNDERSCORE_ALIASES)
-        case GeometryType.SPHERICAL:
-            aliases = dict(_SPHERICAL_ALIASES)
-            aliases.update(_SPHERICAL_UNDERSCORE_ALIASES)
-        case GeometryType.CYLINDRICAL:
-            aliases = dict(_CYLINDRICAL_ALIASES)
-            aliases.update(_CYLINDRICAL_UNDERSCORE_ALIASES)
-        case _ as unreachable:
-            assert_never(unreachable)
-    aliases.update(_SCALAR_UNDERSCORE_ALIASES)
-    aliases.update(_SPECIES_ALIASES)
-    return aliases
 
 
 def _build_grid_from_dataset(old_grid: GridInfo, new_ds: Dataset) -> GridInfo:

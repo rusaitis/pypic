@@ -26,6 +26,10 @@ The distribution is `pypic-plasma` on PyPI; the import name is `pypic`.
   like every other reader's.
 - OpenGGCM lists fields from the ``.3df`` record headers without decoding
   any WRN2 payload, so `pypic fields` no longer reads the whole file.
+- `pypic.compute_with_siblings(name, dataset)`: one call evaluates a
+  vector recipe and returns every component. `FieldDataset.with_derived`
+  uses it, and per-species components synthesized from the templates
+  (`V_s2_perp_1`, `KEF_s3_2`, ...) now batch like registered ones.
 
 ### Fixed
 
@@ -89,6 +93,16 @@ The distribution is `pypic-plasma` on PyPI; the import name is `pypic`.
   to look for ``fields/`` and ``grid/`` groups.
 - Built-in readers register in `pypic.readers.__init__`, in one place, rather
   than each subpackage registering itself at import time.
+- Every alias table lives in one module, `pypic._aliases`, which imports
+  nothing from pypic; `pypic.grid` is only `GridInfo` now. The species
+  qualifier regex and the operator-suffix vocabulary (`par`, `perp`) are
+  defined once and shared by `fields` and `compute`. The identity entries
+  (``P_11 → P_11``) and the `Ve_s{N}_{i}` metadata pattern, which named an
+  electron velocity of an arbitrary species, are gone.
+- `dataset`, `comparison`, `regrid` and `reconnection` import at module scope
+  what they used to import inside functions; only the calls from
+  `FieldDataset` up into `compute` and `reductions` stay deferred, and
+  `docs/architecture.md` now states that rule.
 
 ### Removed
 

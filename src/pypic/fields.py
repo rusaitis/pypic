@@ -15,7 +15,7 @@ import threading
 from dataclasses import dataclass
 from enum import StrEnum
 
-from pypic._aliases import COMPUTE_ALIASES, _get_field_alias_fallback
+from pypic._aliases import COMPUTE_ALIASES, OPERATOR_SUFFIXES, _get_field_alias_fallback
 from pypic.exceptions import UnknownFieldError
 
 log = logging.getLogger(__name__)
@@ -792,12 +792,6 @@ _SPECIES_PATTERN_SPECS: list[tuple[str, str, str, str]] = [
         r"$V_{{{C},s{N}}}$",
     ),
     (
-        "Ve([123])",
-        "velocity",
-        "Electron velocity component {C} (species {N})",
-        r"$V_{{e,{C},s{N}}}$",
-    ),
-    (
         "EF([123])",
         "energy_flux",
         "Energy flux component {C} (species {N})",
@@ -923,14 +917,6 @@ _SPECIES_PATTERN_SPECS: list[tuple[str, str, str, str]] = [
     ),
 ]
 
-# Generic operator suffixes — when a pattern prefix ends in one of these,
-# the species qualifier sits between the field root and the operator
-# (``P_s0_par``, not ``P_par_s0``). Compound-name descriptors like
-# ``_m``/``_c``/``_th``/``_int``/``_gyro``/``_trace`` stay glued to the
-# parent field and species goes at the end (``rho_m_s0``, ``s_gyro_s0``).
-_GENERIC_OPERATOR_SUFFIXES: frozenset[str] = frozenset({"par", "perp"})
-
-
 def _build_species_info_pattern(prefix: str) -> re.Pattern[str]:
     r"""Translate a Tier-3 prefix entry into its full species-name regex.
 
@@ -958,7 +944,7 @@ def _build_species_info_pattern(prefix: str) -> re.Pattern[str]:
         # ``^V_s(\d+)_perp_([123])$``.
         if "_" in base:
             root, _, op = base.rstrip("_").rpartition("_")
-            if op in _GENERIC_OPERATOR_SUFFIXES:
+            if op in OPERATOR_SUFFIXES:
                 return re.compile(rf"^{root}_s(\d+)_{op}_([123])$")
         return re.compile(rf"^{base}_s(\d+)_([123])$")
     if r"P(\d{0,2})" in prefix:
@@ -969,12 +955,12 @@ def _build_species_info_pattern(prefix: str) -> re.Pattern[str]:
         # ``\|V_perp\|`` → ``^\|V_s(\d+)_perp\|$``.
         if "_" in inner:
             root, _, op = inner.rpartition("_")
-            if op in _GENERIC_OPERATOR_SUFFIXES:
+            if op in OPERATOR_SUFFIXES:
                 return re.compile(rf"^\|{root}_s(\d+)_{op}\|$")
         return re.compile(rf"^\|{inner}_s(\d+)\|$")
     if "_" in prefix:
         root, _, suffix = prefix.rpartition("_")
-        if suffix in _GENERIC_OPERATOR_SUFFIXES:
+        if suffix in OPERATOR_SUFFIXES:
             return re.compile(rf"^{root}_s(\d+)_{suffix}$")
     return re.compile(rf"^{prefix}_s(\d+)$")
 

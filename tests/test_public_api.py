@@ -7,7 +7,9 @@ a contract break — bump the schema major before changing the behavior.
 
 from __future__ import annotations
 
+import ast
 import types
+from pathlib import Path
 
 import pytest
 
@@ -209,3 +211,69 @@ def test_physics_modules_are_fully_re_exported() -> None:
         f"public names not re-exported from pypic: {missing}. Add them to "
         f"pypic/__init__.py, or drop them from the module's __all__."
     )
+
+
+# Modules below ``dataset`` in the dependency order (docs/architecture.md
+# § Module layout). They may import each other, never anything above.
+_BELOW_DATASET = [
+    "_aliases",
+    "containers",
+    "coordinates/geometry",
+    "coordinates/operators",
+    "coordinates/transforms",
+    "exceptions",
+    "fields",
+    "grid",
+    "types",
+    "units",
+]
+_ABOVE_DATASET = (
+    "pypic.dataset",
+    "pypic.compute",
+    "pypic.reductions",
+    "pypic.regrid",
+    "pypic.comparison",
+    "pypic.selections",
+    "pypic.readers",
+    "pypic.io",
+    "pypic.plotting",
+    "pypic.server",
+    "pypic.cli",
+)
+
+
+def _runtime_pypic_imports(source: str) -> list[str]:
+    """Every ``pypic.*`` module imported outside ``if TYPE_CHECKING:``."""
+    tree = ast.parse(source)
+    guarded: set[int] = set()
+    for node in ast.walk(tree):
+        if (
+            isinstance(node, ast.If)
+            and isinstance(node.test, ast.Name)
+            and node.test.id == "TYPE_CHECKING"
+        ):
+            guarded.update(range(node.lineno, node.end_lineno + 1))
+    found: list[str] = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Import | ast.ImportFrom) or node.lineno in guarded:
+            continue
+        if isinstance(node, ast.ImportFrom):
+            found.append(node.module or "")
+        else:
+            found.extend(alias.name for alias in node.names)
+    return [m for m in found if m == "pypic" or m.startswith("pypic.")]
+
+
+def test_modules_below_dataset_never_import_above_it() -> None:
+    """The arrow ``grid ← containers ← dataset ← everything else`` is one-way.
+
+    Function-local imports count: a lazy ``from pypic.dataset import`` in
+    ``grid`` is still a dependency pointing the wrong way.
+    """
+    src = Path(pypic.__file__).parent
+    offenders: list[str] = []
+    for module in _BELOW_DATASET:
+        for imported in _runtime_pypic_imports((src / f"{module}.py").read_text()):
+            if imported == "pypic" or imported.startswith(_ABOVE_DATASET):
+                offenders.append(f"{module}.py imports {imported}")
+    assert not offenders, "imports pointing above dataset: " + ", ".join(offenders)

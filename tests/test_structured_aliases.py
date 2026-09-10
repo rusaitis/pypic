@@ -3,12 +3,12 @@
 import numpy as np
 import pytest
 
+from pypic._aliases import _default_aliases
 from pypic.compute import (
     COMPUTE_ALIASES,
     compute_field,
     field_si_factor,
 )
-from pypic.dataset import _default_aliases
 from pypic.units import Normalization, SpeciesInfo
 from tests._helpers import ELECTRONS, IONS, make_test_dataset
 
@@ -722,7 +722,7 @@ class TestAuditSIFactorGaps:
 
 
 class TestAuditFieldPrefixAliases:
-    """EF and B0 Cartesian aliases via _FIELD_PREFIX_PAIRS."""
+    """EF and B0 Cartesian aliases via ``_aliases._FIELD_PREFIX_PAIRS``."""
 
     def test_efx_alias_resolves(self):
         shape = (2, 2, 2)

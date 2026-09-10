@@ -9,7 +9,6 @@ this module via deferred imports.
 from __future__ import annotations
 
 import difflib
-import re
 import threading
 from dataclasses import dataclass
 from enum import StrEnum
@@ -22,12 +21,20 @@ from pypic import derived, diagnostics
 from pypic._aliases import (
     COMPUTE_ALIASES,
     GROUP_ALIASES,
+    OPERATOR_SUFFIXES,
+    SPECIES_SUFFIX_RE,
     _get_field_alias_fallback,
 )
 from pypic.coordinates import operators
 from pypic.coordinates.geometry import GeometryType
 from pypic.exceptions import GeometryUnsupportedError, UnknownFieldError
-from pypic.fields import _FIELD_INFO, _SPECIES_QUANTITY_PATTERNS, QuantityType
+from pypic.fields import (
+    _FIELD_INFO,
+    _SPECIES_QUANTITY_PATTERNS,
+    QuantityType,
+    register_field,
+    unregister_field,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -651,42 +658,40 @@ _SPECIES_TEMPLATES: dict[str, SpeciesTemplate] = {
     ),
 }
 
-# Match the species qualifier ``_s<N>`` in any of its four positions: at
-# the end (``P_s0``), before a component or operator suffix (``V_s0_1``,
-# ``P_s0_par``), before a closing pipe (``|V_s0|``), or before an operator
-# plus pipe (``|V_s0_perp|``).  The template key is ``<prefix><suffix>``:
-# ``V_s0_1`` → ``"V_1"``, ``|V_s0_perp|`` → ``"|V_perp|"``.  The
-# ``_[^|]+\|`` alternative comes first so the operator-plus-pipe form wins
-# when both could match.
-_SPECIES_SUFFIX_RE = re.compile(
-    r"^(?P<prefix>.+?)_s(?P<idx>\d+)(?P<suffix>_[^|]+\||_[^|]+|\|)?$"
-)
+# Legacy shapes that put the operator before the species (``P_par_s0``,
+# ``|V|_s0``) invert the Tier-3 order and must not synthesize.
+_INVALID_PREFIX_ENDINGS = (*(f"_{op}" for op in OPERATOR_SUFFIXES), "|")
 
-# Generic operator suffixes sit *after* the species qualifier in Tier-3
-# names (``P_s0_par``, not ``P_par_s0``).  When the regex puts one in the
-# prefix, reject the match so the legacy form raises ``KeyError``.
-_INVALID_PREFIX_OPERATOR_ENDINGS: tuple[str, ...] = ("_par", "_perp", "|")
+
+def _split_species_name(name: str) -> tuple[str, int, str] | None:
+    """Split ``V_s2_perp_1`` into ``("V", 2, "_perp_1")``.
+
+    The template key is ``prefix + suffix`` (``"V_perp_1"``). Returns
+    ``None`` when *name* carries no species qualifier or puts a generic
+    operator before it.
+    """
+    m = SPECIES_SUFFIX_RE.search(name)
+    if m is None:
+        return None
+    prefix, suffix = name[: m.start()], m.group("suffix") or ""
+    if not suffix and prefix.endswith(_INVALID_PREFIX_ENDINGS):
+        return None
+    return prefix, int(m.group(1)), suffix
 
 
 def _try_species_recipe(name: str) -> Recipe | None:
-    """Try to build a recipe from species templates for names like ``omega_p_s2``.
+    """Build a recipe from the species templates for names like ``omega_p_s2``.
 
     Returns ``None`` if the name doesn't match any template.
     """
-    m = _SPECIES_SUFFIX_RE.match(name)
-    if m is None:
+    parts = _split_species_name(name)
+    if parts is None:
         return None
-    raw_prefix = m.group("prefix")
-    raw_suffix = m.group("suffix") or ""
-    # Reject matches whose prefix ends in a generic operator and whose
-    # suffix is empty — the legacy ``P_par_s0`` / ``|V|_s0`` shape, which
-    # inverts the Tier-3 order.
-    if not raw_suffix and raw_prefix.endswith(_INVALID_PREFIX_OPERATOR_ENDINGS):
-        return None
-    template = _SPECIES_TEMPLATES.get(raw_prefix + raw_suffix)
+    prefix, species_index, suffix = parts
+    template = _SPECIES_TEMPLATES.get(prefix + suffix)
     if template is None:
         return None
-    return _species_recipe(template, int(m.group("idx")))
+    return _species_recipe(template, species_index)
 
 
 def _species_recipe(template: SpeciesTemplate, species_index: int) -> Recipe:
@@ -885,8 +890,8 @@ def _execute_recipe(
     component should index into the result via ``recipe.component``.
 
     Shared between `compute_field` (single-component path) and
-    `FieldDataset._attach_vector_siblings` (multi-component path)
-    so the two cannot drift on argument construction or geometry handling.
+    `compute_with_siblings` (multi-component path) so the two cannot
+    drift on argument construction or geometry handling.
     Dependency resolution recurses through ``compute_field`` to benefit
     from its alias handling and cycle guard.
     """
@@ -1127,11 +1132,12 @@ _recipe_lock = threading.Lock()
 
 
 def _find_sibling_components(name: str) -> dict[str, int]:
-    r"""Find all recipes sharing the same func/fields as *name*.
+    r"""Find every component recipe sharing *name*'s function and inputs.
 
-    Returns a ``{name: component_index}`` dict for component-based
-    recipes (e.g. ``S_1/S_2/S_3``, ``curl_B_1/2/3``). Returns an empty
-    dict if *name* has no ``component``.
+    Returns ``{name: component_index}`` for component recipes
+    (``S_1/S_2/S_3``, ``curl_B_1/2/3``, ``V_s2_perp_1/2/3``) and an empty
+    dict otherwise. Registered recipes find their siblings in the
+    registry; synthesized per-species ones among the templates.
     """
     canonical = _resolve_name(name)
     try:
@@ -1140,15 +1146,54 @@ def _find_sibling_components(name: str) -> dict[str, int]:
         return {}
     if recipe.component is None:
         return {}
-    siblings: dict[str, int] = {}
-    for reg_name, reg_recipe in _REGISTRY.items():
-        if (
-            reg_recipe.func is recipe.func
+    if canonical in _REGISTRY:
+        return {
+            reg_name: reg_recipe.component
+            for reg_name, reg_recipe in _REGISTRY.items()
+            if reg_recipe.func is recipe.func
             and reg_recipe.fields == recipe.fields
             and reg_recipe.component is not None
-        ):
-            siblings[reg_name] = reg_recipe.component
-    return siblings
+        }
+    parts = _split_species_name(canonical)
+    if parts is None:
+        return {}
+    prefix, species_index, suffix = parts
+    template = _SPECIES_TEMPLATES[prefix + suffix]
+    return {
+        f"{prefix}_s{species_index}{key.removeprefix(prefix)}": sibling.component
+        for key, sibling in _SPECIES_TEMPLATES.items()
+        if key.startswith(prefix)
+        and sibling.func is template.func
+        and sibling.field_pattern == template.field_pattern
+        and sibling.component is not None
+    }
+
+
+def compute_with_siblings(name: str, dataset: FieldDataset) -> dict[str, FloatArray]:
+    r"""Compute *name* and, for a vector component, its siblings in one call.
+
+    Component recipes (``S_1``, ``curl_B_2``, ``V_s2_perp_3``) share one
+    tuple-returning function, so evaluating it once yields every
+    component. Scalar recipes return a single entry keyed by *name*.
+
+    Parameters
+    ----------
+    name : str
+        Field or derived quantity name (canonical or alias).
+    dataset : FieldDataset
+        Source of the dependency fields.
+
+    Returns
+    -------
+    dict[str, FloatArray]
+        One entry for a scalar recipe; one per component, keyed by the
+        registry names, for a vector recipe.
+    """
+    siblings = _find_sibling_components(name)
+    if not siblings:
+        return {name: compute_field(name, dataset)}
+    _recipe, full_result = _execute_recipe(_resolve_name(name), dataset)
+    return {sibling: full_result[index] for sibling, index in siblings.items()}
 
 
 def register_recipe(
@@ -1212,8 +1257,6 @@ def register_recipe(
     True
     >>> unregister_recipe("e_mag_ratio")
     """
-    from pypic.fields import register_field as _register_field
-
     recipe = Recipe(
         func=func,
         fields=fields,
@@ -1228,7 +1271,7 @@ def register_recipe(
         _REGISTRY[name] = recipe
 
     try:
-        _register_field(name, quantity_type, long_name=long_name, latex=latex)
+        register_field(name, quantity_type, long_name=long_name, latex=latex)
     except Exception:
         with _recipe_lock:
             _REGISTRY.pop(name, None)
@@ -1245,8 +1288,6 @@ def unregister_recipe(name: str) -> None:
     KeyError
         If *name* is not registered.
     """
-    from pypic.fields import unregister_field as _unregister_field
-
     with _recipe_lock:
         try:
             recipe = _REGISTRY.pop(name)
@@ -1255,7 +1296,7 @@ def unregister_recipe(name: str) -> None:
             raise KeyError(msg) from None
 
     try:
-        _unregister_field(name)
+        unregister_field(name)
     except Exception:
         with _recipe_lock:
             _REGISTRY[name] = recipe
@@ -1279,6 +1320,7 @@ __all__ = [
     "SpeciesTemplate",
     "available_quantities",
     "compute_field",
+    "compute_with_siblings",
     "display_unit_factor",
     "field_dependencies",
     "field_si_factor",
