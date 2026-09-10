@@ -164,6 +164,7 @@ class FieldDataset:
         aliases: dict[str, str] | None = None,
         frame: str = "simulation",
         transforms: dict[str, FrameTransform] | None = None,
+        coords: Mapping[str, FloatArray] | None = None,
         strict_fields: bool = True,
     ) -> FieldDataset:
         r"""Build a FieldDataset from a dict of NumPy arrays.
@@ -193,6 +194,11 @@ class FieldDataset:
         transforms : dict[str, FrameTransform] | None
             Frame transforms reachable from *frame*, keyed by
             target-frame name.  Consumed by `transform_to`.
+        coords : Mapping[str, FloatArray] | None
+            Coordinate arrays keyed by axis name, replacing the uniform
+            ones derived from *grid* on those axes.  For non-uniform
+            meshes whose ``GridInfo`` spacing is only a mean; the true
+            positions then live in the xarray coordinates.
         strict_fields : bool
             When ``True`` (default), every key in *fields* must resolve
             through ``pypic.fields.field_info`` — any unknown name
@@ -214,6 +220,8 @@ class FieldDataset:
             construction time instead of later at ``compute()``.  Subclass of
             `KeyError`, so existing ``except KeyError`` callers
             keep working unchanged.
+        ValueError
+            When *coords* names an axis the grid does not have.
 
         Examples
         --------
@@ -229,7 +237,12 @@ class FieldDataset:
             normalization = _Norm.identity()
         dim_names = list(grid.surviving_axis_names)
         coord_arrays = grid.coordinate_arrays()
-        coords = {dim_names[i]: coord_arrays[i] for i in range(len(dim_names))}
+        axis_coords = dict(zip(dim_names, coord_arrays, strict=True))
+        if coords:
+            if unknown := sorted(set(coords) - set(dim_names)):
+                msg = f"coords name axes the grid lacks: {unknown}; axes: {dim_names}"
+                raise ValueError(msg)
+            axis_coords.update(coords)
 
         from pypic.fields import field_info as _field_info
         from pypic.fields import quantity_dimension as _quantity_dimension
@@ -260,7 +273,7 @@ class FieldDataset:
                 "to register an ad-hoc quantity_type."
             )
             raise UnknownFieldError(msg)
-        dataset = xr.Dataset(data_vars, coords=coords)
+        dataset = xr.Dataset(data_vars, coords=axis_coords)
         return cls(
             dataset,
             grid,
@@ -297,6 +310,32 @@ class FieldDataset:
     def metadata(self) -> MappingProxyType[str, Any]:
         """Arbitrary metadata (read-only view)."""
         return MappingProxyType(self._metadata)
+
+    @property
+    def time(self) -> float | None:
+        """Snapshot time in code units, or ``None`` when unknown.
+
+        ``metadata["time"]`` when the reader recorded one, otherwise
+        ``metadata["step"] * grid.dt`` when both are known.
+
+        Examples
+        --------
+        >>> import numpy as np
+        >>> grid = GridInfo(dimensions=(2,), spacing=(1.0,), dt=0.5)
+        >>> FieldDataset.from_arrays(
+        ...     {"B_1": np.zeros(2)}, grid, metadata={"step": 4}
+        ... ).time
+        2.0
+        >>> FieldDataset.from_arrays({"B_1": np.zeros(2)}, grid).time is None
+        True
+        """
+        time = self._metadata.get("time")
+        if time is not None:
+            return float(time)
+        step = self._metadata.get("step")
+        if step is None or self._grid.dt is None:
+            return None
+        return float(step) * self._grid.dt
 
     @property
     def aliases(self) -> MappingProxyType[str, str]:

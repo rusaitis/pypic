@@ -122,9 +122,3 @@ def _detect_prefix(path: Path) -> str:
             return m.group(1)
     msg = f"No *.3df.* files found in {path}"
     raise FileNotFoundError(msg)
-
-
-# Self-register with the reader registry
-from pypic.readers._registry import register_reader as _register_reader  # noqa: E402
-
-_register_reader("openggcm", can_read_confidence, open_openggcm)

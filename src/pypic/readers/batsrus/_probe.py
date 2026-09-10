@@ -2,15 +2,13 @@
 
 from __future__ import annotations
 
-import re
 from typing import TYPE_CHECKING
 
 from pypic.readers._protocols import score_signals
+from pypic.readers.batsrus._header import TIMESTAMP_RE
 
 if TYPE_CHECKING:
     from pathlib import Path
-
-_BATSRUS_H_RE = re.compile(r"_[tn]\d{8}")
 
 # Pure-glob signals handled by the shared helper.
 _CORE_SIGNALS: list[tuple[str, float]] = [
@@ -48,7 +46,7 @@ def can_read_confidence(path: Path) -> float:
 
     # Filter .h files by BATSRUS timestamp pattern to avoid C header
     # false positives (reader.h, config.h, ...).
-    if any(_BATSRUS_H_RE.search(f.name) for f in path.glob("*.h")):
+    if any(TIMESTAMP_RE.search(f.name) for f in path.glob("*.h")):
         score += 0.3
 
     # Merged .out / .outs fall back only if nothing else matched, and

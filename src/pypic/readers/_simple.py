@@ -31,27 +31,29 @@ When they don't, pass ``config`` explicitly.
 
 from __future__ import annotations
 
+import copy
 import logging
 import pathlib
 import re
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, cast
 
 import h5py
 import numpy as np
 
-from pypic.containers import SimulationConfig, TabularData
+from pypic.containers import SimulationConfig
 from pypic.coordinates.geometry import CARTESIAN, GEOMETRY_BY_NAME
-from pypic.dataset import FieldDataset
 from pypic.grid import GridInfo
+from pypic.readers._base import ReaderBase
+from pypic.readers._protocols import score_signals
 from pypic.units import Normalization
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
     from pathlib import Path
 
+    from pypic.dataset import FieldDataset
     from pypic.readers._registry import Simulation
     from pypic.types import FloatArray, ModelType
-    from pypic.units import SpeciesInfo
 
 _VALID_MODEL_TYPES: frozenset[str] = frozenset(
     ("PIC", "MHD", "hybrid", "vlasov", "gyrokinetic")
@@ -152,7 +154,7 @@ def _read_model_attrs(
     return str(model), cast("ModelType", model_type_str)
 
 
-class SimpleReader:
+class SimpleReader(ReaderBase):
     r"""Minimal HDF5 reader implementing the ``SimulationReader`` protocol.
 
     Reads HDF5 files where field arrays live under a configurable group
@@ -206,11 +208,23 @@ class SimpleReader:
         config: SimulationConfig | None = None,
         fields_group: str = "fields",
     ) -> None:
+        if config is not None:
+            config = copy.replace(
+                config,
+                grid=grid or config.grid,
+                normalization=normalization or config.normalization,
+            )
+        elif grid is not None:
+            config = SimulationConfig(
+                model_name="unknown",
+                model_type="PIC",
+                grid=grid,
+                normalization=normalization or Normalization.identity(),
+            )
+        super().__init__(config)
         self._file_pattern = file_pattern
         self._field_map = dict(field_map) if field_map else None
-        self._grid = grid
         self._normalization = normalization
-        self._config = config
         self._fields_group = fields_group
         self._glob, self._regex = _parse_file_pattern(file_pattern)
 
@@ -273,23 +287,6 @@ class SimpleReader:
             return {fm.get(n, n): n for n in native_names}
         return {n: n for n in native_names}
 
-    def available_fields(self, path: Path, step: int) -> list[str]:
-        """List canonical field names at *step* without loading arrays.
-
-        Parameters
-        ----------
-        path : Path
-            Directory containing the data files.
-        step : int
-            Timestep index.
-
-        Returns
-        -------
-        list[str]
-            Sorted canonical field names.
-        """
-        return sorted(self.available_fields_mapping(path, step))
-
     def read_timestep(
         self,
         path: Path,
@@ -329,52 +326,20 @@ class SimpleReader:
             raise FileNotFoundError(msg)
 
         canonical_set = set(fields) if fields is not None else None
-
         raw = self._read_raw(filepath, fields=canonical_set)
         field_data = self._apply_field_map(raw)
 
         if is_custom:
             if canonical_set is not None:
                 field_data = {k: v for k, v in field_data.items() if k in canonical_set}
-            grid = self._grid
-            if grid is None and self._config is not None:
-                grid = self._config.grid
-            if grid is None:
-                msg = (
-                    "Custom _read_raw requires grid metadata. "
-                    "Pass grid=GridInfo(...) or "
-                    "config=SimulationConfig(...)."
-                )
-                raise ValueError(msg)
-            normalization = (
-                self._normalization
-                or (self._config.normalization if self._config else None)
-                or Normalization.identity()
+            return self._finish(
+                field_data, step=step, config=self._resolve_config(None, filepath)
             )
-            metadata: dict[str, Any] = {"step": step}
-        else:
-            with h5py.File(filepath, "r") as f:
-                grid = self._resolve_grid(f, filepath)
-                normalization = self._resolve_normalization(f)
-                metadata = self._read_metadata(f, step)
 
-        from pypic.units import PhysicsParams
-
-        physics: PhysicsParams = PhysicsParams()
-        species: tuple[SpeciesInfo, ...] = ()
-        if self._config is not None:
-            physics = self._config.physics
-            species = self._config.species
-
-        return FieldDataset.from_arrays(
-            field_data,
-            grid,
-            normalization,
-            species=species,
-            physics=physics,
-            metadata=metadata,
-            strict_fields=False,
-        )
+        with h5py.File(filepath, "r") as f:
+            config = self._resolve_config(_read_grid_attrs(f), filepath)
+            file_step, time = self._snapshot(f, step)
+        return self._finish(field_data, step=file_step, time=time, config=config)
 
     def _read_raw(
         self,
@@ -519,92 +484,54 @@ class SimpleReader:
             result[name] = np.asarray(ds, dtype=np.float64)
         return result
 
-    def _resolve_grid(
-        self,
-        f: h5py.File,
-        filename: Path,
-    ) -> GridInfo:
-        """Get grid: HDF5 attrs > explicit grid > config.grid."""
-        hdf5_grid = _read_grid_attrs(f)
-        if hdf5_grid is not None:
-            return hdf5_grid
-        if self._grid is not None:
-            return self._grid
-        if self._config is not None:
-            return self._config.grid
-        msg = (
-            f"No grid/ metadata in {filename.name} and no grid "
-            f"or config provided. Pass grid=GridInfo(...) or "
-            f"config=SimulationConfig(...)."
-        )
-        raise ValueError(msg)
+    def _resolve_config(
+        self, file_grid: GridInfo | None, filename: Path
+    ) -> SimulationConfig:
+        """Resolve the config for one file: its ``grid/`` attributes win over ours."""
+        config = self._sim_config
+        if file_grid is None:
+            if config is None:
+                msg = (
+                    f"No grid for {filename.name}: pass grid=GridInfo(...) "
+                    "or config=SimulationConfig(...)."
+                )
+                raise ValueError(msg)
+            return config
+        if config is None:
+            return SimulationConfig(
+                model_name="unknown",
+                model_type="PIC",
+                grid=file_grid,
+                normalization=self._normalization or Normalization.identity(),
+            )
+        return copy.replace(config, grid=file_grid)
 
-    def _resolve_normalization(
-        self,
-        f: h5py.File,
-    ) -> Normalization:
-        """Get normalization: explicit > config > identity."""
-        if self._normalization is not None:
-            return self._normalization
-        if self._config is not None:
-            return self._config.normalization
-        return Normalization.identity()
+    @staticmethod
+    def _snapshot(f: h5py.File, step: int) -> tuple[int, float | None]:
+        """Step and time from the root attributes; the filename's step otherwise."""
+        file_step = int(f.attrs["step"]) if "step" in f.attrs else step
+        time = float(f.attrs["time"]) if "time" in f.attrs else None
+        return file_step, time
 
-    def _read_metadata(
-        self,
-        f: h5py.File,
-        step: int,
-    ) -> dict[str, Any]:
-        """Extract scalar metadata from root attributes."""
-        meta: dict[str, Any] = {"step": step}
-        if "time" in f.attrs:
-            meta["time"] = float(f.attrs["time"])
-        if "step" in f.attrs:
-            meta["step"] = int(f.attrs["step"])
-        return meta
 
-    def available_auxiliary(self, path: Path) -> list[str]:
-        """Return names of available auxiliary datasets.
-
-        Default returns ``[]``.  Subclasses may override.
-
-        Parameters
-        ----------
-        path : Path
-            Simulation output directory.
-
-        Returns
-        -------
-        list[str]
-        """
-        return []
-
-    def load_auxiliary(self, path: Path, name: str) -> TabularData:
-        """Load a named auxiliary dataset.
-
-        Default raises ``KeyError``.  Subclasses may override.
-
-        Parameters
-        ----------
-        path : Path
-            Simulation output directory.
-        name : str
-            Dataset name.
-
-        Raises
-        ------
-        KeyError
-            Always, unless overridden by a subclass.
-        """
-        msg = f"No auxiliary dataset {name!r}"
-        raise KeyError(msg)
+_SIGNALS: list[tuple[str, float]] = [
+    ("*.h5", 0.2),
+    ("output_*.h5", 0.2),
+    ("simulation.toml", 0.3),
+]
 
 
 def can_read_confidence(path: Path) -> float:
     """Estimate confidence that *path* contains canonical HDF5 output.
 
-    Low confidence by design — specific readers (iPIC3D, BATSRUS)
-    should win when their signatures are present.
+    Detection signals (additive, capped at 1.0):
+
+    - any ``*.h5`` file: +0.2
+    - files matching the default ``output_*.h5`` pattern: +0.2
+    - ``simulation.toml``: +0.3
+
+    Low by design, from globs alone — specific readers (iPIC3D,
+    BATSRUS) win when their signatures are present.
 
     Parameters
     ----------
@@ -616,24 +543,7 @@ def can_read_confidence(path: Path) -> float:
     float
         Confidence in ``[0.0, 1.0]``.
     """
-    if not path.is_dir():
-        return 0.0
-
-    h5_file = next(path.glob("*.h5"), None)
-    if h5_file is None:
-        return 0.0
-
-    score = 0.2
-    try:
-        with h5py.File(h5_file, "r") as f:
-            if "fields" in f:
-                score += 0.3
-            if "grid" in f:
-                score += 0.2
-    except OSError:
-        log.debug("Failed to read %s", h5_file, exc_info=True)
-
-    return min(score, 1.0)
+    return score_signals(path, _SIGNALS)
 
 
 def open_simple(
@@ -781,15 +691,7 @@ def _open_reader(
     reader = SimpleReader(
         file_pattern=file_pattern,
         field_map=field_map,
-        grid=resolved_grid,
-        normalization=resolved_norm,
         config=auto_config,
         fields_group=fields_group,
     )
     return reader, auto_config
-
-
-# Self-register with the reader registry
-from pypic.readers._registry import register_reader as _register_reader  # noqa: E402
-
-_register_reader("simple", can_read_confidence, _open_reader)

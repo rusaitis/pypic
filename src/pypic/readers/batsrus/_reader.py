@@ -3,15 +3,14 @@
 from __future__ import annotations
 
 import logging
-import re
 from typing import TYPE_CHECKING, Any, assert_never
 
 import numpy as np
 
 from pypic.containers import SimulationConfig, StaggerInfo
 from pypic.coordinates import CARTESIAN, GEOMETRY_BY_NAME
-from pypic.dataset import FieldDataset
 from pypic.grid import GridInfo
+from pypic.readers._base import ReaderBase
 from pypic.readers._config_helpers import normalize_fields
 from pypic.readers.batsrus._config import BATSRUSConfig, to_simulation_config
 from pypic.readers.batsrus._field_map import (
@@ -29,13 +28,16 @@ from pypic.readers.batsrus._grid import (
     regrid_amr_idl,
 )
 from pypic.readers.batsrus._hdf5 import read_batl
-from pypic.readers.batsrus._header import BATSRUSHeader, parse_header
+from pypic.readers.batsrus._header import (
+    BATSRUSHeader,
+    extract_step_from_filename,
+    parse_header,
+)
 from pypic.readers.batsrus._idl import (
     read_idl_cells,
     read_out_file,
     read_out_header,
 )
-from pypic.units import Normalization, PhysicsParams
 
 log = logging.getLogger(__name__)
 
@@ -43,12 +45,11 @@ if TYPE_CHECKING:
     from collections.abc import Iterable
     from pathlib import Path
 
+    from pypic.dataset import FieldDataset
     from pypic.readers.batsrus import BATSRUSOutputFormat
 
-_STEP_RE = re.compile(r"_n(\d{8})")
 
-
-class BATSRUSReader:
+class BATSRUSReader(ReaderBase):
     """Read BATSRUS simulation output in IDL or HDF5 format.
 
     Supports three output formats:
@@ -69,17 +70,15 @@ class BATSRUSReader:
         geometry: str = "cartesian",
         sim_config: SimulationConfig | None = None,
     ) -> None:
+        super().__init__(sim_config)
         self._config = config
         self._output_format = output_format
         self._prefix = prefix
         self._geometry = geometry
-        self._sim_config = sim_config
 
     def available_timesteps(self, path: Path) -> list[int]:
         """Return sorted list of available timestep indices."""
         from pypic.readers.batsrus import BATSRUSOutputFormat
-
-        steps: set[int] = set()
 
         match self._output_format:
             case BATSRUSOutputFormat.HDF5:
@@ -91,12 +90,8 @@ class BATSRUSReader:
             case _ as unreachable:
                 assert_never(unreachable)
 
-        for f in path.glob(pattern):
-            m = _STEP_RE.search(f.stem)
-            if m:
-                steps.add(int(m.group(1)))
-
-        return sorted(steps)
+        steps = {extract_step_from_filename(f.name) for f in path.glob(pattern)}
+        return sorted(step for step in steps if step is not None)
 
     def _build_var_mapping(self, var_names: tuple[str, ...]) -> dict[str, str | None]:
         """Map native BATSRUS var names to canonical, return canonical→native."""
@@ -149,23 +144,6 @@ class BATSRUSReader:
             Canonical → native name.
         """
         return self._build_var_mapping(self._get_var_names(path, step))
-
-    def available_fields(self, path: Path, step: int) -> list[str]:
-        """List canonical field names at *step* without loading arrays.
-
-        Parameters
-        ----------
-        path : Path
-            Directory containing the simulation output.
-        step : int
-            Timestep index.
-
-        Returns
-        -------
-        list[str]
-            Sorted canonical field names.
-        """
-        return sorted(self.available_fields_mapping(path, step))
 
     def read_timestep(
         self,
@@ -270,19 +248,18 @@ class BATSRUSReader:
                 unit_names,
             )
 
-        # Filter to requested fields
         if fields is not None:
             field_data = {k: v for k, v in field_data.items() if k in fields}
-
-        metadata: dict[str, Any] = {
-            "step": header.n_step,
-            "time": header.time,
-            "format": "idl",
-            "stagger": StaggerInfo(convention="cell"),
-        }
-        if not is_uniform_idl(dx):
-            metadata["is_regridded"] = True
-        return self._build_dataset(field_data, grid, metadata, path=path, header=header)
+        return self._finish_si(
+            field_data,
+            grid,
+            path=path,
+            header=header,
+            step=header.n_step,
+            time=header.time,
+            output_format="idl",
+            is_regridded=not is_uniform_idl(dx),
+        )
 
     def _read_hdf5(
         self,
@@ -327,19 +304,17 @@ class BATSRUSReader:
                 unit_names,
             )
 
-        # Filter to requested fields
         if fields is not None:
             field_data = {k: v for k, v in field_data.items() if k in fields}
-
-        metadata: dict[str, Any] = {
-            "step": batl.n_step,
-            "time": batl.time,
-            "format": "hdf5",
-            "stagger": StaggerInfo(convention="cell"),
-        }
-        if not is_uniform:
-            metadata["is_regridded"] = True
-        return self._build_dataset(field_data, grid, metadata, path=path)
+        return self._finish_si(
+            field_data,
+            grid,
+            path=path,
+            step=batl.n_step,
+            time=batl.time,
+            output_format="hdf5",
+            is_regridded=not is_uniform,
+        )
 
     def _read_out(
         self,
@@ -392,39 +367,44 @@ class BATSRUSReader:
         if unit_names and not is_normalized(head_line):
             field_data = convert_fields_to_si(field_data, var_names, unit_names)
 
-        metadata: dict[str, Any] = {
-            "step": out_meta.get("step", step),
-            "time": out_meta.get("time", 0.0),
-            "format": "out",
-            "stagger": StaggerInfo(convention="cell"),
-        }
-        return self._build_dataset(field_data, grid, metadata, path=path)
+        return self._finish_si(
+            field_data,
+            grid,
+            path=path,
+            step=out_meta.get("step", step),
+            time=out_meta.get("time", 0.0),
+            output_format="out",
+        )
 
-    def _build_dataset(
+    def _finish_si(
         self,
         field_data: dict[str, np.ndarray],
         grid: GridInfo,
-        metadata: dict[str, Any],
         *,
         path: Path,
         header: BATSRUSHeader | None = None,
+        step: int,
+        time: float,
+        output_format: str,
+        is_regridded: bool = False,
     ) -> FieldDataset:
-        """Wrap SI-valued *field_data* in a dataset carrying the run's config."""
-        sc = self._sim_config
-        if sc is None:
-            sc = self._sim_config = to_simulation_config(
+        """Normalize SI-valued *field_data* by the run's references and wrap it."""
+        if self._sim_config is None:
+            self._sim_config = to_simulation_config(
                 self._config, header, grid=grid, sim_dir=path
             )
-        return FieldDataset.from_arrays(
-            normalize_fields(field_data, sc.normalization),
-            grid,
-            sc.normalization,
-            species=sc.species,
-            physics=sc.physics,
-            metadata=metadata,
-            frame=sc.frame,
-            transforms=sc.transforms or None,
-            strict_fields=False,
+        extra: dict[str, Any] = {
+            "format": output_format,
+            "stagger": StaggerInfo(convention="cell"),
+        }
+        if is_regridded:
+            extra["is_regridded"] = True
+        return self._finish(
+            normalize_fields(field_data, self._sim_config.normalization),
+            step=step,
+            time=time,
+            grid=grid,
+            extra=extra,
         )
 
     def _find_file(self, path: Path, step: int, suffix: str) -> Path:

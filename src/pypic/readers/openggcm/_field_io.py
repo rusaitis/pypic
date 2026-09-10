@@ -7,6 +7,7 @@ and decodes WRN2 data in bulk using vectorized NumPy operations.
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -14,6 +15,7 @@ import numpy as np
 from pypic.readers.openggcm._wrn2 import decompress_field_vectorized
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
     from pathlib import Path
 
     from pypic.types import FloatArray
@@ -60,6 +62,55 @@ def _read_line(data: bytes, start: int) -> tuple[bytes, int]:
     return data[start:end], end + 1
 
 
+@dataclass(frozen=True, slots=True)
+class _Record:
+    """One ``FIELD-3D-1`` record: its header and the span of its WRN2 payload."""
+
+    name: str
+    timestep: int
+    shape: tuple[int, int, int]
+    count: int
+    zmin: float
+    zmax: float
+    data_start: int
+    data_end: int
+
+
+def _scan_records(data: bytes) -> Iterator[_Record]:
+    """Walk the ``FIELD-3D-1`` records of a ``.3df`` buffer without decoding."""
+    newline_positions = np.flatnonzero(np.frombuffer(data, dtype=np.uint8) == 10)
+    pos = 0
+    while (idx := data.find(_MARKER, pos)) != -1:
+        _, pos = _read_line(data, idx)
+        name_bytes, pos = _read_line(data, pos)
+        name = name_bytes.rstrip(b"\r").decode("ascii").strip()
+        # Description / time info
+        _, pos = _read_line(data, pos)
+        dim_bytes, pos = _read_line(data, pos)
+        timestep, nx, ny, nz = (int(part) for part in dim_bytes.split()[:4])
+
+        wrn2_bytes, pos = _read_line(data, pos)
+        wrn2_line = wrn2_bytes.rstrip(b"\r")
+        if not wrn2_line.startswith(_WRN2):
+            log.warning("Expected WRN2 header for field %s, skipping", name)
+            continue
+        count, zmin, zmax = _parse_wrn2_header(wrn2_line)
+        if count != nx * ny * nz:
+            msg = f"Field {name}: WRN2 count {count} != nx*ny*nz = {nx * ny * nz}"
+            raise ValueError(msg)
+
+        # Exact data region: n_chunks * 2 lines; a constant field has none.
+        n_data_lines = 0 if zmin == zmax else ((count + 63) // 64) * 2
+        data_end = _skip_n_lines(newline_positions, pos, n_data_lines, len(data))
+        yield _Record(name, timestep, (nx, ny, nz), count, zmin, zmax, pos, data_end)
+        pos = data_end
+
+
+def read_3df_field_names(path: Path) -> list[str]:
+    """Field names recorded in a ``.3df`` file, in file order, without decoding."""
+    return [record.name for record in _scan_records(path.read_bytes())]
+
+
 def read_3df_file(
     path: Path,
     *,
@@ -91,66 +142,24 @@ def read_3df_file(
     skip = skip or set()
     fields: dict[str, FloatArray] = {}
     timestep = 0
-    nx = ny = nz = 0
+    shape = (0, 0, 0)
 
     data = path.read_bytes()
-    raw = np.frombuffer(data, dtype=np.uint8)
-    newline_positions = np.flatnonzero(raw == 10)
-    pos = 0
-
-    while True:
-        # Scan for next FIELD-3D-1 marker
-        idx = data.find(_MARKER, pos)
-        if idx == -1:
-            break
-
-        # Advance past marker line
-        _, pos = _read_line(data, idx)
-
-        # Field name (80-char padded)
-        name_bytes, pos = _read_line(data, pos)
-        name = name_bytes.rstrip(b"\r").decode("ascii").strip()
-
-        # Description / time info (skip)
-        _, pos = _read_line(data, pos)
-
-        # Dimensions: timestep nx ny nz
-        dim_bytes, pos = _read_line(data, pos)
-        parts = dim_bytes.split()
-        timestep = int(parts[0])
-        nx = int(parts[1])
-        ny = int(parts[2])
-        nz = int(parts[3])
-
-        # WRN2 header
-        wrn2_bytes, pos = _read_line(data, pos)
-        wrn2_line = wrn2_bytes.rstrip(b"\r")
-        if not wrn2_line.startswith(_WRN2):
-            log.warning("Expected WRN2 header for field %s, skipping", name)
+    for record in _scan_records(data):
+        timestep, shape = record.timestep, record.shape
+        if record.name in skip:
+            log.debug("Skipped field %s", record.name)
             continue
-
-        count, zmin, zmax = _parse_wrn2_header(wrn2_line)
-        expected = nx * ny * nz
-        if count != expected:
-            msg = f"Field {name}: WRN2 count {count} != nx*ny*nz = {expected}"
-            raise ValueError(msg)
-
-        # Calculate exact data region: n_chunks * 2 lines
-        n_data_lines = 0 if zmin == zmax else ((count + 63) // 64) * 2
-        data_start = pos
-        data_end = _skip_n_lines(newline_positions, data_start, n_data_lines, len(data))
-
-        if name in skip:
-            log.debug("Skipped field %s", name)
-            pos = data_end
-            continue
-
-        log.info("Reading field %s (%d values)", name, count)
+        log.info("Reading field %s (%d values)", record.name, record.count)
         flat = decompress_field_vectorized(
-            data, data_start, data_end - data_start, count, zmin, zmax
+            data,
+            record.data_start,
+            record.data_end - record.data_start,
+            record.count,
+            record.zmin,
+            record.zmax,
         )
         # Fortran column-major: reshape with order='F'
-        fields[name] = flat.reshape((nx, ny, nz), order="F")
-        pos = data_end
+        fields[record.name] = flat.reshape(shape, order="F")
 
-    return fields, timestep, nx, ny, nz
+    return fields, timestep, *shape

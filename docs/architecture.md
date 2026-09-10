@@ -27,7 +27,12 @@ code units. SI conversion is applied only at I/O and display boundaries, via
 
 **Readers produce `FieldDataset`.** Each reader is a self-contained module;
 adding support for a new simulation code means adding one module under
-`pypic/readers/`, not touching anything downstream.
+`pypic/readers/`, not touching anything downstream. Readers subclass
+`ReaderBase` (`readers/_base.py`) and build every dataset through its
+`_finish`, the one place arrays become a `FieldDataset`: it stamps
+`metadata["step"]` (and `"time"` when the file records one) and takes
+normalization, species, physics, frame and transforms from the merged
+`SimulationConfig`, so a `simulation.toml` always reaches the data.
 
 **Readers destagger to co-located grids.** Staggered-mesh codes (ARMS,
 Athena++, BATSRUS face-centered B) store field components at different grid
@@ -80,9 +85,10 @@ trigger server dependencies.
 variants (parallel, serial, H5hut) and BATSRUS has two (IDL, HDF5). Before
 committing a fix in one, grep the siblings for the same pattern — duplicated
 sign and weight conventions, dead guard code, and drifted docstrings tend to
-travel together. `correct_pressure_tensor_component` in
-`readers/ipic3d/_field_map.py` is the reference outcome: one shared
-implementation across all three variants.
+travel together. `read_species_moments` in
+`readers/ipic3d/_field_map.py` is the reference outcome: the three
+variants supply a loader for their own file layout, and one shared
+path applies the Gaussian, sign and mass corrections to every moment.
 
 ### Module layout
 

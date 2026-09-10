@@ -3,28 +3,22 @@
 from __future__ import annotations
 
 import re
+from contextlib import ExitStack
 from typing import TYPE_CHECKING
 
 import h5py
 import numpy as np
 
-from pypic.dataset import FieldDataset
-from pypic.readers.ipic3d._config import IPic3DConfig, to_simulation_config
-from pypic.readers.ipic3d._conserved import detect_conserved, load_ipic3d_auxiliary
+from pypic.readers.ipic3d._base import IPic3DReaderBase
 from pypic.readers.ipic3d._field_map import (
     _EFLUX_MAP,
     _FIELD_NAME_MAP,
     _PHDF5_PRESSURE_MAP,
     compute_totals_and_filter,
-    correct_pressure_tensor_component,
     expand_moment_dependencies,
-    gaussian_current_to_si,
-    gaussian_density_to_si,
-    gaussian_pressure_to_si,
     infer_total_fields,
-    per_species_canonical,
-    per_species_eflux_canonical,
-    per_species_pressure_canonical,
+    read_species_moments,
+    species_moment_names,
 )
 from pypic.readers.ipic3d._particles import detect_particle_steps, read_phdf5_particles
 
@@ -32,11 +26,70 @@ if TYPE_CHECKING:
     from collections.abc import Iterable
     from pathlib import Path
 
-    from pypic.containers import ParticleData, SimulationConfig, TabularData
+    from pypic.containers import ParticleData
+    from pypic.dataset import FieldDataset
     from pypic.types import FloatArray
 
+_FIELDS_DIR_RE = re.compile(r"^Fields_(\d+)$")
 
-class IPic3DParallelReader:
+# Which ``Moments_XXXXX/<kind>_species_N_XXXXX.h5`` file holds each native moment.
+_MOMENT_FILE: dict[str, str] = {
+    "rho": "rho",
+    "Jx": "J",
+    "Jy": "J",
+    "Jz": "J",
+    **dict.fromkeys(_PHDF5_PRESSURE_MAP, "Pressure"),
+    **dict.fromkeys(_EFLUX_MAP, "E_flux"),
+}
+
+
+class _MomentFiles:
+    """One species' moment files for one timestep, opened on first use.
+
+    Each moment kind lives in its own file; pressure and energy flux are
+    optional output, so a missing file reads as "not carried".
+    """
+
+    def __init__(self, moments_dir: Path, step_str: str, species: int) -> None:
+        self._dir = moments_dir
+        self._step_str = step_str
+        self._species = species
+        self._stack = ExitStack()
+        self._groups: dict[str, h5py.Group | None] = {}
+
+    def __enter__(self) -> _MomentFiles:
+        return self
+
+    def __exit__(self, *exc: object) -> None:
+        self._stack.close()
+
+    def _group(self, native: str) -> h5py.Group | None:
+        kind = _MOMENT_FILE.get(native)
+        if kind is None:
+            return None
+        if kind not in self._groups:
+            file = self._dir / f"{kind}_species_{self._species}_{self._step_str}.h5"
+            self._groups[kind] = (
+                self._stack.enter_context(h5py.File(file, "r"))[
+                    f"Moments/species_{self._species}"
+                ]
+                if file.exists()
+                else None
+            )
+        return self._groups[kind]
+
+    def has(self, native: str) -> bool:
+        group = self._group(native)
+        return group is not None and native in group
+
+    def load(self, native: str) -> FloatArray | None:
+        group = self._group(native)
+        if group is None or native not in group:
+            return None
+        return np.array(group[native])
+
+
+class IPic3DParallelReader(IPic3DReaderBase):
     """Read iPIC3D parallel HDF5 (phdf5) output.
 
     Each timestep is stored in separate ``Fields_XXXXX/`` and
@@ -44,47 +97,20 @@ class IPic3DParallelReader:
     field group.
 
     Unique to this reader: scanning timestep directories and the
-    per-rank file fan-in. Field-name mapping, Gaussian-CGS unit
+    one-file-per-moment layout. Field-name mapping, Gaussian-CGS unit
     conversions, pressure-tensor mass correction, and config
     translation live in `pypic.readers.ipic3d._field_map` and
     `pypic.readers.ipic3d._config`, shared with the serial and
     H5hut readers.
-
-    Parameters
-    ----------
-    config : IPic3DConfig
-        Parsed iPIC3D configuration.
     """
 
-    def __init__(
-        self, config: IPic3DConfig, sim_config: SimulationConfig | None = None
-    ) -> None:
-        self._config = config
-        self._sim_config = sim_config or to_simulation_config(config)
-
     def available_timesteps(self, path: Path) -> list[int]:
-        """Return sorted list of available timestep numbers.
-
-        Scans for ``Fields_XXXXX`` directories under *path*.
-
-        Parameters
-        ----------
-        path : Path
-            Simulation output directory.
-
-        Returns
-        -------
-        list[int]
-            Sorted timestep indices.
-        """
-        steps: list[int] = []
-        pattern = re.compile(r"^Fields_(\d+)$")
-        for entry in path.iterdir():
-            if entry.is_dir():
-                m = pattern.match(entry.name)
-                if m:
-                    steps.append(int(m.group(1)))
-        return sorted(steps)
+        """Sorted timestep numbers, from the ``Fields_XXXXX`` directories."""
+        return sorted(
+            int(m.group(1))
+            for entry in path.iterdir()
+            if entry.is_dir() and (m := _FIELDS_DIR_RE.match(entry.name))
+        )
 
     def available_fields_mapping(self, path: Path, step: int) -> dict[str, str | None]:
         """Map canonical field names to native (on-disk) names at *step*.
@@ -108,72 +134,28 @@ class IPic3DParallelReader:
         ns = self._config.ns
         mapping: dict[str, str | None] = {}
 
-        # Electromagnetic fields
         for prefix in ("B", "E"):
             em_path = path / f"Fields_{step_str}" / f"{prefix}_{step_str}.h5"
             if em_path.exists():
                 with h5py.File(em_path, "r") as f:
-                    for ipic_name in f["Fields"]:
-                        if ipic_name in _FIELD_NAME_MAP:
-                            mapping[_FIELD_NAME_MAP[ipic_name]] = ipic_name
+                    mapping.update(
+                        (_FIELD_NAME_MAP[name], name)
+                        for name in f["Fields"]
+                        if name in _FIELD_NAME_MAP
+                    )
 
-        # Per-species moments
         for s in range(ns):
-            j_path = path / f"Moments_{step_str}" / f"J_species_{s}_{step_str}.h5"
-            if j_path.exists():
-                with h5py.File(j_path, "r") as f:
-                    group = f[f"Moments/species_{s}"]
-                    for comp in ("Jx", "Jy", "Jz"):
-                        if comp in group:
-                            mapping[per_species_canonical(comp, s)] = comp
+            with _MomentFiles(path / f"Moments_{step_str}", step_str, s) as files:
+                names = species_moment_names(s, _PHDF5_PRESSURE_MAP)
+                mapping.update(
+                    (canon, native)
+                    for canon, native in names.items()
+                    if files.has(native)
+                )
 
-            rho_path = path / f"Moments_{step_str}" / f"rho_species_{s}_{step_str}.h5"
-            if rho_path.exists():
-                mapping[per_species_canonical("rho", s)] = "rho"
-
-            p_path = (
-                path / f"Moments_{step_str}" / f"Pressure_species_{s}_{step_str}.h5"
-            )
-            if p_path.exists():
-                with h5py.File(p_path, "r") as f:
-                    group = f[f"Moments/species_{s}"]
-                    for phdf5_name in _PHDF5_PRESSURE_MAP:
-                        if phdf5_name in group:
-                            mapping[per_species_pressure_canonical(phdf5_name, s)] = (
-                                phdf5_name
-                            )
-
-            ef_path = path / f"Moments_{step_str}" / f"E_flux_species_{s}_{step_str}.h5"
-            if ef_path.exists():
-                with h5py.File(ef_path, "r") as f:
-                    group = f[f"Moments/species_{s}"]
-                    for phdf5_name, _canon_base in _EFLUX_MAP.items():
-                        if phdf5_name in group:
-                            canon = per_species_eflux_canonical(phdf5_name, s)
-                            mapping[canon] = phdf5_name
-
-        # Total fields — computed, no single native source
         for total in infer_total_fields(set(mapping), ns):
             mapping[total] = None
-
         return mapping
-
-    def available_fields(self, path: Path, step: int) -> list[str]:
-        """List canonical field names at *step* without loading arrays.
-
-        Parameters
-        ----------
-        path : Path
-            Simulation output directory.
-        step : int
-            Timestep index.
-
-        Returns
-        -------
-        list[str]
-            Sorted canonical field names.
-        """
-        return sorted(self.available_fields_mapping(path, step))
 
     def read_timestep(
         self,
@@ -206,120 +188,35 @@ class IPic3DParallelReader:
         )
         field_data: dict[str, FloatArray] = {}
 
-        # Electromagnetic fields — skip file open if none wanted
-        want_b = expanded is None or any(f"B_{i}" in expanded for i in range(1, 4))
-        if want_b:
-            b_path = path / f"Fields_{step_str}" / f"B_{step_str}.h5"
-            with h5py.File(b_path, "r") as f:
+        for prefix in ("B", "E"):
+            if expanded is not None and not any(
+                f"{prefix}_{i}" in expanded for i in "123"
+            ):
+                continue
+            em_path = path / f"Fields_{step_str}" / f"{prefix}_{step_str}.h5"
+            with h5py.File(em_path, "r") as f:
                 for ipic_name, canon_name in _FIELD_NAME_MAP.items():
                     if (
-                        ipic_name.startswith("B")
+                        ipic_name.startswith(prefix)
                         and ipic_name in f["Fields"]
                         and (expanded is None or canon_name in expanded)
                     ):
                         field_data[canon_name] = np.array(f["Fields"][ipic_name])
 
-        want_e = expanded is None or any(f"E_{i}" in expanded for i in range(1, 4))
-        if want_e:
-            e_path = path / f"Fields_{step_str}" / f"E_{step_str}.h5"
-            with h5py.File(e_path, "r") as f:
-                for ipic_name, canon_name in _FIELD_NAME_MAP.items():
-                    if (
-                        ipic_name.startswith("E")
-                        and ipic_name in f["Fields"]
-                        and (expanded is None or canon_name in expanded)
-                    ):
-                        field_data[canon_name] = np.array(f["Fields"][ipic_name])
-
-        # Per-species moments
         for s in range(ns):
-            # Current density
-            want_j_s = expanded is None or any(
-                per_species_canonical(c, s) in expanded for c in ("Jx", "Jy", "Jz")
-            )
-            if want_j_s:
-                j_path = path / f"Moments_{step_str}" / f"J_species_{s}_{step_str}.h5"
-                with h5py.File(j_path, "r") as f:
-                    group = f[f"Moments/species_{s}"]
-                    for comp in ("Jx", "Jy", "Jz"):
-                        canon = per_species_canonical(comp, s)
-                        if expanded is not None and canon not in expanded:
-                            continue
-                        field_data[canon] = gaussian_current_to_si(
-                            np.array(group[comp])
-                        )
-
-            # Charge density
-            rho_canon = per_species_canonical("rho", s)
-            if expanded is None or rho_canon in expanded:
-                rho_path = (
-                    path / f"Moments_{step_str}" / f"rho_species_{s}_{step_str}.h5"
-                )
-                with h5py.File(rho_path, "r") as f:
-                    group = f[f"Moments/species_{s}"]
-                    field_data[rho_canon] = gaussian_density_to_si(
-                        np.array(group["rho"])
+            with _MomentFiles(path / f"Moments_{step_str}", step_str, s) as files:
+                field_data.update(
+                    read_species_moments(
+                        files.load,
+                        s,
+                        species_qom=self._config.qom[s],
+                        expanded=expanded,
+                        pressure_map=_PHDF5_PRESSURE_MAP,
                     )
-
-            # Pressure tensor (optional)
-            # Tier-3 per-species tensor: ``P_s<N>_<ij>`` (species before
-            # ij pair); convert ``canon_base`` (``P_11``) accordingly.
-            want_p_s = expanded is None or any(
-                per_species_pressure_canonical(phdf5_name, s) in expanded
-                for phdf5_name in _PHDF5_PRESSURE_MAP
-            )
-            if want_p_s:
-                p_path = (
-                    path / f"Moments_{step_str}" / f"Pressure_species_{s}_{step_str}.h5"
                 )
-                if p_path.exists():
-                    with h5py.File(p_path, "r") as f:
-                        group = f[f"Moments/species_{s}"]
-                        for phdf5_name, canon_base in _PHDF5_PRESSURE_MAP.items():
-                            canon = per_species_pressure_canonical(phdf5_name, s)
-                            if expanded is not None and canon not in expanded:
-                                continue
-                            if phdf5_name in group:
-                                field_data[canon] = correct_pressure_tensor_component(
-                                    np.array(group[phdf5_name]),
-                                    canonical_base=canon_base,
-                                    species_qom=self._config.qom[s],
-                                )
-
-            # Energy flux (optional)
-            want_ef_s = expanded is None or any(
-                per_species_eflux_canonical(phdf5_name, s) in expanded
-                for phdf5_name in _EFLUX_MAP
-            )
-            if want_ef_s:
-                ef_path = (
-                    path / f"Moments_{step_str}" / f"E_flux_species_{s}_{step_str}.h5"
-                )
-                if ef_path.exists():
-                    with h5py.File(ef_path, "r") as f:
-                        group = f[f"Moments/species_{s}"]
-                        for phdf5_name, _canon_base in _EFLUX_MAP.items():
-                            canon = per_species_eflux_canonical(phdf5_name, s)
-                            if expanded is not None and canon not in expanded:
-                                continue
-                            if phdf5_name in group:
-                                data = np.array(group[phdf5_name])
-                                field_data[canon] = gaussian_pressure_to_si(data)
 
         field_data = compute_totals_and_filter(field_data, ns, expanded, wanted)
-
-        sc = self._sim_config
-        return FieldDataset.from_arrays(
-            field_data,
-            sc.grid,
-            sc.normalization,
-            species=sc.species,
-            physics=sc.physics,
-            metadata={**dict(sc.metadata), "step": step},
-            frame=sc.frame,
-            transforms=sc.transforms or None,
-            strict_fields=False,
-        )
+        return self._finish(field_data, step=step)
 
     def available_particle_steps(self, path: Path) -> list[int]:
         """Return sorted timestep indices that have particle data."""
@@ -354,11 +251,3 @@ class IPic3DParallelReader:
         ParticleData
         """
         return read_phdf5_particles(path, step, species, self._config, columns=columns)
-
-    def available_auxiliary(self, path: Path) -> list[str]:
-        """Return names of auxiliary datasets at *path*."""
-        return detect_conserved(path)
-
-    def load_auxiliary(self, path: Path, name: str) -> TabularData:
-        """Load a named auxiliary dataset from *path*."""
-        return load_ipic3d_auxiliary(path, name)

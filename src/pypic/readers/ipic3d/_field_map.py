@@ -6,6 +6,8 @@ import math
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from collections.abc import Callable, Mapping
+
     from pypic.types import FloatArray
 
 FOUR_PI = 4.0 * math.pi
@@ -146,6 +148,108 @@ def per_species_eflux_canonical(component: str, species_index: int) -> str:
     # canonical is "EF_<c>"; Tier-3 per-species form is "EF_s<N>_<c>".
     c = canonical.removeprefix("EF_")
     return f"EF_s{species_index}_{c}"
+
+
+def species_moment_names(
+    species_index: int, pressure_map: Mapping[str, str]
+) -> dict[str, str]:
+    """Canonical → bare native name for one species' deposited moments.
+
+    Covers charge density, current, number density (written by H5hut
+    only), the six pressure-tensor components under *pressure_map*'s
+    spelling, and the energy flux. Each layout adds its own species
+    suffix or file path to the native name.
+
+    Examples
+    --------
+    >>> names = species_moment_names(1, _PHDF5_PRESSURE_MAP)
+    >>> names["J_s1_1"], names["P_s1_23"], names["EF_s1_3"], names["n_s1"]
+    ('Jx', 'pYZ', 'EFz', 'N')
+    """
+    names = {per_species_canonical(c, species_index): c for c in _MOMENT_COMPONENT_MAP}
+    names[f"n_s{species_index}"] = "N"
+    for native in pressure_map:
+        names[per_species_pressure_canonical(native, species_index)] = native
+    for native in _EFLUX_MAP:
+        names[per_species_eflux_canonical(native, species_index)] = native
+    return names
+
+
+def convert_species_moment(
+    native: str,
+    data: FloatArray,
+    *,
+    species_qom: float,
+    pressure_map: Mapping[str, str],
+) -> FloatArray:
+    r"""Bring one raw per-species moment to canonical, SI-rationalized form.
+
+    iPIC3D stores every deposited moment divided by $4\pi$; the
+    pressure tensor additionally carries the charge sign and weight
+    that `correct_pressure_tensor_component` removes. Number density
+    is stored as is.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> raw = np.array([1.0 / (4.0 * np.pi)])
+    >>> convert_species_moment("Jx", raw, species_qom=-1.0, pressure_map={})
+    array([1.])
+    >>> convert_species_moment("N", raw, species_qom=-1.0, pressure_map={})
+    array([0.07957747])
+    """
+    if native in pressure_map:
+        return correct_pressure_tensor_component(
+            data, canonical_base=pressure_map[native], species_qom=species_qom
+        )
+    match native:
+        case "rho":
+            return gaussian_density_to_si(data)
+        case "N":
+            return data
+        case "Jx" | "Jy" | "Jz":
+            return gaussian_current_to_si(data)
+        case _ if native in _EFLUX_MAP:
+            return gaussian_pressure_to_si(data)
+    msg = f"Not an iPIC3D species moment: {native!r}"
+    raise ValueError(msg)
+
+
+def read_species_moments(
+    load: Callable[[str], FloatArray | None],
+    species_index: int,
+    *,
+    species_qom: float,
+    expanded: set[str] | None,
+    pressure_map: Mapping[str, str],
+) -> dict[str, FloatArray]:
+    """Load and convert one species' moments through *load*.
+
+    *load* maps a bare native name (``"Jx"``, ``"pXX"``, ``"EFz"``, ...)
+    to its raw array, or ``None`` when this layout does not carry it.
+    Only names in *expanded* (all, when ``None``) are requested, so a
+    selective read never touches unwanted moments.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> stored = {"rho": np.array([-1.0 / (4.0 * np.pi)])}
+    >>> read_species_moments(
+    ...     stored.get, 0, species_qom=-1.0, expanded=None,
+    ...     pressure_map=_PHDF5_PRESSURE_MAP,
+    ... )
+    {'rho_c_s0': array([-1.])}
+    """
+    out: dict[str, FloatArray] = {}
+    for canonical, native in species_moment_names(species_index, pressure_map).items():
+        if expanded is not None and canonical not in expanded:
+            continue
+        raw = load(native)
+        if raw is not None:
+            out[canonical] = convert_species_moment(
+                native, raw, species_qom=species_qom, pressure_map=pressure_map
+            )
+    return out
 
 
 def expand_moment_dependencies(
@@ -338,8 +442,10 @@ def compute_totals_and_filter(
     """Sum per-species moments into totals and filter to wanted fields.
 
     Computes total ``rho_c``, ``J_1``, ``J_2``, ``J_3`` by summing the
-    per-species contributions already present in *field_data*.  Guards
-    against missing per-species keys (e.g. when a species lacks data).
+    per-species contributions already present in *field_data*.  A total
+    whose per-species terms are only partly present raises: iPIC3D
+    deposits every species, so a gap means truncated output or a wrong
+    species count, and a silent partial sum would be wrong physics.
 
     Parameters
     ----------
@@ -360,6 +466,11 @@ def compute_totals_and_filter(
     dict[str, FloatArray]
         Filtered field dict containing only *wanted* keys (or all
         keys when *wanted* is ``None``).
+
+    Raises
+    ------
+    ValueError
+        If some but not all species contribute to a requested total.
 
     Examples
     --------
@@ -383,16 +494,19 @@ def compute_totals_and_filter(
     for moment_comp, canon_total in _MOMENT_COMPONENT_MAP.items():
         if expanded is not None and canon_total not in expanded:
             continue
-        first_key = per_species_canonical(moment_comp, 0)
-        if first_key not in field_data:
+        keys = [per_species_canonical(moment_comp, s) for s in range(nspec)]
+        present = [key for key in keys if key in field_data]
+        if not present:
             continue
+        if len(present) != nspec:
+            missing = [key for key in keys if key not in field_data]
+            msg = f"Cannot total {canon_total!r}: missing per-species {missing}"
+            raise ValueError(msg)
         # Start from a copy of species 0, then += the rest. Avoids
         # allocating a fresh full-size array per species on large grids.
-        total = field_data[first_key].copy()
-        for s in range(1, nspec):
-            key = per_species_canonical(moment_comp, s)
-            if key in field_data:
-                total += field_data[key]
+        total = field_data[keys[0]].copy()
+        for key in keys[1:]:
+            total += field_data[key]
         field_data[canon_total] = total
 
     if wanted is not None:

@@ -6,14 +6,13 @@ import re
 from typing import TYPE_CHECKING
 
 import numpy as np
-import xarray as xr
 
 from pypic.containers import StaggerInfo
 from pypic.coordinates.geometry import CARTESIAN
-from pypic.dataset import FieldDataset
 from pypic.grid import GridInfo
+from pypic.readers._base import ReaderBase
 from pypic.readers._config_helpers import normalize_fields
-from pypic.readers.openggcm._field_io import read_3df_file
+from pypic.readers.openggcm._field_io import read_3df_field_names, read_3df_file
 from pypic.readers.openggcm._field_map import (
     DEFAULT_SKIP,
     FIELD_NAME_MAP,
@@ -25,13 +24,25 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     from pypic.containers import SimulationConfig
+    from pypic.dataset import FieldDataset
     from pypic.readers.openggcm._grid import OpenGGCMGrid
 
 
 _3DF_PATTERN = re.compile(r"\.3df\.(\d+)$")
 
+_STAGGER = StaggerInfo(
+    convention="cell",
+    notes=(
+        "OpenGGCM integrates on a Yee mesh (B on faces, E on edges) under "
+        "Evans-Hawley constrained transport, but writes .3df diagnostic "
+        "output at cell centres: every field record carries the same "
+        "nx*ny*nz count as rho and P, where a face-centred B would carry "
+        "nx+1 along its normal. Nothing to destagger on load."
+    ),
+)
 
-class OpenGGCMReader:
+
+class OpenGGCMReader(ReaderBase):
     """Read OpenGGCM .3df field output on a non-uniform grid.
 
     Parameters
@@ -51,9 +62,9 @@ class OpenGGCMReader:
         prefix: str,
         sim_config: SimulationConfig,
     ) -> None:
+        super().__init__(sim_config)
         self._grid = grid
         self._prefix = prefix
-        self._sim_config = sim_config
 
     @property
     def grid(self) -> OpenGGCMGrid:
@@ -75,13 +86,28 @@ class OpenGGCMReader:
         list[int]
             Sorted timestep indices.
         """
-        steps: list[int] = []
-        pattern = f"{self._prefix}.3df.*"
-        for entry in path.glob(pattern):
-            m = _3DF_PATTERN.search(entry.name)
-            if m:
-                steps.append(int(m.group(1)))
-        return sorted(steps)
+        return sorted(
+            int(m.group(1))
+            for entry in path.glob(f"{self._prefix}.3df.*")
+            if (m := _3DF_PATTERN.search(entry.name))
+        )
+
+    def available_fields_mapping(self, path: Path, step: int) -> dict[str, str | None]:
+        """Map canonical field names to native ``.3df`` record names at *step*.
+
+        Scans the file's ``FIELD-3D-1`` markers without decoding any
+        WRN2 payload.
+        """
+        filename = path / f"{self._prefix}.3df.{step:06d}"
+        native = [
+            name for name in read_3df_field_names(filename) if name not in DEFAULT_SKIP
+        ]
+        mapping: dict[str, str | None] = {
+            FIELD_NAME_MAP.get(name, name): name for name in native
+        }
+        if "rr" in native:
+            mapping["n_s0"] = "rr"
+        return mapping
 
     def read_timestep(
         self,
@@ -129,10 +155,7 @@ class OpenGGCMReader:
             # Skip known native fields that aren't wanted
             skip = skip | (set(FIELD_NAME_MAP.keys()) - wanted_native)
 
-        raw_fields, ts, nx, ny, nz = read_3df_file(
-            filename,
-            skip=skip,
-        )
+        raw_fields, _ts, nx, ny, nz = read_3df_file(filename, skip=skip)
 
         # Verify grid dimensions match
         if (nx, ny, nz) != (self._grid.nx, self._grid.ny, self._grid.nz):
@@ -142,54 +165,20 @@ class OpenGGCMReader:
             )
             raise ValueError(msg)
 
-        sc = self._sim_config
-        si_fields = normalize_fields(convert_fields_to_si(raw_fields), sc.normalization)
-
-        # Filter to requested canonical fields
+        sc = self._require_config()
+        code_fields = normalize_fields(
+            convert_fields_to_si(raw_fields), sc.normalization
+        )
         if wanted_canonical is not None:
-            si_fields = {k: v for k, v in si_fields.items() if k in wanted_canonical}
+            code_fields = {
+                k: v for k, v in code_fields.items() if k in wanted_canonical
+            }
 
-        # Build xr.Dataset with non-uniform coordinates
-        dim_names = ["x", "y", "z"]
-        coords = {
-            "x": self._grid.x,
-            "y": self._grid.y,
-            "z": self._grid.z,
-        }
-        data_vars = {
-            name: xr.DataArray(data=arr, dims=dim_names)
-            for name, arr in si_fields.items()
-        }
-        dataset = xr.Dataset(data_vars, coords=coords)
-
-        # Build approximate GridInfo (mean spacing)
-        grid_info = _make_grid_info(self._grid)
-
-        return FieldDataset(
-            dataset,
-            grid_info,
-            sc.normalization,
-            species=sc.species,
-            physics=sc.physics,
-            frame=sc.frame,
-            transforms=sc.transforms or None,
-            metadata={
-                "step": step,
-                "timestep": ts,
-                "prefix": self._prefix,
-                "is_uniform_grid": False,
-                "stagger": StaggerInfo(
-                    convention="cell",
-                    notes=(
-                        "OpenGGCM integrates on a Yee mesh (B on faces, E on "
-                        "edges) under Evans-Hawley constrained transport, but "
-                        "writes .3df diagnostic output at cell centres: every "
-                        "field record carries the same nx*ny*nz count as rho "
-                        "and P, where a face-centred B would carry nx+1 along "
-                        "its normal. Nothing to destagger on load."
-                    ),
-                ),
-            },
+        return self._finish(
+            code_fields,
+            step=step,
+            coords={"x": self._grid.x, "y": self._grid.y, "z": self._grid.z},
+            extra={"is_uniform_grid": False, "stagger": _STAGGER},
         )
 
 

@@ -145,9 +145,7 @@ def _resolve_timeseries_pairs(
         def _iter_sim() -> Iterable[tuple[float | int, FieldDataset]]:
             for step in step_list:
                 fds = source.read(step, fields=fields_list)
-                dt = fds.grid.dt
-                t: float | int = step * dt if dt is not None else step
-                yield t, fds
+                yield step if fds.time is None else fds.time, fds
 
         return _iter_sim()
     return source

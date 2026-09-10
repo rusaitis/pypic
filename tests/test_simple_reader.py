@@ -516,25 +516,19 @@ mass = 1.0
 
 
 class TestCanReadConfidence:
+    """Glob-only, as the registry contract requires: no file is opened."""
+
     def test_empty_dir(self, tmp_path: Path) -> None:
         assert can_read_confidence(tmp_path) == 0.0
 
-    def test_generic_h5(self, tmp_path: Path) -> None:
-        _write_h5(
-            tmp_path / "data.h5",
-            {"x": np.zeros(4)},
-            fields_group="",
-        )
-        assert can_read_confidence(tmp_path) > 0.0
+    def test_any_h5_is_a_weak_signal(self, tmp_path: Path) -> None:
+        (tmp_path / "data.h5").write_bytes(b"not even HDF5")
+        assert can_read_confidence(tmp_path) == pytest.approx(0.2)
 
-    def test_canonical_h5(self, tmp_path: Path) -> None:
-        _write_h5(
-            tmp_path / "output.h5",
-            _make_fields(),
-            grid_attrs=_grid_attrs(),
-        )
-        score = can_read_confidence(tmp_path)
-        assert score >= 0.5
+    def test_default_pattern_and_toml_add_up(self, tmp_path: Path) -> None:
+        (tmp_path / "output_000000.h5").touch()
+        (tmp_path / "simulation.toml").touch()
+        assert can_read_confidence(tmp_path) == pytest.approx(0.7)
 
 
 class TestCustomReadRaw:

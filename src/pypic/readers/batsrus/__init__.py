@@ -13,20 +13,23 @@ the appropriate reader.
 from __future__ import annotations
 
 import copy
-import re
 from enum import StrEnum
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 from pypic.readers.batsrus._config import (
     BATSRUSConfig,
-    extract_step_from_filename,
     parse_param_in,
     to_simulation_config,
 )
 from pypic.readers.batsrus._grid import assemble_uniform_hdf5, regrid_amr_hdf5
 from pypic.readers.batsrus._hdf5 import read_batl
-from pypic.readers.batsrus._header import BATSRUSHeader, parse_header
+from pypic.readers.batsrus._header import (
+    BATSRUSHeader,
+    extract_step_from_filename,
+    parse_header,
+    prefix_before_step,
+)
 from pypic.readers.batsrus._probe import can_read_confidence
 from pypic.readers.batsrus._reader import BATSRUSReader
 
@@ -146,41 +149,17 @@ def _detect_prefix_batl(files: list[Path]) -> str:
 
     Prefers 3D files (``3d__``) over slices (``z=0_``).
     """
-    # Prefer 3d files
     for f in files:
         if f.name.startswith("3d"):
-            return _prefix_before_step(f.name, ".batl")
-    return _prefix_before_step(files[0].name, ".batl")
+            return prefix_before_step(f.name, ".batl")
+    return prefix_before_step(files[0].name, ".batl")
 
 
 def _detect_prefix_h(files: list[Path]) -> str:
     """Extract prefix from .h header filenames."""
-    return _prefix_before_step(files[0].name, ".h")
+    return prefix_before_step(files[0].name, ".h")
 
 
 def _detect_prefix_out(files: list[Path]) -> str:
     """Extract prefix from .out filenames."""
-    return _prefix_before_step(files[0].name, ".out")
-
-
-def _prefix_before_step(filename: str, suffix: str) -> str:
-    """Extract the part of the filename before the timestep/step pattern.
-
-    Handles both ``prefix_n{step}`` and ``prefix_t{time}_n{step}`` patterns.
-    Returns the prefix up to (but not including) the first ``_t`` or ``_n``
-    timestamp marker.
-    """
-    stem = filename
-    if stem.endswith(suffix):
-        stem = stem[: -len(suffix)]
-    # Find the earliest _t{8digits} or _n{8digits} pattern
-    m = re.search(r"_[tn]\d{8}", stem)
-    if m:
-        return stem[: m.start() + 1]  # include trailing underscore
-    return stem
-
-
-# Self-register with the reader registry
-from pypic.readers._registry import register_reader as _register_reader  # noqa: E402
-
-_register_reader("batsrus", can_read_confidence, open_batsrus)
+    return prefix_before_step(files[0].name, ".out")

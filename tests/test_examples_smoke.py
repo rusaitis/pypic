@@ -20,7 +20,7 @@ import pytest
 from numpy.testing import assert_allclose
 from scipy import constants
 
-from pypic.readers.batsrus import open_batsrus
+from pypic.readers.batsrus import extract_step_from_filename, open_batsrus
 from pypic.readers.ipic3d import open_ipic3d
 from pypic.readers.openggcm import open_openggcm
 from pypic.units import Normalization
@@ -30,8 +30,6 @@ _OPENERS = {
     "openggcm": open_openggcm,
     "batsrus": open_batsrus,
 }
-
-_BATSRUS_STEP_RE = re.compile(r"_n(\d{8})")
 
 
 def _detect_model(path: Path) -> str | None:
@@ -62,11 +60,9 @@ def _first_timestep(path: Path, model: str) -> int:
         if steps:
             return steps[0]
     if model == "batsrus":
-        steps_b: list[int] = []
-        for f in path.iterdir():
-            m = _BATSRUS_STEP_RE.search(f.name)
-            if m:
-                steps_b.append(int(m.group(1)))
+        steps_b = [
+            s for f in path.iterdir() if (s := extract_step_from_filename(f.name))
+        ]
         if steps_b:
             return min(steps_b)
     return 0

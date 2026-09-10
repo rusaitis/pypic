@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import re
 from dataclasses import dataclass, field
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Any
@@ -303,18 +302,6 @@ def to_simulation_config(
 def _first_token(line: str) -> str:
     """Extract the first whitespace-delimited token from a PARAM.in line."""
     return line.split()[0]
-
-
-_STEP_RE = re.compile(r"_n(\d{8})")
-
-
-def extract_step_from_filename(name: str) -> int | None:
-    """Extract the timestep number from a BATSRUS output filename.
-
-    Filenames follow ``prefix_n{step:08d}*`` or ``prefix_t{time:08d}_n{step:08d}*``.
-    """
-    m = _STEP_RE.search(name)
-    return int(m.group(1)) if m else None
 
 
 def _compute_grid_dims(header: BATSRUSHeader) -> tuple[int, ...]:

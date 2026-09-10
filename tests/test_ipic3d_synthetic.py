@@ -322,6 +322,26 @@ class TestH5hutSpeciesCount:
             IPic3DH5hutReader(bad).read_timestep(H5HUT_DIR, 0)
 
 
+class TestPartialSpeciesTotals:
+    """A total summed over only some species is wrong physics; it must raise."""
+
+    def test_missing_species_moment_raises(self):
+        from pypic.readers.ipic3d._field_map import compute_totals_and_filter
+
+        data = {"rho_c_s0": np.ones(3), "J_s0_1": np.ones(3), "J_s1_1": np.ones(3)}
+        with pytest.raises(ValueError, match=r"Cannot total 'rho_c'.*rho_c_s1"):
+            compute_totals_and_filter(data, 2, None, None)
+
+    def test_phdf5_missing_species_file_surfaces(self, tmp_path: Path):
+        import shutil
+
+        shutil.copytree(PHDF5_DIR, tmp_path / "run")
+        (tmp_path / "run" / "Moments_00000" / "rho_species_1_00000.h5").unlink()
+        reader = IPic3DParallelReader(parse_inp(tmp_path / "run" / "synthetic.inp"))
+        with pytest.raises(ValueError, match="rho_c_s1"):
+            reader.read_timestep(tmp_path / "run", 0)
+
+
 class TestH5hutMatchesPhdf5:
     """Cross-format validation: H5hut must match phdf5 after 4π correction."""
 

@@ -2,43 +2,35 @@
 
 from __future__ import annotations
 
-import logging
 import re
 from typing import TYPE_CHECKING
 
 import h5py
 import numpy as np
 
-from pypic.dataset import FieldDataset
-from pypic.readers.ipic3d._config import IPic3DConfig, to_simulation_config
-from pypic.readers.ipic3d._conserved import detect_conserved, load_ipic3d_auxiliary
+from pypic.readers.ipic3d._base import IPic3DReaderBase
 from pypic.readers.ipic3d._field_map import (
-    _EFLUX_MAP,
     _FIELD_NAME_MAP,
     _H5HUT_FIELD_MAP,
     _PRESSURE_COMPONENT_MAP,
     compute_totals_and_filter,
-    correct_pressure_tensor_component,
     expand_moment_dependencies,
-    gaussian_current_to_si,
-    gaussian_density_to_si,
-    gaussian_pressure_to_si,
     infer_total_fields,
-    per_species_canonical,
-    per_species_eflux_canonical,
-    per_species_pressure_canonical,
+    read_species_moments,
+    species_moment_names,
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable
+    from collections.abc import Callable, Iterable
     from pathlib import Path
 
-    from pypic.containers import SimulationConfig, TabularData
+    from pypic.dataset import FieldDataset
     from pypic.types import FloatArray
 
-log = logging.getLogger(__name__)
-
 _FIELDS_PATTERN = re.compile(r"-Fields_(\d+)\.h5$")
+
+# Every known EM or diagnostic field, native → canonical.
+_KNOWN_FIELDS = _FIELD_NAME_MAP | _H5HUT_FIELD_MAP
 
 
 def _read_field(block: h5py.Group, name: str) -> FloatArray:
@@ -48,7 +40,19 @@ def _read_field(block: h5py.Group, name: str) -> FloatArray:
     return data
 
 
-class IPic3DH5hutReader:
+def _species_loader(
+    block: h5py.Group, available: set[str], species: int
+) -> Callable[[str], FloatArray | None]:
+    """Loader over H5hut's ``<native>_<species>`` keys for one species."""
+
+    def load(native: str) -> FloatArray | None:
+        key = f"{native}_{species}"
+        return _read_field(block, key) if key in available else None
+
+    return load
+
+
+class IPic3DH5hutReader(IPic3DReaderBase):
     """Read iPIC3D H5hut field output.
 
     H5hut files store all fields for a single timestep in one file
@@ -61,46 +65,22 @@ class IPic3DH5hutReader:
     readers. Electromagnetic fields are unaffected.
 
     Unique to this reader: the single-file-per-timestep layout, ZYX
-    transpose, and H5hut-specific field naming (uppercase axis letters
-    in ``_PRESSURE_COMPONENT_MAP``). Field-name mapping for everything
-    else, the Gaussian conversions, pressure-tensor mass correction, and
-    config translation live in `pypic.readers.ipic3d._field_map` and
+    transpose, H5hut-specific field naming (uppercase axis letters
+    in ``_PRESSURE_COMPONENT_MAP``), and passthrough of unknown native
+    fields. Field-name mapping for everything else, the Gaussian
+    conversions, pressure-tensor mass correction, and config
+    translation live in `pypic.readers.ipic3d._field_map` and
     `pypic.readers.ipic3d._config`, shared with the parallel and
     serial readers.
-
-    Parameters
-    ----------
-    config : IPic3DConfig
-        Parsed iPIC3D configuration.
     """
 
-    def __init__(
-        self, config: IPic3DConfig, sim_config: SimulationConfig | None = None
-    ) -> None:
-        self._config = config
-        self._sim_config = sim_config or to_simulation_config(config)
-
     def available_timesteps(self, path: Path) -> list[int]:
-        """Return sorted list of available timestep numbers.
-
-        Scans for ``*-Fields_*.h5`` files under *path*.
-
-        Parameters
-        ----------
-        path : Path
-            Simulation output directory.
-
-        Returns
-        -------
-        list[int]
-            Sorted timestep (cycle) indices.
-        """
-        steps: list[int] = []
-        for entry in path.iterdir():
-            m = _FIELDS_PATTERN.search(entry.name)
-            if m:
-                steps.append(int(m.group(1)))
-        return sorted(steps)
+        """Sorted cycle numbers, from the ``*-Fields_*.h5`` files under *path*."""
+        return sorted(
+            int(m.group(1))
+            for entry in path.iterdir()
+            if (m := _FIELDS_PATTERN.search(entry.name))
+        )
 
     def available_fields_mapping(self, path: Path, step: int) -> dict[str, str | None]:
         """Map canonical field names to native (on-disk) names at *step*.
@@ -121,78 +101,29 @@ class IPic3DH5hutReader:
         dict[str, str | None]
             Canonical → native name, ``None`` for computed totals.
         """
-        fields_file = self._find_fields_file(path, step)
         ns = self._config.ns
+        with h5py.File(self._find_fields_file(path, step), "r") as f:
+            available = set(f["Step#0"]["Block"].keys())
+
         mapping: dict[str, str | None] = {}
         consumed: set[str] = set()
-
-        with h5py.File(fields_file, "r") as f:
-            block = f["Step#0"]["Block"]
-            available = set(block.keys())
-
-            for ipic_name, canon_name in _FIELD_NAME_MAP.items():
-                if ipic_name in available:
-                    consumed.add(ipic_name)
-                    mapping[canon_name] = ipic_name
-
-            for ipic_name, canon_name in _H5HUT_FIELD_MAP.items():
-                if ipic_name in available:
-                    consumed.add(ipic_name)
-                    mapping[canon_name] = ipic_name
-
-            for s in range(ns):
-                n_key = f"N_{s}"
-                if n_key in available:
-                    consumed.add(n_key)
-                    mapping[f"n_s{s}"] = n_key
-
-                rho_key = f"rho_{s}"
-                if rho_key in available:
-                    consumed.add(rho_key)
-                    mapping[per_species_canonical("rho", s)] = rho_key
-
-                for comp in ("Jx", "Jy", "Jz"):
-                    j_key = f"{comp}_{s}"
-                    if j_key in available:
-                        consumed.add(j_key)
-                        mapping[per_species_canonical(comp, s)] = j_key
-
-                for pcomp in _PRESSURE_COMPONENT_MAP:
-                    p_key = f"{pcomp}_{s}"
-                    if p_key in available:
-                        consumed.add(p_key)
-                        mapping[per_species_pressure_canonical(pcomp, s)] = p_key
-
-                for efcomp in _EFLUX_MAP:
-                    ef_key = f"{efcomp}_{s}"
-                    if ef_key in available:
-                        consumed.add(ef_key)
-                        mapping[per_species_eflux_canonical(efcomp, s)] = ef_key
-
-            # Passthrough: native name is both key and value
-            for native in available - consumed:
-                mapping[native] = native
+        for native, canon in _KNOWN_FIELDS.items():
+            if native in available:
+                mapping[canon] = native
+                consumed.add(native)
+        for s in range(ns):
+            for canon, native in species_moment_names(
+                s, _PRESSURE_COMPONENT_MAP
+            ).items():
+                key = f"{native}_{s}"
+                if key in available:
+                    mapping[canon] = key
+                    consumed.add(key)
+        mapping.update((native, native) for native in available - consumed)
 
         for total in infer_total_fields(set(mapping), ns):
             mapping[total] = None
         return mapping
-
-    def available_fields(self, path: Path, step: int) -> list[str]:
-        """List canonical field names at *step* without loading arrays.
-
-        Parameters
-        ----------
-        path : Path
-            Simulation output directory.
-        step : int
-            Timestep (cycle) index.
-
-        Returns
-        -------
-        list[str]
-            Sorted canonical field names.
-        """
-        return sorted(self.available_fields_mapping(path, step))
 
     def _find_fields_file(self, path: Path, step: int) -> Path:
         """Locate the H5hut fields file for a given cycle."""
@@ -236,9 +167,8 @@ class IPic3DH5hutReader:
             pressure tensor all corrected by 4π (Gaussian→SI-rationalized).
         """
         fields_file = self._find_fields_file(path, step)
-        field_data: dict[str, FloatArray] = {}
-
         wanted: set[str] | None = set(fields) if fields is not None else None
+        field_data: dict[str, FloatArray] = {}
 
         with h5py.File(fields_file, "r") as f:
             step_group = f["Step#0"]
@@ -251,117 +181,40 @@ class IPic3DH5hutReader:
                 raise ValueError(msg)
             block = step_group["Block"]
             available = set(block.keys())
-
             expanded: set[str] | None = (
                 expand_moment_dependencies(wanted, nspec)
                 if wanted is not None
                 else None
             )
 
-            # Track which native keys are consumed by known-field logic
             consumed: set[str] = set()
+            for native, canon in _KNOWN_FIELDS.items():
+                if native in available:
+                    consumed.add(native)
+                    if expanded is None or canon in expanded:
+                        field_data[canon] = _read_field(block, native)
 
-            # Electromagnetic fields (Bx→B_1, Ex→E_1, etc.)
-            for ipic_name, canon_name in _FIELD_NAME_MAP.items():
-                if ipic_name in available:
-                    consumed.add(ipic_name)
-                    if expanded is not None and canon_name not in expanded:
-                        continue
-                    field_data[canon_name] = _read_field(block, ipic_name)
-
-            # H5hut-specific fields (Vfx→V_1, divB→div_B)
-            for ipic_name, canon_name in _H5HUT_FIELD_MAP.items():
-                if ipic_name in available:
-                    consumed.add(ipic_name)
-                    if expanded is not None and canon_name not in expanded:
-                        continue
-                    field_data[canon_name] = _read_field(block, ipic_name)
-
-            # Per-species densities and currents.
-            # Charge density and current stored as rho/(4pi) and J/(4pi) —
-            # Gaussian convention.
             for s in range(nspec):
-                # Number density: N_{s} → n_s{s}
-                n_key = f"N_{s}"
-                if n_key in available:
-                    consumed.add(n_key)
-                    canon = f"n_s{s}"
-                    if expanded is None or canon in expanded:
-                        field_data[canon] = _read_field(block, n_key)
+                names = species_moment_names(s, _PRESSURE_COMPONENT_MAP)
+                consumed.update(
+                    key
+                    for native in names.values()
+                    if (key := f"{native}_{s}") in available
+                )
+                field_data.update(
+                    read_species_moments(
+                        _species_loader(block, available, s),
+                        s,
+                        species_qom=self._config.qom[s],
+                        expanded=expanded,
+                        pressure_map=_PRESSURE_COMPONENT_MAP,
+                    )
+                )
 
-                # Charge density: rho_{s} → rho_c_s{s}
-                rho_key = f"rho_{s}"
-                if rho_key in available:
-                    consumed.add(rho_key)
-                    canon = per_species_canonical("rho", s)
-                    if expanded is None or canon in expanded:
-                        field_data[canon] = gaussian_density_to_si(
-                            _read_field(block, rho_key)
-                        )
-
-                # Current density: Jx_{s} → J1_s{s}, etc.
-                for comp in ("Jx", "Jy", "Jz"):
-                    j_key = f"{comp}_{s}"
-                    if j_key in available:
-                        consumed.add(j_key)
-                        canon = per_species_canonical(comp, s)
-                        if expanded is None or canon in expanded:
-                            field_data[canon] = gaussian_current_to_si(
-                                _read_field(block, j_key)
-                            )
-
-                # Pressure tensor: Pxx_{s} → P_s{N}_{ij}, etc.
-                # nspec is clamped to self._config.ns above, so s is
-                # always a valid index into qom.
-                for pcomp, canon_base in _PRESSURE_COMPONENT_MAP.items():
-                    p_key = f"{pcomp}_{s}"
-                    if p_key in available:
-                        consumed.add(p_key)
-                        canon = per_species_pressure_canonical(pcomp, s)
-                        if expanded is not None and canon not in expanded:
-                            continue
-                        field_data[canon] = correct_pressure_tensor_component(
-                            _read_field(block, p_key),
-                            canonical_base=canon_base,
-                            species_qom=self._config.qom[s],
-                        )
-
-                # Energy flux: EFx_{s} → EF_s{N}_{c}, etc.
-                for efcomp, _ef_canon_base in _EFLUX_MAP.items():
-                    ef_key = f"{efcomp}_{s}"
-                    if ef_key in available:
-                        consumed.add(ef_key)
-                        canon = per_species_eflux_canonical(efcomp, s)
-                        if expanded is not None and canon not in expanded:
-                            continue
-                        data = _read_field(block, ef_key)
-                        field_data[canon] = gaussian_pressure_to_si(data)
-
-            # Pass through unknown fields with native names, no conversion
-            for native_name in available - consumed:
-                if expanded is not None and native_name not in expanded:
-                    continue
-                field_data[native_name] = _read_field(block, native_name)
+            # Unknown fields pass through under their native names, unconverted.
+            for native in available - consumed:
+                if expanded is None or native in expanded:
+                    field_data[native] = _read_field(block, native)
 
         field_data = compute_totals_and_filter(field_data, nspec, expanded, wanted)
-
-        sc = self._sim_config
-        return FieldDataset.from_arrays(
-            field_data,
-            sc.grid,
-            sc.normalization,
-            species=sc.species,
-            physics=sc.physics,
-            metadata={**dict(sc.metadata), "step": step},
-            frame=sc.frame,
-            transforms=sc.transforms or None,
-            strict_fields=False,
-        )
-
-    def available_auxiliary(self, path: Path) -> list[str]:
-        """Return names of auxiliary datasets at *path*."""
-        return detect_conserved(path)
-
-    def load_auxiliary(self, path: Path, name: str) -> TabularData:
-        """Load a named auxiliary dataset from *path*."""
-        return load_ipic3d_auxiliary(path, name)
+        return self._finish(field_data, step=step)

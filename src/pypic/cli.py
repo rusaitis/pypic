@@ -431,6 +431,11 @@ def _parse_compression(
     return {_ENCODING_BLANKET_KEY: {"compressors": compressor}}
 
 
+def _time_coordinate(fds: FieldDataset, step: int) -> float | int:
+    """Zarr ``time`` coordinate for one snapshot: its time, else its step."""
+    return step if fds.time is None else fds.time
+
+
 def _expand_encoding_for_vars(
     spec: dict[str, dict[str, object]] | None,
     data_vars: list[str],
@@ -780,8 +785,6 @@ def convert_fields(
             message=message,
         )
     else:
-        dt = sim.grid.dt
-
         # Read step 0 once — reused for the encoding dict AND as the first
         # yielded pair, avoiding a duplicate I/O on large datasets.
         first = sim.read(step_list[0], fields=field_list)
@@ -790,14 +793,12 @@ def convert_fields(
         enc = _expand_encoding_for_vars(compression_spec, list(first.field_names()))
 
         def _base_pairs() -> object:
-            first_t = step_list[0] * dt if dt is not None else step_list[0]
-            yield first_t, first
+            yield _time_coordinate(first, step_list[0]), first
             for s in step_list[1:]:
                 fds = sim.read(s, fields=field_list)
                 if needs_transform:
                     fds = _postprocess(fds)
-                t = s * dt if dt is not None else s
-                yield t, fds
+                yield _time_coordinate(fds, s), fds
 
         pairs = _make_progress_iter(
             _base_pairs(),
@@ -1191,16 +1192,14 @@ def reduce_apply(
             message=message,
         )
     else:
-        dt = sim.grid.dt
         first = _reduce_one(sim.read(step_list[0], fields=read_fields))
         enc = _expand_encoding_for_vars(compression_spec, list(first.field_names()))
 
         def _base_pairs() -> object:
-            first_t = step_list[0] * dt if dt is not None else step_list[0]
-            yield first_t, first
+            yield _time_coordinate(first, step_list[0]), first
             for s in step_list[1:]:
-                fds = sim.read(s, fields=read_fields)
-                yield (s * dt if dt is not None else s), _reduce_one(fds)
+                reduced = _reduce_one(sim.read(s, fields=read_fields))
+                yield _time_coordinate(reduced, s), reduced
 
         pairs = _make_progress_iter(
             _base_pairs(),
@@ -1979,7 +1978,7 @@ def _render_plot(
             )
             plane_sel = None  # already applied
 
-        time = step_val * ds.grid.dt if ds.grid.dt else None
+        time = ds.time
 
         fig, ax = plot_field_slice(
             ds,
@@ -2309,7 +2308,7 @@ def plot_compare(
 
         plane_sel = _resolve_plane(ds_a.grid, plane, None, None)
 
-        time = step_val * ds_a.grid.dt if ds_a.grid.dt else None
+        time = ds_a.time
 
         # Convert to SI before plotting when requested (plot_comparison
         # only accepts display-unit strings, not "si"/"code" selectors)

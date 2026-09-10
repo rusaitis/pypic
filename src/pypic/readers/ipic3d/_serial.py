@@ -3,39 +3,34 @@
 from __future__ import annotations
 
 import re
+from functools import partial
 from typing import TYPE_CHECKING
 
 import h5py
 import numpy as np
 
-from pypic.dataset import FieldDataset
-from pypic.readers.ipic3d._config import IPic3DConfig, to_simulation_config
-from pypic.readers.ipic3d._conserved import detect_conserved, load_ipic3d_auxiliary
+from pypic.readers.ipic3d._base import IPic3DReaderBase
 from pypic.readers.ipic3d._field_map import (
-    _EFLUX_MAP,
     _FIELD_NAME_MAP,
     _PHDF5_PRESSURE_MAP,
     compute_totals_and_filter,
-    correct_pressure_tensor_component,
     expand_moment_dependencies,
-    gaussian_current_to_si,
-    gaussian_density_to_si,
-    gaussian_pressure_to_si,
     infer_total_fields,
-    per_species_canonical,
-    per_species_eflux_canonical,
-    per_species_pressure_canonical,
+    read_species_moments,
+    species_moment_names,
 )
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
     from pathlib import Path
 
-    from pypic.containers import SimulationConfig, TabularData
+    from pypic.dataset import FieldDataset
     from pypic.types import FloatArray
 
+_CYCLE_RE = re.compile(r"^cycle_(\d+)$")
 
-class IPic3DSerialReader:
+
+class IPic3DSerialReader(IPic3DReaderBase):
     """Read iPIC3D serial HDF5 (shdf5) output.
 
     Each MPI process writes to its own ``procN.hdf`` file containing all
@@ -48,43 +43,27 @@ class IPic3DSerialReader:
     `pypic.readers.ipic3d._field_map` and
     `pypic.readers.ipic3d._config`, shared with the parallel and
     H5hut readers.
-
-    Parameters
-    ----------
-    config : IPic3DConfig
-        Parsed iPIC3D configuration.
     """
 
-    def __init__(
-        self, config: IPic3DConfig, sim_config: SimulationConfig | None = None
-    ) -> None:
-        self._config = config
-        self._sim_config = sim_config or to_simulation_config(config)
-
     def available_timesteps(self, path: Path) -> list[int]:
-        """Return sorted list of available timestep numbers.
+        """Sorted timestep numbers, from the cycle keys in ``proc0.hdf``."""
+        with h5py.File(path / "proc0.hdf", "r") as f:
+            return sorted(
+                int(m.group(1)) for key in f["fields/Bx"] if (m := _CYCLE_RE.match(key))
+            )
 
-        Reads cycle keys from ``proc0.hdf`` fields group.
-
-        Parameters
-        ----------
-        path : Path
-            Simulation output directory.
-
-        Returns
-        -------
-        list[int]
-            Sorted timestep indices.
-        """
-        proc0 = path / "proc0.hdf"
-        pattern = re.compile(r"^cycle_(\d+)$")
+    @staticmethod
+    def _present_moments(proc0: Path, cycle_key: str) -> set[str]:
+        """``species_N/<native>`` moment groups carrying *cycle_key* in proc0."""
         with h5py.File(proc0, "r") as f:
-            steps: list[int] = []
-            for key in f["fields/Bx"]:
-                m = pattern.match(key)
-                if m:
-                    steps.append(int(m.group(1)))
-        return sorted(steps)
+            if "moments" not in f:
+                return set()
+            return {
+                f"{species}/{native}"
+                for species, group in f["moments"].items()
+                for native, cycles in group.items()
+                if cycle_key in cycles
+            }
 
     def available_fields_mapping(self, path: Path, step: int) -> dict[str, str | None]:
         """Map canonical field names to native (on-disk) names at *step*.
@@ -111,53 +90,23 @@ class IPic3DSerialReader:
 
         with h5py.File(proc0, "r") as f:
             if "fields" in f:
-                for ipic_name in f["fields"]:
-                    if ipic_name in _FIELD_NAME_MAP:
-                        mapping[_FIELD_NAME_MAP[ipic_name]] = ipic_name
-
-            for s in range(ns):
-                species_group = f"moments/species_{s}"
-                if species_group not in f:
-                    continue
-                group = f[species_group]
-
-                for comp in ("Jx", "Jy", "Jz"):
-                    if comp in group and cycle_key in group[comp]:
-                        mapping[per_species_canonical(comp, s)] = comp
-
-                if "rho" in group and cycle_key in group["rho"]:
-                    mapping[per_species_canonical("rho", s)] = "rho"
-
-                for phdf5_name in _PHDF5_PRESSURE_MAP:
-                    if phdf5_name in group and cycle_key in group[phdf5_name]:
-                        mapping[per_species_pressure_canonical(phdf5_name, s)] = (
-                            phdf5_name
-                        )
-
-                for ef_name in _EFLUX_MAP:
-                    if ef_name in group and cycle_key in group[ef_name]:
-                        mapping[per_species_eflux_canonical(ef_name, s)] = ef_name
+                mapping.update(
+                    (_FIELD_NAME_MAP[name], name)
+                    for name in f["fields"]
+                    if name in _FIELD_NAME_MAP
+                )
+        present = self._present_moments(proc0, cycle_key)
+        for s in range(ns):
+            names = species_moment_names(s, _PHDF5_PRESSURE_MAP)
+            mapping.update(
+                (canon, native)
+                for canon, native in names.items()
+                if f"species_{s}/{native}" in present
+            )
 
         for total in infer_total_fields(set(mapping), ns):
             mapping[total] = None
         return mapping
-
-    def available_fields(self, path: Path, step: int) -> list[str]:
-        """List canonical field names at *step* without loading arrays.
-
-        Parameters
-        ----------
-        path : Path
-            Simulation output directory.
-        step : int
-            Timestep index.
-
-        Returns
-        -------
-        list[str]
-            Sorted canonical field names.
-        """
-        return sorted(self.available_fields_mapping(path, step))
 
     def _assemble_field(
         self,
@@ -212,6 +161,21 @@ class IPic3DSerialReader:
 
         return result
 
+    def _load_moment(
+        self,
+        proc_files: list[Path],
+        cycle_key: str,
+        present: set[str],
+        species: int,
+        native: str,
+    ) -> FloatArray | None:
+        """Assemble one species moment, or ``None`` when proc0 lacks it."""
+        if f"species_{species}/{native}" not in present:
+            return None
+        return self._assemble_field(
+            proc_files, f"moments/species_{species}/{native}", cycle_key
+        )
+
     def read_timestep(
         self,
         path: Path,
@@ -250,7 +214,6 @@ class IPic3DSerialReader:
         )
         field_data: dict[str, FloatArray] = {}
 
-        # Electromagnetic fields
         for ipic_name, canon_name in _FIELD_NAME_MAP.items():
             if expanded is not None and canon_name not in expanded:
                 continue
@@ -258,81 +221,17 @@ class IPic3DSerialReader:
                 proc_files, f"fields/{ipic_name}", cycle_key
             )
 
-        # Per-species moments
+        present = self._present_moments(proc_files[0], cycle_key)
         for s in range(ns):
-            for comp in ("Jx", "Jy", "Jz"):
-                canon = per_species_canonical(comp, s)
-                if expanded is not None and canon not in expanded:
-                    continue
-                raw = self._assemble_field(
-                    proc_files, f"moments/species_{s}/{comp}", cycle_key
+            field_data.update(
+                read_species_moments(
+                    partial(self._load_moment, proc_files, cycle_key, present, s),
+                    s,
+                    species_qom=self._config.qom[s],
+                    expanded=expanded,
+                    pressure_map=_PHDF5_PRESSURE_MAP,
                 )
-                field_data[canon] = gaussian_current_to_si(raw)
-
-            canon_rho = per_species_canonical("rho", s)
-            if expanded is None or canon_rho in expanded:
-                raw_rho = self._assemble_field(
-                    proc_files, f"moments/species_{s}/rho", cycle_key
-                )
-                field_data[canon_rho] = gaussian_density_to_si(raw_rho)
-
-            # Pressure tensor (optional — not all shdf5 runs include it)
-            want_p_s = expanded is None or any(
-                per_species_pressure_canonical(phdf5_name, s) in expanded
-                for phdf5_name in _PHDF5_PRESSURE_MAP
             )
-            if want_p_s:
-                for phdf5_name, canon_base in _PHDF5_PRESSURE_MAP.items():
-                    canon = per_species_pressure_canonical(phdf5_name, s)
-                    if expanded is not None and canon not in expanded:
-                        continue
-                    group_path = f"moments/species_{s}/{phdf5_name}"
-                    # Optional moment: skip when proc0 does not carry it
-                    with h5py.File(proc_files[0], "r") as f:
-                        if group_path not in f or cycle_key not in f[group_path]:
-                            continue
-                    field_data[canon] = correct_pressure_tensor_component(
-                        self._assemble_field(proc_files, group_path, cycle_key),
-                        canonical_base=canon_base,
-                        species_qom=self._config.qom[s],
-                    )
-
-            # Energy flux (optional)
-            want_ef_s = expanded is None or any(
-                per_species_eflux_canonical(ef_name, s) in expanded
-                for ef_name in _EFLUX_MAP
-            )
-            if want_ef_s:
-                for ef_name, _ef_canon_base in _EFLUX_MAP.items():
-                    canon = per_species_eflux_canonical(ef_name, s)
-                    if expanded is not None and canon not in expanded:
-                        continue
-                    group_path = f"moments/species_{s}/{ef_name}"
-                    with h5py.File(proc_files[0], "r") as f:
-                        if group_path not in f or cycle_key not in f[group_path]:
-                            continue
-                    data = self._assemble_field(proc_files, group_path, cycle_key)
-                    field_data[canon] = gaussian_pressure_to_si(data)
 
         field_data = compute_totals_and_filter(field_data, ns, expanded, wanted)
-
-        sc = self._sim_config
-        return FieldDataset.from_arrays(
-            field_data,
-            sc.grid,
-            sc.normalization,
-            species=sc.species,
-            physics=sc.physics,
-            metadata={**dict(sc.metadata), "step": step},
-            frame=sc.frame,
-            transforms=sc.transforms or None,
-            strict_fields=False,
-        )
-
-    def available_auxiliary(self, path: Path) -> list[str]:
-        """Return names of auxiliary datasets at *path*."""
-        return detect_conserved(path)
-
-    def load_auxiliary(self, path: Path, name: str) -> TabularData:
-        """Load a named auxiliary dataset from *path*."""
-        return load_ipic3d_auxiliary(path, name)
+        return self._finish(field_data, step=step)

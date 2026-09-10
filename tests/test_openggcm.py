@@ -209,6 +209,11 @@ class TestOpenGGCMReader:
         v1 = ds["V_1"]
         assert np.abs(v1).max() < 1e7  # < 10,000 km/s
 
+    def test_available_fields_matches_read(self, reader_cfg_ds) -> None:
+        """Listing scans the record headers; it must agree with a full read."""
+        reader, _cfg, ds = reader_cfg_ds
+        assert reader.available_fields(FIXTURE_DIR, 6300) == sorted(ds.field_names())
+
     def test_cartesian_aliases(self, reader_cfg_ds) -> None:
         _reader, _cfg, ds = reader_cfg_ds
         assert ds.has_field("Bx")

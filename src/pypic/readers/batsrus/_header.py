@@ -1,12 +1,46 @@
-"""Parse BATSRUS ``.h`` header files."""
+"""Parse BATSRUS ``.h`` header files and decode output filenames."""
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from pathlib import Path
+
+# Output files are ``<prefix>_n<step:08d>`` or ``<prefix>_t<time:08d>_n<step:08d>``.
+STEP_RE = re.compile(r"_n(\d{8})")
+TIMESTAMP_RE = re.compile(r"_[tn]\d{8}")
+
+
+def extract_step_from_filename(name: str) -> int | None:
+    """Extract the timestep number from a BATSRUS output filename.
+
+    Examples
+    --------
+    >>> extract_step_from_filename("3d__mhd_2_t00000010_n00000042.batl")
+    42
+    >>> extract_step_from_filename("PARAM.in") is None
+    True
+    """
+    m = STEP_RE.search(name)
+    return int(m.group(1)) if m else None
+
+
+def prefix_before_step(filename: str, suffix: str) -> str:
+    """Return the part of *filename* before its timestamp, underscore included.
+
+    Examples
+    --------
+    >>> prefix_before_step("3d__mhd_2_t00000010_n00000042.batl", ".batl")
+    '3d__mhd_2_'
+    >>> prefix_before_step("z=0_mhd_1_n00000000.out", ".out")
+    'z=0_mhd_1_'
+    """
+    stem = filename.removesuffix(suffix)
+    m = TIMESTAMP_RE.search(stem)
+    return stem[: m.start() + 1] if m else stem
 
 
 @dataclass(frozen=True, slots=True)

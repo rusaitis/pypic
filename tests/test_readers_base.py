@@ -7,12 +7,17 @@ import pytest
 import xarray as xr
 from numpy.testing import assert_allclose
 
+from pypic import open_simulation
 from pypic.coordinates import CARTESIAN, CYLINDRICAL, SPHERICAL
 from pypic.dataset import FieldDataset, _default_aliases
 from pypic.grid import GridInfo
+from pypic.readers import ReaderBase
 from pypic.readers._protocols import SimulationReader
 from pypic.units import Normalization, PhysicsParams, SpeciesInfo
 from tests._helpers import make_synthetic_fielddataset, make_uniform_grid
+from tests._sim_fixtures import make_sim_dir
+
+DATA = Path(__file__).parent / "data"
 
 
 @pytest.fixture
@@ -497,3 +502,74 @@ class TestWithFieldAutoFill:
         info = ds.field_info("|B|")
         # attrs-level metadata takes precedence
         assert info.quantity_type == "pressure"
+
+
+class TestSnapshotTime:
+    def test_recorded_time_wins_over_step_times_dt(self):
+        grid = GridInfo(dimensions=(2,), spacing=(1.0,), dt=0.5)
+        ds = FieldDataset.from_arrays(
+            {"B_1": np.zeros(2)}, grid, metadata={"step": 4, "time": 7.25}
+        )
+        assert ds.time == 7.25
+
+    def test_step_times_dt_when_no_time_recorded(self):
+        grid = GridInfo(dimensions=(2,), spacing=(1.0,), dt=0.5)
+        ds = FieldDataset.from_arrays({"B_1": np.zeros(2)}, grid, metadata={"step": 4})
+        assert ds.time == 2.0
+
+    def test_none_without_dt(self):
+        grid = GridInfo(dimensions=(2,), spacing=(1.0,))
+        ds = FieldDataset.from_arrays({"B_1": np.zeros(2)}, grid, metadata={"step": 4})
+        assert ds.time is None
+
+
+class TestFromArraysCoords:
+    def test_non_uniform_coords_replace_the_grid_axis(self):
+        grid = GridInfo(dimensions=(4, 2), spacing=(1.0, 1.0))
+        x = np.array([0.0, 0.1, 0.5, 2.0])
+        ds = FieldDataset.from_arrays({"B_1": np.zeros((4, 2))}, grid, coords={"x": x})
+        np.testing.assert_array_equal(ds.xr.coords["x"].values, x)
+        np.testing.assert_array_equal(ds.xr.coords["y"].values, [0.5, 1.5])
+
+    def test_unknown_axis_raises(self):
+        grid = GridInfo(dimensions=(4, 2), spacing=(1.0, 1.0))
+        with pytest.raises(ValueError, match="coords name axes the grid lacks"):
+            FieldDataset.from_arrays(
+                {"B_1": np.zeros((4, 2))}, grid, coords={"z": np.zeros(3)}
+            )
+
+
+# (label, directory, step, whether the file or config records a time)
+_READER_FIXTURES = [
+    ("ipic3d/phdf5", DATA / "ipic3d-synthetic" / "phdf5", 0, True),
+    ("ipic3d/shdf5", DATA / "ipic3d-synthetic" / "shdf5", 0, True),
+    ("ipic3d/h5hut", DATA / "ipic3d-synthetic" / "h5hut", 0, True),
+    ("batsrus/idl", DATA / "batsrus-synthetic" / "idl-uniform", 0, True),
+    ("batsrus/hdf5", DATA / "batsrus-synthetic" / "hdf5-uniform", 0, True),
+    ("batsrus/out", DATA / "batsrus-synthetic" / "out-ascii", 0, True),
+    ("openggcm", DATA / "openggcm-small", 6300, False),
+]
+
+
+class TestReaderContract:
+    """Every built-in reader honours the `ReaderBase` contract on real fixtures."""
+
+    def test_every_reader_stamps_step_and_lists_what_it_reads(self, tmp_path):
+        cases = [*_READER_FIXTURES, ("simple", make_sim_dir(tmp_path), 1, True)]
+        problems: list[str] = []
+        for label, directory, step, knows_time in cases:
+            sim = open_simulation(directory)
+            ds = sim.read(step)
+            if not isinstance(sim.reader, ReaderBase):
+                problems.append(
+                    f"{label}: {type(sim.reader).__name__} lacks ReaderBase"
+                )
+            if ds.metadata.get("step") != step:
+                problems.append(f"{label}: metadata step {ds.metadata.get('step')!r}")
+            if (ds.time is not None) != knows_time:
+                problems.append(f"{label}: time is {ds.time!r}")
+            if sim.available_fields(step) != sorted(ds.field_names()):
+                problems.append(f"{label}: listing disagrees with the read")
+            if "stagger" not in ds.metadata:
+                problems.append(f"{label}: no stagger provenance")
+        assert not problems, "\n".join(problems)

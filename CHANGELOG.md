@@ -14,6 +14,18 @@ The distribution is `pypic-plasma` on PyPI; the import name is `pypic`.
 - `pypic.vector_component(name)` splits a registered Tier-3 vector component
   name into ``(base, component)`` — the single source `transform_to` now uses
   to decide what rotates.
+- `pypic.readers.ReaderBase`: the base every built-in reader now shares.
+  `available_fields`, the auxiliary-data defaults and the one `_finish` exit
+  that turns arrays into a `FieldDataset` live there, so a new reader
+  implements listing, timestep discovery and the read itself, nothing else.
+- `FieldDataset.time`: the snapshot time, from `metadata["time"]` when the
+  file records one, else `step * grid.dt`. The Zarr time-series writer and
+  the CLI use it instead of recomputing `step * dt` at each site.
+- `FieldDataset.from_arrays(coords=...)` keeps true coordinate arrays for
+  non-uniform meshes; OpenGGCM datasets now carry per-field registry attrs
+  like every other reader's.
+- OpenGGCM lists fields from the ``.3df`` record headers without decoding
+  any WRN2 payload, so `pypic fields` no longer reads the whole file.
 
 ### Fixed
 
@@ -62,6 +74,21 @@ The distribution is `pypic-plasma` on PyPI; the import name is `pypic`.
   read, an H5hut species count that disagrees with the config, and ambiguous
   BATSRUS step files now raise. The serial iPIC3D reader no longer swallows
   HDF5 errors while probing optional moments.
+- The three iPIC3D readers read per-species moments through one shared path
+  (`read_species_moments`); each variant supplies only a loader for its file
+  layout. Every variant now treats a missing moment as "not written" the way
+  H5hut always did, and a total (`rho_c`, `J_*`) whose per-species terms are
+  only partly present raises instead of summing what it found.
+- Dataset metadata from every reader now starts from the config's metadata,
+  as the iPIC3D readers' always did; BATSRUS, OpenGGCM and the simple reader
+  used to drop it. OpenGGCM's redundant ``metadata["timestep"]`` is gone
+  (it duplicated ``step``).
+- The simple reader's format probe is glob-only, as the registry contract
+  says probes must be: any ``*.h5`` (+0.2), the default ``output_*.h5``
+  pattern (+0.2) and ``simulation.toml`` (+0.3). It no longer opens a file
+  to look for ``fields/`` and ``grid/`` groups.
+- Built-in readers register in `pypic.readers.__init__`, in one place, rather
+  than each subpackage registering itself at import time.
 
 ### Removed
 

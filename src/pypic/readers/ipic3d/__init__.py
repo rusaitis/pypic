@@ -118,9 +118,3 @@ def open_ipic3d(
                 reader = IPic3DParallelReader(cfg, sim_config)
 
     return reader, sim_config
-
-
-# Self-register with the reader registry
-from pypic.readers._registry import register_reader as _register_reader  # noqa: E402
-
-_register_reader("ipic3d", can_read_confidence, open_ipic3d)
