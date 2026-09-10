@@ -161,6 +161,9 @@ convention = "numpy"
 # capitalized scientific symbols (R for rotation, P/Pe/Pi for canonical
 # pressure fields) are intentional in physics test names and locals.
 "tests/*" = ["D", "ANN", "N"]
+# Typer evaluates each command's annotations at registration time, so
+# argument and option types must exist at runtime, not only for mypy.
+"src/pypic/cli/*" = ["TC001", "TC002", "TC003"]
 # pyvista wraps the untyped vtk C-API; helpers must accept Any.
 "src/pypic/plotting/pyvista/*" = ["ANN401"]
 # Fixture generators, benchmarks and examples are scripts: they print
