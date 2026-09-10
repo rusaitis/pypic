@@ -2,13 +2,20 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Literal
 
 import typer
 
+from pypic.cli._options import (
+    ComparisonUnitsOption,
+    JsonOption,
+    MethodOption,
+    NanPolicyOption,
+    PathA,
+    PathB,
+    TimestepOption,
+)
 from pypic.cli._shared import (
-    _check_choice,
     _open,
     _output,
     _require_single_step,
@@ -17,31 +24,20 @@ from pypic.cli._shared import (
 
 
 def compare(
-    path_a: Annotated[Path, typer.Argument(help="First simulation directory.")],
-    path_b: Annotated[Path, typer.Argument(help="Second simulation directory.")],
-    step: Annotated[
-        str, typer.Option("--step", help="Timestep (default: last).")
-    ] = "last",
+    path_a: PathA,
+    path_b: PathB,
+    step: TimestepOption = "last",
     field: Annotated[
         str | None,
         typer.Option("--field", help="Field to compare (omit for all common)."),
     ] = None,
     metric: Annotated[
-        str,
-        typer.Option("--metric", help="Error metric: l2, linf, or both."),
+        Literal["l2", "linf", "both"],
+        typer.Option("--metric", help="Error metric; both reports l2 and linf."),
     ] = "both",
-    comp_units: Annotated[
-        str,
-        typer.Option("--units", help="Unit system: si or code."),
-    ] = "si",
-    method: Annotated[
-        str,
-        typer.Option("--method", help="Interpolation method for regridding."),
-    ] = "linear",
-    nan_policy: Annotated[
-        str,
-        typer.Option("--nan-policy", help="NaN handling: omit, propagate, raise."),
-    ] = "omit",
+    comp_units: ComparisonUnitsOption = "si",
+    method: MethodOption = "linear",
+    nan_policy: NanPolicyOption = "omit",
     frame: Annotated[
         str | None,
         typer.Option(
@@ -49,15 +45,9 @@ def compare(
             help="Transform both to this reference frame.",
         ),
     ] = None,
-    json_output: Annotated[
-        bool, typer.Option("--json", help="Output as JSON.")
-    ] = False,
+    json_output: JsonOption = False,
 ) -> None:
     """Compare fields between two simulations."""
-    _check_choice("--metric", metric, ("l2", "linf", "both"))
-    _check_choice("--units", comp_units, ("si", "code"))
-    _check_choice("--nan-policy", nan_policy, ("omit", "propagate", "raise"))
-
     from pypic.comparison import compare_fields as cmp_fields
     from pypic.comparison import field_comparison_report
 

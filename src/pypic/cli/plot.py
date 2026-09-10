@@ -3,12 +3,25 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated
+from typing import TYPE_CHECKING, Annotated, Literal
 
 import typer
 
+from pypic.cli._options import (
+    ComparisonUnitsOption,
+    DpiOption,
+    FieldOption,
+    FormatOption,
+    MethodOption,
+    PathA,
+    PathB,
+    PlaneOption,
+    SimulationPath,
+    ThemeOption,
+    TimestepOption,
+    UnitsOption,
+)
 from pypic.cli._shared import (
-    _check_choice,
     _open,
     _require_single_step,
     _resolve_plane,
@@ -215,15 +228,10 @@ def _render_plot(
 
 
 def plot(
-    path: Annotated[Path, typer.Argument(help="Simulation directory.")],
-    field: Annotated[str, typer.Option("--field", help="Field name.")],
-    step: Annotated[
-        str, typer.Option("--step", help="Timestep (default: last).")
-    ] = "last",
-    plane: Annotated[
-        str | None,
-        typer.Option("--plane", help="Slice plane (xy/xz/yz, axis pair, or normal)."),
-    ] = None,
+    path: SimulationPath,
+    field: FieldOption,
+    step: TimestepOption = "last",
+    plane: PlaneOption = None,
     index: Annotated[
         int | None,
         typer.Option("--index", help="Cell index along normal axis."),
@@ -232,10 +240,7 @@ def plot(
         float | None,
         typer.Option("--coord", help="Physical coordinate along normal."),
     ] = None,
-    units: Annotated[
-        str | None,
-        typer.Option("--units", help="Display units (e.g. nT, km/s)."),
-    ] = None,
+    units: UnitsOption = None,
     frame: Annotated[
         str | None,
         typer.Option("--frame", help="Reference frame."),
@@ -244,14 +249,8 @@ def plot(
         str | None,
         typer.Option("--output", help="Output file (batch template: {step:06d}.png)."),
     ] = None,
-    fmt: Annotated[
-        str | None,
-        typer.Option("--format", help="Image format: png, pdf, svg."),
-    ] = None,
-    dpi: Annotated[
-        int,
-        typer.Option("--dpi", help="Output DPI."),
-    ] = 150,
+    fmt: FormatOption = None,
+    dpi: DpiOption = 150,
     res: Annotated[
         str | None,
         typer.Option("--res", help="Max grid resolution WxH for fast preview."),
@@ -269,8 +268,8 @@ def plot(
         typer.Option("--colormap", help="Colormap name."),
     ] = None,
     scale: Annotated[
-        str,
-        typer.Option("--scale", help="Color scale: linear, log, or symlog."),
+        Literal["linear", "log", "symlog"],
+        typer.Option("--scale", help="Color scale."),
     ] = "linear",
     linthresh: Annotated[
         float | None,
@@ -280,10 +279,7 @@ def plot(
         int,
         typer.Option("--jobs", help="Parallel workers for batch rendering."),
     ] = 1,
-    theme: Annotated[
-        str | None,
-        typer.Option("--theme", help="Plot theme name (e.g. dark, light, synthwave)."),
-    ] = None,
+    theme: ThemeOption = None,
     contour: Annotated[
         str | None,
         typer.Option("--contour", help="Overlay contour lines from this field."),
@@ -302,9 +298,6 @@ def plot(
     ] = 24,
 ) -> None:
     """Plot a 2D field slice."""
-    _check_choice("--scale", scale, ("linear", "log", "symlog"))
-    _check_choice("--format", fmt, ("png", "pdf", "svg"))
-
     if animate is not None and output is None:
         msg = "--animate requires --output to know where frames are."
         raise typer.BadParameter(msg)
@@ -415,20 +408,12 @@ def plot(
 
 
 def plot_compare(
-    path_a: Annotated[Path, typer.Argument(help="First simulation directory.")],
-    path_b: Annotated[Path, typer.Argument(help="Second simulation directory.")],
-    field: Annotated[str, typer.Option("--field", help="Field name.")],
-    step: Annotated[
-        str, typer.Option("--step", help="Timestep (default: last).")
-    ] = "last",
-    plane: Annotated[
-        str | None,
-        typer.Option("--plane", help="Slice plane (xy/xz/yz, axis pair, or normal)."),
-    ] = None,
-    comp_units: Annotated[
-        str,
-        typer.Option("--units", help="Unit system: si or code."),
-    ] = "si",
+    path_a: PathA,
+    path_b: PathB,
+    field: FieldOption,
+    step: TimestepOption = "last",
+    plane: PlaneOption = None,
+    comp_units: ComparisonUnitsOption = "si",
     frame: Annotated[
         str | None,
         typer.Option("--frame", help="Transform both to this reference frame."),
@@ -453,31 +438,16 @@ def plot_compare(
         str | None,
         typer.Option("--output", help="Output file."),
     ] = None,
-    fmt: Annotated[
-        str | None,
-        typer.Option("--format", help="Image format: png, pdf, svg."),
-    ] = None,
-    dpi: Annotated[
-        int,
-        typer.Option("--dpi", help="Output DPI."),
-    ] = 150,
+    fmt: FormatOption = None,
+    dpi: DpiOption = 150,
     colormap: Annotated[
         str | None,
         typer.Option("--colormap", help="Colormap for field panels."),
     ] = None,
-    method: Annotated[
-        str,
-        typer.Option("--method", help="Interpolation method for regridding."),
-    ] = "linear",
-    theme: Annotated[
-        str | None,
-        typer.Option("--theme", help="Plot theme name (e.g. dark, light, synthwave)."),
-    ] = None,
+    method: MethodOption = "linear",
+    theme: ThemeOption = None,
 ) -> None:
     """Three-panel comparison plot: A | B | difference."""
-    _check_choice("--units", comp_units, ("si", "code"))
-    _check_choice("--format", fmt, ("png", "pdf", "svg"))
-
     import matplotlib
 
     matplotlib.use("Agg" if output else matplotlib.get_backend())

@@ -323,13 +323,33 @@ def test_bad_log_level(tmp_path):
     assert "Invalid --log-level" in result.output
 
 
+def test_reduction_choices_mirror_the_library_vocabulary():
+    """``--reduction`` offers exactly the ``Reduction`` members, so drift is loud."""
+    from typing import get_args, get_type_hints
+
+    from pypic.cli.reduce import reduce_apply
+    from pypic.reductions import Reduction
+
+    hint = get_type_hints(reduce_apply, include_extras=True)["reduction"]
+    assert get_args(get_args(hint)[0]) == get_args(Reduction.__value__)
+
+
+def test_nan_policy_choices_mirror_the_library_vocabulary():
+    from typing import get_args
+
+    from pypic.cli._options import NanPolicyOption
+    from pypic.diagnostics import NanPolicy
+
+    assert get_args(get_args(NanPolicyOption)[0]) == get_args(NanPolicy.__value__)
+
+
 def test_bad_metric(tmp_path):
     d = make_sim_dir(tmp_path, "sim")
     result = runner.invoke(
         app, ["compare", str(d), str(d), "--field", "B_1", "--metric", "oops"]
     )
     assert result.exit_code != 0
-    assert "Invalid --metric" in result.output
+    assert "Invalid value for '--metric'" in result.output
 
 
 def test_bad_units(tmp_path):
@@ -338,7 +358,7 @@ def test_bad_units(tmp_path):
         app, ["compare", str(d), str(d), "--field", "B_1", "--units", "cgs"]
     )
     assert result.exit_code != 0
-    assert "Invalid --units" in result.output
+    assert "Invalid value for '--units'" in result.output
 
 
 def test_bad_nan_policy(tmp_path):
@@ -348,7 +368,7 @@ def test_bad_nan_policy(tmp_path):
         ["compare", str(d), str(d), "--field", "B_1", "--nan-policy", "ignore"],
     )
     assert result.exit_code != 0
-    assert "Invalid --nan-policy" in result.output
+    assert "Invalid value for '--nan-policy'" in result.output
 
 
 def test_log_level_not_sticky(tmp_path):
@@ -638,7 +658,7 @@ class TestPlot:
             ["plot", str(d), "--field", "B_1", "--scale", "banana", "--output", out],
         )
         assert result.exit_code != 0
-        assert "Invalid --scale" in result.output
+        assert "Invalid value for '--scale'" in result.output
 
     def test_bad_plane(self, tmp_path: Path) -> None:
         d = make_sim_dir(tmp_path, "sim")
@@ -734,7 +754,7 @@ class TestPlotCompare:
             ],
         )
         assert result.exit_code != 0
-        assert "Invalid --units" in result.output
+        assert "Invalid value for '--units'" in result.output
 
     def test_missing_field(self, tmp_path: Path) -> None:
         d = make_sim_dir(tmp_path, "sim")

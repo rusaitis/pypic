@@ -2,21 +2,33 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Annotated, Literal
 
 import typer
 
-from pypic.cli._options import DryRunOption, ProgressOption, StepOption
+from pypic.cli._options import (
+    BackendOption,
+    CompressionOption,
+    DryRunOption,
+    DtypeOption,
+    FieldsOption,
+    InputPath,
+    MessageOption,
+    NanPolicyOption,
+    PlaneCoordOption,
+    PlaneIndexOption,
+    ProgressOption,
+    StepOption,
+    TagOption,
+    ZarrOutputOption,
+)
 from pypic.cli._shared import (
-    _expand_encoding_for_vars,
-    _make_progress_iter,
+    ZarrTarget,
     _open,
     _parse_box_ranges,
     _parse_comma_list,
-    _parse_compression,
     _resolve_plane,
-    _time_coordinate,
+    _write_steps,
     parse_steps,
 )
 from pypic.dataset import FieldDataset
@@ -33,11 +45,8 @@ reduce_app = typer.Typer(
 
 @reduce_app.command("apply")
 def reduce_apply(
-    path: Annotated[Path, typer.Argument(help="Simulation directory or HDF5 file.")],
-    output: Annotated[
-        Path,
-        typer.Option("--output", "-o", help="Destination Zarr store directory."),
-    ],
+    path: InputPath,
+    output: ZarrOutputOption,
     axis: Annotated[
         str,
         typer.Option(
@@ -46,13 +55,21 @@ def reduce_apply(
         ),
     ],
     reduction: Annotated[
-        str,
+        Literal[
+            "integrate",
+            "sum",
+            "mean",
+            "median",
+            "max",
+            "min",
+            "std",
+            "var",
+            "argmax",
+            "argmin",
+        ],
         typer.Option(
             "--reduction",
-            help=(
-                "How to collapse the axis: integrate (default), sum, mean, "
-                "median, max, min, std, var, argmax, argmin."
-            ),
+            help="How to collapse the axis.",
         ),
     ] = "integrate",
     weight: Annotated[
@@ -65,12 +82,7 @@ def reduce_apply(
             ),
         ),
     ] = None,
-    fields: Annotated[
-        str | None,
-        typer.Option(
-            "--fields", help="Comma-separated field names (e.g. B,E_3,rho_c)."
-        ),
-    ] = None,
+    fields: FieldsOption = None,
     step: StepOption = "all",
     box: Annotated[
         str | None,
@@ -85,44 +97,14 @@ def reduce_apply(
             help="Pre-slice plane before reducing (e.g. xy, xz, z).",
         ),
     ] = None,
-    plane_index: Annotated[
-        int | None,
-        typer.Option("--plane-index", help="Cell index along the plane normal."),
-    ] = None,
-    plane_coord: Annotated[
-        float | None,
-        typer.Option("--plane-coord", help="Physical coord along the plane normal."),
-    ] = None,
-    nan_policy: Annotated[
-        str,
-        typer.Option(
-            "--nan-policy",
-            help="NaN handling: omit (default), propagate, or raise.",
-        ),
-    ] = "omit",
-    dtype: Annotated[
-        str | None,
-        typer.Option("--dtype", help="Downcast (e.g. float32)."),
-    ] = None,
-    compression: Annotated[
-        str | None,
-        typer.Option(
-            "--compression",
-            help="Codec spec: zstd[:level] or blosc[:level] (default blosc:5).",
-        ),
-    ] = None,
-    backend: Annotated[
-        Literal["zarr", "icechunk"],
-        typer.Option("--backend", help="Storage backend: zarr or icechunk."),
-    ] = "zarr",
-    message: Annotated[
-        str | None,
-        typer.Option("--message", help="Icechunk commit message."),
-    ] = None,
-    tag: Annotated[
-        str | None,
-        typer.Option("--tag", help="Icechunk tag name (created on success)."),
-    ] = None,
+    plane_index: PlaneIndexOption = None,
+    plane_coord: PlaneCoordOption = None,
+    nan_policy: NanPolicyOption = "omit",
+    dtype: DtypeOption = None,
+    compression: CompressionOption = None,
+    backend: BackendOption = "zarr",
+    message: MessageOption = None,
+    tag: TagOption = None,
     progress: ProgressOption = True,
     dry_run: DryRunOption = False,
 ) -> None:
@@ -133,17 +115,12 @@ def reduce_apply(
     (applied before the reduction) and --weight (yt-style
     density-weighted average; mean / integrate only).
     """
-    from pypic.io import to_zarr, to_zarr_timeseries
     from pypic.reductions import reduce as reduce_fn
     from pypic.selections import BoxSelection
 
-    if tag is not None and backend != "icechunk":
-        msg = "--tag requires --backend icechunk."
-        raise typer.BadParameter(msg)
-    if message is not None and backend != "icechunk":
-        msg = "--message requires --backend icechunk."
-        raise typer.BadParameter(msg)
-    backend_arg = None if backend == "zarr" else backend
+    target = ZarrTarget(
+        output, backend, dtype=dtype, compression=compression, message=message, tag=tag
+    )
 
     axis_list = _parse_comma_list(axis)
     if not axis_list:
@@ -162,8 +139,6 @@ def reduce_apply(
         if (plane or plane_index is not None or plane_coord is not None)
         else None
     )
-    compression_spec = _parse_compression(compression)
-
     # A weight field must be pulled from disk even when ``--fields`` narrows
     # the load list; ``reduce(fields=...)`` drops it again on output.  Without
     # this a restricted read fails on the missing weight at compute time.
@@ -183,10 +158,10 @@ def reduce_apply(
         return reduce_fn(
             fds,
             axis_spec,
-            reduction=reduction,  # type: ignore[arg-type]
+            reduction=reduction,
             fields=field_list or None,
             weight=weight,
-            nan_policy=nan_policy,  # type: ignore[arg-type]
+            nan_policy=nan_policy,
         )
 
     if dry_run:
@@ -210,47 +185,13 @@ def reduce_apply(
             typer.echo(f"  tag: {tag}")
         return
 
-    if len(step_list) == 1:
-        fds = sim.read(step_list[0], fields=read_fields)
-        reduced = _reduce_one(fds)
-        enc = _expand_encoding_for_vars(compression_spec, list(reduced.field_names()))
-        snapshot = to_zarr(
-            reduced,
-            output,
-            dtype=dtype,
-            encoding=enc,
-            backend=backend_arg,
-            message=message,
-        )
-    else:
-        first = _reduce_one(sim.read(step_list[0], fields=read_fields))
-        enc = _expand_encoding_for_vars(compression_spec, list(first.field_names()))
-
-        def _base_pairs() -> object:
-            yield _time_coordinate(first, step_list[0]), first
-            for s in step_list[1:]:
-                reduced = _reduce_one(sim.read(s, fields=read_fields))
-                yield _time_coordinate(reduced, s), reduced
-
-        pairs = _make_progress_iter(
-            _base_pairs(),
-            total=len(step_list),
-            description="Reducing fields",
-            enabled=progress,
-        )
-        snapshot = to_zarr_timeseries(
-            pairs,  # type: ignore[arg-type]
-            output,
-            dtype=dtype,
-            encoding=enc,
-            backend=backend_arg,
-            message=message,
-        )
-
-    if tag is not None and snapshot is not None:
-        from pypic.io import icechunk_create_tag
-
-        icechunk_create_tag(output, tag, snapshot_id=snapshot)
-        typer.echo(f"Reduced {len(step_list)} step(s) to {output} (tag={tag})")
-    else:
-        typer.echo(f"Reduced {len(step_list)} step(s) to {output}")
+    _write_steps(
+        sim,
+        step_list,
+        target,
+        read_fields=read_fields,
+        transform=_reduce_one,
+        description="Reducing fields",
+        progress=progress,
+        done=f"Reduced {len(step_list)} step(s) to {output}",
+    )

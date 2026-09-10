@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 from typing import TYPE_CHECKING, Annotated
 
 import typer
 
+from pypic.cli._options import JsonOption, SimulationPath, TimestepOption, UnitsOption
 from pypic.cli._shared import _open, _output, _require_single_step, parse_steps
 
 if TYPE_CHECKING:
@@ -31,10 +31,8 @@ def _get_field_array(
 
 
 def info(
-    path: Annotated[Path, typer.Argument(help="Simulation directory.")],
-    json_output: Annotated[
-        bool, typer.Option("--json", help="Output as JSON.")
-    ] = False,
+    path: SimulationPath,
+    json_output: JsonOption = False,
 ) -> None:
     """Show simulation metadata."""
     sim = _open(path)
@@ -139,10 +137,8 @@ def info(
 
 
 def fields(
-    path: Annotated[Path, typer.Argument(help="Simulation directory.")],
-    step: Annotated[
-        str, typer.Option("--step", help="Timestep (default: last).")
-    ] = "last",
+    path: SimulationPath,
+    step: TimestepOption = "last",
     mapping: Annotated[
         bool,
         typer.Option("--mapping", help="Show native-to-canonical name mapping."),
@@ -158,9 +154,7 @@ def fields(
         bool,
         typer.Option("--all", help="Show mapping, derived, and auxiliary."),
     ] = False,
-    json_output: Annotated[
-        bool, typer.Option("--json", help="Output as JSON.")
-    ] = False,
+    json_output: JsonOption = False,
 ) -> None:
     """List available fields at a timestep."""
     sim = _open(path)
@@ -235,20 +229,13 @@ def fields(
 
 
 def stats(
-    path: Annotated[Path, typer.Argument(help="Simulation directory.")],
+    path: SimulationPath,
     field: Annotated[
         str, typer.Option("--field", help="Field name ('all' for every field).")
     ],
-    step: Annotated[
-        str, typer.Option("--step", help="Timestep (default: last).")
-    ] = "last",
-    units: Annotated[
-        str | None,
-        typer.Option("--units", help="Display units (e.g. nT, km/s)."),
-    ] = None,
-    json_output: Annotated[
-        bool, typer.Option("--json", help="Output as JSON.")
-    ] = False,
+    step: TimestepOption = "last",
+    units: UnitsOption = None,
+    json_output: JsonOption = False,
 ) -> None:
     """Print field statistics (min, max, mean, rms, NaN count)."""
     import numpy as np
@@ -343,13 +330,9 @@ def stats(
 
 
 def validate(
-    path: Annotated[Path, typer.Argument(help="Simulation directory.")],
-    step: Annotated[
-        str, typer.Option("--step", help="Timestep (default: last).")
-    ] = "last",
-    json_output: Annotated[
-        bool, typer.Option("--json", help="Output as JSON.")
-    ] = False,
+    path: SimulationPath,
+    step: TimestepOption = "last",
+    json_output: JsonOption = False,
 ) -> None:
     """Quick health check: NaN census, div B, field energy."""
     import numpy as np

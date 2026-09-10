@@ -7,21 +7,37 @@ from typing import TYPE_CHECKING, Annotated, Literal
 
 import typer
 
-from pypic.cli._options import DryRunOption, ProgressOption, StepOption
+from pypic.cli._options import (
+    BackendOption,
+    CompressionOption,
+    DryRunOption,
+    DtypeOption,
+    FieldsOption,
+    InputPath,
+    MessageOption,
+    PlaneCoordOption,
+    PlaneIndexOption,
+    ProgressOption,
+    SimulationPath,
+    StepOption,
+    TagOption,
+    ZarrOutputOption,
+)
 from pypic.cli._shared import (
-    _expand_encoding_for_vars,
+    ZarrTarget,
     _make_progress_iter,
     _open,
     _parse_box_ranges,
     _parse_comma_list,
-    _parse_compression,
     _resolve_plane,
-    _time_coordinate,
+    _write_steps,
     parse_steps,
 )
 from pypic.dataset import FieldDataset
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
+
     from pypic.containers import ParticleData
     from pypic.readers._registry import Simulation
 
@@ -119,18 +135,10 @@ convert_app = typer.Typer(
 
 @convert_app.command("fields")
 def convert_fields(
-    path: Annotated[Path, typer.Argument(help="Simulation directory or HDF5 file.")],
-    output: Annotated[
-        Path,
-        typer.Option("--output", "-o", help="Destination Zarr store directory."),
-    ],
+    path: InputPath,
+    output: ZarrOutputOption,
     step: StepOption = "all",
-    fields: Annotated[
-        str | None,
-        typer.Option(
-            "--fields", help="Comma-separated field names (e.g. B,E_3,rho_c)."
-        ),
-    ] = None,
+    fields: FieldsOption = None,
     box: Annotated[
         str | None,
         typer.Option("--box", help="Spatial crop as axis=lo:hi,...,axis=lo:hi."),
@@ -139,14 +147,8 @@ def convert_fields(
         str | None,
         typer.Option("--plane", help="Slab plane (e.g. xy, xz, z). See `pypic plot`."),
     ] = None,
-    plane_index: Annotated[
-        int | None,
-        typer.Option("--plane-index", help="Cell index along the plane normal."),
-    ] = None,
-    plane_coord: Annotated[
-        float | None,
-        typer.Option("--plane-coord", help="Physical coord along the plane normal."),
-    ] = None,
+    plane_index: PlaneIndexOption = None,
+    plane_coord: PlaneCoordOption = None,
     target_resolution: Annotated[
         float | None,
         typer.Option("--target-resolution", help="Regrid to this uniform spacing."),
@@ -155,17 +157,8 @@ def convert_fields(
         bool,
         typer.Option("--to-si", help="Convert all fields to SI units before writing."),
     ] = False,
-    dtype: Annotated[
-        str | None,
-        typer.Option("--dtype", help="Downcast (e.g. float32)."),
-    ] = None,
-    compression: Annotated[
-        str | None,
-        typer.Option(
-            "--compression",
-            help="Codec spec: zstd[:level] or blosc[:level] (default blosc:5).",
-        ),
-    ] = None,
+    dtype: DtypeOption = None,
+    compression: CompressionOption = None,
     virtual: Annotated[
         bool,
         typer.Option(
@@ -179,18 +172,9 @@ def convert_fields(
             ),
         ),
     ] = False,
-    backend: Annotated[
-        Literal["zarr", "icechunk"],
-        typer.Option("--backend", help="Storage backend: zarr or icechunk."),
-    ] = "zarr",
-    message: Annotated[
-        str | None,
-        typer.Option("--message", help="Icechunk commit message."),
-    ] = None,
-    tag: Annotated[
-        str | None,
-        typer.Option("--tag", help="Icechunk tag name (created on success)."),
-    ] = None,
+    backend: BackendOption = "zarr",
+    message: MessageOption = None,
+    tag: TagOption = None,
     progress: ProgressOption = True,
     dry_run: DryRunOption = False,
 ) -> None:
@@ -202,16 +186,11 @@ def convert_fields(
     storage, or --virtual to persist HDF5 byte-range references
     without copying data.
     """
-    from pypic.io import to_zarr, to_zarr_timeseries
     from pypic.selections import BoxSelection
 
-    if tag is not None and backend != "icechunk":
-        msg = "--tag requires --backend icechunk."
-        raise typer.BadParameter(msg)
-    if message is not None and backend != "icechunk":
-        msg = "--message requires --backend icechunk."
-        raise typer.BadParameter(msg)
-    backend_arg = None if backend == "zarr" else backend
+    target = ZarrTarget(
+        output, backend, dtype=dtype, compression=compression, message=message, tag=tag
+    )
 
     # -- Virtual mode: treat path as one HDF5 file, single-step write --------
     if virtual:
@@ -264,7 +243,6 @@ def convert_fields(
         if (plane or plane_index is not None or plane_coord is not None)
         else None
     )
-    compression_spec = _parse_compression(compression)
 
     def _postprocess(fds: FieldDataset) -> FieldDataset:
         if plane_sel is not None:
@@ -312,64 +290,21 @@ def convert_fields(
             typer.echo(f"  tag: {tag}")
         return
 
-    needs_transform = bool(plane_sel or box_ranges or target_resolution or to_si)
-
-    if len(step_list) == 1:
-        fds = sim.read(step_list[0], fields=field_list)
-        if needs_transform:
-            fds = _postprocess(fds)
-        enc = _expand_encoding_for_vars(compression_spec, list(fds.field_names()))
-        snapshot = to_zarr(
-            fds,
-            output,
-            dtype=dtype,
-            encoding=enc,
-            backend=backend_arg,
-            message=message,
-        )
-    else:
-        # Read step 0 once — reused for the encoding dict AND as the first
-        # yielded pair, avoiding a duplicate I/O on large datasets.
-        first = sim.read(step_list[0], fields=field_list)
-        if needs_transform:
-            first = _postprocess(first)
-        enc = _expand_encoding_for_vars(compression_spec, list(first.field_names()))
-
-        def _base_pairs() -> object:
-            yield _time_coordinate(first, step_list[0]), first
-            for s in step_list[1:]:
-                fds = sim.read(s, fields=field_list)
-                if needs_transform:
-                    fds = _postprocess(fds)
-                yield _time_coordinate(fds, s), fds
-
-        pairs = _make_progress_iter(
-            _base_pairs(),
-            total=len(step_list),
-            description="Writing fields",
-            enabled=progress,
-        )
-        snapshot = to_zarr_timeseries(
-            pairs,  # type: ignore[arg-type]
-            output,
-            dtype=dtype,
-            encoding=enc,
-            backend=backend_arg,
-            message=message,
-        )
-
-    if tag is not None and snapshot is not None:
-        from pypic.io import icechunk_create_tag
-
-        icechunk_create_tag(output, tag, snapshot_id=snapshot)
-        typer.echo(f"Wrote {len(step_list)} step(s) to {output} (tag={tag})")
-    else:
-        typer.echo(f"Wrote {len(step_list)} step(s) to {output}")
+    _write_steps(
+        sim,
+        step_list,
+        target,
+        read_fields=field_list,
+        transform=_postprocess,
+        description="Writing fields",
+        progress=progress,
+        done=f"Wrote {len(step_list)} step(s) to {output}",
+    )
 
 
 @convert_app.command("particles")
 def convert_particles(
-    path: Annotated[Path, typer.Argument(help="Simulation directory.")],
+    path: SimulationPath,
     output: Annotated[
         Path,
         typer.Option("--output", "-o", help="Destination partitioned Parquet dir."),
@@ -465,7 +400,7 @@ def convert_particles(
         species_idx if species_idx is not None else list(range(len(sim.config.species)))
     )
 
-    def _pairs() -> object:
+    def _pairs() -> Iterator[tuple[int, str, ParticleData]]:
         for s in step_list:
             for sp_idx in species_resolved:
                 pcl = sim.particles(s, sp_idx, columns=columns_list)
@@ -481,7 +416,7 @@ def convert_particles(
         enabled=progress,
     )
     particles_to_dataset(
-        pairs_iter,  # type: ignore[arg-type]
+        pairs_iter,
         output,
         position_dtype=position_dtype,
         velocity_dtype=velocity_dtype,
@@ -495,7 +430,7 @@ def convert_particles(
 @convert_app.command("all")
 def convert_all(
     ctx: typer.Context,
-    path: Annotated[Path, typer.Argument(help="Simulation directory.")],
+    path: SimulationPath,
     output: Annotated[
         Path,
         typer.Option("--output", "-o", help="Destination root directory."),

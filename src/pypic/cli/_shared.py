@@ -3,15 +3,16 @@
 from __future__ import annotations
 
 import json
+from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 import typer
 
 from pypic.dataset import FieldDataset
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Sequence
+    from collections.abc import Callable, Iterable, Iterator, Sequence
     from typing import Any
 
     from pypic.grid import GridInfo
@@ -95,17 +96,6 @@ def _require_single_step(step_list: list[int], raw: str) -> int:
         )
         raise typer.BadParameter(msg)
     return step_list[0]
-
-
-def _check_choice(option: str, value: str | None, choices: tuple[str, ...]) -> None:
-    """Raise BadParameter when *value* isn't one of *choices*.
-
-    ``None`` passes through so callers can use the helper for both
-    required and optional options.
-    """
-    if value is not None and value not in choices:
-        msg = f"Invalid {option} {value!r}. Use {', '.join(choices)}."
-        raise typer.BadParameter(msg)
 
 
 def _open(path: Path) -> Simulation:
@@ -313,13 +303,13 @@ def _expand_encoding_for_vars(
     return spec
 
 
-def _make_progress_iter(
-    items: object,
+def _make_progress_iter[T](
+    items: Iterable[T],
     *,
     total: int,
     description: str,
     enabled: bool,
-) -> object:
+) -> Iterable[T]:
     """Wrap an iterable with a rich.progress bar when *enabled* and TTY.
 
     Falls back to the raw iterable when rich isn't installed or output
@@ -349,11 +339,93 @@ def _make_progress_iter(
         transient=True,
     )
 
-    def _iter() -> object:
+    def _iter() -> Iterator[T]:
         with progress:
             task_id = progress.add_task(description, total=total)
-            for item in items:  # type: ignore[attr-defined]
+            for item in items:
                 yield item
                 progress.advance(task_id)
 
     return _iter()
+
+
+@dataclass(frozen=True, slots=True)
+class ZarrTarget:
+    """The Zarr output options ``convert fields`` and ``reduce apply`` share."""
+
+    output: Path
+    backend: Literal["zarr", "icechunk"]
+    dtype: str | None = None
+    compression: str | None = None
+    message: str | None = None
+    tag: str | None = None
+
+    def __post_init__(self) -> None:
+        for option, value in (("--tag", self.tag), ("--message", self.message)):
+            if value is not None and self.backend != "icechunk":
+                msg = f"{option} requires --backend icechunk."
+                raise typer.BadParameter(msg)
+
+
+def _write_steps(
+    sim: Simulation,
+    step_list: list[int],
+    target: ZarrTarget,
+    *,
+    read_fields: list[str] | None,
+    transform: Callable[[FieldDataset], FieldDataset],
+    description: str,
+    progress: bool,
+    done: str,
+) -> None:
+    """Read, transform and write *step_list* to *target*, then echo *done*.
+
+    One step goes through `to_zarr`; several promote ``time`` to a
+    leading dimension through `to_zarr_timeseries`. The first step is
+    read once, for the encoding dict and as the first yielded pair.
+    """
+    from pypic.io import to_zarr, to_zarr_timeseries
+
+    backend = None if target.backend == "zarr" else target.backend
+    first = transform(sim.read(step_list[0], fields=read_fields))
+    encoding = _expand_encoding_for_vars(
+        _parse_compression(target.compression), list(first.field_names())
+    )
+    if len(step_list) == 1:
+        snapshot = to_zarr(
+            first,
+            target.output,
+            dtype=target.dtype,
+            encoding=encoding,
+            backend=backend,
+            message=target.message,
+        )
+    else:
+
+        def _pairs() -> Iterator[tuple[float | int, FieldDataset]]:
+            yield _time_coordinate(first, step_list[0]), first
+            for step in step_list[1:]:
+                fds = transform(sim.read(step, fields=read_fields))
+                yield _time_coordinate(fds, step), fds
+
+        snapshot = to_zarr_timeseries(
+            _make_progress_iter(
+                _pairs(),
+                total=len(step_list),
+                description=description,
+                enabled=progress,
+            ),
+            target.output,
+            dtype=target.dtype,
+            encoding=encoding,
+            backend=backend,
+            message=target.message,
+        )
+
+    if target.tag is not None and snapshot is not None:
+        from pypic.io import icechunk_create_tag
+
+        icechunk_create_tag(target.output, target.tag, snapshot_id=snapshot)
+        typer.echo(f"{done} (tag={target.tag})")
+    else:
+        typer.echo(done)
