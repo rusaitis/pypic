@@ -13,13 +13,16 @@ for ergonomic consumption by the TypeScript side.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
+from pypic._field_table import _FIELD_INFO
 from pypic.aliases import COMPUTE_ALIASES, GROUP_ALIASES, SPECIES_SUFFIX_RE
 from pypic.compute import RECIPES, SPECIES_TEMPLATES, Recipe, SpeciesTemplate
-from pypic.fields import _FIELD_INFO, FieldInfo
 from pypic.schema._export import build_schema
 from pypic.schema._models import SCHEMA_VERSION
+
+if TYPE_CHECKING:
+    from pypic.fields import FieldInfo
 
 __all__ = [
     "export_aliases",

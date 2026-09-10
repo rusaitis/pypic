@@ -15,8 +15,9 @@ from __future__ import annotations
 
 import re
 
+from pypic._field_table import _FIELD_INFO
 from pypic.coordinates.transforms import find_vector_triplets
-from pypic.fields import _FIELD_INFO, vector_component
+from pypic.fields import vector_component
 
 _COMPONENT = re.compile(r"^(?P<base>.+)_(?P<c>[123])$")
 

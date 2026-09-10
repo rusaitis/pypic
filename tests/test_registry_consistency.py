@@ -26,6 +26,7 @@ from pypic._aliases import (
     OPERATOR_SUFFIXES,
     _get_field_alias_fallback,
 )
+from pypic._field_table import _FIELD_INFO
 from pypic.compute import (
     _REGISTRY,
     SPECIES_TEMPLATES,
@@ -35,7 +36,7 @@ from pypic.compute import (
     _try_species_recipe,
 )
 from pypic.coordinates.geometry import GeometryType
-from pypic.fields import _FIELD_INFO, _SPECIES_INFO_PATTERNS, field_info
+from pypic.fields import _SPECIES_INFO_PATTERNS, field_info
 from pypic.units import Normalization
 
 # ---------------------------------------------------------------------------

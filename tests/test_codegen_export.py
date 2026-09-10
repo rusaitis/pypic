@@ -8,9 +8,9 @@ from typer.testing import CliRunner
 
 from pypic._aliases import COMPUTE_ALIASES, GROUP_ALIASES
 from pypic._codegen_cli import app as export_app
+from pypic._field_table import _FIELD_INFO
 from pypic.codegen import export_aliases, export_bundle, export_fields, export_recipes
 from pypic.compute import RECIPES, SPECIES_TEMPLATES
-from pypic.fields import _FIELD_INFO
 
 runner = CliRunner()
 

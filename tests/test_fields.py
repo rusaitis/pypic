@@ -1,10 +1,10 @@
 import numpy as np
 import pytest
 
+from pypic._field_table import _FIELD_INFO
 from pypic.compute import field_si_factor
 from pypic.dataset import FieldDataset
 from pypic.fields import (
-    _FIELD_INFO,
     _QUANTITY_DIMENSIONS,
     _QUANTITY_UNITS,
     _SPECIES_INFO_PATTERNS,

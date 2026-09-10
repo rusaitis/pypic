@@ -217,6 +217,7 @@ def test_physics_modules_are_fully_re_exported() -> None:
 # § Module layout). They may import each other, never anything above.
 _BELOW_DATASET = [
     "_aliases",
+    "_field_table",
     "containers",
     "coordinates/geometry",
     "coordinates/operators",

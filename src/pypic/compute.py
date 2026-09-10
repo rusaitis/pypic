@@ -21,6 +21,7 @@ from pypic._aliases import (
     SPECIES_SUFFIX_RE,
     _get_field_alias_fallback,
 )
+from pypic._field_table import _FIELD_INFO
 from pypic._recipes import (
     _REGISTRY,
     _SPECIES_TEMPLATES,
@@ -32,7 +33,6 @@ from pypic._recipes import (
 from pypic.coordinates.geometry import GeometryType
 from pypic.exceptions import GeometryUnsupportedError, UnknownFieldError
 from pypic.fields import (
-    _FIELD_INFO,
     _SPECIES_QUANTITY_PATTERNS,
     QuantityType,
     register_field,
