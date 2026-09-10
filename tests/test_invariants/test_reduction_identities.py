@@ -90,7 +90,12 @@ def test_field_energy_is_linear_in_field(
     """
     baseline = field_energy(f, spacing)
     scaled = field_energy(alpha * f, spacing)
-    assert_allclose(scaled, alpha * baseline, rtol=1e-13, atol=1e-13)
+    # Summation order differs between the two sides, so the roundoff
+    # scales with the sum of magnitudes, not with the (possibly cancelling)
+    # result: an rtol on the result alone flakes whenever the integrand
+    # nearly sums to zero.
+    roundoff = 8 * np.finfo(float).eps * abs(alpha) * field_energy(np.abs(f), spacing)
+    assert_allclose(scaled, alpha * baseline, rtol=1e-13, atol=roundoff)
 
 
 @given(
