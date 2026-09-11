@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, fields
+from types import MappingProxyType
 from typing import TYPE_CHECKING, Any, cast
 
 if TYPE_CHECKING:
-    from collections.abc import Generator
+    from collections.abc import Generator, Mapping
 
     from matplotlib.axes import Axes
     from matplotlib.figure import Figure
@@ -62,9 +63,10 @@ class PlotTheme:
     ----------
     name : str
         Human-readable theme name.
-    rcparams : dict[str, Any]
+    rcparams : Mapping[str, Any]
         Full set of matplotlib rcParams to apply (must not contain
-        ``axes.prop_cycle`` — use *color_cycle* instead).
+        ``axes.prop_cycle`` — use *color_cycle* instead). Stored
+        read-only; derive a changed theme with `customize`.
     sequential_cmaps : tuple[str, ...]
         Colormap preference list for positive-definite fields (first is default).
     diverging_cmaps : tuple[str, ...]
@@ -79,7 +81,7 @@ class PlotTheme:
     """
 
     name: str
-    rcparams: dict[str, Any]
+    rcparams: Mapping[str, Any]  # read-only via __post_init__
 
     # Colors — RGBA tuples (r, g, b, a) with built-in opacity.
     # String colors (background, accent) are opaque and don't need alpha.
@@ -170,6 +172,23 @@ class PlotTheme:
     # Plot area
     plot_rounding: float = 0.0
 
+    def __post_init__(self) -> None:
+        # get_theme() hands every caller the same instance, so a mutable
+        # rcparams would let one plot restyle all the others.
+        object.__setattr__(self, "rcparams", MappingProxyType(dict(self.rcparams)))
+
+    # A mappingproxy neither pickles nor deep-copies: ship the dict it wraps.
+    def __getstate__(self) -> list[Any]:
+        return [
+            dict(self.rcparams) if f.name == "rcparams" else getattr(self, f.name)
+            for f in fields(self)
+        ]
+
+    def __setstate__(self, state: list[Any]) -> None:
+        for f, value in zip(fields(self), state, strict=True):
+            object.__setattr__(self, f.name, value)
+        self.__post_init__()
+
     @property
     def sequential_cmap(self) -> str:
         """Default sequential colormap (first in preference list)."""
@@ -203,9 +222,8 @@ class PlotTheme:
         6.0
         """
         import copy
-        import dataclasses
 
-        field_names = {f.name for f in dataclasses.fields(self)}
+        field_names = {f.name for f in fields(self)}
         theme_kw: dict[str, Any] = {}
         rc_kw: dict[str, Any] = {}
 

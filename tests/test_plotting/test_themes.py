@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import copy
 import dataclasses
+import pickle
 from typing import TYPE_CHECKING
 
 import matplotlib
@@ -22,6 +24,7 @@ from pypic.plotting._theme_io import _bundled_theme_dir
 from pypic.plotting.styles import _resolve_theme_arg
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
     from pathlib import Path
 
     from pypic.dataset import FieldDataset
@@ -94,6 +97,23 @@ class TestThemes:
         original_size = light.rcparams["font.size"]
         _ = light.customize(font_size=20)
         assert light.rcparams["font.size"] == original_size
+
+    def test_rcparams_are_read_only(self) -> None:
+        with pytest.raises(TypeError):
+            get_theme().rcparams["font.size"] = 99
+
+    @pytest.mark.parametrize(
+        "clone",
+        [copy.deepcopy, lambda theme: pickle.loads(pickle.dumps(theme))],
+        ids=["deepcopy", "pickle"],
+    )
+    def test_a_cloned_theme_is_equal_and_still_read_only(
+        self, clone: Callable[[PlotTheme], PlotTheme]
+    ) -> None:
+        cloned = clone(get_theme())
+        assert cloned == get_theme()
+        with pytest.raises(TypeError):
+            cloned.rcparams["font.size"] = 99
 
 
 class TestSetDefaultTheme:
