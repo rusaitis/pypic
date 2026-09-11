@@ -141,7 +141,7 @@ def plot_field_slice(
     from pypic.plotting._colorbar import attach_colorbar
     from pypic.plotting._colormaps import (
         is_positive_definite,
-        resolve_colormap,
+        resolve_field_colormap,
         symmetric_clim,
     )
     from pypic.plotting._labels import axis_label, field_label, figure_title
@@ -171,9 +171,7 @@ def plot_field_slice(
     coords = data.grid.coordinate_arrays()
     surviving_axes = surviving_axis_names(data)
 
-    cmap_name = resolve_colormap(
-        field, values, theme, info=info, cmap=cmap if isinstance(cmap, str) else None
-    )
+    _, colormap = resolve_field_colormap(field, values, theme, info=info, cmap=cmap)
 
     use_symmetric = symmetric
     if use_symmetric is None:
@@ -221,7 +219,7 @@ def plot_field_slice(
 
         mesh_kwargs: dict[str, Any] = {
             "shading": "auto",
-            "cmap": cmap if not isinstance(cmap, str) else cmap_name,
+            "cmap": colormap,
             "alpha": alpha,
         }
         if norm is not None:

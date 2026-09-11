@@ -67,15 +67,15 @@ def _resolve_vector_colors(
     units: str | None,
     theme: PlotTheme,
     cmap: str | Colormap | None,
-) -> tuple[FloatArray, str, FieldInfo]:
-    """Resolve color values, colormap name, and field info for vector plots.
+) -> tuple[FloatArray, Colormap, FieldInfo]:
+    """Resolve color values, colormap, and field info for vector plots.
 
     Returns
     -------
     tuple
-        ``(color_values, cmap_name, info)``
+        ``(color_values, colormap, info)``
     """
-    from pypic.plotting._colormaps import resolve_colormap
+    from pypic.plotting._colormaps import resolve_field_colormap
 
     if color_field is not None:
         try:
@@ -92,14 +92,10 @@ def _resolve_vector_colors(
         color_name = f"|{field}|"
 
     info = data.field_info(color_field if color_field is not None else f"|{field}|")
-    cmap_name = resolve_colormap(
-        color_name,
-        color_values,
-        theme,
-        info=info,
-        cmap=cmap if isinstance(cmap, str) else None,
+    _, colormap = resolve_field_colormap(
+        color_name, color_values, theme, info=info, cmap=cmap
     )
-    return color_values, cmap_name, info
+    return color_values, colormap, info
 
 
 def plot_streamlines(
@@ -257,7 +253,7 @@ def plot_streamlines(
     use_colormap = color is None
 
     color_values: FloatArray | None = None
-    cmap_name: str | None = None
+    colormap: Colormap | None = None
     info: FieldInfo | None = None
     if use_colormap:
         # Convert magnitude to display units when no explicit color_field
@@ -266,7 +262,7 @@ def plot_streamlines(
             u_display = resolve_field_values(data, comp_u, units)
             v_display = resolve_field_values(data, comp_v, units)
             display_magnitude = np.sqrt(u_display**2 + v_display**2)
-        color_values, cmap_name, info = _resolve_vector_colors(
+        color_values, colormap, info = _resolve_vector_colors(
             data, field, color_field, display_magnitude, units, theme, cmap
         )
 
@@ -351,7 +347,7 @@ def plot_streamlines(
             from matplotlib.colors import Normalize
 
             assert color_values is not None  # narrowed by use_colormap gate
-            assert cmap_name is not None
+            assert colormap is not None
             norm = (
                 Normalize(vmin=vmin, vmax=vmax)
                 if vmin is not None or vmax is not None
@@ -363,7 +359,7 @@ def plot_streamlines(
                 u.T,
                 v.T,
                 color=color_values.T,
-                cmap=cmap if not isinstance(cmap, str) else cmap_name,
+                cmap=colormap,
                 norm=norm,
                 density=density,
                 linewidth=lw_arg,
@@ -576,11 +572,11 @@ def plot_quiver(
     use_colormap = color is None
 
     color_values: FloatArray | None = None
-    cmap_name: str | None = None
+    colormap: Colormap | None = None
     info: FieldInfo | None = None
     if use_colormap:
         magnitude = np.sqrt(u**2 + v**2)
-        color_values, cmap_name, info = _resolve_vector_colors(
+        color_values, colormap, info = _resolve_vector_colors(
             data, field, color_field, magnitude, units, theme, cmap
         )
 
@@ -606,7 +602,7 @@ def plot_quiver(
 
         if use_colormap:
             assert color_values is not None  # narrowed by use_colormap gate
-            assert cmap_name is not None
+            assert colormap is not None
             color_sub = color_values[::s0, ::s1]
             quiv = ax.quiver(
                 xx.T,
@@ -614,7 +610,7 @@ def plot_quiver(
                 u_sub.T,
                 v_sub.T,
                 color_sub.T,
-                cmap=cmap if not isinstance(cmap, str) else cmap_name,
+                cmap=colormap,
                 scale=scale,
                 alpha=alpha,
                 **kwargs,

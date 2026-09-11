@@ -8,6 +8,13 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pytest
 
+from pypic.plotting import (
+    get_theme,
+    plot_comparison,
+    plot_field_slice,
+    plot_quiver,
+    plot_streamlines,
+)
 from pypic.plotting._colormaps import (
     _auto_linthresh,
     auto_clim,
@@ -17,6 +24,10 @@ from pypic.plotting._colormaps import (
 )
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from matplotlib.axes import Axes
+
     from pypic.dataset import FieldDataset
 
 
@@ -60,6 +71,47 @@ class TestColormapDetection:
             else None
         )
         assert is_positive_definite(name, data, info) is expected
+
+
+class TestDefaultColormap:
+    @pytest.mark.parametrize(
+        ("plot", "family"),
+        [
+            pytest.param(
+                lambda ds: plot_field_slice(ds, "B_1")[1], "diverging", id="slice"
+            ),
+            pytest.param(
+                lambda ds: plot_field_slice(ds, "rho_m")[1],
+                "sequential",
+                id="slice-positive",
+            ),
+            pytest.param(
+                lambda ds: plot_streamlines(ds, "B")[1], "sequential", id="streamlines"
+            ),
+            pytest.param(lambda ds: plot_quiver(ds, "B")[1], "sequential", id="quiver"),
+            pytest.param(
+                lambda ds: plot_comparison(ds, ds, "B_1")[1]["a"],
+                "diverging",
+                id="comparison",
+            ),
+        ],
+    )
+    def test_follows_the_theme_when_cmap_is_none(
+        self,
+        ds_2d: FieldDataset,
+        plot: Callable[[FieldDataset], Axes],
+        family: str,
+    ) -> None:
+        """Signed fields draw with the theme's diverging map and magnitudes
+        with its sequential one, not matplotlib's ``image.cmap`` default."""
+        theme = get_theme()
+        expected = (
+            theme.diverging_cmap if family == "diverging" else theme.sequential_cmap
+        )
+        assert expected != plt.rcParams["image.cmap"], "theme must differ to test"
+        ax = plot(ds_2d)
+        assert ax.collections[0].cmap.name == expected
+        plt.close("all")
 
 
 class TestSymmetricClim:
