@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Literal, cast
+
+from pypic.plotting._labels import axis_label
 
 if TYPE_CHECKING:
     from matplotlib.axes import Axes
@@ -12,11 +14,6 @@ if TYPE_CHECKING:
     from pypic.plotting.styles import PlotTheme
     from pypic.selections import PlaneSelection
     from pypic.types import FloatArray
-
-
-def surviving_axis_names(data: FieldDataset) -> tuple[str, ...]:
-    """Return the axis names surviving after any plane selection."""
-    return data.grid.surviving_axis_names
 
 
 def require_plottable_grid(data: FieldDataset) -> None:
@@ -36,6 +33,18 @@ def resolve_coord_units(
     if isinstance(coord_units, tuple):
         return coord_units
     return (coord_units, coord_units)
+
+
+def plane_axis_labels(
+    data: FieldDataset, coord_units: str | tuple[str, str] | None
+) -> tuple[str, str]:
+    """Label the two surviving axes of a plane plot."""
+    surviving = data.grid.surviving_axis_names
+    x_unit, y_unit = resolve_coord_units(coord_units)
+    return (
+        axis_label(surviving[0], unit_str=x_unit),
+        axis_label(surviving[1], unit_str=y_unit),
+    )
 
 
 def resolve_field_values(
@@ -107,6 +116,48 @@ def get_or_create_axes(
     fig = cast("Figure", raw_fig)
     apply_theme_to_figure(fig, theme)
     return fig, ax
+
+
+def finish_axes(
+    fig: Figure,
+    ax: Axes,
+    theme: PlotTheme,
+    *,
+    owns_figure: bool,
+    xlabel: str | None = None,
+    ylabel: str | None = None,
+    title: str | None = None,
+    aspect: Literal["equal"] | None = None,
+    minor_grid: bool = False,
+    badge: bool = False,
+    step: int | None = None,
+    time: float | None = None,
+) -> None:
+    """Label, grid, bake and round *ax* once its artists are drawn.
+
+    ``None`` leaves a label or title as it was, so plots layered onto shared
+    axes keep each other's. Only the call that created *fig* lays it out, and
+    rounding comes last because it measures the laid-out axes.
+    """
+    from pypic.plotting.styles import apply_grid, apply_rounding, bake_theme
+
+    if xlabel is not None:
+        ax.set_xlabel(xlabel)
+    if ylabel is not None:
+        ax.set_ylabel(ylabel)
+    if title is not None:
+        ax.set_title(title)
+    if aspect is not None:
+        ax.set_aspect(aspect)
+    apply_grid(ax, theme, minor=minor_grid)
+    bake_theme(ax, theme)
+    if badge and (step is not None or time is not None):
+        from pypic.plotting._badge import add_badge
+
+        add_badge(ax, step=step, time=time)
+    if owns_figure:
+        fig.tight_layout()
+    apply_rounding(ax)
 
 
 def default_midplane(data: FieldDataset) -> PlaneSelection | None:

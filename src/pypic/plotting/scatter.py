@@ -106,18 +106,15 @@ def plot_scatter(
     from pypic.plotting._colorbar import _style_colorbar
     from pypic.plotting._labels import field_label
     from pypic.plotting._resolve import (
+        finish_axes,
         get_or_create_axes,
+        maybe_save,
         prepare_data,
         resolve_field_values,
     )
-    from pypic.plotting.styles import (
-        _resolve_theme_arg,
-        apply_grid,
-        apply_rounding,
-        use_theme,
-    )
+    from pypic.plotting.styles import _resolve_theme_arg, use_theme
 
-    owned = ax is None
+    owns_figure = ax is None
     theme = _resolve_theme_arg(theme)
     data = prepare_data(data, plane)
 
@@ -184,12 +181,6 @@ def plot_scatter(
         if log_y and not density:
             ax.set_yscale("log")
 
-        ax.set_xlabel(field_label(info_x, unit_str=units_x or ""))
-        ax.set_ylabel(field_label(info_y, unit_str=units_y or ""))
-        if title is not None:
-            ax.set_title(title)
-        apply_grid(ax, theme)
-
         if colorbar and mappable is not None:
             from mpl_toolkits.axes_grid1 import make_axes_locatable
 
@@ -211,11 +202,15 @@ def plot_scatter(
                 cb_label = ""
             _style_colorbar(cb, cb_label)
 
-        if owned:
-            fig.tight_layout()
-            apply_rounding(ax)
-
-    from pypic.plotting._resolve import maybe_save
+        finish_axes(
+            fig,
+            ax,
+            theme,
+            owns_figure=owns_figure,
+            xlabel=field_label(info_x, unit_str=units_x or ""),
+            ylabel=field_label(info_y, unit_str=units_y or ""),
+            title=title,
+        )
 
     maybe_save(fig, save)
     return fig, ax

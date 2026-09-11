@@ -82,16 +82,15 @@ def plot_line(
     ensure_matplotlib()
 
     from pypic.plotting._labels import axis_label, field_label, figure_title
-    from pypic.plotting._resolve import get_or_create_axes, resolve_field_values
-    from pypic.plotting.styles import (
-        _resolve_theme_arg,
-        apply_grid,
-        apply_rounding,
-        style_legend,
-        use_theme,
+    from pypic.plotting._resolve import (
+        finish_axes,
+        get_or_create_axes,
+        maybe_save,
+        resolve_field_values,
     )
+    from pypic.plotting.styles import _resolve_theme_arg, style_legend, use_theme
 
-    owned = ax is None
+    owns_figure = ax is None
     theme = _resolve_theme_arg(theme)
 
     ndim = len(data.grid.dimensions)
@@ -136,29 +135,25 @@ def plot_line(
 
     info = data.field_info(field)
     coord = data.grid.coordinate_arrays()[0]
+    if title is None and (step is not None or time is not None):
+        title = figure_title(info, step=step, time=time)
 
     with use_theme(theme):
         fig, ax = get_or_create_axes(theme, ax, figsize)
 
         ax.plot(coord, values, label=label, **kwargs)
-        ax.set_xlabel(axis_label(plot_axis, unit_str=coord_units or ""))
-        ax.set_ylabel(field_label(info, unit_str=units or ""))
-        apply_grid(ax, theme)
-
-        if title is not None:
-            ax.set_title(title)
-        elif step is not None or time is not None:
-            ax.set_title(figure_title(info, step=step, time=time))
-
         if label is not None:
             ax.legend()
             style_legend(ax)
-
-        if owned:
-            fig.tight_layout()
-            apply_rounding(ax)
-
-    from pypic.plotting._resolve import maybe_save
+        finish_axes(
+            fig,
+            ax,
+            theme,
+            owns_figure=owns_figure,
+            xlabel=axis_label(plot_axis, unit_str=coord_units or ""),
+            ylabel=field_label(info, unit_str=units or ""),
+            title=title,
+        )
 
     maybe_save(fig, save)
     return fig, ax
@@ -391,16 +386,10 @@ def plot_time_series(
     """
     ensure_matplotlib()
 
-    from pypic.plotting._resolve import get_or_create_axes
-    from pypic.plotting.styles import (
-        _resolve_theme_arg,
-        apply_grid,
-        apply_rounding,
-        style_legend,
-        use_theme,
-    )
+    from pypic.plotting._resolve import finish_axes, get_or_create_axes, maybe_save
+    from pypic.plotting.styles import _resolve_theme_arg, style_legend, use_theme
 
-    owned = ax is None
+    owns_figure = ax is None
     theme = _resolve_theme_arg(theme)
 
     if isinstance(columns, str):
@@ -410,39 +399,26 @@ def plot_time_series(
 
     if labels is None:
         labels = columns
+    if xlabel is None:
+        xlabel = x_column or data.index_column or "Cycle"
 
     with use_theme(theme):
         fig, ax = get_or_create_axes(theme, ax, figsize)
 
         for col, lbl in zip(columns, labels, strict=True):
             ax.plot(x, data[col], label=lbl, **kwargs)
-
-        if xlabel is not None:
-            ax.set_xlabel(xlabel)
-        elif x_column is not None:
-            ax.set_xlabel(x_column)
-        else:
-            ax.set_xlabel(
-                data.index_column if data.index_column is not None else "Cycle"
-            )
-
-        if ylabel is not None:
-            ax.set_ylabel(ylabel)
-
-        if title is not None:
-            ax.set_title(title)
-
-        apply_grid(ax, theme)
-
         if legend and (len(columns) > 1 or labels != columns):
             ax.legend()
             style_legend(ax)
-
-        if owned:
-            fig.tight_layout()
-            apply_rounding(ax)
-
-    from pypic.plotting._resolve import maybe_save
+        finish_axes(
+            fig,
+            ax,
+            theme,
+            owns_figure=owns_figure,
+            xlabel=xlabel,
+            ylabel=ylabel,
+            title=title,
+        )
 
     maybe_save(fig, save)
     return fig, ax

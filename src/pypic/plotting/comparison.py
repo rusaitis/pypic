@@ -146,13 +146,13 @@ def plot_comparison(
         resolve_norm,
         symmetric_clim,
     )
-    from pypic.plotting._labels import axis_label, field_label, figure_title
+    from pypic.plotting._labels import field_label, figure_title
     from pypic.plotting._resolve import (
         default_midplane,
+        maybe_save,
+        plane_axis_labels,
         require_plottable_grid,
-        resolve_coord_units,
         resolve_field_values,
-        surviving_axis_names,
     )
     from pypic.plotting.styles import (
         _resolve_theme_arg,
@@ -182,7 +182,7 @@ def plot_comparison(
 
     info = data_a.field_info(field)
     coords = data_a.grid.coordinate_arrays()
-    surviving_axes = surviving_axis_names(data_a)
+    xlabel, ylabel = plane_axis_labels(data_a, coord_units)
 
     _, colormap = resolve_field_colormap(field, values_a, theme, info=info, cmap=cmap)
     if symmetric is None:
@@ -239,9 +239,8 @@ def plot_comparison(
             )
             label = f"\u0394 {cb_label}" if key == "diff" else cb_label
             attach_colorbar(fig, ax, mesh, label, colorbar, extremes=extremes)
-            cu_x, cu_y = resolve_coord_units(coord_units)
-            ax.set_xlabel(axis_label(surviving_axes[0], unit_str=cu_x))
-            ax.set_ylabel(axis_label(surviving_axes[1], unit_str=cu_y))
+            ax.set_xlabel(xlabel)
+            ax.set_ylabel(ylabel)
             ax.set_aspect("equal")
             apply_grid(ax, theme)
             ax.set_title(panel_title)
@@ -275,8 +274,6 @@ def plot_comparison(
         fig.tight_layout()
         for ax_item in axes_dict.values():
             apply_rounding(ax_item)
-
-    from pypic.plotting._resolve import maybe_save
 
     maybe_save(fig, save)
     return fig, axes_dict

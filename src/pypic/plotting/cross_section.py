@@ -125,7 +125,6 @@ def plot_cross_section(
         prepare_data,
         resolve_coord_units,
         resolve_field_values,
-        surviving_axis_names,
     )
     from pypic.plotting.slices import plot_field_slice
     from pypic.plotting.styles import (
@@ -140,7 +139,7 @@ def plot_cross_section(
         cut_color = theme.accent_color
     data = prepare_data(data, plane)
 
-    surviving = surviving_axis_names(data)
+    surviving = data.grid.surviving_axis_names
     if cut_axis not in surviving:
         msg = f"cut_axis={cut_axis!r} not in dataset axes {list(surviving)}"
         raise ValueError(msg)

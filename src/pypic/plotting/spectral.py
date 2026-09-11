@@ -73,19 +73,17 @@ def plot_power_spectrum(
     """
     ensure_matplotlib()
 
-    from pypic.plotting._resolve import get_or_create_axes
-    from pypic.plotting.styles import (
-        _resolve_theme_arg,
-        apply_grid,
-        apply_rounding,
-        style_legend,
-        use_theme,
-    )
+    from pypic.plotting._resolve import finish_axes, get_or_create_axes, maybe_save
+    from pypic.plotting.styles import _resolve_theme_arg, style_legend, use_theme
 
-    owned = ax is None
+    owns_figure = ax is None
     theme = _resolve_theme_arg(theme)
 
     plot_power = power * k**compensated if compensated is not None else power
+    if ylabel is None:
+        ylabel = (
+            f"$k^{{{compensated:.2g}}} P(k)$" if compensated is not None else "$P(k)$"
+        )
 
     with use_theme(theme):
         fig, ax = get_or_create_axes(theme, ax, figsize)
@@ -118,28 +116,19 @@ def plot_power_spectrum(
                     label=f"$k^{{{slope_str}}}$",
                 )
 
-        ax.set_xlabel(xlabel if xlabel is not None else "$k$")
-        if ylabel is not None:
-            ax.set_ylabel(ylabel)
-        elif compensated is not None:
-            ax.set_ylabel(f"$k^{{{compensated:.2g}}} P(k)$")
-        else:
-            ax.set_ylabel("$P(k)$")
-
-        if title is not None:
-            ax.set_title(title)
-
-        apply_grid(ax, theme, minor=True)
-
         if label is not None or reference_slopes:
             ax.legend()
             style_legend(ax)
-
-        if owned:
-            fig.tight_layout()
-            apply_rounding(ax)
-
-    from pypic.plotting._resolve import maybe_save
+        finish_axes(
+            fig,
+            ax,
+            theme,
+            owns_figure=owns_figure,
+            xlabel=xlabel if xlabel is not None else "$k$",
+            ylabel=ylabel,
+            title=title,
+            minor_grid=True,
+        )
 
     maybe_save(fig, save)
     return fig, ax

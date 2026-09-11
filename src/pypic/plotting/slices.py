@@ -144,22 +144,18 @@ def plot_field_slice(
         resolve_field_colormap,
         resolve_norm,
     )
-    from pypic.plotting._labels import axis_label, field_label, figure_title
+    from pypic.plotting._labels import field_label, figure_title
     from pypic.plotting._resolve import (
+        finish_axes,
         get_or_create_axes,
+        maybe_save,
+        plane_axis_labels,
         prepare_data,
-        resolve_coord_units,
         resolve_field_values,
-        surviving_axis_names,
     )
-    from pypic.plotting.styles import (
-        _resolve_theme_arg,
-        apply_grid,
-        apply_rounding,
-        use_theme,
-    )
+    from pypic.plotting.styles import _resolve_theme_arg, use_theme
 
-    owned = ax is None
+    owns_figure = ax is None
     theme = _resolve_theme_arg(theme)
     data = prepare_data(data, plane)
     values = resolve_field_values(data, field, units)
@@ -169,7 +165,6 @@ def plot_field_slice(
 
     info = data.field_info(field)
     coords = data.grid.coordinate_arrays()
-    surviving_axes = surviving_axis_names(data)
 
     _, colormap = resolve_field_colormap(field, values, theme, info=info, cmap=cmap)
     if symmetric is None:
@@ -219,34 +214,22 @@ def plot_field_slice(
             ticks=colorbar_ticks,
         )
 
-        cu_x, cu_y = resolve_coord_units(coord_units)
-        ax.set_xlabel(axis_label(surviving_axes[0], unit_str=cu_x))
-        ax.set_ylabel(axis_label(surviving_axes[1], unit_str=cu_y))
-        ax.set_aspect("equal")
-
-        # Bake theme font sizes and tick geometry onto the axes so they
-        # persist after the use_theme() context exits.
-        from pypic.plotting.styles import bake_theme
-
-        bake_theme(ax, theme)
-
-        apply_grid(ax, theme)
-
-        if title is not None:
-            ax.set_title(title)
-        else:
-            ax.set_title(figure_title(info, step=step, time=time))
-
-        if badge and (step is not None or time is not None):
-            from pypic.plotting._badge import add_badge
-
-            add_badge(ax, step=step, time=time)
-
-        apply_rounding(ax)
-        if owned:
-            fig.tight_layout()
-
-    from pypic.plotting._resolve import maybe_save
+        if title is None:
+            title = figure_title(info, step=step, time=time)
+        xlabel, ylabel = plane_axis_labels(data, coord_units)
+        finish_axes(
+            fig,
+            ax,
+            theme,
+            owns_figure=owns_figure,
+            xlabel=xlabel,
+            ylabel=ylabel,
+            title=title,
+            aspect="equal",
+            badge=badge,
+            step=step,
+            time=time,
+        )
 
     maybe_save(fig, save)
     return fig, ax

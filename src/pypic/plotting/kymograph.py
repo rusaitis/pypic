@@ -99,13 +99,8 @@ def plot_kymograph(
 
     from pypic.plotting._colorbar import attach_colorbar
     from pypic.plotting._colormaps import resolve_norm
-    from pypic.plotting._resolve import get_or_create_axes
-    from pypic.plotting.styles import (
-        _resolve_theme_arg,
-        apply_grid,
-        apply_rounding,
-        use_theme,
-    )
+    from pypic.plotting._resolve import finish_axes, get_or_create_axes, maybe_save
+    from pypic.plotting.styles import _resolve_theme_arg, use_theme
 
     if values.ndim != 2:
         msg = f"values must be 2D (n_times, n_x), got {values.ndim}D"
@@ -118,7 +113,7 @@ def plot_kymograph(
         msg = f"times length {times.shape[0]} != values rows {n_times}"
         raise ValueError(msg)
 
-    owned = ax is None
+    owns_figure = ax is None
     theme = _resolve_theme_arg(theme)
     if symmetric is None:
         symmetric = bool(np.any(values < 0))
@@ -135,18 +130,15 @@ def plot_kymograph(
         )
 
         attach_colorbar(fig, ax, mesh, label, colorbar, extremes=extremes)
-
-        ax.set_xlabel(xlabel or "")
-        ax.set_ylabel(ylabel if ylabel is not None else "time")
-        if title is not None:
-            ax.set_title(title)
-        apply_grid(ax, theme)
-
-        if owned:
-            fig.tight_layout()
-            apply_rounding(ax)
-
-    from pypic.plotting._resolve import maybe_save
+        finish_axes(
+            fig,
+            ax,
+            theme,
+            owns_figure=owns_figure,
+            xlabel=xlabel or "",
+            ylabel=ylabel if ylabel is not None else "time",
+            title=title,
+        )
 
     maybe_save(fig, save)
     return fig, ax
