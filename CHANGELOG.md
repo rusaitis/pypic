@@ -89,6 +89,14 @@ The distribution is `pypic-plasma` on PyPI; the import name is `pypic`.
   kept pyvista's own limits and white tubes where a batch used a shared scale
   and theme colors; an unknown trajectory scalar drew white tubes instead of
   raising `KeyError`; and a trace's own `speed` scalar lost to the derived one.
+- `FieldDataset`, `SimulationConfig`, `PhysicsParams`, `TabularData`,
+  `ParticleData`, `FieldLine`, `ParticleTrace` and the other frozen containers
+  that hold a read-only mapping raised `TypeError` under `pickle`,
+  `copy.deepcopy` and `dataclasses.asdict`, so they could not cross a
+  `ProcessPoolExecutor` or land in a `joblib.Memory` cache. Importing pypic
+  registers a pickle reducer for `MappingProxyType`: round-trips come back
+  equal and still read-only. The registration is process-wide, so any
+  mappingproxy then pickles as a snapshot of its mapping.
 
 ### Changed
 

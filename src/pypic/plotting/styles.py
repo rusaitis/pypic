@@ -177,18 +177,6 @@ class PlotTheme:
         # rcparams would let one plot restyle all the others.
         object.__setattr__(self, "rcparams", MappingProxyType(dict(self.rcparams)))
 
-    # A mappingproxy neither pickles nor deep-copies: ship the dict it wraps.
-    def __getstate__(self) -> list[Any]:
-        return [
-            dict(self.rcparams) if f.name == "rcparams" else getattr(self, f.name)
-            for f in fields(self)
-        ]
-
-    def __setstate__(self, state: list[Any]) -> None:
-        for f, value in zip(fields(self), state, strict=True):
-            object.__setattr__(self, f.name, value)
-        self.__post_init__()
-
     @property
     def sequential_cmap(self) -> str:
         """Default sequential colormap (first in preference list)."""

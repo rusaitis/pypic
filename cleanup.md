@@ -241,7 +241,7 @@ Verify: full `./scripts/check.sh` after every item; the invariant is
 Budget ~14 files, ~130 added / ~45 deleted, one new module. Independent of
 Phases 6 and 7.
 
-1. - [ ] **Pickle and deepcopy** (a `fix:` commit). A frozen dataclass that
+1. - [x] **Pickle and deepcopy** (a `fix:` commit). A frozen dataclass that
    stores a `MappingProxyType` can be neither pickled nor deep-copied:
    confirmed for `PhysicsParams`, `SimulationConfig`, `TabularData`,
    `FieldLine` and `ParticleTrace`, and `FieldDataset` inherits it through
