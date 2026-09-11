@@ -13,19 +13,89 @@ Theme lookup order:
 
 from __future__ import annotations
 
+import dataclasses
 import importlib.resources
+import json
 import logging
 import os
 import shutil
 import tomllib
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal, assert_never
 
 from pypic.plotting.styles import _COMMON_RC, PlotTheme
 
 _log = logging.getLogger(__name__)
 
 RGBA = tuple[float, float, float, float]
+
+type _Kind = Literal["rgba", "float", "str", "bool", "names"]
+
+# (section, key, PlotTheme field, kind), in the order save_theme writes them.
+# Fields missing here (the font and layout scale factors) are not part of the
+# cross-tool file format and always take their PlotTheme default.
+_THEME_FIELDS: tuple[tuple[str, str, str, _Kind], ...] = (
+    ("colors", "text", "text_color", "rgba"),
+    ("colors", "secondary_text", "secondary_text_color", "rgba"),
+    ("colors", "grid", "grid_color", "rgba"),
+    ("colors", "accent", "accent_color", "str"),
+    ("colors", "overlay", "overlay_color", "rgba"),
+    ("colors", "overlay_text", "overlay_text_color", "rgba"),
+    ("colors", "overlay_alt", "overlay_alt_color", "rgba"),
+    ("colors", "overlay_alt_text", "overlay_alt_text_color", "rgba"),
+    ("colors", "overlay_border", "overlay_border_color", "rgba"),
+    ("colors", "overlay_alt_border", "overlay_alt_border_color", "rgba"),
+    ("colors", "track", "track_color", "rgba"),
+    ("colors", "track_alt", "track_alt_color", "rgba"),
+    ("colors.cycle", "values", "color_cycle", "names"),
+    ("colormaps", "sequential", "sequential_cmaps", "names"),
+    ("colormaps", "diverging", "diverging_cmaps", "names"),
+    ("font", "family", "font_family", "names"),
+    ("font", "title", "font_title", "float"),
+    ("font", "label", "font_label", "float"),
+    ("font", "tick", "font_tick", "float"),
+    ("font", "overlay", "font_overlay", "float"),
+    ("overlay", "rounding", "overlay_rounding", "float"),
+    ("overlay", "padding", "overlay_padding", "float"),
+    ("overlay", "margin", "overlay_margin", "float"),
+    ("lines", "width", "line_width", "float"),
+    ("lines", "arrow_size", "arrow_size", "float"),
+    ("lines", "arrow_style", "arrow_style", "str"),
+    ("axes", "x_color", "axis_x_color", "str"),
+    ("axes", "y_color", "axis_y_color", "str"),
+    ("axes", "z_color", "axis_z_color", "str"),
+    ("axes", "arrows", "axis_arrows", "bool"),
+    ("ticks", "direction", "tick_direction", "str"),
+    ("ticks", "major_length", "tick_major_length", "float"),
+    ("ticks", "major_width", "tick_major_width", "float"),
+    ("ticks", "minor_length", "tick_minor_length", "float"),
+    ("ticks", "minor_width", "tick_minor_width", "float"),
+    ("grid", "major_width", "grid_major_width", "float"),
+    ("grid", "minor_width", "grid_minor_width", "float"),
+    ("grid", "style", "grid_style", "str"),
+    ("colorbar", "width", "colorbar_width", "str"),
+    ("colorbar", "outline_width", "colorbar_outline_width", "float"),
+    ("colorbar", "tick_length", "colorbar_tick_length", "float"),
+    ("colorbar", "pad", "colorbar_pad", "float"),
+    ("progress_bar", "width", "progress_bar_width", "float"),
+    ("progress_bar", "height", "progress_bar_height", "float"),
+    ("progress_bar", "rounding", "progress_bar_rounding", "float"),
+    ("plot", "rounding", "plot_rounding", "float"),
+)
+
+_DEFAULTS: dict[str, Any] = {f.name: f.default for f in dataclasses.fields(PlotTheme)}
+
+# A hex string or an [r, g, b(, a)] list for colors; a bare string for a
+# one-element list of names.
+_TOML_TYPES: dict[_Kind, tuple[type, ...]] = {
+    "rgba": (str, list),
+    "float": (int, float),
+    "str": (str,),
+    "bool": (bool,),
+    "names": (str, list),
+}
+
+_FACECOLOR_KEYS = ("figure.facecolor", "axes.facecolor", "savefig.facecolor")
 
 
 def _parse_rgba(
@@ -43,14 +113,28 @@ def _parse_rgba(
 
         r, g, b, _a = to_rgba(val)
         return (r, g, b, default_alpha)
-    if len(val) == 3:
-        return (val[0], val[1], val[2], default_alpha)
-    return (val[0], val[1], val[2], val[3])
+    r, g, b, *alpha = (float(c) for c in val)
+    return (r, g, b, alpha[0] if alpha else default_alpha)
 
 
-def _rgba_to_toml(c: RGBA) -> str:
-    """Format an RGBA tuple as a TOML inline array."""
-    return f"[{c[0]:.3f}, {c[1]:.3f}, {c[2]:.3f}, {c[3]:.2f}]"
+def _decode(kind: _Kind, value: Any, field: str) -> Any:  # noqa: ANN401 — TOML value
+    match kind:
+        case "rgba":
+            return _parse_rgba(value, default_alpha=_DEFAULTS[field][3])
+        case "float":
+            return float(value)
+        case "names":
+            return (value,) if isinstance(value, str) else tuple(value)
+        case "str" | "bool":
+            return value
+        case _ as unreachable:
+            assert_never(unreachable)
+
+
+def _toml_value(value: object) -> str:
+    # JSON's strings, numbers, booleans and arrays are valid TOML, and repr
+    # floats make save → load exact.
+    return json.dumps(value, ensure_ascii=False, allow_nan=False)
 
 
 def _default_theme_dir() -> Path:
@@ -126,9 +210,15 @@ def load_theme(path: str | Path) -> PlotTheme:
     r"""Load a `PlotTheme` from a TOML file.
 
     Only ``name`` and ``[colors]`` (with at least ``background`` and
-    ``text``) are required.  All other sections fall back to
-    `PlotTheme` defaults.  App-specific settings live under
-    ``[pypic]``; other sections (``[webpic]``, etc.) are ignored.
+    ``text``) are required.  All other keys fall back to `PlotTheme`
+    defaults, and sections other tools own (``[webpic]``, ...) are
+    ignored.
+
+    Raises
+    ------
+    ValueError
+        If a key holds the wrong TOML type (a string where a number or
+        boolean belongs, ...).
 
     Parameters
     ----------
@@ -150,149 +240,28 @@ def load_theme(path: str | Path) -> PlotTheme:
     with path.open("rb") as f:
         raw = tomllib.load(f)
 
-    name = raw.get("name", path.stem)
+    values: dict[str, Any] = {}
+    for section, key, field, kind in _THEME_FIELDS:
+        table = raw
+        for part in section.split("."):
+            table = table.get(part, {})
+        if key not in table:
+            continue
+        value = table[key]
+        if not isinstance(value, _TOML_TYPES[kind]) or (
+            kind == "float" and isinstance(value, bool)
+        ):
+            msg = f"{path}: [{section}] {key} = {value!r} is not a valid {kind}"
+            raise ValueError(msg)
+        values[field] = _decode(kind, value, field)
 
-    # Build rcParams from _COMMON_RC + background color
     rc: dict[str, Any] = {**_COMMON_RC}
-    colors = raw.get("colors", {})
-    if "background" in colors:
-        bg = colors["background"]
-        for key in ("figure.facecolor", "axes.facecolor", "savefig.facecolor"):
-            rc[key] = bg
-
-    # Universal sections
-    overlay = raw.get("overlay", {})
-    font = raw.get("font", {})
-    grid = raw.get("grid", {})
-    ticks = raw.get("ticks", {})
-    cmaps = raw.get("colormaps", {})
-    lines = raw.get("lines", {})
-    axes = raw.get("axes", {})
-
-    overlay_padding = overlay.get("padding", 0.4)
-    rc["legend.borderaxespad"] = overlay_padding * 1.5
-
-    colorbar_sec = raw.get("colorbar", {})
-    progress_sec = raw.get("progress_bar", {})
-    plot_sec = raw.get("plot", {})
-
-    # Color cycle
-    cycle_section = colors.get("cycle", {})
-    color_cycle = tuple(cycle_section.get("values", ()))
-
-    # Font family: accept string or list
-    _default_family = ("DejaVu Serif", "Computer Modern", "Times", "serif")
-    raw_family = font.get("family", _default_family)
-    font_family = (raw_family,) if isinstance(raw_family, str) else tuple(raw_family)
-
-    # Colormaps: accept string or list
-    raw_seq = cmaps.get("sequential", "inferno")
-    seq_cmaps = (raw_seq,) if isinstance(raw_seq, str) else tuple(raw_seq)
-    raw_div = cmaps.get("diverging", "RdBu_r")
-    div_cmaps = (raw_div,) if isinstance(raw_div, str) else tuple(raw_div)
-
-    # Parse RGBA colors with appropriate default alphas
-    defaults = PlotTheme(name=name, rcparams={})
-    text_color = (
-        _parse_rgba(colors["text"], 0.9) if "text" in colors else defaults.text_color
-    )
-    sec_text = (
-        _parse_rgba(colors["secondary_text"], 0.8)
-        if "secondary_text" in colors
-        else defaults.secondary_text_color
-    )
-    grid_color = (
-        _parse_rgba(colors["grid"], 0.08) if "grid" in colors else defaults.grid_color
-    )
-    overlay_color = (
-        _parse_rgba(colors["overlay"], 0.65)
-        if "overlay" in colors
-        else defaults.overlay_color
-    )
-    overlay_text = (
-        _parse_rgba(colors["overlay_text"], 0.8)
-        if "overlay_text" in colors
-        else defaults.overlay_text_color
-    )
-    overlay_alt = (
-        _parse_rgba(colors["overlay_alt"], 0.55)
-        if "overlay_alt" in colors
-        else defaults.overlay_alt_color
-    )
-    overlay_alt_text = (
-        _parse_rgba(colors["overlay_alt_text"], 0.8)
-        if "overlay_alt_text" in colors
-        else defaults.overlay_alt_text_color
-    )
-    overlay_border = (
-        _parse_rgba(colors["overlay_border"], 0.2)
-        if "overlay_border" in colors
-        else defaults.overlay_border_color
-    )
-    overlay_alt_border = (
-        _parse_rgba(colors["overlay_alt_border"], 0.3)
-        if "overlay_alt_border" in colors
-        else (0.5, 0.5, 0.5, 0.3)
-    )
-    track_color = (
-        _parse_rgba(colors["track"], 0.3) if "track" in colors else defaults.track_color
-    )
-    track_alt_color = (
-        _parse_rgba(colors["track_alt"], 0.4)
-        if "track_alt" in colors
-        else (0.5, 0.5, 0.5, 0.4)
-    )
-
-    return PlotTheme(
-        name=name,
-        rcparams=rc,
-        text_color=text_color,
-        secondary_text_color=sec_text,
-        grid_color=grid_color,
-        overlay_color=overlay_color,
-        overlay_text_color=overlay_text,
-        overlay_alt_color=overlay_alt,
-        overlay_alt_text_color=overlay_alt_text,
-        overlay_border_color=overlay_border,
-        overlay_alt_border_color=overlay_alt_border,
-        track_color=track_color,
-        track_alt_color=track_alt_color,
-        accent_color=colors.get("accent", "#e8913a"),
-        color_cycle=color_cycle,
-        sequential_cmaps=seq_cmaps,
-        diverging_cmaps=div_cmaps,
-        font_family=font_family,
-        font_title=font.get("title", 12.0),
-        font_label=font.get("label", 11.0),
-        font_tick=font.get("tick", 10.0),
-        font_overlay=font.get("overlay", 9.0),
-        overlay_rounding=overlay.get("rounding", 0.6),
-        overlay_padding=overlay_padding,
-        overlay_margin=overlay.get("margin", 0.03),
-        line_width=lines.get("width", 1.5),
-        arrow_size=lines.get("arrow_size", 4.0),
-        arrow_style=lines.get("arrow_style", "triangle"),
-        axis_x_color=axes.get("x_color", "#d63031"),
-        axis_y_color=axes.get("y_color", "#00b894"),
-        axis_z_color=axes.get("z_color", "#0984e3"),
-        axis_arrows=axes.get("arrows", True),
-        tick_direction=ticks.get("direction", "in"),
-        tick_major_length=ticks.get("major_length", 4.0),
-        tick_major_width=ticks.get("major_width", 0.6),
-        tick_minor_length=ticks.get("minor_length", 2.0),
-        tick_minor_width=ticks.get("minor_width", 0.4),
-        grid_major_width=grid.get("major_width", 0.5),
-        grid_minor_width=grid.get("minor_width", 0.3),
-        grid_style=grid.get("style", "solid"),
-        colorbar_width=colorbar_sec.get("width", "4%"),
-        colorbar_outline_width=colorbar_sec.get("outline_width", 0.3),
-        colorbar_tick_length=colorbar_sec.get("tick_length", 2.0),
-        colorbar_pad=colorbar_sec.get("pad", 0.05),
-        progress_bar_width=progress_sec.get("width", 80.0),
-        progress_bar_height=progress_sec.get("height", 4.0),
-        progress_bar_rounding=progress_sec.get("rounding", 2.0),
-        plot_rounding=plot_sec.get("rounding", 0.0),
-    )
+    background = raw.get("colors", {}).get("background")
+    if background is not None:
+        rc.update(dict.fromkeys(_FACECOLOR_KEYS, background))
+    padding = values.get("overlay_padding", _DEFAULTS["overlay_padding"])
+    rc["legend.borderaxespad"] = padding * 1.5
+    return PlotTheme(name=raw.get("name", path.stem), rcparams=rc, **values)
 
 
 def save_theme(theme: PlotTheme, path: str | Path) -> None:
@@ -319,109 +288,17 @@ def save_theme(theme: PlotTheme, path: str | Path) -> None:
     ...     load_theme(out).name == theme.name
     True
     """
-    path = Path(path)
-    lines: list[str] = [f'name = "{theme.name}"', ""]
-
-    # [colors]
-    lines.append("[colors]")
-    bg = theme.rcparams.get("figure.facecolor", "white")
-    lines.append(f'background = "{bg}"')
-    lines.append(f"text = {_rgba_to_toml(theme.text_color)}")
-    lines.append(f"secondary_text = {_rgba_to_toml(theme.secondary_text_color)}")
-    lines.append(f"grid = {_rgba_to_toml(theme.grid_color)}")
-    lines.append(f'accent = "{theme.accent_color}"')
-    lines.append(f"overlay = {_rgba_to_toml(theme.overlay_color)}")
-    lines.append(f"overlay_text = {_rgba_to_toml(theme.overlay_text_color)}")
-    lines.append(f"overlay_alt = {_rgba_to_toml(theme.overlay_alt_color)}")
-    lines.append(f"overlay_alt_text = {_rgba_to_toml(theme.overlay_alt_text_color)}")
-    lines.append(f"overlay_border = {_rgba_to_toml(theme.overlay_border_color)}")
-    lines.append(
-        f"overlay_alt_border = {_rgba_to_toml(theme.overlay_alt_border_color)}"
-    )
-    lines.append(f"track = {_rgba_to_toml(theme.track_color)}")
-    lines.append(f"track_alt = {_rgba_to_toml(theme.track_alt_color)}")
-
-    if theme.color_cycle:
-        lines.append("")
-        lines.append("[colors.cycle]")
-        cycle_strs = ", ".join(f'"{c}"' for c in theme.color_cycle)
-        lines.append(f"values = [{cycle_strs}]")
-
-    # [colormaps]
-    lines.extend(["", "[colormaps]"])
-    if len(theme.sequential_cmaps) == 1:
-        lines.append(f'sequential = "{theme.sequential_cmap}"')
-    else:
-        seq_strs = ", ".join(f'"{c}"' for c in theme.sequential_cmaps)
-        lines.append(f"sequential = [{seq_strs}]")
-    if len(theme.diverging_cmaps) == 1:
-        lines.append(f'diverging = "{theme.diverging_cmap}"')
-    else:
-        div_strs = ", ".join(f'"{c}"' for c in theme.diverging_cmaps)
-        lines.append(f"diverging = [{div_strs}]")
-
-    # [font]
-    lines.extend(["", "[font]"])
-    family_strs = ", ".join(f'"{f}"' for f in theme.font_family)
-    lines.append(f"family = [{family_strs}]")
-    lines.append(f"title = {theme.font_title}")
-    lines.append(f"label = {theme.font_label}")
-    lines.append(f"tick = {theme.font_tick}")
-    lines.append(f"overlay = {theme.font_overlay}")
-
-    # [overlay]
-    lines.extend(["", "[overlay]"])
-    lines.append(f"rounding = {theme.overlay_rounding}")
-    lines.append(f"padding = {theme.overlay_padding}")
-    lines.append(f"margin = {theme.overlay_margin}")
-
-    # [lines]
-    lines.extend(["", "[lines]"])
-    lines.append(f"width = {theme.line_width}")
-    lines.append(f"arrow_size = {theme.arrow_size}")
-    lines.append(f'arrow_style = "{theme.arrow_style}"')
-
-    # [axes]
-    lines.extend(["", "[axes]"])
-    lines.append(f'x_color = "{theme.axis_x_color}"')
-    lines.append(f'y_color = "{theme.axis_y_color}"')
-    lines.append(f'z_color = "{theme.axis_z_color}"')
-    lines.append(f"arrows = {'true' if theme.axis_arrows else 'false'}")
-
-    # [ticks]
-    lines.extend(["", "[ticks]"])
-    lines.append(f'direction = "{theme.tick_direction}"')
-    lines.append(f"major_length = {theme.tick_major_length}")
-    lines.append(f"major_width = {theme.tick_major_width}")
-    lines.append(f"minor_length = {theme.tick_minor_length}")
-    lines.append(f"minor_width = {theme.tick_minor_width}")
-
-    # [grid]
-    lines.extend(["", "[grid]"])
-    lines.append(f"major_width = {theme.grid_major_width}")
-    lines.append(f"minor_width = {theme.grid_minor_width}")
-    lines.append(f'style = "{theme.grid_style}"')
-
-    # [colorbar]
-    lines.extend(["", "[colorbar]"])
-    lines.append(f'width = "{theme.colorbar_width}"')
-    lines.append(f"outline_width = {theme.colorbar_outline_width}")
-    lines.append(f"tick_length = {theme.colorbar_tick_length}")
-    lines.append(f"pad = {theme.colorbar_pad}")
-
-    # [progress_bar]
-    lines.extend(["", "[progress_bar]"])
-    lines.append(f"width = {theme.progress_bar_width}")
-    lines.append(f"height = {theme.progress_bar_height}")
-    lines.append(f"rounding = {theme.progress_bar_rounding}")
-
-    # [plot]
-    if theme.plot_rounding > 0:
-        lines.extend(["", "[plot]"])
-        lines.append(f"rounding = {theme.plot_rounding}")
-
-    lines.append("")  # trailing newline
-    path.write_text("\n".join(lines))
+    background = theme.rcparams.get("figure.facecolor", "white")
+    lines = [f"name = {_toml_value(theme.name)}"]
+    section = ""
+    for field_section, key, field, _kind in _THEME_FIELDS:
+        if field_section != section:
+            section = field_section
+            lines += ["", f"[{section}]"]
+            if section == "colors":
+                lines.append(f"background = {_toml_value(background)}")
+        lines.append(f"{key} = {_toml_value(getattr(theme, field))}")
+    Path(path).write_text("\n".join(lines) + "\n")
 
 
 def available_themes() -> dict[str, PlotTheme]:

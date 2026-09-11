@@ -2,19 +2,64 @@
 
 from __future__ import annotations
 
+import dataclasses
 from typing import TYPE_CHECKING
 
 import matplotlib
 import matplotlib.pyplot as plt
 import pytest
 
-from pypic.plotting import get_theme, plot_field_slice, set_theme, use_theme
+from pypic.plotting import (
+    PlotTheme,
+    get_theme,
+    load_theme,
+    plot_field_slice,
+    save_theme,
+    set_theme,
+    use_theme,
+)
+from pypic.plotting._theme_io import _bundled_theme_dir
 from pypic.plotting.styles import _resolve_theme_arg
 
 if TYPE_CHECKING:
     from pathlib import Path
 
     from pypic.dataset import FieldDataset
+
+# Fields a theme file does not carry: identity and rcparams are written
+# specially, the scale factors live only in memory.
+_NOT_IN_FILE_TABLE = frozenset(
+    {
+        "name",
+        "rcparams",
+        "colorbar_title_font_scale",
+        "colorbar_tick_font_scale",
+        "badge_font_scale",
+        "axis_triad_font_scale",
+        "grid_label_font_scale",
+        "figsize_per_col",
+        "figsize_per_row",
+        "panel_label_scale_sparse",
+        "panel_label_scale_dense",
+        "contour_label_fontsize",
+        "annotation_fontsize",
+    }
+)
+
+
+def _off_default(value: object) -> object:
+    match value:
+        case bool():
+            return not value
+        case float():
+            return value + 0.5
+        case str():
+            return value + "-x"
+        case (float(), float(), float(), float()):
+            return (0.125, 0.25, 0.375, 0.5)
+        case tuple():
+            return ("alpha", "beta")
+    raise AssertionError(value)
 
 
 class TestThemes:
@@ -179,13 +224,42 @@ class TestFileThemes:
         resolved = _resolve_theme_arg("space-purple")
         assert resolved.accent_color == "#9b59b6"
 
+    def test_bundled_themes_round_trip_through_save(self, tmp_path: Path) -> None:
+        """load → save → load reproduces every field of every bundled theme."""
+        mismatched = []
+        for path in sorted(_bundled_theme_dir().glob("*.toml")):
+            theme = load_theme(path)
+            save_theme(theme, tmp_path / path.name)
+            again = load_theme(tmp_path / path.name)
+            mismatched += [
+                f"{path.stem}.{f.name}"
+                for f in dataclasses.fields(PlotTheme)
+                if getattr(again, f.name) != getattr(theme, f.name)
+            ]
+        assert mismatched == []
+
+    def test_every_file_field_survives_save_and_load(self, tmp_path: Path) -> None:
+        """Every field outside the in-memory set, moved off its default, is
+        written and read back: a field either side drops fails here."""
+        overrides = {
+            f.name: _off_default(f.default)
+            for f in dataclasses.fields(PlotTheme)
+            if f.name not in _NOT_IN_FILE_TABLE
+        }
+        save_theme(get_theme().customize(**overrides), tmp_path / "every.toml")
+        again = load_theme(tmp_path / "every.toml")
+        lost = sorted(k for k, v in overrides.items() if getattr(again, k) != v)
+        assert lost == []
+
+    def test_mistyped_value_names_its_key(self, tmp_path: Path) -> None:
+        path = tmp_path / "mistyped.toml"
+        path.write_text('name = "mistyped"\n[axes]\narrows = "false"\n')
+        with pytest.raises(ValueError, match=r"\[axes\] arrows"):
+            load_theme(path)
+
     def test_minimal_theme_falls_back_to_defaults(self, tmp_path: Path) -> None:
         """Only ``name`` and ``[colors]`` background and text are required;
         every other field takes its `PlotTheme` default."""
-        import dataclasses
-
-        from pypic.plotting import PlotTheme, load_theme
-
         path = tmp_path / "minimal.toml"
         path.write_text(
             'name = "minimal"\n[colors]\nbackground = "#000000"\ntext = "#ffffff"\n'
