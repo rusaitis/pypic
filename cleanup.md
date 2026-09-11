@@ -1,13 +1,13 @@
 # Code-quality cleanup — remaining phases
 
-Checklist for the last three phases of the September 2026 code-quality audit.
+Checklist for the last four phases of the September 2026 code-quality audit.
 Phases 0–4 landed on `main` (bug fixes, vector triplets from the field
 registry, `ReaderBase`, alias/layering consolidation, the `_recipes` /
 `_field_table` / `cli/` / `tests/test_plotting/` splits and the `reduce`
 decomposition; see `git log 499a846..4562923`). Phase 5 landed on 2026-09-11;
-Phases 6–7 are approved but unexecuted. Their line anchors were re-verified on
-2026-09-10 and Phase 5 did not touch those files; re-check them before editing,
-they drift.
+Phases 6–8 are approved but unexecuted. Their line anchors were re-verified on
+2026-09-10 (the pickle anchors on 2026-09-11) and Phase 5 did not touch those
+files; re-check them before editing, they drift.
 
 Working rules for every phase:
 
@@ -93,7 +93,7 @@ after; the old "143" counted functions, not parametrized cases),
 
 ## Phase 6 — remaining duplication, dead weight, comments
 
-Budget ~25 files, ~200 added / ~550 deleted. Group commits by bullet.
+Budget ~20 files, ~150 added / ~550 deleted. Group commits by bullet.
 
 1. - [ ] **One nan-policy helper.** `diagnostics.py:34-77`
    (`_apply_nan_policy_single`) and `:80-128` (`_apply_nan_policy`) become one
@@ -156,59 +156,14 @@ Budget ~25 files, ~200 added / ~550 deleted. Group commits by bullet.
    schema.md. `comparison.py:3` "only place" claim: verify against
    `reductions`/`regrid` before keeping.
 
-8. - [ ] **Typing.** `containers.py:333,410` and `dataset.py:1093` bare
-   `np.ndarray` → `IntArray` / `FloatArray` / `BoolArray` from `pypic.types`;
-   `containers.py:200,210,266` annotate `Mapping[...]` to match the
-   `MappingProxyType` substitution in `__post_init__` (`units.py` is the
-   model); `:198` `default_factory=PhysicsParams`; the four
-   `type: ignore[type-arg]` in `traces/_tracing.py:545,671,867,1075` →
-   `dict[str, Any]`; named constants for magic indices at
-   `batsrus/_hdf5.py:63-67` (`ipm[2]`, `ipm[1]`, `rpm[0]`),
-   `ipic3d/_conserved.py` column indices, `openggcm/_wrn2.py` header offsets,
-   and `ipic3d/_config.py` `reference_density`.
-
-   **Pickle and deepcopy** (its own `fix:` commit; added 2026-09-11, outside
-   the budget above: ~60 lines plus the test). A frozen dataclass that stores
-   a `MappingProxyType` can be neither pickled nor deep-copied. Confirmed for
-   `PhysicsParams`, `SimulationConfig`, `TabularData`, `FieldLine` and
-   `ParticleTrace`; `FieldDataset` inherits it through its `PhysicsParams`.
-   That breaks multiprocessing, joblib and dask. Stored proxies:
-   `units.py:677` (`PhysicsParams.extra`), `containers.py:102,114`
-   (`StaggerInfo`, conditional), `:218-220` (`SimulationConfig`), `:283-284`
-   (`TabularData`), `:427` (`ParticleData`), `traces/_fieldline.py:96-97`,
-   `traces/_particletrace.py:98-99`, `traces/_poincare.py:278`,
-   `ipic3d/_config.py:120`, and the proxies `openggcm/_grid.py:133-134` hands
-   to `OpenGGCMGrid` from outside. Fix: lift `PlotTheme.__getstate__` /
-   `__setstate__` (`plotting/styles.py`) into two shared functions that swap
-   any proxy field for its dict and re-run `__post_init__`, in a stdlib-only
-   leaf module (e.g. `pypic/_frozen.py`) so every layer can import it, and
-   assign them in each class body. A mixin does not work: on a
-   `frozen=True, slots=True` class the decorator installs its own
-   `__getstate__` unless the class body defines one (checked 2026-09-11).
-   Check each `__post_init__` is idempotent before relying on the re-run.
-   Test: one aggregated invariant that every such class round-trips through
-   `pickle` and `copy.deepcopy` equal and still read-only, plus a guard that
-   the tested set equals the classes whose source builds a `MappingProxyType`
-   field, so a new one cannot slip past.
-
-9. - [ ] **Boundaries.** HTTP `kind` / `status_code` classvars leave
+8. - [ ] **Boundaries.** HTTP `kind` / `status_code` classvars leave
    `pypic/exceptions.py:41-95` for a mapping in `server/exceptions.py` (the
    core exception module should not know the wire format).
    `schema/cli.py` imports typer + rich, contradicting the "stdlib + pydantic
    only" promise in architecture.md; move it to `pypic/_schema_cli.py` and
    point the `pypic schema` sub-app at it (mirror `_codegen_cli.py`).
 
-10. - [ ] **Import time.** Measured 2026-09-10: `import pypic` 1.09 s warm.
-    Two avoidable chains: `pypic.codegen` (0.28 s, pulls `pypic.schema` +
-    pydantic) eagerly imported at `__init__.py:5`; `pypic.comparison →
-    pypic.regrid → scipy.interpolate` (0.29 s). Fix: PEP 562 `__getattr__` in
-    `__init__.py` for `codegen`, and `RegularGridInterpolator` imported inside
-    its single use in `regrid.py:37`. Add an import-time budget test
-    (subprocess, generous ceiling) so it cannot regress silently. Target
-    below 0.6 s.
-
-Verify: full suite, `./scripts/check.sh docs` (moved `schema/cli.py`),
-`uv run python -X importtime -c "import pypic"` before and after item 10.
+Verify: full suite, `./scripts/check.sh docs` (moved `schema/cli.py`).
 
 ## Phase 7 — tests and tooling
 
@@ -280,6 +235,68 @@ land first and will guard everything else.
 
 Verify: full `./scripts/check.sh` after every item; the invariant is
 2854+ tests green on 3.13 and 3.14, mypy strict clean, doctests green.
+
+## Phase 8 — pickling, typing, import time
+
+Budget ~18 files, ~160 added / ~30 deleted, one new module. Independent of
+Phases 6 and 7. Items 1 and 2 edit the same `containers.py` classes, so
+re-take the item 2 anchors after item 1 lands.
+
+1. - [ ] **Pickle and deepcopy** (a `fix:` commit). A frozen dataclass that
+   stores a `MappingProxyType` can be neither pickled nor deep-copied.
+   Confirmed for `PhysicsParams`, `SimulationConfig`, `TabularData`,
+   `FieldLine` and `ParticleTrace`; `FieldDataset` inherits it through its
+   `PhysicsParams`. That breaks multiprocessing, joblib and dask. Stored
+   proxies: `units.py:677` (`PhysicsParams.extra`), `containers.py:102,114`
+   (`StaggerInfo`, conditional), `:218-220` (`SimulationConfig`), `:283-284`
+   (`TabularData`), `:427` (`ParticleData`), `traces/_fieldline.py:96-97`,
+   `traces/_particletrace.py:98-99`, `traces/_poincare.py:278`,
+   `ipic3d/_config.py:120`, and the proxies `openggcm/_grid.py:133-134` hands
+   to `OpenGGCMGrid` from outside. Fix: lift `PlotTheme.__getstate__` /
+   `__setstate__` (`plotting/styles.py`) into two shared functions that swap
+   any proxy field for its dict and re-run `__post_init__`, in a stdlib-only
+   leaf module (e.g. `pypic/_frozen.py`) so every layer can import it, and
+   assign them in each class body. A mixin does not work: on a
+   `frozen=True, slots=True` class the decorator installs its own
+   `__getstate__` unless the class body defines one (checked 2026-09-11).
+   Check each `__post_init__` is idempotent before relying on the re-run.
+   Test: one aggregated invariant that every such class round-trips through
+   `pickle` and `copy.deepcopy` equal and still read-only, plus a guard that
+   the tested set equals the classes whose source builds a `MappingProxyType`
+   field, so a new one cannot slip past.
+
+2. - [ ] **Typing.** `containers.py:333,410` and `dataset.py:1093` bare
+   `np.ndarray` → `IntArray` / `FloatArray` / `BoolArray` from `pypic.types`;
+   `containers.py:200,210,266` annotate `Mapping[...]` to match the
+   `MappingProxyType` substitution in `__post_init__` (`units.py` is the
+   model); `:198` `default_factory=PhysicsParams`; the four
+   `type: ignore[type-arg]` in `traces/_tracing.py:545,671,867,1075` →
+   `dict[str, Any]`; named constants for magic indices at
+   `batsrus/_hdf5.py:63-67` (`ipm[2]`, `ipm[1]`, `rpm[0]`),
+   `ipic3d/_conserved.py` column indices, `openggcm/_wrn2.py` header offsets,
+   and `ipic3d/_config.py` `reference_density`.
+
+3. - [ ] **Import time.** `import pypic` takes 0.73 s warm (best of 7 fresh
+   interpreters, 2026-09-11). The avoidable part is `scipy.interpolate`, which
+   `regrid.py:37` and `traces/_tracing.py:19` import at module scope and
+   `__init__.py` reaches through `comparison` (:6), `reconnection` (:174,
+   imports `traces`), `regrid` (:176) and `traces` (:180). Fix: export those
+   four modules' 21 names lazily through a PEP 562 `__getattr__` and
+   `__dir__` in `__init__.py`, driven by one name → module table, with the
+   real imports kept under `if TYPE_CHECKING:` so mypy and IDEs still see
+   the types. The four modules keep their module-scope imports; add the
+   lazy table to architecture.md's import rule as its second sanctioned
+   case. Stubbing all four out of `sys.modules` measured 0.52 s with
+   `scipy.interpolate` never loaded; stubbing only `comparison` and `regrid`
+   measured no saving, because `traces` loads it anyway. `codegen` stays
+   eager: `__init__.py:177` imports `pypic.schema` (pydantic) directly, and
+   deferring `codegen` measured no saving. Guard: a subprocess test that
+   `import pypic` leaves `scipy.interpolate` out of `sys.modules`, rather
+   than a wall-clock ceiling that would flake on CI. Target below 0.6 s.
+
+Verify: `./scripts/check.sh types`, the full suite, and
+`uv run python -X importtime -c "import pypic"` before and after item 3
+(`scipy.interpolate` must drop out).
 
 ## Non-goals
 
