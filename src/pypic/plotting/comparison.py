@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Literal
 
 from pypic.plotting._guard import ensure_matplotlib
 
 if TYPE_CHECKING:
     from matplotlib.axes import Axes
-    from matplotlib.colors import Colormap, Normalize
+    from matplotlib.colors import Colormap
     from matplotlib.figure import Figure
 
     from pypic.dataset import FieldDataset
@@ -135,15 +135,15 @@ def plot_comparison(
     """
     ensure_matplotlib()
 
-    import warnings
-
     import matplotlib.pyplot as plt
     import numpy as np
+    from matplotlib.colors import Normalize
 
     from pypic.plotting._colorbar import attach_colorbar
     from pypic.plotting._colormaps import (
         is_positive_definite,
-        resolve_colormap,
+        resolve_field_colormap,
+        resolve_norm,
         symmetric_clim,
     )
     from pypic.plotting._labels import axis_label, field_label, figure_title
@@ -184,50 +184,25 @@ def plot_comparison(
     coords = data_a.grid.coordinate_arrays()
     surviving_axes = surviving_axis_names(data_a)
 
-    cmap_name = resolve_colormap(
-        field, values_a, theme, info=info, cmap=cmap if isinstance(cmap, str) else None
+    _, colormap = resolve_field_colormap(field, values_a, theme, info=info, cmap=cmap)
+    if symmetric is None:
+        symmetric = not is_positive_definite(field, values_a, info)
+    # One norm over both inputs, so A and B share a color scale.
+    norm = resolve_norm(
+        np.concatenate([values_a.ravel(), values_b.ravel()]),
+        symmetric=symmetric,
+        log_scale=log_scale,
+        symlog=symlog,
+        vmin=vmin,
+        vmax=vmax,
+        linthresh=linthresh,
     )
-    diff_cmap_name = diff_cmap if isinstance(diff_cmap, str) else theme.diverging_cmap
-
-    # Determine whether A/B panels use symmetric color limits
-    use_symmetric = symmetric
-    if use_symmetric is None:
-        use_symmetric = not is_positive_definite(field, values_a, info)
-
-    norm: Normalize | None = None
-    if log_scale and use_symmetric:
-        warnings.warn(
-            "log_scale=True ignored because symmetric color limits are active",
-            stacklevel=2,
-        )
-        log_scale = False
-
-    if vmin is not None and vmax is not None:
-        combined_min, combined_max = vmin, vmax
-    else:
-        combined_min = float(np.nanmin([np.nanmin(values_a), np.nanmin(values_b)]))
-        combined_max = float(np.nanmax([np.nanmax(values_a), np.nanmax(values_b)]))
-        if use_symmetric:
-            absmax = max(abs(combined_min), abs(combined_max))
-            combined_min, combined_max = -absmax, absmax
-
-    if log_scale:
-        from matplotlib.colors import LogNorm
-
-        safe_min = combined_min if combined_min > 0 else 1e-10
-        norm = LogNorm(vmin=safe_min, vmax=combined_max)
-    elif symlog:
-        from matplotlib.colors import SymLogNorm
-
-        from pypic.plotting._colormaps import _auto_linthresh
-
-        lt = linthresh if linthresh is not None else _auto_linthresh(values_a)
-        norm = SymLogNorm(linthresh=lt, vmin=combined_min, vmax=combined_max)
 
     if diff_vmin is None or diff_vmax is None:
         auto_dvmin, auto_dvmax = symmetric_clim(diff)
         diff_vmin = diff_vmin if diff_vmin is not None else auto_dvmin
         diff_vmax = diff_vmax if diff_vmax is not None else auto_dvmax
+    diff_norm = Normalize(vmin=diff_vmin, vmax=diff_vmax)
 
     unit_str = units if units else ""
     cb_label = field_label(info, unit_str=unit_str)
@@ -240,32 +215,28 @@ def plot_comparison(
 
         diff_title = f"{labels[0]} \u2212 {labels[1]}"
         panels = [
-            ("a", values_a, labels[0], combined_min, combined_max),
-            ("b", values_b, labels[1], combined_min, combined_max),
-            ("diff", diff, diff_title, diff_vmin, diff_vmax),
+            ("a", values_a, labels[0], colormap, norm),
+            ("b", values_b, labels[1], colormap, norm),
+            (
+                "diff",
+                diff,
+                diff_title,
+                diff_cmap if diff_cmap is not None else theme.diverging_cmap,
+                diff_norm,
+            ),
         ]
 
-        for key, values, panel_title, panel_vmin, panel_vmax in panels:
-            if key == "diff":
-                panel_cmap = diff_cmap or diff_cmap_name
-            elif cmap is not None and not isinstance(cmap, str):
-                panel_cmap = cmap
-            else:
-                panel_cmap = cmap_name
-
+        for key, values, panel_title, panel_cmap, panel_norm in panels:
             ax = axes_dict[key]
-            mesh_kwargs: dict[str, Any] = {
-                "shading": "auto",
-                "cmap": panel_cmap,
-                "alpha": alpha,
-            }
-            # Log norm for A/B panels only (diff is always linear)
-            if norm is not None and key != "diff":
-                mesh_kwargs["norm"] = norm
-            else:
-                mesh_kwargs["vmin"] = panel_vmin
-                mesh_kwargs["vmax"] = panel_vmax
-            mesh = ax.pcolormesh(coords[0], coords[1], values.T, **mesh_kwargs)
+            mesh = ax.pcolormesh(
+                coords[0],
+                coords[1],
+                values.T,
+                shading="auto",
+                cmap=panel_cmap,
+                alpha=alpha,
+                norm=panel_norm,
+            )
             label = f"\u0394 {cb_label}" if key == "diff" else cb_label
             attach_colorbar(fig, ax, mesh, label, colorbar, extremes=extremes)
             cu_x, cu_y = resolve_coord_units(coord_units)

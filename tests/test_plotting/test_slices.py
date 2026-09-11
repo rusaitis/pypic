@@ -2,19 +2,23 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pytest
 from matplotlib.axes import Axes
+from matplotlib.colors import LogNorm, Normalize
 from matplotlib.figure import Figure
 
-from pypic.plotting import plot_comparison, plot_field_slice
+from pypic.dataset import FieldDataset
+from pypic.plotting import plot_comparison, plot_field_slice, plot_kymograph
 from pypic.selections import PlaneSelection
+from pypic.units import Normalization
+from tests._helpers import make_uniform_grid
 
 if TYPE_CHECKING:
-    from pypic.dataset import FieldDataset
+    from collections.abc import Callable
 
 
 class TestPlotFieldSlice:
@@ -161,7 +165,103 @@ class TestLogScale:
         plt.close(fig)
 
 
+def _as_dataset(values: np.ndarray) -> FieldDataset:
+    return FieldDataset.from_arrays(
+        {"B_1": values}, make_uniform_grid(*values.shape), Normalization.identity()
+    )
+
+
+def _slice_norm(values: np.ndarray, **options: Any) -> Normalize:
+    _, ax = plot_field_slice(_as_dataset(values), "B_1", **options)
+    return ax.collections[0].norm
+
+
+def _comparison_norm(values: np.ndarray, **options: Any) -> Normalize:
+    ds = _as_dataset(values)
+    _, axes = plot_comparison(ds, ds, "B_1", **options)
+    return axes["a"].collections[0].norm
+
+
+def _kymograph_norm(values: np.ndarray, **options: Any) -> Normalize:
+    n_times, n_x = values.shape
+    coords, times = np.arange(float(n_x)), np.arange(float(n_times))
+    _, ax = plot_kymograph(values, coords, times, **options)
+    return ax.collections[0].norm
+
+
+_SIGNED = np.random.default_rng(7).standard_normal((10, 8))
+_ABSMAX = float(np.abs(_SIGNED).max())
+_MOSTLY_POSITIVE = np.abs(_SIGNED) + 0.1
+_MOSTLY_POSITIVE[0, 0] = -1.0
+_MOSTLY_POSITIVE[1, 1] = 0.0
+_POSITIVE_RANGE = (
+    float(_MOSTLY_POSITIVE[_MOSTLY_POSITIVE > 0].min()),
+    float(_MOSTLY_POSITIVE.max()),
+)
+
+
+class TestNormAgreement:
+    @pytest.mark.parametrize(
+        ("values", "options", "expected"),
+        [
+            pytest.param(
+                _SIGNED, {}, (Normalize, -_ABSMAX, _ABSMAX), id="auto-symmetric"
+            ),
+            pytest.param(
+                _SIGNED,
+                {"symmetric": False},
+                (Normalize, float(_SIGNED.min()), float(_SIGNED.max())),
+                id="data-range",
+            ),
+            pytest.param(
+                _SIGNED,
+                {"vmin": -0.5, "vmax": 0.5},
+                (Normalize, -0.5, 0.5),
+                id="explicit",
+            ),
+            pytest.param(
+                _SIGNED,
+                {"vmax": 2.0},
+                (Normalize, float(_SIGNED.min()), 2.0),
+                id="one-sided",
+            ),
+            pytest.param(
+                _MOSTLY_POSITIVE,
+                {"log_scale": True, "symmetric": False},
+                (LogNorm, *_POSITIVE_RANGE),
+                id="log-skips-non-positive",
+            ),
+        ],
+    )
+    def test_same_input_gives_the_same_norm_on_every_plot(
+        self,
+        values: np.ndarray,
+        options: dict[str, Any],
+        expected: tuple[type, float, float],
+    ) -> None:
+        """Slice, comparison and kymograph resolve the color scale the same way."""
+        sites: dict[str, Callable[..., Normalize]] = {
+            "slice": _slice_norm,
+            "comparison": _comparison_norm,
+            "kymograph": _kymograph_norm,
+        }
+        observed = {}
+        for site, norm_of in sites.items():
+            norm = norm_of(values, **options)
+            observed[site] = (type(norm), norm.vmin, norm.vmax)
+        plt.close("all")
+        assert set(observed.values()) == {expected}, observed
+
+
 class TestSymlogSlice:
+    def test_symlog_centres_signed_fields_on_zero(self, ds_2d: FieldDataset) -> None:
+        """Symlog keeps a signed field's zero-centred limits, where the
+        diverging colormap puts its midpoint."""
+        fig, ax = plot_field_slice(ds_2d, "B_1", symlog=True)
+        norm = ax.collections[0].norm
+        assert norm.vmin == -norm.vmax
+        plt.close(fig)
+
     def test_symlog_renders(self, ds_2d: FieldDataset) -> None:
         """``symlog=True`` produces a SymLogNorm on the mesh."""
         from matplotlib.colors import SymLogNorm

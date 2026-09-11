@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
+import warnings
 from typing import TYPE_CHECKING
 
 import numpy as np
 
 if TYPE_CHECKING:
-    from matplotlib.colors import Colormap
+    from matplotlib.colors import Colormap, Normalize
 
     from pypic.fields import FieldInfo
     from pypic.plotting.styles import PlotTheme
@@ -207,6 +208,53 @@ def symmetric_clim(data: FloatArray) -> tuple[float, float]:
     if not np.isfinite(absmax) or absmax == 0.0:
         return (-1e-8, 1e-8)
     return (-absmax, absmax)
+
+
+def resolve_norm(
+    values: FloatArray,
+    *,
+    symmetric: bool,
+    log_scale: bool = False,
+    symlog: bool = False,
+    vmin: float | None = None,
+    vmax: float | None = None,
+    linthresh: float | None = None,
+) -> Normalize:
+    """Build the color normalization for a pcolormesh plot.
+
+    *values* is everything the norm must cover, every panel that shares it.
+    A missing limit comes from the finite data range, or both from
+    `symmetric_clim` when *symmetric* is set and neither is given. Log
+    scaling needs positive limits, so it skips non-positive data and a
+    non-positive *vmin*, and it yields to *symmetric* with a warning.
+    """
+    from matplotlib.colors import LogNorm, Normalize, SymLogNorm
+
+    if log_scale and symmetric:
+        warnings.warn(
+            "log_scale=True ignored because symmetric color limits are active",
+            stacklevel=3,
+        )
+        log_scale = False
+    if log_scale:
+        positive = values[np.isfinite(values) & (values > 0)]
+        if positive.size == 0:
+            return Normalize()
+        low = vmin if vmin is not None and vmin > 0 else float(positive.min())
+        high = vmax if vmax is not None else float(positive.max())
+        return LogNorm(vmin=low, vmax=high)
+
+    if symmetric and vmin is None and vmax is None:
+        vmin, vmax = symmetric_clim(values)
+    else:
+        finite = values[np.isfinite(values)]
+        if finite.size > 0:
+            vmin = float(finite.min()) if vmin is None else vmin
+            vmax = float(finite.max()) if vmax is None else vmax
+    if symlog:
+        threshold = linthresh if linthresh is not None else _auto_linthresh(values)
+        return SymLogNorm(linthresh=threshold, vmin=vmin, vmax=vmax)
+    return Normalize(vmin=vmin, vmax=vmax)
 
 
 def round_nice(value: float) -> float:

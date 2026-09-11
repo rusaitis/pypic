@@ -2,8 +2,7 @@
 
 from __future__ import annotations
 
-import warnings
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Literal
 
 import numpy as np
 
@@ -99,7 +98,7 @@ def plot_kymograph(
     ensure_matplotlib()
 
     from pypic.plotting._colorbar import attach_colorbar
-    from pypic.plotting._colormaps import symmetric_clim
+    from pypic.plotting._colormaps import resolve_norm
     from pypic.plotting._resolve import get_or_create_axes
     from pypic.plotting.styles import (
         _resolve_theme_arg,
@@ -121,54 +120,19 @@ def plot_kymograph(
 
     owned = ax is None
     theme = _resolve_theme_arg(theme)
-
-    # Auto-detect symmetric
-    use_symmetric = symmetric
-    if use_symmetric is None:
-        finite = values[np.isfinite(values)]
-        use_symmetric = bool(finite.size > 0 and float(np.nanmin(finite)) < 0)
-
-    # Colormap selection
+    if symmetric is None:
+        symmetric = bool(np.any(values < 0))
     if cmap is None:
-        cmap = theme.diverging_cmap if use_symmetric else theme.sequential_cmap
-
-    # Log scale handling (same pattern as slices.py)
-    norm = None
-    if log_scale and use_symmetric:
-        warnings.warn(
-            "log_scale=True ignored because symmetric color limits are active",
-            stacklevel=2,
-        )
-        log_scale = False
-
-    if log_scale:
-        from matplotlib.colors import LogNorm
-
-        plot_values = np.where(values > 0, values, np.nan)
-        finite = plot_values[np.isfinite(plot_values)]
-        if finite.size > 0:
-            auto_vmin = vmin if vmin is not None else float(np.nanmin(finite))
-            auto_vmax = vmax if vmax is not None else float(np.nanmax(finite))
-            if auto_vmin <= 0:
-                positive = finite[finite > 0]
-                auto_vmin = float(np.nanmin(positive)) if positive.size > 0 else 1e-10
-            norm = LogNorm(vmin=auto_vmin, vmax=auto_vmax)
-        values = plot_values
-        vmin, vmax = None, None
-    elif vmin is None and vmax is None and use_symmetric:
-        vmin, vmax = symmetric_clim(values)
+        cmap = theme.diverging_cmap if symmetric else theme.sequential_cmap
+    norm = resolve_norm(
+        values, symmetric=symmetric, log_scale=log_scale, vmin=vmin, vmax=vmax
+    )
 
     with use_theme(theme):
         fig, ax = get_or_create_axes(theme, ax, figsize)
-
-        mesh_kwargs: dict[str, Any] = {"shading": "auto", "cmap": cmap}
-        if norm is not None:
-            mesh_kwargs["norm"] = norm
-        else:
-            mesh_kwargs["vmin"] = vmin
-            mesh_kwargs["vmax"] = vmax
-
-        mesh = ax.pcolormesh(coords, times, values, **mesh_kwargs)
+        mesh = ax.pcolormesh(
+            coords, times, values, shading="auto", cmap=cmap, norm=norm
+        )
 
         attach_colorbar(fig, ax, mesh, label, colorbar, extremes=extremes)
 

@@ -8,7 +8,7 @@ from pypic.plotting._guard import ensure_matplotlib
 
 if TYPE_CHECKING:
     from matplotlib.axes import Axes
-    from matplotlib.colors import Colormap, Normalize
+    from matplotlib.colors import Colormap
     from matplotlib.figure import Figure
 
     from pypic.dataset import FieldDataset
@@ -142,7 +142,7 @@ def plot_field_slice(
     from pypic.plotting._colormaps import (
         is_positive_definite,
         resolve_field_colormap,
-        symmetric_clim,
+        resolve_norm,
     )
     from pypic.plotting._labels import axis_label, field_label, figure_title
     from pypic.plotting._resolve import (
@@ -172,63 +172,35 @@ def plot_field_slice(
     surviving_axes = surviving_axis_names(data)
 
     _, colormap = resolve_field_colormap(field, values, theme, info=info, cmap=cmap)
-
-    use_symmetric = symmetric
-    if use_symmetric is None:
-        use_symmetric = not is_positive_definite(field, values, info)
-
-    norm: Normalize | None = None
-    if log_scale and use_symmetric:
-        warnings.warn(
-            "log_scale=True ignored because symmetric color limits are active",
-            stacklevel=2,
-        )
-    if log_scale and not use_symmetric:
-        from matplotlib.colors import LogNorm
-
-        plot_values = np.where(values > 0, values, np.nan)
-        finite = plot_values[np.isfinite(plot_values)]
-        if finite.size > 0:
-            auto_vmin = vmin if vmin is not None else float(np.nanmin(finite))
-            auto_vmax = vmax if vmax is not None else float(np.nanmax(finite))
-            if auto_vmin <= 0:
-                positive = finite[finite > 0]
-                auto_vmin = float(np.nanmin(positive)) if positive.size > 0 else 1e-10
-            norm = LogNorm(vmin=auto_vmin, vmax=auto_vmax)
-        values = plot_values
-        # Don't pass vmin/vmax separately when using norm
-        vmin, vmax = None, None
-    elif symlog:
-        from matplotlib.colors import SymLogNorm
-
-        from pypic.plotting._colormaps import _auto_linthresh
-
-        lt = linthresh if linthresh is not None else _auto_linthresh(values)
-        norm = SymLogNorm(linthresh=lt, vmin=vmin, vmax=vmax)
-        vmin, vmax = None, None
-    elif vmin is None and vmax is None and use_symmetric:
-        vmin, vmax = symmetric_clim(values)
+    if symmetric is None:
+        symmetric = not is_positive_definite(field, values, info)
+    norm = resolve_norm(
+        values,
+        symmetric=symmetric,
+        log_scale=log_scale,
+        symlog=symlog,
+        vmin=vmin,
+        vmax=vmax,
+        linthresh=linthresh,
+    )
 
     # Transparent extremes: mask out-of-range values so pcolormesh
     # renders them as truly transparent (not black)
-    if extremes == "transparent" and vmin is not None and vmax is not None:
-        values = np.where((values >= vmin) & (values <= vmax), values, np.nan)
+    if extremes == "transparent" and norm.vmin is not None and norm.vmax is not None:
+        in_range = (values >= norm.vmin) & (values <= norm.vmax)
+        values = np.where(in_range, values, np.nan)
 
     with use_theme(theme):
         fig, ax = get_or_create_axes(theme, ax, figsize)
-
-        mesh_kwargs: dict[str, Any] = {
-            "shading": "auto",
-            "cmap": colormap,
-            "alpha": alpha,
-        }
-        if norm is not None:
-            mesh_kwargs["norm"] = norm
-        else:
-            mesh_kwargs["vmin"] = vmin
-            mesh_kwargs["vmax"] = vmax
-
-        mesh = ax.pcolormesh(coords[0], coords[1], values.T, **mesh_kwargs)
+        mesh = ax.pcolormesh(
+            coords[0],
+            coords[1],
+            values.T,
+            shading="auto",
+            cmap=colormap,
+            alpha=alpha,
+            norm=norm,
+        )
 
         unit_str = units or ""
         cb_label = (
