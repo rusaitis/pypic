@@ -16,6 +16,7 @@ if TYPE_CHECKING:
     from pypic.dataset import FieldDataset
     from pypic.plotting.styles import PlotTheme
     from pypic.traces import FieldLine, ParticleTrace
+    from pypic.types import FloatArray
 
 
 def _polyline_from_points(points: np.ndarray) -> pv.PolyData:
@@ -72,6 +73,185 @@ def _prepare_scalar(
     return values, display_name
 
 
+def _trajectory_scalar(trace: ParticleTrace, scalar: str) -> FloatArray:
+    if scalar in trace.scalars:
+        return trace.scalars[scalar]
+    if scalar == "time":
+        return trace.time
+    if scalar == "speed":
+        return np.linalg.norm(trace.velocity, axis=1)
+    available = sorted({*trace.scalars, "time", "speed"})
+    msg = f"Scalar {scalar!r} not on the trace; available: {available}"
+    raise KeyError(msg)
+
+
+def _tube_colors(n: int, color: str | None, theme: PlotTheme | None) -> list[str]:
+    if color is not None:
+        return [color] * n
+    cycle = _resolve_theme(theme).color_cycle or ("#1f77b4",)
+    return [cycle[i % len(cycle)] for i in range(n)]
+
+
+def _add_colored_tubes(
+    plotter: pv.Plotter,
+    paths: list[FloatArray],
+    colors: list[str],
+    *,
+    radius: float,
+    opacity: float,
+) -> list[pv.Actor]:
+    return [
+        plotter.add_mesh(
+            _polyline_from_points(points).tube(radius=radius),
+            color=tube_color,
+            opacity=opacity,
+            show_scalar_bar=False,
+        )
+        for points, tube_color in zip(paths, colors, strict=True)
+    ]
+
+
+def _add_scalar_tubes(
+    plotter: pv.Plotter,
+    paths: list[FloatArray],
+    values: list[FloatArray],
+    *,
+    name: str,
+    cmap: Colormap,
+    clim: tuple[float, float] | None,
+    radius: float,
+    opacity: float,
+    show_scalar_bar: bool,
+    scalar_bar_position: str,
+    theme: PlotTheme | None,
+) -> list[pv.Actor]:
+    actors = []
+    for points, tube_values in zip(paths, values, strict=True):
+        polyline = _polyline_from_points(points)
+        polyline[name] = tube_values
+        actors.append(
+            plotter.add_mesh(
+                polyline.tube(radius=radius),
+                scalars=name,
+                cmap=cmap,
+                clim=clim,
+                opacity=opacity,
+                show_scalar_bar=False,
+            )
+        )
+    if show_scalar_bar and clim is not None:
+        from pypic.plotting.pyvista._overlay import add_colorbar
+
+        add_colorbar(
+            plotter, cmap, clim, label=name, loc=scalar_bar_position, theme=theme
+        )
+    return actors
+
+
+def add_field_lines(
+    plotter: pv.Plotter,
+    field_lines: list[FieldLine],
+    *,
+    color: str | None = None,
+    scalar: str | None = None,
+    data: FieldDataset | None = None,
+    units: str | None = None,
+    cmap: str | Colormap | None = None,
+    clim: tuple[float, float] | None = None,
+    signed: bool = True,
+    radius: float = 0.08,
+    opacity: float = 1.0,
+    show_scalar_bar: bool = True,
+    scalar_bar_position: str = "lower_left",
+    theme: PlotTheme | None = None,
+) -> list[pv.Actor]:
+    r"""Render field lines as tubes on one shared color scale.
+
+    When *data* is provided, scalars are automatically sampled along
+    each line. When *units* is also set, values are unit-converted.
+    When *cmap* and *clim* are ``None``, they are auto-derived from
+    field metadata and the sampled values: symmetric about zero for a
+    signed field on the theme's diverging map, ``(0, max)`` on its
+    sequential map otherwise.
+
+    Parameters
+    ----------
+    plotter : pv.Plotter
+        The pyvista plotter.
+    field_lines : list[FieldLine]
+        Field lines to render.
+    color : str or None
+        Uniform color for every line when *scalar* is ``None``. ``None``
+        cycles the theme's color cycle.
+    scalar : str or None
+        Field name for coloring. Sampled from *data* if not already
+        on each line. ``None`` draws uniform colors.
+    data : FieldDataset or None
+        Source dataset for scalar sampling and unit conversion.
+    units : str or None
+        Display units (e.g. ``"nT"``). Requires *data*.
+    cmap : str, Colormap, or None
+        Colormap. ``None`` auto-selects from field metadata.
+    clim : tuple[float, float] or None
+        Shared color limits. ``None`` auto-computes.
+    signed : bool
+        Whether the scalar is signed or positive-definite; only read
+        when *cmap* is ``None`` and there is no *data* to decide from.
+    radius : float
+        Tube radius.
+    opacity : float
+        Tube opacity (0–1).
+    show_scalar_bar : bool
+        Whether to show a single themed scalar bar.
+    scalar_bar_position : str
+        Scalar bar corner: ``"lower_left"``, ``"lower_right"``, etc.
+    theme : PlotTheme or None
+        Theme for defaults.
+
+    Returns
+    -------
+    list[pv.Actor]
+        One actor per field line.
+    """
+    ensure_pyvista()
+
+    if not field_lines:
+        return []
+    paths = [fl.points for fl in field_lines]
+    if scalar is None:
+        colors = _tube_colors(len(paths), color, theme)
+        return _add_colored_tubes(
+            plotter, paths, colors, radius=radius, opacity=opacity
+        )
+
+    from pypic.plotting._colormaps import is_positive_definite
+
+    sampled = [_prepare_scalar(fl, scalar, data, units) for fl in field_lines]
+    values = [tube_values for tube_values, _ in sampled]
+    combined = np.concatenate(values)
+    info = data.field_info(scalar) if data is not None else None
+    is_positive = is_positive_definite(scalar, combined, info)
+    if cmap is None and data is not None:
+        signed = not is_positive
+    finite = combined[np.isfinite(combined)]
+    if clim is None and finite.size > 0:
+        top = float(np.max(finite if is_positive else np.abs(finite)))
+        clim = (0.0, top) if is_positive else (-top, top)
+    return _add_scalar_tubes(
+        plotter,
+        paths,
+        values,
+        name=sampled[0][1],
+        cmap=resolve_cmap(cmap, signed=signed, theme=theme),
+        clim=clim,
+        radius=radius,
+        opacity=opacity,
+        show_scalar_bar=show_scalar_bar,
+        scalar_bar_position=scalar_bar_position,
+        theme=theme,
+    )
+
+
 def add_field_line(
     plotter: pv.Plotter,
     field_line: FieldLine,
@@ -88,12 +268,8 @@ def add_field_line(
     show_scalar_bar: bool = False,
     scalar_bar_position: str = "lower_left",
     theme: PlotTheme | None = None,
-) -> pv.Actor | None:
-    r"""Render a `FieldLine` as a colored tube.
-
-    When *data* is provided with *scalar*, the field is automatically
-    sampled along the line via ``attach_scalars()``. When *units* is
-    also set, values are converted to display units.
+) -> pv.Actor:
+    r"""Render one `FieldLine` as a tube, exactly as `add_field_lines` would.
 
     Parameters
     ----------
@@ -102,7 +278,8 @@ def add_field_line(
     field_line : FieldLine
         Field line to render.
     color : str or None
-        Uniform color. Ignored if *scalar* is set.
+        Uniform color when *scalar* is ``None``. ``None`` uses the first
+        color of the theme's cycle.
     scalar : str or None
         Name of a scalar for per-point coloring. Sampled from *data*
         automatically if not already in ``field_line.scalars``.
@@ -113,9 +290,10 @@ def add_field_line(
     cmap : str, Colormap, or None
         Colormap. ``None`` auto-selects from field metadata.
     clim : tuple[float, float] or None
-        Color limits. ``None`` for auto.
+        Color limits. ``None`` derives them as `add_field_lines` does.
     signed : bool
-        Whether the scalar is signed (diverging cmap) or positive-definite.
+        Whether the scalar is signed (diverging cmap) or positive-definite;
+        only read when *cmap* is ``None`` and there is no *data*.
     radius : float
         Tube radius.
     opacity : float
@@ -129,101 +307,68 @@ def add_field_line(
 
     Returns
     -------
-    pv.Actor or None
+    pv.Actor
     """
-    ensure_pyvista()
-
-    pts = field_line.points
-    if pts.shape[0] < 2:
-        return None
-
-    polyline = _polyline_from_points(pts)
-
-    if scalar is not None:
-        values, display_name = _prepare_scalar(field_line, scalar, data, units)
-        resolved_cmap = resolve_cmap(cmap, signed=signed, theme=theme)
-        polyline[display_name] = values
-        tube = polyline.tube(radius=radius)
-
-        actor = plotter.add_mesh(
-            tube,
-            scalars=display_name,
-            cmap=resolved_cmap,
-            clim=clim,
-            opacity=opacity,
-            show_scalar_bar=False,
-        )
-
-        if show_scalar_bar and clim is not None:
-            from pypic.plotting.pyvista._overlay import add_colorbar
-
-            add_colorbar(
-                plotter,
-                resolved_cmap,
-                clim,
-                label=display_name,
-                loc=scalar_bar_position,
-                theme=theme,
-            )
-
-        return actor
-    tube = polyline.tube(radius=radius)
-    return plotter.add_mesh(
-        tube,
-        color=color or "white",
+    (actor,) = add_field_lines(
+        plotter,
+        [field_line],
+        color=color,
+        scalar=scalar,
+        data=data,
+        units=units,
+        cmap=cmap,
+        clim=clim,
+        signed=signed,
+        radius=radius,
         opacity=opacity,
-        show_scalar_bar=False,
+        show_scalar_bar=show_scalar_bar,
+        scalar_bar_position=scalar_bar_position,
+        theme=theme,
     )
+    return actor
 
 
-def add_field_lines(
+def add_trajectories(
     plotter: pv.Plotter,
-    field_lines: list[FieldLine],
+    traces: list[ParticleTrace],
     *,
+    color: str | None = None,
     scalar: str | None = None,
-    data: FieldDataset | None = None,
-    units: str | None = None,
     cmap: str | Colormap | None = None,
     clim: tuple[float, float] | None = None,
-    signed: bool = True,
     radius: float = 0.08,
     opacity: float = 1.0,
     show_scalar_bar: bool = True,
     scalar_bar_position: str = "lower_left",
     theme: PlotTheme | None = None,
 ) -> list[pv.Actor]:
-    r"""Render multiple field lines with a shared color scale.
+    r"""Render particle trajectories as tubes on one shared color scale.
 
-    When *data* is provided, scalars are automatically sampled along
-    each line. When *units* is also set, values are unit-converted.
-    When *cmap* and *clim* are ``None``, they are auto-derived from
-    field metadata.
+    Supports coloring by any scalar in ``trace.scalars``, or by
+    ``"time"`` and ``"speed"``, derived from the trace when it does not
+    carry a scalar of that name.
 
     Parameters
     ----------
     plotter : pv.Plotter
         The pyvista plotter.
-    field_lines : list[FieldLine]
-        Field lines to render.
+    traces : list[ParticleTrace]
+        Particle trajectories to render.
+    color : str or None
+        Uniform color for every trace when *scalar* is ``None``. ``None``
+        cycles the theme's color cycle.
     scalar : str or None
-        Field name for coloring. Sampled from *data* if not already
-        on each line. ``None`` uses theme color cycle.
-    data : FieldDataset or None
-        Source dataset for scalar sampling and unit conversion.
-    units : str or None
-        Display units (e.g. ``"nT"``). Requires *data*.
+        Scalar name for coloring. ``None`` draws uniform colors.
     cmap : str, Colormap, or None
-        Colormap. ``None`` auto-selects from field metadata.
+        Colormap. ``None`` selects the theme's sequential map.
     clim : tuple[float, float] or None
-        Shared color limits. ``None`` auto-computes.
-    signed : bool
-        Whether the scalar is signed or positive-definite.
+        Shared color limits. ``None`` spans the finite values of all traces.
     radius : float
         Tube radius.
     opacity : float
         Tube opacity (0–1).
     show_scalar_bar : bool
-        Whether to show a single themed scalar bar.
+        Whether to show a single themed scalar bar via `add_colorbar`.
     scalar_bar_position : str
         Scalar bar corner: ``"lower_left"``, ``"lower_right"``, etc.
     theme : PlotTheme or None
@@ -232,69 +377,43 @@ def add_field_lines(
     Returns
     -------
     list[pv.Actor]
+        One actor per trace.
+
+    Raises
+    ------
+    KeyError
+        If a trace carries no *scalar* and it is neither ``"time"`` nor
+        ``"speed"``.
     """
     ensure_pyvista()
 
-    if not field_lines:
+    if not traces:
         return []
-
-    # Auto-compute shared clim from all lines
-    if scalar is not None and clim is None:
-        all_vals = []
-        for fl in field_lines:
-            try:
-                values, _ = _prepare_scalar(fl, scalar, data, units)
-                all_vals.append(values)
-            except KeyError:
-                pass
-        if all_vals:
-            combined = np.concatenate(all_vals)
-            valid = combined[np.isfinite(combined)]
-            if len(valid) > 0:
-                from pypic.plotting._colormaps import is_positive_definite
-
-                info = data.field_info(scalar) if data is not None else None
-                if is_positive_definite(scalar, combined, info):
-                    clim = (0.0, float(np.max(valid)))
-                else:
-                    absmax = float(np.max(np.abs(valid)))
-                    clim = (-absmax, absmax)
-
-    # Auto-select signedness from field metadata so the right default
-    # cmap is chosen downstream by add_field_line via resolve_cmap()
-    if scalar is not None and cmap is None and data is not None:
-        from pypic.plotting._colormaps import is_positive_definite
-
-        info = data.field_info(scalar)
-        signed = not is_positive_definite(scalar, np.array([0.0]), info)
-
-    # Color cycle for uniform-colored lines
-    t = _resolve_theme(theme)
-    cycle = t.color_cycle if t.color_cycle else ("#1f77b4",)
-
-    actors: list[pv.Actor] = []
-    for i, fl in enumerate(field_lines):
-        is_last = i == len(field_lines) - 1
-        line_color = None if scalar is not None else cycle[i % len(cycle)]
-        actor = add_field_line(
-            plotter,
-            fl,
-            color=line_color,
-            scalar=scalar,
-            data=data,
-            units=units,
-            cmap=cmap,
-            clim=clim,
-            signed=signed,
-            radius=radius,
-            opacity=opacity,
-            show_scalar_bar=show_scalar_bar and is_last,
-            scalar_bar_position=scalar_bar_position,
-            theme=theme,
+    paths = [tr.points for tr in traces]
+    if scalar is None:
+        colors = _tube_colors(len(paths), color, theme)
+        return _add_colored_tubes(
+            plotter, paths, colors, radius=radius, opacity=opacity
         )
-        if actor is not None:
-            actors.append(actor)
-    return actors
+
+    values = [_trajectory_scalar(tr, scalar) for tr in traces]
+    combined = np.concatenate(values)
+    finite = combined[np.isfinite(combined)]
+    if clim is None and finite.size > 0:
+        clim = (float(finite.min()), float(finite.max()))
+    return _add_scalar_tubes(
+        plotter,
+        paths,
+        values,
+        name=scalar,
+        cmap=resolve_cmap(cmap, signed=False, theme=theme),
+        clim=clim,
+        radius=radius,
+        opacity=opacity,
+        show_scalar_bar=show_scalar_bar,
+        scalar_bar_position=scalar_bar_position,
+        theme=theme,
+    )
 
 
 def add_trajectory(
@@ -310,11 +429,8 @@ def add_trajectory(
     show_scalar_bar: bool = False,
     scalar_bar_position: str = "lower_left",
     theme: PlotTheme | None = None,
-) -> pv.Actor | None:
-    r"""Render a `ParticleTrace` as a colored tube.
-
-    Supports coloring by any scalar in ``trace.scalars``, or by the
-    built-in ``"time"`` or ``"speed"`` keys (derived automatically).
+) -> pv.Actor:
+    r"""Render one `ParticleTrace` as a tube, exactly as `add_trajectories` would.
 
     Parameters
     ----------
@@ -323,14 +439,15 @@ def add_trajectory(
     trace : ParticleTrace
         Particle trajectory to render.
     color : str or None
-        Uniform color. Ignored if *scalar* is set.
+        Uniform color when *scalar* is ``None``. ``None`` uses the first
+        color of the theme's cycle.
     scalar : str or None
         Name of a scalar for per-point coloring. ``"time"`` and
         ``"speed"`` are derived automatically if not in ``trace.scalars``.
     cmap : str, Colormap, or None
         Colormap. ``None`` selects from theme.
     clim : tuple[float, float] or None
-        Color limits. ``None`` for auto.
+        Color limits. ``None`` spans the trace's finite values.
     radius : float
         Tube radius.
     opacity : float
@@ -344,139 +461,25 @@ def add_trajectory(
 
     Returns
     -------
-    pv.Actor or None
+    pv.Actor
+
+    Raises
+    ------
+    KeyError
+        If the trace carries no *scalar* and it is neither ``"time"`` nor
+        ``"speed"``.
     """
-    ensure_pyvista()
-
-    pts = trace.points
-    if pts.shape[0] < 2:
-        return None
-
-    polyline = _polyline_from_points(pts)
-
-    scalars = {**trace.scalars, "time": trace.time}
-    speed = np.sqrt(np.sum(trace.velocity**2, axis=1))
-    scalars["speed"] = speed
-
-    if scalar is not None and scalar in scalars:
-        resolved_cmap = resolve_cmap(cmap, signed=False, theme=theme)
-        polyline[scalar] = scalars[scalar]
-        tube = polyline.tube(radius=radius)
-
-        actor = plotter.add_mesh(
-            tube,
-            scalars=scalar,
-            cmap=resolved_cmap,
-            clim=clim,
-            opacity=opacity,
-            show_scalar_bar=False,
-        )
-
-        if show_scalar_bar and clim is not None:
-            from pypic.plotting.pyvista._overlay import add_colorbar
-
-            add_colorbar(
-                plotter,
-                resolved_cmap,
-                clim,
-                label=scalar,
-                loc=scalar_bar_position,
-                theme=theme,
-            )
-
-        return actor
-    tube = polyline.tube(radius=radius)
-    return plotter.add_mesh(
-        tube,
-        color=color or "white",
+    (actor,) = add_trajectories(
+        plotter,
+        [trace],
+        color=color,
+        scalar=scalar,
+        cmap=cmap,
+        clim=clim,
+        radius=radius,
         opacity=opacity,
-        show_scalar_bar=False,
+        show_scalar_bar=show_scalar_bar,
+        scalar_bar_position=scalar_bar_position,
+        theme=theme,
     )
-
-
-def add_trajectories(
-    plotter: pv.Plotter,
-    traces: list[ParticleTrace],
-    *,
-    scalar: str | None = None,
-    cmap: str | Colormap | None = None,
-    clim: tuple[float, float] | None = None,
-    radius: float = 0.08,
-    opacity: float = 1.0,
-    show_scalar_bar: bool = True,
-    scalar_bar_position: str = "lower_left",
-    theme: PlotTheme | None = None,
-) -> list[pv.Actor]:
-    r"""Render multiple particle trajectories with a shared color scale.
-
-    Parameters
-    ----------
-    plotter : pv.Plotter
-        The pyvista plotter.
-    traces : list[ParticleTrace]
-        Particle trajectories to render.
-    scalar : str or None
-        Scalar name for coloring (see `add_trajectory`).
-    cmap : str, Colormap, or None
-        Colormap. ``None`` selects from theme.
-    clim : tuple[float, float] or None
-        Shared color limits. ``None`` computes from all traces.
-    radius : float
-        Tube radius.
-    opacity : float
-        Tube opacity (0–1).
-    show_scalar_bar : bool
-        Whether to show a single themed scalar bar via `add_colorbar`.
-    scalar_bar_position : str
-        Scalar bar corner: ``"lower_left"``, ``"lower_right"``, etc.
-    theme : PlotTheme or None
-        Theme for defaults.
-
-    Returns
-    -------
-    list[pv.Actor]
-    """
-    ensure_pyvista()
-
-    if not traces:
-        return []
-
-    if scalar is not None and clim is None:
-        all_vals = []
-        for tr in traces:
-            built_in = {
-                "time": tr.time,
-                "speed": np.sqrt(np.sum(tr.velocity**2, axis=1)),
-            }
-            all_scalars = {**tr.scalars, **built_in}
-            if scalar in all_scalars:
-                all_vals.append(all_scalars[scalar])
-        if all_vals:
-            combined = np.concatenate(all_vals)
-            valid = combined[np.isfinite(combined)]
-            if len(valid) > 0:
-                clim = (float(np.min(valid)), float(np.max(valid)))
-
-    t = _resolve_theme(theme)
-    cycle = t.color_cycle if t.color_cycle else ("#1f77b4",)
-
-    actors: list[pv.Actor] = []
-    for i, tr in enumerate(traces):
-        is_last = i == len(traces) - 1
-        line_color = None if scalar is not None else cycle[i % len(cycle)]
-        actor = add_trajectory(
-            plotter,
-            tr,
-            color=line_color,
-            scalar=scalar,
-            cmap=cmap,
-            clim=clim,
-            radius=radius,
-            opacity=opacity,
-            show_scalar_bar=show_scalar_bar and is_last,
-            scalar_bar_position=scalar_bar_position,
-            theme=theme,
-        )
-        if actor is not None:
-            actors.append(actor)
-    return actors
+    return actor
