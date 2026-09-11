@@ -30,6 +30,12 @@ The distribution is `pypic-plasma` on PyPI; the import name is `pypic`.
   vector recipe and returns every component. `FieldDataset.with_derived`
   uses it, and per-species components synthesized from the templates
   (`V_s2_perp_1`, `KEF_s3_2`, ...) now batch like registered ones.
+- `ax=` on `plot_comparison` (the three panels), `plot_cross_section` (the
+  2D/1D pair) and `plot_field_grid` (one axes per field), so they draw into
+  caller-built figures; `vmin`/`vmax` on `plot_quiver` and `plot_scatter`;
+  `units=` on `plot_kymograph`, appended to the colorbar label; `save=` on
+  `plot_poincare_section`; `color=` on the pyvista `add_field_lines` and
+  `add_trajectories`.
 
 ### Fixed
 
@@ -70,6 +76,19 @@ The distribution is `pypic-plasma` on PyPI; the import name is `pypic`.
   the field registry (`pypic.fields.vector_component`), so anything registered
   as a vector rotates; an invariants test pins every registered component to
   a complete, detectable triplet.
+- `plot_field_slice`, `plot_streamlines` and `plot_quiver` drew in
+  matplotlib's default colormap whenever `cmap` was omitted, ignoring the
+  theme's diverging and sequential maps, so signed fields got a sequential
+  one. They now use the theme's, as `plot_comparison` did.
+- `load_theme` raised `AttributeError` on a theme file that omits any
+  optional color instead of falling back to the `PlotTheme` default.
+- `plot_quiver(units=...)` labeled its colorbar in those units but colored
+  the arrows by the magnitude in code units.
+- The pyvista field-line and trajectory helpers: signed field lines got the
+  sequential colormap under symmetric limits; a single line or trajectory
+  kept pyvista's own limits and white tubes where a batch used a shared scale
+  and theme colors; an unknown trajectory scalar drew white tubes instead of
+  raising `KeyError`; and a trace's own `speed` scalar lost to the derived one.
 
 ### Changed
 
@@ -117,6 +136,20 @@ The distribution is `pypic-plasma` on PyPI; the import name is `pypic`.
   `reduce apply` share one write path.
 - `pypic.reduce` is split into validation, dispatch and provenance helpers;
   behaviour and messages are unchanged.
+- `plot_field_slice`, `plot_comparison` and `plot_kymograph` build their
+  color scale from one rule. Symlog keeps a signed field's zero-centred
+  limits; log scaling starts at the smallest positive value (comparisons
+  used 1e-10 whenever the data touched zero); and a comparison given only
+  `vmin` or `vmax` honors it instead of discarding both.
+- Every plot clips the axes it draws on to the theme's rounded corners, so
+  an overlay drawn onto caller-supplied axes is clipped like the base plot;
+  line, scatter, kymograph and spectrum plots used to skip it there.
+- `save_theme` writes exact values (it rounded colors to three decimals),
+  always writes name lists as TOML arrays and always writes `[plot]`.
+  `load_theme` raises `ValueError` naming the key when a value has the
+  wrong TOML type, e.g. `arrows = "false"`.
+- `PlotTheme.rcparams` is read-only; derive a changed theme with
+  `customize`. Themes still pickle and deep-copy.
 
 ### Removed
 
