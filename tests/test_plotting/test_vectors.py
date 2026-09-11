@@ -90,6 +90,15 @@ class TestVectorPlots:
         assert len(legend_boxes) >= 1
         plt.close(fig)
 
+    @pytest.mark.parametrize(
+        "plot_fn", [plot_streamlines, plot_quiver], ids=["streamlines", "quiver"]
+    )
+    def test_unknown_color_field_is_named_in_the_error(
+        self, ds_2d: FieldDataset, plot_fn: object
+    ) -> None:
+        with pytest.raises(ValueError, match="color_field 'nope' not found"):
+            plot_fn(ds_2d, "B", color_field="nope")  # type: ignore[operator]
+
     def test_quiver_colors_magnitude_in_the_requested_units(
         self, ds_2d: FieldDataset
     ) -> None:

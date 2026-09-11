@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Literal
 
 import numpy as np
 
+from pypic.plotting._badge import LegendEntry, add_legend
+from pypic.plotting._colorbar import attach_colorbar
 from pypic.plotting._guard import ensure_matplotlib
-from pypic.plotting._labels import figure_title
+from pypic.plotting._labels import field_label, figure_title
 from pypic.plotting._resolve import (
     finish_axes,
     get_or_create_axes,
@@ -16,6 +19,7 @@ from pypic.plotting._resolve import (
     prepare_data,
     resolve_field_values,
 )
+from pypic.plotting.styles import _resolve_theme_arg, _theme_val, use_theme
 
 if TYPE_CHECKING:
     from matplotlib.axes import Axes
@@ -30,53 +34,50 @@ if TYPE_CHECKING:
     from pypic.types import FloatArray
 
 
-def _resolve_plane_components(data: FieldDataset, field_prefix: str) -> tuple[str, str]:
-    """Return the two in-plane component field names for a vector field.
+@dataclass(frozen=True, slots=True)
+class _VectorInputs:
+    data: FieldDataset
+    components: tuple[str, str]
+    u: FloatArray
+    v: FloatArray
+    color_values: FloatArray | None  # None when drawn in one uniform color
+    colormap: Colormap | None
+    info: FieldInfo  # colorbar label and default title
 
-    Maps surviving dataset axes to the corresponding numbered component
-    indices using the full 3D geometry axis order. For example, on a
-    z-normal slice with surviving axes ``(x, y)``, returns
-    ``("B_1", "B_2")`` for ``field_prefix="B"``.
 
-    Parameters
-    ----------
-    data : FieldDataset
-        2D dataset (after plane selection).
-    field_prefix : str
-        Vector field prefix (e.g. ``"B"``, ``"V"``, ``"J"``).
+def _vector_prelude(
+    data: FieldDataset,
+    field: str,
+    *,
+    plane: PlaneSelection | None,
+    color: str | None,
+    color_field: str | None,
+    units: str | None,
+    theme: PlotTheme,
+    cmap: str | Colormap | None,
+) -> _VectorInputs:
+    """Slice to the plane, look up the in-plane components, resolve the colors.
 
-    Returns
-    -------
-    tuple[str, str]
-        Numbered field names for the two in-plane components.
+    The surviving axes map to component indices through the full geometry
+    order, so a y-normal slice of ``B`` draws ``(B_1, B_3)``. Without
+    *color_field* the colors are the in-plane magnitude, in *units* when given.
     """
+    from pypic.plotting._colormaps import resolve_field_colormap
+
+    data = prepare_data(data, plane)
     surviving = data.grid.surviving_axis_names
     if len(surviving) != 2:
         msg = f"Expected 2D data, got {len(surviving)}D"
         raise ValueError(msg)
     all_axes = data.grid.geometry.axis_names
-    comp0 = all_axes.index(surviving[0]) + 1
-    comp1 = all_axes.index(surviving[1]) + 1
-    return f"{field_prefix}_{comp0}", f"{field_prefix}_{comp1}"
-
-
-def _resolve_vector_colors(
-    data: FieldDataset,
-    field: str,
-    color_field: str | None,
-    magnitude: FloatArray,
-    units: str | None,
-    theme: PlotTheme,
-    cmap: str | Colormap | None,
-) -> tuple[FloatArray, Colormap, FieldInfo]:
-    """Resolve color values, colormap, and field info for vector plots.
-
-    Returns
-    -------
-    tuple
-        ``(color_values, colormap, info)``
-    """
-    from pypic.plotting._colormaps import resolve_field_colormap
+    comp_u, comp_v = (f"{field}_{all_axes.index(a) + 1}" for a in surviving)
+    u = resolve_field_values(data, comp_u, None)
+    v = resolve_field_values(data, comp_v, None)
+    # The leading "|" is what marks the default magnitude positive-definite.
+    magnitude_name = f"|{field}|"
+    if color is not None:
+        info = data.field_info(magnitude_name)
+        return _VectorInputs(data, (comp_u, comp_v), u, v, None, None, info)
 
     if color_field is not None:
         try:
@@ -84,19 +85,19 @@ def _resolve_vector_colors(
         except KeyError:
             msg = f"color_field {color_field!r} not found in dataset"
             raise ValueError(msg) from None
-        color_name = color_field
+    elif units is not None:
+        color_values = np.hypot(
+            resolve_field_values(data, comp_u, units),
+            resolve_field_values(data, comp_v, units),
+        )
     else:
-        color_values = magnitude
-        # Internal name routed to resolve_colormap only — the leading "|"
-        # is what triggers positive-definite detection. Never displayed:
-        # the rendered colorbar label comes from `info` below.
-        color_name = f"|{field}|"
-
-    info = data.field_info(color_field if color_field is not None else f"|{field}|")
+        color_values = np.hypot(u, v)
+    color_name = color_field if color_field is not None else magnitude_name
+    info = data.field_info(color_name)
     _, colormap = resolve_field_colormap(
         color_name, color_values, theme, info=info, cmap=cmap
     )
-    return color_values, colormap, info
+    return _VectorInputs(data, (comp_u, comp_v), u, v, color_values, colormap, info)
 
 
 def plot_streamlines(
@@ -234,33 +235,20 @@ def plot_streamlines(
     """
     ensure_matplotlib()
 
-    from pypic.plotting.styles import _resolve_theme_arg, use_theme
-
     owns_figure = ax is None
     theme = _resolve_theme_arg(theme)
-    data = prepare_data(data, plane)
-
-    comp_u, comp_v = _resolve_plane_components(data, field)
-    u = resolve_field_values(data, comp_u, None)
-    v = resolve_field_values(data, comp_v, None)
-
-    magnitude = np.sqrt(u**2 + v**2)
-    use_colormap = color is None
-
-    color_values: FloatArray | None = None
-    colormap: Colormap | None = None
-    info: FieldInfo | None = None
-    if use_colormap:
-        # Convert magnitude to display units when no explicit color_field
-        display_magnitude = magnitude
-        if units is not None and color_field is None:
-            u_display = resolve_field_values(data, comp_u, units)
-            v_display = resolve_field_values(data, comp_v, units)
-            display_magnitude = np.sqrt(u_display**2 + v_display**2)
-        color_values, colormap, info = _resolve_vector_colors(
-            data, field, color_field, display_magnitude, units, theme, cmap
-        )
-
+    inputs = _vector_prelude(
+        data,
+        field,
+        plane=plane,
+        color=color,
+        color_field=color_field,
+        units=units,
+        theme=theme,
+        cmap=cmap,
+    )
+    data, u, v, color_values = inputs.data, inputs.u, inputs.v, inputs.color_values
+    magnitude = np.hypot(u, v)
     coords = data.grid.coordinate_arrays()
 
     # Linewidth dispatch
@@ -302,8 +290,7 @@ def plot_streamlines(
         coords = (coords[0][::s], coords[1][::s])
         u = u[::s, ::s]
         v = v[::s, ::s]
-        if use_colormap:
-            assert color_values is not None  # narrowed by use_colormap gate
+        if color_values is not None:
             color_values = color_values[::s, ::s]
         if isinstance(lw_arg, np.ndarray):
             lw_arg = lw_arg[::s, ::s]
@@ -313,6 +300,7 @@ def plot_streamlines(
     # code units via the same factor used by in_units().
     if magnitude_min is not None or magnitude_max is not None:
         if units is not None:
+            comp_u = inputs.components[0]
             code = resolve_field_values(data, comp_u, None)
             display = resolve_field_values(data, comp_u, units)
             nonzero = np.abs(code) > 0
@@ -337,11 +325,9 @@ def plot_streamlines(
     with use_theme(theme):
         fig, ax = get_or_create_axes(theme, ax, figsize)
 
-        if use_colormap:
+        if color_values is not None:
             from matplotlib.colors import Normalize
 
-            assert color_values is not None  # narrowed by use_colormap gate
-            assert colormap is not None
             norm = (
                 Normalize(vmin=vmin, vmax=vmax)
                 if vmin is not None or vmax is not None
@@ -353,7 +339,7 @@ def plot_streamlines(
                 u.T,
                 v.T,
                 color=color_values.T,
-                cmap=colormap,
+                cmap=inputs.colormap,
                 norm=norm,
                 density=density,
                 linewidth=lw_arg,
@@ -385,27 +371,16 @@ def plot_streamlines(
                 if isinstance(child, FancyArrowPatch):
                     child.set_alpha(alpha)
 
-        if use_colormap and colorbar:
-            from pypic.plotting._colorbar import attach_colorbar
-            from pypic.plotting._labels import field_label
-
-            assert info is not None  # narrowed by use_colormap gate
-            unit_str = units or ""
-            cb_label = field_label(info, unit_str=unit_str)
+        if color_values is not None and colorbar:
+            cb_label = field_label(inputs.info, unit_str=units or "")
             attach_colorbar(
                 fig, ax, stream.lines, cb_label, colorbar, extremes=extremes
             )
-
-        if not use_colormap and legend is not False:
-            from pypic.plotting._badge import LegendEntry, add_legend
-
-            legend_label = legend if isinstance(legend, str) else field
-            from pypic.plotting.styles import _theme_val
-
+        if color is not None and legend is not False:
             default_lw: float = _theme_val("line_width", 1.0)
             lw = linewidth if isinstance(linewidth, (int, float)) else default_lw
             entry = LegendEntry(
-                label=legend_label,
+                label=legend if isinstance(legend, str) else field,
                 color=color,
                 linewidth=lw,
                 alpha=alpha,
@@ -413,8 +388,7 @@ def plot_streamlines(
             add_legend(ax, entry)
 
         if title is None:
-            title_info = info if info is not None else data.field_info(f"|{field}|")
-            title = figure_title(title_info, step=step, time=time)
+            title = figure_title(inputs.info, step=step, time=time)
         xlabel, ylabel = plane_axis_labels(data, coord_units)
         finish_axes(
             fig,
@@ -537,31 +511,19 @@ def plot_quiver(
     """
     ensure_matplotlib()
 
-    from pypic.plotting.styles import _resolve_theme_arg, use_theme
-
     owns_figure = ax is None
     theme = _resolve_theme_arg(theme)
-    data = prepare_data(data, plane)
-
-    comp_u, comp_v = _resolve_plane_components(data, field)
-    u = resolve_field_values(data, comp_u, None)
-    v = resolve_field_values(data, comp_v, None)
-
-    use_colormap = color is None
-
-    color_values: FloatArray | None = None
-    colormap: Colormap | None = None
-    info: FieldInfo | None = None
-    if use_colormap:
-        magnitude = np.sqrt(u**2 + v**2)
-        if units is not None and color_field is None:
-            u_display = resolve_field_values(data, comp_u, units)
-            v_display = resolve_field_values(data, comp_v, units)
-            magnitude = np.sqrt(u_display**2 + v_display**2)
-        color_values, colormap, info = _resolve_vector_colors(
-            data, field, color_field, magnitude, units, theme, cmap
-        )
-
+    inputs = _vector_prelude(
+        data,
+        field,
+        plane=plane,
+        color=color,
+        color_field=color_field,
+        units=units,
+        theme=theme,
+        cmap=cmap,
+    )
+    data, u, v, color_values = inputs.data, inputs.u, inputs.v, inputs.color_values
     coords = data.grid.coordinate_arrays()
 
     # Stride dispatch
@@ -581,17 +543,14 @@ def plot_quiver(
     with use_theme(theme):
         fig, ax = get_or_create_axes(theme, ax, figsize)
 
-        if use_colormap:
-            assert color_values is not None  # narrowed by use_colormap gate
-            assert colormap is not None
-            color_sub = color_values[::s0, ::s1]
+        if color_values is not None:
             quiv = ax.quiver(
                 xx.T,
                 yy.T,
                 u_sub.T,
                 v_sub.T,
-                color_sub.T,
-                cmap=colormap,
+                color_values[::s0, ::s1].T,
+                cmap=inputs.colormap,
                 scale=scale,
                 alpha=alpha,
                 **kwargs,
@@ -608,29 +567,19 @@ def plot_quiver(
                 **kwargs,
             )
 
-        if use_colormap and colorbar:
-            from pypic.plotting._colorbar import attach_colorbar
-            from pypic.plotting._labels import field_label
-
-            assert info is not None  # narrowed by use_colormap gate
-            unit_str = units or ""
-            cb_label = field_label(info, unit_str=unit_str)
+        if color_values is not None and colorbar:
+            cb_label = field_label(inputs.info, unit_str=units or "")
             attach_colorbar(fig, ax, quiv, cb_label, colorbar, extremes=extremes)
-
-        if not use_colormap and legend is not False:
-            from pypic.plotting._badge import LegendEntry, add_legend
-
-            legend_label = legend if isinstance(legend, str) else field
+        if color is not None and legend is not False:
             entry = LegendEntry(
-                label=legend_label,
+                label=legend if isinstance(legend, str) else field,
                 color=color,
                 alpha=alpha,
             )
             add_legend(ax, entry)
 
         if title is None:
-            title_info = info if info is not None else data.field_info(f"|{field}|")
-            title = figure_title(title_info, step=step, time=time)
+            title = figure_title(inputs.info, step=step, time=time)
         xlabel, ylabel = plane_axis_labels(data, coord_units)
         finish_axes(
             fig,
