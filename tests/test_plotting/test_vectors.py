@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import matplotlib.pyplot as plt
+import numpy as np
 import pytest
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
@@ -88,6 +89,19 @@ class TestVectorPlots:
         legend_boxes = [a for a in ax.artists if hasattr(a, "patch")]
         assert len(legend_boxes) >= 1
         plt.close(fig)
+
+    def test_quiver_colors_magnitude_in_the_requested_units(
+        self, ds_2d: FieldDataset
+    ) -> None:
+        """With *units* and no *color_field*, arrows are colored by the
+        in-plane magnitude in those units, matching the colorbar label."""
+        _, ax = plot_quiver(ds_2d, "B", units="nT")
+        expected = np.hypot(ds_2d.in_units("B_1", "nT"), ds_2d.in_units("B_2", "nT"))
+        drawn = np.asarray(ax.collections[0].get_array())
+        np.testing.assert_allclose(
+            np.sort(drawn), np.sort(expected.ravel()), rtol=1e-12
+        )
+        plt.close("all")
 
     def test_legend_false_disables(self, ds_2d: FieldDataset) -> None:
         fig, ax = plot_streamlines(ds_2d, "B", color="black", legend=False)

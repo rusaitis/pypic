@@ -554,6 +554,10 @@ def plot_quiver(
     info: FieldInfo | None = None
     if use_colormap:
         magnitude = np.sqrt(u**2 + v**2)
+        if units is not None and color_field is None:
+            u_display = resolve_field_values(data, comp_u, units)
+            v_display = resolve_field_values(data, comp_v, units)
+            magnitude = np.sqrt(u_display**2 + v_display**2)
         color_values, colormap, info = _resolve_vector_colors(
             data, field, color_field, magnitude, units, theme, cmap
         )
