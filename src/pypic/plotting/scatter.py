@@ -30,6 +30,8 @@ def plot_scatter(
     color_units: str | None = None,
     theme: ThemeArg = None,
     cmap: str | None = None,
+    vmin: float | None = None,
+    vmax: float | None = None,
     alpha: float = 0.3,
     marker_size: float = 1.0,
     density: bool = False,
@@ -73,6 +75,9 @@ def plot_scatter(
         Plot theme. ``None`` uses ``DEFAULT``.
     cmap : str | None
         Colormap override for colored scatter or density mode.
+    vmin, vmax : float | None
+        Color limits for *color_field* or the density counts. ``None``
+        (default) autoscales.
     alpha : float
         Point transparency (scatter mode only).
     marker_size : float
@@ -150,6 +155,8 @@ def plot_scatter(
                 C=color,
                 gridsize=bins,
                 cmap=cmap,
+                vmin=vmin,
+                vmax=vmax,
                 mincnt=1,
                 xscale="log" if log_x else "linear",
                 yscale="log" if log_y else "linear",
@@ -164,6 +171,8 @@ def plot_scatter(
                     s=marker_size,
                     alpha=alpha,
                     cmap=cmap,
+                    vmin=vmin,
+                    vmax=vmax,
                     edgecolors="none",
                 )
                 mappable = sc

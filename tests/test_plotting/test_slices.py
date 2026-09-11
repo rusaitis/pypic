@@ -253,6 +253,51 @@ class TestNormAgreement:
         assert set(observed.values()) == {expected}, observed
 
 
+class TestSuppliedAxes:
+    def test_comparison_draws_into_the_three_supplied_axes(
+        self, ds_2d: FieldDataset
+    ) -> None:
+        _, supplied = plt.subplots(1, 3)
+        _, axes = plot_comparison(ds_2d, ds_2d, "B_1", ax=tuple(supplied))
+        drawn = [(panel, len(panel.collections)) for panel in axes.values()]
+        assert drawn == [(panel, 1) for panel in supplied]
+        plt.close("all")
+
+    def test_cross_section_draws_into_the_supplied_pair(
+        self, ds_2d: FieldDataset
+    ) -> None:
+        from pypic.plotting import plot_cross_section
+
+        _, (top, bottom) = plt.subplots(1, 2)
+        _, (ax_2d, ax_1d) = plot_cross_section(
+            ds_2d, "B_1", cut_axis="x", ax=(top, bottom)
+        )
+        drawn = (ax_2d, ax_1d, len(top.collections), len(bottom.lines))
+        assert drawn == (top, bottom, 1, 1)
+        plt.close("all")
+
+    def test_field_grid_draws_one_field_per_supplied_axes(
+        self, ds_2d: FieldDataset
+    ) -> None:
+        from pypic.plotting import plot_field_grid
+
+        _, supplied = plt.subplots(1, 2)
+        _, axes = plot_field_grid(ds_2d, ["B_1", "P"], ax=list(supplied))
+        drawn = [(panel, len(panel.collections)) for panel in axes]
+        assert drawn == [(panel, 1) for panel in supplied]
+        plt.close("all")
+
+    def test_field_grid_rejects_a_mismatched_axes_count(
+        self, ds_2d: FieldDataset
+    ) -> None:
+        from pypic.plotting import plot_field_grid
+
+        _, supplied = plt.subplots(1, 3)
+        with pytest.raises(ValueError, match="3 axes for 2 fields"):
+            plot_field_grid(ds_2d, ["B_1", "P"], ax=list(supplied))
+        plt.close("all")
+
+
 class TestSymlogSlice:
     def test_symlog_centres_signed_fields_on_zero(self, ds_2d: FieldDataset) -> None:
         """Symlog keeps a signed field's zero-centred limits, where the
@@ -302,6 +347,17 @@ class TestAddContours:
         assert cs is not None
         assert len(ax.collections) > n_before
         assert len(cs.levels) >= 3
+        plt.close(fig)
+
+    def test_returns_the_contour_set_it_drew(self, ds_2d: FieldDataset) -> None:
+        from matplotlib.contour import QuadContourSet
+
+        from pypic.plotting import add_contours
+
+        fig, ax = plot_field_slice(ds_2d, "B_1")
+        cs = add_contours(ax, ds_2d, "P")
+        assert isinstance(cs, QuadContourSet)
+        assert cs in ax.collections
         plt.close(fig)
 
     def test_contour_with_labels(self, ds_2d: FieldDataset) -> None:
@@ -694,6 +750,15 @@ class TestPlotKymograph:
         fig, ax = plot_kymograph(values, coords, times, colorbar="inset")
         # Inset colorbars live as children of the parent axes.
         assert len(ax.child_axes) >= 1
+        plt.close(fig)
+
+    def test_units_are_appended_to_the_colorbar_label(self) -> None:
+        values = np.ones((3, 5))
+        fig, ax = plot_kymograph(
+            values, np.arange(5.0), np.arange(3.0), label="$B_z$", units="nT"
+        )
+        colorbar_ax = next(a for a in fig.axes if a is not ax)
+        assert colorbar_ax.get_ylabel() == "$B_z$ [nT]"
         plt.close(fig)
 
     def test_invalid_shape(self) -> None:

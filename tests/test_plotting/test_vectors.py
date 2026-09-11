@@ -112,6 +112,12 @@ class TestVectorPlots:
         )
         plt.close("all")
 
+    def test_quiver_honours_color_limits(self, ds_2d: FieldDataset) -> None:
+        _, ax = plot_quiver(ds_2d, "B", vmin=0.5, vmax=1.5)
+        norm = ax.collections[0].norm
+        assert (norm.vmin, norm.vmax) == (0.5, 1.5)
+        plt.close("all")
+
     def test_legend_false_disables(self, ds_2d: FieldDataset) -> None:
         fig, ax = plot_streamlines(ds_2d, "B", color="black", legend=False)
         legend_boxes = [a for a in ax.artists if hasattr(a, "patch")]

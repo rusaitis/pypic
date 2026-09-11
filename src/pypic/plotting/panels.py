@@ -8,6 +8,8 @@ from typing import TYPE_CHECKING, Literal
 from pypic.plotting._guard import ensure_matplotlib
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+
     from matplotlib.axes import Axes
     from matplotlib.colors import Colormap
     from matplotlib.figure import Figure
@@ -41,6 +43,7 @@ def plot_field_grid(
     figsize: tuple[float, float] | None = None,
     panel_labels: bool = True,
     suptitle: str | None = None,
+    ax: Sequence[Axes] | None = None,
 ) -> tuple[Figure, list[Axes]]:
     r"""Plot multiple fields in an auto-arranged grid with panel labels.
 
@@ -90,6 +93,10 @@ def plot_field_grid(
         Add ``(a)``, ``(b)``, … labels to each panel.
     suptitle : str | None
         Figure super-title. ``None`` generates from step/time.
+    ax : Sequence[Axes] or None
+        Existing axes, one per field in order; *ncols* and *figsize* are
+        then unused and the figure is left to the caller to lay out.
+        ``None`` creates the grid.
     vmin : float or None
         Lower color limit. ``None`` (default) autoscales.
     vmax : float or None
@@ -115,7 +122,7 @@ def plot_field_grid(
     import matplotlib.pyplot as plt
 
     from pypic.plotting._badge import add_label
-    from pypic.plotting._resolve import prepare_data
+    from pypic.plotting._resolve import get_or_create_axes, maybe_save, prepare_data
     from pypic.plotting.slices import plot_field_slice
     from pypic.plotting.styles import _resolve_theme_arg, apply_rounding, use_theme
 
@@ -123,6 +130,9 @@ def plot_field_grid(
 
     if not fields:
         msg = "fields list must not be empty"
+        raise ValueError(msg)
+    if ax is not None and len(ax) != len(fields):
+        msg = f"ax holds {len(ax)} axes for {len(fields)} fields"
         raise ValueError(msg)
 
     data = prepare_data(data, plane)
@@ -138,10 +148,15 @@ def plot_field_grid(
     label_fontsize = theme.font_overlay * label_scale
 
     with use_theme(theme):
-        fig, axes_arr = plt.subplots(nrows, ncols, figsize=figsize, squeeze=False)
-        axes_flat = list(axes_arr.flat)
+        if ax is None:
+            fig, axes_arr = plt.subplots(nrows, ncols, figsize=figsize, squeeze=False)
+            axes_flat = list(axes_arr.flat)
+        else:
+            axes_flat = list(ax)
+            fig, _ = get_or_create_axes(theme, axes_flat[0], None)
+        panels = axes_flat[: len(fields)]
 
-        for i, field_name in enumerate(fields):
+        for i, (field_name, panel_ax) in enumerate(zip(fields, panels, strict=True)):
             field_units = (units or {}).get(field_name)
             panel_cmap = cmap.get(field_name) if isinstance(cmap, dict) else cmap
             plot_field_slice(
@@ -156,14 +171,14 @@ def plot_field_grid(
                 alpha=alpha,
                 symmetric=symmetric,
                 log_scale=log_scale,
-                ax=axes_flat[i],
+                ax=panel_ax,
                 colorbar=colorbar,
                 extremes=extremes,
                 step=step,
                 time=time,
             )
             if panel_labels:
-                add_label(axes_flat[i], chr(ord("a") + i), fontsize=label_fontsize)
+                add_label(panel_ax, chr(ord("a") + i), fontsize=label_fontsize)
 
         # Hide unused axes
         for j in range(len(fields), len(axes_flat)):
@@ -179,11 +194,10 @@ def plot_field_grid(
                 parts.append(f"t = {time:.2f}")
             fig.suptitle(", ".join(parts))
 
-        fig.tight_layout()
-        for panel_ax in axes_flat[: len(fields)]:
+        if ax is None:
+            fig.tight_layout()
+        for panel_ax in panels:
             apply_rounding(panel_ax)
 
-    from pypic.plotting._resolve import maybe_save
-
     maybe_save(fig, save)
-    return fig, axes_flat[: len(fields)]
+    return fig, panels

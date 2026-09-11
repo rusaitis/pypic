@@ -13,6 +13,8 @@ from matplotlib.figure import Figure
 from pypic.plotting import plot_line, plot_time_series
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from pypic.containers import TabularData
     from pypic.dataset import FieldDataset
 
@@ -328,6 +330,41 @@ class TestPlotScatter:
         # finite-mask); at minimum the value range must overlap rho_m's.
         assert float(np.nanmin(arr)) >= 0.0
         plt.close(fig)
+
+    @pytest.mark.parametrize("density", [False, True], ids=["scatter", "hexbin"])
+    def test_color_limits(self, ds_2d: FieldDataset, density: bool) -> None:
+        from pypic.plotting import plot_scatter
+
+        _, ax = plot_scatter(
+            ds_2d,
+            "B_1",
+            "B_2",
+            color_field="rho_m",
+            density=density,
+            vmin=0.2,
+            vmax=0.8,
+        )
+        norm = ax.collections[0].norm
+        assert (norm.vmin, norm.vmax) == (0.2, 0.8)
+        plt.close("all")
+
+
+class TestPlotPoincareSection:
+    def test_save_writes_the_figure(self, tmp_path: Path) -> None:
+        from pypic.plotting import plot_poincare_section
+        from pypic.traces import PoincareSection, PoincareSurface
+
+        section = PoincareSection(
+            surface=PoincareSurface.from_axis("z", 0.0),
+            seeds=np.zeros((1, 3)),
+            direction="forward",
+            punctures_3d=(np.zeros((2, 3)),),
+            punctures_2d=(np.array([[0.1, 0.2], [0.3, -0.1]]),),
+            field_lines=(),
+        )
+        out = tmp_path / "poincare.png"
+        plot_poincare_section(section, save=str(out))
+        assert out.read_bytes()[:8] == b"\x89PNG\r\n\x1a\n"
 
 
 class TestPlotPowerSpectrum:

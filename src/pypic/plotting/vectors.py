@@ -420,6 +420,8 @@ def plot_quiver(
     alpha: float = 1.0,
     theme: ThemeArg = None,
     cmap: str | Colormap | None = None,
+    vmin: float | None = None,
+    vmax: float | None = None,
     stride: int | tuple[int, int] = 1,
     scale: float | None = None,
     title: str | None = None,
@@ -468,6 +470,9 @@ def plot_quiver(
         Plot theme. ``None`` uses ``DEFAULT``.
     cmap : str | Colormap | None
         Override automatic colormap selection.
+    vmin, vmax : float or None
+        Color limits for the arrow colors. ``None`` (default) autoscales.
+        Ignored when *color* is set.
     stride : int | tuple[int, int]
         Subsample every N grid points. Scalar or ``(stride_x, stride_y)``.
     scale : float | None
@@ -544,6 +549,8 @@ def plot_quiver(
         fig, ax = get_or_create_axes(theme, ax, figsize)
 
         if color_values is not None:
+            from matplotlib.colors import Normalize
+
             quiv = ax.quiver(
                 xx.T,
                 yy.T,
@@ -551,6 +558,7 @@ def plot_quiver(
                 v_sub.T,
                 color_values[::s0, ::s1].T,
                 cmap=inputs.colormap,
+                norm=Normalize(vmin=vmin, vmax=vmax),
                 scale=scale,
                 alpha=alpha,
                 **kwargs,

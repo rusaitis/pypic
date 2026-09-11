@@ -40,6 +40,7 @@ def plot_cross_section(
     extremes: ExtremesMode = "semi",
     cut_color: str | None = None,
     cut_linestyle: str = "--",
+    ax: tuple[Axes, Axes] | None = None,
     save: str | None = None,
     figsize: tuple[float, float] | None = None,
 ) -> tuple[Figure, tuple[Axes, Axes]]:
@@ -93,6 +94,10 @@ def plot_cross_section(
         the theme's accent color.
     cut_linestyle : str
         Line style for the cut marker.
+    ax : tuple[Axes, Axes] or None
+        Existing ``(ax_2d, ax_1d)`` pair to draw into; the figure is then
+        left to the caller to lay out. ``None`` creates a two-row figure
+        whose panels share the cut axis.
     figsize : tuple[float, float] | None
         Figure size override. ``None`` uses ``(7, 8)``.
     vmin : float or None
@@ -122,6 +127,8 @@ def plot_cross_section(
 
     from pypic.plotting._labels import axis_label, field_label
     from pypic.plotting._resolve import (
+        get_or_create_axes,
+        maybe_save,
         prepare_data,
         resolve_coord_units,
         resolve_field_values,
@@ -164,14 +171,19 @@ def plot_cross_section(
     # Cut position in physical coordinates
     cut_coord = float(coords[perp_dim_idx][cut_index])
 
+    owns_figure = ax is None
     with use_theme(theme):
-        fig, (ax_2d, ax_1d) = plt.subplots(
-            2,
-            1,
-            figsize=figsize or (7, 8),
-            height_ratios=[2, 1],
-            sharex=(cut_dim_idx == 0),
-        )
+        if ax is None:
+            fig, (ax_2d, ax_1d) = plt.subplots(
+                2,
+                1,
+                figsize=figsize or (7, 8),
+                height_ratios=[2, 1],
+                sharex=(cut_dim_idx == 0),
+            )
+        else:
+            ax_2d, ax_1d = ax
+            fig, _ = get_or_create_axes(theme, ax_2d, None)
 
         # Top panel: 2D slice
         plot_field_slice(
@@ -195,7 +207,7 @@ def plot_cross_section(
         )
 
         # Suppress redundant xlabel on top panel when sharing x-axis
-        if cut_dim_idx == 0:
+        if owns_figure and cut_dim_idx == 0:
             ax_2d.set_xlabel("")
 
         # Mark the cut line on the 2D panel
@@ -228,10 +240,9 @@ def plot_cross_section(
         if np.any(np.isfinite(profile)):
             ax_1d.set_xlim(cut_coords[0], cut_coords[-1])
 
-        fig.tight_layout()
+        if owns_figure:
+            fig.tight_layout()
         apply_rounding(ax_2d)
-
-    from pypic.plotting._resolve import maybe_save
 
     maybe_save(fig, save)
     return fig, (ax_2d, ax_1d)

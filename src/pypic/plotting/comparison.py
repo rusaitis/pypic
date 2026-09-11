@@ -43,6 +43,7 @@ def plot_comparison(
     colorbar: bool | Literal["inset"] = True,
     extremes: ExtremesMode = "semi",
     show_error: bool = False,
+    ax: tuple[Axes, Axes, Axes] | None = None,
     save: str | None = None,
     figsize: tuple[float, float] | None = None,
     title: str | None = None,
@@ -99,6 +100,10 @@ def plot_comparison(
     show_error : bool
         When ``True``, display the relative L2 error on the difference
         panel as a text annotation.
+    ax : tuple[Axes, Axes, Axes] or None
+        Existing axes for A, B and the difference, in that order; the
+        figure they belong to is then left to the caller to lay out.
+        ``None`` creates a one-row, three-panel figure.
     figsize : tuple[float, float] | None
         Figure size override. Defaults to ``(14, 4)``.
     title : str | None
@@ -149,6 +154,7 @@ def plot_comparison(
     from pypic.plotting._labels import field_label, figure_title
     from pypic.plotting._resolve import (
         default_midplane,
+        get_or_create_axes,
         maybe_save,
         plane_axis_labels,
         require_plottable_grid,
@@ -208,10 +214,14 @@ def plot_comparison(
     cb_label = field_label(info, unit_str=unit_str)
 
     with use_theme(theme):
-        fig, axes_dict = plt.subplot_mosaic(
-            [["a", "b", "diff"]],
-            figsize=figsize or (14, 4),
-        )
+        if ax is None:
+            fig, axes_dict = plt.subplot_mosaic(
+                [["a", "b", "diff"]],
+                figsize=figsize or (14, 4),
+            )
+        else:
+            fig, _ = get_or_create_axes(theme, ax[0], None)
+            axes_dict = dict(zip(("a", "b", "diff"), ax, strict=True))
 
         diff_title = f"{labels[0]} \u2212 {labels[1]}"
         panels = [
@@ -227,8 +237,8 @@ def plot_comparison(
         ]
 
         for key, values, panel_title, panel_cmap, panel_norm in panels:
-            ax = axes_dict[key]
-            mesh = ax.pcolormesh(
+            panel_ax = axes_dict[key]
+            mesh = panel_ax.pcolormesh(
                 coords[0],
                 coords[1],
                 values.T,
@@ -238,12 +248,12 @@ def plot_comparison(
                 norm=panel_norm,
             )
             label = f"\u0394 {cb_label}" if key == "diff" else cb_label
-            attach_colorbar(fig, ax, mesh, label, colorbar, extremes=extremes)
-            ax.set_xlabel(xlabel)
-            ax.set_ylabel(ylabel)
-            ax.set_aspect("equal")
-            apply_grid(ax, theme)
-            ax.set_title(panel_title)
+            attach_colorbar(fig, panel_ax, mesh, label, colorbar, extremes=extremes)
+            panel_ax.set_xlabel(xlabel)
+            panel_ax.set_ylabel(ylabel)
+            panel_ax.set_aspect("equal")
+            apply_grid(panel_ax, theme)
+            panel_ax.set_title(panel_title)
 
         if show_error:
             import matplotlib as mpl
@@ -271,9 +281,10 @@ def plot_comparison(
         else:
             fig.suptitle(figure_title(info, step=step, time=time))
 
-        fig.tight_layout()
-        for ax_item in axes_dict.values():
-            apply_rounding(ax_item)
+        if ax is None:
+            fig.tight_layout()
+        for panel_ax in axes_dict.values():
+            apply_rounding(panel_ax)
 
     maybe_save(fig, save)
     return fig, axes_dict

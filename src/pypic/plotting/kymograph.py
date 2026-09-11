@@ -23,6 +23,7 @@ def plot_kymograph(
     times: FloatArray,
     *,
     label: str = "",
+    units: str | None = None,
     xlabel: str | None = None,
     ylabel: str | None = None,
     theme: ThemeArg = None,
@@ -53,7 +54,10 @@ def plot_kymograph(
     times : FloatArray
         1D time array of length ``n_times``.
     label : str
-        Colorbar label (e.g. ``"$B_z$"`` or ``"$B_z$ [nT]"``).
+        Colorbar label (e.g. ``"$B_z$"``).
+    units : str | None
+        Units *values* are already in, appended to the colorbar label as
+        ``[units]``. The values are drawn as given, not converted.
     xlabel : str | None
         X-axis label. ``None`` defaults to empty.
     ylabel : str | None
@@ -129,7 +133,8 @@ def plot_kymograph(
             coords, times, values, shading="auto", cmap=cmap, norm=norm
         )
 
-        attach_colorbar(fig, ax, mesh, label, colorbar, extremes=extremes)
+        cb_label = f"{label} [{units}]" if units else label
+        attach_colorbar(fig, ax, mesh, cb_label, colorbar, extremes=extremes)
         finish_axes(
             fig,
             ax,

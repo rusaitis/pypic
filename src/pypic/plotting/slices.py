@@ -9,6 +9,7 @@ from pypic.plotting._guard import ensure_matplotlib
 if TYPE_CHECKING:
     from matplotlib.axes import Axes
     from matplotlib.colors import Colormap
+    from matplotlib.contour import QuadContourSet
     from matplotlib.figure import Figure
 
     from pypic.dataset import FieldDataset
@@ -250,7 +251,7 @@ def add_contours(
     labels: bool = False,
     label_fontsize: float | None = None,
     **kwargs: Any,  # noqa: ANN401 — contour passthrough
-) -> object:
+) -> QuadContourSet:
     r"""Add contour lines to existing axes from a scalar field.
 
     Works as an overlay on `plot_field_slice` or any other 2D plot.

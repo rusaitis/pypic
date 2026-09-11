@@ -24,6 +24,7 @@ def plot_poincare_section(
     marker_size: float = 2.0,
     alpha: float = 0.7,
     title: str | None = None,
+    save: str | None = None,
     figsize: tuple[float, float] | None = None,
 ) -> tuple[Figure, Axes]:
     r"""Scatter the puncture cloud of a `PoincareSection`.
@@ -51,6 +52,9 @@ def plot_poincare_section(
     title : str | None
         Axes title. Defaults to ``f"Poincaré section: {surface.name}"``
         when ``section.surface.name`` is set.
+    save : str or None
+        Path to write the figure to. When given, the figure is saved
+        and closed; when ``None`` (default) it is left open.
     figsize : tuple[float, float] | None
         Figure size override.
 
@@ -60,7 +64,7 @@ def plot_poincare_section(
     """
     ensure_matplotlib()
 
-    from pypic.plotting._resolve import get_or_create_axes
+    from pypic.plotting._resolve import get_or_create_axes, maybe_save
     from pypic.plotting.styles import _resolve_theme_arg, apply_grid, use_theme
 
     resolved_theme = _resolve_theme_arg(theme)
@@ -106,4 +110,5 @@ def plot_poincare_section(
             ax.set_title(title)
         apply_grid(ax, resolved_theme)
 
+    maybe_save(fig, save)
     return fig, ax
