@@ -179,6 +179,27 @@ class TestFileThemes:
         resolved = _resolve_theme_arg("space-purple")
         assert resolved.accent_color == "#9b59b6"
 
+    def test_minimal_theme_falls_back_to_defaults(self, tmp_path: Path) -> None:
+        """Only ``name`` and ``[colors]`` background and text are required;
+        every other field takes its `PlotTheme` default."""
+        import dataclasses
+
+        from pypic.plotting import PlotTheme, load_theme
+
+        path = tmp_path / "minimal.toml"
+        path.write_text(
+            'name = "minimal"\n[colors]\nbackground = "#000000"\ntext = "#ffffff"\n'
+        )
+        theme = load_theme(path)
+        reference = PlotTheme(name="minimal", rcparams={})
+        differing = [
+            f.name
+            for f in dataclasses.fields(PlotTheme)
+            if f.name not in {"rcparams", "text_color"}
+            and getattr(theme, f.name) != getattr(reference, f.name)
+        ]
+        assert differing == []
+
     def test_use_theme_with_string(self) -> None:
         original = matplotlib.rcParams["text.color"]
         with use_theme("dark"):

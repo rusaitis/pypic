@@ -192,7 +192,7 @@ def load_theme(path: str | Path) -> PlotTheme:
     div_cmaps = (raw_div,) if isinstance(raw_div, str) else tuple(raw_div)
 
     # Parse RGBA colors with appropriate default alphas
-    defaults = PlotTheme.__new__(PlotTheme)
+    defaults = PlotTheme(name=name, rcparams={})
     text_color = (
         _parse_rgba(colors["text"], 0.9) if "text" in colors else defaults.text_color
     )
