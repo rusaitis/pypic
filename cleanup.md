@@ -238,32 +238,46 @@ Verify: full `./scripts/check.sh` after every item; the invariant is
 
 ## Phase 8 — pickling, typing, import time
 
-Budget ~18 files, ~160 added / ~30 deleted, one new module. Independent of
-Phases 6 and 7. Items 1 and 2 edit the same `containers.py` classes, so
-re-take the item 2 anchors after item 1 lands.
+Budget ~14 files, ~130 added / ~45 deleted, one new module. Independent of
+Phases 6 and 7.
 
 1. - [ ] **Pickle and deepcopy** (a `fix:` commit). A frozen dataclass that
-   stores a `MappingProxyType` can be neither pickled nor deep-copied.
-   Confirmed for `PhysicsParams`, `SimulationConfig`, `TabularData`,
-   `FieldLine` and `ParticleTrace`; `FieldDataset` inherits it through its
-   `PhysicsParams`. That breaks multiprocessing, joblib and dask. Stored
-   proxies: `units.py:677` (`PhysicsParams.extra`), `containers.py:102,114`
-   (`StaggerInfo`, conditional), `:218-220` (`SimulationConfig`), `:283-284`
+   stores a `MappingProxyType` can be neither pickled nor deep-copied:
+   confirmed for `PhysicsParams`, `SimulationConfig`, `TabularData`,
+   `FieldLine` and `ParticleTrace`, and `FieldDataset` inherits it through
+   its `PhysicsParams`. Measured 2026-09-11, that fails stdlib `pickle` and
+   everything built on it (process pools from `concurrent.futures` or
+   `multiprocessing`, sending or returning a dataset; `joblib.dump`, which
+   `joblib.Memory` uses), plus `copy.deepcopy` and `dataclasses.asdict`.
+   cloudpickle paths already work: `joblib.Parallel` with its default loky
+   backend, and dask (inferred, not run). Stored proxies: `units.py:677`
+   (`PhysicsParams.extra`), `containers.py:102,114` (`StaggerInfo`,
+   conditional), `:218-220` (`SimulationConfig`), `:283-284`
    (`TabularData`), `:427` (`ParticleData`), `traces/_fieldline.py:96-97`,
    `traces/_particletrace.py:98-99`, `traces/_poincare.py:278`,
    `ipic3d/_config.py:120`, and the proxies `openggcm/_grid.py:133-134` hands
-   to `OpenGGCMGrid` from outside. Fix: lift `PlotTheme.__getstate__` /
-   `__setstate__` (`plotting/styles.py`) into two shared functions that swap
-   any proxy field for its dict and re-run `__post_init__`, in a stdlib-only
-   leaf module (e.g. `pypic/_frozen.py`) so every layer can import it, and
-   assign them in each class body. A mixin does not work: on a
-   `frozen=True, slots=True` class the decorator installs its own
-   `__getstate__` unless the class body defines one (checked 2026-09-11).
-   Check each `__post_init__` is idempotent before relying on the re-run.
-   Test: one aggregated invariant that every such class round-trips through
-   `pickle` and `copy.deepcopy` equal and still read-only, plus a guard that
-   the tested set equals the classes whose source builds a `MappingProxyType`
-   field, so a new one cannot slip past.
+   to `OpenGGCMGrid` from outside.
+
+   Fix the type, not its holders. A stdlib-only leaf module (e.g.
+   `pypic/_frozen.py`) registers one reducer,
+   `copyreg.pickle(MappingProxyType, lambda m: (_mappingproxy, (dict(m),)))`,
+   where `_mappingproxy` is a named module-level function returning
+   `MappingProxyType(mapping)`: pickle cannot reference the type itself,
+   which is not importable as `builtins.mappingproxy`. `pypic/__init__.py`
+   imports the module first, for its side effect; the package init runs
+   before any submodule, so every class is covered, and the import stays
+   eager when item 3 lands. `copy.deepcopy` and the process-pool pickler
+   read the same `copyreg.dispatch_table`: in the measurement every failing
+   path above passed, round-trips compared equal and the fields stayed
+   read-only. The registration is process-wide, so after `import pypic` any
+   `mappingproxy` pickles as a snapshot instead of raising; nothing that
+   pickles today changes. Delete `PlotTheme.__getstate__` / `__setstate__`
+   (`plotting/styles.py`), which the reducer makes redundant; the theme
+   clone test keeps guarding it. Test: one aggregated invariant that every
+   class above round-trips through `pickle` and `copy.deepcopy` equal and
+   still read-only, with one `FieldDataset` sent through
+   `multiprocessing.reduction.ForkingPickler`, the pickler process pools
+   use, so no worker process is needed.
 
 2. - [ ] **Typing.** `containers.py:333,410` and `dataset.py:1093` bare
    `np.ndarray` → `IntArray` / `FloatArray` / `BoolArray` from `pypic.types`;
