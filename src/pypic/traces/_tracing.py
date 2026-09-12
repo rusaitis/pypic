@@ -13,7 +13,7 @@ __all__ = [
 
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import TYPE_CHECKING, Literal, Self, assert_never
+from typing import TYPE_CHECKING, Any, Literal, Self, assert_never
 
 import numpy as np
 from scipy.interpolate import RegularGridInterpolator
@@ -542,7 +542,7 @@ def _assemble_field_line(
     direction: TraceDirection,
     field_name: str,
     normalization: object,
-    metadata: dict,  # type: ignore[type-arg]
+    metadata: dict[str, Any],
 ) -> FieldLine:
     """Concatenate forward/backward traces into a FieldLine."""
     from pypic.traces._fieldline import FieldLine as _FieldLine
@@ -668,7 +668,7 @@ def trace_field_line(
     _validate_seed(seed_arr, interpolator, null_threshold)
 
     field_name = _field_name_from_components(field_components)
-    meta: dict = {"step_size": step_size, "method": "rk4"}  # type: ignore[type-arg]
+    meta: dict[str, Any] = {"step_size": step_size, "method": "rk4"}
     args = (step_size, max_steps, null_threshold, terminate)
 
     match direction:
@@ -864,7 +864,7 @@ def trace_field_line_adaptive(
             loop_min_arclen,
         )
 
-    def _meta(err: float) -> dict:  # type: ignore[type-arg]
+    def _meta(err: float) -> dict[str, Any]:
         return {
             "method": "rk45_dopri",
             "atol": atol,
@@ -1072,7 +1072,7 @@ def trace_field_lines_adaptive(
         seed_i: int,
         max_err: float,
     ) -> FieldLine:
-        meta: dict = {  # type: ignore[type-arg]
+        meta: dict[str, Any] = {
             "method": "rk45_dopri",
             "atol": atol,
             "rtol": rtol,

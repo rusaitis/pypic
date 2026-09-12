@@ -16,6 +16,37 @@ if TYPE_CHECKING:
     from pypic.types import FloatArray
 
 
+# Column positions in the three layouts this module parses. The two
+# ConservedQuantities formats (described on the class below) agree only on
+# the cycle column, so every constant carries its format in the prefix.
+_A_CYCLE = 0
+_A_ELECTRIC = 1
+_A_MAGNETIC = 5
+_A_KINETIC = 9
+_A_TOTAL = 10
+_A_MOMENTUM = 12
+
+_B_CYCLE = 0
+_B_TOTAL = 1
+_B_ELECTRIC = 3
+_B_KINETIC = 5
+_B_MOMENTUM = 6
+_B_MAGNETIC = 7
+# Per-species triples (npart, charge, KE) fill the tail. The Format B header
+# numbers its columns from 1; the parsed array indexes from 0.
+_B_SPECIES_HEADER_COL = 12
+_B_SPECIES_BASE = _B_SPECIES_HEADER_COL - 1
+_B_SPECIES_STRIDE = 3
+
+# SpeciesQuantities.txt: one row per species per cycle.
+_SQ_CYCLE = 0
+_SQ_SPECIES = 1
+_SQ_MOMENTUM = 2
+_SQ_TOTAL_KE = 3
+_SQ_BULK_KE = 4
+_SQ_THERMAL_KE = 5
+
+
 @dataclass(frozen=True, slots=True)
 class ConservedQuantities:
     """Time series of conserved quantities from an iPIC3D run.
@@ -95,12 +126,12 @@ def _parse_single(path: Path) -> ConservedQuantities:
         data = data.reshape(1, -1)
 
     return ConservedQuantities(
-        cycle=data[:, 0],
-        total_energy=data[:, 10],
-        electric_energy=data[:, 1],
-        magnetic_energy=data[:, 5],
-        kinetic_energy=data[:, 9],
-        momentum=data[:, 12],
+        cycle=data[:, _A_CYCLE],
+        total_energy=data[:, _A_TOTAL],
+        electric_energy=data[:, _A_ELECTRIC],
+        magnetic_energy=data[:, _A_MAGNETIC],
+        kinetic_energy=data[:, _A_KINETIC],
+        momentum=data[:, _A_MOMENTUM],
         species_npart=(),
         species_charge=(),
         species_kinetic_energy=(),
@@ -123,8 +154,8 @@ def _parse_multi_file(path: Path) -> tuple[FloatArray, int]:
             if m:
                 col = int(m.group(1))
                 expected_cols = max(expected_cols, col)
-                if col >= 12:
-                    species_idx = (col - 12) // 3
+                if col >= _B_SPECIES_HEADER_COL:
+                    species_idx = (col - _B_SPECIES_HEADER_COL) // _B_SPECIES_STRIDE
                     nspec = max(nspec, species_idx + 1)
                 continue
             if line.startswith("#") or line.startswith("-"):
@@ -176,11 +207,11 @@ def _parse_multi(directory: Path) -> ConservedQuantities:
     priorities = np.concatenate(file_indices)
 
     # Sort by cycle, then by file index (later file wins ties)
-    sort_order = np.lexsort((priorities, combined[:, 0]))
+    sort_order = np.lexsort((priorities, combined[:, _B_CYCLE]))
     combined = combined[sort_order]
 
     # Deduplicate: keep last occurrence of each cycle
-    cycles = combined[:, 0]
+    cycles = combined[:, _B_CYCLE]
     _, unique_idx = np.unique(cycles[::-1], return_index=True)
     unique_idx = len(cycles) - 1 - unique_idx
     unique_idx.sort()
@@ -190,18 +221,18 @@ def _parse_multi(directory: Path) -> ConservedQuantities:
     species_charge: list[FloatArray] = []
     species_ke: list[FloatArray] = []
     for s in range(nspec):
-        base_col = 11 + s * 3
+        base_col = _B_SPECIES_BASE + s * _B_SPECIES_STRIDE
         species_npart.append(combined[:, base_col])
         species_charge.append(combined[:, base_col + 1])
         species_ke.append(combined[:, base_col + 2])
 
     return ConservedQuantities(
-        cycle=combined[:, 0],
-        total_energy=combined[:, 1],
-        electric_energy=combined[:, 3],
-        magnetic_energy=combined[:, 7],
-        kinetic_energy=combined[:, 5],
-        momentum=combined[:, 6],
+        cycle=combined[:, _B_CYCLE],
+        total_energy=combined[:, _B_TOTAL],
+        electric_energy=combined[:, _B_ELECTRIC],
+        magnetic_energy=combined[:, _B_MAGNETIC],
+        kinetic_energy=combined[:, _B_KINETIC],
+        momentum=combined[:, _B_MOMENTUM],
         species_npart=tuple(species_npart),
         species_charge=tuple(species_charge),
         species_kinetic_energy=tuple(species_ke),
@@ -240,18 +271,18 @@ def load_conserved_quantities(path: Path) -> ConservedQuantities:
     species_charge: list[FloatArray] = []
     species_ke: list[FloatArray] = []
     for s in range(nspec):
-        base_col = 11 + s * 3
+        base_col = _B_SPECIES_BASE + s * _B_SPECIES_STRIDE
         species_npart.append(data[:, base_col])
         species_charge.append(data[:, base_col + 1])
         species_ke.append(data[:, base_col + 2])
 
     return ConservedQuantities(
-        cycle=data[:, 0],
-        total_energy=data[:, 1],
-        electric_energy=data[:, 3],
-        magnetic_energy=data[:, 7],
-        kinetic_energy=data[:, 5],
-        momentum=data[:, 6],
+        cycle=data[:, _B_CYCLE],
+        total_energy=data[:, _B_TOTAL],
+        electric_energy=data[:, _B_ELECTRIC],
+        magnetic_energy=data[:, _B_MAGNETIC],
+        kinetic_energy=data[:, _B_KINETIC],
+        momentum=data[:, _B_MOMENTUM],
         species_npart=tuple(species_npart),
         species_charge=tuple(species_charge),
         species_kinetic_energy=tuple(species_ke),
@@ -365,26 +396,24 @@ def load_species_quantities(path: Path) -> TabularData:
 
     data = np.array(rows, dtype=np.float64)
 
-    # Determine species from the species column (col 1)
-    species_ids = sorted(set(int(x) for x in data[:, 1]))
-    cycles = sorted(set(data[:, 0]))
+    species_ids = sorted(set(int(x) for x in data[:, _SQ_SPECIES]))
+    cycles = sorted(set(data[:, _SQ_CYCLE]))
     n_cycles = len(cycles)
     cycle_arr = np.array(cycles, dtype=np.float64)
 
     # Build cycle→row-index mapping per species
     columns: dict[str, FloatArray] = {"cycle": cycle_arr}
     for s in species_ids:
-        mask = data[:, 1] == s
+        mask = data[:, _SQ_SPECIES] == s
         s_data = data[mask]
-        # Sort by cycle
-        order = np.argsort(s_data[:, 0])
+        order = np.argsort(s_data[:, _SQ_CYCLE])
         s_data = s_data[order]
         # Ensure same cycle count (truncate to common set)
         n = min(len(s_data), n_cycles)
-        columns[f"momentum_s{s}"] = s_data[:n, 2]
-        columns[f"total_ke_s{s}"] = s_data[:n, 3]
-        columns[f"bulk_ke_s{s}"] = s_data[:n, 4]
-        columns[f"thermal_ke_s{s}"] = s_data[:n, 5]
+        columns[f"momentum_s{s}"] = s_data[:n, _SQ_MOMENTUM]
+        columns[f"total_ke_s{s}"] = s_data[:n, _SQ_TOTAL_KE]
+        columns[f"bulk_ke_s{s}"] = s_data[:n, _SQ_BULK_KE]
+        columns[f"thermal_ke_s{s}"] = s_data[:n, _SQ_THERMAL_KE]
 
     return TabularData(
         name="species_quantities",

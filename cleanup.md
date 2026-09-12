@@ -279,7 +279,7 @@ Phases 6 and 7.
    `multiprocessing.reduction.ForkingPickler`, the pickler process pools
    use, so no worker process is needed.
 
-2. - [ ] **Typing.** `containers.py:333,410` and `dataset.py:1093` bare
+2. - [x] **Typing.** `containers.py:333,410` and `dataset.py:1093` bare
    `np.ndarray` → `IntArray` / `FloatArray` / `BoolArray` from `pypic.types`;
    `containers.py:200,210,266` annotate `Mapping[...]` to match the
    `MappingProxyType` substitution in `__post_init__` (`units.py` is the
@@ -289,6 +289,18 @@ Phases 6 and 7.
    `batsrus/_hdf5.py:63-67` (`ipm[2]`, `ipm[1]`, `rpm[0]`),
    `ipic3d/_conserved.py` column indices, `openggcm/_wrn2.py` header offsets,
    and `ipic3d/_config.py` `reference_density`.
+
+   Landed: `Mapping` went on every proxied field in `containers.py`, not just
+   the three anchors, and mypy then pulled `FieldDataset.__init__` /
+   `from_arrays` (`metadata`, `aliases`, `transforms` — all three already
+   copy defensively) and two `io/_virtual.py` locals along with it. The
+   `reference_density` anchor was stale: no such symbol in
+   `ipic3d/_config.py`. `_conserved.py` got prefixed constants per layout
+   (`_A_` / `_B_` / `_SQ_`) because Format B's mapping is spelled out in two
+   functions and its species stride in three; `_wrn2.py` got the encoding
+   constants both the scalar and vectorized path read. No new test — item 1's
+   invariant already asserts the runtime read-only half, and `check.sh types`
+   is the static half.
 
 3. - [ ] **Import time.** `import pypic` takes 0.73 s warm (best of 7 fresh
    interpreters, 2026-09-11). The avoidable part is `scipy.interpolate`, which

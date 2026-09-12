@@ -41,7 +41,7 @@ if TYPE_CHECKING:
     from xarray import Dataset
 
     from pypic.fields import QuantityType
-    from pypic.types import FloatArray
+    from pypic.types import BoolArray, FloatArray
     from pypic.units import SpeciesInfo
 
 
@@ -71,16 +71,16 @@ class FieldDataset:
         Species definitions, if applicable.
     physics : PhysicsParams | None
         Physics parameters (adiabatic index, speed of light, etc.).
-    metadata : dict[str, Any] | None
+    metadata : Mapping[str, Any] | None
         Arbitrary metadata (run name, code version, etc.).
-    aliases : dict[str, str] | None
+    aliases : Mapping[str, str] | None
         Extra field-name aliases merged with geometry defaults.
         Aliases whose canonical target is absent from the dataset
         are silently dropped (they become inactive).
     frame : str
         Name of the reference frame these arrays are expressed in.
         Defaults to ``"simulation"``.
-    transforms : dict[str, FrameTransform] | None
+    transforms : Mapping[str, FrameTransform] | None
         Frame transforms reachable from *frame*, keyed by target-frame
         name.  Consumed by `transform_to` and `available_frames`;
         chains resolve by breadth-first search.
@@ -109,10 +109,10 @@ class FieldDataset:
         *,
         species: Sequence[SpeciesInfo] | None = None,
         physics: PhysicsParams | None = None,
-        metadata: dict[str, Any] | None = None,
-        aliases: dict[str, str] | None = None,
+        metadata: Mapping[str, Any] | None = None,
+        aliases: Mapping[str, str] | None = None,
         frame: str = "simulation",
-        transforms: dict[str, FrameTransform] | None = None,
+        transforms: Mapping[str, FrameTransform] | None = None,
     ) -> None:
         self._ds = dataset
         self._grid = grid
@@ -170,10 +170,10 @@ class FieldDataset:
         *,
         species: Sequence[SpeciesInfo] | None = None,
         physics: PhysicsParams | None = None,
-        metadata: dict[str, Any] | None = None,
-        aliases: dict[str, str] | None = None,
+        metadata: Mapping[str, Any] | None = None,
+        aliases: Mapping[str, str] | None = None,
         frame: str = "simulation",
-        transforms: dict[str, FrameTransform] | None = None,
+        transforms: Mapping[str, FrameTransform] | None = None,
         coords: Mapping[str, FloatArray] | None = None,
         strict_fields: bool = True,
     ) -> FieldDataset:
@@ -194,14 +194,14 @@ class FieldDataset:
             Species definitions, if applicable.
         physics : PhysicsParams | None
             Physics parameters.
-        metadata : dict[str, Any] | None
+        metadata : Mapping[str, Any] | None
             Arbitrary metadata.
-        aliases : dict[str, str] | None
+        aliases : Mapping[str, str] | None
             Extra field-name aliases.
         frame : str
             Name of the reference frame these arrays are expressed in.
             Defaults to ``"simulation"``.
-        transforms : dict[str, FrameTransform] | None
+        transforms : Mapping[str, FrameTransform] | None
             Frame transforms reachable from *frame*, keyed by
             target-frame name.  Consumed by `transform_to`.
         coords : Mapping[str, FloatArray] | None
@@ -1090,7 +1090,7 @@ class FieldDataset:
         merged.update(kwargs)
         return self._wrap_sliced(self._ds.isel(merged))
 
-    def where(self, cond: np.ndarray, other: float = np.nan) -> FieldDataset:
+    def where(self, cond: BoolArray, other: float = np.nan) -> FieldDataset:
         r"""Mask fields where *cond* is ``False``.
 
         Returns a new `FieldDataset` with the same grid shape.
@@ -1100,7 +1100,7 @@ class FieldDataset:
 
         Parameters
         ----------
-        cond : np.ndarray
+        cond : BoolArray
             Boolean array with shape matching the grid dimensions.
             ``True`` keeps the value, ``False`` replaces with *other*.
         other : float

@@ -15,6 +15,15 @@ if TYPE_CHECKING:
     from pypic.types import FloatArray
 
 
+# Fixed slots in the BATL plot-metadata header arrays. Positions, not
+# arithmetic: they are part of the .batl file layout.
+_IPM_N_STEP = 1
+_IPM_NDIM = 2
+_IPM_BLOCK_SIZE = 7  # first of ndim consecutive per-axis cell counts
+_RPM_TIME = 0
+_RPM_DOMAIN = 1  # first of ndim consecutive (min, max) pairs
+
+
 @dataclass(frozen=True, slots=True)
 class BATLData:
     """Raw block-structured data from a ``.batl`` HDF5 file."""
@@ -60,13 +69,13 @@ def read_batl(
         ipm = f["Integer Plot Metadata"][:]
         rpm = f["Real Plot Metadata"][:]
 
-        ndim = int(ipm[2])
-        block_size = tuple(int(ipm[7 + i]) for i in range(ndim))
-        n_step = int(ipm[1])
+        ndim = int(ipm[_IPM_NDIM])
+        block_size = tuple(int(ipm[_IPM_BLOCK_SIZE + i]) for i in range(ndim))
+        n_step = int(ipm[_IPM_N_STEP])
 
-        time = float(rpm[0])
-        domain_min = tuple(float(rpm[1 + 2 * i]) for i in range(ndim))
-        domain_max = tuple(float(rpm[2 + 2 * i]) for i in range(ndim))
+        time = float(rpm[_RPM_TIME])
+        domain_min = tuple(float(rpm[_RPM_DOMAIN + 2 * i]) for i in range(ndim))
+        domain_max = tuple(float(rpm[_RPM_DOMAIN + 1 + 2 * i]) for i in range(ndim))
 
         var_names = tuple(x.decode().strip() for x in f["NamePlotVar_V"][:])
         unit_names = tuple(x.decode().strip() for x in f["NamePlotUnit_V"][:])

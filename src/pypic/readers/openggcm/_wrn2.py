@@ -27,6 +27,22 @@ if TYPE_CHECKING:
     from pypic.types import FloatArray
 
 
+# WRN2 byte encoding, from the Fortran ``wrndec`` / ``rdn2`` pair. Every
+# value below is a property of the on-disk format, not a tunable, and each
+# is read by both the scalar and the vectorized path.
+_NEWLINE_BYTE = 10
+_EOR_BYTE = 32  # space terminates a record
+_MARKER_MAX = 127  # bytes above this are RLE markers
+_RLE_BASE = 170  # a marker byte encodes (byte - 170) repeats
+_ASCII_BASE = 33  # printable-range offset carried by every data byte
+_RADIX = 94  # distinct values per 7-bit half
+_SIGN_FLAG = 47  # set in the high half for negative values
+_CHECKSUM_MOD = 92
+_CHUNK = 64  # values per chunk, two RLE lines each
+_I3_COUNT = _RADIX * _SIGN_FLAG  # 4418 reconstructible 12.5-bit indices
+_I3_SPAN = _I3_COUNT - 8  # max usable 12.5-bit index
+
+
 # REFERENCE IMPL: the readable scalar decoder. Production reads go through
 # decompress_field_vectorized; this one is the oracle it is cross-validated
 # against in tests/test_openggcm_wrn2.py, so it stays.
@@ -66,13 +82,13 @@ def decode_rle(line: bytes) -> tuple[list[int], int]:
     length = len(line)
     while j < length:
         ir = line[j]
-        if ir == 10:  # newline — skip
+        if ir == _NEWLINE_BYTE:
             j += 1
             continue
-        if ir == 32:  # space — end of record
+        if ir == _EOR_BYTE:
             break
-        if ir > 127:  # RLE: repeat next byte (ir - 170) times
-            count = ir - 170
+        if ir > _MARKER_MAX:  # RLE: repeat the next byte
+            count = ir - _RLE_BASE
             j += 1
             if j >= length:
                 return [], -5
@@ -86,7 +102,7 @@ def decode_rle(line: bytes) -> tuple[list[int], int]:
         j += 1
 
     n = i  # Fortran: data positions are 0..n
-    if n > 63:
+    if n >= _CHUNK:
         return [], -5
     if n < 0:
         return [], -5
@@ -96,7 +112,7 @@ def decode_rle(line: bytes) -> tuple[list[int], int]:
     # Validate checksum: i2(-1) == 33 + sum(data) % 92
     checksum_byte = i2.get(-1, 0)
     ick = sum(data)
-    expected = 33 + (ick % 92)
+    expected = _ASCII_BASE + (ick % _CHECKSUM_MOD)
     if checksum_byte != expected:
         return [], -5
 
@@ -131,11 +147,11 @@ def decompress_field(
         return np.full(count, zmin, dtype=np.float64)
 
     result = np.empty(count, dtype=np.float64)
-    dzi = (zmax - zmin) / 4410.0  # 94 × 47 - 8: max usable 12.5-bit index
+    dzi = (zmax - zmin) / _I3_SPAN
     pos = 0
 
-    for k in range(0, count, 64):
-        nk = min(63, count - k - 1)  # Fortran: min0(63, n-k)
+    for k in range(0, count, _CHUNK):
+        nk = min(_CHUNK - 1, count - k - 1)  # Fortran: min0(63, n-k)
         expected_count = nk + 1
 
         line1 = next(lines)
@@ -151,15 +167,15 @@ def decompress_field(
             raise ValueError(msg)
 
         # Vectorized value reconstruction
-        a1 = np.array(i1_data[:expected_count], dtype=np.int32) - 33
-        a2 = np.array(i2_data[:expected_count], dtype=np.int32) - 33
+        a1 = np.array(i1_data[:expected_count], dtype=np.int32) - _ASCII_BASE
+        a2 = np.array(i2_data[:expected_count], dtype=np.int32) - _ASCII_BASE
 
         sign = np.ones(expected_count, dtype=np.float64)
-        negative = a1 >= 47
+        negative = a1 >= _SIGN_FLAG
         sign[negative] = -1.0
-        a1[negative] -= 47
+        a1[negative] -= _SIGN_FLAG
 
-        i3 = a2 + 94 * a1
+        i3 = a2 + _RADIX * a1
         vals = sign * np.exp(dzi * i3 + zmin)
 
         result[pos : pos + expected_count] = vals
@@ -185,8 +201,8 @@ def _build_exp_lut(zmin: float, zmax: float) -> FloatArray:
     FloatArray
         Shape ``(4418,)`` lookup table.
     """
-    dzi = (zmax - zmin) / 4410.0  # 94 × 47 - 8: max usable 12.5-bit index
-    i3 = np.arange(4418, dtype=np.float64)  # 94 × 47 = 4418 possible values
+    dzi = (zmax - zmin) / _I3_SPAN
+    i3 = np.arange(_I3_COUNT, dtype=np.float64)
     return np.exp(dzi * i3 + zmin)
 
 
@@ -223,9 +239,9 @@ def _classify_rle_bytes(
     is_consumed : NDArray[np.bool_]
         True at positions that are the repeated value after a marker.
     """
-    is_marker = raw > 127
-    is_newline = raw == 10
-    is_space = raw == 32
+    is_marker = raw > _MARKER_MAX
+    is_newline = raw == _NEWLINE_BYTE
+    is_space = raw == _EOR_BYTE
 
     # The byte after a marker is consumed (repeated value), unless the
     # marker is the last byte before a newline boundary — but in practice
@@ -286,7 +302,7 @@ def decompress_field_vectorized(
     raw = np.frombuffer(data, dtype=np.uint8, count=length, offset=offset)
 
     # Phase 2: classify bytes
-    is_marker = raw > 127
+    is_marker = raw > _MARKER_MAX
     is_literal, _is_consumed = _classify_rle_bytes(raw)
 
     # Phase 3: build emit values and repeat counts for non-structural bytes
@@ -305,14 +321,14 @@ def decompress_field_vectorized(
     literal_emitters = emitter_idx[~emitter_is_marker]
 
     emit_values[emitter_is_marker] = raw[marker_emitters + 1]
-    repeat_counts[emitter_is_marker] = raw[marker_emitters].astype(np.int32) - 170
+    repeat_counts[emitter_is_marker] = raw[marker_emitters].astype(np.int32) - _RLE_BASE
     emit_values[~emitter_is_marker] = raw[literal_emitters]
 
     # Phase 4: expand to full decoded stream
     decoded = np.repeat(emit_values, repeat_counts)
 
     # Phase 5: find newline positions to split into lines
-    newline_pos = np.flatnonzero(raw == 10)
+    newline_pos = np.flatnonzero(raw == _NEWLINE_BYTE)
     n_lines = len(newline_pos)
 
     # Each line's decoded values sit between newlines.  We need to map
@@ -347,8 +363,8 @@ def decompress_field_vectorized(
     # Phase 6: deinterleave lines into i1/i2 (vectorized)
     # Each line decodes to: checksum (pos -1), then data (pos 0..nk).
     # Lines come in pairs: (0, 1) → chunk 0, (2, 3) → chunk 1, ...
-    n_chunks = (count + 63) // 64
-    last_chunk_size = count - (n_chunks - 1) * 64  # 1..64
+    n_chunks = (count + _CHUNK - 1) // _CHUNK
+    last_chunk_size = count - (n_chunks - 1) * _CHUNK  # 1..64
 
     expected_lines = n_chunks * 2
     if n_lines < expected_lines:
@@ -363,28 +379,28 @@ def decompress_field_vectorized(
     if n_full > 0:
         i1_starts = line_starts[0 : n_full * 2 : 2] + 1  # skip checksum
         i2_starts = line_starts[1 : n_full * 2 : 2] + 1
-        offsets = np.arange(64, dtype=np.int64)
+        offsets = np.arange(_CHUNK, dtype=np.int64)
         i1_src = (i1_starts[:, np.newaxis] + offsets).ravel()
         i2_src = (i2_starts[:, np.newaxis] + offsets).ravel()
-        i1_flat[: n_full * 64] = decoded[i1_src]
-        i2_flat[: n_full * 64] = decoded[i2_src]
+        i1_flat[: n_full * _CHUNK] = decoded[i1_src]
+        i2_flat[: n_full * _CHUNK] = decoded[i2_src]
 
     # Last chunk (1..64 values)
     s1 = line_starts[(n_chunks - 1) * 2] + 1
     s2 = line_starts[(n_chunks - 1) * 2 + 1] + 1
-    i1_flat[n_full * 64 :] = decoded[s1 : s1 + last_chunk_size]
-    i2_flat[n_full * 64 :] = decoded[s2 : s2 + last_chunk_size]
+    i1_flat[n_full * _CHUNK :] = decoded[s1 : s1 + last_chunk_size]
+    i2_flat[n_full * _CHUNK :] = decoded[s2 : s2 + last_chunk_size]
 
     # Phase 7: reconstruct values using LUT
     lut = _build_exp_lut(zmin, zmax)
 
-    a1 = i1_flat - 33
-    a2 = i2_flat - 33
+    a1 = i1_flat - _ASCII_BASE
+    a2 = i2_flat - _ASCII_BASE
 
     sign = np.ones(count, dtype=np.float64)
-    negative = a1 >= 47
+    negative = a1 >= _SIGN_FLAG
     sign[negative] = -1.0
-    a1[negative] -= 47
+    a1[negative] -= _SIGN_FLAG
 
-    i3 = a2 + 94 * a1
+    i3 = a2 + _RADIX * a1
     return sign * lut[i3]  # type: ignore[no-any-return]

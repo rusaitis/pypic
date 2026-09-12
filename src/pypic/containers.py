@@ -13,6 +13,8 @@ from pypic.grid import GridInfo  # noqa: TC001 — used in doctests
 from pypic.units import PhysicsParams
 
 if TYPE_CHECKING:
+    from collections.abc import Mapping
+
     from pypic.coordinates.transforms import FrameTransform
     from pypic.schema import (
         Body,
@@ -25,7 +27,7 @@ if TYPE_CHECKING:
         Restart,
         Run,
     )
-    from pypic.types import FloatArray, ModelType
+    from pypic.types import FloatArray, IntArray, ModelType
     from pypic.units import Normalization, SpeciesInfo
 
 
@@ -43,12 +45,12 @@ class StaggerInfo:
         Overall grid type: ``"node"`` (all fields on vertices),
         ``"cell"`` (all fields at cell centers), or ``"staggered"``
         (Yee mesh — B on faces, E on edges, etc.).
-    field_locations : dict[str, str] | None
+    field_locations : Mapping[str, str] | None
         Per-field-group stagger locations, e.g.
         ``{"B": "face", "E": "edge"}``.  Only meaningful for the
         ``"staggered"`` convention; ``None`` otherwise.  Frozen to
         ``MappingProxyType`` after construction.
-    position : dict[str, tuple[float, ...]] | None
+    position : Mapping[str, tuple[float, ...]] | None
         Per-component stagger offsets in ``[0.0, 1.0)``, one tuple per
         canonical field component (e.g. ``{"B_1": (0.5, 0.0, 0.0),
         "E_1": (0.0, 0.5, 0.5)}``).  Adopts the openPMD ED-PIC
@@ -89,8 +91,8 @@ class StaggerInfo:
     """
 
     convention: str
-    field_locations: dict[str, str] | None = None
-    position: dict[str, tuple[float, ...]] | None = None
+    field_locations: Mapping[str, str] | None = None
+    position: Mapping[str, tuple[float, ...]] | None = None
     interpolation_order: int | None = None
     notes: str | None = None
 
@@ -139,7 +141,7 @@ class SimulationConfig:
         Physics parameters (frozen dataclass).
     frame : str
         Reference frame label (e.g. ``"GSM"``, ``"simulation"``).
-    transforms : dict[str, FrameTransform]
+    transforms : Mapping[str, FrameTransform]
         Validated ``[coordinates.transforms]`` entries, keyed by
         target-frame name. Chains resolve breadth-first from *frame*.
     initial_conditions : InitialConditions | None
@@ -169,7 +171,7 @@ class SimulationConfig:
         Validated ``[phase_space]`` block for >3D kinetic codes.
         Continuum-Vlasov sparse-block storage knobs live under
         ``phase_space.storage``.
-    metadata : dict[str, Any]
+    metadata : Mapping[str, Any]
         Free-form annotations from readers (stagger, scaling, version,
         description, ...). Schema-typed sections live on dedicated
         attributes above rather than as opaque dict entries here.
@@ -195,9 +197,9 @@ class SimulationConfig:
     grid: GridInfo
     normalization: Normalization
     species: tuple[SpeciesInfo, ...] = ()
-    physics: PhysicsParams = field(default_factory=lambda: PhysicsParams())
+    physics: PhysicsParams = field(default_factory=PhysicsParams)
     frame: str = "simulation"
-    transforms: dict[str, FrameTransform] = field(default_factory=dict)
+    transforms: Mapping[str, FrameTransform] = field(default_factory=dict)
     initial_conditions: InitialConditions | None = None
     output: Output | None = None
     bodies: tuple[Body, ...] = ()
@@ -207,7 +209,7 @@ class SimulationConfig:
     probes: tuple[Probe, ...] = ()
     collisions: tuple[Collision, ...] = ()
     phase_space: PhaseSpace | None = None
-    metadata: dict[str, Any] = field(default_factory=dict)  # frozen via __post_init__
+    metadata: Mapping[str, Any] = field(default_factory=dict)  # frozen in __post_init__
 
     def __post_init__(self) -> None:
         # Wrap mutable dicts in read-only proxies to enforce true immutability.
@@ -232,13 +234,13 @@ class TabularData:
     ----------
     name : str
         Dataset label (e.g. ``"conserved_quantities"``).
-    columns : dict[str, FloatArray]
+    columns : Mapping[str, FloatArray]
         Column name → 1-D array mapping.  All arrays must have
         the same length.
     index_column : str | None
         Which column serves as the index (e.g. ``"cycle"``).
         ``None`` means row-indexed.
-    metadata : dict[str, Any]
+    metadata : Mapping[str, Any]
         Source info (reader name, file path, etc.).
 
     Examples
@@ -261,9 +263,9 @@ class TabularData:
     """
 
     name: str
-    columns: dict[str, FloatArray]  # frozen at runtime via __post_init__
+    columns: Mapping[str, FloatArray]  # frozen at runtime via __post_init__
     index_column: str | None = None
-    metadata: dict[str, Any] = field(default_factory=dict)  # frozen at runtime
+    metadata: Mapping[str, Any] = field(default_factory=dict)  # frozen at runtime
 
     def __post_init__(self) -> None:
         # Validate before freezing
@@ -330,7 +332,7 @@ class TabularData:
 
 
 def _check_particle_shape(
-    arr: np.ndarray | None, name: str, expected: tuple[int, ...]
+    arr: FloatArray | IntArray | None, name: str, expected: tuple[int, ...]
 ) -> None:
     """Shape validator for per-particle arrays in ``ParticleData``."""
     if arr is None or arr.shape == expected:
@@ -370,7 +372,7 @@ class ParticleData:
         Particle velocities, shape ``(N, 3)``. ``None`` if not loaded.
     n_particles : int
         Total particle count.
-    id : np.ndarray | None
+    id : IntArray | None
         Integer particle tracking IDs, shape ``(N,)``. ``None`` if not
         available or not requested.
     weight : FloatArray | None
@@ -382,7 +384,7 @@ class ParticleData:
         electrons in iPIC3D normalization).
     species_mass : float | None
         Scalar species mass $m_s$ in code units.
-    metadata : dict[str, Any]
+    metadata : Mapping[str, Any]
         Source info (file path, format, etc.).
 
     Examples
@@ -406,8 +408,8 @@ class ParticleData:
     position: FloatArray | None
     velocity: FloatArray | None
     n_particles: int
-    metadata: dict[str, Any]  # frozen at runtime via __post_init__
-    id: np.ndarray | None = None
+    metadata: Mapping[str, Any]  # frozen at runtime via __post_init__
+    id: IntArray | None = None
     weight: FloatArray | None = None
     species_charge: float | None = None
     species_mass: float | None = None

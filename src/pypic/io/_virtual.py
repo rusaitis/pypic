@@ -26,6 +26,7 @@ from pypic.io.metadata import encode_pypic_attrs
 from pypic.units import Normalization
 
 if TYPE_CHECKING:
+    from collections.abc import Mapping
     from pathlib import Path
 
     from pypic.containers import SimulationConfig
@@ -267,9 +268,9 @@ def open_virtual(
         normalization = config.normalization
         species = config.species
         physics = config.physics
-        metadata: dict[str, Any] = config.metadata
+        metadata: Mapping[str, Any] = config.metadata
         frame = config.frame
-        transforms: dict[str, FrameTransform] | None = config.transforms
+        transforms: Mapping[str, FrameTransform] | None = config.transforms
     else:
         h5_grid, h5_norm, h5_extra = _read_metadata_from_h5(path_str)
         if h5_grid is None:
