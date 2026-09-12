@@ -8,6 +8,7 @@ import typer
 
 from pypic.cli._options import JsonOption, SimulationPath, TimestepOption, UnitsOption
 from pypic.cli._shared import _open, _output, _require_single_step, parse_steps
+from pypic.exceptions import UndeclaredNormalizationError
 from pypic.units import UnitSystem
 
 if TYPE_CHECKING:
@@ -26,7 +27,7 @@ def _get_field_array(
         if units is not None:
             return ds.in_units(field, units)
         return np.asarray(ds[field]) if ds.has_field(field) else ds.compute(field)
-    except KeyError as exc:
+    except (KeyError, UndeclaredNormalizationError) as exc:
         typer.echo(f"Error: {exc}", err=True)
         raise typer.Exit(1) from None
 

@@ -1195,6 +1195,44 @@ _IPIC3D_FIXTURE = (
 )
 
 
+class TestUndeclaredNormalizationReachesTheUser:
+    """A run with no ``simulation.toml`` has no SI anchor to convert with.
+
+    The message is the whole point of the raise, so it has to land as a
+    readable error rather than a traceback.
+    """
+
+    def test_info_reports_the_undeclared_state(self) -> None:
+        result = runner.invoke(app, ["info", str(_IPIC3D_FIXTURE)])
+        assert "undeclared" in result.output
+
+    def test_stats_with_a_display_unit_fails_cleanly(self) -> None:
+        result = runner.invoke(
+            app, ["stats", str(_IPIC3D_FIXTURE), "--field", "B_1", "--units", "nT"]
+        )
+        assert result.exit_code == 1
+        assert "no unit system was declared" in result.output
+
+    def test_stats_in_code_units_still_works(self) -> None:
+        result = runner.invoke(app, ["stats", str(_IPIC3D_FIXTURE), "--field", "B_1"])
+        assert result.exit_code == 0, result.output
+
+    def test_convert_to_si_fails_cleanly(self, tmp_path: Path) -> None:
+        result = runner.invoke(
+            app,
+            [
+                "convert",
+                "fields",
+                str(_IPIC3D_FIXTURE),
+                "--output",
+                str(tmp_path / "si.zarr"),
+                "--to-si",
+            ],
+        )
+        assert result.exit_code == 1
+        assert "no unit system was declared" in result.output
+
+
 @arrow_required
 def test_convert_particles_dry_run(tmp_path: Path) -> None:
     out = tmp_path / "particles"

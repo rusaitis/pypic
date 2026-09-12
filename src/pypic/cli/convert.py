@@ -34,6 +34,7 @@ from pypic.cli._shared import (
     parse_steps,
 )
 from pypic.dataset import FieldDataset
+from pypic.exceptions import UndeclaredNormalizationError
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -112,7 +113,11 @@ def _to_si_dataset(fds: FieldDataset) -> FieldDataset:
     """
     from pypic.units import Normalization
 
-    si_fields = {name: fds.in_si(name) for name in fds.field_names()}
+    try:
+        si_fields = {name: fds.in_si(name) for name in fds.field_names()}
+    except UndeclaredNormalizationError as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(1) from None
     return FieldDataset.from_arrays(
         si_fields,
         fds.grid,
