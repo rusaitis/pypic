@@ -390,7 +390,9 @@ class SimpleReader(ReaderBase):
 
     def _is_read_raw_overridden(self) -> bool:
         """Check whether a subclass overrides ``_read_raw``."""
-        return type(self)._read_raw is not SimpleReader._read_raw
+        # Both sides are this class's own method; comparing identity against
+        # the base is the only way to detect a subclass override.
+        return type(self)._read_raw is not SimpleReader._read_raw  # noqa: SLF001
 
     def _resolve_fields_group(
         self,

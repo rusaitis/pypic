@@ -429,7 +429,7 @@ class Simulation:
         # Internal mutation: read_timestep returns a fresh FieldDataset
         # each call, so the caller has no prior reference to invalidate.
         # Cheaper than a full reconstruction (alias resolution etc.).
-        fds._metadata = new_meta
+        fds._metadata = new_meta  # noqa: SLF001 — see above
         return fds
 
     def available_fields(self, step: int) -> list[str]:

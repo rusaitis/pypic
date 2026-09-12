@@ -145,6 +145,7 @@ select = [
     "PTH",            # flake8-use-pathlib
     "PLW",            # pylint warnings
     "BLE",            # flake8-blind-except
+    "SLF",            # flake8-self — private access across object boundaries
 ]
 ignore = [
     "D100",  # missing module docstring
@@ -172,7 +173,9 @@ convention = "numpy"
 # BLE001: the aggregated sweeps ("run every function in this family over
 # an empty array and report which ones broke") catch Exception because
 # the exception type is the finding, not an accident.
-"tests/*" = ["D", "ANN", "N", "BLE001"]
+# SLF001: reaching into a private attribute is what a unit test is for —
+# `_REGISTRY`, `_normal_arr`, `_rgba_under` are the things under test.
+"tests/*" = ["D", "ANN", "N", "BLE001", "SLF001"]
 # Typer evaluates each command's annotations at registration time, so
 # argument and option types must exist at runtime, not only for mypy.
 "src/pypic/cli/*" = ["TC001", "TC002", "TC003"]
@@ -189,6 +192,9 @@ convention = "numpy"
 # columns, settings.hdf lines) that must stay on one line to remain valid
 # fixtures, and use capitalized physics names (meshgrid Y) like the tests.
 "scripts/*" = ["T201", "E501", "N806"]
+# Run-by-eye figure generators drive pyvista's widget internals directly;
+# mypy already skips this directory for the same reason.
+"scripts/visual/*" = ["SLF001"]
 "benchmarks/*" = ["T201"]
 "examples/*" = ["T201"]
 

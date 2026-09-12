@@ -243,7 +243,9 @@ def reduce(
         source=data.xr,
     )
     _stamp_provenance(reduced, data.xr, axes, reduction, weight_canonical)
-    return data._wrap_sliced(reduced)
+    # reductions sits above dataset in the layering, so it reuses the
+    # dataset's own re-wrap rather than reconstructing grid and aliases.
+    return data._wrap_sliced(reduced)  # noqa: SLF001
 
 
 def _validate_reduce(
