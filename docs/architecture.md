@@ -115,6 +115,15 @@ import anything above it.
 and declares `__all__`. Users import from `pypic` or `pypic.coordinates`, never
 from internal modules.
 
+`comparison`, `reconnection`, `regrid` and `traces` are the exception: their
+names reach the top level through a PEP 562 `__getattr__` in `pypic/__init__.py`
+driven by one name → module table, with the real imports under
+`if TYPE_CHECKING:` so mypy and IDEs still resolve them. They are the only
+modules that import `scipy.interpolate`, which costs a third of `import pypic`.
+Deferral is the second sanctioned departure from module-scope imports;
+`tests/test_public_api.py` holds the interpolator out of `sys.modules` after a
+bare `import pypic`.
+
 ### Deliberate exclusions
 
 - No `astropy.units` in the computation path — 10-100× overhead.

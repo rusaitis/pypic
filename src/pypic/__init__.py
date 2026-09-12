@@ -2,15 +2,13 @@
 
 __version__ = "0.1.3"
 
+import importlib
+from typing import TYPE_CHECKING, Any, Final
+
 from pypic import (
     _pickling,  # noqa: F401  registers the mappingproxy pickle reducer
     aliases,
     codegen,
-)
-from pypic.comparison import (
-    compare_fields,
-    field_comparison_report,
-    field_difference_dataset,
 )
 from pypic.compute import (
     RECIPES,
@@ -175,27 +173,34 @@ from pypic.readers import (
     supports_selective_read,
     unregister_reader,
 )
-from pypic.reconnection import find_saddle_points, reconnection_rate, schindler_xi
 from pypic.reductions import Reduction, reduce
-from pypic.regrid import align_grids, common_grid, regrid
 from pypic.schema import SimulationSchema, validate_simulation_toml
 from pypic.selections import BoxSelection, PlaneSelection, SphereSelection
 from pypic.spectral import power_spectrum_1d, power_spectrum_2d, power_spectrum_3d
-from pypic.traces import (
-    FieldLine,
-    ParticleTrace,
-    PoincareSection,
-    PoincareSurface,
-    TerminationReason,
-    TraceDirection,
-    VectorFieldInterpolator,
-    estimate_tracing_error,
-    poincare_section,
-    trace_field_line,
-    trace_field_line_adaptive,
-    trace_field_lines_adaptive,
-)
 from pypic.units import Normalization, PhysicsConstants, PhysicsParams, SpeciesInfo
+
+if TYPE_CHECKING:
+    from pypic.comparison import (
+        compare_fields,
+        field_comparison_report,
+        field_difference_dataset,
+    )
+    from pypic.reconnection import find_saddle_points, reconnection_rate, schindler_xi
+    from pypic.regrid import align_grids, common_grid, regrid
+    from pypic.traces import (
+        FieldLine,
+        ParticleTrace,
+        PoincareSection,
+        PoincareSurface,
+        TerminationReason,
+        TraceDirection,
+        VectorFieldInterpolator,
+        estimate_tracing_error,
+        poincare_section,
+        trace_field_line,
+        trace_field_line_adaptive,
+        trace_field_lines_adaptive,
+    )
 
 __all__ = [
     "CARTESIAN",
@@ -381,3 +386,55 @@ __all__ = [
     "vector_component",
     "velocity_magnitude",
 ]
+
+# Deferred: these four are the only modules that pull scipy.interpolate, and
+# they carry roughly a third of `import pypic`. Held behind PEP 562 so a
+# session that never traces a field line never pays for the interpolator.
+_LAZY_EXPORTS: Final = {
+    "compare_fields": "comparison",
+    "field_comparison_report": "comparison",
+    "field_difference_dataset": "comparison",
+    "find_saddle_points": "reconnection",
+    "reconnection_rate": "reconnection",
+    "schindler_xi": "reconnection",
+    "align_grids": "regrid",
+    "common_grid": "regrid",
+    "regrid": "regrid",
+    "FieldLine": "traces",
+    "ParticleTrace": "traces",
+    "PoincareSection": "traces",
+    "PoincareSurface": "traces",
+    "TerminationReason": "traces",
+    "TraceDirection": "traces",
+    "VectorFieldInterpolator": "traces",
+    "estimate_tracing_error": "traces",
+    "poincare_section": "traces",
+    "trace_field_line": "traces",
+    "trace_field_line_adaptive": "traces",
+    "trace_field_lines_adaptive": "traces",
+}
+_LAZY_MODULES: Final = frozenset(_LAZY_EXPORTS.values())
+
+
+def __getattr__(name: str) -> Any:  # noqa: ANN401  one hook, twenty-one types
+    """Import a deferred module on first access to any of its names."""
+    module_name = _LAZY_EXPORTS.get(name, name)
+    if module_name not in _LAZY_MODULES:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    module = importlib.import_module(f"pypic.{module_name}")
+    # Bind the module's whole export set at once: importing `pypic.regrid`
+    # binds the submodule as `pypic.regrid`, and the eager surface had the
+    # function of that name there instead.
+    globals().update(
+        {
+            n: getattr(module, n)
+            for n, owner in _LAZY_EXPORTS.items()
+            if owner == module_name
+        }
+    )
+    return globals()[name]
+
+
+def __dir__() -> list[str]:
+    """List the deferred names too, so completion sees the whole surface."""
+    return sorted({*globals(), *__all__, *_LAZY_MODULES})

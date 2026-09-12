@@ -8,6 +8,8 @@ a contract break — bump the schema major before changing the behavior.
 from __future__ import annotations
 
 import ast
+import subprocess
+import sys
 import types
 from pathlib import Path
 
@@ -143,6 +145,37 @@ def test_top_level_all_entries_resolve() -> None:
     """Nothing in ``pypic.__all__`` is a name that does not exist."""
     unresolved = [name for name in pypic.__all__ if not hasattr(pypic, name)]
     assert not unresolved, f"pypic.__all__ names nothing: {sorted(unresolved)}"
+
+
+def _probe(source: str) -> str:
+    """Run *source* in a fresh interpreter and return its stdout, stripped."""
+    result = subprocess.run(
+        [sys.executable, "-c", source], capture_output=True, text=True, check=True
+    )
+    return result.stdout.strip()
+
+
+def test_importing_pypic_leaves_the_interpolator_unloaded() -> None:
+    """A bare ``import pypic`` does not pull ``scipy.interpolate``.
+
+    ``regrid`` and ``traces`` import it at module scope, and eager
+    re-export cost a third of ``import pypic`` for every session that
+    never regrids or traces a field line. The loaded module set is what
+    the deferral controls; a wall-clock ceiling would flake on CI.
+    """
+    loaded = _probe("import sys, pypic; print('scipy.interpolate' in sys.modules)")
+    assert loaded == "False"
+
+
+def test_deferred_name_leaves_regrid_bound_to_the_function() -> None:
+    """``pypic.regrid`` is the function no matter which name is touched first.
+
+    Importing the submodule binds it as ``pypic.regrid``, where the
+    eager surface had the function of the same name — so resolving any
+    one deferred name binds its module's whole export set at once.
+    """
+    kind = _probe("import pypic; pypic.align_grids; print(type(pypic.regrid).__name__)")
+    assert kind == "function"
 
 
 _CROSS_CHECKED_SUBMODULES = [

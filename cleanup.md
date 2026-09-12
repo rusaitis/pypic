@@ -303,7 +303,7 @@ Phases 6 and 7.
    invariant already asserts the runtime read-only half, and `check.sh types`
    is the static half.
 
-3. - [ ] **Import time.** `import pypic` takes 0.73 s warm (best of 7 fresh
+3. - [x] **Import time.** `import pypic` takes 0.73 s warm (best of 7 fresh
    interpreters, 2026-09-11). The avoidable part is `scipy.interpolate`, which
    `regrid.py:37` and `traces/_tracing.py:19` import at module scope and
    `__init__.py` reaches through `comparison` (:6), `reconnection` (:174,
@@ -320,6 +320,15 @@ Phases 6 and 7.
    deferring `codegen` measured no saving. Guard: a subprocess test that
    `import pypic` leaves `scipy.interpolate` out of `sys.modules`, rather
    than a wall-clock ceiling that would flake on CI. Target below 0.6 s.
+
+   Landed: 0.73 s → 0.50 s (best of 7 fresh interpreters, 2026-09-12), with
+   `scipy.interpolate` absent from `-X importtime` entirely. One flat
+   name → module table, as planned. Resolving any one name binds that
+   module's whole export set rather than the single name asked for:
+   importing `pypic.regrid` binds the submodule as `pypic.regrid`, where the
+   eager surface had the function of that name, so a one-at-a-time binding
+   would make `pypic.regrid` callable or not depending on access order. Two
+   guard tests, not one — the second pins that ordering.
 
 Verify: `./scripts/check.sh types`, the full suite, and
 `uv run python -X importtime -c "import pypic"` before and after item 3
