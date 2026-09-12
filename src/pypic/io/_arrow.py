@@ -167,8 +167,7 @@ def particles_to_arrow(
     table = pa.table(arrays)
     meta = table.schema.metadata or {}
     meta[b"pypic"] = _encode_species_meta(data)
-    table = table.replace_schema_metadata(meta)
-    return table
+    return table.replace_schema_metadata(meta)
 
 
 def particles_from_arrow(table: pa.Table) -> ParticleData:

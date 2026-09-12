@@ -36,8 +36,7 @@ _KNOWN_FIELDS = _FIELD_NAME_MAP | _H5HUT_FIELD_MAP
 def _read_field(block: h5py.Group, name: str) -> FloatArray:
     """Read a single field dataset, transpose ZYX→XYZ, promote to float64."""
     raw = block[name]["0"][()]
-    data = np.ascontiguousarray(raw.transpose(2, 1, 0), dtype=np.float64)
-    return data
+    return np.ascontiguousarray(raw.transpose(2, 1, 0), dtype=np.float64)
 
 
 def _species_loader(

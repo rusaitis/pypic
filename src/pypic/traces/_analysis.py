@@ -483,7 +483,6 @@ def drift_velocity(
     if window == 1:
         return v_inst  # type: ignore[no-any-return]
     kernel = np.ones(window) / window
-    smoothed = np.column_stack(
+    return np.column_stack(
         [np.convolve(v_inst[:, i], kernel, mode="same") for i in range(3)]
     )
-    return smoothed
