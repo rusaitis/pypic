@@ -7,25 +7,30 @@
 # benchmarks/ and the committed examples, so touching those directories
 # gave a green local run and a red pull request.
 #
+# ruff now takes the repo root instead of that list — see the note above
+# lint() for why.
+#
 # Usage: scripts/check.sh [lint|format|types|test|docs|schema]
 #        scripts/check.sh            # everything, in CI order
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-# Every Python path CI lints and type-checks. examples/ is globbed: only
-# committed scripts live there, since .gitignore keeps local simulation
-# data out (see the examples/ block there).
-PATHS=(src tests scripts benchmarks examples)
-
-# mypy skips tests/: the suite imports examples/ as a package, which makes
+# mypy is given explicit paths; it has no .gitignore awareness, and tests/
+# is deliberately out (the suite imports examples/ as a package, which makes
 # the same file resolvable under two module names, and strict mode over
-# fixtures buys little. ruff still covers it.
-MYPY_PATHS=("${PATHS[@]/tests}")
+# fixtures buys little). ruff still covers tests/.
+MYPY_PATHS=(src scripts benchmarks examples)
 
-lint()   { uv run ruff check "${PATHS[@]}"; }
-format() { uv run ruff format --check "${PATHS[@]}"; }
-types()  { uv run mypy ${MYPY_PATHS[@]}; }
+# ruff gets the repo root, not a path list. Measured 2026-09-12 with ruff
+# 0.15.5: a multi-root invocation (`ruff check src tests scripts benchmarks
+# examples`) walks a different file set on each run — 264 files, or 69 with
+# src/ dropped entirely — and caught a planted F401 in src/ once in ten
+# runs. `--no-cache` does not help; it pins the walk to the truncated set.
+# A single root is deterministic and a strict superset of the five paths.
+lint()   { uv run ruff check .; }
+format() { uv run ruff format --check .; }
+types()  { uv run mypy "${MYPY_PATHS[@]}"; }
 test()   { uv run pytest; }
 docs()   { uv run mkdocs build --strict; }
 
