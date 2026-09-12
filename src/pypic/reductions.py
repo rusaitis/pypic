@@ -30,6 +30,7 @@ from typing import TYPE_CHECKING, Literal, get_args
 import numpy as np
 
 from pypic.coordinates.geometry import GeometryType
+from pypic.diagnostics import _VALID_NAN_POLICIES
 from pypic.exceptions import GeometryUnsupportedError, UnknownFieldError
 
 if TYPE_CHECKING:
@@ -56,7 +57,6 @@ type Reduction = Literal[
 ]
 
 _VALID_REDUCTIONS: tuple[str, ...] = get_args(Reduction.__value__)
-_VALID_NAN_POLICIES: tuple[str, ...] = ("omit", "propagate", "raise")
 
 # Reductions accepting xarray's ``dim=[...]`` natively.
 _MULTI_AXIS_DIM_REDUCERS: frozenset[str] = frozenset(

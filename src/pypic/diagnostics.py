@@ -10,7 +10,7 @@ from __future__ import annotations
 import math
 import warnings
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal, cast
+from typing import TYPE_CHECKING, Literal, cast, get_args, overload
 
 import numpy as np
 
@@ -25,87 +25,65 @@ if TYPE_CHECKING:
 
 type NanPolicy = Literal["omit", "propagate", "raise"]
 
+# Single source for the policy vocabulary: `pypic.reductions` and
+# `pypic.comparison` validate against this tuple too, so adding a policy
+# means editing the alias above and nothing else.
+_VALID_NAN_POLICIES: tuple[str, ...] = get_args(NanPolicy.__value__)
+
 # Anchor for ``warnings.warn(skip_file_prefixes=...)``: Python walks up the
 # stack until it leaves the pypic package, so a NaN warning points at the
 # user's call site however deeply pypic wrapped the diagnostic.
 _PYPIC_PREFIX = (str(Path(__file__).parent),)
 
 
-def _apply_nan_policy_single(
+@overload
+def _apply_nan_policy(
     field: FloatArray,
+    /,
     *,
     nan_policy: NanPolicy,
     function_name: str,
-) -> FloatArray | None:
-    """Apply *nan_policy* to a single-array reducer.
-
-    Returns the (possibly NaN-stripped) flat array to feed into the
-    reduction, or ``None`` to signal "all cells masked, result
-    undefined".  Mirrors `_apply_nan_policy` for the
-    paired-array case but operates on one array.
-    """
-    if nan_policy not in ("omit", "propagate", "raise"):
-        msg = f"nan_policy must be 'omit', 'propagate', or 'raise', got {nan_policy!r}"
-        raise ValueError(msg)
-
-    if nan_policy == "propagate":
-        return field
-
-    nan_mask = np.isnan(field)
-    n_nan = int(nan_mask.sum())
-    if n_nan == 0:
-        return field
-
-    if nan_policy == "raise":
-        msg = f"{function_name}: input contains {n_nan} NaN cell(s)"
-        raise ValueError(msg)
-
-    valid = ~nan_mask
-    if not valid.any():
-        warnings.warn(
-            f"{function_name}: all {n_nan} cell(s) are NaN, result undefined",
-            UserWarning,
-            skip_file_prefixes=_PYPIC_PREFIX,
-        )
-        return None
-    fraction = 100.0 * n_nan / nan_mask.size
-    warnings.warn(
-        f"{function_name}: ignored {n_nan} NaN cell(s) ({fraction:.2f}% of input)",
-        UserWarning,
-        skip_file_prefixes=_PYPIC_PREFIX,
-    )
-    return field[valid]
+) -> tuple[FloatArray] | None: ...
 
 
+@overload
 def _apply_nan_policy(
     computed: FloatArray,
     reference: FloatArray,
+    /,
     *,
     nan_policy: NanPolicy,
     function_name: str,
-) -> tuple[FloatArray, FloatArray] | None:
-    """Apply *nan_policy* to a (computed, reference) pair.
+) -> tuple[FloatArray, FloatArray] | None: ...
 
-    Returns the (possibly masked) pair to feed into the metric, or
-    ``None`` to signal "all cells masked, return NaN".
 
-    For ``"omit"``, NaN cells in either input are dropped from both
-    arrays via a joint mask, so downstream relative norms compare the
-    same set of points in numerator and denominator. Emits a
-    `UserWarning` reporting the dropped count when masking
-    occurs (no warning when both inputs are NaN-free).
+def _apply_nan_policy(
+    *arrays: FloatArray,
+    nan_policy: NanPolicy,
+    function_name: str,
+) -> tuple[FloatArray, ...] | None:
+    """Apply *nan_policy* to the arrays a diagnostic reduces over.
+
+    Returns the (possibly masked) arrays to feed into the metric, or
+    ``None`` to signal "all cells masked, result undefined".
+
+    For ``"omit"``, NaN cells in *any* input are dropped from *every*
+    input via one joint mask, so a relative norm compares the same set
+    of points in numerator and denominator. Emits a `UserWarning`
+    reporting the dropped count when masking occurs (no warning when
+    every input is NaN-free).
     """
-    if nan_policy not in ("omit", "propagate", "raise"):
+    if nan_policy not in _VALID_NAN_POLICIES:
         msg = f"nan_policy must be 'omit', 'propagate', or 'raise', got {nan_policy!r}"
         raise ValueError(msg)
 
     if nan_policy == "propagate":
-        return computed, reference
+        return arrays
 
-    nan_mask = np.isnan(computed) | np.isnan(reference)
+    nan_mask = np.logical_or.reduce([np.isnan(array) for array in arrays])
     n_nan = int(nan_mask.sum())
     if n_nan == 0:
-        return computed, reference
+        return arrays
 
     if nan_policy == "raise":
         msg = f"{function_name}: input contains {n_nan} NaN cell(s)"
@@ -125,7 +103,7 @@ def _apply_nan_policy(
         UserWarning,
         skip_file_prefixes=_PYPIC_PREFIX,
     )
-    return computed[valid], reference[valid]
+    return tuple(array[valid] for array in arrays)
 
 
 def l2_relative_error(
@@ -322,12 +300,13 @@ def field_energy(
         )
         raise ValueError(msg)
     dv = math.prod(spacing)
-    masked = _apply_nan_policy_single(
+    masked = _apply_nan_policy(
         energy_density, nan_policy=nan_policy, function_name="field_energy"
     )
     if masked is None:
         return cast("np.floating[Any]", np.float64(np.nan))
-    return np.sum(masked) * dv
+    (valid,) = masked
+    return np.sum(valid) * dv
 
 
 def div_b(
@@ -436,12 +415,11 @@ def max_div_b(
     np.float64(0.0)
     """
     div = np.abs(div_b(b1, b2, b3, d1, d2, d3, geometry=geometry))
-    masked = _apply_nan_policy_single(
-        div, nan_policy=nan_policy, function_name="max_div_b"
-    )
+    masked = _apply_nan_policy(div, nan_policy=nan_policy, function_name="max_div_b")
     if masked is None:
         return cast("np.floating[Any]", np.float64(np.nan))
-    return np.max(masked)
+    (valid,) = masked
+    return np.max(valid)
 
 
 def div_e(
@@ -528,12 +506,11 @@ def spatial_mean(
     >>> spatial_mean(np.array([1.0, 2.0, 3.0]))
     np.float64(2.0)
     """
-    masked = _apply_nan_policy_single(
-        field, nan_policy=nan_policy, function_name="spatial_mean"
-    )
+    masked = _apply_nan_policy(field, nan_policy=nan_policy, function_name="spatial_mean")
     if masked is None:
         return cast("np.floating[Any]", np.float64(np.nan))
-    return np.mean(masked)
+    (valid,) = masked
+    return np.mean(valid)
 
 
 def spatial_rms(
@@ -567,12 +544,11 @@ def spatial_rms(
     >>> spatial_rms(np.array([3.0, 4.0]))
     np.float64(3.5355339059327378)
     """
-    masked = _apply_nan_policy_single(
-        field, nan_policy=nan_policy, function_name="spatial_rms"
-    )
+    masked = _apply_nan_policy(field, nan_policy=nan_policy, function_name="spatial_rms")
     if masked is None:
         return cast("np.floating[Any]", np.float64(np.nan))
-    return cast("np.floating[Any]", np.sqrt(np.mean(masked**2)))
+    (valid,) = masked
+    return cast("np.floating[Any]", np.sqrt(np.mean(valid**2)))
 
 
 def field_extrema(
@@ -603,7 +579,7 @@ def field_extrema(
     >>> field_extrema(np.array([3.0, -1.0, 7.0]))
     (np.float64(-1.0), np.float64(7.0))
     """
-    masked = _apply_nan_policy_single(
+    masked = _apply_nan_policy(
         field, nan_policy=nan_policy, function_name="field_extrema"
     )
     if masked is None:
@@ -612,7 +588,8 @@ def field_extrema(
             cast("np.floating[Any]", nan),
             cast("np.floating[Any]", nan),
         )
-    return np.min(masked), np.max(masked)
+    (valid,) = masked
+    return np.min(valid), np.max(valid)
 
 
 __all__ = [

@@ -39,6 +39,7 @@ from typing import TYPE_CHECKING, Any
 from pypic.dataset import FieldDataset
 from pypic.diagnostics import (
     _PYPIC_PREFIX,
+    _VALID_NAN_POLICIES,
     NanPolicy,
     field_difference,
     l2_relative_error,
@@ -62,7 +63,6 @@ __all__ = [
 
 _ALLOWED_UNITS = ("si", "code")
 _ALLOWED_METRICS = ("l2", "linf")
-_ALLOWED_NAN_POLICIES = ("omit", "propagate", "raise")
 _RESOLUTION_WARNING_THRESHOLD = 10.0
 
 
@@ -325,7 +325,7 @@ def compare_fields(
     # Duplicates the check inside ``_apply_nan_policy`` intentionally:
     # a bad policy caught *here* fails before the expensive alignment
     # step, turning a wasted multi-field regrid into an instant error.
-    _validate_choice(nan_policy, _ALLOWED_NAN_POLICIES, "nan_policy")
+    _validate_choice(nan_policy, _VALID_NAN_POLICIES, "nan_policy")
     _validate_code_units_compatible(a, b, units)
     # Resolve against the *original* datasets: alignment rebuilds them
     # without custom aliases (``transform_to`` drops them, ``regrid`` keeps
@@ -415,7 +415,7 @@ def field_comparison_report(
     'si'
     """
     _validate_choice(units, _ALLOWED_UNITS, "units")
-    _validate_choice(nan_policy, _ALLOWED_NAN_POLICIES, "nan_policy")
+    _validate_choice(nan_policy, _VALID_NAN_POLICIES, "nan_policy")
     _validate_code_units_compatible(a, b, units)
     # Resolve names against the *originals* so custom aliases from
     # ``from_arrays(aliases=...)`` survive — both transform_to and
