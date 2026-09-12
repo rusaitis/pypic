@@ -664,12 +664,23 @@ class TestErrorMessages:
         with pytest.raises(UnknownFieldError, match=r"Cannot compute '\|B\|'.*'B_2'"):
             compute_field("|B|", ds)
 
-    def test_nested_missing_dependency_keeps_suggestions(self):
+    def test_nested_missing_dependency_names_the_absent_field(self):
+        """A correctly spelled field the dataset lacks is not a typo.
+
+        Suggesting near-matches for a name the user got right sends
+        them hunting a spelling problem instead of the missing input.
+        """
         ds = make_test_dataset({"B_1": np.ones((2, 2, 2))}, shape=(2, 2, 2))
         with pytest.raises(
-            UnknownFieldError, match=r"Cannot compute 'beta'.*Did you mean"
+            UnknownFieldError, match=r"Cannot compute 'beta'.*stored field"
         ):
             compute_field("beta", ds)
+
+    def test_absent_field_offers_no_spelling_suggestions(self):
+        ds = make_test_dataset({"B_1": np.ones((2, 2, 2))}, shape=(2, 2, 2))
+        with pytest.raises(UnknownFieldError) as excinfo:
+            compute_field("v_A", ds)
+        assert "Did you mean" not in str(excinfo.value)
 
     def test_recursion_depth(self):
         ds = make_test_dataset({}, shape=(2, 2, 2))
@@ -1204,12 +1215,57 @@ class TestGeometryGuard:
             ("vort_1", {"V_1", "V_2", "V_3"}),
         ],
     )
-    def test_compute_rejects_2d_grid(self, field, components):
+    def test_compute_accepts_2d_grid(self, field, components):
+        """2D is where most published reconnection analysis happens."""
         shape = (4, 4)
+        data = {name: np.ones(shape) for name in components}
+        ds = make_test_dataset(data, shape=shape)
+        assert compute_field(field, ds).shape == shape
+
+    @pytest.mark.parametrize(
+        ("field", "components"),
+        [
+            ("div_B", {"B_1", "B_2", "B_3"}),
+            ("curl_B_1", {"B_1", "B_2", "B_3"}),
+        ],
+    )
+    def test_compute_rejects_1d_grid(self, field, components):
+        shape = (4,)
         data = {name: np.ones(shape) for name in components}
         ds = make_test_dataset(data, shape=shape)
         with pytest.raises(NotImplementedError, match=rf"{field}.*2D"):
             compute_field(field, ds)
+
+    def test_flux_function_is_reachable_on_a_2d_grid(self):
+        r"""``psi`` used to be computable on no grid at all.
+
+        The recipe demanded three spacings while the function demanded
+        2D data, so every grid failed one of the two. Reaching it, the
+        defining relation $B_2 = -\partial\psi/\partial x_1$ must hold
+        on the discrete field it returns — exactly, since the flux
+        function accumulates $-B_2\,\mathrm{d}x$ cell by cell.
+        """
+        n = 32
+        d = 2 * np.pi / n
+        axis = np.arange(n) * d
+        grid_x, grid_y = np.meshgrid(axis, axis, indexing="ij")
+        psi = np.sin(grid_x) * np.cos(grid_y)
+        b2 = -np.gradient(psi, d, axis=0)
+        ds = FieldDataset.from_arrays(
+            {"B_1": np.zeros((n, n)), "B_2": b2},
+            GridInfo(dimensions=(n, n), spacing=(d, d)),
+            Normalization.identity(),
+        )
+        recovered = compute_field("psi", ds)
+        np.testing.assert_allclose(
+            -np.diff(recovered, axis=0) / d, b2[1:, :], rtol=1e-10, atol=1e-14
+        )
+
+    def test_flux_function_rejects_a_3d_grid(self):
+        shape = (4, 4, 4)
+        ds = make_test_dataset({"B_2": np.ones(shape)}, shape=shape)
+        with pytest.raises(NotImplementedError, match="2D data"):
+            compute_field("psi", ds)
 
 
 class TestRegisterRecipe:

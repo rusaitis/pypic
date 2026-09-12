@@ -586,8 +586,16 @@ class UnitsPIC(_UnitsBase):
     reference_species: str = "electrons"
     reference_density: PositiveFloat
     reference_mass: PositiveFloat | None = None
-    reference_charge: float | None = None
+    # A magnitude, matching the builtin defaults (electrons carry +e).
+    # Signed input used to survive here and die downstream complaining
+    # about b_field_ref, a key the deck never mentioned.
+    reference_charge: PositiveFloat | None = None
     speed_of_light: PositiveFloat | None = None
+    # Velocity unit in m/s, defaulting to the speed of light. Hybrid
+    # codes normalize to the Alfvén speed, which v1.0 could not state:
+    # setting it makes B_ref the field at which v_A equals this speed
+    # and puts the time unit on the inverse ion cyclotron frequency.
+    reference_velocity: PositiveFloat | None = None
 
 
 class UnitsMHD(_UnitsBase):
@@ -606,7 +614,17 @@ class UnitsSI(_UnitsBase):
 
 
 class UnitsReferenceTable(_StrictBase):
-    """``[units.reference]`` sub-table for ``system = "custom"``."""
+    """``[units.reference]`` sub-table for ``system = "custom"``.
+
+    Keys left out are derived from the two dimensional relations that
+    tie the eight references together, $v = l / t$ and $E = v B$, so a
+    deck supplies one of each coupled pair rather than all eight.
+    ``mass`` and ``charge`` fall back to the electron values.
+
+    What cannot be derived must be given: a normalization that leaves
+    the magnetic or the density anchor unknown has no SI meaning, and
+    guessing one would return code units labelled as tesla.
+    """
 
     length: PositiveFloat
     time: PositiveFloat | None = None
@@ -615,7 +633,22 @@ class UnitsReferenceTable(_StrictBase):
     e_field: PositiveFloat | None = None
     density: PositiveFloat | None = None
     mass: PositiveFloat | None = None
-    charge: float | None = None
+    charge: PositiveFloat | None = None
+
+    @model_validator(mode="after")
+    def _check_determined(self) -> UnitsReferenceTable:
+        missing: list[str] = []
+        if self.time is None and self.velocity is None:
+            missing.append("'time' or 'velocity' (velocity = length / time)")
+        if self.b_field is None and self.e_field is None:
+            missing.append("'b_field' or 'e_field' (e_field = velocity * b_field)")
+        if self.density is None:
+            missing.append("'density' (no relation derives it)")
+        if missing:
+            raise ValueError(
+                "[units.reference] is underdetermined; add " + ", ".join(missing)
+            )
+        return self
 
 
 class UnitsCustom(_UnitsBase):
@@ -994,7 +1027,10 @@ class Species(_StrictBase):
 
     name: str
     charge: float | None = None
-    mass: PositiveFloat | None = None
+    # Zero is legal for a fluid species only — massless electrons are the
+    # standard hybrid closure, and `inertia` (me/mi, 0 = massless) has
+    # always accepted it. `_check_mass_charge` enforces the restriction.
+    mass: NonNegativeFloat | None = None
     charge_to_mass: float | None = None
     # 0 (or absent) marks a fluid species — see [[species]] in schema.md.
     particles_per_cell: (
@@ -1027,6 +1063,13 @@ class Species(_StrictBase):
     # additive starting point.
     tracer: bool = False
 
+    def _is_kinetic(self) -> bool:
+        """Whether the deck asks for macroparticles rather than a fluid."""
+        ppc = self.particles_per_cell
+        if ppc is None:
+            return False
+        return any(ppc) if isinstance(ppc, list) else ppc > 0
+
     @model_validator(mode="after")
     def _check_mass_charge(self) -> Species:
         has_qm = self.charge is not None and self.mass is not None
@@ -1040,6 +1083,12 @@ class Species(_StrictBase):
             raise ValueError(
                 f"species '{self.name}' has both (charge + mass) and "
                 f"charge_to_mass — choose one"
+            )
+        if self.mass == 0.0 and self._is_kinetic():
+            raise ValueError(
+                f"species '{self.name}' carries particles_per_cell, so it is "
+                f"kinetic and needs mass > 0; mass = 0 describes a massless "
+                f"fluid species"
             )
         has_par = self.gamma_eos_par is not None
         has_perp = self.gamma_eos_perp is not None

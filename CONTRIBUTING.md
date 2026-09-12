@@ -140,6 +140,12 @@ reads it back through `open_simulation`. It runs with no external data, and
 [`examples/README.md`](examples/README.md) indexes the numbered on-ramp that
 builds up to it.
 
+The base class is `from pypic.readers import ReaderBase` — the reader
+machinery lives in that subpackage rather than the top-level namespace, which
+is reserved for what an analysis session reaches for. Subclassing is optional:
+`SimulationReader` in `readers/_protocols.py` is a `Protocol`, so any class
+with `read_timestep` and `available_timesteps` already satisfies it.
+
 Anything you add under `examples/` is picked up automatically — but
 `tests/test_examples.py` asserts that every committed script is listed there,
 so add the filename when you add the file.

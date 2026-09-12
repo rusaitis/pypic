@@ -220,6 +220,80 @@ class TestUnits:
         with pytest.raises(ValidationError, match="reference"):
             load_config(_write(tmp_path, _shell(units=units)))
 
+    def test_omitted_references_are_derived(self, tmp_path: Path) -> None:
+        """Leaving out velocity and e_field reproduces the full table.
+
+        The reference table in docs/schema.md states all eight; dropping
+        the two that $v = l/t$ and $E = vB$ determine must land on the
+        same numbers, or the relations are not the ones documented.
+        """
+        units = (
+            '[units]\nsystem = "custom"\n'
+            "[units.reference]\nlength = 5.31e-3\ntime = 1.77e-11\n"
+            "b_field = 1.07e-3\ndensity = 1.0e18"
+        )
+        norm = load_config(_write(tmp_path, _shell(units=units))).normalization
+        np.testing.assert_allclose(norm.velocity_ref, 5.31e-3 / 1.77e-11, rtol=1e-10)
+        np.testing.assert_allclose(norm.e_field_ref, 3.21e5, rtol=1e-3)
+
+    def test_omitted_mass_and_charge_fall_back_to_electron(
+        self, tmp_path: Path
+    ) -> None:
+        units = (
+            '[units]\nsystem = "custom"\n'
+            "[units.reference]\nlength = 5.31e-3\nvelocity = 2.998e8\n"
+            "b_field = 1.07e-3\ndensity = 1.0e18"
+        )
+        norm = load_config(_write(tmp_path, _shell(units=units))).normalization
+        np.testing.assert_allclose(norm.mass_ref, constants.m_e, rtol=1e-10)
+        np.testing.assert_allclose(norm.charge_ref, constants.e, rtol=1e-10)
+
+    def test_reference_velocity_defaults_to_the_speed_of_light(
+        self, tmp_path: Path
+    ) -> None:
+        """Omitting the key reproduces the PIC references exactly."""
+        pic = '[units]\nsystem = "PIC"\nreference_density = 1.0e6'
+        norm = load_config(_write(tmp_path, _shell(units=pic))).normalization
+        assert norm.velocity_ref == constants.c
+
+    def test_reference_velocity_gives_hybrid_the_cyclotron_time_unit(
+        self, tmp_path: Path
+    ) -> None:
+        r"""Pinning velocity to $v_A$ lands the time unit on $1/\Omega_{ci}$.
+
+        The identity $d_i \Omega_{ci} = v_A$ is what makes this the
+        textbook hybrid normalization rather than a rescaled PIC one:
+        with length already the ion skin depth, asking for the Alfvén
+        speed as the velocity unit forces the ion cyclotron time.
+        """
+        units = (
+            '[units]\nsystem = "PIC"\nreference_species = "ions"\n'
+            "reference_density = 1.0e6\nreference_mass = 1.673e-27\n"
+            "reference_velocity = 1.0e5"
+        )
+        norm = load_config(_write(tmp_path, _shell(units=units))).normalization
+        omega_ci = constants.e * norm.b_field_ref / 1.673e-27
+        np.testing.assert_allclose(norm.time_ref, 1.0 / omega_ci, rtol=1e-10)
+        np.testing.assert_allclose(
+            norm.velocity_ref * norm.time_ref, norm.length_ref, rtol=1e-10
+        )
+
+    def test_signed_reference_charge_names_the_key_it_rejects(
+        self, tmp_path: Path
+    ) -> None:
+        """The refs are magnitudes, and saying so beats failing elsewhere.
+
+        A signed charge used to pass validation and die in
+        ``Normalization.__post_init__`` complaining about ``b_field_ref``,
+        which the deck never mentions.
+        """
+        units = (
+            '[units]\nsystem = "PIC"\n'
+            "reference_density = 1.0e18\nreference_charge = -1.602e-19"
+        )
+        with pytest.raises(ValidationError, match="reference_charge"):
+            load_config(_write(tmp_path, _shell(units=units)))
+
     def test_unknown_system(self, tmp_path: Path) -> None:
         units = '[units]\nsystem = "CGS"'
         with pytest.raises(ValidationError, match="CGS"):
@@ -277,6 +351,33 @@ class TestSpecies:
         cfg = load_config(_write(tmp_path, _shell()))
         assert len(cfg.species) == 1
         assert cfg.species[0].name == "e"
+
+    def test_hybrid_deck_with_massless_fluid_electrons_loads(
+        self, tmp_path: Path
+    ) -> None:
+        """The canonical hybrid closure has to survive the whole path.
+
+        Kinetic ions plus a massless electron fluid is what a hybrid
+        code writes; `inertia = 0` has always documented it. Before,
+        the only decks that validated stated a mass the run does not
+        have.
+        """
+        species = (
+            '[[species]]\nname = "ions"\ncharge = 1.0\nmass = 1.0\n'
+            "particles_per_cell = 64\n\n"
+            '[[species]]\nname = "electrons"\ncharge = -1.0\nmass = 0.0\n'
+            'closure = "isothermal"\ninertia = 0.0'
+        )
+        cfg = load_config(_write(tmp_path, _shell(species=species)))
+        assert cfg.species[1].mass == 0.0
+
+    def test_kinetic_species_still_needs_mass(self, tmp_path: Path) -> None:
+        species = (
+            '[[species]]\nname = "e"\ncharge = -1.0\nmass = 0.0\n'
+            "particles_per_cell = 64"
+        )
+        with pytest.raises(ValidationError, match="kinetic"):
+            load_config(_write(tmp_path, _shell(species=species)))
 
     def test_charge_to_mass_only(self, tmp_path: Path) -> None:
         species = '[[species]]\nname = "e"\ncharge_to_mass = -256.0'

@@ -1586,7 +1586,7 @@ class TestMagneticFluxFunction:
         np.testing.assert_allclose(-dpsi_dx[2:-2, :], 2.0, rtol=0.01)
 
     def test_3d_raises(self):
-        with pytest.raises(ValueError, match="2D"):
+        with pytest.raises(NotImplementedError, match="2D data"):
             magnetic_flux_function(np.ones((4, 3, 2)), 1.0, 1.0)
 
     @staticmethod

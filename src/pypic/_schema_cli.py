@@ -323,16 +323,19 @@ def _coerce_errors(exc: ValidationError) -> list[dict[str, Any]]:
 def _print_validate_human(results: Iterable[dict[str, Any]]) -> None:
     """Render per-file pass/fail with indented Pydantic error lines."""
     from rich.console import Console
+    from rich.markup import escape
 
     console = Console(stderr=True)
     for entry in results:
         if entry["ok"]:
-            console.print(f"[green]✓[/green] {entry['path']}")
+            console.print(f"[green]✓[/green] {escape(str(entry['path']))}")
             continue
-        console.print(f"[red]✗[/red] {entry['path']}")
+        console.print(f"[red]✗[/red] {escape(str(entry['path']))}")
         for err in entry["errors"]:
             loc = ".".join(str(part) for part in err.get("loc", [])) or "<root>"
-            console.print(f"    [dim]{loc}[/dim]: {err.get('msg', '')}")
+            # Validation messages name TOML sections as [units], [grid], ...
+            # Unescaped, rich reads those as style tags and drops them.
+            console.print(f"    [dim]{escape(loc)}[/dim]: {escape(err.get('msg', ''))}")
 
 
 if __name__ == "__main__":

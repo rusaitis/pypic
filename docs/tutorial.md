@@ -97,6 +97,39 @@ plot_comparison(
 This produces a three-panel figure: run A, run B, and the pointwise
 difference.
 
+For a number rather than a picture, `compare_fields` returns one error
+metric, regridding onto a common grid and converting to SI first so
+runs with different normalizations stay comparable:
+
+```python
+from pypic import compare_fields, field_comparison_report
+
+err = compare_fields(data_a, data_b, "beta")           # L2 by default
+report = field_comparison_report(data_a, data_b)       # every shared field
+```
+
+### Comparing your own analysis against a run
+
+Three paths, depending on what you are holding:
+
+| You have | Use |
+|---|---|
+| Two `FieldDataset`s | `compare_fields` — handles regridding and SI conversion |
+| Bare arrays on the same grid | `l2_relative_error(computed, reference)`, `linf_error` |
+| An array you want to keep alongside the run | `data.with_field(name, array, quantity_type)`, then either of the above |
+
+The bare-array path is the one to reach for when checking your own
+implementation against pypic's, and it needs no wrapping:
+
+```python
+from pypic import l2_relative_error
+
+mine = my_own_beta(data)                     # your code, a plain array
+err = l2_relative_error(mine, data.compute("beta"))
+```
+
+`examples/advanced_calculations.py` runs all three end to end.
+
 ## 7. Frame transforms
 
 If `simulation.toml` defines coordinate transforms:

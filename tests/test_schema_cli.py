@@ -74,6 +74,23 @@ class TestSchemaValidateCli:
         assert result.exit_code == 1, result.output
         assert "✗" in result.output
 
+    def test_section_names_survive_rich_rendering(self, tmp_path: Path) -> None:
+        """Validation messages name TOML sections, and rich eats brackets.
+
+        Unescaped, ``[units.reference]`` reads as a style tag and
+        disappears, leaving a message that begins mid-sentence and
+        never says which section is at fault.
+        """
+        path = tmp_path / "underdetermined.toml"
+        path.write_text(
+            _build_toml(
+                units='[units]\nsystem = "custom"\n[units.reference]\nlength = 1.0'
+            )
+        )
+        runner = CliRunner()
+        result = runner.invoke(schema_app, ["validate", str(path)])
+        assert "[units.reference]" in result.output, result.output
+
     def test_syntactically_broken_toml_exits_two(self, tmp_path: Path) -> None:
         path = tmp_path / "syntax.toml"
         path.write_text("broken =\n")

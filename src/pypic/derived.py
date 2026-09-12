@@ -10,6 +10,8 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
+from pypic.exceptions import GeometryUnsupportedError
+
 if TYPE_CHECKING:
     from pypic.types import FloatArray
 
@@ -2431,8 +2433,12 @@ def magnetic_flux_function(
     >>> np.testing.assert_allclose(psi[0, :], -0.5)
     """
     if b2.ndim != 2:
-        msg = f"magnetic_flux_function requires 2D data, got {b2.ndim}D"
-        raise ValueError(msg)
+        msg = (
+            f"The flux function is defined for a translationally symmetric "
+            f"plane, so it needs 2D data; got {b2.ndim}D. Slice first, e.g. "
+            f"PlaneSelection(normal='z').apply(data)."
+        )
+        raise GeometryUnsupportedError(msg)
     return -np.cumsum(b2 * dx, axis=0)
 
 

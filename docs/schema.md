@@ -373,8 +373,9 @@ system = "PIC"                     # "PIC" | "MHD" | "SI" | "custom"
 reference_species = "electrons"    # optional: "electrons" (default) | "ions" | species name
 reference_density = 1.0e18         # m⁻³ (number density of reference species)
 reference_mass = 9.109e-31         # kg (optional, default: electron mass)
-reference_charge = 1.602e-19       # C (optional, default: elementary charge)
+reference_charge = 1.602e-19       # C (optional, default: elementary charge, a magnitude)
 speed_of_light = 2.998e8           # m/s (optional, default scipy.constants.c)
+reference_velocity = 1.0e5         # m/s (optional, default: speed_of_light) — see below
 scaling_factor = 10.0              # optional: informational shrink factor (no effect on computation)
 scaling_description = "c/v_A reduced by 10x; mass ratio mi/me = 256 (real: 1836)"
 ```
@@ -385,6 +386,29 @@ For **ion-normalized PIC** (e.g. iPIC3D large-scale runs), set
 builtins `"electrons"` / `"ions"` / `"protons"` are accepted as a
 fallback when no matching entry exists, so legacy decks parse
 without forcing a rename.
+
+**`reference_velocity`, and hybrid codes.** The `"PIC"` branch names
+an *anchor parameterization*, not a code type: it derives the eight
+storage primitives from a reference species plus a velocity unit.
+`[model].type` is where the code says it is `"PIC"`, `"hybrid"`,
+`"vlasov"` or `"gyrokinetic"`.
+
+The velocity unit defaults to `speed_of_light`, which is the PIC
+convention. Hybrid codes normalize to the Alfvén speed instead, so
+they set `reference_velocity` to it. Given $l_{ref} = c/\omega_{ref}$
+(the reference-species skin depth, unaffected by the velocity unit),
+the rest follow:
+
+$$t_{ref} = \frac{l_{ref}}{v_{ref}}, \quad
+B_{ref} = v_{ref}\sqrt{\mu_0 n_{ref} m_{ref}}, \quad
+E_{ref} = v_{ref} B_{ref}$$
+
+$B_{ref}$ is therefore the field at which the Alfvén speed equals
+$v_{ref}$. For an ion reference species that puts $t_{ref}$ on the
+inverse ion cyclotron frequency, via $d_i \Omega_{ci} = v_A$ — the
+textbook hybrid normalization. At the default $v_{ref} = c$ the two
+expressions reduce to $1/\omega_{ref}$ and $m_{ref}\omega_{ref}/q_{ref}$,
+so decks that omit the key are unaffected.
 
 ```toml
 [units]
@@ -401,18 +425,28 @@ reference_b_field = 5.0e-9         # Tesla (e.g., 5 nT)
 [units]
 system = "custom"
 
-[units.reference]                  # all in SI
-length = 5.31e-3                   # meters — REQUIRED for custom
-time = 1.77e-11                    # optional
-velocity = 2.998e8                 # optional
-b_field = 1.07e-3                  # optional
-e_field = 3.21e5                   # optional
-density = 1.0e18                   # optional
-mass = 9.109e-31                   # optional
-charge = 1.602e-19                 # optional
+[units.reference]                  # all in SI, all magnitudes (unsigned)
+length = 5.31e-3                   # meters — REQUIRED
+time = 1.77e-11                    # REQUIRED unless `velocity` is given
+velocity = 2.998e8                 # REQUIRED unless `time` is given
+b_field = 1.07e-3                  # REQUIRED unless `e_field` is given
+e_field = 3.21e5                   # REQUIRED unless `b_field` is given
+density = 1.0e18                   # REQUIRED
+mass = 9.109e-31                   # optional, default: electron mass
+charge = 1.602e-19                 # optional, default: elementary charge
 # `speed_of_light` stays at top-level [units].speed_of_light
 # regardless of approach; it never appears under [units.reference].
 ```
+
+**Determining set.** Two relations tie these together — $v = l / t$
+and $E = v B$ — so a deck supplies one of each coupled pair and the
+validator derives the other. Nothing derives `length` or `density`,
+so both are required; `mass` and `charge` fall back to the electron
+values. A table that leaves the velocity or magnetic anchor
+undetermined is rejected at validation time, naming the key that
+would have closed it: a normalization missing one of these has no SI
+meaning, and filling it with 1.0 would return code units labelled as
+tesla.
 
 If `system` is "SI", all data is already in SI and no conversion is needed
 (all reference values = 1.0).

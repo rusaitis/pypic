@@ -1989,13 +1989,11 @@ class TestHelpTextIsUserFacing:
 
 
 class TestValidateOnTwoDimensionalGrids:
-    """``pypic validate`` must not crash on 2D output.
+    """``pypic validate`` reports div B on 2D output.
 
-    ``div_b`` differentiates along axes 0/1/2 explicitly, so it needs
-    three spacings. The command splatted ``ds.grid.spacing`` unguarded,
-    which raised ``TypeError: max_div_b() missing 1 required positional
-    argument`` for every 2D dataset — the most common BATSRUS artifact,
-    and the shape of the committed fixtures.
+    2D is the most common BATSRUS artifact and the shape of the
+    committed fixtures. The third term of the divergence vanishes
+    identically there, so the constraint is as checkable as in 3D.
     """
 
     def test_reports_rather_than_raising(self) -> None:
@@ -2003,10 +2001,10 @@ class TestValidateOnTwoDimensionalGrids:
         result = runner.invoke(app, ["validate", str(fixture)])
         assert result.exit_code == 0, result.output
 
-    def test_says_why_div_b_is_absent(self) -> None:
+    def test_computes_div_b(self) -> None:
         fixture = Path(__file__).parent / "data" / "batsrus-synthetic" / "idl-uniform"
         result = runner.invoke(app, ["validate", str(fixture)])
-        assert "max |div B|: skipped (needs a 3D grid)" in result.output
+        assert "max |div B|: skipped" not in result.output
 
     def test_still_computes_div_b_on_3d_grids(self) -> None:
         fixture = Path(__file__).parent / "data" / "openggcm-small"

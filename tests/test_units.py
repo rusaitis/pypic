@@ -134,12 +134,18 @@ class TestSpeciesInfoValidation:
         s = SpeciesInfo(name="ok", charge=2.0, mass=1.0, charge_to_mass=2.0)
         assert s.charge_to_mass == 2.0
 
-    def test_zero_mass_raises(self):
-        with pytest.raises(ValueError, match="mass must be positive"):
-            SpeciesInfo(name="bad", charge=-1.0, mass=0.0)
+    def test_massless_species_has_no_charge_to_mass(self):
+        """Massless fluid electrons are the standard hybrid closure.
+
+        The ratio is left unset rather than infinite — consumers
+        already branch on its absence, where an inf would travel
+        silently into whatever moment used it next.
+        """
+        electrons = SpeciesInfo(name="electrons", charge=-1.0, mass=0.0)
+        assert electrons.charge_to_mass is None
 
     def test_negative_mass_raises(self):
-        with pytest.raises(ValueError, match="mass must be positive"):
+        with pytest.raises(ValueError, match="mass must not be negative"):
             SpeciesInfo(name="bad", charge=-1.0, mass=-1.0)
 
 

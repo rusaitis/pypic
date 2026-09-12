@@ -169,6 +169,24 @@ agyrotropy measures) are exempt: they are correct under any anchor.
 Three ways to supply one: ship a `simulation.toml`, pass
 `normalization=` to the reader, or stay in code units.
 
+## Massless Fluid Species
+
+Hybrid codes close the system with an inertialess electron fluid, so
+`mass = 0.0` on a `[[species]]` entry is a statement about the model,
+not a missing value — `inertia` (the mass ratio $m_e/m_i$, zero when
+massless) says the same thing. A species with `particles_per_cell`
+still needs a positive mass: macroparticles have to be pushed.
+
+Two consequences follow, both deliberate. `SpeciesInfo.charge_to_mass`
+is left unset rather than infinite, because every consumer already
+branches on its absence while an infinity would travel silently into
+whatever moment consumed it next. And the per-species kinetic scales
+that divide by mass — $v_{th} = \sqrt{T/m}$, $\omega_p$, $d_s$, $r_s$
+— return `inf` or `0` with a NumPy divide warning. That is the correct
+answer: a massless fluid has no gyroradius and no inertial length. Ask
+for those quantities on the *ion* species, which carries the mass that
+sets the scales a hybrid run resolves.
+
 ## Error Norms and Divergence
 
 ### L2 norm: discrete, unweighted

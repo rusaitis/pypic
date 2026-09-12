@@ -27,6 +27,7 @@ from pypic.schema import (
     UnitsCustom,
     UnitsMHD,
     UnitsPIC,
+    UnitsReferenceTable,
     UnitsSI,
     validate_simulation_toml,
 )
@@ -319,23 +320,52 @@ def _build_normalization(units: Units) -> Normalization:
         return _pic_norm(units)
     if isinstance(units, UnitsMHD):
         return Normalization.mhd_standard(
-            l_0=float(units.reference_length),
-            rho_0=float(units.reference_density),
-            b_0=float(units.reference_b_field),
+            reference_length=float(units.reference_length),
+            reference_density=float(units.reference_density),
+            reference_b_field=float(units.reference_b_field),
         )
     if isinstance(units, UnitsCustom):
-        ref = units.reference
-        return Normalization(
-            length_ref=float(ref.length),
-            time_ref=float(ref.time) if ref.time is not None else 0.0,
-            velocity_ref=float(ref.velocity) if ref.velocity is not None else 0.0,
-            b_field_ref=float(ref.b_field) if ref.b_field is not None else 0.0,
-            e_field_ref=float(ref.e_field) if ref.e_field is not None else 0.0,
-            density_ref=float(ref.density) if ref.density is not None else 0.0,
-            mass_ref=float(ref.mass) if ref.mass is not None else 0.0,
-            charge_ref=float(ref.charge) if ref.charge is not None else 0.0,
-        )
+        return _custom_norm(units.reference)
     raise TypeError(f"unsupported units variant: {type(units).__name__}")
+
+
+def _custom_norm(ref: UnitsReferenceTable) -> Normalization:
+    """Build a Normalization from a partially-specified reference table.
+
+    Fills the gaps through $v = l / t$ and $E = v B$, and falls back to
+    the electron mass and elementary charge.  `UnitsReferenceTable`
+    guarantees one of each coupled pair is present, so every branch
+    below resolves.
+
+    Values supplied explicitly are used as given: the relations close
+    gaps, they do not adjudicate between primitives a deck states
+    itself.  The reference table in docs/schema.md is internally
+    consistent only to the rounding of its printed digits.
+    """
+    length = float(ref.length)
+    if ref.velocity is not None:
+        velocity = float(ref.velocity)
+    else:
+        # Guaranteed non-None by UnitsReferenceTable._check_determined.
+        velocity = length / float(ref.time)  # type: ignore[arg-type]
+    time = float(ref.time) if ref.time is not None else length / velocity
+
+    if ref.b_field is not None:
+        b_field = float(ref.b_field)
+    else:
+        b_field = float(ref.e_field) / velocity  # type: ignore[arg-type]
+    e_field = float(ref.e_field) if ref.e_field is not None else velocity * b_field
+
+    return Normalization(
+        length_ref=length,
+        time_ref=time,
+        velocity_ref=velocity,
+        b_field_ref=b_field,
+        e_field_ref=e_field,
+        density_ref=float(ref.density),  # type: ignore[arg-type]
+        mass_ref=float(ref.mass) if ref.mass is not None else constants.m_e,
+        charge_ref=float(ref.charge) if ref.charge is not None else constants.e,
+    )
 
 
 def _pic_norm(units: UnitsPIC) -> Normalization:
@@ -364,7 +394,14 @@ def _pic_norm(units: UnitsPIC) -> Normalization:
         )
 
     c = float(units.speed_of_light) if units.speed_of_light is not None else constants.c
-    return Normalization.pic_standard(float(units.reference_density), mass, charge, c)
+    velocity = (
+        float(units.reference_velocity)
+        if units.reference_velocity is not None
+        else None
+    )
+    return Normalization.pic_standard(
+        float(units.reference_density), mass, charge, c, velocity
+    )
 
 
 def _build_species(sp: Species) -> SpeciesInfo:
@@ -396,7 +433,10 @@ def _build_physics(physics: Physics | None) -> PhysicsParams:
     # PhysicsParams.c is the speed of light in *normalized* units: 1.0 by
     # construction for PIC (velocity_ref = c_SI).  `[units].speed_of_light` is
     # an SI value already consumed by `_pic_norm`, not a code-unit override.
-    # MHD/hybrid would want c_SI / v_A, which v1.0 does not express.
+    # Normalizations whose velocity unit is not c — MHD, custom, and PIC
+    # carrying `reference_velocity` — want c_SI / velocity_ref here and
+    # still get 1.0, so their relativistic branch is wrong. Untriggered in
+    # practice, since those are the non-relativistic models.
     if physics is None:
         return PhysicsParams()
 

@@ -9,7 +9,6 @@ import typer
 from pypic.cli._options import JsonOption, SimulationPath, TimestepOption, UnitsOption
 from pypic.cli._shared import _open, _output, _require_single_step, parse_steps
 from pypic.exceptions import UndeclaredNormalizationError
-from pypic.units import UnitSystem
 
 if TYPE_CHECKING:
     from pypic.readers._registry import Simulation
@@ -71,16 +70,7 @@ def info(
     )
 
     norm = sim.normalization
-    refs_str = (
-        f"l={norm.length_ref:.4g} m, v={norm.velocity_ref:.4g} m/s, "
-        f"B={norm.b_field_ref:.4g} T, n={norm.density_ref:.4g} m^-3"
-    )
-    if norm.system is None:
-        norm_str = "undeclared (code units; no [units] section)"
-    elif norm.system is UnitSystem.SI and norm.is_identity:
-        norm_str = "SI (identity)"
-    else:
-        norm_str = f"{norm.system}: {refs_str}"
+    norm_str = norm.summary()
 
     stagger = cfg.metadata.get("stagger")
 
@@ -361,15 +351,14 @@ def validate(
     b_energy: float | None = None
     e_energy: float | None = None
 
-    # div B needs all three axes: the operators differentiate along
-    # axis 0/1/2 explicitly, so a 2D dataset has no third axis to take
-    # the derivative over.
-    is_3d = len(ds.grid.spacing) == 3
+    # 2D is fine — the operators drop the third term, which vanishes
+    # identically there. A 1D grid has no plane to differentiate in.
+    has_plane = len(ds.grid.spacing) >= 2
 
     if has_b:
         b1, b2, b3 = ds["B_1"], ds["B_2"], ds["B_3"]
         b_mag = np.sqrt(b1**2 + b2**2 + b3**2)
-        if is_3d:
+        if has_plane:
             div_b_val = float(max_div_b(b1, b2, b3, *ds.grid.spacing))
         b_energy = float(field_energy(magnetic_energy_density(b_mag), ds.grid.spacing))
     if has_e:
@@ -402,7 +391,7 @@ def validate(
     if div_b_val is not None:
         lines.append(f"  max |div B|: {div_b_val:.6g}")
     elif has_b:
-        lines.append("  max |div B|: skipped (needs a 3D grid)")
+        lines.append("  max |div B|: skipped (needs at least a 2D grid)")
     if b_energy is not None:
         lines.append(f"  B energy:   {b_energy:.6g}")
     if e_energy is not None:

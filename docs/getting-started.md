@@ -44,7 +44,7 @@ takes a dict of NumPy arrays plus a `GridInfo`:
 
 ```python
 import numpy as np
-from pypic import CARTESIAN, FieldDataset, GridInfo
+from pypic import CARTESIAN, FieldDataset, GridInfo, Normalization
 
 nx, ny, nz = 32, 32, 1
 grid = GridInfo(
@@ -67,6 +67,10 @@ data = FieldDataset.from_arrays(
         "P": 0.5 * (1.0 - bx**2) + 0.1,
     },
     grid,
+    # The SI anchor. `identity()` says these arrays already are SI;
+    # omit it and pypic records the units as undeclared, which is
+    # honest but makes `in_si()` below raise instead of guessing.
+    Normalization.identity(),
 )
 
 print(data.compute("|B|").max())   # -> 0.999, saturating at the edges
@@ -75,7 +79,20 @@ print(data.compute("beta").max())  # -> 76.6, pressure-dominated at the centre
 
 Field names must resolve through the registry — see
 [Schema § 3](schema.md#3-canonical-field-names) for the canonical set.
-Pass `strict_fields=False` to allow unregistered names through.
+Pass `strict_fields=False` to allow unregistered names through, or
+`with_field(name, array, quantity_type)` to attach one with metadata.
+
+**About that `Normalization`.** Code units fix only dimensionless
+ratios, so converting to SI needs one absolute anchor that no reader can
+recover from the data. Supply it three ways: ship a `simulation.toml`
+with a `[units]` section, pass `normalization=` as above, or stay in
+code units and use the dimensionless quantities (`beta`, `M_A`, the
+agyrotropy measures), which are correct under any anchor. A dataset
+built without one reports its units as undeclared — `sim.describe()`
+and `pypic info` both say so — and `in_si()` raises rather than
+returning code units labelled as tesla. See
+[Conventions](conventions.md#the-si-anchor-is-a-choice-not-a-recoverable-value)
+for why this is a modelling choice rather than a missing feature.
 
 The same ground is covered by runnable scripts in
 [`examples/`](https://github.com/rusaitis/pypic/blob/main/examples/README.md),

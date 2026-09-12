@@ -189,6 +189,7 @@ class Normalization:
         reference_mass: float,
         reference_charge: float,
         c: float = constants.c,
+        reference_velocity: float | None = None,
     ) -> Normalization:
         r"""Construct PIC normalization for an arbitrary reference species.
 
@@ -196,6 +197,13 @@ class Normalization:
         reference species:
 
         $$\omega_{ref} = \sqrt{\frac{n_{ref} \, q_{ref}^2}{\varepsilon_0 \, m_{ref}}}$$
+
+        The skin depth $l_{ref} = c / \omega_{ref}$ anchors length, and
+        the remaining references follow from the velocity unit:
+        $t_{ref} = l_{ref} / v_{ref}$,
+        $B_{ref} = v_{ref}\sqrt{\mu_0 n_{ref} m_{ref}}$, and
+        $E_{ref} = v_{ref} B_{ref}$.  At the default $v_{ref} = c$ these
+        reduce to $1/\omega_{ref}$ and $m_{ref}\omega_{ref}/q_{ref}$.
 
         Parameters
         ----------
@@ -207,6 +215,12 @@ class Normalization:
             Charge of the reference species in Coulombs.
         c : float, optional
             Speed of light in m/s. Defaults to ``scipy.constants.c``.
+        reference_velocity : float or None, optional
+            Velocity unit in m/s. ``None`` (the default) uses *c*, the
+            PIC convention.  Hybrid codes normalize to the Alfvén speed
+            instead; passing it makes $B_{ref}$ the field at which $v_A$
+            equals that speed, which lands $t_{ref}$ on the inverse ion
+            cyclotron frequency — the hybrid time unit.
 
         Returns
         -------
@@ -226,15 +240,25 @@ class Normalization:
             / (constants.epsilon_0 * reference_mass)
         )
         length_ref = c / omega_ref
-        time_ref = 1.0 / omega_ref
-        b_field_ref = reference_mass * omega_ref / reference_charge
-        # From E = -v x B with v_ref = c
-        e_field_ref = c * b_field_ref
+        if reference_velocity is None:
+            velocity_ref = c
+            # Algebraically equal to the general forms below at v = c;
+            # kept verbatim so the default path stays bit-identical.
+            time_ref = 1.0 / omega_ref
+            b_field_ref = reference_mass * omega_ref / reference_charge
+        else:
+            velocity_ref = reference_velocity
+            time_ref = length_ref / velocity_ref
+            b_field_ref = velocity_ref * np.sqrt(
+                constants.mu_0 * reference_density * reference_mass
+            )
+        # From E = -v x B.
+        e_field_ref = velocity_ref * b_field_ref
 
         return cls(
             length_ref=float(length_ref),
             time_ref=float(time_ref),
-            velocity_ref=float(c),
+            velocity_ref=float(velocity_ref),
             b_field_ref=float(b_field_ref),
             e_field_ref=float(e_field_ref),
             density_ref=float(reference_density),
@@ -271,7 +295,12 @@ class Normalization:
         return cls.pic_standard(n_e, constants.m_e, constants.e)
 
     @classmethod
-    def mhd_standard(cls, l_0: float, rho_0: float, b_0: float) -> Normalization:
+    def mhd_standard(
+        cls,
+        reference_length: float,
+        reference_density: float,
+        reference_b_field: float,
+    ) -> Normalization:
         r"""MHD normalization from macroscopic reference quantities.
 
         Derives the Alfvén speed:
@@ -280,12 +309,14 @@ class Normalization:
 
         Parameters
         ----------
-        l_0 : float
-            Reference length in meters.
-        rho_0 : float
-            Reference mass density in kg/m$^3$.
-        b_0 : float
-            Reference magnetic field in Tesla.
+        reference_length : float
+            Reference length $l_0$ in meters.
+        reference_density : float
+            Reference **mass** density $\rho_0$ in kg/m$^3$ — not the
+            number density in m$^{-3}$ that the identically-named
+            `[units]` key carries under ``system = "PIC"``.
+        reference_b_field : float
+            Reference magnetic field $B_0$ in Tesla.
 
         Returns
         -------
@@ -298,16 +329,16 @@ class Normalization:
         >>> norm.length_ref
         1000000.0
         """
-        v_a = b_0 / np.sqrt(constants.mu_0 * rho_0)
+        v_a = reference_b_field / np.sqrt(constants.mu_0 * reference_density)
 
         return cls(
-            length_ref=float(l_0),
-            time_ref=float(l_0 / v_a),
+            length_ref=float(reference_length),
+            time_ref=float(reference_length / v_a),
             velocity_ref=float(v_a),
-            b_field_ref=float(b_0),
-            e_field_ref=float(v_a * b_0),
+            b_field_ref=float(reference_b_field),
+            e_field_ref=float(v_a * reference_b_field),
             # Convert mass density → number density (reference species: proton)
-            density_ref=float(rho_0 / constants.m_p),
+            density_ref=float(reference_density / constants.m_p),
             mass_ref=float(constants.m_p),
             charge_ref=float(constants.e),
             system=UnitSystem.MHD,
@@ -410,6 +441,31 @@ class Normalization:
                 "mass",
                 "charge",
             )
+        )
+
+    def summary(self) -> str:
+        """One-line description of the unit system and its SI anchor.
+
+        Shared by ``Simulation.describe()`` and ``pypic info`` so the
+        two report a dataset's units identically. The undeclared case
+        is spelled out rather than shown as unit references, since
+        those read as SI when nothing established the anchor.
+
+        Examples
+        --------
+        >>> Normalization.undeclared().summary()
+        'undeclared (code units; no [units] section)'
+        >>> Normalization.identity().summary()
+        'SI (identity)'
+        """
+        if self.system is None:
+            return "undeclared (code units; no [units] section)"
+        if self.system is UnitSystem.SI and self.is_identity:
+            return "SI (identity)"
+        return (
+            f"{self.system}: l={self.length_ref:.4g} m, "
+            f"v={self.velocity_ref:.4g} m/s, "
+            f"B={self.b_field_ref:.4g} T, n={self.density_ref:.4g} m^-3"
         )
 
     def _reference_value(self, quantity: str) -> float:
@@ -690,8 +746,8 @@ class SpeciesInfo:
     particles_per_cell: int | tuple[int, int, int] | None = None
 
     def __post_init__(self) -> None:
-        if self.mass is not None and self.mass <= 0:
-            msg = f"mass must be positive, got {self.mass}"
+        if self.mass is not None and self.mass < 0:
+            msg = f"mass must not be negative, got {self.mass}"
             raise ValueError(msg)
 
         if (
@@ -699,7 +755,11 @@ class SpeciesInfo:
             and self.mass is not None
             and self.charge_to_mass is None
         ):
-            object.__setattr__(self, "charge_to_mass", self.charge / self.mass)
+            # A massless fluid species has no finite charge-to-mass ratio.
+            # Left unset rather than infinite: consumers already handle the
+            # absent case, and an inf would propagate silently into moments.
+            if self.mass != 0.0:
+                object.__setattr__(self, "charge_to_mass", self.charge / self.mass)
         elif (
             self.charge_to_mass is not None
             and self.charge is None
@@ -719,6 +779,12 @@ class SpeciesInfo:
             and self.mass is not None
             and self.charge_to_mass is not None
         ):
+            if self.mass == 0.0:
+                msg = (
+                    "A massless species has no charge_to_mass; provide "
+                    "charge and mass alone."
+                )
+                raise ValueError(msg)
             expected = self.charge / self.mass
             if not math.isclose(expected, self.charge_to_mass, rel_tol=1e-12):
                 msg = (

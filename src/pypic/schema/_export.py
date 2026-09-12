@@ -194,6 +194,7 @@ def _stamp_metadata(schema: dict[str, Any], *, schema_version: str) -> None:
         "pypic.schema._export.build_schema. Cross-field invariants "
         "(range checks on ensemble member_id, time scheme/dt/cfl rules, "
         "grid axis/upper-lower/stretched-widths/stagger checks, "
+        "units.reference determining-set rule for system='custom', "
         "coordinate-transform BFS resolution, driver target precedence, "
         "restart.from existence, root-level cross-references to species, "
         "bodies, drivers, and collisions) are enforced at runtime by "

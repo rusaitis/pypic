@@ -16,6 +16,7 @@ Read them in order — each adds one layer over the last.
 | [`ex2_simple_hdf5.py`](ex2_simple_hdf5.py) | Writing canonical HDF5 and reading it back with `open_simple`. Grid metadata comes from the file. |
 | [`ex3_field_mapping.py`](ex3_field_mapping.py) | Non-canonical dataset names (`mag_x` → `B_1`) via `field_map`, with an explicit `GridInfo`. |
 | [`ex4_toml_config.py`](ex4_toml_config.py) | A full `simulation.toml` beside the data: species, normalization, and species-dependent derived quantities. |
+| [`advanced_calculations.py`](advanced_calculations.py) | Your own quantities: `with_field` to attach one array, `register_recipe` to teach the registry a formula, and the three ways to check a result against a run. |
 
 ## Standalone
 
@@ -23,7 +24,6 @@ Read them in order — each adds one layer over the last.
 |---|---|
 | [`custom_reader_example.py`](custom_reader_example.py) | Writing a reader for a new simulation code — the worked version of [Adding a reader](../CONTRIBUTING.md#adding-a-reader). |
 | [`ex_schindler_xi.py`](ex_schindler_xi.py) | The 3D Schindler reconnection criterion on a guide-field Harris sheet, with a figure. Honors `PYPIC_EXAMPLE_OUTPUT_DIR`. |
-| [`advanced_calculations.py`](advanced_calculations.py) | Cases `compute()` does not resolve automatically: multi-species sums, custom derived fields, manual tensor work. |
 
 ## Configuration reference
 

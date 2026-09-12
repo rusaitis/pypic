@@ -315,7 +315,7 @@ def div_b(
     b3: FloatArray,
     d1: float,
     d2: float,
-    d3: float,
+    d3: float | None = None,
     *,
     geometry: GeometryType = GeometryType.CARTESIAN,
 ) -> FloatArray:
@@ -342,8 +342,8 @@ def div_b(
         Grid spacing along the first axis.
     d2 : float
         Grid spacing along the second axis.
-    d3 : float
-        Grid spacing along the third axis.
+    d3 : float or None
+        Grid spacing along the third axis, or ``None`` for 2D data.
     geometry : GeometryType
         Coordinate geometry. Only Cartesian is implemented.
 
@@ -370,7 +370,7 @@ def max_div_b(
     b3: FloatArray,
     d1: float,
     d2: float,
-    d3: float,
+    d3: float | None = None,
     *,
     geometry: GeometryType = GeometryType.CARTESIAN,
     nan_policy: NanPolicy = "omit",
@@ -393,8 +393,8 @@ def max_div_b(
         Grid spacing along the first axis.
     d2 : float
         Grid spacing along the second axis.
-    d3 : float
-        Grid spacing along the third axis.
+    d3 : float or None
+        Grid spacing along the third axis, or ``None`` for 2D data.
     geometry : GeometryType
         Coordinate geometry. Only Cartesian is implemented.
     nan_policy : {"omit", "propagate", "raise"}, default "omit"
@@ -428,7 +428,7 @@ def div_e(
     e3: FloatArray,
     d1: float,
     d2: float,
-    d3: float,
+    d3: float | None = None,
     *,
     geometry: GeometryType = GeometryType.CARTESIAN,
 ) -> FloatArray:
@@ -454,8 +454,8 @@ def div_e(
         Grid spacing along the first axis.
     d2 : float
         Grid spacing along the second axis.
-    d3 : float
-        Grid spacing along the third axis.
+    d3 : float or None
+        Grid spacing along the third axis, or ``None`` for 2D data.
     geometry : GeometryType
         Coordinate geometry. Only Cartesian is implemented.
 

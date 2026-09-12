@@ -35,6 +35,7 @@ from pypic.exceptions import GeometryUnsupportedError, UnknownFieldError
 from pypic.fields import (
     _SPECIES_QUANTITY_PATTERNS,
     QuantityType,
+    field_info,
     register_field,
     unregister_field,
 )
@@ -111,6 +112,16 @@ def _get_recipe(name: str) -> Recipe:
             f'or read(fields=["{group_name}"]) to load all three.'
         )
         raise UnknownFieldError(msg) from None
+    # A name the registry knows, but that nothing derives, is data the
+    # dataset does not carry — not a typo. Spelling suggestions for a
+    # correctly spelled field send the reader hunting the wrong problem.
+    if _names_a_storage_field(canonical):
+        msg = (
+            f"{name!r} is a stored field, not a derived quantity: it has to "
+            f"come from the reader, and this dataset does not carry it. "
+            f"Call field_names() to see what was loaded."
+        )
+        raise UnknownFieldError(msg) from None
     all_names = available_quantities()
     suggestions = difflib.get_close_matches(name, all_names, n=3, cutoff=0.4)
     msg = f"Unknown derived quantity {name!r}."
@@ -118,6 +129,15 @@ def _get_recipe(name: str) -> Recipe:
         msg += f" Did you mean: {suggestions}?"
     msg += " Call available_quantities() for the full list."
     raise UnknownFieldError(msg) from None
+
+
+def _names_a_storage_field(canonical: str) -> bool:
+    """Whether the registry knows *canonical* as a field readers write."""
+    try:
+        field_info(canonical)
+    except KeyError:
+        return False
+    return True
 
 
 def _get_species_args(
@@ -242,10 +262,13 @@ def _execute_recipe(
                 f"Dataset has {dataset.grid.geometry.type.value} geometry."
             )
             raise GeometryUnsupportedError(msg)
-        if len(dataset.grid.spacing) != 3:
+        # 2D passes two spacings, leaving the operators' `d3=None` to mark
+        # the axis along which the derivative vanishes identically. A 1D
+        # grid has no plane to differentiate in.
+        if len(dataset.grid.spacing) < 2:
             msg = (
                 f"Derived quantity {canonical!r} requires spatial derivatives, "
-                f"which are only implemented for 3D grids. "
+                f"which need at least a 2D grid. "
                 f"Dataset grid is {len(dataset.grid.spacing)}D."
             )
             raise GeometryUnsupportedError(msg)

@@ -584,6 +584,9 @@ class Simulation:
             f"  Path:    {self._path}",
             f"  Grid:    {dims} ({geom})",
             f"  Spacing: {spacing}",
+            # Without this the only way to learn the data has no SI anchor
+            # is to call in_si() and read the exception.
+            f"  Units:   {self._config.normalization.summary()}",
         ]
         if self._config.species:
             species_parts = []

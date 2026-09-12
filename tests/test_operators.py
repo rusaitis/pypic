@@ -346,3 +346,48 @@ class TestNonCartesianNotImplemented:
         f = np.zeros((4, 4, 4))
         with pytest.raises(NotImplementedError, match=geom.value):
             gradient(f, 1.0, 1.0, 1.0, geometry=geom)
+
+
+class TestTwoDimensional:
+    """2D fields, where ∂/∂x₃ ≡ 0 makes the third term vanish.
+
+    The common shape for BATSRUS z=0 slices and published reconnection
+    runs, which the operators used to refuse for want of a third
+    spacing rather than for any mathematical reason.
+    """
+
+    @staticmethod
+    def _in_plane_field(n: int = 64) -> tuple[np.ndarray, ...]:
+        """B = ∇×(0, 0, ψ) with ψ = sin x cos y — divergence-free by construction."""
+        d = 2 * np.pi / n
+        x = np.arange(n) * d
+        grid_x, grid_y = np.meshgrid(x, x, indexing="ij")
+        psi = np.sin(grid_x) * np.cos(grid_y)
+        zero = np.zeros_like(psi)
+        b1, b2, b3 = curl(zero, zero, psi, d, d, None)
+        return b1, b2, b3, psi, d
+
+    def test_divergence_of_a_curl_vanishes(self):
+        b1, b2, b3, _, d = self._in_plane_field()
+        div = divergence(b1, b2, b3, d, d, None)
+        # Interior only: the one-sided boundary stencils are lower order.
+        assert np.abs(div[2:-2, 2:-2]).max() < 1e-12
+
+    def test_gradient_third_component_is_zero(self):
+        f = np.arange(24.0).reshape(4, 6)
+        _, _, df_d3 = gradient(f, 0.5, 0.5, None)
+        assert not df_d3.any()
+
+    def test_curl_matches_the_three_dimensional_result_when_uniform_in_x3(self):
+        """Stacking a 2D field along x₃ must not change the in-plane curl."""
+        b1, b2, b3, _, d = self._in_plane_field(n=16)
+        flat = curl(b1, b2, b3, d, d, None)
+        stacked = [np.repeat(c[:, :, None], 4, axis=2) for c in (b1, b2, b3)]
+        solid = curl(*stacked, d, d, 1.0)
+        for plane, volume in zip(flat, solid, strict=True):
+            np.testing.assert_allclose(plane, volume[:, :, 1], rtol=1e-12)
+
+    def test_divergence_rejects_a_nonpositive_third_spacing(self):
+        f = np.zeros((4, 4, 4))
+        with pytest.raises(ValueError, match="must be positive"):
+            divergence(f, f, f, 1.0, 1.0, 0.0)

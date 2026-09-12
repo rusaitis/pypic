@@ -272,21 +272,27 @@ scaling_description = "real mass ratio mi/me = 1836; no artificial rescaling"
 # Approach B — explicit-SI reference values. Use system = "custom" when
 # the run doesn't fit a named normalization (e.g. laser-plasma where
 # length references the plasma wavelength, time the laser period). Every
-# unit conversion routes through these references; missing entries
-# default to scipy.constants. Pick A or B per run, never both.
+# unit conversion routes through these references. Pick A or B per run,
+# never both.
+#
+# `length` and `density` are required. The relations v = l/t and E = vB
+# each derive one member of their pair, so give either `time` or
+# `velocity`, and either `b_field` or `e_field`. `mass` and `charge`
+# default to the electron values. Anything still undetermined is a
+# validation error rather than a silent 1.0.
 #
 # [units]
 # system = "custom"
 #
 # [units.reference]
-# length   = 5.31e-3                   # meters
-# time     = 1.77e-11                  # seconds
-# velocity = 2.998e8                   # m/s
-# b_field  = 1.07e-3                   # Tesla
-# e_field  = 3.21e5                    # V/m
-# density  = 1.0e18                    # m⁻³
-# mass     = 9.109e-31                 # kg
-# charge   = 1.602e-19                 # C
+# length   = 5.31e-3                   # meters       — required
+# time     = 1.77e-11                  # seconds      — or velocity
+# velocity = 2.998e8                   # m/s          — or time
+# b_field  = 1.07e-3                   # Tesla        — or e_field
+# e_field  = 3.21e5                    # V/m          — or b_field
+# density  = 1.0e18                    # m⁻³          — required
+# mass     = 9.109e-31                 # kg           — default m_e
+# charge   = 1.602e-19                 # C            — default e
 
 [coordinates]
 geometry             = "cartesian"     # "cartesian" | "spherical" | "cylindrical"

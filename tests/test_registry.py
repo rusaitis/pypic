@@ -907,6 +907,22 @@ class TestDescribe:
         assert "electrons" in desc
         assert "ions" in desc
 
+    def test_reports_an_undeclared_unit_system(self, tmp_path: Path) -> None:
+        """Otherwise the only way to find out is to call in_si().
+
+        ``pypic info`` has always said so; the Python summary stayed
+        silent, so a notebook user met the missing anchor as an
+        exception several cells later.
+        """
+        cfg = SimulationConfig(
+            model_name="iPIC3D",
+            model_type="PIC",
+            grid=GridInfo(dimensions=(4, 4, 4), spacing=(1.0, 1.0, 1.0)),
+            normalization=Normalization.undeclared(),
+        )
+        sim = Simulation(MagicMock(spec=SimulationReader), cfg, tmp_path)
+        assert "Units:   undeclared" in sim.describe()
+
     def test_steps_shown_only_when_cached(
         self,
         tmp_path: Path,

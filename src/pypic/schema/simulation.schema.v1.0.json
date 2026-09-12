@@ -1,5 +1,5 @@
 {
-  "$comment": "Structural schema only. Generated from pypic.schema._models.SimulationSchema via pypic.schema._export.build_schema. Cross-field invariants (range checks on ensemble member_id, time scheme/dt/cfl rules, grid axis/upper-lower/stretched-widths/stagger checks, coordinate-transform BFS resolution, driver target precedence, restart.from existence, root-level cross-references to species, bodies, drivers, and collisions) are enforced at runtime by pypic.schema.validate_simulation_toml and are not expressible in JSON Schema. The v1.0 'x-*' extension namespace is permitted wherever additionalProperties is true.",
+  "$comment": "Structural schema only. Generated from pypic.schema._models.SimulationSchema via pypic.schema._export.build_schema. Cross-field invariants (range checks on ensemble member_id, time scheme/dt/cfl rules, grid axis/upper-lower/stretched-widths/stagger checks, units.reference determining-set rule for system='custom', coordinate-transform BFS resolution, driver target precedence, restart.from existence, root-level cross-references to species, bodies, drivers, and collisions) are enforced at runtime by pypic.schema.validate_simulation_toml and are not expressible in JSON Schema. The v1.0 'x-*' extension namespace is permitted wherever additionalProperties is true.",
   "$defs": {
     "Allocation": {
       "additionalProperties": false,
@@ -2981,7 +2981,7 @@
         "mass": {
           "anyOf": [
             {
-              "exclusiveMinimum": 0,
+              "minimum": 0,
               "type": "number"
             },
             {
@@ -3276,6 +3276,7 @@
         "reference_charge": {
           "anyOf": [
             {
+              "exclusiveMinimum": 0,
               "type": "number"
             },
             {
@@ -3307,6 +3308,19 @@
           "default": "electrons",
           "title": "Reference Species",
           "type": "string"
+        },
+        "reference_velocity": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reference Velocity"
         },
         "scaling_description": {
           "anyOf": [
@@ -3358,7 +3372,7 @@
     },
     "UnitsReferenceTable": {
       "additionalProperties": false,
-      "description": "``[units.reference]`` sub-table for ``system = \"custom\"``.",
+      "description": "``[units.reference]`` sub-table for ``system = \"custom\"``.\n\nKeys left out are derived from the two dimensional relations that\ntie the eight references together, $v = l / t$ and $E = v B$, so a\ndeck supplies one of each coupled pair rather than all eight.\n``mass`` and ``charge`` fall back to the electron values.\n\nWhat cannot be derived must be given: a normalization that leaves\nthe magnetic or the density anchor unknown has no SI meaning, and\nguessing one would return code units labelled as tesla.",
       "properties": {
         "b_field": {
           "anyOf": [
@@ -3376,6 +3390,7 @@
         "charge": {
           "anyOf": [
             {
+              "exclusiveMinimum": 0,
               "type": "number"
             },
             {
