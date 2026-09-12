@@ -1,10 +1,7 @@
 """Step-size controllers for embedded Runge-Kutta methods.
 
-The current implementation is the **elementary (I) controller** from
+The implementation is the **elementary (I) controller** from
 [@HairerWanner1993] §II.4: one step's error norm sets the next step.
-A true PI controller — which threads in the previous step's error —
-is queued behind the ``err_prev`` kwarg for when a consumer needs it
-(see the parameter docstring for citations).
 
 References
 ----------
@@ -35,7 +32,6 @@ def i_step_controller(
     min_step: float,
     max_step: float,
     order: int = 5,
-    err_prev: float | None = None,  # reserved for future PI upgrade
 ) -> float:
     r"""Next step size from the current step and its error norm.
 
@@ -45,9 +41,6 @@ def i_step_controller(
     ``[_GROWTH_MIN, _GROWTH_MAX]`` and the absolute step to
     ``[min_step, max_step]``. ``order`` is the order of the embedded
     method's higher-order solution (5 for Dormand-Prince 5(4)).
-
-    ``err_prev`` is reserved for a future PI upgrade and ignored
-    today; passing it is harmless.
 
     Parameters
     ----------
@@ -63,11 +56,6 @@ def i_step_controller(
     order : int
         Order $p$ of the embedded higher-order solution. Default 5
         (Dormand-Prince 5(4)).
-    err_prev : float or None
-        Reserved for a future PI controller upgrade
-        ([@Gustafsson1988]; [@HairerWanner1993] §IV.2) that would
-        thread the previous step's error norm into the formula.
-        Currently ignored; passing it is harmless.
 
     Returns
     -------
@@ -83,7 +71,6 @@ def i_step_controller(
     >>> float(i_step_controller(1.0, 0.0, min_step=1e-6, max_step=10.0))
     5.0
     """
-    del err_prev  # reserved; not yet used
     exponent = -1.0 / order
     factor = min(
         _GROWTH_MAX,
@@ -102,7 +89,6 @@ def i_step_controller_batched(
     min_step: float,
     max_step: float,
     order: int = 5,
-    err_prev: FloatArray | None = None,
 ) -> FloatArray:
     r"""Per-seed step-size update for a batched embedded RK integration.
 
@@ -126,10 +112,6 @@ def i_step_controller_batched(
     order : int
         Order $p$ of the embedded higher-order solution. Default 5
         (Dormand-Prince 5(4)).
-    err_prev : NDArray or None
-        Reserved for a future per-seed PI controller upgrade
-        ([@Gustafsson1988]; [@HairerWanner1993] §IV.2). Currently
-        ignored; passing it is harmless.
 
     Returns
     -------
@@ -148,7 +130,6 @@ def i_step_controller_batched(
     >>> float(h_new[1])
     5.0
     """
-    del err_prev  # reserved; not yet used
     err_clamped = np.maximum(err_norm, _ERR_FLOOR)
     factor = _SAFETY * err_clamped ** (-1.0 / order)
     factor = np.clip(factor, _GROWTH_MIN, _GROWTH_MAX)

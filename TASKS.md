@@ -34,7 +34,7 @@ Each step produces something testable. No step starts until the previous step's 
 - [x] **Step 34:** StaggerInfo provenance metadata
 - [x] **Step 45:** Spectral analysis — `power_spectrum_1d/2d/3d` in `pypic.spectral`, Parseval-consistent, Hann-windowed, radially/spherically averaged
 - [x] **Step 46:** Reconnection diagnostics — `pypic.reconnection` (`find_saddle_points`, `reconnection_rate`, `schindler_xi`) plus the `D_e` / `R_recon` / `agyrotropy` / `D_ng` / `A_phi` registry entries
-- [x] **Step 47:** Field-line tracing — `trace_field_line`, `trace_field_line_adaptive` (Dormand-Prince 5(4) with PI step control), the batched path, and `pypic.numerics`
+- [x] **Step 47:** Field-line tracing — `trace_field_line`, `trace_field_line_adaptive` (Dormand-Prince 5(4) with elementary (I) step control), the batched path, and `pypic.numerics`
 - [x] **Step 48:** Poincaré sections — `PoincareSurface`, `poincare_section`, `plane_crossings`, `plot_poincare_section`
 - [x] **Step 49:** Cross-language codegen — `pypic.codegen` exports aliases, recipes, species templates and field metadata as one JSON bundle; CLI `pypic export`
 - [x] **M0-prep:** webpic API readiness — public `pypic.aliases`, `Recipe`, `RECIPES`, a `[webpic]` block in the bundled themes, and public-API invariants tests
@@ -111,6 +111,12 @@ Each step produces something testable. No step starts until the previous step's 
   After `reduce(reduction="integrate")` along $n$ axes, the SI unit shifts by $n$ length factors (m⁻³ → m⁻² → m⁻¹). Today `quantity_type`/`si_unit` are preserved unchanged, so `in_si()` is off by one length factor per reduced axis (workaround: multiply by `normalization.length_si**n`). Options: (a) generalize the `unit_dimension` 7-tuple arithmetic so attrs carry correct post-reduction dimensions; (b) add shifted canonical names (`column_density`, `surface_brightness`); (c) hybrid. Pairs with Step 20b's volume-weighted-norms work (same unit-dim concerns).
   **Depends on:** Step 43. **Pairs with:** Step 20b (shares the `unit_dimension` 7-tuple arithmetic concerns; ships independently).
 
+- [ ] **Step 15b: breadth-first frame-chain resolution**
+  `resolve_transform` (`coordinates/transforms.py`) builds the directed edge set (each declared transform plus its inverse), then tries a direct lookup and a single intermediate hop — a hard ceiling of two edges. `transform_to` (`dataset.py`) calls it once, so it inherits that ceiling: a three-hop request (simulation→GSE→GSM→SM) raises `ValueError("No transform path ...")` even though every edge is declared. Tie-breaking is dict insertion order, where each transform's inverse edge is inserted right behind its forward edge, and there is no cycle detection anywhere.
+  schema.md § 2 (*Chain resolution*) promises something stricter — BFS from `[coordinates].frame` returning the **shortest** path, ties broken on TOML declaration order, cycles raising at apply time — and the promise is repeated in `dataset.py` / `containers.py` docstrings, in `schema/_export.py`'s runtime-enforced list, and in the generated `simulation.schema.v1.0.json`. So the documented contract, not the code, is the reference; implement it rather than weaken four documents.
+  BFS over the edge set is small (a queue, a visited set, path reconstruction, then `compose_transforms` along the path). Two things it must preserve: the inverse-edge synthesis, and the signed-permutation restriction `transform_to` enforces on the composed rotation. Tests: three-hop chain resolves and round-trips; a shorter path wins over a longer one regardless of declaration order; two equal-length paths pick the earlier-declared one; a cycle raises instead of looping. Regenerate the JSON Schema afterwards only if the wording there changes.
+  **Depends on:** Step 15.
+
 - [ ] **Step 40: time-dependent frame transforms**
   Extend `FrameTransform` to per-timestep rotations. Primary use: GSE↔GSM via dipole tilt angle. Two paths:
   - **Parameter-driven:** `parameter = "dipole_tilt"` in `[coordinates.transforms]` names a time-varying quantity; rotation recomputed each step.
@@ -119,7 +125,7 @@ Each step produces something testable. No step starts until the previous step's 
   **Depends on:** Step 15.
 
 - [ ] **Step 44: field-line tracer & mapping infrastructure — symplectic integrator, periodic tricubic, curvature step control, squashing factor $Q$**
-  Additive opt-in upgrades to `pypic.traces` + new `pypic.maps` module; existing `trace_field_line_adaptive` (Dormand-Prince 5(4) + trilinear + PI step control) stays default. Motivates: fusion/Poincaré topology (44a, 44b), solar coronal mapping (44d–44g), magnetospheric X-line detection (44e–44g). 44e/44f are direct lifts from Predictive Science's MapFL Fortran tracer; 44g ($Q$) builds on both. Reference: Hairer-Lubich-Wanner *Geometric Numerical Integration* (2006), Ch. II.1 + V. No new mandatory deps — scipy ships cubic `RegularGridInterpolator` and periodic `CubicSpline`.
+  Additive opt-in upgrades to `pypic.traces` + new `pypic.maps` module; existing `trace_field_line_adaptive` (Dormand-Prince 5(4) + trilinear + elementary (I) step control) stays default. Motivates: fusion/Poincaré topology (44a, 44b), solar coronal mapping (44d–44g), magnetospheric X-line detection (44e–44g). 44e/44f are direct lifts from Predictive Science's MapFL Fortran tracer; 44g ($Q$) builds on both. Reference: Hairer-Lubich-Wanner *Geometric Numerical Integration* (2006), Ch. II.1 + V. No new mandatory deps — scipy ships cubic `RegularGridInterpolator` and periodic `CubicSpline`.
 
   **44a — implicit midpoint integrator.** New `trace_field_line_symplectic` (fixed `step_size`, 1-stage Gauss-Legendre RK solved by 2-3 fixed-point iterations). Preserves discrete symplectic 2-form: invariants like $r^2$ on closed orbits stay *bounded* instead of secularly drifting. Take 5-10× larger steps for same picture quality on Hamiltonian-like flows → net wall-clock 1.2-1.5×. **Tests:** $r^2$ conservation on $\mathbf{B}=(-y,x,0)$ over $10^4$ steps; $\psi$-conservation on 2D analytic flux; closed-circle Poincaré collapses to a single ring.
 
@@ -130,7 +136,7 @@ Each step produces something testable. No step starts until the previous step's 
   **44d — periodic tricubic splines for $\phi$/$\theta$.** Knob: `periodic_axes: tuple[int,...] = ()` on `VectorFieldInterpolator.from_dataset()` — flagged axes use `CubicSpline(..., bc_type="periodic")` per spline line, accumulated into a tensor-product cubic block. Fixes the C⁰ discontinuity in $\hat{\mathbf{B}}$ at the $\phi=2\pi$ seam that visibly bends field lines. **Tests:** seamless across $\phi=2\pi$ on $\mathbf{B}=(-\sin\phi,\cos\phi,0)$; regression vs 44b in seam-free interior.
   **Depends on:** Step 19b (gates the geometry), 44b.
 
-  **44e — curvature-based step control (non-default).** `step_control: Literal["error","curvature"] = "error"` kwarg alongside Gustafsson PI. Curvature path keeps $\|\hat{\mathbf{B}}_{n+1}-\hat{\mathbf{B}}_n\|\cdot h/\Delta s \approx$ `over_rc` (default 0.0025), clamped by `local_mesh_factor × min(\Delta x_i)`. Wins 2-5× on long quasi-laminar traces (PFSS, dipole magnetospheres, tokamak equilibria); auto-tightens in sharp-gradient regions. **Depends on:** `pypic.traces._tracing`.
+  **44e — curvature-based step control (non-default).** `step_control: Literal["error","curvature"] = "error"` kwarg alongside the elementary (I) error controller. Curvature path keeps $\|\hat{\mathbf{B}}_{n+1}-\hat{\mathbf{B}}_n\|\cdot h/\Delta s \approx$ `over_rc` (default 0.0025), clamped by `local_mesh_factor × min(\Delta x_i)`. Wins 2-5× on long quasi-laminar traces (PFSS, dipole magnetospheres, tokamak equilibria); auto-tightens in sharp-gradient regions. **Depends on:** `pypic.traces._tracing`.
 
   **44f — endpoint-only mode for `trace_field_lines_adaptive`.** `return_endpoints_only: bool = False` kwarg skips materializing `FieldLine.points`/`arc_lengths`, returns a `FieldLineEndpoint` namedtuple `(start, end, arc_length, termination_reason)`. Memory: a 1000×1000 map at 20k steps is $\mathcal{O}(\text{TB})$ in full-trace mode. Kernel of 44g ($Q$ = 5 endpoint traces per seed). **Depends on:** `pypic.traces._tracing`.
 
@@ -201,6 +207,7 @@ changing `pypic/schema/_models.py`.
 ```
 Step 19 (regrid)         ←── 19b (spherical) ←── 20b (volume-weighted norms)  pairs-with 43c
 Step 15 (transforms)     ←── 40 (time-dependent) ←── 41b (SPICE trajectory)
+                         ←── 15b (BFS chain resolution)
 Step 5 (FieldDataset)    ←── 24, 25 (Zarr/Arrow)    ←── 26 (convert CLI)
                                                    ←── 24b (VirtualiZarr), 24c (Icechunk)
                                                    ←── 25b (canonical ParticleData)
@@ -218,4 +225,4 @@ pypic.traces             ←── 44 (field-line tracer + pypic.maps)
 traces/_sampling.py      ←── 41 (probes) ←── 41b (SPICE)
 ```
 
-Recommended order: 37b next (37 and 37a shipped); 38 needs a rustpic dump; 39 follows 37; 23/35/36/42 anytime; 40 unblocks 41b; 43b/43c anytime after 43; 44a-g modular (44f is the kernel for 44g); 19b precedes 20b and 44d.
+Recommended order: 37b next (37 and 37a shipped); 15b is small and closes a documented-contract gap; 38 needs a rustpic dump; 39 follows 37; 23/35/36/42 anytime; 40 unblocks 41b; 43b/43c anytime after 43; 44a-g modular (44f is the kernel for 44g); 19b precedes 20b and 44d.

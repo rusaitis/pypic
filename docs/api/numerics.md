@@ -6,9 +6,7 @@ tracer — Dormand-Prince 5(4) [@DormandPrince1980] with FSAL re-use,
 an elementary order-$p$ (I) step controller in the convention of
 [@HairerWanner1993] §II.4, and `scipy.interpolate.RegularGridInterpolator`
 for trilinear field evaluation. Future consumers (particle pushers,
-splitting helpers, higher-order quadrature) land here. A true PI
-controller [@Gustafsson1988] is queued behind an `err_prev` kwarg
-already wired through the public signatures.
+splitting helpers, higher-order quadrature) land here.
 
 ## What's tested
 

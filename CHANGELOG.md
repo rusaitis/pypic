@@ -163,6 +163,11 @@ The distribution is `pypic-plasma` on PyPI; the import name is `pypic`.
 
 - `pypic.readers.ipic3d.to_toml`: unused, untested, and it emitted a document
   the schema rejects (`n_steps = 0`).
+- The `err_prev` kwarg on `i_step_controller` and
+  `i_step_controller_batched`. It was reserved for a PI upgrade, accepted and
+  immediately discarded; offering a kwarg that silently does nothing is worse
+  than not offering it. Pass nothing — the elementary (I) controller is
+  unchanged.
 
 ## [0.1.3] — 2026-08-23
 

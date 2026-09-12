@@ -288,12 +288,6 @@ class TestIStepController:
         h_order8 = i_step_controller(1.0, 0.5, min_step=1e-6, max_step=10.0, order=8)
         assert h_order5 > h_order8
 
-    def test_err_prev_kwarg_accepted_and_ignored(self) -> None:
-        """Reserved err_prev kwarg is accepted but does not change behavior."""
-        h_without = i_step_controller(1.0, 0.5, min_step=1e-6, max_step=10.0)
-        h_with = i_step_controller(1.0, 0.5, min_step=1e-6, max_step=10.0, err_prev=0.1)
-        assert h_with == pytest.approx(h_without)
-
     def test_h_new_monotone_non_increasing_in_err(self) -> None:
         """``h_new`` never grows when ``err_norm`` grows.
 
