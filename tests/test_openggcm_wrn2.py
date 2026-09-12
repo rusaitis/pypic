@@ -374,7 +374,7 @@ class TestRealData:
 
     def test_first_wrn2_block(self) -> None:
         """Read and verify the first WRN2 block from a real file."""
-        with open(_EXAMPLE_3DF, "rb") as f:
+        with _EXAMPLE_3DF.open("rb") as f:
             # Skip 5 header lines
             for _ in range(5):
                 f.readline()
@@ -417,7 +417,7 @@ class TestRealData:
         )
 
         # Original (line-by-line)
-        with open(_EXAMPLE_3DF, "rb") as f:
+        with _EXAMPLE_3DF.open("rb") as f:
             for _ in range(5):
                 f.readline()
             result_orig = decompress_field(iter(f), count, zmin, zmax)

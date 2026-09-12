@@ -107,7 +107,7 @@ def decode_rle(line: bytes) -> tuple[list[int], int]:
     if n < 0:
         return [], -5
 
-    data = [i2.get(k, 0) for k in range(0, n + 1)]
+    data = [i2.get(k, 0) for k in range(n + 1)]
 
     # Validate checksum: i2(-1) == 33 + sum(data) % 92
     checksum_byte = i2.get(-1, 0)

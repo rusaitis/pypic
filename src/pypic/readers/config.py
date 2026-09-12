@@ -417,8 +417,7 @@ def _build_physics(physics: Physics | None) -> PhysicsParams:
             continue
         extra[branch_name] = branch.model_dump(exclude_none=True)
 
-    for key, value in (physics.__pydantic_extra__ or {}).items():
-        extra[key] = value
+    extra.update(physics.__pydantic_extra__ or {})
 
     return PhysicsParams(gamma=gamma, relativistic=relativistic, extra=extra)
 

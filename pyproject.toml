@@ -139,6 +139,10 @@ select = [
     "NPY",            # numpy-specific
     "FURB",           # refurb — modern-Python rewrites
     "LOG",            # flake8-logging
+    "PERF",           # perflint
+    "C4",             # flake8-comprehensions
+    "PIE",            # flake8-pie
+    "PTH",            # flake8-use-pathlib
 ]
 ignore = [
     "D100",  # missing module docstring

@@ -99,9 +99,12 @@ def convert_fields_to_si(
             si[canon_name] = pressure_to_si(data)
 
     # Pass through unknown fields with native names, no conversion
-    mapped_names = set(FIELD_NAME_MAP.keys())
-    for raw_name, data in raw_fields.items():
-        if raw_name not in mapped_names:
-            si[raw_name] = data
+    si.update(
+        {
+            raw_name: data
+            for raw_name, data in raw_fields.items()
+            if raw_name not in FIELD_NAME_MAP
+        }
+    )
 
     return si

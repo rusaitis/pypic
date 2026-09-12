@@ -872,9 +872,13 @@ class TestTraceFieldLinesAdaptive:
         from pypic.traces import trace_field_line_adaptive, trace_field_lines_adaptive
 
         seeds = np.array([[5.0, 8.0, 7.0], [10.0, 10.0, 10.0], [12.0, 6.0, 14.0]])
-        kw: dict = dict(  # type: ignore[type-arg]
-            atol=1e-8, rtol=1e-8, step_size_init=0.5, max_steps=20, direction="forward"
-        )
+        kw: dict = {  # type: ignore[type-arg]
+            "atol": 1e-8,
+            "rtol": 1e-8,
+            "step_size_init": 0.5,
+            "max_steps": 20,
+            "direction": "forward",
+        }
         batched = trace_field_lines_adaptive(uniform_field_data, seeds, **kw)
         for i in range(len(seeds)):
             scalar = trace_field_line_adaptive(
@@ -1265,12 +1269,12 @@ class TestClosedLoopDetection:
 
         spacing = closed_loop_field_data.grid.spacing
         explicit_tol = 0.5 * min(spacing)
-        kw: dict = dict(  # type: ignore[type-arg]
-            step_size_init=0.1,
-            max_step=0.2,
-            max_steps=500,
-            direction="forward",
-        )
+        kw: dict = {  # type: ignore[type-arg]
+            "step_size_init": 0.1,
+            "max_step": 0.2,
+            "max_steps": 500,
+            "direction": "forward",
+        }
         fl_auto = trace_field_line_adaptive(
             closed_loop_field_data, (12.0, 10.0, 10.0), **kw
         )
@@ -1295,12 +1299,12 @@ class TestClosedLoopDetection:
         """
         from pypic.traces import trace_field_line_adaptive
 
-        kw: dict = dict(  # type: ignore[type-arg]
-            step_size_init=0.1,
-            max_step=0.2,
-            max_steps=500,
-            direction="forward",
-        )
+        kw: dict = {  # type: ignore[type-arg]
+            "step_size_init": 0.1,
+            "max_step": 0.2,
+            "max_steps": 500,
+            "direction": "forward",
+        }
         fl_default = trace_field_line_adaptive(
             closed_loop_field_data, (12.0, 10.0, 10.0), **kw
         )

@@ -1105,32 +1105,32 @@ def trace_field_lines_adaptive(
             buf, n_steps, reasons, errs = _trace_batch_single_direction_adaptive(
                 interpolator, seeds_arr, 1.0, *args
             )
-            for i in range(n_seeds):
-                field_lines.append(
-                    _build(
-                        buf[i, : int(n_steps[i]) + 1],
-                        _REASON_FROM_INT[int(reasons[i])],
-                        _EMPTY_POINTS,
-                        TerminationReason.MAX_STEPS,
-                        i,
-                        float(errs[i]),
-                    )
+            field_lines.extend(
+                _build(
+                    buf[i, : int(n_steps[i]) + 1],
+                    _REASON_FROM_INT[int(reasons[i])],
+                    _EMPTY_POINTS,
+                    TerminationReason.MAX_STEPS,
+                    i,
+                    float(errs[i]),
                 )
+                for i in range(n_seeds)
+            )
         case "backward":
             buf, n_steps, reasons, errs = _trace_batch_single_direction_adaptive(
                 interpolator, seeds_arr, -1.0, *args
             )
-            for i in range(n_seeds):
-                field_lines.append(
-                    _build(
-                        _EMPTY_POINTS,
-                        TerminationReason.MAX_STEPS,
-                        buf[i, : int(n_steps[i]) + 1],
-                        _REASON_FROM_INT[int(reasons[i])],
-                        i,
-                        float(errs[i]),
-                    )
+            field_lines.extend(
+                _build(
+                    _EMPTY_POINTS,
+                    TerminationReason.MAX_STEPS,
+                    buf[i, : int(n_steps[i]) + 1],
+                    _REASON_FROM_INT[int(reasons[i])],
+                    i,
+                    float(errs[i]),
                 )
+                for i in range(n_seeds)
+            )
         case "both":
             fwd_buf, fwd_n, fwd_reasons, fwd_errs = (
                 _trace_batch_single_direction_adaptive(
@@ -1142,17 +1142,17 @@ def trace_field_lines_adaptive(
                     interpolator, seeds_arr, -1.0, *args
                 )
             )
-            for i in range(n_seeds):
-                field_lines.append(
-                    _build(
-                        fwd_buf[i, : int(fwd_n[i]) + 1],
-                        _REASON_FROM_INT[int(fwd_reasons[i])],
-                        bwd_buf[i, : int(bwd_n[i]) + 1],
-                        _REASON_FROM_INT[int(bwd_reasons[i])],
-                        i,
-                        max(float(fwd_errs[i]), float(bwd_errs[i])),
-                    )
+            field_lines.extend(
+                _build(
+                    fwd_buf[i, : int(fwd_n[i]) + 1],
+                    _REASON_FROM_INT[int(fwd_reasons[i])],
+                    bwd_buf[i, : int(bwd_n[i]) + 1],
+                    _REASON_FROM_INT[int(bwd_reasons[i])],
+                    i,
+                    max(float(fwd_errs[i]), float(bwd_errs[i])),
                 )
+                for i in range(n_seeds)
+            )
         case _ as unreachable:
             assert_never(unreachable)
 

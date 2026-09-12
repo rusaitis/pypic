@@ -295,7 +295,7 @@ def open_virtual(
             f"{ds_dims} but grid expects {len(dim_names)} {dim_names}."
         )
         raise ValueError(msg)
-    rename_map = {old: new for old, new in zip(ds_dims, dim_names, strict=True)}
+    rename_map = dict(zip(ds_dims, dim_names, strict=True))
     ds = ds.rename(rename_map)
 
     coord_arrays = grid.coordinate_arrays()
@@ -417,9 +417,9 @@ def to_icechunk_virtual(
                 )
             repo_config = persisted
 
-        all_prefixes: dict[str, Any] = {
-            p: None for p in (repo_config.virtual_chunk_containers or {})
-        }
+        all_prefixes: dict[str, Any] = dict.fromkeys(
+            repo_config.virtual_chunk_containers or {}
+        )
         all_prefixes.setdefault(url_prefix, None)
 
         repo = icechunk.Repository.open_or_create(

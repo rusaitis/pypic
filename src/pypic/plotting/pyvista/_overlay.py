@@ -50,11 +50,11 @@ def _rounded_rect_points(
         (x + w - r, y + h - r, 0, math.pi / 2),
         (x + r, y + h - r, math.pi / 2, math.pi),
     ]
-    pts: list[tuple[float, float]] = []
-    for cx, cy, a0, a1 in corners:
-        for ang in np.linspace(a0, a1, n_arc):
-            pts.append((cx + r * math.cos(ang), cy + r * math.sin(ang)))
-    return pts
+    return [
+        (cx + r * math.cos(ang), cy + r * math.sin(ang))
+        for cx, cy, a0, a1 in corners
+        for ang in np.linspace(a0, a1, n_arc)
+    ]
 
 
 def _vtk_viewport_coord() -> _vtk.vtkCoordinate:

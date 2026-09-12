@@ -116,11 +116,8 @@ def _parse_single(path: Path) -> ConservedQuantities:
     # Skip the Roman numeral header, separator, and column-name lines.
     # Data lines start with whitespace followed by a digit.
     data_re = re.compile(r"^\s+\d")
-    rows: list[list[float]] = []
-    with open(path) as fh:
-        for line in fh:
-            if data_re.match(line):
-                rows.append([float(x) for x in line.split()])
+    with path.open() as fh:
+        rows = [[float(x) for x in line.split()] for line in fh if data_re.match(line)]
     data = np.array(rows, dtype=np.float64)
     if data.ndim == 1:
         data = data.reshape(1, -1)
@@ -148,7 +145,7 @@ def _parse_multi_file(path: Path) -> tuple[FloatArray, int]:
     expected_cols = 0
     header_re = re.compile(r"#\((\d+)-> ")
     rows: list[list[float]] = []
-    with open(path) as fh:
+    with path.open() as fh:
         for line in fh:
             m = header_re.match(line)
             if m:
@@ -158,7 +155,7 @@ def _parse_multi_file(path: Path) -> tuple[FloatArray, int]:
                     species_idx = (col - _B_SPECIES_HEADER_COL) // _B_SPECIES_STRIDE
                     nspec = max(nspec, species_idx + 1)
                 continue
-            if line.startswith("#") or line.startswith("-"):
+            if line.startswith(("#", "-")):
                 continue
             parts = line.split()
             if not parts:
@@ -377,10 +374,10 @@ def load_species_quantities(path: Path) -> TabularData:
         raise FileNotFoundError(msg)
 
     rows: list[list[float]] = []
-    with open(path) as fh:
+    with path.open() as fh:
         for line in fh:
             stripped = line.strip()
-            if not stripped or stripped.startswith("#") or stripped.startswith("-"):
+            if not stripped or stripped.startswith(("#", "-")):
                 continue
             parts = stripped.split()
             if len(parts) < 6:
@@ -396,7 +393,7 @@ def load_species_quantities(path: Path) -> TabularData:
 
     data = np.array(rows, dtype=np.float64)
 
-    species_ids = sorted(set(int(x) for x in data[:, _SQ_SPECIES]))
+    species_ids = sorted({int(x) for x in data[:, _SQ_SPECIES]})
     cycles = sorted(set(data[:, _SQ_CYCLE]))
     n_cycles = len(cycles)
     cycle_arr = np.array(cycles, dtype=np.float64)

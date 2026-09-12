@@ -478,7 +478,7 @@ class Simulation:
 
         if isinstance(self._reader, FieldListingReader):
             return self._reader.available_fields_mapping(self._path, step)
-        return {name: None for name in self.available_fields(step)}
+        return dict.fromkeys(self.available_fields(step))
 
     @property
     def auxiliary_names(self) -> list[str]:

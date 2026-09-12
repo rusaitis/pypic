@@ -137,7 +137,7 @@ class TestSetDefaultTheme:
         child_text = " ".join(
             t.get_text()
             for a in patch_artists
-            for t in getattr(a, "get_children", lambda: [])()
+            for t in getattr(a, "get_children", list)()
             if hasattr(t, "get_text")
         )
         combined = all_text + " " + child_text
@@ -324,7 +324,9 @@ class TestFileThemes:
                 got = webpic.get("version")
                 problems.append(f"{path.name}: webpic.version = {got!r}, expected 1")
                 continue
-            for required in ("layout", "shortcuts", "diagnostics", "embed"):
-                if required not in webpic:
-                    problems.append(f"{path.name}: missing [webpic.{required}]")
+            problems.extend(
+                f"{path.name}: missing [webpic.{required}]"
+                for required in ("layout", "shortcuts", "diagnostics", "embed")
+                if required not in webpic
+            )
         assert not problems, "themes failed [webpic] invariant: " + "; ".join(problems)

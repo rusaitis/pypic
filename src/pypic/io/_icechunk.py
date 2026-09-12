@@ -111,7 +111,7 @@ def open_icechunk_repo(
         else:
             probe = icechunk.Repository.open(storage)
         containers = probe.config.virtual_chunk_containers or {}
-        authorize_virtual_chunk_access = {prefix: None for prefix in containers}
+        authorize_virtual_chunk_access = dict.fromkeys(containers)
 
     if create:
         return icechunk.Repository.open_or_create(

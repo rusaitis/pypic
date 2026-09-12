@@ -195,11 +195,11 @@ def add_circle(
             rotation=label_position - 90,
             rotation_mode="anchor",
             zorder=zorder,
-            bbox=dict(
-                boxstyle="round,pad=0.15",
-                facecolor=bg_color,
-                edgecolor="none",
-            ),
+            bbox={
+                "boxstyle": "round,pad=0.15",
+                "facecolor": bg_color,
+                "edgecolor": "none",
+            },
         )
 
     return circle

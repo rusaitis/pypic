@@ -319,9 +319,10 @@ def test_modules_below_dataset_never_import_above_it() -> None:
     ``grid`` is still a dependency pointing the wrong way.
     """
     src = Path(pypic.__file__).parent
-    offenders: list[str] = []
-    for module in _BELOW_DATASET:
-        for imported in _runtime_pypic_imports((src / f"{module}.py").read_text()):
-            if imported == "pypic" or imported.startswith(_ABOVE_DATASET):
-                offenders.append(f"{module}.py imports {imported}")
+    offenders = [
+        f"{module}.py imports {imported}"
+        for module in _BELOW_DATASET
+        for imported in _runtime_pypic_imports((src / f"{module}.py").read_text())
+        if imported == "pypic" or imported.startswith(_ABOVE_DATASET)
+    ]
     assert not offenders, "imports pointing above dataset: " + ", ".join(offenders)

@@ -190,8 +190,7 @@ def fields(
         data["native_mapping"] = dict(sorted(field_map.items()))
     else:
         lines.append("Fields:")
-        for name in canonical:
-            lines.append(f"  {name}")
+        lines.extend(f"  {name}" for name in canonical)
 
     if show_derived:
         from pypic.compute import (
@@ -210,8 +209,7 @@ def fields(
         computable.sort()
         lines.append("")
         lines.append("Derived (computable from available fields):")
-        for name in computable:
-            lines.append(f"  {name}")
+        lines.extend(f"  {name}" for name in computable)
         data["derived"] = computable
 
     if show_aux:
@@ -219,8 +217,7 @@ def fields(
         lines.append("")
         lines.append("Auxiliary datasets:")
         if aux_names:
-            for name in aux_names:
-                lines.append(f"  {name}")
+            lines.extend(f"  {name}" for name in aux_names)
         else:
             lines.append("  (none)")
         data["auxiliary"] = aux_names
@@ -270,12 +267,12 @@ def stats(
             f"{'mean':>12}  {'rms':>12}  {'NaN':>5}"
         )
         text_lines = [f"Step: {step_val}  Units: {unit_label}", hdr]
-        for r in rows:
-            text_lines.append(
-                f"{r['field']!s:<{max_name}}  {r['min']:>12.6g}  "
-                f"{r['max']:>12.6g}  {r['mean']:>12.6g}  "
-                f"{r['rms']:>12.6g}  {r['nan_count']:>5}"
-            )
+        text_lines.extend(
+            f"{r['field']!s:<{max_name}}  {r['min']:>12.6g}  "
+            f"{r['max']:>12.6g}  {r['mean']:>12.6g}  "
+            f"{r['rms']:>12.6g}  {r['nan_count']:>5}"
+            for r in rows
+        )
         data: dict[str, object] = {
             "path": str(path),
             "step": step_val,

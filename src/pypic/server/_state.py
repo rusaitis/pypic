@@ -67,11 +67,11 @@ class SimulationRegistry:
         """
         if not self._root.is_dir():
             return []
-        out: list[str] = []
-        for entry in self._root.iterdir():
-            if entry.is_dir() and (entry / "simulation.toml").is_file():
-                out.append(entry.name)
-        return sorted(out)
+        return sorted(
+            entry.name
+            for entry in self._root.iterdir()
+            if entry.is_dir() and (entry / "simulation.toml").is_file()
+        )
 
     def get(self, name: str) -> Simulation:
         """Return the opened `Simulation` named *name*.

@@ -569,12 +569,12 @@ def test_registry_func_signatures_match_recipe_metadata() -> None:
                     inspect.Parameter.KEYWORD_ONLY,
                 )
             }
-            for kw in expected_kw:
-                if kw not in accepted_kw:
-                    failures.append(
-                        f"{kind} {ident!r}: dispatcher injects {kw}= but "
-                        f"func {entry.func.__qualname__} does not accept it"
-                    )
+            failures.extend(
+                f"{kind} {ident!r}: dispatcher injects {kw}= but "
+                f"func {entry.func.__qualname__} does not accept it"
+                for kw in expected_kw
+                if kw not in accepted_kw
+            )
 
     assert not failures, _format_failures(
         "Recipe/func signature mismatches",

@@ -190,8 +190,7 @@ def write_grid_file(
         lines.append(f"  0 {len(arr)}")
         # Fake WRN2-like header (grid files store raw ASCII values)
         lines.append(f"  ASCII {len(arr)}")
-        for val in arr:
-            lines.append(f"  {val:.10E}")
+        lines.extend(f"  {val:.10E}" for val in arr)
 
     path.write_text("\n".join(lines) + "\n", encoding="ascii")
 

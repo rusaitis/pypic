@@ -310,16 +310,14 @@ def _coerce_errors(exc: ValidationError) -> list[dict[str, Any]]:
     values (regex objects, exceptions); we project to the fields we
     actually care about.
     """
-    out: list[dict[str, Any]] = []
-    for err in exc.errors():
-        out.append(
-            {
-                "type": err.get("type", "validation_error"),
-                "loc": list(err.get("loc", ())),
-                "msg": err.get("msg", ""),
-            }
-        )
-    return out
+    return [
+        {
+            "type": err.get("type", "validation_error"),
+            "loc": list(err.get("loc", ())),
+            "msg": err.get("msg", ""),
+        }
+        for err in exc.errors()
+    ]
 
 
 def _print_validate_human(results: Iterable[dict[str, Any]]) -> None:

@@ -511,16 +511,16 @@ class TestMultiSpeciesSIConversion:
         ids=["density", "frequency", "velocity", "dimensionless"],
     )
     def test_species_si_factor(self, field, norm_kwargs, expected):
-        defaults = dict(
-            length_ref=1.0,
-            time_ref=1.0,
-            velocity_ref=1.0,
-            b_field_ref=1.0,
-            e_field_ref=1.0,
-            density_ref=1.0,
-            mass_ref=1.0,
-            charge_ref=1.0,
-        )
+        defaults = {
+            "length_ref": 1.0,
+            "time_ref": 1.0,
+            "velocity_ref": 1.0,
+            "b_field_ref": 1.0,
+            "e_field_ref": 1.0,
+            "density_ref": 1.0,
+            "mass_ref": 1.0,
+            "charge_ref": 1.0,
+        }
         defaults.update(norm_kwargs)
         norm = Normalization(**defaults)
         assert field_si_factor(field, norm) == pytest.approx(expected)
