@@ -21,6 +21,7 @@ from pypic.dataset import FieldDataset
 from pypic.io._guard import ensure_zarr
 from pypic.io.metadata import (
     SCHEMA_VERSION,
+    check_schema_version,
     decode_pypic_attrs,
     encode_pypic_attrs,
     pop_reserved_metadata,
@@ -39,34 +40,6 @@ __all__ = ["from_zarr", "to_zarr", "to_zarr_timeseries"]
 _log = logging.getLogger(__name__)
 
 
-# Root-attrs keys reserved for pypic metadata.  Stripped from any
-# Dataset before it is handed to ``FieldDataset`` so layout-bookkeeping
-# attrs don't leak as user-visible.
-_PYPIC_ROOT_ATTR_KEYS = frozenset(
-    {
-        "schema",
-        "grid",
-        "normalization",
-        "species",
-        "physics",
-        "frame",
-        "transforms",
-        "metadata",
-    }
-)
-
-
-def _strip_pypic_attrs(ds: xr.Dataset) -> xr.Dataset:
-    """Return *ds* with pypic-internal attrs removed.
-
-    Mutates ``ds.attrs`` in place and returns the same object — caller
-    typically passes a fresh Dataset reference (the result of
-    ``open_datatree(...)["fields"].to_dataset()``).
-    """
-    ds.attrs = {k: v for k, v in ds.attrs.items() if k not in _PYPIC_ROOT_ATTR_KEYS}
-    return ds
-
-
 def _ds_to_field_dataset(
     ds: xr.Dataset, root_attrs: dict[str, Any], source_label: str
 ) -> FieldDataset:
@@ -83,7 +56,7 @@ def _ds_to_field_dataset(
         msg = f"No pypic metadata found in {source_label}: {exc}"
         raise ValueError(msg) from None
     return FieldDataset(
-        _strip_pypic_attrs(ds),
+        ds,
         grid,
         normalization,
         species=species,
@@ -107,20 +80,9 @@ def _open_store(
     """
     tree = xr.open_datatree(store, engine="zarr", consolidated="auto")
     root_attrs: dict[str, Any] = {str(k): v for k, v in tree.attrs.items()}
-    schema_attrs = root_attrs.get("schema")
-    if not isinstance(schema_attrs, dict) or "version" not in schema_attrs:
-        msg = (
-            f"{source_label}: no pypic metadata found "
-            f"(expected ``schema.version`` discriminator)"
-        )
-        raise ValueError(msg)
-    version = schema_attrs["version"]
-    if version != SCHEMA_VERSION:
-        msg = (
-            f"{source_label}: schema.version={version!r} but this pypic "
-            f"build expects {SCHEMA_VERSION!r}; cannot decode safely"
-        )
-        raise ValueError(msg)
+    # Ahead of the /fields check on purpose: a store from the wrong
+    # schema version should say so, not complain about its layout.
+    check_schema_version(root_attrs, source_label=source_label)
     if "fields" not in tree.children:
         msg = f"{source_label}: schema.version declared but no /fields group present"
         raise ValueError(msg)

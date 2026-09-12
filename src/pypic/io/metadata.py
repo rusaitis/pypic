@@ -28,6 +28,7 @@ from pypic.grid import GridInfo
 from pypic.units import Normalization, PhysicsParams, SpeciesInfo
 
 if TYPE_CHECKING:
+    from collections.abc import Mapping
     from pathlib import Path
 
     from pypic.dataset import FieldDataset
@@ -41,10 +42,9 @@ SCHEMA_VERSION = "1.0"
 
 __all__ = [
     "SCHEMA_VERSION",
+    "check_schema_version",
     "decode_pypic_attrs",
-    "dict_to_grid",
     "dict_to_normalization",
-    "dict_to_physics",
     "dict_to_transforms",
     "encode_pypic_attrs",
     "from_json_native",
@@ -58,6 +58,32 @@ __all__ = [
     "to_json_native",
     "transforms_to_dict",
 ]
+
+
+def check_schema_version(
+    attrs: Mapping[str, Any], *, source_label: str = "store attrs"
+) -> None:
+    """Raise unless *attrs* carries a ``schema.version`` this build decodes.
+
+    *source_label* names what was opened, so a store path reaches the
+    message. Equality, not a major-component comparison: v1.x is
+    additive, and a store written by a future minor may carry sections
+    this build would silently drop.
+    """
+    schema_attrs = attrs.get("schema")
+    if not isinstance(schema_attrs, dict) or "version" not in schema_attrs:
+        msg = (
+            f"{source_label}: no pypic metadata found "
+            f"(expected ``schema.version`` discriminator)"
+        )
+        raise ValueError(msg)
+    version = schema_attrs["version"]
+    if version != SCHEMA_VERSION:
+        msg = (
+            f"{source_label}: schema.version={version!r} but this pypic "
+            f"build expects {SCHEMA_VERSION!r}; cannot decode safely"
+        )
+        raise ValueError(msg)
 
 
 def grid_to_dict(grid: GridInfo) -> dict[str, Any]:
@@ -77,26 +103,6 @@ def grid_to_dict(grid: GridInfo) -> dict[str, Any]:
             list(grid.surviving_axes) if grid.surviving_axes is not None else None
         ),
     }
-
-
-def dict_to_grid(d: dict[str, Any]) -> GridInfo:
-    """Reconstruct a GridInfo from a serialized dict."""
-    geom_d = d["geometry"]
-    geometry = GEOMETRY_BY_NAME[geom_d["type"]]
-    # If axis_names differ from the singleton default, we still use the
-    # canonical singleton — custom axis names come from frame transforms
-    # and are not part of the grid's own geometry identity.
-    return GridInfo(
-        dimensions=tuple(d["dimensions"]),
-        spacing=tuple(d["spacing"]),
-        origin=tuple(d["origin"]),
-        geometry=geometry,
-        dt=d.get("dt"),
-        boundary=tuple(d["boundary"]) if d.get("boundary") is not None else None,
-        surviving_axes=(
-            tuple(d["surviving_axes"]) if d.get("surviving_axes") is not None else None
-        ),
-    )
 
 
 def normalization_to_dict(norm: Normalization) -> dict[str, float]:
@@ -207,16 +213,6 @@ def physics_to_dict(physics: PhysicsParams) -> dict[str, Any]:
         "relativistic": physics.relativistic,
         "extra": dict(physics.extra),
     }
-
-
-def dict_to_physics(d: dict[str, Any]) -> PhysicsParams:
-    """Reconstruct PhysicsParams from a serialized dict."""
-    return PhysicsParams(
-        gamma=d["gamma"],
-        c=_decode_c(d["c"]),
-        relativistic=d["relativistic"],
-        extra=d.get("extra", {}),
-    )
 
 
 def _transform_to_dict(t: FrameTransform) -> dict[str, Any]:
@@ -593,20 +589,7 @@ def decode_pypic_attrs(
     layout, or ``metadata.stagger`` in the old) is also re-stuffed
     into ``metadata`` so the in-memory shape stays the same.
     """
-    schema_attrs = d.get("schema")
-    if not isinstance(schema_attrs, dict) or "version" not in schema_attrs:
-        msg = (
-            "No pypic metadata found in store attrs "
-            "(expected ``schema.version`` discriminator)"
-        )
-        raise ValueError(msg)
-    version = schema_attrs["version"]
-    if version != SCHEMA_VERSION:
-        msg = (
-            f"schema.version={version!r} but this pypic build expects "
-            f"{SCHEMA_VERSION!r}; cannot decode safely"
-        )
-        raise ValueError(msg)
+    check_schema_version(d)
 
     coords_attrs = d.get("coordinates", {}) or {}
     time_attrs = d.get("time", {}) or {}

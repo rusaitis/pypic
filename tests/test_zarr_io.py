@@ -16,9 +16,7 @@ from pypic.grid import GridInfo  # noqa: E402
 from pypic.io import from_zarr, to_zarr, to_zarr_timeseries  # noqa: E402
 from pypic.io.metadata import (  # noqa: E402
     decode_pypic_attrs,
-    dict_to_grid,
     dict_to_normalization,
-    dict_to_physics,
     dict_to_transforms,
     encode_pypic_attrs,
     grid_to_dict,
@@ -41,19 +39,23 @@ from tests._helpers import (  # noqa: E402
 class TestSerializationHelpers:
     """Unit tests for ``pypic.io.metadata`` round-trip fidelity."""
 
-    def test_grid_round_trip_basic(self):
+    def test_grid_encodes_every_axis_tuple_as_a_json_list(self):
         grid = make_uniform_grid(4, 3, 2, spacing=0.5, origin=-1.0)
-        d = grid_to_dict(grid)
-        rebuilt = dict_to_grid(d)
-        assert rebuilt.dimensions == grid.dimensions
-        assert rebuilt.spacing == grid.spacing
-        assert rebuilt.origin == grid.origin
-        assert rebuilt.geometry.type == grid.geometry.type
-        assert rebuilt.dt is None
-        assert rebuilt.boundary is None
-        assert rebuilt.surviving_axes is None
+        assert grid_to_dict(grid) == {
+            "dimensions": [4, 3, 2],
+            "spacing": [0.5, 0.5, 0.5],
+            "origin": [-1.0, -1.0, -1.0],
+            "geometry": {
+                "type": "cartesian",
+                "axis_names": ["x", "y", "z"],
+                "axis_units": list(grid.geometry.axis_units),
+            },
+            "dt": None,
+            "boundary": None,
+            "surviving_axes": None,
+        }
 
-    def test_grid_round_trip_with_optional_fields(self):
+    def test_grid_encodes_the_optional_fields_when_set(self):
         grid = GridInfo(
             dimensions=(4, 2),
             spacing=(1.0, 1.0),
@@ -63,10 +65,11 @@ class TestSerializationHelpers:
             surviving_axes=(0, 2),
         )
         d = grid_to_dict(grid)
-        rebuilt = dict_to_grid(d)
-        assert rebuilt.dt == 0.01
-        assert rebuilt.boundary == ("periodic", "open")
-        assert rebuilt.surviving_axes == (0, 2)
+        assert (d["dt"], d["boundary"], d["surviving_axes"]) == (
+            0.01,
+            ["periodic", "open"],
+            [0, 2],
+        )
 
     def test_normalization_round_trip(self):
         norm = Normalization.pic_electron(1e18)
@@ -114,26 +117,24 @@ class TestSerializationHelpers:
         assert rebuilt[0].drift_velocity == (0.5, 0.0, 0.0)
         assert rebuilt[0].particles_per_cell == (5, 5, 1)
 
-    def test_physics_round_trip(self):
+    def test_physics_encodes_the_extra_table_as_a_plain_dict(self):
         physics = PhysicsParams(
             gamma=1.4,
             c=1.0,
             relativistic=True,
             extra={"theta": 0.5},
         )
-        d = physics_to_dict(physics)
-        rebuilt = dict_to_physics(d)
-        assert rebuilt.gamma == 1.4
-        assert rebuilt.c == 1.0
-        assert rebuilt.relativistic is True
-        assert rebuilt.extra["theta"] == 0.5
+        assert physics_to_dict(physics) == {
+            "gamma": 1.4,
+            "c": 1.0,
+            "relativistic": True,
+            "extra": {"theta": 0.5},
+        }
 
-    def test_physics_inf_c_round_trip(self):
-        physics = PhysicsParams(c=math.inf)
-        d = physics_to_dict(physics)
-        assert d["c"] == "inf"
-        rebuilt = dict_to_physics(d)
-        assert math.isinf(rebuilt.c)
+    def test_physics_encodes_infinite_c_as_a_string(self):
+        # JSON has no infinity literal, and c = inf is the
+        # non-relativistic MHD default.
+        assert physics_to_dict(PhysicsParams(c=math.inf))["c"] == "inf"
 
     def test_transforms_round_trip(self):
         rot = (
@@ -309,6 +310,19 @@ class TestToZarrFromZarr:
         assert loaded.grid.spacing == fds.grid.spacing
         assert loaded.grid.origin == fds.grid.origin
         assert loaded.normalization.is_identity
+
+    def test_section_attrs_do_not_leak_onto_the_loaded_dataset(self, tmp_path):
+        """Root-group sections stay typed fields, never user-visible attrs.
+
+        The sections are written on the root group, while ``from_zarr``
+        returns the ``/fields`` group, so nothing has to strip them —
+        this pins that the two stay separate instead of trusting a
+        hand-kept mirror of the encoder's key list.
+        """
+        fds = make_test_dataset({"B_1": np.ones((4, 3, 2))})
+        store = tmp_path / "no_leak.zarr"
+        to_zarr(fds, store)
+        assert from_zarr(store).xr.attrs == {}
 
     def test_round_trip_full_metadata(self, tmp_path):
         rot = (
