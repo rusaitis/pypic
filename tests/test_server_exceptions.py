@@ -15,6 +15,7 @@ third-party code keep working.
 
 from __future__ import annotations
 
+import pydantic
 import pytest
 
 from pypic.exceptions import (
@@ -143,7 +144,6 @@ def test_detail_preserves_embedded_quotes() -> None:
 
 def test_validation_failed_error_preserves_cause() -> None:
     """``ValidationFailedError`` keeps the pydantic ``ValidationError`` on __cause__."""
-    pydantic = pytest.importorskip("pydantic")
 
     class _Model(pydantic.BaseModel):
         x: int
