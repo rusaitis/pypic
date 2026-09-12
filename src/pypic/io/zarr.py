@@ -20,7 +20,6 @@ import xarray as xr
 from pypic.dataset import FieldDataset
 from pypic.io._guard import ensure_zarr
 from pypic.io.metadata import (
-    SCHEMA_VERSION,
     check_schema_version,
     decode_pypic_attrs,
     encode_pypic_attrs,
