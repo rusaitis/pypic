@@ -290,6 +290,24 @@ def compute_field(name: str, dataset: FieldDataset, _depth: int = 0) -> FloatArr
         `NotImplementedError`.
     RecursionError
         If dependency chain exceeds depth limit.
+
+    Examples
+    --------
+    Dependencies resolve recursively — ``v_A`` needs ``|B|``, which the
+    dataset does not carry either:
+
+    >>> import numpy as np
+    >>> from pypic import FieldDataset, GridInfo
+    >>> from pypic.units import Normalization
+    >>> grid = GridInfo(dimensions=(2, 2, 2), spacing=(1.0, 1.0, 1.0))
+    >>> ones = np.ones((2, 2, 2))
+    >>> ds = FieldDataset.from_arrays(
+    ...     {"B_1": 3.0 * ones, "B_2": 4.0 * ones, "B_3": 0.0 * ones,
+    ...      "rho_m": 4.0 * ones},
+    ...     grid, Normalization.identity(),
+    ... )
+    >>> float(compute_field("v_A", ds)[0, 0, 0])  # |B| / sqrt(rho_m)
+    2.5
     """
     if _depth > _MAX_DEPTH:
         msg = f"Dependency chain too deep (>{_MAX_DEPTH}) while computing {name!r}"
@@ -337,6 +355,13 @@ def field_si_factor(name: str, normalization: Normalization) -> float:
     ------
     ValueError
         If the quantity type for *name* is unknown.
+
+    Examples
+    --------
+    >>> from pypic.units import Normalization
+    >>> norm = Normalization.mhd_standard(6.371e6, 1.67e-17, 5.0e-9)
+    >>> field_si_factor("B_1", norm)  # b_field type resolves to B_ref
+    5e-09
     """
     canonical = _resolve_name(name)
     info = _FIELD_INFO.get(canonical)
@@ -377,6 +402,11 @@ def display_unit_factor(unit_str: str) -> float:
     ------
     ValueError
         If *unit_str* is not recognized.
+
+    Examples
+    --------
+    >>> display_unit_factor("nT"), display_unit_factor("km/s")
+    (1e-09, 1000.0)
     """
     try:
         return _DISPLAY_UNITS[unit_str]
@@ -396,6 +426,12 @@ def available_quantities() -> list[str]:
     Returns
     -------
     list[str]
+
+    Examples
+    --------
+    >>> names = available_quantities()
+    >>> "beta" in names, "v_A" in names, "omega_p_s2" in names
+    (True, True, False)
     """
     return sorted(set(_REGISTRY) | set(COMPUTE_ALIASES))
 
@@ -415,6 +451,13 @@ def field_dependencies(name: str, _depth: int = 0) -> set[str]:
     -------
     set[str]
         Leaf field names that must be present in the dataset.
+
+    Examples
+    --------
+    >>> sorted(field_dependencies("v_A"))
+    ['B_1', 'B_2', 'B_3', 'rho_m']
+    >>> sorted(field_dependencies("rho_m"))  # a raw field is its own leaf
+    ['rho_m']
     """
     if _depth > _MAX_DEPTH:
         msg = f"Dependency chain too deep (>{_MAX_DEPTH}) while resolving {name!r}"

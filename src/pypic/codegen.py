@@ -81,7 +81,13 @@ def _fieldinfo_dict(info: FieldInfo) -> dict[str, Any]:
 
 
 def export_aliases() -> dict[str, Any]:
-    """Return the alias tables (compute aliases, group aliases, species regex)."""
+    """Return the alias tables (compute aliases, group aliases, species regex).
+
+    Examples
+    --------
+    >>> sorted(export_aliases())
+    ['computeAliases', 'groupAliases', 'speciesSuffixRe']
+    """
     return {
         "computeAliases": dict(COMPUTE_ALIASES),
         "groupAliases": dict(GROUP_ALIASES),
@@ -90,7 +96,18 @@ def export_aliases() -> dict[str, Any]:
 
 
 def export_recipes() -> dict[str, Any]:
-    """Return the recipe registry and per-species templates (metadata only)."""
+    """Return the recipe registry and per-species templates (metadata only).
+
+    Examples
+    --------
+    The camelCase keys below are the wire contract webpic reads:
+
+    >>> recipes = export_recipes()["recipes"]
+    >>> recipes["v_A"]["fields"]
+    ['|B|', 'rho_m']
+    >>> recipes["v_A"]["supportsRelativistic"], recipes["v_A"]["passesGeometry"]
+    (True, False)
+    """
     return {
         "recipes": {key: _recipe_dict(recipe) for key, recipe in RECIPES.items()},
         "speciesTemplates": {
@@ -100,7 +117,14 @@ def export_recipes() -> dict[str, Any]:
 
 
 def export_fields() -> dict[str, Any]:
-    """Return static field metadata: units, LaTeX symbols, long names."""
+    """Return static field metadata: units, LaTeX symbols, long names.
+
+    Examples
+    --------
+    >>> b1 = export_fields()["fields"]["B_1"]
+    >>> b1["quantityType"], b1["siUnit"], b1["latex"]
+    ('b_field', 'T', '$B_1$')
+    """
     return {
         "fields": {name: _fieldinfo_dict(info) for name, info in _FIELD_INFO.items()}
     }
@@ -116,6 +140,15 @@ def export_bundle(
 
     ``inline_single_use_defs`` / ``include_x_extensions`` pass through to
     `pypic.schema._export.build_schema` (the former yields flatter Zod).
+
+    Examples
+    --------
+    >>> bundle = export_bundle()
+    >>> bundle["schemaVersion"]
+    '1.0'
+    >>> sorted(bundle)  # doctest: +NORMALIZE_WHITESPACE
+    ['computeAliases', 'fields', 'groupAliases', 'jsonSchema', 'recipes',
+     'schemaVersion', 'speciesSuffixRe', 'speciesTemplates']
     """
     return {
         "schemaVersion": schema_version,

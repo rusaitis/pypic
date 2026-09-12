@@ -83,6 +83,19 @@ def sample_field(
     -------
     FloatArray
         Sampled values, shape ``(N,)``. NaN for points outside the domain.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> from pypic import FieldDataset, GridInfo, Normalization
+    >>> grid = GridInfo(dimensions=(4, 4, 4), spacing=(1.0, 1.0, 1.0))
+    >>> ds = FieldDataset.from_arrays(
+    ...     {"B_1": np.arange(64.0).reshape(4, 4, 4)},
+    ...     grid, Normalization.identity(),
+    ... )
+    >>> points = np.array([[0.5, 0.5, 0.5], [1.5, 0.5, 0.5], [99.0, 0.0, 0.0]])
+    >>> sample_field(ds, points, "B_1")  # last point is outside the domain
+    array([ 0., 16., nan])
     """
     values: np.ndarray[Any, Any] = data[field]
     coord_arrays = data.grid.coordinate_arrays()
@@ -156,6 +169,21 @@ def sample_fields(
     -------
     dict[str, FloatArray]
         Field name → sampled values.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> from pypic import FieldDataset, GridInfo, Normalization
+    >>> grid = GridInfo(dimensions=(4, 4, 4), spacing=(1.0, 1.0, 1.0))
+    >>> ds = FieldDataset.from_arrays(
+    ...     {"B_1": np.arange(64.0).reshape(4, 4, 4),
+    ...      "B_2": np.zeros((4, 4, 4))},
+    ...     grid, Normalization.identity(),
+    ... )
+    >>> points = np.array([[0.5, 0.5, 0.5], [1.5, 0.5, 0.5]])
+    >>> sampled = sample_fields(ds, points, ["B_1", "B_2"])
+    >>> sampled["B_1"], sampled["B_2"]
+    (array([ 0., 16.]), array([0., 0.]))
     """
     if not fields:
         return {}

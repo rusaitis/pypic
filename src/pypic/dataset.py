@@ -398,6 +398,31 @@ class FieldDataset:
             If no transform path exists from the current frame.
         KeyError
             If *target* is a string and no transforms are registered.
+
+        Examples
+        --------
+        A -90° rotation about $z$ sends $\hat{x}$ to $-\hat{y}$, and
+        swaps the two grid axes with it:
+
+        >>> import numpy as np
+        >>> from pypic.coordinates import FrameTransform
+        >>> from pypic.units import Normalization
+        >>> grid = GridInfo(dimensions=(4, 3, 2), spacing=(1.0, 1.0, 1.0))
+        >>> gsm = FrameTransform(
+        ...     "simulation", "GSM",
+        ...     rotation=((0.0, 1.0, 0.0), (-1.0, 0.0, 0.0), (0.0, 0.0, 1.0)),
+        ... )
+        >>> ds = FieldDataset.from_arrays(
+        ...     {"B_1": np.ones((4, 3, 2)),
+        ...      "B_2": np.zeros((4, 3, 2)),
+        ...      "B_3": np.zeros((4, 3, 2))},
+        ...     grid, Normalization.identity(), transforms={"GSM": gsm},
+        ... )
+        >>> rotated = ds.transform_to("GSM")
+        >>> rotated.frame, rotated.grid.dimensions
+        ('GSM', (3, 4, 2))
+        >>> float(rotated["B_2"][0, 0, 0])
+        -1.0
         """
         if isinstance(target, FrameTransform):
             transform = target
@@ -771,6 +796,22 @@ class FieldDataset:
         Returns
         -------
         FieldDataset
+
+        Examples
+        --------
+        Cell centres sit at half-integer positions, so a label that
+        falls between them needs ``method="nearest"``:
+
+        >>> import numpy as np
+        >>> from pypic.units import Normalization
+        >>> grid = GridInfo(dimensions=(4, 3, 2), spacing=(1.0, 1.0, 1.0))
+        >>> ds = FieldDataset.from_arrays(
+        ...     {"B_1": np.arange(24.0).reshape(4, 3, 2)},
+        ...     grid, Normalization.identity(),
+        ... )
+        >>> midplane = ds.sel({"z": 1.4}, method="nearest")
+        >>> midplane.grid.dimensions, midplane.grid.surviving_axis_names
+        ((4, 3), ('x', 'y'))
         """
         merged = dict(indexers) if indexers else {}
         merged.update(kwargs)
@@ -1019,6 +1060,18 @@ class FieldDataset:
             If no SI conversion is registered for *name* — a field
             carrying no ``quantity_type`` attr whose name the global
             registry also cannot resolve.
+
+        Examples
+        --------
+        >>> import numpy as np
+        >>> from pypic.units import Normalization
+        >>> grid = GridInfo(dimensions=(4, 3, 2), spacing=(1.0, 1.0, 1.0))
+        >>> norm = Normalization.mhd_standard(6.371e6, 1.67e-17, 5.0e-9)
+        >>> ds = FieldDataset.from_arrays(
+        ...     {"B_1": np.full((4, 3, 2), 2.0)}, grid, norm,
+        ... )
+        >>> float(ds.in_si("B_1")[0, 0, 0])  # 2 code units at B_ref = 5 nT
+        1e-08
         """
         from pypic.compute import compute_field, field_si_factor  # above dataset
 
@@ -1068,6 +1121,18 @@ class FieldDataset:
         T in SI; ``in_units(name, "nT")`` is the space-physics
         idiom. See ``_DISPLAY_UNITS`` in ``pypic.units`` for the
         full vocabulary.
+
+        Examples
+        --------
+        >>> import numpy as np
+        >>> from pypic.units import Normalization
+        >>> grid = GridInfo(dimensions=(4, 3, 2), spacing=(1.0, 1.0, 1.0))
+        >>> norm = Normalization.mhd_standard(6.371e6, 1.67e-17, 5.0e-9)
+        >>> ds = FieldDataset.from_arrays(
+        ...     {"B_1": np.full((4, 3, 2), 2.0)}, grid, norm,
+        ... )
+        >>> float(ds.in_units("B_1", "nT")[0, 0, 0])
+        10.0
         """
         from pypic.compute import display_unit_factor  # layered above dataset
 
@@ -1092,6 +1157,19 @@ class FieldDataset:
         Returns
         -------
         FieldDataset
+
+        Examples
+        --------
+        >>> import numpy as np
+        >>> from pypic.units import Normalization
+        >>> grid = GridInfo(dimensions=(4, 3, 2), spacing=(1.0, 1.0, 1.0))
+        >>> ds = FieldDataset.from_arrays(
+        ...     {"B_1": np.arange(24.0).reshape(4, 3, 2)},
+        ...     grid, Normalization.identity(),
+        ... )
+        >>> face = ds.isel(x=0)
+        >>> face.grid.dimensions, face.grid.surviving_axis_names
+        ((3, 2), ('y', 'z'))
         """
         merged = dict(indexers) if indexers else {}
         merged.update(kwargs)
@@ -1116,6 +1194,20 @@ class FieldDataset:
         Returns
         -------
         FieldDataset
+
+        Examples
+        --------
+        >>> import numpy as np
+        >>> from pypic.units import Normalization
+        >>> grid = GridInfo(dimensions=(4, 3, 2), spacing=(1.0, 1.0, 1.0))
+        >>> ds = FieldDataset.from_arrays(
+        ...     {"B_1": np.arange(24.0).reshape(4, 3, 2)},
+        ...     grid, Normalization.identity(),
+        ... )
+        >>> x, _, _ = np.meshgrid(*grid.coordinate_arrays(), indexing="ij")
+        >>> inner = ds.where(x < 2.0)
+        >>> inner["B_1"].shape, int(np.isnan(inner["B_1"]).sum())
+        ((4, 3, 2), 12)
         """
         axis_names = list(self._grid.surviving_axis_names)
         mask_da = xr.DataArray(cond, dims=axis_names)
@@ -1144,6 +1236,21 @@ class FieldDataset:
         -------
         FieldDataset
             With *axis* (or every name in the tuple) removed from the grid.
+
+        Examples
+        --------
+        Integrating a unit field over two cells of unit spacing gives the
+        trapezoidal path length between the two cell centres:
+
+        >>> import numpy as np
+        >>> from pypic.units import Normalization
+        >>> grid = GridInfo(dimensions=(4, 3, 2), spacing=(1.0, 1.0, 1.0))
+        >>> ds = FieldDataset.from_arrays(
+        ...     {"B_1": np.ones((4, 3, 2))}, grid, Normalization.identity(),
+        ... )
+        >>> column = ds.reduce("z", reduction="integrate")
+        >>> column.grid.dimensions, float(column["B_1"][0, 0])
+        ((4, 3), 1.0)
         """
         from pypic.reductions import reduce as _reduce  # layered above dataset
 
