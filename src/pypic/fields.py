@@ -89,10 +89,6 @@ _QUANTITY_UNITS: dict[str, str] = {
     "dimensionless": "",
 }
 
-assert set(QuantityType) == set(_QUANTITY_UNITS), (
-    "QuantityType and _QUANTITY_UNITS out of sync"
-)
-
 
 # openPMD `unitDimension` 7-tuple — powers of the SI base units in the order
 # (length, mass, time, current, temperature, amount, luminosity).  Encodes the
@@ -124,10 +120,6 @@ _QUANTITY_DIMENSIONS: dict[str, tuple[int, int, int, int, int, int, int]] = {
     "power_density": (-1, 1, -3, 0, 0, 0, 0),  # W/m^3
     "dimensionless": (0, 0, 0, 0, 0, 0, 0),
 }
-
-assert set(QuantityType) == set(_QUANTITY_DIMENSIONS), (
-    "QuantityType and _QUANTITY_DIMENSIONS out of sync"
-)
 
 
 def quantity_dimension(

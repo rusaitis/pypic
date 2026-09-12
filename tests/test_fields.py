@@ -319,6 +319,18 @@ class TestNewFieldEntries:
 class TestQuantityTypeCoverage:
     """Structural tests ensuring quantity-type registries stay synchronized."""
 
+    def test_quantity_type_members_match_the_unit_labels(self) -> None:
+        """Every member has a unit label, and no label is orphaned."""
+        assert {member.value for member in QuantityType} == set(_QUANTITY_UNITS)
+
+    def test_quantity_type_members_match_the_unit_dimensions(self) -> None:
+        """Every member has a 7-tuple, and no 7-tuple is orphaned.
+
+        Set equality in both directions: a one-sided check would miss a
+        `_QUANTITY_DIMENSIONS` key left behind after a member is renamed.
+        """
+        assert {member.value for member in QuantityType} == set(_QUANTITY_DIMENSIONS)
+
     def test_quantity_types_complete(self) -> None:
         """Every quantity type with an SI factor must have a unit label."""
         si_factor_types = _QUANTITIES | _COMPOUND_FACTORS.keys()
@@ -422,12 +434,6 @@ class TestFieldRegistration:
 class TestUnitDimension:
     """openPMD `unitDimension` 7-tuple lookup parallels _QUANTITY_UNITS."""
 
-    def test_every_quantity_type_has_dimension(self) -> None:
-        missing = [
-            qt.value for qt in QuantityType if qt.value not in _QUANTITY_DIMENSIONS
-        ]
-        assert not missing, f"missing dimensions: {missing}"
-
     @pytest.mark.parametrize(
         ("quantity", "expected"),
         [
@@ -498,11 +504,7 @@ class TestUnitDimension:
 
 
 class TestQuantityType:
-    """QuantityType StrEnum covers all _QUANTITY_UNITS keys."""
-
-    def test_covers_all_quantity_units(self) -> None:
-        enum_values = {member.value for member in QuantityType}
-        assert enum_values == set(_QUANTITY_UNITS)
+    """QuantityType StrEnum behaviour."""
 
     def test_strenum_equality_with_strings(self) -> None:
         assert QuantityType.B_FIELD == "b_field"

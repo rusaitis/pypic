@@ -13,12 +13,15 @@ __all__ = [
 
 from dataclasses import dataclass
 from enum import StrEnum
+from types import MappingProxyType
 from typing import TYPE_CHECKING, Any, assert_never
 
 import numpy as np
 from numpy.typing import NDArray
 
 if TYPE_CHECKING:
+    from collections.abc import Mapping
+
     from pypic.types import Numeric
 
 type ScaleFactor = np.floating[Any] | NDArray[np.floating[Any]]
@@ -136,8 +139,12 @@ CYLINDRICAL = CoordinateGeometry(
     axis_units=("length", "angle", "length"),
 )
 
-GEOMETRY_BY_NAME: dict[str, CoordinateGeometry] = {
-    "cartesian": CARTESIAN,
-    "spherical": SPHERICAL,
-    "cylindrical": CYLINDRICAL,
-}
+# Read-only: the three geometries are singletons, and a reader that
+# mutated this table would change what every later dataset resolves to.
+GEOMETRY_BY_NAME: Mapping[str, CoordinateGeometry] = MappingProxyType(
+    {
+        "cartesian": CARTESIAN,
+        "spherical": SPHERICAL,
+        "cylindrical": CYLINDRICAL,
+    }
+)

@@ -250,9 +250,8 @@ def _execute_recipe(
             )
             raise GeometryUnsupportedError(msg)
         args.extend(dataset.grid.spacing)
-        # A no-op while the check above admits Cartesian only, but it
-        # wires the FieldDataset → recipe → operator path so relaxing
-        # that raise is all a non-Cartesian operator would need.
+        # Value-wise inert behind the Cartesian raise; keeps the
+        # FieldDataset → recipe → operator path wired.
         if recipe.passes_geometry:
             kwargs["geometry"] = dataset.grid.geometry.type
 

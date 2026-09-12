@@ -13,10 +13,6 @@ if TYPE_CHECKING:
 
     from pypic.types import FloatArray
 
-# Names of the 21 grid sections in the order they appear in the file.
-# First three are the primary coordinate arrays; the remaining 18 are
-# staggered grids for the field components.
-
 
 @dataclass(frozen=True, slots=True)
 class OpenGGCMGrid:

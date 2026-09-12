@@ -1012,10 +1012,18 @@ class FieldDataset:
         -------
         FloatArray
             Values in SI units.
+
+        Raises
+        ------
+        ValueError
+            If no SI conversion is registered for *name* — a field
+            carrying no ``quantity_type`` attr whose name the global
+            registry also cannot resolve.
         """
         from pypic.compute import compute_field, field_si_factor  # above dataset
 
         length_axes = 0
+        factor: float | None = None
         if self.has_field(name):
             resolved = self.resolve_key(name)
             data = self._ds[resolved].values
@@ -1024,15 +1032,14 @@ class FieldDataset:
             qt = self._ds[resolved].attrs.get("quantity_type")
             if qt is not None:
                 factor = self._normalization.si_factor(qt)
-                if length_axes:
-                    factor *= self._normalization.length_ref**length_axes
-                return data if factor == 1.0 else data * factor
-            # No quantity_type attr — fall through to global registry
         else:
             data = compute_field(name, self)
-
-        # Fall back to global registry
-        factor = field_si_factor(name, self._normalization)
+        if factor is None:
+            # Either a derived quantity, or a stored field with no
+            # ``quantity_type`` attr — what
+            # ``from_arrays(..., strict_fields=False)`` and
+            # ``open_virtual`` produce. Both resolve through the registry.
+            factor = field_si_factor(name, self._normalization)
         if length_axes:
             factor *= self._normalization.length_ref**length_axes
         return data if factor == 1.0 else data * factor
