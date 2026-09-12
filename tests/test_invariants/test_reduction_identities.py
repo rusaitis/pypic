@@ -3,21 +3,21 @@
 #         :457 (spatial_rms, sqrt(nanmean(f²))); docs/equations.md § 7
 #         (reductions table); docs/conventions.md § "Field energy as
 #         volume integral" ("computes Σ f·ΔV, not Σ f²·ΔV").
-# Claims:
-#   (a) field_energy(α·f, dx) == α · field_energy(f, dx) — linearity
-#       in f. Sign-preserving: a negative f gives a negative energy
-#       (catches any accidental square in the sum that would yield a
-#       non-negative L2 norm² instead of the documented volume integral).
-#   (b) field_energy(f, α·dx) == α^ndim · field_energy(f, dx) —
-#       homogeneous of degree ndim in the spacing. Guards the
-#       math.prod(spacing) product.
-#   (c) spatial_mean(α·f + β·g) == α·spatial_mean(f) + β·spatial_mean(g)
-#       — linearity of the unweighted NaN-ignoring mean.
-#   (d) spatial_rms(α·f) == |α|·spatial_rms(f) — homogeneity of degree 1
-#       in magnitude.
-#   (e) spatial_rms(f)² == spatial_mean(f²) — the rms is literally
-#       sqrt of mean-of-squares, so squaring the rms must recover the
-#       mean-square exactly to float64.
+# Claim:
+#  (a) field_energy(α·f, dx) == α · field_energy(f, dx) — linearity
+#      in f. Sign-preserving: a negative f gives a negative energy
+#      (catches any accidental square in the sum that would yield a
+#      non-negative L2 norm² instead of the documented volume integral).
+#  (b) field_energy(f, α·dx) == α^ndim · field_energy(f, dx) —
+#      homogeneous of degree ndim in the spacing. Guards the
+#      math.prod(spacing) product.
+#  (c) spatial_mean(α·f + β·g) == α·spatial_mean(f) + β·spatial_mean(g)
+#      — linearity of the unweighted NaN-ignoring mean.
+#  (d) spatial_rms(α·f) == |α|·spatial_rms(f) — homogeneity of degree 1
+#      in magnitude.
+#  (e) spatial_rms(f)² == spatial_mean(f²) — the rms is literally
+#      sqrt of mean-of-squares, so squaring the rms must recover the
+#      mean-square exactly to float64.
 # Fresh invariant #20 after backlog exhaustion.
 """Linearity + homogeneity of field_energy, spatial_mean, spatial_rms."""
 

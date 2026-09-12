@@ -2,14 +2,17 @@
 #         components by a 3×3 rotation matrix: v'_i = sum_j R_ij v_j")
 #         + :444 ("Rotate a symmetric pressure tensor by a rotation
 #         matrix: P'_ij = sum_kl R_ik R_jl P_kl").
-# Orthogonality of the rotation matrix (required by
-# ``FrameTransform.__post_init__`` at :110, ``|R^T R - I| < 1e-6``)
-# implies two consequences the code never states directly but every
-# caller relies on:
-#   (a) Vector magnitude is preserved: ``|R·v|² == |v|²``.
-#   (b) Composition with the transpose is the identity:
-#       ``R^T · (R · v) == v``, and likewise for the tensor double
-#       contraction.
+# Claim: orthogonality of the rotation matrix (required by
+#        ``FrameTransform.__post_init__`` at :110, ``|R^T R - I| < 1e-6``)
+#        implies three consequences the code never states directly but
+#        every caller relies on:
+#  (a) Vector magnitude is preserved: ``|R·v|² == |v|²``.
+#  (b) Composition with the transpose is the identity:
+#      ``R^T · (R · v) == v``, and likewise for the tensor double
+#      contraction.
+#  (c) The Frobenius norm is preserved: ``‖R P R^T‖_F == ‖P‖_F`` — the
+#      second symmetric-tensor invariant, and the tensor counterpart
+#      of (a).
 # Existing tests in tests/test_transforms.py only cover specific axis
 # swaps / single-angle rotations. Hypothesis over the full SO(3)
 # (Rodrigues via tests.strategies.rotations) exercises arbitrary

@@ -8,15 +8,15 @@
 #         (entropy docstring) + src/pypic/derived.py:571
 #         (gyrotropic_entropy docstring, "exponent 5 arises from combining
 #         the two CGL invariants").
-# Claims:
-#   (a) At isotropy (P_par = P_perp = P), s_gyro(P,P,n) = 3·s(P,n,γ=5/3).
-#       This is the CGL / 3D-γ coincidence made explicit — changing
-#       either formula in isolation breaks it.
-#   (b) Logarithmic scaling: s(α·P,n,γ) = s(P,n,γ) + ln(α).
-#   (c) Logarithmic scaling: s(P,α·n,γ) = s(P,n,γ) - γ·ln(α).
-#   (d) s_gyro(α·P_par, P_perp, n) = s_gyro(P_par, P_perp, n) + ln(α).
-#   (e) s_gyro(P_par, α·P_perp, n) = s_gyro(P_par, P_perp, n) + 2·ln(α).
-#   (f) s_gyro(P_par, P_perp, α·n) = s_gyro(P_par, P_perp, n) - 5·ln(α).
+# Claim:
+#  (a) At isotropy (P_par = P_perp = P), s_gyro(P,P,n) = 3·s(P,n,γ=5/3).
+#      This is the CGL / 3D-γ coincidence made explicit — changing
+#      either formula in isolation breaks it.
+#  (b) Logarithmic scaling: s(α·P,n,γ) = s(P,n,γ) + ln(α).
+#  (c) Logarithmic scaling: s(P,α·n,γ) = s(P,n,γ) - γ·ln(α).
+#  (d) s_gyro(α·P_par, P_perp, n) = s_gyro(P_par, P_perp, n) + ln(α).
+#  (e) s_gyro(P_par, α·P_perp, n) = s_gyro(P_par, P_perp, n) + 2·ln(α).
+#  (f) s_gyro(P_par, P_perp, α·n) = s_gyro(P_par, P_perp, n) - 5·ln(α).
 # Fresh invariant #13 after backlog exhaustion.
 """Algebraic identities between isotropic and gyrotropic entropy."""
 

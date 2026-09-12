@@ -5,14 +5,15 @@
 #         "$P(k) = |FFT(f)|^2 dx / (2π N)$, so that $\int P(k) dk$
 #          is Parseval-consistent with the variance of the windowed
 #          signal."
-# With the boxcar window (correction = 1, no tapering), the identity
-# simplifies to ``sum(power) * dk == var(field)`` bit-exactly for
-# zero-mean signals. Verified numerically to machine precision.
-# Tapered windows (Hann/Hamming/Blackman) apply a ``1/mean(win²)``
-# correction, but for discrete finite signals the integral only
-# *approximately* matches the unwindowed variance — signals whose
-# energy concentrates near the boundary get zeroed by the window taper,
-# and no correction factor can recover that. Tested only with boxcar.
+# Claim: with the boxcar window (correction = 1, no tapering), the
+#        identity simplifies to ``sum(power) * dk == var(field)``
+#        bit-exactly for zero-mean signals. Verified numerically to
+#        machine precision. Tapered windows (Hann/Hamming/Blackman)
+#        apply a ``1/mean(win²)`` correction, but for discrete finite
+#        signals the integral only *approximately* matches the
+#        unwindowed variance — signals whose energy concentrates near
+#        the boundary get zeroed by the window taper, and no correction
+#        factor can recover that. Tested only with boxcar.
 # Fresh invariant #9 after backlog exhaustion.
 """Parseval identity for ``power_spectrum_1d``."""
 

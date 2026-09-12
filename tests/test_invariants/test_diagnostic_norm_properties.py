@@ -5,16 +5,16 @@
 #         ("L2 is discrete, unweighted ... volume factors cancel;
 #         L∞ is absolute, not relative — relative L∞ is misleading
 #         near field nulls").
-# Claims (the two non-trivial metric properties of the error norms):
-#   (a) Scale invariance of the relative L2:
-#       l2(α a, α b) == l2(a, b) for α ≠ 0 — the scale factor cancels
-#       between numerator and denominator. Catches any accidental
-#       absolute-norm regression.
-#   (b) Homogeneity of the absolute L∞:
-#       linf(α a, α b) == |α| · linf(a, b) — the abs-max-difference
-#       scales linearly with a uniform rescaling, matching the
-#       "absolute, not relative" docstring contract. A sign leak
-#       (missing abs()) would flip the comparison under α < 0.
+# Claim: the two non-trivial metric properties of the error norms:
+#  (a) Scale invariance of the relative L2:
+#      l2(α a, α b) == l2(a, b) for α ≠ 0 — the scale factor cancels
+#      between numerator and denominator. Catches any accidental
+#      absolute-norm regression.
+#  (b) Homogeneity of the absolute L∞:
+#      linf(α a, α b) == |α| · linf(a, b) — the abs-max-difference
+#      scales linearly with a uniform rescaling, matching the
+#      "absolute, not relative" docstring contract. A sign leak
+#      (missing abs()) would flip the comparison under α < 0.
 # Note on l2 symmetry: NOT a claim — l2_relative_error normalizes by
 # the reference, so swapping args swaps the denominator. Documented
 # asymmetry (conventions.md) that we do not test as an invariant.

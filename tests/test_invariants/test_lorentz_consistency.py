@@ -6,16 +6,16 @@
 #    v_i = u_i/γ only when needed."
 # + src/pypic/derived.py:1980 (lorentz_factor — from 3-velocity)
 # + src/pypic/derived.py:2015 (lorentz_factor_from_four_velocity).
-# Claims:
-#   (a) The two formulas agree bit-exactly on matched inputs:
-#       given γ = 1/√(1 - v²/c²), setting u = γ·v gives
-#       γ' = √(1 + u²/c²) == γ (algebraic identity).
-#   (b) γ(v=0) == 1.
-#   (c) γ(-v) == γ(+v) (even function of v).
-#   (d) γ(v) ≥ 1 for any v in [0, c).
+# Claim:
+#  (a) The two formulas agree bit-exactly on matched inputs:
+#      given γ = 1/√(1 - v²/c²), setting u = γ·v gives
+#      γ' = √(1 + u²/c²) == γ (algebraic identity).
+#  (b) γ(v=0) == 1.
+#  (c) γ(-v) == γ(+v) (even function of v).
+#  (d) γ(v) ≥ 1 for any v in [0, c).
 # Also covers ``magnetization`` sign:
-#   (e) σ ≥ 0 for any B, ρ_m > 0.
-#   (f) σ(B=0) == 0.
+#  (e) σ ≥ 0 for any B, ρ_m > 0.
+#  (f) σ(B=0) == 0.
 # Fresh invariant #10 after backlog exhaustion.
 """Cross-consistency between the two Lorentz-factor formulas."""
 

@@ -2,7 +2,8 @@
 #   d  = c / ω_p          (skin depth)
 #   r  = v_th / ω_c       (gyroradius)
 #   λ_D = sqrt(T / (nq²)) (Debye length)
-# Direct algebraic consequences linking the independently-authored recipes:
+# Claim: direct algebraic consequences linking the independently-authored
+#        recipes:
 #   (i)   skin_depth × plasma_frequency == c
 #   (ii)  gyroradius × gyrofrequency == thermal_speed
 #   (iii) debye_length × plasma_frequency == thermal_speed

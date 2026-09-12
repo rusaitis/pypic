@@ -2,12 +2,12 @@
 #         ("EF = KEF + EHF + q"); src/pypic/derived.py:1103
 #         (kinetic_energy_flux_component, KEF_i = (1/2) n m |V|² V_i);
 #         :1181 (enthalpy_flux_component, EHF_i = (γ/(γ-1)) P V_i).
-# Claims:
-#   (a) KEF_i(αV) = α³ · KEF_i(V). Encodes the |V|² · V_i structure:
-#       a typo reducing to |V| · V_i (α²) or V_i alone (α) would be
-#       caught by varying α.
-#   (b) EHF is jointly linear in (P, V) — a single α-scaling of either
-#       argument scales EHF by α; combined (αP, βV) scales by αβ.
+# Claim:
+#  (a) KEF_i(αV) = α³ · KEF_i(V). Encodes the |V|² · V_i structure:
+#      a typo reducing to |V| · V_i (α²) or V_i alone (α) would be
+#      caught by varying α.
+#  (b) EHF is jointly linear in (P, V) — a single α-scaling of either
+#      argument scales EHF by α; combined (αP, βV) scales by αβ.
 # Dropped as ill-posed:
 #   - "HF + KEF = EF bit-exact" and "q + EHF = HF bit-exact": Hypothesis
 #     found ef=0.05, kef=1.0 produces a 1-ulp residual in (ef-kef)+kef-ef.

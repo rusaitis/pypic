@@ -1,6 +1,17 @@
 # Source: docs/equations.md § 5 ("Characteristic Scales") — β, v_A, Alfvén
 # and magnetosonic Mach numbers have closed-form algebraic definitions in
 # pypic's SI-rationalized normalization (μ₀ = 1).
+# Claim: reached through ``ds.compute(name)``, each recipe reproduces its
+#        closed form exactly — the registry dispatch is not a second
+#        implementation:
+#  (a) "beta", "beta_e", "beta_i" == 2 P / B² with P, Pe, Pi respectively;
+#      the species suffix selects the pressure and nothing else.
+#  (b) "v_A" == |B| / sqrt(ρ_m) (non-relativistic branch).
+#  (c) "M_A" == |V| / v_A — a composition the registry resolves from
+#      V_1..V_3, B_1..B_3 and ρ_m.
+# A recipe wired to the wrong pressure field, or a dependency resolved to
+# the wrong intermediate, passes every pure-function test in
+# tests/test_derived.py and fails only here.
 # Covers backlog #2b: compute-dispatch parity for the plasma-parameter
 # recipes (beta family, v_A, M_A).
 """Algebraic identities for plasma-parameter recipes in ``compute._REGISTRY``."""

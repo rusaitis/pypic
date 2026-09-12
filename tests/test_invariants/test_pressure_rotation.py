@@ -4,14 +4,14 @@
 #         P_11 + P_22 + P_33 is invariant [under rotation]")
 #         + docs/equations.md § 4 footnote [^9]
 #         ("$P = (P_\parallel + 2 P_\perp)/3$").
-# Claims tested here:
-#   (a) Trace of the rotated pressure tensor equals the original trace.
-#   (b) ``parallel_pressure(R·P·R^T, R·B)`` == ``parallel_pressure(P, B)``
-#       — R acts on both arguments, scalar falls out unchanged.
-#   (c) Same for ``perpendicular_pressure``.
-#   (d) Algebraic: ``(P_par + 2 P_perp)/3`` equals the trace/3, so the
-#       isotropic scalar pressure agrees whether derived from the tensor
-#       trace directly or via the parallel/perpendicular decomposition.
+# Claim:
+#  (a) Trace of the rotated pressure tensor equals the original trace.
+#  (b) ``parallel_pressure(R·P·R^T, R·B)`` == ``parallel_pressure(P, B)``
+#      — R acts on both arguments, scalar falls out unchanged.
+#  (c) Same for ``perpendicular_pressure``.
+#  (d) Algebraic: ``(P_par + 2 P_perp)/3`` equals the trace/3, so the
+#      isotropic scalar pressure agrees whether derived from the tensor
+#      trace directly or via the parallel/perpendicular decomposition.
 """Rotation invariance and CGL identity for pressure decomposition."""
 
 from __future__ import annotations

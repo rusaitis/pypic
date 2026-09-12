@@ -3,11 +3,11 @@
 #         "E_ideal = -V × B"
 #         src/pypic/derived.py:1675 (non_ideal_electric_field)
 #         src/pypic/derived.py:1623 (ideal_electric_field)
-# Claims:
-#   (a) E_prime + E_ideal = E component-wise (Ohm's law closure).
-#   (b) E_ideal · B = 0 (ideal E is perpendicular to B).
-#   (c) E_prime · B = E · B (non-ideal preserves B-parallel E component).
-#   (d) magnetic_shear_angle(B, B) = 0 and magnetic_shear_angle(B, -B) = π.
+# Claim:
+#  (a) E_prime + E_ideal = E component-wise (Ohm's law closure).
+#  (b) E_ideal · B = 0 (ideal E is perpendicular to B).
+#  (c) E_prime · B = E · B (non-ideal preserves B-parallel E component).
+#  (d) magnetic_shear_angle(B, B) = 0 and magnetic_shear_angle(B, -B) = π.
 # Each function is authored independently (different args, different
 # signs); a sign error in the V×B cross product would break (a) even
 # though each function's own unit test uses only one test vector.

@@ -5,16 +5,16 @@
 #         test_ohms_law_decomposition.py, which establishes
 #         E_ideal · B = 0; this file covers the three complementary
 #         orthogonalities.
-# Claims:
-#   (a) E_ideal · V = 0 — the convective E = -V × B is perpendicular
-#       to V as well as to B; test_ohms_law_decomposition.py covers
-#       only the B side.
-#   (b) E_Hall · J = 0 — J × B / (n|q|) is perpendicular to J.
-#   (c) E_Hall · B = 0 — and to B.
-#   (d) hall_electric_field(.., charge=+q) == hall_electric_field(.., charge=-q)
-#       — docstring promises "The absolute value is used — sign does not
-#       affect the result" (derived.py:1777). A missing abs() would
-#       break this.
+# Claim:
+#  (a) E_ideal · V = 0 — the convective E = -V × B is perpendicular
+#      to V as well as to B; test_ohms_law_decomposition.py covers
+#      only the B side.
+#  (b) E_Hall · J = 0 — J × B / (n|q|) is perpendicular to J.
+#  (c) E_Hall · B = 0 — and to B.
+#  (d) hall_electric_field(.., charge=+q) == hall_electric_field(.., charge=-q)
+#      — docstring promises "The absolute value is used — sign does not
+#      affect the result" (derived.py:1777). A missing abs() would
+#      break this.
 # Fresh invariant #15 after backlog exhaustion.
 """Hall and ideal E-field perpendicularities + Hall charge-sign invariance."""
 

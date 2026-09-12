@@ -7,14 +7,14 @@
 #         docs/equations.md § 9 footnote [^14]: "firehose unstable when
 #         P_par - P_perp > B²/2; mirror unstable when
 #         P_perp/P_par > 1 + 1/beta_perp".
-# Claims:
-#   (a) poynting_flux(E, B) == -poynting_flux(B, E) — anti-commutativity
-#       of the cross product. Guards against sign/order bugs in the
-#       component expansion.
-#   (b) At isotropy (P_par == P_perp): firehose < 0 and mirror < 0
-#       for any finite B and P > 0. At isotropy the plasma is ALWAYS
-#       stable to both instabilities — a sign or denominator bug would
-#       break this. Tests the analytical limit, not the formula itself.
+# Claim:
+#  (a) poynting_flux(E, B) == -poynting_flux(B, E) — anti-commutativity
+#      of the cross product. Guards against sign/order bugs in the
+#      component expansion.
+#  (b) At isotropy (P_par == P_perp): firehose < 0 and mirror < 0
+#      for any finite B and P > 0. At isotropy the plasma is ALWAYS
+#      stable to both instabilities — a sign or denominator bug would
+#      break this. Tests the analytical limit, not the formula itself.
 # Fresh invariant #6 after backlog exhaustion.
 """Poynting-flux anti-commutativity and stability at pressure isotropy."""
 

@@ -7,16 +7,16 @@
 #         "You cannae change the laws of physics - v_ms < c, always"
 #         + src/pypic/derived.py:659-660 "caps the result at c"
 #         + src/pypic/derived.py:166-169 "approaches c as sigma -> inf".
-# Claims:
-#   (a) alfven_speed(b, rho_m, c=c)    <= c for b >= 0, rho_m > 0.
-#   (b) magnetosonic_speed(v_A, c_s, c=c) <= c for v_A, c_s in [0, c].
-#   (c) magnetosonic_speed(v_A, c_s, c=c) >= max(v_A, c_s) for v_A, c_s
-#       in [0, c] (fast-mode ordering - v_ms is the *fast* mode, so it
-#       must exceed both constituent speeds).
-#   (d) thermal_speed(T, m, c=c)       <= c for T >= 0, m > 0.
-#   (e) Non-relativistic v_ms can exceed c (demonstrates why the
-#       relativistic composition exists) - guards against a future
-#       refactor silently capping the non-rel branch too.
+# Claim:
+#  (a) alfven_speed(b, rho_m, c=c)    <= c for b >= 0, rho_m > 0.
+#  (b) magnetosonic_speed(v_A, c_s, c=c) <= c for v_A, c_s in [0, c].
+#  (c) magnetosonic_speed(v_A, c_s, c=c) >= max(v_A, c_s) for v_A, c_s
+#      in [0, c] (fast-mode ordering - v_ms is the *fast* mode, so it
+#      must exceed both constituent speeds).
+#  (d) thermal_speed(T, m, c=c)       <= c for T >= 0, m > 0.
+#  (e) Non-relativistic v_ms can exceed c (demonstrates why the
+#      relativistic composition exists) - guards against a future
+#      refactor silently capping the non-rel branch too.
 # Fresh invariant #12 after backlog exhaustion.
 """Relativistic speed formulas respect the c-cap at any finite c."""
 

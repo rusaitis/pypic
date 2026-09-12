@@ -3,7 +3,7 @@
 #           e_int  = P / ((γ - 1) ρ_m)                    # specific internal energy
 #           e_th   = P / (γ - 1)                          # volumetric thermal energy
 #           c_s    = √(γ P / ρ_m)                         # adiabatic sound speed
-# Direct algebraic consequences of those four formulas:
+# Claim: direct algebraic consequences of those four formulas:
 #   (i)  h - e_int = P / ρ_m           (pressure-to-density ratio)
 #   (ii) h = γ · e_int                  (enthalpy = γ × internal energy)
 #   (iii) e_th = ρ_m · e_int            (volumetric thermal = mass × specific internal)

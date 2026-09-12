@@ -1,6 +1,17 @@
 # Source: docs/schema.md § 2 (Normalization must round-trip SI ↔ code).
 # Extends tests/test_units.py:65 from {pic_electron, mhd_standard} to all
 # four standard constructors × all six base quantities.
+# Claim:
+#  (a) ``to_si(q, normalize(q, x)) ≈ x`` for every base quantity and every
+#      standard normalization — the two directions are mutual inverses to
+#      float64 roundoff, so neither can carry a reference factor the other
+#      does not.
+#  (b) All four constructors accept all six base quantities without
+#      raising: a constructor that silently left a ``*_ref`` field unset
+#      fails here rather than deep in an analysis.
+#  (c) ``si_factor(q)`` is finite and strictly positive for every compound
+#      quantity, which is what makes the compound conversion invertible by
+#      division.
 """Hypothesis round-trip properties for ``Normalization.normalize`` / ``to_si``."""
 
 from __future__ import annotations
