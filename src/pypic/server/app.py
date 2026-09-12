@@ -95,10 +95,10 @@ def create_app(
         """Route every typed pypic error to its declared HTTP status.
 
         Body shape is ``{"kind": <wire kind>, "detail": <message>}`` —
-        ``detail`` stays back-compat with the previous
-        ``HTTPException(detail=str(exc))`` shape; ``kind`` is additive
-        and matches the WebSocket `ErrorFrame.kind` literal so
-        clients can dispatch identically across both transports.
+        ``detail`` carries the message a bare
+        ``HTTPException(detail=str(exc))`` would, and ``kind`` matches
+        the WebSocket `ErrorFrame.kind` literal so clients can dispatch
+        identically across both transports.
         """
         return JSONResponse(
             status_code=exc.status_code,

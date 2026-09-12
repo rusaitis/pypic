@@ -453,9 +453,8 @@ def _build_metadata(schema: SimulationSchema) -> dict[str, Any]:
     """Build the free-form ``metadata`` dict for ``SimulationConfig``.
 
     ``initial_conditions`` and ``output`` are *not* duplicated here —
-    they live as typed attributes on ``SimulationConfig`` directly.
-    Callers that previously read ``cfg.metadata["output"]`` should now
-    use ``cfg.output`` (a validated ``Output`` model) instead.
+    they live as typed attributes on ``SimulationConfig`` directly
+    (``cfg.output`` is a validated ``Output`` model).
     """
     metadata: dict[str, Any] = {}
     if schema.model.version is not None:

@@ -345,8 +345,8 @@ def align_grids(
         Input datasets on (possibly different) uniform Cartesian grids.
     fields : Iterable[str] | None
         Canonical field names (or aliases) to keep on the output. When
-        *None* (default) every field in each dataset is regridded, which
-        matches the historical behavior. Pass a subset to skip wasted
+        *None* (default) every field in each dataset is regridded.
+        Pass a subset to skip wasted
         interpolation — each name is resolved through **both** source
         alias tables independently, so ``"Bx"`` works even when one side
         only exposes the canonical ``"B_1"``.

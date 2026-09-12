@@ -361,8 +361,7 @@ def validate(
 
     # div B needs all three axes: the operators differentiate along
     # axis 0/1/2 explicitly, so a 2D dataset has no third axis to take
-    # the derivative over. Splatting a 2-tuple of spacings used to raise
-    # TypeError here and take the whole command down.
+    # the derivative over.
     is_3d = len(ds.grid.spacing) == 3
 
     if has_b:

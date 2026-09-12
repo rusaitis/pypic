@@ -1,12 +1,14 @@
 r"""Grid-aware cross-model comparison utilities.
 
-These three functions are the only place in pypic where diagnostic
-math touches [`FieldDataset`][pypic.dataset.FieldDataset]. Everything in
-[`pypic.diagnostics`][pypic.diagnostics] stays pure (NumPy in, NumPy out); the
-functions here add the glue layer — alignment via [`pypic.regrid`][pypic.regrid],
-alias resolution through both datasets, and SI conversion at the
-comparison boundary — then delegate the actual norm evaluation back
-to the pure helpers.
+These three functions are the only place the pure
+[`pypic.diagnostics`][pypic.diagnostics] norms are wrapped as a
+[`FieldDataset`][pypic.dataset.FieldDataset]-level public API
+([`pypic.reductions`][pypic.reductions] is the other module that runs
+NumPy reductions over dataset-held arrays). The norms themselves stay
+pure (NumPy in, NumPy out); the functions here add the glue layer —
+alignment via [`pypic.regrid`][pypic.regrid], alias resolution through
+both datasets, and SI conversion at the comparison boundary — then
+delegate the actual norm evaluation back to the pure helpers.
 
 Cross-model comparisons (e.g. iPIC3D vs BATSRUS) default to SI because
 different normalizations are incomparable in code units; same-model
@@ -128,10 +130,8 @@ def _align_frames(
     first would compute a common domain across two incompatible
     coordinate systems.
 
-    Frame transforms are static. When ``transform_to`` grows an
-    ``epoch`` kwarg for dipole-tilt-style rotations and SPICE
-    ephemerides, this helper forwards it; there is nothing to thread
-    through until then.
+    Frame transforms are static, so the target frame alone determines
+    the rotation.
     """
     if frame is not None and not frame:
         msg = "frame must be a non-empty string"

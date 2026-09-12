@@ -1,10 +1,9 @@
 """Shared formatting helpers for pypic plotting overlays.
 
-This module consolidates helpers that were previously duplicated across
-the matplotlib (`pypic.plotting._badge`) and pyvista
-(`pypic.plotting.pyvista._badge`) backends. Both backends import the
-same `BadgeLoc` type alias and the same formatters so badge
-content and positioning stay in lockstep.
+The matplotlib (`pypic.plotting._badge`) and pyvista
+(`pypic.plotting.pyvista._badge`) backends import the same `BadgeLoc`
+type alias and the same formatters from here, so badge content and
+positioning stay in lockstep across the two.
 """
 
 from __future__ import annotations

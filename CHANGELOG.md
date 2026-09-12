@@ -100,6 +100,10 @@ The distribution is `pypic-plasma` on PyPI; the import name is `pypic`.
 
 ### Changed
 
+- `pypic.coordinates.GEOMETRY_BY_NAME` is a read-only `Mapping`
+  (`MappingProxyType`), not a `dict`: the three geometries are singletons, and
+  a caller that mutated the table would change what every later dataset
+  resolves to. Reads are unaffected.
 - Fail loud instead of warn-and-continue: duplicate `register_field` /
   `register_reader` calls, read options passed to a reader without selective
   read, an H5hut species count that disagrees with the config, and ambiguous

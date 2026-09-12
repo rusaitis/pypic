@@ -495,8 +495,7 @@ def encode_pypic_attrs(fds: FieldDataset) -> dict[str, Any]:
       ``grid.boundary`` (in-memory carries one tuple per axis; emitted
       as both faces).
     * ``coordinates`` — consolidates ``geometry``, ``frame``, optional
-      ``axis_labels``, and ``transforms`` (previously split across
-      ``grid``, top-level ``frame``, top-level ``transforms``).
+      ``axis_labels``, and ``transforms``.
     * ``physics`` — emits ``relativistic`` plus ``gamma_eos`` (from
       ``PhysicsParams.gamma``); ``c`` moves to
       ``normalization.speed_of_light``.

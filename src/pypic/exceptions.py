@@ -55,9 +55,9 @@ class PypicError(Exception):
         The `KeyError`-inheriting subclasses (Unknown\*Error)
         otherwise ``str()`` to ``"'msg'"`` because ``KeyError.__str__``
         calls ``repr()`` on ``args[0]``.  Wire consumers (the HTTP body's
-        ``detail`` field, `ErrorFrame.message`) want the bare
-        message, and the previous ``str(exc).strip("'")`` workaround
-        silently mangled legitimate-quote messages.
+        ``detail`` field, `ErrorFrame.message`) want the bare message,
+        which ``args[0]`` gives directly — stripping quotes off
+        ``str(exc)`` would mangle messages that legitimately carry them.
         """
         if self.args:
             return str(self.args[0])

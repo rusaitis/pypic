@@ -170,12 +170,11 @@ def _check_timeseries_identity(
 
     A timeseries describes one simulation's evolution: grid,
     normalization, species, physics, frame, and frame transforms must
-    stay constant.  Without this check, the writer used to silently
-    flatten every later step's identity to the first step's — the data
-    landed but the reconstructed FieldDataset described a different
-    simulation than the one that produced it.  Per-step *metadata*
-    differences are tolerated (intersected by the caller); this guard
-    only fires for the identity-defining attrs.
+    stay constant.  Only step 0's identity attrs reach the store, so
+    without this check the data would land under a description of a
+    different simulation than the one that produced it.  Per-step
+    *metadata* differences are tolerated (intersected by the caller);
+    this guard only fires for the identity-defining attrs.
     """
     diffs: list[str] = []
     if first_fds.grid != current_fds.grid:
