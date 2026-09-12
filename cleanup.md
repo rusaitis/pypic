@@ -393,10 +393,18 @@ after.
 
 ## Phase 7 — tests and tooling
 
-Budget ~45 files, ~600 added / ~400 deleted, four config files. Item 1 can
-land first and will guard everything else.
+Landed 2026-09-12. Budget was ~45 files, ~600 added / ~400 deleted, four
+config files. Item 1 landed first and guarded the rest.
 
-1. - [ ] **pytest hardening in `pyproject.toml`.** Today only
+Three anchors were measured wrong in the text below and are corrected
+per item: the bare-`assert_allclose` count (280 by grep, 194 by parse —
+a grep reports a multi-line call as bare when its `rtol` sits on a later
+line), item 3's fixture-adoption premise (the three named files already
+import `tests/_helpers`), and item 5's `test_examples_smoke.py` premise
+(that file is `--sim-data`-gated and never reads `tests/data`). Item 1's
+lint-gate diagnosis was also wrong in an interesting way — see below.
+
+1. - [x] **pytest hardening in `pyproject.toml`.** Today only
    `addopts = "--doctest-modules --strict-markers -ra"`. Add
    `markers = ["slow", "integration", "fixture_data"]`, `xfail_strict = true`,
    `filterwarnings = ["error", ...]`. Run the suite with `-W error` first and
@@ -415,7 +423,35 @@ land first and will guard everything else.
    upstream with the ruff version from `uv.lock`. Until it is fixed,
    `format` is the gate that actually catches long lines.
 
-2. - [ ] **Tolerances.** 280 of 794 `assert_allclose` calls carry no
+   Landed. Only **two** warning sources fired under `-W error`, not the
+   3-5 expected: zarr-python's consolidated-metadata warning (71 of the
+   73, and deliberate on our side — schema.md § 4.2 makes consolidated
+   metadata part of the layout), which takes the one suite-wide ignore;
+   and pypic's own NaN-omit warning, which reaches exactly one test, the
+   one checking that `-q` routes it to logging. That test opts out
+   locally with `@pytest.mark.filterwarnings`, so an unexpected NaN
+   warning anywhere else still fails. `xfail_strict` went in (no xfail
+   exists yet; it is a guard on the first one). The three **markers did
+   not**: `--strict-markers` already fails an undeclared marker at first
+   use, which is the moment to declare it, and none of `slow` /
+   `integration` / `fixture_data` has a user — item 5's `fixture_data`
+   candidate turned out not to be one. Verified on 3.13 and 3.14: 2912
+   passed, 2 warnings, both the allowed ones.
+
+   The lint-gate diagnosis above is wrong. It is not that adding paths
+   suppresses findings — it is that ruff 0.15.5's **multi-root walk is
+   nondeterministic**. Same tree, same command, repeated: 264 files
+   walked, or 253, or 69 with `src/` dropped whole. A planted F401 in
+   `src/` was caught **1 run in 10**. `--no-cache` makes it worse, not
+   better: it pins the walk to the 69-file truncation. Some runs also
+   ignored `.gitignore` and linted `examples/*/` scratch directories.
+   Fix: give ruff a single root (`ruff check .`), which is deterministic
+   across 8 runs, catches the planted F401 8/8, and walks a strict
+   superset of the five paths — the only extra file is `pyproject.toml`.
+   mypy keeps an explicit list; it has no `.gitignore` awareness. Worth
+   reporting upstream, with this reproduction.
+
+2. - [x] **Tolerances.** 280 of 794 `assert_allclose` calls carry no
    `rtol`/`atol`. Sweep file by file: `test_derived.py` 39,
    `test_ipic3d_synthetic.py` 38, `test_transforms.py` 25, `test_compute.py`
    22, `test_readers_base.py` 18, `test_traces.py` 16, `test_geometry.py` 15,
@@ -426,13 +462,51 @@ land first and will guard everything else.
    Then add a ruff-free guard: a test that greps `tests/` for bare
    `assert_allclose(` and fails with the file list.
 
-3. - [ ] **Fixtures.** Adopt `conftest.py` `cartesian_3d` / `spherical_3d`
+   Landed. **194**, not 280 — the count above is grep-derived and a grep
+   calls a multi-line invocation bare when its `rtol` sits on a later
+   line. `test_derived.py`'s 39 and `test_compute.py`'s 22 were almost
+   entirely that: 0 and 5 respectively once parsed. The guard is
+   therefore AST-based too, in the new `tests/test_suite_conventions.py`,
+   and was checked against a planted multi-line bare call that a grep
+   guard would have passed.
+   183 of the 194 were never approximations — an I/O round-trip, a
+   second reader path over the same bytes, an alias resolving to the
+   same array, a signed-permutation rotation, a literal read back out of
+   a fixture — and became `assert_array_equal`. Every one passed first
+   run; no exactness claim had to be walked back. The remaining 11 got
+   `rtol=1e-15`, a tightening from numpy's 1e-7 default. No cancelling
+   sum needed the `atol` treatment the text anticipated. Two findings:
+   the iPIC3D `rho_c`-sums-over-species tests compare against an
+   identically-zero field, where a bare `assert_allclose` asserts
+   nothing at all (rtol scales the desired value); and
+   `test_numerics.py`'s Dormand-Prince docstring already promised the
+   batched and scalar kernels agree bit-for-bit while the assertion
+   claimed only "close".
+
+3. - [x] **Fixtures.** Adopt `conftest.py` `cartesian_3d` / `spherical_3d`
    and `tests/_helpers.py` in `test_comparison.py` (58 inline `from_arrays`),
    `test_regrid.py` (33), `test_zarr_io.py` (27), and the 24 files building
    `GridInfo(...)` inline. Add fixtures to `conftest.py` only when a second
    file needs the same shape.
 
-4. - [ ] **Banners and headers.** 66 `# ---` / `# ===` banner lines across
+   Premise stale on the first half: `test_comparison.py`, `test_regrid.py`
+   and `test_zarr_io.py` already import `tests/_helpers`, and their
+   `from_arrays` calls are not boilerplate — each carries the analytic
+   field that test is about (`np.sin(x)`, `x + 2y + offset`), which is
+   exactly what a shared random-normal fixture would destroy.
+   `cartesian_3d` is an 8x6x4 standard-normal dataset; a comparison or
+   regrid test needs known interpolants, not noise. Nothing adopted
+   there, and no new `conftest.py` fixture earned a second caller.
+   The real residual was the `GridInfo(...)` half, measured by AST: 93
+   inline constructions, of which 58 pass `geometry`, `dt`, `boundary`
+   or `surviving_axes` and cannot be expressed by `make_uniform_grid`.
+   31 could and now do (the other 4 are inside `_helpers.py` itself,
+   where routing them through a sibling helper adds indirection for no
+   reader). Seven of the 31 also carried a function-local `from
+   pypic.grid import GridInfo` purely to build a unit grid. Net -77
+   lines, 405 tests unchanged.
+
+4. - [x] **Banners and headers.** 66 `# ---` / `# ===` banner lines across
    8 test files (`test_arrow_parquet_io`, `test_traces`, `test_schema`,
    `test_comparison`, `test_regrid`, `test_derived`, `test_transforms`,
    `test_registry_consistency`): delete, use classes or module split if the
@@ -440,13 +514,45 @@ land first and will guard everything else.
    `tests/test_invariants/` to `# Claim:`; add a test that every module there
    carries both `# Source:` and `# Claim:`.
 
-5. - [ ] **Gating.** Drop `importorskip("pydantic")` at
+   Landed. 35 of the 36 banner blocks were pure restatement of the class
+   or docstring directly beneath (`# compare_fields` over
+   `class TestCompareFields`; `# Test 2 — per-species prefixes resolve
+   for both static (s0/s1) and dynamic (s5+)` over a docstring saying
+   that), and three named work batches rather than code, which CLAUDE.md
+   rules out on its own. One survivor labels a module-level data table
+   and carries a schema.md pointer found nowhere else; it keeps the text
+   and loses the rules. No grouping was load-bearing, so the class-wrap
+   escape hatch went unused: 678 tests over the eight files, before and
+   after.
+   The header half was worse than the plural-label count suggested:
+   eight *further* modules had no `# Claim:` label at all, their claim
+   sitting as unlabelled prose inside the `# Source:` block. Those are
+   split apart; two (`test_norm_roundtrip`, `test_compute_plasma_params`)
+   had no claim written anywhere and got one derived from their
+   assertions. The split also caught `test_rotation_roundtrip` promising
+   "two consequences" of orthogonality while testing three.
+
+5. - [x] **Gating.** Drop `importorskip("pydantic")` at
    `tests/test_server_exceptions.py:95` (pydantic is core). Replace the 8
    hand-rolled `pytest.skip(...)` in `test_examples_smoke.py:167-246` with one
    `fixture_data` marker plus a `skipif` on missing `tests/data`. Delete
    `tests/data/.DS_Store` and add it to `.gitignore` if not already.
 
-6. - [ ] **Doctests for non-exempt gaps.** `dataset.py`: `transform_to`
+   The `importorskip` is gone (it had drifted to :146). The `.DS_Store`
+   half was already done: both files are untracked and `.gitignore:109`
+   already re-excludes `tests/data/.DS_Store` past the `!tests/data/**`
+   negation. Local copies deleted.
+   The `test_examples_smoke.py` premise **fails**. That module collects
+   zero tests without `--sim-data` and never reads `tests/data` — it
+   scans a user-supplied directory of real simulation output. Its eight
+   skips are per-discovered-directory dispatch ("no reader for model in
+   X", "not an MHDUCLA simulation", "no B_1 field"), which a single
+   `fixture_data` marker plus a `skipif` on a path cannot express, and
+   replacing them would lose the dispatch while gating on a directory
+   the file does not use. Left alone; this is also why no `fixture_data`
+   marker was declared in item 1.
+
+6. - [x] **Doctests for non-exempt gaps.** `dataset.py`: `transform_to`
    (:374), `sel` (:750), `in_si` (:987), `in_units` (:1040), `isel` (:1069),
    `where` (:1093), `reduce` (:1117). `compute.py` has 4 doctest lines over
    18 defs; cover `compute_field`, `available_quantities`,
@@ -454,13 +560,35 @@ land first and will guard everything else.
    `field_si_factor`. `codegen.py` (4 public exports, 0 doctests) and
    `traces/_sampling.py` (0 doctests) get one each on synthetic arrays.
 
-7. - [ ] **Coverage.** `pytest-cov` in the dev group, `[tool.coverage.run]`
+   Landed: 15 new Examples blocks. `register_recipe` already had one, so
+   `compute.py` got five not six. `codegen.py`'s four double as the first
+   pin on the camelCase wire keys webpic reads — Phase 6 item 6 found
+   `passesGeometry` crossing repos with no test behind it, and
+   `export_recipes`'s doctest now asserts it. `traces/_sampling.py` got
+   two (`sample_field`, `sample_fields`), both showing the
+   out-of-domain-returns-NaN behaviour that the prose only asserts.
+
+7. - [x] **Coverage.** `pytest-cov` in the dev group, `[tool.coverage.run]`
    with `source = ["pypic"]`, `fail_under` = measured minus 2, a `cov`
    subcommand in `scripts/check.sh`, one CI job. No upload service.
 
-8. - [ ] **Pre-commit.** `.pre-commit-config.yaml` running
+   Measured 88.19%; `fail_under = 86`. Two `exclude_also` entries for
+   code that cannot execute: `if TYPE_CHECKING:` blocks, and the
+   `assert_never` guard architecture.md mandates after an exhaustive
+   enum match (reaching it means the enum grew a member, which mypy
+   rejects first). `cov` sits outside the default `check.sh` chain — it
+   re-runs the suite `test` already ran, instrumented, for ~60% more
+   wall clock — and is one CI job rather than a flag on the 3.13/3.14
+   matrix, which would buy the same number twice.
+
+8. - [x] **Pre-commit.** `.pre-commit-config.yaml` running
    `scripts/check.sh lint` and `format` only (local hooks, no mirrors, so the
    pinned ruff in `uv.lock` is the one that runs).
+
+   Landed as specified, plus a CONTRIBUTING.md pointer. Verified with
+   `uvx pre-commit run --all-files`; both hooks pass. `pre-commit` is
+   deliberately not a dev-group dependency — CI gates on `check.sh`
+   directly, so the hook is a local convenience, not a build input.
 
 9. - [ ] **Ruff families, one commit each.** PLW, BLE, SLF (with a
    per-file-ignores list that doubles as the seam inventory), PTH, PERF,
@@ -469,11 +597,59 @@ land first and will guard everything else.
    is escaped; add a same-line reason). Not PLR / TRY / EM / FBT / COM /
    PLC0415 / ISC.
 
+   Nine of the ten enabled, in five commits rather than ten. FURB+LOG,
+   then PERF+C4+PIE+PTH together, then PLW, BLE and SLF separately. The
+   four in the middle share files — `readers/ipic3d/_conserved.py` alone
+   carries PTH123, PIE810, C401 and PERF401, two of them in one
+   function — so a commit per family would have meant staging
+   overlapping hunks, which serves bisection worse than one commit that
+   names all four. The last three each carry a distinct judgement and
+   are worth reading separately.
+   **RET is not enabled.** It finds eight things here and is wrong about
+   five: `_morton.py`'s bit-interleave and `fields.py`'s LaTeX
+   substitutions are ladders of parallel transformations where promoting
+   the last rung to a `return` makes it look special when it isn't;
+   `test_operators` names its `max(...)` `error` because that is what
+   the number means; and RET501's single finding is a `find_spec`
+   returning None as the meta-path protocol's "not mine" signal. A
+   family needing five suppressions to buy three line deletions is not
+   worth the noqa noise, so the three genuine ones landed as a hand
+   edit (`c45a2fa`) and the rule stayed off.
+   Suppressions, all reasoned: PLW0603 per-file for `plotting/styles.py`
+   (the active theme is process-wide because `use_theme()` wraps
+   matplotlib's own global rcParams); BLE001 and SLF001 per-file for
+   `tests/*` (aggregated sweeps where the exception type is the finding;
+   private attributes that are the thing under test) and SLF001 for
+   `scripts/visual/*`; and three same-line SLF001 plus three same-line
+   BLE001 in src, each naming its seam. PERF, C4, PIE, PTH, FURB and LOG
+   needed none.
+   The S608 one-off above is moot: `S` is not in the family list and
+   enabling it would report 3078 findings, 3000-odd of them S101
+   "use of assert" in the test suite. With `S` off, a `# noqa: S608`
+   would itself be flagged by RUF100. The escaping is already visible on
+   the line above (`escaped = glob_pattern.replace("'", "''")`).
+
 10. - [ ] **CI matrix (optional).** Currently 3.13 + 3.14 on ubuntu. macOS
     adds little (dev platform); Windows would add h5py path signal if wanted.
 
+    Not done, deliberately. macOS is the development platform, so a job
+    there mostly re-runs what is already run before every push. Windows
+    would be real signal — `pathlib` is mandated everywhere precisely so
+    paths stay portable, and nothing checks that claim — but no Windows
+    support is claimed beyond the `Operating System :: OS Independent`
+    classifier, and no Windows user has reported anything. Adding a
+    platform to catch a hypothetical is the kind of speculative
+    maintenance this audit removes elsewhere. Revisit on the first
+    Windows bug report, or the first time the project claims Windows in
+    prose rather than in a classifier.
+
 Verify: full `./scripts/check.sh` after every item; the invariant is
 2854+ tests green on 3.13 and 3.14, mypy strict clean, doctests green.
+
+Verified on landing: 2930 passed / 15 skipped on both 3.13 and 3.14
+(2912 before the doctests and guards this phase added), mypy strict
+clean over 148 files, `ruff check .` and `ruff format --check .` clean,
+coverage 88.19% against a floor of 86.
 
 ## Phase 8 — pickling, typing, import time
 

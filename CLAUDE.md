@@ -22,13 +22,15 @@ not restate it here.
 ## Dev Commands
 
 ```
-# scripts/check.sh owns the path list CI covers — don't inline `src tests`,
-# it under-covers scripts/, benchmarks/ and the committed examples.
+# scripts/check.sh owns what CI covers — don't inline a ruff path list.
+# Passing ruff several roots makes its walk nondeterministic (measured on
+# 0.15.5: src/ silently dropped on most runs), so the gate uses one root.
 ./scripts/check.sh                    # everything CI gates, in CI order
 ./scripts/check.sh lint               # ruff check
 ./scripts/check.sh format             # ruff format --check
 ./scripts/check.sh types              # mypy, strict
 ./scripts/check.sh test               # pytest (suite + doctests)
+./scripts/check.sh cov                # pytest under coverage, floor 86%
 ./scripts/check.sh docs               # mkdocs build --strict
 ./scripts/check.sh schema             # bundled JSON Schema is in sync
 
