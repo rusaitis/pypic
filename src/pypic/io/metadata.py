@@ -25,7 +25,7 @@ import numpy as np
 from pypic.coordinates.geometry import GEOMETRY_BY_NAME
 from pypic.coordinates.transforms import FrameTransform
 from pypic.grid import GridInfo
-from pypic.units import Normalization, PhysicsParams, SpeciesInfo
+from pypic.units import Normalization, PhysicsParams, SpeciesInfo, UnitSystem
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -105,8 +105,14 @@ def grid_to_dict(grid: GridInfo) -> dict[str, Any]:
     }
 
 
-def normalization_to_dict(norm: Normalization) -> dict[str, float]:
-    """Serialize a Normalization to a JSON-compatible dict."""
+def normalization_to_dict(norm: Normalization) -> dict[str, float | str | None]:
+    """Serialize a Normalization to a JSON-compatible dict.
+
+    ``system`` rides alongside the eight ``*_ref`` primitives and is
+    ``None`` when nothing declared one, so the undeclared state
+    survives a store round-trip instead of being laundered into
+    declared SI.
+    """
     return {
         "length_ref": norm.length_ref,
         "time_ref": norm.time_ref,
@@ -116,20 +122,29 @@ def normalization_to_dict(norm: Normalization) -> dict[str, float]:
         "density_ref": norm.density_ref,
         "mass_ref": norm.mass_ref,
         "charge_ref": norm.charge_ref,
+        "system": norm.system.value if norm.system is not None else None,
     }
 
 
-def dict_to_normalization(d: dict[str, float]) -> Normalization:
-    """Reconstruct a Normalization from a serialized dict."""
+def dict_to_normalization(d: Mapping[str, Any]) -> Normalization:
+    """Reconstruct a Normalization from a serialized dict.
+
+    A dict with no ``system`` key was written before the key existed
+    and carried eight references someone wrote down, so it decodes as
+    `UnitSystem.CUSTOM` — declared, system unknown. An explicit
+    ``None`` is the undeclared state.
+    """
+    system = d.get("system", UnitSystem.CUSTOM)
     return Normalization(
-        length_ref=d["length_ref"],
-        time_ref=d["time_ref"],
-        velocity_ref=d["velocity_ref"],
-        b_field_ref=d["b_field_ref"],
-        e_field_ref=d["e_field_ref"],
-        density_ref=d["density_ref"],
-        mass_ref=d["mass_ref"],
-        charge_ref=d["charge_ref"],
+        length_ref=float(d["length_ref"]),
+        time_ref=float(d["time_ref"]),
+        velocity_ref=float(d["velocity_ref"]),
+        b_field_ref=float(d["b_field_ref"]),
+        e_field_ref=float(d["e_field_ref"]),
+        density_ref=float(d["density_ref"]),
+        mass_ref=float(d["mass_ref"]),
+        charge_ref=float(d["charge_ref"]),
+        system=UnitSystem(system) if system is not None else None,
     )
 
 

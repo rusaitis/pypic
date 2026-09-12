@@ -27,7 +27,12 @@ from pypic.io.metadata import (  # noqa: E402
     to_json_native,
     transforms_to_dict,
 )
-from pypic.units import Normalization, PhysicsParams, SpeciesInfo  # noqa: E402
+from pypic.units import (  # noqa: E402
+    Normalization,
+    PhysicsParams,
+    SpeciesInfo,
+    UnitSystem,
+)
 from tests._helpers import (  # noqa: E402
     ELECTRONS,
     IONS,
@@ -84,6 +89,28 @@ class TestSerializationHelpers:
         d = normalization_to_dict(norm)
         rebuilt = dict_to_normalization(d)
         assert rebuilt.is_identity
+
+    def test_undeclared_survives_the_round_trip(self):
+        """Otherwise a store hop launders undeclared into declared SI."""
+        rebuilt = dict_to_normalization(
+            normalization_to_dict(Normalization.undeclared())
+        )
+        assert rebuilt.system is None
+
+    def test_declared_system_survives_the_round_trip(self):
+        rebuilt = dict_to_normalization(
+            normalization_to_dict(Normalization.pic_electron(1e18))
+        )
+        assert rebuilt.system is UnitSystem.PIC
+
+    def test_a_dict_without_system_decodes_as_declared(self):
+        """Stores written before the key existed keep their meaning."""
+        legacy = {
+            k: v
+            for k, v in normalization_to_dict(Normalization.identity()).items()
+            if k != "system"
+        }
+        assert dict_to_normalization(legacy).system is UnitSystem.CUSTOM
 
     def test_species_round_trip(self):
         species = (ELECTRONS, IONS)
@@ -294,6 +321,25 @@ class TestDecodeTransformsNullEdge:
 
 class TestToZarrFromZarr:
     """Round-trip tests for to_zarr / from_zarr."""
+
+    def test_undeclared_normalization_survives_a_store_hop(self, tmp_path):
+        """A store round-trip must not turn "unknown" into "declared SI"."""
+        fds = FieldDataset.from_arrays(
+            {"B_1": np.ones((4, 3, 2))}, make_uniform_grid(4, 3, 2)
+        )
+        store = tmp_path / "undeclared.zarr"
+        to_zarr(fds, store)
+        assert from_zarr(store).normalization.system is None
+
+    def test_declared_system_survives_a_store_hop(self, tmp_path):
+        fds = FieldDataset.from_arrays(
+            {"B_1": np.ones((4, 3, 2))},
+            make_uniform_grid(4, 3, 2),
+            Normalization.pic_electron(1e18),
+        )
+        store = tmp_path / "declared.zarr"
+        to_zarr(fds, store)
+        assert from_zarr(store).normalization.system is UnitSystem.PIC
 
     def test_round_trip_basic(self, tmp_path):
         fds = make_test_dataset(

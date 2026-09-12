@@ -23,7 +23,7 @@ from pypic.grid import GridInfo
 from pypic.io._guard import ensure_icechunk, ensure_virtualizarr
 from pypic.io._icechunk import _ensure_branch
 from pypic.io.metadata import encode_pypic_attrs
-from pypic.units import Normalization
+from pypic.units import Normalization, UnitSystem
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -91,6 +91,7 @@ def _read_metadata_from_h5(
         # Normalization metadata
         if "normalization" in f:
             n = f["normalization"]
+            raw_system = n.attrs.get("system")
             norm = Normalization(
                 length_ref=float(n.attrs.get("length_ref", 1.0)),
                 time_ref=float(n.attrs.get("time_ref", 1.0)),
@@ -100,6 +101,13 @@ def _read_metadata_from_h5(
                 density_ref=float(n.attrs.get("density_ref", 1.0)),
                 mass_ref=float(n.attrs.get("mass_ref", 1.0)),
                 charge_ref=float(n.attrs.get("charge_ref", 1.0)),
+                # A group without the attr predates it and carried eight
+                # refs someone wrote down — declared, system unknown.
+                system=(
+                    UnitSystem.CUSTOM
+                    if raw_system is None
+                    else UnitSystem(_as_text(raw_system))
+                ),
             )
 
         # Root-level scalar metadata
@@ -280,7 +288,7 @@ def open_virtual(
             )
             raise ValueError(msg)
         grid = h5_grid
-        normalization = h5_norm if h5_norm is not None else Normalization.identity()
+        normalization = h5_norm if h5_norm is not None else Normalization.undeclared()
         species = None
         physics = None
         metadata = h5_extra

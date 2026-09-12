@@ -24,6 +24,7 @@ from typing import TYPE_CHECKING
 from pypic.exceptions import (
     GeometryUnsupportedError,
     PypicError,
+    UndeclaredNormalizationError,
     UnknownFieldError,
     UnknownSimulationError,
     UnknownStepError,
@@ -37,6 +38,7 @@ if TYPE_CHECKING:
 __all__ = [
     "GeometryUnsupportedError",
     "PypicError",
+    "UndeclaredNormalizationError",
     "UnknownFieldError",
     "UnknownSimulationError",
     "UnknownStepError",
@@ -64,6 +66,7 @@ _ROUTING: Mapping[type[PypicError], tuple[ErrorKind, int]] = MappingProxyType(
         UnknownFieldError: ("unknown_field", 404),
         UnknownStepError: ("unknown_step", 404),
         GeometryUnsupportedError: ("geometry_unsupported", 400),
+        UndeclaredNormalizationError: ("undeclared_normalization", 400),
         ValidationFailedError: ("validation", 422),
     }
 )

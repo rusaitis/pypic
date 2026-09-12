@@ -21,6 +21,7 @@ import pytest
 from pypic.exceptions import (
     GeometryUnsupportedError,
     PypicError,
+    UndeclaredNormalizationError,
     UnknownFieldError,
     UnknownSimulationError,
     UnknownStepError,
@@ -35,6 +36,7 @@ _ROUTING_CONTRACT: tuple[tuple[type[PypicError], str, int, type[Exception]], ...
     (UnknownFieldError, "unknown_field", 404, KeyError),
     (UnknownStepError, "unknown_step", 404, KeyError),
     (GeometryUnsupportedError, "geometry_unsupported", 400, NotImplementedError),
+    (UndeclaredNormalizationError, "undeclared_normalization", 400, ValueError),
     (ValidationFailedError, "validation", 422, ValueError),
 )
 

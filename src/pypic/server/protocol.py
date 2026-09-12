@@ -58,6 +58,7 @@ type ErrorKind = Literal[
     "unknown_sim",
     "unknown_step",
     "geometry_unsupported",
+    "undeclared_normalization",
     "internal",
 ]
 
