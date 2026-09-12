@@ -69,6 +69,21 @@ jobs:
       - run: uv sync --all-extras --all-groups --python ${{ matrix.python-version }}
       - run: uv run pytest
 
+  coverage:
+    # Its own job rather than a flag on the matrix above: instrumenting
+    # both interpreters buys one number twice. fail_under lives in
+    # [tool.coverage.report]; no upload service, the terminal report is
+    # the artifact.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.0.1
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+      - run: uv sync --all-extras --all-groups
+      - run: ./scripts/check.sh cov
+
   docs:
     # docs.yml builds and deploys on push to main; this job covers pull
     # requests, where that workflow does not run.

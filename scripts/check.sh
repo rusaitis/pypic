@@ -10,8 +10,12 @@
 # ruff now takes the repo root instead of that list — see the note above
 # lint() for why.
 #
-# Usage: scripts/check.sh [lint|format|types|test|docs|schema]
+# Usage: scripts/check.sh [lint|format|types|test|cov|docs|schema]
 #        scripts/check.sh            # everything, in CI order
+#
+# `cov` is a CI job of its own and deliberately outside the default
+# chain: it runs the same suite `test` already ran, only instrumented,
+# and costs about 60% more wall clock for it.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -32,6 +36,7 @@ lint()   { uv run ruff check .; }
 format() { uv run ruff format --check .; }
 types()  { uv run mypy "${MYPY_PATHS[@]}"; }
 test()   { uv run pytest; }
+cov()    { uv run pytest --cov --cov-report=term-missing; }
 docs()   { uv run mkdocs build --strict; }
 
 # Scoped to the generated artifact, not the whole schema/ directory: any

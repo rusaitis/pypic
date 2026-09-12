@@ -90,6 +90,7 @@ server = [
 [dependency-groups]
 dev = [
     "pytest>=8.0",
+    "pytest-cov>=6.0",
     "hypothesis>=6.100",
     "ruff>=0.8",
     "mypy>=1.13",
@@ -214,6 +215,26 @@ disable_error_code = [
     "attr-defined",
 ]
 
+
+[tool.coverage.run]
+source = ["pypic"]
+# Doctests exercise the same modules; without this, running the suite
+# twice over src/ (once as tests, once as doctests) double-counts nothing
+# but branch arcs get confusing.
+branch = false
+
+[tool.coverage.report]
+# Measured 2026-09-12 at 88%. Two points of slack absorbs the churn of a
+# normal change; a real drop still fails. Raise it when it earns the room.
+fail_under = 86
+exclude_also = [
+    # Type-only imports never execute at runtime.
+    "if TYPE_CHECKING:",
+    # The exhaustive-match guard architecture.md mandates after an enum
+    # match. Reaching it means the enum grew a member, which mypy catches
+    # first, so there is nothing to cover.
+    "assert_never\\(",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests", "src"]
