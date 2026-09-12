@@ -711,7 +711,8 @@ def open_simulation(
     for name, entry in sorted(registry_snapshot.items()):
         try:
             confidence = entry.can_read_confidence(path)
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 — a third-party probe must not
+            # break detection for every other reader; the failure is recorded.
             probe_results.append(ProbeResult(name, 0.0, f"{type(exc).__name__}: {exc}"))
             log.debug(
                 "can_read_confidence %r raised, skipping",
@@ -753,7 +754,8 @@ def open_simulation(
                 path,
                 probe_results=frozen_probes,
             )
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 — try the next candidate reader;
+            # everything collected here is re-raised as one ExceptionGroup below.
             log.warning("Reader %r (confidence=%.2f) failed: %s", name, confidence, exc)
             errors.append(exc)
 

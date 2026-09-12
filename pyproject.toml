@@ -144,6 +144,7 @@ select = [
     "PIE",            # flake8-pie
     "PTH",            # flake8-use-pathlib
     "PLW",            # pylint warnings
+    "BLE",            # flake8-blind-except
 ]
 ignore = [
     "D100",  # missing module docstring
@@ -168,7 +169,10 @@ convention = "numpy"
 # Tests get D (docstrings), ANN (annotations), and N (naming) leeway —
 # capitalized scientific symbols (R for rotation, P/Pe/Pi for canonical
 # pressure fields) are intentional in physics test names and locals.
-"tests/*" = ["D", "ANN", "N"]
+# BLE001: the aggregated sweeps ("run every function in this family over
+# an empty array and report which ones broke") catch Exception because
+# the exception type is the finding, not an accident.
+"tests/*" = ["D", "ANN", "N", "BLE001"]
 # Typer evaluates each command's annotations at registration time, so
 # argument and option types must exist at runtime, not only for mypy.
 "src/pypic/cli/*" = ["TC001", "TC002", "TC003"]

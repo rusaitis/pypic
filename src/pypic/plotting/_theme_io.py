@@ -316,7 +316,7 @@ def available_themes() -> dict[str, PlotTheme]:
     for path in _iter_theme_files():
         try:
             theme = load_theme(path)
-        except Exception:
+        except Exception:  # noqa: BLE001 — one bad theme file must not hide the rest
             _log.warning("failed to load theme from %s", path, exc_info=True)
             continue
         themes[path.stem.lower()] = theme
