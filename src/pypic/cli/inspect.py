@@ -8,6 +8,7 @@ import typer
 
 from pypic.cli._options import JsonOption, SimulationPath, TimestepOption, UnitsOption
 from pypic.cli._shared import _open, _output, _require_single_step, parse_steps
+from pypic.units import UnitSystem
 
 if TYPE_CHECKING:
     from pypic.readers._registry import Simulation
@@ -69,14 +70,16 @@ def info(
     )
 
     norm = sim.normalization
-    norm_str = (
-        "identity (SI)"
-        if norm.is_identity
-        else (
-            f"l={norm.length_ref:.4g} m, v={norm.velocity_ref:.4g} m/s, "
-            f"B={norm.b_field_ref:.4g} T, n={norm.density_ref:.4g} m^-3"
-        )
+    refs_str = (
+        f"l={norm.length_ref:.4g} m, v={norm.velocity_ref:.4g} m/s, "
+        f"B={norm.b_field_ref:.4g} T, n={norm.density_ref:.4g} m^-3"
     )
+    if norm.system is None:
+        norm_str = "undeclared (code units; no [units] section)"
+    elif norm.system is UnitSystem.SI and norm.is_identity:
+        norm_str = "SI (identity)"
+    else:
+        norm_str = f"{norm.system}: {refs_str}"
 
     stagger = cfg.metadata.get("stagger")
 
@@ -112,6 +115,7 @@ def info(
             "dt": grid.dt,
         },
         "normalization": {
+            "system": norm.system,
             "length_ref": norm.length_ref,
             "time_ref": norm.time_ref,
             "velocity_ref": norm.velocity_ref,

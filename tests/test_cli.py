@@ -74,6 +74,13 @@ def test_info_text(tmp_path):
     assert "Units:" in result.output
 
 
+def test_info_names_the_declared_unit_system(tmp_path):
+    """A declared ``system = "SI"`` deck must not read as "undeclared"."""
+    d = make_sim_dir(tmp_path, "sim")
+    result = runner.invoke(app, ["info", str(d)])
+    assert "Units:     SI (identity)" in result.output
+
+
 def test_info_json(tmp_path):
     d = make_sim_dir(tmp_path, "sim")
     result = runner.invoke(app, ["info", str(d), "--json"])
@@ -85,6 +92,12 @@ def test_info_json(tmp_path):
     assert "steps" in data
     assert "normalization" in data
     assert "length_ref" in data["normalization"]
+
+
+def test_info_json_carries_the_unit_system(tmp_path):
+    d = make_sim_dir(tmp_path, "sim")
+    result = runner.invoke(app, ["info", str(d), "--json"])
+    assert json.loads(result.output)["normalization"]["system"] == "SI"
 
 
 # -- fields ------------------------------------------------------------------

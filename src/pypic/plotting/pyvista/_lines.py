@@ -60,10 +60,12 @@ def _prepare_scalar(
     # Unit conversion
     display_name = scalar
     if units is not None and data is not None:
-        # Get the SI conversion factor from a single-value probe
         info = data.field_info(scalar)
         quantity_type = info.quantity_type if info else "b_field"
-        si_val = float(data.normalization.to_si(quantity_type, 1.0))
+        # si_factor, not to_si: to_si resolves only the six base
+        # quantities, so compound types (pressure, temperature, ...)
+        # raise there.
+        si_val = data.normalization.si_factor(quantity_type)
         from pypic.compute import display_unit_factor
 
         unit_factor = display_unit_factor(units)
