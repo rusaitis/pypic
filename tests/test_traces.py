@@ -1187,6 +1187,34 @@ class TestClosedLoopDetection:
         )
         assert fl_guarded.metadata["reason"] != str(TerminationReason.CLOSED_LOOP)
 
+    def test_scalar_and_batched_detectors_agree_on_one_seed(
+        self, closed_loop_field_data: FieldDataset
+    ) -> None:
+        """One seed through both paths stops at the same step, same reason.
+
+        The two detectors express the same predicate differently — the
+        scalar path bounds the scan with ``searchsorted``, the batched
+        path masks a rectangular window — so only a parity check keeps
+        them from drifting apart.
+        """
+        from pypic.traces import trace_field_line_adaptive, trace_field_lines_adaptive
+
+        seed = (12.0, 10.0, 10.0)
+        kwargs = {
+            "step_size_init": 0.1,
+            "max_step": 0.2,
+            "max_steps": 200,
+            "direction": "forward",
+            "loop_tol": 0.1,
+            "loop_min_arclen": 2.0,
+        }
+        scalar = trace_field_line_adaptive(closed_loop_field_data, seed, **kwargs)
+        (batched,) = trace_field_lines_adaptive(
+            closed_loop_field_data, np.array([seed]), **kwargs
+        )
+        assert scalar.metadata["reason"] == batched.metadata["reason"]
+        np.testing.assert_allclose(scalar.points, batched.points, rtol=1e-12)
+
     def test_batched_mixed_seed_termination(
         self,
         closed_loop_field_data: FieldDataset,

@@ -289,7 +289,10 @@ def _trace_single_direction_adaptive(
     # Closed-loop detection: monotone arc-length prefix over accepted
     # steps, used with searchsorted to bound the proximity scan to the
     # past tail older than `loop_min_arclen`. Allocated only when
-    # detection is enabled.
+    # detection is enabled. Same predicate as the batched detector in
+    # `_trace_batch_single_direction_adaptive`, which expresses it as a
+    # rectangular mask because its window is ragged across seeds; keep
+    # the two in step.
     arclen: FloatArray | None = (
         np.empty(max_steps + 1, dtype=np.float64) if loop_tol is not None else None
     )
@@ -408,7 +411,9 @@ def _trace_batch_single_direction_adaptive(
 
     # Closed-loop detection: monotone per-seed arc-length prefix,
     # allocated only when detection is enabled. Mirrors the scalar
-    # tracer's `arclen` array, one row per seed.
+    # tracer's `arclen` array, one row per seed; the detector below
+    # must stay in step with the scalar one in
+    # `_trace_single_direction_adaptive`.
     arclen: FloatArray | None = (
         np.zeros((n_seeds, max_steps + 1), dtype=np.float64)
         if loop_tol is not None
@@ -478,8 +483,11 @@ def _trace_batch_single_direction_adaptive(
                 cutoffs = arclen[acc_idx, cur_idx] - loop_min_arclen  # (M,)
 
                 # Gate: skip the entire scan until at least one seed has
-                # accumulated past loop_min_arclen.
-                if cutoffs.max() > 0.0:
+                # accumulated past loop_min_arclen. ``>= 0.0``, not
+                # ``> 0.0``: arclen[0] is 0, so a cutoff of exactly zero
+                # still leaves the seed point eligible below, which is
+                # what the scalar detector's `j_end > 0` gate admits.
+                if cutoffs.max() >= 0.0:
                     max_n = int(cur_idx.max())
                     past_buf = buf[acc_idx, :max_n]  # (M, max_n, 3)
                     past_arc = arclen[acc_idx, :max_n]  # (M, max_n)
