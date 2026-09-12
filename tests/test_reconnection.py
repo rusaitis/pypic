@@ -7,9 +7,9 @@ import numpy as np
 import pytest
 
 from pypic.dataset import FieldDataset
-from pypic.grid import GridInfo
 from pypic.reconnection import find_saddle_points, reconnection_rate, schindler_xi
 from pypic.units import Normalization
+from tests._helpers import make_uniform_grid
 
 
 class TestFindSaddlePoints:
@@ -202,7 +202,7 @@ def _uniform_field_dataset(
             "E_2": np.full(shape, e[1]),
             "E_3": np.full(shape, e[2]),
         },
-        GridInfo(dimensions=shape, spacing=spacing),
+        make_uniform_grid(*shape, spacing=spacing),
         Normalization.identity(),
     )
 
@@ -219,7 +219,7 @@ def _uniform_b_cos_e_dataset(
     """
     spacing = (domain / n, domain / n, domain / n)
     shape = (n, n, n)
-    grid = GridInfo(dimensions=shape, spacing=spacing)
+    grid = make_uniform_grid(*shape, spacing=spacing)
     _, _, zz = (
         a.astype(np.float64)
         for a in np.meshgrid(*grid.coordinate_arrays(), indexing="ij")
@@ -316,11 +316,7 @@ class TestSchindlerXi:
         dx = 0.25
         origin = (-(nx * dx) / 2.0, -(ny * dx) / 2.0, -(nz * dx) / 2.0)
 
-        grid = GridInfo(
-            dimensions=(nx, ny, nz),
-            spacing=(dx, dx, dx),
-            origin=origin,
-        )
+        grid = make_uniform_grid(nx, ny, nz, spacing=dx, origin=origin)
         coord_arrays = grid.coordinate_arrays()
         xx, yy, _ = (
             a.astype(np.float64) for a in np.meshgrid(*coord_arrays, indexing="ij")

@@ -11,9 +11,9 @@ from pypic import (
     poincare_section,
 )
 from pypic.dataset import FieldDataset
-from pypic.grid import GridInfo
 from pypic.traces import plane_crossings
 from pypic.units import Normalization
+from tests._helpers import make_uniform_grid
 
 
 def _closed_circle_data(n: int = 32, extent: float = 1.5) -> FieldDataset:
@@ -29,11 +29,7 @@ def _closed_circle_data(n: int = 32, extent: float = 1.5) -> FieldDataset:
             "B_2": X,
             "B_3": np.zeros_like(X),
         },
-        GridInfo(
-            dimensions=(n, n, n),
-            spacing=(2 * extent / (n - 1),) * 3,
-            origin=(-extent, -extent, -extent),
-        ),
+        make_uniform_grid(n, n, n, spacing=2 * extent / (n - 1), origin=-extent),
         Normalization.identity(),
     )
 
@@ -48,11 +44,7 @@ def _vortex_data(n: int = 32, extent: float = 1.5, drift: float = 0.1) -> FieldD
             "B_2": X,
             "B_3": drift * np.ones_like(X),
         },
-        GridInfo(
-            dimensions=(n, n, n),
-            spacing=(2 * extent / (n - 1),) * 3,
-            origin=(-extent, -extent, -extent),
-        ),
+        make_uniform_grid(n, n, n, spacing=2 * extent / (n - 1), origin=-extent),
         Normalization.identity(),
     )
 
@@ -66,11 +58,7 @@ def _uniform_data(n: int = 16, extent: float = 1.0) -> FieldDataset:
             "B_2": np.zeros(shape),
             "B_3": np.zeros(shape),
         },
-        GridInfo(
-            dimensions=shape,
-            spacing=(2 * extent / (n - 1),) * 3,
-            origin=(-extent, -extent, -extent),
-        ),
+        make_uniform_grid(*shape, spacing=2 * extent / (n - 1), origin=-extent),
         Normalization.identity(),
     )
 

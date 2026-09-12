@@ -6,7 +6,6 @@ import numpy as np
 import pytest
 
 from pypic.dataset import FieldDataset
-from pypic.grid import GridInfo
 from pypic.traces import (
     FieldLine,
     VectorFieldInterpolator,
@@ -14,6 +13,7 @@ from pypic.traces import (
     trace_field_line,
     trace_field_line_adaptive,
 )
+from tests._helpers import make_uniform_grid
 
 
 def _make_uniform_field(
@@ -23,11 +23,7 @@ def _make_uniform_field(
 ) -> FieldDataset:
     """Uniform B = b_vec on an n^3 grid spanning [0, extent]."""
     dx = extent / n
-    grid = GridInfo(
-        dimensions=(n, n, n),
-        spacing=(dx, dx, dx),
-        origin=(0.0, 0.0, 0.0),
-    )
+    grid = make_uniform_grid(n, n, n, spacing=dx)
     shape = (n, n, n)
     return FieldDataset.from_arrays(
         {
@@ -45,11 +41,7 @@ def _make_circular_field(
 ) -> FieldDataset:
     """B = (-y, x, 0): circular field lines centered at domain center."""
     dx = extent / n
-    grid = GridInfo(
-        dimensions=(n, n, n),
-        spacing=(dx, dx, dx),
-        origin=(0.0, 0.0, 0.0),
-    )
+    grid = make_uniform_grid(n, n, n, spacing=dx)
     center = extent / 2.0
     x1d = np.arange(n) * dx + 0.5 * dx
     xx, yy, _ = np.meshgrid(x1d, x1d, x1d, indexing="ij")
@@ -68,11 +60,7 @@ def _make_helical_field(
 ) -> FieldDataset:
     """B = (-y, x, 1): helical field lines."""
     dx = extent / n
-    grid = GridInfo(
-        dimensions=(n, n, n),
-        spacing=(dx, dx, dx),
-        origin=(0.0, 0.0, 0.0),
-    )
+    grid = make_uniform_grid(n, n, n, spacing=dx)
     center = extent / 2.0
     x1d = np.arange(n) * dx + 0.5 * dx
     xx, yy, _ = np.meshgrid(x1d, x1d, x1d, indexing="ij")
@@ -91,11 +79,7 @@ def _make_null_field(
 ) -> FieldDataset:
     """B pointing inward: null at domain center."""
     dx = extent / n
-    grid = GridInfo(
-        dimensions=(n, n, n),
-        spacing=(dx, dx, dx),
-        origin=(0.0, 0.0, 0.0),
-    )
+    grid = make_uniform_grid(n, n, n, spacing=dx)
     center = extent / 2.0
     x1d = np.arange(n) * dx + 0.5 * dx
     xx, yy, zz = np.meshgrid(x1d, x1d, x1d, indexing="ij")
@@ -126,11 +110,7 @@ class TestVectorFieldInterpolator:
         n = 20
         extent = 10.0
         dx = extent / n
-        grid = GridInfo(
-            dimensions=(n, n, n),
-            spacing=(dx, dx, dx),
-            origin=(0.0, 0.0, 0.0),
-        )
+        grid = make_uniform_grid(n, n, n, spacing=dx)
         x1d = np.arange(n) * dx + 0.5 * dx
         xx, _, _ = np.meshgrid(x1d, x1d, x1d, indexing="ij")
         data = FieldDataset.from_arrays(

@@ -32,6 +32,7 @@ from pypic.traces import (
     tangent_vectors,
 )
 from pypic.units import Normalization
+from tests._helpers import make_uniform_grid
 
 
 def _identity() -> Normalization:
@@ -478,13 +479,8 @@ class TestSampling:
     def field_dataset(self) -> object:
         """3D FieldDataset with a simple scalar field."""
         from pypic.dataset import FieldDataset
-        from pypic.grid import GridInfo
 
-        grid = GridInfo(
-            dimensions=(4, 4, 4),
-            spacing=(1.0, 1.0, 1.0),
-            origin=(0.0, 0.0, 0.0),
-        )
+        grid = make_uniform_grid(4, 4, 4)
         # Field value = x coordinate at each cell center
         x = np.arange(4) * 1.0 + 0.5
         field = np.broadcast_to(x[:, None, None], (4, 4, 4)).copy().astype(np.float64)
@@ -572,13 +568,7 @@ class TestSampleFieldsBatching:
     @pytest.fixture
     def multi_field_dataset(self) -> FieldDataset:
         """3D dataset with three distinct fields on the same grid."""
-        from pypic.grid import GridInfo
-
-        grid = GridInfo(
-            dimensions=(5, 4, 3),
-            spacing=(1.0, 1.0, 1.0),
-            origin=(0.0, 0.0, 0.0),
-        )
+        grid = make_uniform_grid(5, 4, 3)
         x, y, z = (
             a.astype(np.float64)
             for a in np.meshgrid(
@@ -631,13 +621,8 @@ class TestSamplingEdgeCases:
         ``_nearest_indices`` (Unit 14b).
         """
         from pypic.dataset import FieldDataset
-        from pypic.grid import GridInfo
 
-        grid = GridInfo(
-            dimensions=(4, 4, 1),
-            spacing=(1.0, 1.0, 1.0),
-            origin=(0.0, 0.0, 0.0),
-        )
+        grid = make_uniform_grid(4, 4, 1)
         # Field varies along x; constant along y, z
         x = np.arange(4) * 1.0 + 0.5
         field = np.broadcast_to(x[:, None, None], (4, 4, 1)).copy().astype(np.float64)
@@ -650,13 +635,8 @@ class TestSamplingEdgeCases:
     def test_single_node_axis_far_z_out_of_bounds(self) -> None:
         """Querying far outside the (single) z node returns NaN, not garbage."""
         from pypic.dataset import FieldDataset
-        from pypic.grid import GridInfo
 
-        grid = GridInfo(
-            dimensions=(4, 4, 1),
-            spacing=(1.0, 1.0, 1.0),
-            origin=(0.0, 0.0, 0.0),
-        )
+        grid = make_uniform_grid(4, 4, 1)
         field = np.zeros((4, 4, 1), dtype=np.float64)
         data = FieldDataset.from_arrays({"rho": field}, grid, strict_fields=False)
         pts = np.array([[0.5, 0.5, 100.0]])  # z way outside the single node
@@ -667,13 +647,7 @@ class TestSamplingEdgeCases:
 @pytest.fixture
 def uniform_field_data() -> FieldDataset:
     """3D uniform B=(1,0,0) field on a 20x20x20 grid for tracing tests."""
-    from pypic.grid import GridInfo
-
-    grid = GridInfo(
-        dimensions=(20, 20, 20),
-        spacing=(1.0, 1.0, 1.0),
-        origin=(0.0, 0.0, 0.0),
-    )
+    grid = make_uniform_grid(20, 20, 20)
     ones = np.ones((20, 20, 20), dtype=np.float64)
     zeros = np.zeros((20, 20, 20), dtype=np.float64)
     return FieldDataset.from_arrays(
@@ -1010,13 +984,7 @@ class TestClosedLoopDetection:
         is concentric circles in the z=const plane; the centre is a
         magnetic null (|B|=0) so seeds must lie off-axis.
         """
-        from pypic.grid import GridInfo
-
-        grid = GridInfo(
-            dimensions=(20, 20, 20),
-            spacing=(1.0, 1.0, 1.0),
-            origin=(0.0, 0.0, 0.0),
-        )
+        grid = make_uniform_grid(20, 20, 20)
         cx, cy = 10.0, 10.0
         coords = np.arange(20.0)
         x, y, _z = np.meshgrid(coords, coords, coords, indexing="ij")
@@ -1039,13 +1007,7 @@ class TestClosedLoopDetection:
         because each turn is offset in z by $2\\pi \\cdot 0.2 \\approx
         1.26$ — much larger than any reasonable ``loop_tol``.
         """
-        from pypic.grid import GridInfo
-
-        grid = GridInfo(
-            dimensions=(20, 20, 20),
-            spacing=(1.0, 1.0, 1.0),
-            origin=(0.0, 0.0, 0.0),
-        )
+        grid = make_uniform_grid(20, 20, 20)
         cx, cy = 10.0, 10.0
         coords = np.arange(20.0)
         x, y, _z = np.meshgrid(coords, coords, coords, indexing="ij")

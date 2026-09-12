@@ -216,11 +216,7 @@ class TestOpenVirtual:
         assert fds.metadata["model"] == "iPIC3D"
 
     def test_coordinate_arrays_match_grid(self, tmp_path):
-        grid = GridInfo(
-            dimensions=(4, 3, 2),
-            spacing=(0.5, 1.0, 2.0),
-            origin=(0.0, 0.0, 0.0),
-        )
+        grid = make_uniform_grid(4, 3, 2, spacing=(0.5, 1.0, 2.0))
         h5path = tmp_path / "coords.h5"
         _write_canonical_h5(h5path, {"B_1": np.ones((4, 3, 2))}, grid)
 

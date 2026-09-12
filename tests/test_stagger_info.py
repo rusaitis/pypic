@@ -10,8 +10,8 @@ import pytest
 
 from pypic.containers import StaggerInfo
 from pypic.dataset import FieldDataset
-from pypic.grid import GridInfo
 from pypic.units import Normalization
+from tests._helpers import make_uniform_grid
 
 
 class TestStaggerInfoConstruction:
@@ -105,7 +105,7 @@ class TestStaggerInFieldDataset:
     """StaggerInfo round-trips through FieldDataset.metadata."""
 
     def test_stagger_in_metadata(self):
-        grid = GridInfo(dimensions=(4, 4), spacing=(1.0, 1.0))
+        grid = make_uniform_grid(4, 4)
         norm = Normalization.identity()
         stagger = StaggerInfo(convention="node")
         fds = FieldDataset.from_arrays(
@@ -119,7 +119,7 @@ class TestStaggerInFieldDataset:
 
     def test_stagger_survives_selection(self):
         """Stagger metadata propagates through isel."""
-        grid = GridInfo(dimensions=(4, 4, 4), spacing=(1.0, 1.0, 1.0))
+        grid = make_uniform_grid(4, 4, 4)
         norm = Normalization.identity()
         stagger = StaggerInfo(convention="cell")
         fds = FieldDataset.from_arrays(

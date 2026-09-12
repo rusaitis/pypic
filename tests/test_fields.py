@@ -16,15 +16,15 @@ from pypic.fields import (
     unit_label,
     unregister_field,
 )
-from pypic.grid import GridInfo
 from pypic.selections import PlaneSelection
 from pypic.units import _COMPOUND_FACTORS, _QUANTITIES, Normalization, SpeciesInfo
+from tests._helpers import make_uniform_grid
 
 
 def _make_dataset(
     fields: dict[str, np.ndarray], *, strict_fields: bool = True
 ) -> FieldDataset:
-    grid = GridInfo(dimensions=(4, 3, 2), spacing=(1.0, 1.0, 1.0))
+    grid = make_uniform_grid(4, 3, 2)
     return FieldDataset.from_arrays(
         fields,
         grid,
@@ -526,7 +526,7 @@ class TestWithField:
 
     def test_in_si_via_attrs(self) -> None:
         norm = Normalization.pic_electron(n_e=1.0e18)
-        grid = GridInfo(dimensions=(2,), spacing=(1.0,))
+        grid = make_uniform_grid(2)
         ds = FieldDataset.from_arrays({"B_1": np.array([1.0, 2.0])}, grid, norm)
         data = np.array([3.0, 4.0])
         ds2 = ds.with_field("custom_v", data, QuantityType.VELOCITY)
@@ -611,7 +611,7 @@ class TestAttrsOverrideRegistry:
     def test_in_si_uses_attrs_over_registry(self) -> None:
         """in_si() picks quantity_type from attrs, not global registry."""
         norm = Normalization.pic_electron(n_e=1.0e18)
-        grid = GridInfo(dimensions=(2,), spacing=(1.0,))
+        grid = make_uniform_grid(2)
         ds = FieldDataset.from_arrays({"B_1": np.array([1.0, 2.0])}, grid, norm)
         # Attach "B_1" with velocity quantity_type (overriding b_field)
         ds2 = ds.with_field("B_1", np.array([5.0, 6.0]), QuantityType.VELOCITY)

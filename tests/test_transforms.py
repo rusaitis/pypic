@@ -20,6 +20,7 @@ from pypic.coordinates.transforms import (
 from pypic.dataset import FieldDataset
 from pypic.grid import GridInfo
 from pypic.units import Normalization
+from tests._helpers import make_uniform_grid
 
 
 class TestFrameTransform:
@@ -541,7 +542,7 @@ def test_available_frames_lists_every_reachable_frame() -> None:
     A public property with no coverage: it is the only way to ask a
     dataset what ``transform_to`` will accept.
     """
-    grid = GridInfo(dimensions=(2, 2, 2), spacing=(1.0, 1.0, 1.0))
+    grid = make_uniform_grid(2, 2, 2)
     fields = {"B_1": np.zeros((2, 2, 2))}
     ds = FieldDataset.from_arrays(
         fields,

@@ -450,7 +450,7 @@ class TestWithDerived:
         shape = (4, 3, 2)
         ds = FieldDataset.from_arrays(
             {"B_1": np.ones(shape), "B_2": np.zeros(shape), "B_3": np.zeros(shape)},
-            GridInfo(dimensions=shape, spacing=(1.0, 1.0, 1.0)),
+            make_uniform_grid(*shape),
             Normalization.identity(),
         )
         # |B| is a dependency of e_B, so computing it first helps
@@ -472,7 +472,7 @@ class TestWithDerived:
                 "B_2": np.zeros(shape),
                 "B_3": np.ones(shape),
             },
-            GridInfo(dimensions=shape, spacing=(1.0, 1.0, 1.0)),
+            make_uniform_grid(*shape),
             Normalization.identity(),
         )
         ds = ds.with_derived("S_1")
@@ -491,7 +491,7 @@ class TestWithDerived:
         }
         ds = FieldDataset.from_arrays(
             fields,
-            GridInfo(dimensions=shape, spacing=(1.0, 1.0, 1.0)),
+            make_uniform_grid(*shape),
             Normalization.identity(),
             species=[
                 SpeciesInfo("e", charge=-1.0, mass=1.0),
@@ -542,21 +542,21 @@ class TestSnapshotTime:
         assert ds.time == 2.0
 
     def test_none_without_dt(self):
-        grid = GridInfo(dimensions=(2,), spacing=(1.0,))
+        grid = make_uniform_grid(2)
         ds = FieldDataset.from_arrays({"B_1": np.zeros(2)}, grid, metadata={"step": 4})
         assert ds.time is None
 
 
 class TestFromArraysCoords:
     def test_non_uniform_coords_replace_the_grid_axis(self):
-        grid = GridInfo(dimensions=(4, 2), spacing=(1.0, 1.0))
+        grid = make_uniform_grid(4, 2)
         x = np.array([0.0, 0.1, 0.5, 2.0])
         ds = FieldDataset.from_arrays({"B_1": np.zeros((4, 2))}, grid, coords={"x": x})
         np.testing.assert_array_equal(ds.xr.coords["x"].values, x)
         np.testing.assert_array_equal(ds.xr.coords["y"].values, [0.5, 1.5])
 
     def test_unknown_axis_raises(self):
-        grid = GridInfo(dimensions=(4, 2), spacing=(1.0, 1.0))
+        grid = make_uniform_grid(4, 2)
         with pytest.raises(ValueError, match="coords name axes the grid lacks"):
             FieldDataset.from_arrays(
                 {"B_1": np.zeros((4, 2))}, grid, coords={"z": np.zeros(3)}
