@@ -18,8 +18,7 @@ uv sync --all-extras --all-groups
 
 CI gates six things, and `scripts/check.sh` runs all six in CI's order.
 It is the single source of truth for *which paths* each check covers —
-scripts/, benchmarks/ and the committed examples are covered too, not
-just `src` and `tests`.
+ruff reads the whole repo, and mypy's path list lives there too.
 
 ```sh
 ./scripts/check.sh          # everything
@@ -29,7 +28,20 @@ just `src` and `tests`.
 ./scripts/check.sh types    # mypy, strict
 ./scripts/check.sh test     # pytest (suite + doctests)
 ./scripts/check.sh docs     # mkdocs build --strict
+./scripts/check.sh cov      # pytest under coverage, gated at 86%
 ```
+
+`cov` is a CI job of its own and sits outside the default chain — it
+re-runs the same suite `test` did, only instrumented.
+
+Optionally, run `lint` and `format` on every commit:
+
+```sh
+uv tool install pre-commit && pre-commit install
+```
+
+The hooks call `scripts/check.sh` rather than a ruff mirror, so the
+version they run is the one `uv.lock` pins and CI uses.
 
 `--strict` turns unresolved cross-references and broken internal links
 into build failures, so docs rot is caught here rather than on the
