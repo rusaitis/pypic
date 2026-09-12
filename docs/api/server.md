@@ -156,6 +156,7 @@ client can retry. `kind` is one of:
 | `unknown_step` | The requested step isn't available in that simulation. |
 | `unknown_sim` | The path's `{sim}` doesn't exist or its directory lacks `simulation.toml`. |
 | `geometry_unsupported` | Spatial-axis reduction on a non-Cartesian grid (Jacobian-aware integration is not yet implemented). |
+| `undeclared_normalization` | `units="si"` (or a display unit) on a simulation whose `[units]` section is missing, so no SI anchor exists. Dimensionless quantities are unaffected; request `units="code"` for the rest. |
 | `internal` | Anything else. The server logs a full traceback; the client receives the exception message. |
 
 ## Schema metadata in the Arrow payload

@@ -428,6 +428,15 @@ velocity references are derived from those); Approach B supplies
 each primitive directly. The `*_ref` form is the single name a
 non-pypic reader of the on-disk store needs to know.
 
+`system` is carried through to the store alongside the eight
+primitives (§4.2), where `null` means no `[units]` section declared
+one. The distinction matters because a missing `[units]` section and
+`system = "SI"` both leave all eight references at 1.0 while meaning
+opposite things: the first says the SI anchor is unknown, the second
+asserts the data already *is* SI. A consumer that converts to SI on a
+`null` system converts nothing and mislabels code units — pypic
+raises there rather than returning a wrong number.
+
 ### [coordinates]
 
 Describes the coordinate geometry and reference frame.
@@ -1519,7 +1528,7 @@ groups vs Zarr root attrs).
 | `[boundary_conditions]` | `/boundary_conditions/` group + optional `field_overrides/` sub-group | `attrs.boundary_conditions` |
 | `[coordinates]` (geometry, frame, axis_labels, physical_extent, modes) | `/coordinates/` group | `attrs.coordinates` |
 | `[coordinates.transforms]` | `/coordinates/transforms/<name>/` sub-groups | `attrs.coordinates.transforms` |
-| `[units]` | `/normalization/` group | `attrs.normalization` |
+| `[units]` | `/normalization/` group | `attrs.normalization` (the eight `*_ref` primitives, plus `system` and `speed_of_light`) |
 | `[[species]]` | `/species/{s0,s1,...}/` sub-groups | `attrs.species` (list, in declaration order) |
 | `[physics]` | `/physics/` group + model sub-groups | `attrs.physics` |
 | `[run]` (optional) | `/run/` group with attrs (writer-side contract; pypic readers do not yet round-trip it) | `attrs.run` (typed; `Run.model_dump`; round-trips end-to-end) |

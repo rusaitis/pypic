@@ -11,6 +11,7 @@ the typed class lets a caller dispatch on type instead of on message text.
 | `UnknownFieldError` | `KeyError` | `unknown_field` | 404 |
 | `UnknownStepError` | `KeyError` | `unknown_step` | 404 |
 | `GeometryUnsupportedError` | `NotImplementedError` | `geometry_unsupported` | 400 |
+| `UndeclaredNormalizationError` | `ValueError` | `undeclared_normalization` | 400 |
 
 The `kind` and HTTP columns are not properties of these classes — they live in
 `pypic.server.exceptions.error_routing`, the one table

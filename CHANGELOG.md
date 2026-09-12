@@ -11,6 +11,16 @@ The distribution is `pypic-plasma` on PyPI; the import name is `pypic`.
 
 ### Added
 
+- `pypic.UnitSystem` and `Normalization.system`: which normalization system
+  a `Normalization` came from (`PIC` / `MHD` / `SI` / `custom`), or `None`
+  when no `[units]` section declared one. `Normalization.undeclared()`
+  constructs that undeclared state. The value round-trips through Zarr
+  stores and the Arrow wire as `attrs.normalization.system`; a store written
+  before the key existed decodes as `custom`, keeping its current meaning.
+- `pypic.UndeclaredNormalizationError`: raised by `Normalization.si_factor`
+  (and so by `in_si`, `in_units` and `field_si_factor`) when a dimensional
+  quantity is converted under an undeclared normalization. A subclass of
+  `ValueError`; the server maps it to `undeclared_normalization` / 400.
 - `pypic.vector_component(name)` splits a registered Tier-3 vector component
   name into ``(base, component)`` — the single source `transform_to` now uses
   to decide what rotates.
@@ -39,6 +49,11 @@ The distribution is `pypic-plasma` on PyPI; the import name is `pypic`.
 
 ### Fixed
 
+- 3D field lines coloured by a compound quantity (pressure, temperature,
+  energy density, ...) with `units=` set raised `Unknown quantity`: the
+  pyvista path converted through `Normalization.to_si`, which resolves only
+  the six base quantities. It uses `si_factor` now, like every other
+  conversion site.
 - Derived quantities that divide (`temperature`, `alfven_speed`, `plasma_beta`,
   ...) crashed on integer arrays because the output was allocated with the
   input dtype; inputs now promote to float. `entropy` and `gyrotropic_entropy`
@@ -100,6 +115,24 @@ The distribution is `pypic-plasma` on PyPI; the import name is `pypic`.
 
 ### Changed
 
+- **SI conversion now fails loud when no unit system was declared.** A reader
+  that finds no `simulation.toml` used to hand back `Normalization.identity()`,
+  which is indistinguishable from a declared `[units] system = "SI"`: `in_si`
+  saw a factor of 1.0 and returned the array unchanged, so
+  `in_units("B_1", "nT")` reported 0.1 code units of B as 1e8 nT. The
+  reference density is not recoverable from a PIC deck — it fixes only
+  dimensionless ratios — so the anchor stays a `simulation.toml` concern and
+  only the silence is fixed. Affects `pypic compare`, `pypic plot-compare`,
+  and `compare_fields` / `field_comparison_report` /
+  `field_difference_dataset`, which all default to `units="si"`; and
+  `FieldDataset.from_arrays` called without a `normalization` argument.
+  Dimensionless quantities (`beta`, `M_A`, `agyrotropy`, ...) are exempt and
+  keep converting. To restore the old reading, pass
+  `Normalization.identity()` explicitly — it now means "these arrays already
+  are SI" — or request `units="code"`.
+- `pypic info` reports three unit states rather than two: declared SI,
+  declared non-trivial (named by system), and undeclared. It previously
+  printed `identity (SI)` for the undeclared case, which was backwards.
 - `pypic.coordinates.GEOMETRY_BY_NAME` is a read-only `Mapping`
   (`MappingProxyType`), not a `dict`: the three geometries are singletons, and
   a caller that mutated the table would change what every later dataset

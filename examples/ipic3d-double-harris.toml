@@ -36,7 +36,7 @@ upper = ["periodic", "periodic", "periodic"]
 [units]
 system            = "PIC"
 reference_species = "electrons"        # this run is electron-normalized
-reference_density = 1.0e18             # m⁻³ (reconstructed from iPIC3D qom, B0, rhoINIT)
+reference_density = 1.0e18             # m⁻³ — a chosen anchor, not recoverable from the .inp
 
 [coordinates]
 geometry = "cartesian"

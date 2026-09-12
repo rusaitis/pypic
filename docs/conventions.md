@@ -137,6 +137,38 @@ The conversion happens once in the reader. Key mapping: Gaussian
 charge density $\rho_{c,G} = \rho_c/(4\pi)$, Gaussian energy
 $B^2/(8\pi) \to B^2/2$.
 
+## The SI Anchor Is a Choice, Not a Recoverable Value
+
+A PIC deck fixes only *dimensionless* ratios — $\omega_{pe}/\omega_{ce}$,
+$m_i/m_e$, $c/v_A$, the grid in skin depths. Every quantity in it is
+already in code units, including the ones that look physical: iPIC3D's
+`rhoINIT` is a code-unit density (typically 1.0) and `qom` is a
+code-unit ratio at a reduced mass ratio.
+
+Converting to SI needs one *absolute* anchor on top of those ratios.
+`Normalization.pic_standard` takes it as the reference plasma
+frequency,
+
+$$\omega_{ref} = \sqrt{\frac{n_{ref} \, q_{ref}^2}{\varepsilon_0 \, m_{ref}}}$$
+
+from which $l_{ref}$, $t_{ref}$, $B_{ref}$ and $E_{ref}$ all follow.
+Nothing in the deck supplies $n_{ref}$: the same double-Harris setup is
+a laboratory plasma at $10^{18}\,\mathrm{m^{-3}}$ or the magnetotail at
+$10^{6}\,\mathrm{m^{-3}}$, and which one it is, is the modeller's
+interpretation of their own run. No reader can reconstruct it.
+
+So `reference_density` belongs in `simulation.toml` — the deck is where
+that interpretation gets recorded — and a reader that finds no
+`[units]` section reports the normalization as **undeclared**
+(`Normalization.undeclared()`, `system = None`) rather than guessing.
+Asking such a dataset for a dimensional SI value raises
+`UndeclaredNormalizationError` instead of returning code units
+labelled tesla. Dimensionless quantities ($\beta$, $M_A$, the
+agyrotropy measures) are exempt: they are correct under any anchor.
+
+Three ways to supply one: ship a `simulation.toml`, pass
+`normalization=` to the reader, or stay in code units.
+
 ## Error Norms and Divergence
 
 ### L2 norm: discrete, unweighted
