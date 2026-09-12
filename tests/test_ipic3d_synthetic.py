@@ -117,6 +117,14 @@ class TestToSimulationConfigSynthetic:
     def sim_cfg(self):
         return to_simulation_config(parse_inp(PHDF5_DIR / "synthetic.inp"))
 
+    def test_normalization_is_undeclared_without_a_simulation_toml(self, sim_cfg):
+        """An .inp fixes only dimensionless ratios — there is no SI anchor.
+
+        Reading as declared SI is what made ``in_si`` return code units
+        labelled tesla.
+        """
+        assert sim_cfg.normalization.system is None
+
     def test_grid_geometry(self, sim_cfg):
         assert sim_cfg.grid.dimensions == (NX, NY, NZ)
         assert_array_equal(sim_cfg.grid.origin, (-DX / 2, -DY / 2, -DZ / 2))

@@ -181,7 +181,9 @@ class SimpleReader(ReaderBase):
         Explicit grid metadata.  Takes precedence over *config* but
         is overridden by HDF5 ``grid/`` attributes when present.
     normalization : Normalization | None
-        Unit normalization.  Defaults to ``Normalization.identity()``.
+        Unit normalization.  Defaults to ``Normalization.undeclared()``,
+        under which dimensional SI conversion raises rather than
+        silently returning code units.
     config : SimulationConfig | None
         Full simulation configuration.  Used as a fallback for grid,
         normalization, species, and physics when individual params
@@ -219,7 +221,7 @@ class SimpleReader(ReaderBase):
                 model_name="unknown",
                 model_type="PIC",
                 grid=grid,
-                normalization=normalization or Normalization.identity(),
+                normalization=normalization or Normalization.undeclared(),
             )
         super().__init__(config)
         self._file_pattern = file_pattern
@@ -504,7 +506,7 @@ class SimpleReader(ReaderBase):
                 model_name="unknown",
                 model_type="PIC",
                 grid=file_grid,
-                normalization=self._normalization or Normalization.identity(),
+                normalization=self._normalization or Normalization.undeclared(),
             )
         return copy.replace(config, grid=file_grid)
 
@@ -681,7 +683,7 @@ def _open_reader(
         )
         raise ValueError(msg)
 
-    resolved_norm = normalization or Normalization.identity()
+    resolved_norm = normalization or Normalization.undeclared()
 
     auto_config = SimulationConfig(
         model_name=model_name,

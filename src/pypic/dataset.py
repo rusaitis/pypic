@@ -189,7 +189,12 @@ class FieldDataset:
         grid : GridInfo
             Grid metadata.
         normalization : Normalization | None
-            Unit normalization.  Defaults to ``Normalization.identity()``.
+            Unit normalization.  Defaults to
+            ``Normalization.undeclared()`` — arrays are left alone, but
+            `in_si` and `in_units` raise on dimensional quantities
+            rather than return code units labelled SI.  Pass
+            ``Normalization.identity()`` to assert the arrays already
+            *are* SI.
         species : Sequence[SpeciesInfo] | None
             Species definitions, if applicable.
         physics : PhysicsParams | None
@@ -242,7 +247,7 @@ class FieldDataset:
         array([1., 2.])
         """
         if normalization is None:
-            normalization = Normalization.identity()
+            normalization = Normalization.undeclared()
         dim_names = list(grid.surviving_axis_names)
         coord_arrays = grid.coordinate_arrays()
         axis_coords = dict(zip(dim_names, coord_arrays, strict=True))

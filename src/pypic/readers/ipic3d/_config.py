@@ -479,7 +479,9 @@ def to_simulation_config(
         model_name="iPIC3D",
         model_type="PIC",
         grid=grid,
-        normalization=Normalization.identity(),
+        # An .inp deck fixes only dimensionless ratios; the SI anchor
+        # arrives with a simulation.toml or not at all.
+        normalization=Normalization.undeclared(),
         species=_build_species(cfg),
         physics=physics,
         frame="",

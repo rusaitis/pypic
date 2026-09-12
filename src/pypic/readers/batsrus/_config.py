@@ -291,7 +291,8 @@ def to_simulation_config(
         model_name="BATSRUS",
         model_type="MHD",
         grid=grid,
-        normalization=Normalization.identity(),
+        # PARAM.in carries no unit block; a simulation.toml supplies one.
+        normalization=Normalization.undeclared(),
         physics=physics,
         frame=config.coord_system,
         metadata=meta,

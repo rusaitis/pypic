@@ -14,7 +14,7 @@ from pypic.compute import (
 )
 from pypic.coordinates.geometry import SPHERICAL
 from pypic.dataset import FieldDataset
-from pypic.exceptions import UnknownFieldError
+from pypic.exceptions import UndeclaredNormalizationError, UnknownFieldError
 from pypic.grid import GridInfo
 from pypic.units import Normalization, PhysicsParams, SpeciesInfo
 from tests._helpers import ELECTRONS, IONS, make_test_dataset
@@ -480,6 +480,33 @@ class TestFieldDatasetMethods:
         beta_code = compute_field("beta", ds)
         # Dimensionless → same in SI
         np.testing.assert_allclose(beta, beta_code, rtol=1e-15)
+
+    def test_undeclared_normalization_refuses_dimensional_conversion(self):
+        """Code units must not come back labelled tesla."""
+        ds = FieldDataset.from_arrays(
+            {"B_1": np.full((2, 2, 2), 0.1)},
+            GridInfo(dimensions=(2, 2, 2), spacing=(1.0, 1.0, 1.0)),
+        )
+        with pytest.raises(UndeclaredNormalizationError):
+            ds.in_units("B_1", "nT")
+
+    def test_undeclared_normalization_still_converts_dimensionless(self):
+        shape = (2, 2, 2)
+        data = {
+            "B_1": np.full(shape, 2.0),
+            "B_2": np.zeros(shape),
+            "B_3": np.zeros(shape),
+            "P": np.full(shape, 0.5),
+        }
+        ds = FieldDataset.from_arrays(
+            data, GridInfo(dimensions=shape, spacing=(1.0, 1.0, 1.0))
+        )
+        np.testing.assert_allclose(ds.in_si("beta"), ds.compute("beta"), rtol=1e-15)
+
+    def test_field_si_factor_refuses_an_undeclared_normalization(self):
+        """The guard covers the exported function, not only ``in_si``."""
+        with pytest.raises(UndeclaredNormalizationError):
+            field_si_factor("B_1", Normalization.undeclared())
 
     def test_in_units_nt(self):
         shape = (2, 2, 2)

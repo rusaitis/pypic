@@ -100,7 +100,7 @@ def open_openggcm(
         model_name="OpenGGCM",
         model_type="MHD",
         grid=grid_info,
-        normalization=normalization or Normalization.identity(),
+        normalization=normalization or Normalization.undeclared(),
         physics=PhysicsParams(),
         frame="GSM",
         metadata={
