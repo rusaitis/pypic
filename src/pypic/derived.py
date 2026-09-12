@@ -1680,13 +1680,7 @@ def agyrotropy(
     ... )
     array([0.])
     """
-    bhat_1, bhat_2, bhat_3 = _unit_vector(b1, b2, b3)
-    p_par = (
-        bhat_1**2 * p11
-        + bhat_2**2 * p22
-        + bhat_3**2 * p33
-        + 2.0 * (bhat_1 * bhat_2 * p12 + bhat_1 * bhat_3 * p13 + bhat_2 * bhat_3 * p23)
-    )
+    p_par = parallel_pressure(p11, p22, p33, p12, p13, p23, b1, b2, b3)
     invariant_1 = p11 + p22 + p33
     invariant_2 = p11 * p22 + p11 * p33 + p22 * p33 - p12**2 - p13**2 - p23**2
     denom = (invariant_1 - p_par) * (invariant_1 + 3.0 * p_par)
@@ -1749,15 +1743,10 @@ def aunai_nongyrotropy(
     ... )
     array([0.])
     """
-    bhat_1, bhat_2, bhat_3 = _unit_vector(b1, b2, b3)
-
-    p_par = (
-        bhat_1**2 * p11
-        + bhat_2**2 * p22
-        + bhat_3**2 * p33
-        + 2.0 * (bhat_1 * bhat_2 * p12 + bhat_1 * bhat_3 * p13 + bhat_2 * bhat_3 * p23)
-    )
+    p_par = parallel_pressure(p11, p22, p33, p12, p13, p23, b1, b2, b3)
     trace_p = p11 + p22 + p33
+    # Inline rather than via ``perpendicular_pressure``, which would
+    # re-derive ``bhat`` through a second ``parallel_pressure`` call.
     p_perp = (trace_p - p_par) / 2.0
 
     frobenius_p_sq = p11**2 + p22**2 + p33**2 + 2.0 * (p12**2 + p13**2 + p23**2)
