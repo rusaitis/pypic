@@ -295,7 +295,8 @@ Phases 6 and 7.
    `from_arrays` (`metadata`, `aliases`, `transforms` — all three already
    copy defensively) and two `io/_virtual.py` locals along with it. The
    `reference_density` anchor was stale: no such symbol in
-   `ipic3d/_config.py`. `_conserved.py` got prefixed constants per layout
+   `ipic3d/_config.py`, and what sits behind that absence is now Phase 9.
+   `_conserved.py` got prefixed constants per layout
    (`_A_` / `_B_` / `_SQ_`) because Format B's mapping is spelled out in two
    functions and its species stride in three; `_wrn2.py` got the encoding
    constants both the scalar and vectorized path read. No new test — item 1's
@@ -323,6 +324,49 @@ Phases 6 and 7.
 Verify: `./scripts/check.sh types`, the full suite, and
 `uv run python -X importtime -c "import pypic"` before and after item 3
 (`scipy.interpolate` must drop out).
+
+## Phase 9 — an unset normalization reads as SI
+
+Budget ~6 files, ~70 added / ~5 deleted. Independent of Phases 6-8, and a
+behaviour change rather than a cleanup, so it wants its own decision.
+
+1. - [ ] **`in_si` cannot tell "already SI" from "no normalization known".**
+   Phase 8 item 2 went looking for a `reference_density` constant in
+   `ipic3d/_config.py`; the anchor was stale, and the reason it was stale is
+   the finding. iPIC3D's `.inp` carries no *physical* reference density
+   (`rhoINIT` is code units, typically 1.0, and lands as
+   `SpeciesInfo.density`), so `to_simulation_config` hands the config
+   `Normalization.identity()` (`_config.py:482`) and only a
+   `simulation.toml` merge can replace it. `batsrus/_config.py:294`,
+   `openggcm/__init__.py:103` and `_simple.py:222,505,682` fall back the
+   same way. Identity is the honest choice for a dimensionless code — the
+   problem is that it is silent.
+
+   `Normalization` (`units.py:81`) carries no provenance field, so that
+   fallback is indistinguishable from the identity a declared
+   `system = "SI"` produces (`readers/config.py:317`). `in_si` then gets
+   `factor == 1.0` and returns the array unchanged
+   (`dataset.py:1026-1029`, same short-circuit at `:1038` for
+   `in_units`), so `in_si("B_1")` or `in_units("B_1", "nT")` on an
+   un-normalized iPIC3D run returns code units labelled tesla, with no way
+   for the caller to notice. It is the one path where
+   "normalized internally, converted at boundaries" can be violated without
+   an error.
+
+   Options: (a) a provenance field on `Normalization` that `identity()`
+   leaves unset and every `[units]` path sets, with `in_si` / `in_units`
+   raising a new `pypic.exceptions` subclass unless the caller opts in; (b)
+   leave the arithmetic alone and stamp the fallback in metadata so
+   `describe()` and `pypic info` can say "code units, no `[units]`
+   section"; (c) both, (b) as the diagnostic and (a) as the guard. (a)
+   changes behaviour for every reader that currently falls back, so it
+   needs a release note and probably a 0.2 landing; (b) is additive and
+   could ship first.
+
+   Tests: a declared `system = "SI"` dataset still round-trips `in_si`
+   unchanged; an iPIC3D fixture with no `simulation.toml` reports (or
+   raises) instead of returning code units; the existing
+   identity-normalization tests pass under whichever default lands.
 
 ## Non-goals
 
