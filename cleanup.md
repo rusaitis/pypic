@@ -259,7 +259,7 @@ Phases 6 and 7.
    to `OpenGGCMGrid` from outside.
 
    Fix the type, not its holders. A stdlib-only leaf module (e.g.
-   `pypic/_frozen.py`) registers one reducer,
+   `pypic/_pickling.py`) registers one reducer,
    `copyreg.pickle(MappingProxyType, lambda m: (_mappingproxy, (dict(m),)))`,
    where `_mappingproxy` is a named module-level function returning
    `MappingProxyType(mapping)`: pickle cannot reference the type itself,

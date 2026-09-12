@@ -3,7 +3,7 @@
 __version__ = "0.1.3"
 
 from pypic import (
-    _frozen,  # noqa: F401  registers the mappingproxy pickle reducer
+    _pickling,  # noqa: F401  registers the mappingproxy pickle reducer
     aliases,
     codegen,
 )

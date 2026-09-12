@@ -12,7 +12,7 @@ from collections.abc import Callable
 from types import MappingProxyType
 
 
-def _mappingproxy[K, V](mapping: dict[K, V]) -> MappingProxyType[K, V]:
+def _rebuild_mappingproxy[K, V](mapping: dict[K, V]) -> MappingProxyType[K, V]:
     return MappingProxyType(mapping)
 
 
@@ -21,7 +21,7 @@ def _reduce_mappingproxy[K, V](
 ) -> tuple[Callable[[dict[K, V]], MappingProxyType[K, V]], tuple[dict[K, V]]]:
     # Pickle stores the constructor by qualified name, and the type itself is
     # not importable as builtins.mappingproxy.
-    return _mappingproxy, (dict(proxy),)
+    return _rebuild_mappingproxy, (dict(proxy),)
 
 
 copyreg.pickle(MappingProxyType, _reduce_mappingproxy)

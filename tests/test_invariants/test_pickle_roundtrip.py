@@ -1,4 +1,4 @@
-# Source: src/pypic/_frozen.py (the MappingProxyType reducer) +
+# Source: src/pypic/_pickling.py (the MappingProxyType reducer) +
 #         docs/architecture.md § "Python conventions" (frozen dataclasses
 #         expose internal dicts as MappingProxyType; concurrent.futures for
 #         parallelism).
