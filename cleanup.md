@@ -4,10 +4,11 @@ Checklist for the last four phases of the September 2026 code-quality audit.
 Phases 0–4 landed on `main` (bug fixes, vector triplets from the field
 registry, `ReaderBase`, alias/layering consolidation, the `_recipes` /
 `_field_table` / `cli/` / `tests/test_plotting/` splits and the `reduce`
-decomposition; see `git log 499a846..4562923`). Phase 5 landed on 2026-09-11;
-Phases 6–8 are approved but unexecuted. Their line anchors were re-verified on
-2026-09-10 (the pickle anchors on 2026-09-11) and Phase 5 did not touch those
-files; re-check them before editing, they drift.
+decomposition; see `git log 499a846..4562923`). Phase 5 landed on 2026-09-11,
+Phases 8 and 6 on 2026-09-12. Phases 7 and 9 remain; their anchors date from
+2026-09-10. Re-check before editing, they drift — and check the premise, not
+just the line number: four of Phase 6's proposed deletions turned out to be
+load-bearing.
 
 Working rules for every phase:
 
@@ -18,7 +19,9 @@ Working rules for every phase:
   selection, then the full suite. `check.sh` stops at the format gate on untracked
   `examples/*/` scripts, so run the subcommands individually when those exist.
   `docs` gate for anything that moves a module.
-- Additive API only. No kwarg renames, no options dataclasses, no new core deps.
+- Additive API by default: no kwarg renames, no options dataclasses, no new
+  core deps. The few removals of public surface are named per item and each
+  carries a CHANGELOG line.
 - Private tables import from their defining module (`pypic._recipes`,
   `pypic._field_table`); mypy strict rejects re-exported underscore names.
 
@@ -93,77 +96,300 @@ after; the old "143" counted functions, not parametrized cases),
 
 ## Phase 6 — remaining duplication, dead weight, comments
 
-Budget ~20 files, ~150 added / ~550 deleted. Group commits by bullet.
+Landed 2026-09-12, `git log 9075636..a89c1f2` (12 commits). src: 24 files,
++420 / −430. Deviations, all recorded per item below: item 4 rewrote the
+orphaned decoders' tests to pin the surviving *encoders* rather than
+deleting them (`grid_to_dict` / `physics_to_dict` are the server wire
+format and had no other coverage); item 5 took the documented
+alternative — align the detectors' gate and cross-reference them — rather
+than one shared helper, because every shape of that helper either copies
+on the scalar hot loop or leaves both callers doing the windowing; item 7
+left `schema/_models.py` alone, since those docstrings feed the generated
+JSON Schema descriptions and regenerating the artifact is a phase
+non-goal. Two stray defects surfaced and were fixed in their own commits:
+two E501s and one F401 that the `lint` gate does not report (see Phase 7
+item 1).
 
-1. - [ ] **One nan-policy helper.** `diagnostics.py:34-77`
-   (`_apply_nan_policy_single`) and `:80-128` (`_apply_nan_policy`) become one
-   variadic `_apply_nan_policy(*arrays, nan_policy)`. Derive the
-   `("omit", "propagate", "raise")` tuples at `diagnostics.py:47,98`,
-   `reductions.py:59`, `comparison.py:65` from `get_args(NanPolicy.__value__)`;
-   the CLI already pins its Literal to that alias by test.
+Budget was ~18 files, ~200 added / ~420 deleted. Group commits by bullet.
+Anchors re-verified 2026-09-12 against `9075636`. Several of the
+original deletions turned out to be live code — `h_rel`,
+`passes_geometry`, the `in_si` fall-through, three of the five
+`io/metadata` decoders, and `decode_rle`. Each stays struck below with
+the reason, so a later reader does not re-propose it. Three items remove
+public surface (item 6's `err_prev`, item 6's `GEOMETRY_BY_NAME`
+annotation, item 8's `pypic.schema.cli` path) against the additive-API
+rule above — each is defensible at 0.1.x, and each wants a CHANGELOG
+line rather than a silent `refactor:`.
 
-2. - [ ] **`spectral.py` radial binning.** `power_spectrum_2d` (:175-202) and
-   `power_spectrum_3d` (:282-306) repeat the `k_radial → digitize → bincount`
-   block. Extract `_radial_bin(power, k_radial, n_bins)`. Parseval tests in
-   `tests/test_invariants` guard it.
+1. - [x] **One nan-policy helper.** `diagnostics.py:34-77`
+   (`_apply_nan_policy_single`) and `:80-128` (`_apply_nan_policy`) are
+   line-for-line identical apart from mask construction
+   (`np.isnan(field)` :54 versus the joint `np.isnan(computed) |
+   np.isnan(reference)` :105, deliberate so relative norms compare one
+   point set) and return arity; both error and both warning strings
+   already match. One variadic `_apply_nan_policy(*arrays, nan_policy)`
+   over `np.logical_or.reduce` covers them. It needs `@overload` on
+   arity to stay mypy-strict clean: `l2_relative_error` (:172) and
+   `linf_error` (:221) destructure a 2-tuple, and the five single-array
+   callers (:325, :439, :531, :570, :606) grow a `(masked,) = ...`.
+   Derive the `("omit", "propagate", "raise")` tuples at
+   `diagnostics.py:47,98`, `reductions.py:59` and `comparison.py:65`
+   from `get_args(NanPolicy.__value__)` — `reductions.py:58` already
+   does exactly that for `Reduction`. Two constraints: the CLI Literal
+   at `cli/_options.py:57-60` stays hand-written (typer introspects it,
+   and `tests/test_cli.py:337` pins it to the alias), and
+   `reductions.py:41` imports `NanPolicy` only under `TYPE_CHECKING`,
+   so deriving adds a runtime `reductions → diagnostics` edge — safe
+   (no cycle, and `__init__.py:106` already imports diagnostics
+   eagerly, so `import pypic` does not grow). Keep the check at
+   `comparison.py:325-327`: its comment says it duplicates the inner
+   one deliberately, to fail before the expensive regrid.
 
-3. - [ ] **`derived.py` pressure decomposition.** The `bhat_1**2 * p11 + ...`
-   projection is inlined at `:1685`, `:1755`, `:1829` (and the perpendicular
-   companions right after each); call `parallel_pressure` (:1486) and
-   `perpendicular_pressure` (:1548) instead. Keep public
-   `relativistic_enthalpy` (:504); drop its registry entry in `_recipes.py:166`
-   only if nothing outside tests resolves `h_rel` (grep docs/equations.md
-   first: it is documented, so more likely keep both and note why).
+2. - [x] **`spectral.py` radial binning.** `power_spectrum_2d`
+   (:177-202) and `power_spectrum_3d` (:284-306) are token-identical
+   apart from one comment word — same `linspace(0, k_max, n_bins + 1)`
+   edges, same `digitize` and `clip`, same count-average, same
+   empty-bin NaN-then-filter, same midpoint `k_centers`, and no
+   annulus-versus-shell weighting difference (geometric weighting lives
+   in the isotropy of the k-grid sampling). Extract
+   `_radial_bin(power, k_radial, n_bins)`; the window, FFT and
+   normalization above each block legitimately differ and stay put.
+   Two corrections to the original text: there is no `bincount`
+   anywhere — both blocks use `np.add.at`, so keep it or justify the
+   `counts` dtype shift and the mandatory `minlength` separately — and
+   the Parseval tests do **not** guard this.
+   `tests/test_invariants/test_parseval_identity.py` is 1-D only, and
+   the 2-D/3-D coverage in `tests/test_spectral.py` is shape and
+   sanity, so an off-by-one in the helper's `digitize` or `k_centers`
+   would pass the suite. Land a 2-D absolute-scale or Parseval
+   assertion first, then refactor under it.
 
-4. - [ ] **`io/metadata.py` decoders.** `dict_to_grid` (:82),
-   `dict_to_normalization` (:116), `dict_to_physics` (:212),
-   `dict_to_transforms` (:261), `transforms_to_dict` (:254) have no caller
-   outside `tests/test_zarr_io.py` (16 references). Delete them with their
-   tests; keep `grid_to_dict` / `normalization_to_dict` / `physics_to_dict`
-   (server wire format). `io/zarr.py:100-127` re-implements the
-   `schema.version` major check that `decode_pypic_attrs` (:557) owns; delegate.
-   `_PYPIC_ROOT_ATTR_KEYS` (`zarr.py:45`) is a hand-kept mirror of the encoder's
-   keys: derive it from `encode_pypic_attrs` or delete it.
+3. - [x] **`derived.py` pressure decomposition.** The
+   `bhat_1**2 * p11 + ...` projection is inlined three times, but only
+   two of them are worth delegating and only two carry a perpendicular
+   companion. `agyrotropy` (:1683-1689) and `aunai_nongyrotropy`
+   (:1752-1761) reproduce `parallel_pressure` (:1486) — and, at the
+   second site, `perpendicular_pressure` (:1548) — token for token, and
+   neither touches `bhat_*` again afterwards, so delegating drops a
+   whole `_unit_vector` call at each. Delegate `p_par` only and keep
+   `p_perp = (trace_p - p_par) / 2.0` inline: `perpendicular_pressure`
+   re-calls `parallel_pressure` internally, so delegating both would
+   recompute `bhat`. `scudder_agyrotropy` (:1826-1834) stays inline —
+   it reads `bhat_1/2/3` heavily at :1836-1851, so delegating there
+   trades the dedup for a second `_unit_vector` over the full grid.
 
-5. - [ ] **`traces/_tracing.py` closed-loop detector.** The proximity check
-   inside `_trace_single_direction` (:204) and
-   `_trace_single_direction_adaptive` (:256, allocation at :289-294, use at
-   :323) must not disagree. Extract `_closed_loop_hit(points, arclens, i, *,
-   loop_tol, loop_min_arclen) -> bool`; keep both integrator loops (they are
-   numerically distinct).
+   `h_rel` stays, both the function and the registry entry. The
+   original text made dropping `_recipes.py:165` conditional on nothing
+   outside tests resolving it; the condition fails. It is documented at
+   `docs/equations.md:101` with footnote `:116` and again at
+   `docs/schema.md:1090`, exported from `__init__.py:94`, aliased from
+   `_aliases.py:103`, and pinned by
+   `tests/test_registry_consistency.py:115`. That
+   `relativistic_enthalpy` (:504) is a one-line forward to
+   `enthalpy(..., c=c)` is the point of it — a named entry point for a
+   documented quantity, not duplication.
 
-6. - [ ] **Dead code.** `numerics/_step_control.py` `err_prev` params (:38,
-   :105) plus the "queued PI" docstring (:5-6, :49, :66, :129, `del err_prev`
-   :86); `compute.py:254-258` the `passes_geometry` branch is a no-op while
-   the 3D-Cartesian raise above it stands (delete the branch and the field,
-   or keep with the comment trimmed to one line); `dataset.py:1030`
-   fall-through in `in_si` after the `quantity_type` branch (check whether
-   any field reaches it); `openggcm/_grid.py:16-18` dangling comment above
-   `OpenGGCMGrid`; `coordinates/geometry.py:139` `GEOMETRY_BY_NAME` →
-   `MappingProxyType`; `fields.py:92,128` module-level asserts → one
-   aggregated test in `tests/test_registry_consistency.py`. Keep
-   `_stagger.py` and `openggcm/_wrn2.decode_rle` (named future consumers in
-   TASKS.md Steps 35/42) with a one-line note each.
+4. - [x] **`io/metadata.py` and `io/zarr.py` attrs plumbing.** Three of
+   the five decoders the original text called dead are live on the
+   `from_zarr` path: `dict_to_normalization` (:116) is called from
+   `decode_pypic_attrs` at `metadata.py:615`, `dict_to_transforms`
+   (:261) at `:644`, and `transforms_to_dict` (:254) at `:793` inside
+   the encoder. Only `dict_to_grid` (:82) and `dict_to_physics` (:212)
+   are orphaned, because the v1.0 reshape replaced them with
+   `_attrs_to_grid` (:691) and `_attrs_to_physics` (:826). Delete those
+   two with their `tests/test_zarr_io.py` references; neither is
+   exported from `pypic.io` nor reachable from the docs. Keep
+   `grid_to_dict` / `normalization_to_dict` / `physics_to_dict` — all
+   three are the server wire format (`server/arrow.py:28-29,271-272`,
+   `server/routes.py:25-27,85-88`).
 
-7. - [ ] **Comments that narrate history.** `readers/config.py:457`
-   ("previously read"), `io/zarr.py:212` ("used to silently"),
-   `io/metadata.py:502` ("previously split"), `cli/inspect.py:364`
-   ("used to raise"), `io/_virtual.py:401` ("previously-saved"). Rewrite each
-   to describe present behaviour or delete. Wrong docs: `dataset.py:86` and
-   `containers.py:144` claim breadth-first chain resolution;
-   `coordinates/transforms.py` `resolve_transform` is one-hop, so either
-   implement BFS (schema.md §2 promises it) or fix the two docstrings and
-   schema.md. `comparison.py:3` "only place" claim: verify against
-   `reductions`/`regrid` before keeping.
+   `_PYPIC_ROOT_ATTR_KEYS` (`zarr.py:45`) and `_strip_pypic_attrs`
+   (:59) are dead, not stale. `_open_store` returns
+   `tree["fields"].to_dataset()` (:127), whose attrs are the `/fields`
+   group's own; the section keys live on the root group and reach
+   `_ds_to_field_dataset` as the separate `root_attrs` dict. Measured
+   2026-09-12: a store carrying `boundary_conditions`, `coordinates`,
+   `grid`, `metadata`, `model`, `normalization`, `physics`, `schema`
+   and `species` on root has `[]` on `/fields` and `[]` on the returned
+   dataset. Delete both and pin the no-leak guarantee with a
+   `from_zarr(...).xr.attrs` assertion, instead of a hand-kept mirror
+   of the encoder's keys that has already drifted six keys out of date.
 
-8. - [ ] **Boundaries.** HTTP `kind` / `status_code` classvars leave
-   `pypic/exceptions.py:41-95` for a mapping in `server/exceptions.py` (the
-   core exception module should not know the wire format).
-   `schema/cli.py` imports typer + rich, contradicting the "stdlib + pydantic
-   only" promise in architecture.md; move it to `pypic/_schema_cli.py` and
-   point the `pypic schema` sub-app at it (mirror `_codegen_cli.py`).
+   `zarr.py:110-123` and `decode_pypic_attrs` (`metadata.py:596-609`)
+   run the same pair of `schema.version` checks — strict equality
+   against `SCHEMA_VERSION`, not the major-component check the original
+   text described. Delegating is right, but it must keep the
+   `source_label` prefix in the message and keep failing ahead of the
+   `"fields" not in tree.children` check at :124.
+
+5. - [x] **`traces/_tracing.py` closed-loop detector.** The original
+   text put one detector in `_trace_single_direction` (:204); there is
+   none there — that path is fixed-step classical RK4, and
+   `trace_field_line` (:589) never exposes loop detection at all. The
+   two detectors are both on adaptive paths: scalar at :321-336
+   (monotone `arclen` prefix allocated :289-297, `searchsorted`-bounded
+   tail scan) and batched at :462-501 (per-seed `arclen` allocated
+   :409-416, rectangular `(M, max_n)` eligibility mask). Tolerance
+   source, arc-length cutoff, `<=` eligibility, past-only scan and
+   trigger all agree today; the one divergence is the cheap gate,
+   `j_end > 0` versus `cutoffs.max() > 0.0`, which disagree when
+   `arclen == loop_min_arclen` exactly — the scalar path tests the seed
+   point, the batched path skips the scan.
+
+   So the proposed scalar-bool `_closed_loop_hit(...)` is the wrong
+   shape: it fits only the scalar site, where it removes no
+   duplication, and routing the batched path through it needs a
+   per-seed Python loop that undoes the vectorization the comment at
+   :465-472 exists to justify. Either extract a vectorized
+   `_closed_loop_hits(points, arclens, cur_idx, *, loop_tol,
+   loop_min_arclen) -> BoolArray` that the scalar path calls with
+   `M == 1`, resolving the gate explicitly, or drop the item and leave
+   a one-line note on each detector pointing at the other. Step 44f
+   (`return_endpoints_only`) reworks this function and would rather
+   inherit one detector than two.
+
+6. - [x] **Dead code.** Two of the six original deletions here are live
+   code, one is a type change rather than dead code, and the closing
+   keep-note was right about the outcome but wrong about the reason.
+   All four stay recorded so they are not re-proposed.
+
+   *Delete* `numerics/_step_control.py` `err_prev`: params :38 and
+   :105, prose :5-6, :49-50, :66-70 and :129-132, and **two**
+   `del err_prev` — :86 and :151, the second missed the first time. No
+   caller passes it (`traces/_tracing.py:314`, :446-448) and
+   `tests/test_numerics.py:291` asserts only that it is ignored, which
+   is worse than not offering the kwarg. It takes three more edits with
+   it: that test, `docs/api/numerics.md:9-11`, and
+   `docs/references.bib:265` — removing the last `[@Gustafsson1988]`
+   citations orphans the entry and fails
+   `tests/test_bibliography.py::test_no_orphan_bib_entries`. While
+   there, fix `TASKS.md:37` and Step 44e: both describe "PI step
+   control" that the shipped elementary (I) controller does not
+   implement.
+
+   *Delete* `openggcm/_grid.py:16-18`, a comment whose constant is
+   gone; `parse_grid_file`'s docstring (:75-78) already carries the
+   same facts.
+
+   *Delete* the `fields.py:92-94` assert — `tests/test_fields.py:503-505`
+   is already the identical set equality. The `:128-130` one needs its
+   counterpart tightened first: `test_fields.py:425-429` checks one
+   direction only, so it would miss an orphan key left in
+   `_QUANTITY_DIMENSIONS` after a `QuantityType` member is renamed.
+   Both belong in `TestQuantityTypeCoverage` (`test_fields.py:319`),
+   not in `tests/test_registry_consistency.py`, which never references
+   either table.
+
+   *Type change, not dead code:* `coordinates/geometry.py:139`
+   `GEOMETRY_BY_NAME` → `MappingProxyType`. All nine callers read
+   (`io/_virtual.py:73`, `io/metadata.py:85,721`,
+   `readers/_simple.py:117`, `readers/config.py:280`,
+   `readers/batsrus/_reader.py:211,288,335`,
+   `readers/batsrus/_config.py:244`), so the swap is safe in-repo, but
+   it narrows a `coordinates.__all__` export and its annotation.
+
+   *Keep* `compute.py:253-257`. The `passes_geometry` branch is
+   value-wise inert behind the Cartesian raise, but it is not free to
+   delete: `codegen.py:53` serializes the field as `"passesGeometry"`
+   into the bundle webpic consumes, with no test pinning that key, so
+   dropping it is a cross-repo break invisible to CI, and
+   `tests/test_registry_consistency.py:538-545` validates the call
+   shape the branch produces. Deferred Step 31 is the work that makes
+   it live. Trim the comment to one line; leave branch and field.
+
+   *Keep* `dataset.py:1030`. The fall-through is the registry-resolution
+   path for fields with no `quantity_type` attr, which
+   `from_arrays(..., strict_fields=False)` produces —
+   `readers/_base.py:118`, `regrid.py:324`, `comparison.py:574` and
+   `cli/convert.py:125` all take it, and `open_virtual(...).in_si(...)`
+   resolves only through it, since VirtualiZarr hands HDF5 attrs
+   straight through. The duplication actually present is the
+   three-line factor-and-`length_axes` tail repeated at :1026-1029 and
+   :1035-1038; collapse that instead, and document the `ValueError`
+   that `field_si_factor` raises in the `Raises` section `in_si` lacks.
+
+   *Keep* `_stagger.py` and `openggcm/_wrn2.py` `decode_rle`, and add
+   no notes — both already carry one (`_stagger.py:19-20`,
+   `_wrn2.py:46-48`). `decode_rle` is not unwired:
+   `decompress_field` calls it at :158 and :164, and it is the readable
+   oracle that `decompress_field_vectorized` (:261) is cross-validated
+   against in `tests/test_openggcm_wrn2.py`. Its citation of TASKS.md
+   Steps 35/42 was wrong — those name `_stagger.py`, whose only
+   importer is `tests/test_destagger.py:8`.
+
+7. - [x] **Comments that narrate history.** Four of the five hold, at
+   slightly different lines: `readers/config.py:457-458` (a migration
+   note on a private helper; :455-456 above it describes present
+   behaviour and stays), `io/zarr.py:211-214` ("the writer used to
+   silently flatten...", which doubles as the guard's rationale — recast
+   it in the conditional rather than delete), `io/metadata.py:501-503`
+   (only the parenthetical narrates the old on-disk layout), and
+   `cli/inspect.py:363-364` (keep the guard's rationale at :361-363,
+   drop the trailing "used to raise TypeError here and take the whole
+   command down").
+   `io/_virtual.py:401` is a false positive and stays: "previously-saved
+   containers" and "earlier commits" are live icechunk repo state, not
+   pypic's own history.
+
+   The original sweep was incomplete. Same class, same treatment:
+   `plotting/_format.py:3` ("previously duplicated across..."),
+   `regrid.py:349` ("matches the historical behavior", in a *public*
+   docstring), `server/app.py:96-98` ("stays back-compat with the
+   previous ... shape"), `exceptions.py:58-59` ("the previous workaround
+   silently mangled..."). Forward references are the same rule read the
+   other way: `comparison.py:131-134` says the helper "forwards" an
+   `epoch` kwarg that `transform_to` does not have — a false claim, not
+   merely a roadmap note — plus `schema/_models.py:276,317,1402` ("a
+   future v1.1 may...").
+
+   `comparison.py:3` overclaims. `reductions.py:77` runs integrate,
+   mean, median, std and argmax on `FieldDataset`-held arrays, and its
+   own docstring (:153) points at
+   `pypic.diagnostics.l2_relative_error` as a sibling. Narrow the
+   sentence to what holds: comparison.py is the only place the pure
+   `pypic.diagnostics` norms are wrapped as a `FieldDataset`-level
+   public API.
+
+   The breadth-first claim is not a comment fix and leaves this phase.
+   `dataset.py:83-86` and `containers.py:144-146` promise BFS chain
+   resolution; `resolve_transform` (`coordinates/transforms.py:262-325`)
+   is hard-capped at two edges, tie-breaks on dict insertion order, and
+   has no cycle detection — and the same promise is repeated in
+   `docs/schema.md:493-496`, `schema/_export.py:197` and the generated
+   `simulation.schema.v1.0.json`. Correcting the docs would mean
+   regenerating the JSON Schema, which this phase's non-goals forbid,
+   and implementing BFS is feature work. Tracked as TASKS.md Step 15b.
+
+8. - [x] **Boundaries.** HTTP `kind` / `status_code` classvars leave
+   `pypic/exceptions.py` (base :48-49, then :75-76, :87-88, :94-95,
+   :106-107) for a mapping in `server/exceptions.py`, which already
+   exists and already defines the sixth carrier, `ValidationFailedError`
+   (:39-51). Only two readers, `server/app.py:103-106` and
+   `server/stream.py:97-98`, and `exceptions.py:11-17` already concedes
+   the classvars are inert for everyone else. One trap: the base
+   class's `internal` / 500 is a deliberate inherited fallback
+   (`exceptions.py:41-46`) and `ErrorFrame.kind`
+   (`server/protocol.py:195-202`) is a closed six-value Literal, so a
+   plain dict lookup would emit an invalid frame for an unmapped
+   subclass. Walk the MRO or carry a default, and add the
+   `PypicError.__subclasses__()` exhaustiveness test the suite lacks —
+   `tests/test_server_exceptions.py:35-60` is a hardcoded five-tuple
+   parametrize that a new subclass cannot fail.
+
+   `schema/cli.py` imports typer at module scope (:27) and rich lazily
+   (:326), so the "only stdlib and pydantic" promise at
+   `docs/architecture.md:75-77` and `schema/__init__.py:3-5` is false
+   as written — lifting the subpackage would carry a typer dependency.
+   It is not re-exported from `schema/__init__.py` (which is what keeps
+   `import pypic.schema` typer-free); the sub-app is mounted from
+   `cli/__init__.py:14,79`. Move it to `pypic/_schema_cli.py`,
+   mirroring `_codegen_cli.py`, which already cites the split it copies
+   (`codegen.py:10`, `_codegen_cli.py:3,45-46`). `pypic.schema.cli` is
+   an importable path today, so this is a removal — CHANGELOG line.
 
 Verify: full suite, `./scripts/check.sh docs` (moved `schema/cli.py`).
+Items 1, 2 and 4 want their guard test landed before the refactor, not
+after.
 
 ## Phase 7 — tests and tooling
 
@@ -175,6 +401,19 @@ land first and will guard everything else.
    `markers = ["slow", "integration", "fixture_data"]`, `xfail_strict = true`,
    `filterwarnings = ["error", ...]`. Run the suite with `-W error` first and
    list what fires; each ignore names the upstream issue. Expect 3–5.
+
+   While here, fix the **lint gate's blind spot**, measured 2026-09-12:
+   `scripts/check.sh lint` runs `ruff check src tests scripts benchmarks
+   examples` and reported "All checks passed!" on a tree where
+   `ruff check src` alone reported two E501s in `diagnostics.py` and an
+   F401 in `io/zarr.py` — all three real, all three introduced and then
+   committed during Phase 6 before `ruff format --check` caught the
+   E501s. Adding paths suppressed the findings; `--no-cache` did not
+   change it, and no nested ruff config exists under the extra
+   directories. So the gate CI trusts under-reports. Reproduce, then
+   either pin the invocation (per-path loop, or `--no-cache`) or file it
+   upstream with the ruff version from `uv.lock`. Until it is fixed,
+   `format` is the gate that actually catches long lines.
 
 2. - [ ] **Tolerances.** 280 of 794 `assert_allclose` calls carry no
    `rtol`/`atol`. Sweep file by file: `test_derived.py` 39,
