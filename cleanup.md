@@ -1,14 +1,18 @@
 # Code-quality cleanup — remaining phases
 
 Checklist for the last four phases of the September 2026 code-quality audit.
-Phases 0–4 landed on `main` (bug fixes, vector triplets from the field
-registry, `ReaderBase`, alias/layering consolidation, the `_recipes` /
-`_field_table` / `cli/` / `tests/test_plotting/` splits and the `reduce`
-decomposition; see `git log 499a846..4562923`). Phase 5 landed on 2026-09-11,
-Phases 8 and 6 on 2026-09-12. Phases 7 and 9 remain; their anchors date from
-2026-09-10. Re-check before editing, they drift — and check the premise, not
-just the line number: four of Phase 6's proposed deletions turned out to be
-load-bearing.
+**All phases have landed.** Phases 0–4 on `main` (bug fixes, vector triplets
+from the field registry, `ReaderBase`, alias/layering consolidation, the
+`_recipes` / `_field_table` / `cli/` / `tests/test_plotting/` splits and the
+`reduce` decomposition; see `git log 499a846..4562923`); Phase 5 on
+2026-09-11; Phases 6, 7, 8 and 9 on 2026-09-12. The one item left open is
+Phase 7's CI matrix, declined with reasons rather than deferred.
+
+Kept as a record of what each phase found, which was routinely not what its
+anchors predicted — check the premise, not just the line number. Four of
+Phase 6's proposed deletions turned out to be load-bearing; Phase 8's stale
+`reference_density` anchor turned out to be Phase 9's entire finding; Phase
+9's own reproduction case needed a change the plan had ruled out.
 
 Working rules for every phase:
 
@@ -590,7 +594,7 @@ lint-gate diagnosis was also wrong in an interesting way — see below.
    deliberately not a dev-group dependency — CI gates on `check.sh`
    directly, so the hook is a local convenience, not a build input.
 
-9. - [ ] **Ruff families, one commit each.** PLW, BLE, SLF (with a
+9. - [x] **Ruff families, one commit each.** PLW, BLE, SLF (with a
    per-file-ignores list that doubles as the seam inventory), PTH, PERF,
    FURB, C4, PIE, RET, LOG. Known one-offs: PLW1510 at `cli/plot.py:101`
    (`subprocess.run` without `check=`), S608 at `io/_duckdb.py:92` (the path
@@ -751,46 +755,189 @@ Verify: `./scripts/check.sh types`, the full suite, and
 
 ## Phase 9 — an unset normalization reads as SI
 
-Budget ~6 files, ~70 added / ~5 deleted. Independent of Phases 6-8, and a
-behaviour change rather than a cleanup, so it wants its own decision.
+Budget ~12 files, ~120 added / ~10 deleted. Independent of Phases 6-8, and a
+behaviour change rather than a cleanup, so it wants its own decision. Anchors
+re-measured 2026-09-12 against `db3edbc`; the original text's
+`_simple.py:222,505,682` had drifted to `:222,507,684`.
 
-1. - [ ] **`in_si` cannot tell "already SI" from "no normalization known".**
-   Phase 8 item 2 went looking for a `reference_density` constant in
-   `ipic3d/_config.py`; the anchor was stale, and the reason it was stale is
-   the finding. iPIC3D's `.inp` carries no *physical* reference density
-   (`rhoINIT` is code units, typically 1.0, and lands as
-   `SpeciesInfo.density`), so `to_simulation_config` hands the config
-   `Normalization.identity()` (`_config.py:482`) and only a
-   `simulation.toml` merge can replace it. `batsrus/_config.py:294`,
-   `openggcm/__init__.py:103` and `_simple.py:222,505,682` fall back the
-   same way. Identity is the honest choice for a dimensionless code — the
-   problem is that it is silent.
+**The finding.** `in_si` cannot tell "already SI" from "no normalization
+known". Phase 8 item 2 went looking for a `reference_density` constant in
+`ipic3d/_config.py`; the anchor was stale, and the reason it was stale is the
+finding. `Normalization` (`units.py:81`) carries no provenance field, so the
+fallback four readers use is indistinguishable from the identity a declared
+`system = "SI"` produces (`readers/config.py:317`). `in_si` gets
+`factor == 1.0` and returns the array unchanged (`dataset.py:1090-1098`,
+inherited by `in_units` at `:1139`), so an un-normalized run returns code
+units labelled tesla with no way for the caller to notice. Measured:
 
-   `Normalization` (`units.py:81`) carries no provenance field, so that
-   fallback is indistinguishable from the identity a declared
-   `system = "SI"` produces (`readers/config.py:317`). `in_si` then gets
-   `factor == 1.0` and returns the array unchanged
-   (`dataset.py:1026-1029`, same short-circuit at `:1038` for
-   `in_units`), so `in_si("B_1")` or `in_units("B_1", "nT")` on an
-   un-normalized iPIC3D run returns code units labelled tesla, with no way
-   for the caller to notice. It is the one path where
-   "normalized internally, converted at boundaries" can be violated without
-   an error.
+```
+>>> ds = FieldDataset.from_arrays({"B_1": np.full((2,2,2), 0.1)},
+...                               grid, Normalization.identity())
+>>> ds.in_units("B_1", "nT")[0, 0, 0]
+100000000.0
+```
 
-   Options: (a) a provenance field on `Normalization` that `identity()`
-   leaves unset and every `[units]` path sets, with `in_si` / `in_units`
-   raising a new `pypic.exceptions` subclass unless the caller opts in; (b)
-   leave the arithmetic alone and stamp the fallback in metadata so
-   `describe()` and `pypic info` can say "code units, no `[units]`
-   section"; (c) both, (b) as the diagnostic and (a) as the guard. (a)
-   changes behaviour for every reader that currently falls back, so it
-   needs a release note and probably a 0.2 landing; (b) is additive and
-   could ship first.
+0.1 code units of B reports as 10⁸ nT. For a magnetotail run that is eight
+orders of magnitude, silent. It is the one path where "normalized
+internally, converted at boundaries" can be violated without an error.
 
-   Tests: a declared `system = "SI"` dataset still round-trips `in_si`
-   unchanged; an iPIC3D fixture with no `simulation.toml` reports (or
-   raises) instead of returning code units; the existing
-   identity-normalization tests pass under whichever default lands.
+**The reference density is absent, not redundant.** Every field in
+`IPic3DConfig` is code units, including the ones that read as physical:
+`c` is "speed of light in code units" (`_config.py:45`), `rho_init` is
+"initial number density per species (code units)" (`:60`), `qom` is a
+code-unit ratio at reduced mass ratio. `Normalization.pic_standard`
+(`units.py:146`) needs one absolute anchor —
+$\omega_{ref} = \sqrt{n_{ref} q_{ref}^2 / (\varepsilon_0 m_{ref})}$, from
+which `length_ref`, `time_ref`, `b_field_ref` and `e_field_ref` all follow —
+and an `.inp` fixes only the dimensionless ratios ($\omega_{pe}/\omega_{ce}$,
+$m_i/m_e$, $c/v_A$). The same double-Harris deck is a lab plasma at
+10¹⁸ m⁻³ or the magnetotail at 10⁶ m⁻³; which one it is, is the
+modeller's interpretation, not data in the file. So the identity fallback at
+`ipic3d/_config.py:482` is *correct*, `reference_density` belongs in
+`simulation.toml` exactly where the schema puts it, and no reader-side
+reconstruction is possible. Only the silence is the bug.
+
+Which makes `examples/ipic3d-double-harris.toml:39` wrong on its face —
+`reference_density = 1.0e18  # m⁻³ (reconstructed from iPIC3D qom, B0,
+rhoINIT)`. It is a chosen anchor, not a reconstruction. Item 5 fixes it.
+
+**Blast radius, measured.** Every SI path in `src/` is opt-in except the
+comparison family, which defaults to `units = "si"`:
+
+| Path | Default |
+|---|---|
+| `pypic compare` (`cli/compare.py:38`) | **`"si"` — raises unconditionally** |
+| `pypic plot-compare` (`cli/plot.py:418`, converts at `:489-493`) | **`"si"` — raises unconditionally** |
+| `compare_fields` / `field_comparison_report` / `field_difference_dataset` (`comparison.py:232,352,454` → `:193`) | **`"si"` — raises unconditionally** |
+| `pypic stats --units` (`cli/inspect.py:26,262`) | `None`, code units |
+| `pypic plot --units` (`cli/plot.py:245` → `plotting/_resolve.py:73`) | `None`, code units |
+| `pypic convert --to-si` (`cli/convert.py:158,269`) | flag off |
+| server stream (`server/protocol.py:187` → `server/arrow.py:109`) | `"code"` |
+| `normalize_fields` (`_config_helpers.py:105`, reverse SI→code) | short-circuits on `is_identity` at `:97` |
+
+`info`, `fields`, `validate`, `reduce` and `export` never convert. So three
+library entry points and two CLI commands change behaviour; everything else
+only changes when the user asked for SI and nobody had declared a scale —
+which is the case that should fail.
+
+Two internal `Normalization.identity()` constructions must keep reading as
+*declared*, or diff datasets and `--to-si` output become un-convertible
+downstream: `comparison.py:558` (result of `field_difference_dataset`) and
+`cli/convert.py:119` (result of `_to_si_dataset`). Both deliberately stamp
+identity onto data that is already SI so `in_si` is a no-op on the result.
+Item 2 exempts them for free by leaving `identity()` alone and moving only
+the reader fallbacks.
+
+1. - [x] **The provenance bit.** One field on `Normalization`,
+   `is_declared: bool = True`, defaulted so every existing construction —
+   including the eight-positional-arg form and every `identity()` in the
+   suite — keeps its meaning. Add `Normalization.undeclared()` returning the
+   same eight 1.0s with the bit clear, and switch the four reader fallbacks
+   to it: `ipic3d/_config.py:482`, `batsrus/_config.py:294`,
+   `openggcm/__init__.py:103`, `_simple.py:222,507,684`. `identity()` keeps
+   meaning "declared SI", so `system = "SI"` decks (`readers/config.py:317`),
+   the `from_arrays` default (`dataset.py:245`), the two exempt sites above
+   and all 28 `in_si`/`in_units` test call sites are untouched.
+   `merge_simulation_toml` needs no change: a TOML `[units]` section already
+   replaces the whole `normalization` field (`_config_helpers.py:73-78`).
+
+2. - [x] **The guard, in `si_factor` rather than `in_si`.** Put it at
+   `units.py:333`, not in `dataset.py`: `si_factor` is the single chokepoint
+   under `in_si` (`dataset.py:1087,1095`), `in_units` (`:1139`) and the
+   publicly exported `field_si_factor` (`compute.py:339,385`, re-exported at
+   `__init__.py:24,286`), so one condition covers a surface that would
+   otherwise need three and would still leave `field_si_factor` silent.
+
+   Raise a new `pypic.exceptions` subclass when `not is_declared` **and** the
+   quantity is dimensional. Dimensionless is exempt and that is physics, not
+   a convenience: `beta`, `M_A`, `agyrotropy` and the rest are correct under
+   an unknown anchor, `si_factor("dimensionless")` returning 1.0 is the truth
+   there, and the exemption keeps the useful half of `compare_fields`
+   working. No opt-in kwarg on `in_si` — the escape hatches already exist and
+   are better: ship a `simulation.toml`, pass `normalization=` (OpenGGCM,
+   SimpleReader), or `units="code"`. The message should name all three.
+
+3. - [x] **Round-trip the bit.** `normalization_to_dict` /
+   `dict_to_normalization` (`io/metadata.py:108-133`) serialize exactly the
+   eight `*_ref` keys, so without this `to_zarr` → `from_zarr` launders
+   undeclared into declared and reintroduces the bug one hop away. Add
+   `"declared"` to the dict and decode it as `d.get("declared", True)` so
+   every store written to date keeps its current meaning. The dict is
+   annotated `dict[str, float]` and is also the server wire format
+   (`server/arrow.py`, `server/routes.py`), so the annotation widens.
+   schema.md §4.2 gains one line next to the eight primitives; §1 makes an
+   added optional key legal in v1.x, so no version bump.
+
+4. - [x] **Stop `pypic info` asserting the lie.** `cli/inspect.py:72-73`
+   prints `"identity (SI)"` whenever `norm.is_identity`, which is exactly
+   backwards for the fallback. Three states, not two: declared SI, declared
+   non-trivial, undeclared ("code units, no `[units]` section"). The JSON
+   branch at `:114` carries the bit too.
+
+5. - [x] **Docs and the example deck.** Fix the "reconstructed from" comment
+   at `examples/ipic3d-double-harris.toml:39` to say the anchor is chosen,
+   and say once — conventions.md is the right home — that PIC code units fix
+   only dimensionless ratios, so the SI anchor is an interpretive choice the
+   deck records rather than a value any reader can recover. CHANGELOG line
+   for the behaviour change.
+
+Tests: a declared `system = "SI"` dataset still round-trips `in_si`
+unchanged; an undeclared normalization raises on `B_1` and does **not** raise
+on `beta`; `to_zarr`/`from_zarr` preserves both states; the
+`field_difference_dataset(units="si")` output is still convertible; the
+existing identity-normalization tests pass untouched.
+
+**Open decision — resolved: landed whole.** The diagnostic half alone
+would have left the 10⁸-nT arithmetic exactly as it is, and item 4 depends
+on item 1's provenance anyway.
+
+Landed 2026-09-12 in six commits. Three changes to the plan above, each
+because the sweep found something the anchors did not say:
+
+- **`system: UnitSystem | None`, not `is_declared: bool`.** Same field
+  count, but it is the `[units].system` discriminator that
+  `readers/config.py:315` was consuming and discarding, so
+  `attrs.normalization.system` on disk now means exactly what the TOML key
+  means — what a non-pypic consumer needs. `None` is the undeclared state;
+  the dataclass default is `CUSTOM`, the honest reading of eight
+  hand-supplied references. This also made item 1's reader work smaller
+  than planned: `_build_normalization` needed no change at all, because
+  every `[units]` branch already routes through a constructor that stamps
+  its own system.
+- **`from_arrays`'s omitted-argument default moved too.** The plan left it
+  as `identity()`, which would have meant its own reproduction case still
+  printed 10⁸ nT. Measured cost was one line: `tests/_helpers.py:58`
+  already passes `identity()` explicitly, so no test needed changing.
+- **Two more fallback sites than the four named.** `io/_virtual.py:283`
+  (HDF5 with no `normalization` group) and a third hand-rolled decoder at
+  `:92-103`, alongside `dict_to_normalization` and `_normalization_to_attrs`.
+
+Three things the anchors did not predict:
+
+- `plotting/pyvista/_lines.py:66` converted through `to_si`, which resolves
+  only the six base quantities in `units.py:20`. Colouring a 3D field line
+  by any compound type — pressure, temperature, energy density — raised
+  `Unknown quantity` before it could reach the plot. Routing it through
+  `si_factor` fixes that *and* closes the one path that bypassed the guard.
+- The server needed a routing row and a new `ErrorKind`. `error_routing`
+  walks the MRO, so the new subclass would have reached clients as
+  `internal` / 500 — a user error reported as a server bug. The suite's own
+  `test_every_pypic_error_subclass_is_routed` caught it, which is the
+  invariant working as designed.
+- `pypic compare` already printed a clean message (its ValueError handler
+  covers the new subclass), but `pypic stats --units` and
+  `pypic convert --to-si` dumped a traceback at the error users will now
+  hit most. Both got the CLI's usual echo-and-exit.
+
+Verified on landing: 2957 passed / 15 skipped (2933 before this phase),
+mypy strict clean over 148 files, `ruff check .` and `ruff format --check .`
+clean, `docs` and `schema` gates green — the latter proving no v1.x bump —
+coverage 88.23% against a floor of 86, `units.py` at 100%. Two manual
+checks beyond the suite: a store written with the `system` key stripped
+decodes as declared-`custom` with `in_si` unchanged, and `pypic info` on
+`tests/data/ipic3d-synthetic/phdf5` now reports
+`undeclared (code units; no [units] section)` where it used to say
+`identity (SI)`.
 
 ## Non-goals
 
