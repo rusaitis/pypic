@@ -42,7 +42,7 @@ def field_label(info: FieldInfo, *, unit_str: str = "") -> str:
     -------
     str
     """
-    text = info.latex if info.latex else info.long_name
+    text = info.latex or info.long_name
     if unit_str:
         text += f" [{unit_str}]"
     return text

@@ -118,7 +118,7 @@ async def _serve_subscribe(
         msg = f"Step {req.step} not available"
         raise UnknownStepError(msg)
 
-    fields = req.fields if req.fields else None
+    fields = req.fields or None
     fds: FieldDataset = simulation.read(
         req.step,
         fields=fields,

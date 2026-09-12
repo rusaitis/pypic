@@ -137,6 +137,8 @@ select = [
     "PT",             # flake8-pytest-style
     "T20",            # flake8-print — the "no print() in library code" rule
     "NPY",            # numpy-specific
+    "FURB",           # refurb — modern-Python rewrites
+    "LOG",            # flake8-logging
 ]
 ignore = [
     "D100",  # missing module docstring

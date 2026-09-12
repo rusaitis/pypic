@@ -210,7 +210,7 @@ def plot_comparison(
         diff_vmax = diff_vmax if diff_vmax is not None else auto_dvmax
     diff_norm = Normalize(vmin=diff_vmin, vmax=diff_vmax)
 
-    unit_str = units if units else ""
+    unit_str = units or ""
     cb_label = field_label(info, unit_str=unit_str)
 
     with use_theme(theme):
