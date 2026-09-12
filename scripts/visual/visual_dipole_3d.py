@@ -298,8 +298,8 @@ def main() -> None:
 
     # Sample |B| along each line for coloring
     colored_lines = []
-    for fl in lines:
-        fl = attach_scalars(fl, ds, ["B_1", "B_2", "B_3"])
+    for raw_fl in lines:
+        fl = attach_scalars(raw_fl, ds, ["B_1", "B_2", "B_3"])
         bmag = np.sqrt(
             fl.scalars["B_1"] ** 2 + fl.scalars["B_2"] ** 2 + fl.scalars["B_3"] ** 2
         )

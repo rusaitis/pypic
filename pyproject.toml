@@ -143,6 +143,7 @@ select = [
     "C4",             # flake8-comprehensions
     "PIE",            # flake8-pie
     "PTH",            # flake8-use-pathlib
+    "PLW",            # pylint warnings
 ]
 ignore = [
     "D100",  # missing module docstring
@@ -173,6 +174,11 @@ convention = "numpy"
 "src/pypic/cli/*" = ["TC001", "TC002", "TC003"]
 # pyvista wraps the untyped vtk C-API; helpers must accept Any.
 "src/pypic/plotting/pyvista/*" = ["ANN401"]
+# The active theme and the default theme are process-wide by design —
+# `use_theme()` is a context manager over matplotlib's own global rcParams,
+# so the state it swaps has to live at module scope too. Threading it
+# through every plotting call is the rewrite this audit rules out.
+"src/pypic/plotting/styles.py" = ["PLW0603"]
 # Fixture generators, benchmarks and examples are scripts: they print
 # progress and are read top-to-bottom, so stdout is the point. Generators
 # additionally embed fixed-width records (iPIC3D ConservedQuantities

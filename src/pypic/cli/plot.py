@@ -98,7 +98,9 @@ def _stitch_animation(
             cmd += ["-c:v", "libx264", "-pix_fmt", "yuv420p"]
         cmd.append(output_path)
 
-        result = subprocess.run(cmd, capture_output=True, text=True)
+        # check=False: the returncode is handled below, with ffmpeg's own
+        # stderr, which is more use than a CalledProcessError traceback.
+        result = subprocess.run(cmd, capture_output=True, text=True, check=False)
         if result.returncode != 0:
             typer.echo(f"ffmpeg error: {result.stderr}", err=True)
             raise typer.Exit(1)

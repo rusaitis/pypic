@@ -400,9 +400,9 @@ def _all_reducers() -> list:
     )
 
     return [
-        ("spatial_mean", lambda f, **kw: _spatial_mean(f, **kw)),
-        ("spatial_rms", lambda f, **kw: _spatial_rms(f, **kw)),
-        ("field_extrema", lambda f, **kw: _field_extrema(f, **kw)),
+        ("spatial_mean", _spatial_mean),
+        ("spatial_rms", _spatial_rms),
+        ("field_extrema", _field_extrema),
         ("field_energy", lambda f, **kw: _field_energy(f, (1.0,) * f.ndim, **kw)),
         # max_div_b: build a synthetic 3D B from f so the divergence is
         # finite where f is finite and NaN where f is NaN.

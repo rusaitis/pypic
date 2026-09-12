@@ -150,8 +150,8 @@ def parse_inp(path: Path) -> IPic3DConfig:
     """
     kv: dict[str, str] = {}
     text = path.read_text()
-    for line in text.splitlines():
-        line = line.strip()
+    for raw_line in text.splitlines():
+        line = raw_line.strip()
         if not line or line.startswith("#"):
             continue
         match = re.match(r"(\w+)\s*=\s*(.+)", line)

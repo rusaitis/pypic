@@ -78,8 +78,8 @@ def _parse_canonical_names() -> set[str]:
         if len(cells) < 3:
             continue
         for token in backtick_re.findall(cells[1].strip()):
-            for piece in re.split(r",\s*", token):
-                piece = piece.strip().rstrip(".")
+            for raw_piece in re.split(r",\s*", token):
+                piece = raw_piece.strip().rstrip(".")
                 if not piece or piece == "..." or piece in _GROUP_IDENTIFIERS:
                     continue
                 # Markdown table cells escape the pipe as ``\|``.

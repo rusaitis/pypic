@@ -1062,10 +1062,10 @@ SCALAR_FUNCTIONS_2ARG: list[tuple[str, Callable[..., Any]]] = [
     ("gyrofrequency", lambda a, _b: gyrofrequency(a, charge=1.0, mass=1.0)),
     ("gyroradius", lambda a, b: gyroradius(a, b, charge=1.0, mass=1.0)),
     ("debye_length", lambda a, b: debye_length(a, b, charge=1.0)),
-    ("sound_speed", lambda a, b: sound_speed(a, b)),
-    ("magnetosonic_speed", lambda a, b: magnetosonic_speed(a, b)),
-    ("alfven_mach", lambda a, b: alfven_mach(a, b)),
-    ("magnetosonic_mach", lambda a, b: magnetosonic_mach(a, b)),
+    ("sound_speed", sound_speed),
+    ("magnetosonic_speed", magnetosonic_speed),
+    ("alfven_mach", alfven_mach),
+    ("magnetosonic_mach", magnetosonic_mach),
 ]
 
 
