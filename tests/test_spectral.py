@@ -8,6 +8,33 @@ import pytest
 from pypic.spectral import power_spectrum_1d, power_spectrum_2d, power_spectrum_3d
 
 
+def _radial_k_max(*axes: tuple[int, float]) -> float:
+    """Largest $|k|$ on the FFT grid — the upper edge of the last bin."""
+    per_axis = [2.0 * np.pi * np.abs(np.fft.fftfreq(n, d=d)).max() for n, d in axes]
+    return float(np.sqrt(sum(k**2 for k in per_axis)))
+
+
+def _histogram_shell_average(
+    k_radial: np.ndarray, cell_power: np.ndarray, n_bins: int
+) -> tuple[np.ndarray, np.ndarray]:
+    """Shell-average *cell_power* via `np.histogram` — an independent oracle.
+
+    Deliberately not the `digitize` + `np.add.at` path under test: numpy's
+    own binning fixes the edges, the right-inclusive last bin and the
+    non-empty-bin filtering, so an off-by-one in the implementation shows
+    up as a shifted spectrum rather than passing unnoticed.
+    """
+    keep = k_radial.ravel() > 0
+    k_flat = k_radial.ravel()[keep]
+    p_flat = cell_power.ravel()[keep]
+    span = (0.0, float(k_flat.max()))
+    counts, edges = np.histogram(k_flat, bins=n_bins, range=span)
+    totals, _ = np.histogram(k_flat, bins=n_bins, range=span, weights=p_flat)
+    valid = counts > 0
+    centers = 0.5 * (edges[:-1] + edges[1:])
+    return centers[valid], totals[valid] / counts[valid]
+
+
 class TestPowerSpectrum1D:
     def test_single_mode_peak(self) -> None:
         """A pure sine at wavenumber k0 should peak at k0."""
@@ -86,6 +113,32 @@ class TestPowerSpectrum2D:
         k, _ = power_spectrum_2d(rng.standard_normal((32, 32)), 1.0, 1.0)
         assert np.all(k > 0)
 
+    def test_single_mode_peaks_in_the_bin_holding_its_wavenumber(self) -> None:
+        """An $x$-aligned sinusoid peaks within half a bin of its own $k_0$."""
+        nx, ny, dx, dy, cycles, n_bins = 64, 64, 0.5, 0.5, 8, 32
+        k0 = 2.0 * np.pi * cycles / (nx * dx)
+        phase = 2.0 * np.pi * cycles * np.arange(nx)[:, None] / nx
+        field = np.broadcast_to(np.sin(phase), (nx, ny))
+        k, power = power_spectrum_2d(field, dx, dy, window="boxcar", n_bins=n_bins)
+        half_bin = 0.5 * _radial_k_max((nx, dx), (ny, dy)) / n_bins
+        assert abs(float(k[np.argmax(power)]) - k0) < half_bin
+
+    def test_radial_average_matches_a_histogram_oracle(self) -> None:
+        """Bin centers and shell averages match `np.histogram` cell-for-cell."""
+        rng = np.random.default_rng(5)
+        nx, ny, dx, dy, n_bins = 48, 32, 0.5, 2.0, 16
+        field = rng.standard_normal((nx, ny))
+        k, power = power_spectrum_2d(field, dx, dy, window="boxcar", n_bins=n_bins)
+        fk = np.fft.fft2(field)
+        cell_power = np.abs(fk) ** 2 * (dx * dy / (nx * ny))
+        kx = 2.0 * np.pi * np.fft.fftfreq(nx, d=dx)[:, None]
+        ky = 2.0 * np.pi * np.fft.fftfreq(ny, d=dy)[None, :]
+        expected_k, expected_power = _histogram_shell_average(
+            np.sqrt(kx**2 + ky**2), cell_power, n_bins
+        )
+        np.testing.assert_allclose(k, expected_k, rtol=1e-12)
+        np.testing.assert_allclose(power, expected_power, rtol=1e-12)
+
 
 class TestPowerSpectrum3D:
     def test_basic_shape(self) -> None:
@@ -112,6 +165,24 @@ class TestPowerSpectrum3D:
         rng = np.random.default_rng(1)
         k, _ = power_spectrum_3d(rng.standard_normal((16, 16, 16)), 1.0, 1.0, 1.0)
         assert np.all(k > 0)
+
+    def test_shell_average_matches_a_histogram_oracle(self) -> None:
+        """Shell centers and averages match `np.histogram` cell-for-cell."""
+        rng = np.random.default_rng(5)
+        nx, ny, nz, n_bins = 16, 12, 20, 10
+        dx, dy, dz = 0.5, 1.0, 2.0
+        field = rng.standard_normal((nx, ny, nz))
+        k, power = power_spectrum_3d(field, dx, dy, dz, window="boxcar", n_bins=n_bins)
+        fk = np.fft.fftn(field)
+        cell_power = np.abs(fk) ** 2 * (dx * dy * dz / (nx * ny * nz))
+        kx = 2.0 * np.pi * np.fft.fftfreq(nx, d=dx)[:, None, None]
+        ky = 2.0 * np.pi * np.fft.fftfreq(ny, d=dy)[None, :, None]
+        kz = 2.0 * np.pi * np.fft.fftfreq(nz, d=dz)[None, None, :]
+        expected_k, expected_power = _histogram_shell_average(
+            np.sqrt(kx**2 + ky**2 + kz**2), cell_power, n_bins
+        )
+        np.testing.assert_allclose(k, expected_k, rtol=1e-12)
+        np.testing.assert_allclose(power, expected_power, rtol=1e-12)
 
     def test_anisotropic_spacing(self) -> None:
         """Non-uniform spacing should still produce valid output."""
