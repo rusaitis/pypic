@@ -14,6 +14,43 @@ if TYPE_CHECKING:
     from pypic.types import FloatArray
 
 
+def _radial_bin(
+    power: FloatArray,
+    k_radial: FloatArray,
+    n_bins: int,
+) -> tuple[FloatArray, FloatArray]:
+    r"""Average *power* over equal-width $|k|$ bins, dropping DC.
+
+    Shared by the 2-D (annulus) and 3-D (spherical shell) spectra: the
+    geometric weighting lives in the isotropy of the $k$-grid sampling,
+    so both reduce to the same count-average over $|k|$. Bin edges span
+    $[0, \max |k|]$; the returned centers are bin midpoints, and empty
+    bins are dropped rather than returned as NaN.
+    """
+    k_flat = k_radial.ravel()
+    p_flat = power.ravel()
+    nonzero = k_flat > 0
+    k_flat = k_flat[nonzero]
+    p_flat = p_flat[nonzero]
+
+    k_max = float(np.max(k_flat))
+    bin_edges = np.linspace(0, k_max, n_bins + 1)
+    bin_indices = np.digitize(k_flat, bin_edges) - 1
+    bin_indices = np.clip(bin_indices, 0, n_bins - 1)
+
+    power_binned = np.zeros(n_bins)
+    counts = np.zeros(n_bins)
+    np.add.at(power_binned, bin_indices, p_flat)
+    np.add.at(counts, bin_indices, 1)
+
+    valid = counts > 0
+    power_binned[valid] /= counts[valid]
+    power_binned[~valid] = np.nan
+
+    k_centers: FloatArray = 0.5 * (bin_edges[:-1] + bin_edges[1:])
+    return k_centers[valid], power_binned[valid]
+
+
 def power_spectrum_1d(
     field: FloatArray,
     dx: float,
@@ -174,32 +211,7 @@ def power_spectrum_2d(
     kx_grid, ky_grid = np.meshgrid(kx, ky, indexing="ij")
     k_radial = np.sqrt(kx_grid**2 + ky_grid**2)
 
-    # Radial binning (exclude DC)
-    k_flat = k_radial.ravel()
-    p_flat = power_2d.ravel()
-    nonzero = k_flat > 0
-    k_flat = k_flat[nonzero]
-    p_flat = p_flat[nonzero]
-
-    k_max = float(np.max(k_flat))
-    bin_edges = np.linspace(0, k_max, n_bins + 1)
-    bin_indices = np.digitize(k_flat, bin_edges) - 1
-    bin_indices = np.clip(bin_indices, 0, n_bins - 1)
-
-    power_binned = np.zeros(n_bins)
-    counts = np.zeros(n_bins)
-    np.add.at(power_binned, bin_indices, p_flat)
-    np.add.at(counts, bin_indices, 1)
-
-    # Average within bins, mask empty bins
-    valid = counts > 0
-    power_binned[valid] /= counts[valid]
-    power_binned[~valid] = np.nan
-
-    k_centers: FloatArray = 0.5 * (bin_edges[:-1] + bin_edges[1:])
-
-    # Return only non-empty bins
-    return k_centers[valid], power_binned[valid]
+    return _radial_bin(power_2d, k_radial, n_bins)
 
 
 def power_spectrum_3d(
@@ -281,29 +293,7 @@ def power_spectrum_3d(
     kx_grid, ky_grid, kz_grid = np.meshgrid(kx, ky, kz, indexing="ij")
     k_radial = np.sqrt(kx_grid**2 + ky_grid**2 + kz_grid**2)
 
-    # Spherical shell binning (exclude DC)
-    k_flat = k_radial.ravel()
-    p_flat = power_3d.ravel()
-    nonzero = k_flat > 0
-    k_flat = k_flat[nonzero]
-    p_flat = p_flat[nonzero]
-
-    k_max = float(np.max(k_flat))
-    bin_edges = np.linspace(0, k_max, n_bins + 1)
-    bin_indices = np.digitize(k_flat, bin_edges) - 1
-    bin_indices = np.clip(bin_indices, 0, n_bins - 1)
-
-    power_binned = np.zeros(n_bins)
-    counts = np.zeros(n_bins)
-    np.add.at(power_binned, bin_indices, p_flat)
-    np.add.at(counts, bin_indices, 1)
-
-    valid = counts > 0
-    power_binned[valid] /= counts[valid]
-    power_binned[~valid] = np.nan
-
-    k_centers: FloatArray = 0.5 * (bin_edges[:-1] + bin_edges[1:])
-    return k_centers[valid], power_binned[valid]
+    return _radial_bin(power_3d, k_radial, n_bins)
 
 
 __all__ = [
