@@ -218,3 +218,18 @@ disable_error_code = [
 [tool.pytest.ini_options]
 testpaths = ["tests", "src"]
 addopts = "--doctest-modules --strict-markers -ra"
+# An xfail that starts passing is a fixed bug nobody noticed, or a test
+# that stopped testing. Either way it should fail.
+xfail_strict = true
+# Warnings are errors. A warning that reaches a user of a physics library
+# usually means a silent numerical compromise (a NaN dropped, a unit
+# unresolved), so the suite must not be able to grow one unnoticed.
+# Every ignore below names its upstream source; there is exactly one.
+filterwarnings = [
+    "error",
+    # zarr-python warns on every consolidated-metadata write. pypic writes
+    # it deliberately — docs/schema.md § 4.2 makes consolidated metadata
+    # part of the on-disk layout, and readers fall back to listing when it
+    # is absent. Drop when the Zarr v3 spec absorbs it.
+    "ignore:Consolidated metadata is currently not part in the Zarr format 3 specification:UserWarning",
+]

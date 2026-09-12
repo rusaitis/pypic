@@ -404,8 +404,13 @@ def test_quiet_flag(tmp_path):
     assert result.exit_code == 0, result.output
 
 
+@pytest.mark.filterwarnings("default::UserWarning")
 def test_quiet_suppresses_warnings(tmp_path):
-    """Verify -q routes warnings.warn through logging and suppresses them."""
+    """Verify -q routes warnings.warn through logging and suppresses them.
+
+    The NaN-omit warning is the subject here, not an accident, so this one
+    test opts out of the suite-wide ``filterwarnings = ["error"]``.
+    """
     d = tmp_path / "sim_nan"
     d.mkdir()
     (d / "simulation.toml").write_text(sim_toml(), encoding="utf-8")
