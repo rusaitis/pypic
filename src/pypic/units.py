@@ -2,15 +2,24 @@
 
 from __future__ import annotations
 
-__all__ = ["Normalization", "PhysicsConstants", "PhysicsParams", "SpeciesInfo"]
+__all__ = [
+    "Normalization",
+    "PhysicsConstants",
+    "PhysicsParams",
+    "SpeciesInfo",
+    "UnitSystem",
+]
 
 import math
 from dataclasses import dataclass, field
+from enum import StrEnum
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
 from scipy import constants
+
+from pypic.exceptions import UndeclaredNormalizationError
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Mapping
@@ -18,6 +27,9 @@ if TYPE_CHECKING:
     from pypic.types import Numeric, Vector3
 
 _QUANTITIES = frozenset({"length", "time", "velocity", "b_field", "e_field", "density"})
+
+# Correct under any anchor, so exempt from the undeclared-normalization guard.
+_DIMENSIONLESS = "dimensionless"
 
 # Display unit conversion: unit string → SI value.
 # Hand-curated rather than parsed from SI prefixes: the table is small,
@@ -77,6 +89,26 @@ _DISPLAY_UNITS: dict[str, float] = {
 }
 
 
+class UnitSystem(StrEnum):
+    """Which normalization system a `Normalization` came from.
+
+    The vocabulary of ``[units].system`` in ``simulation.toml``
+    (Schema § 2).  `Normalization.system` is ``None`` when no
+    ``[units]`` section declared one — see
+    `Normalization.undeclared`.
+
+    Examples
+    --------
+    >>> UnitSystem.PIC == "PIC"
+    True
+    """
+
+    PIC = "PIC"
+    MHD = "MHD"
+    SI = "SI"
+    CUSTOM = "custom"
+
+
 @dataclass(frozen=True, slots=True)
 class Normalization:
     r"""Map between simulation (code) units and SI.
@@ -109,6 +141,13 @@ class Normalization:
         Reference particle mass in kg.
     charge_ref : float
         Reference charge in Coulombs.
+    system : UnitSystem or None
+        Which normalization system these references came from, or
+        ``None`` when nothing declared one. Defaults to
+        ``UnitSystem.CUSTOM``, the honest reading of eight
+        hand-supplied references. ``None`` makes every dimensional
+        `si_factor` raise rather than silently return 1.0 — see
+        `undeclared`.
 
     Examples
     --------
@@ -125,6 +164,7 @@ class Normalization:
     density_ref: float
     mass_ref: float
     charge_ref: float
+    system: UnitSystem | None = UnitSystem.CUSTOM
 
     def __post_init__(self) -> None:
         for attr in (
@@ -200,6 +240,7 @@ class Normalization:
             density_ref=float(reference_density),
             mass_ref=float(reference_mass),
             charge_ref=float(reference_charge),
+            system=UnitSystem.PIC,
         )
 
     @classmethod
@@ -269,23 +310,29 @@ class Normalization:
             density_ref=float(rho_0 / constants.m_p),
             mass_ref=float(constants.m_p),
             charge_ref=float(constants.e),
+            system=UnitSystem.MHD,
         )
 
     @classmethod
     def identity(cls) -> Normalization:
         r"""Return normalization where all reference values are unity.
 
-        Useful for data already in SI or for dimensionless tests.
+        Declares the data to be **already SI** — the runtime form of
+        ``[units] system = "SI"``. Use `undeclared` instead when no
+        unit system is known; the two carry the same eight references
+        and differ only in `system`.
 
         Returns
         -------
         Normalization
-            Identity normalization (all refs = 1.0).
+            Identity normalization (all refs = 1.0, ``system = SI``).
 
         Examples
         --------
         >>> norm = Normalization.identity()
         >>> norm.length_ref
+        1.0
+        >>> norm.si_factor("b_field")
         1.0
         """
         return cls(
@@ -297,6 +344,49 @@ class Normalization:
             density_ref=1.0,
             mass_ref=1.0,
             charge_ref=1.0,
+            system=UnitSystem.SI,
+        )
+
+    @classmethod
+    def undeclared(cls) -> Normalization:
+        r"""Return the normalization of data whose unit system is unknown.
+
+        What a reader falls back to when no ``simulation.toml``
+        accompanies the output. The eight references are unity so the
+        arrays are left alone, but `system` is ``None``, so asking for
+        a dimensional SI conversion raises
+        `UndeclaredNormalizationError` instead of returning code units
+        labelled tesla. Dimensionless quantities still convert.
+
+        The absent reference is not recoverable: a PIC deck fixes only
+        dimensionless ratios ($\omega_{pe}/\omega_{ce}$, $m_i/m_e$,
+        $c/v_A$), so the SI anchor is the modeller's interpretation
+        and belongs in ``[units]``.
+
+        Returns
+        -------
+        Normalization
+            All refs = 1.0, ``system = None``.
+
+        Examples
+        --------
+        >>> norm = Normalization.undeclared()
+        >>> norm.si_factor("dimensionless")  # correct under any anchor
+        1.0
+        >>> norm.si_factor("b_field")
+        Traceback (most recent call last):
+        pypic.exceptions.UndeclaredNormalizationError: ...
+        """
+        return cls(
+            length_ref=1.0,
+            time_ref=1.0,
+            velocity_ref=1.0,
+            b_field_ref=1.0,
+            e_field_ref=1.0,
+            density_ref=1.0,
+            mass_ref=1.0,
+            charge_ref=1.0,
+            system=None,
         )
 
     @property
@@ -347,6 +437,17 @@ class Normalization:
         float
             Multiplicative factor: ``value_si = value_code * si_factor``.
 
+        Raises
+        ------
+        UndeclaredNormalizationError
+            When `system` is ``None`` and *quantity* is dimensional.
+            This is the single chokepoint under `FieldDataset.in_si`,
+            `FieldDataset.in_units` and
+            [`field_si_factor`][pypic.field_si_factor].
+        ValueError
+            When *quantity* names neither a base nor a compound
+            quantity.
+
         Examples
         --------
         >>> Normalization.identity().si_factor("velocity")
@@ -354,6 +455,15 @@ class Normalization:
         >>> Normalization.identity().si_factor("dimensionless")
         1.0
         """
+        if self.system is None and quantity != _DIMENSIONLESS:
+            msg = (
+                f"Cannot convert {quantity!r} to SI: no unit system was declared "
+                "for this data, so the SI anchor is unknown and code units would "
+                "be returned labelled as SI. Ship a simulation.toml with a "
+                "[units] section, pass normalization= when opening the data, or "
+                'ask for code units (units="code").'
+            )
+            raise UndeclaredNormalizationError(msg)
         if quantity in _QUANTITIES:
             return self._reference_value(quantity)
         try:

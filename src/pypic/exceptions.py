@@ -25,6 +25,7 @@ from __future__ import annotations
 __all__ = [
     "GeometryUnsupportedError",
     "PypicError",
+    "UndeclaredNormalizationError",
     "UnknownFieldError",
     "UnknownSimulationError",
     "UnknownStepError",
@@ -73,6 +74,23 @@ class UnknownFieldError(PypicError, KeyError):
 
 class UnknownStepError(PypicError, KeyError):
     """A requested timestep is not available for the simulation."""
+
+
+class UndeclaredNormalizationError(PypicError, ValueError):
+    """SI conversion was asked for, but no unit system was ever declared.
+
+    A reader that finds no ``simulation.toml`` cannot invent the one
+    absolute anchor SI conversion needs — a PIC deck fixes only
+    dimensionless ratios, so the reference density is a modelling
+    choice, not data in the file.  Rather than return code units
+    labelled tesla, `Normalization.si_factor` raises this for any
+    dimensional quantity.  Dimensionless quantities (``beta``,
+    ``M_A``, ``agyrotropy``) are exempt: they are correct under any
+    anchor.
+
+    Subclass of `ValueError`, matching the unknown-quantity raise
+    from the same function.
+    """
 
 
 class GeometryUnsupportedError(PypicError, NotImplementedError):

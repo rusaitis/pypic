@@ -118,6 +118,7 @@ from pypic.diagnostics import (
 from pypic.exceptions import (
     GeometryUnsupportedError,
     PypicError,
+    UndeclaredNormalizationError,
     UnknownFieldError,
     UnknownSimulationError,
     UnknownStepError,
@@ -177,7 +178,13 @@ from pypic.reductions import Reduction, reduce
 from pypic.schema import SimulationSchema, validate_simulation_toml
 from pypic.selections import BoxSelection, PlaneSelection, SphereSelection
 from pypic.spectral import power_spectrum_1d, power_spectrum_2d, power_spectrum_3d
-from pypic.units import Normalization, PhysicsConstants, PhysicsParams, SpeciesInfo
+from pypic.units import (
+    Normalization,
+    PhysicsConstants,
+    PhysicsParams,
+    SpeciesInfo,
+    UnitSystem,
+)
 
 if TYPE_CHECKING:
     from pypic.comparison import (
@@ -242,6 +249,8 @@ __all__ = [
     "TabularData",
     "TerminationReason",
     "TraceDirection",
+    "UndeclaredNormalizationError",
+    "UnitSystem",
     "UnknownFieldError",
     "UnknownSimulationError",
     "UnknownStepError",

@@ -4,7 +4,8 @@ import numpy as np
 import pytest
 from scipy import constants
 
-from pypic.units import Normalization, PhysicsConstants, SpeciesInfo
+from pypic.exceptions import UndeclaredNormalizationError
+from pypic.units import Normalization, PhysicsConstants, SpeciesInfo, UnitSystem
 
 N_REF = 1e18
 
@@ -173,6 +174,65 @@ class TestCompoundSiFactors:
     def test_unknown_compound_raises(self, norm):
         with pytest.raises(ValueError, match="Unknown quantity"):
             norm.si_factor("flux_capacitance")
+
+
+class TestUnitSystemProvenance:
+    """An undeclared normalization is distinguishable from declared SI."""
+
+    def test_every_constructor_stamps_its_own_system(self):
+        built = {
+            "identity": (Normalization.identity(), UnitSystem.SI),
+            "undeclared": (Normalization.undeclared(), None),
+            "pic_electron": (Normalization.pic_electron(N_REF), UnitSystem.PIC),
+            "pic_standard": (
+                Normalization.pic_standard(N_REF, constants.m_e, constants.e),
+                UnitSystem.PIC,
+            ),
+            "mhd_standard": (
+                Normalization.mhd_standard(1e6, 1e-12, 1e-9),
+                UnitSystem.MHD,
+            ),
+            "eight refs by hand": (
+                Normalization(1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0),
+                UnitSystem.CUSTOM,
+            ),
+        }
+        wrong = {
+            name: (norm.system, expected)
+            for name, (norm, expected) in built.items()
+            if norm.system is not expected
+        }
+        assert not wrong, f"constructors stamped the wrong system: {wrong}"
+
+    def test_undeclared_carries_the_same_references_as_identity(self):
+        undeclared = Normalization.undeclared()
+        assert undeclared.is_identity
+
+    def test_undeclared_refuses_a_dimensional_conversion(self):
+        with pytest.raises(UndeclaredNormalizationError, match="no unit system"):
+            Normalization.undeclared().si_factor("b_field")
+
+    def test_undeclared_still_converts_dimensionless_quantities(self):
+        assert Normalization.undeclared().si_factor("dimensionless") == 1.0
+
+    def test_declared_si_converts_unchanged(self):
+        assert Normalization.identity().si_factor("b_field") == 1.0
+
+    def test_the_error_names_every_escape_hatch(self):
+        """The message has to say what to do, not just that it failed."""
+        with pytest.raises(UndeclaredNormalizationError) as exc:
+            Normalization.undeclared().si_factor("pressure")
+        detail = exc.value.detail
+        missing = [
+            hatch
+            for hatch in ("simulation.toml", "normalization=", 'units="code"')
+            if hatch not in detail
+        ]
+        assert not missing, f"escape hatches absent from the message: {missing}"
+
+    def test_undeclared_is_not_equal_to_declared_si(self):
+        """The whole point: the two must not compare equal."""
+        assert Normalization.undeclared() != Normalization.identity()
 
 
 class TestNormalizationValidation:
