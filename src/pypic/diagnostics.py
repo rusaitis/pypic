@@ -506,7 +506,9 @@ def spatial_mean(
     >>> spatial_mean(np.array([1.0, 2.0, 3.0]))
     np.float64(2.0)
     """
-    masked = _apply_nan_policy(field, nan_policy=nan_policy, function_name="spatial_mean")
+    masked = _apply_nan_policy(
+        field, nan_policy=nan_policy, function_name="spatial_mean"
+    )
     if masked is None:
         return cast("np.floating[Any]", np.float64(np.nan))
     (valid,) = masked
@@ -544,7 +546,9 @@ def spatial_rms(
     >>> spatial_rms(np.array([3.0, 4.0]))
     np.float64(3.5355339059327378)
     """
-    masked = _apply_nan_policy(field, nan_policy=nan_policy, function_name="spatial_rms")
+    masked = _apply_nan_policy(
+        field, nan_policy=nan_policy, function_name="spatial_rms"
+    )
     if masked is None:
         return cast("np.floating[Any]", np.float64(np.nan))
     (valid,) = masked
