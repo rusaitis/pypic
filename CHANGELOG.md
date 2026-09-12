@@ -167,6 +167,10 @@ The distribution is `pypic-plasma` on PyPI; the import name is `pypic`.
 
 - `pypic.readers.ipic3d.to_toml`: unused, untested, and it emitted a document
   the schema rejects (`n_steps = 0`).
+- `pypic.schema.cli` moved to `pypic._schema_cli`. It imported typer at module
+  scope, which made `pypic.schema`'s "only stdlib and pydantic" promise false
+  and would have carried a typer dependency into any standalone lift of the
+  subpackage. The `pypic schema export|validate|diff` commands are unchanged.
 - The `kind` and `status_code` classvars on `PypicError` and its subclasses.
   They were HTTP/WebSocket routing metadata on library types that only the
   server read; `pypic.server.exceptions.error_routing(exc)` now returns the

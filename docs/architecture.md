@@ -73,7 +73,9 @@ entry point. `readers.config.load_config()` is a thin translator that delegates
 all shape validation to Pydantic and then maps the validated `SimulationSchema`
 onto the internal `SimulationConfig` / `GridInfo` / `Normalization` /
 `SpeciesInfo`. The subpackage deliberately has zero pypic-internal imports (only
-stdlib and pydantic) so it can be lifted into a standalone distribution. When
+stdlib and pydantic) so it can be lifted into a standalone distribution — which
+is why its typer CLI lives outside it, at `pypic/_schema_cli.py`, the way
+`pypic/_codegen_cli.py` sits outside `pypic.codegen`. When
 changing the schema, edit `pypic/schema/_models.py` first — `readers/config.py`
 and `docs/schema.md` follow from it, never the reverse.
 

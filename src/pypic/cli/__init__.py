@@ -9,9 +9,9 @@ import typer
 
 from pypic import __version__
 from pypic._codegen_cli import app as export_app
+from pypic._schema_cli import app as schema_app
 from pypic.cli import compare, convert, inspect, plot, reduce, serve
 from pypic.cli._shared import parse_steps
-from pypic.schema.cli import app as schema_app
 
 __all__ = ["app", "main", "parse_steps"]
 

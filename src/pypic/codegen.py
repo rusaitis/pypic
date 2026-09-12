@@ -7,7 +7,7 @@ Cross-language consumers (webpic's Zod/TS codegen, rustpic tooling) read the
 bundle instead of re-typing the tables by hand.
 
 Pure (stdlib only, no typer): the thin CLI lives in `pypic._codegen_cli`,
-mirroring the ``schema._export`` / ``schema.cli`` split. JSON keys are camelCase
+mirroring the ``schema._export`` / ``_schema_cli`` split. JSON keys are camelCase
 for ergonomic consumption by the TypeScript side.
 """
 

@@ -167,6 +167,20 @@ def test_importing_pypic_leaves_the_interpolator_unloaded() -> None:
     assert loaded == "False"
 
 
+def test_importing_the_schema_subpackage_pulls_only_stdlib_and_pydantic() -> None:
+    """``pypic.schema`` imports nothing from pypic and no optional dep.
+
+    The subpackage is meant to be liftable into a standalone
+    distribution, which is why its typer CLI lives at
+    ``pypic._schema_cli`` instead of inside it.
+    """
+    loaded = _probe(
+        "import sys, pypic.schema; "
+        "print(sorted(m for m in sys.modules if m in {'typer', 'rich'}))"
+    )
+    assert loaded == "[]"
+
+
 def test_deferred_name_leaves_regrid_bound_to_the_function() -> None:
     """``pypic.regrid`` is the function no matter which name is touched first.
 

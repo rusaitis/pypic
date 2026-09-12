@@ -21,10 +21,10 @@ from pathlib import Path
 
 from typer.testing import CliRunner
 
+from pypic._schema_cli import app as schema_app
 from pypic.cli import app as pypic_app
 from pypic.schema import SCHEMA_VERSION
 from pypic.schema._diff import schema_structured_diff, schema_text_diff
-from pypic.schema.cli import app as schema_app
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 REFERENCE_TOML = REPO_ROOT / "pypic.simulation.toml"

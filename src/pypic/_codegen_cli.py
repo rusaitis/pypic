@@ -1,6 +1,6 @@
 """Typer CLI for codegen export — JSON bundle for cross-language tooling.
 
-Mirrors [`pypic.schema.cli`][pypic.schema.cli]: thin commands delegating to the pure
+Mirrors `pypic._schema_cli`: thin commands delegating to the pure
 helpers in [`pypic.codegen`][pypic.codegen], with stable ``sort_keys`` JSON output.
 ``bundle`` is the one webpic's codegen consumes; the per-table commands
 (``aliases``, ``recipes``, ``fields``) exist for inspection and debugging.
@@ -43,7 +43,7 @@ _PrettyOption = Annotated[
 
 @app.callback()
 def _root() -> None:
-    """Stub callback so subcommands aren't elided (see pypic.schema.cli._root)."""
+    """Stub callback so subcommands aren't elided (see pypic._schema_cli._root)."""
 
 
 def _write(payload: dict[str, Any], output: Path, *, pretty: bool) -> None:

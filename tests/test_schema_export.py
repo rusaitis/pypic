@@ -20,6 +20,7 @@ import jsonschema
 import pytest
 from typer.testing import CliRunner
 
+from pypic._schema_cli import app as schema_app
 from pypic.cli import app as pypic_app
 from pypic.schema import (
     SCHEMA_VERSION,
@@ -27,7 +28,6 @@ from pypic.schema import (
     dump_schema,
     get_schema_path,
 )
-from pypic.schema.cli import app as schema_app
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 REFERENCE_TOML = REPO_ROOT / "pypic.simulation.toml"
