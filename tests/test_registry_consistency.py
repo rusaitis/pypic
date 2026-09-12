@@ -39,9 +39,7 @@ from pypic.coordinates.geometry import GeometryType
 from pypic.fields import _SPECIES_INFO_PATTERNS, field_info
 from pypic.units import Normalization
 
-# ---------------------------------------------------------------------------
 # Canonical name list — hand-curated from schema.md § 3
-# ---------------------------------------------------------------------------
 # The keys here are the *canonical* (numbered, geometry-agnostic) names
 # documented in schema.md as belonging to pypic's vocabulary. Letter
 # aliases (Bx, By, Bz, n_e, n_i, …) are intentionally excluded —
@@ -272,11 +270,6 @@ def _format_failures(label: str, failures: list[str]) -> str:
     return f"{label} ({len(failures)} item(s)):\n  - {bullets}"
 
 
-# ---------------------------------------------------------------------------
-# Test 1 — every SCHEMA canonical name is reachable
-# ---------------------------------------------------------------------------
-
-
 def test_all_schema_fields_are_reachable() -> None:
     """Every name in schema.md must resolve via fields/compute/aliases."""
     unreachable = sorted(n for n in CANONICAL_NAMES if not _is_reachable(n))
@@ -286,11 +279,6 @@ def test_all_schema_fields_are_reachable() -> None:
         "from CANONICAL_NAMES",
         unreachable,
     )
-
-
-# ---------------------------------------------------------------------------
-# Test 2 — per-species prefixes resolve for both static (s0/s1) and dynamic (s5+)
-# ---------------------------------------------------------------------------
 
 
 def _per_species_form(prefix: str, idx: int) -> str:
@@ -339,11 +327,6 @@ def test_all_per_species_prefixes_resolve() -> None:
     )
 
 
-# ---------------------------------------------------------------------------
-# Test 3 — every _FIELD_INFO entry has a working SI conversion
-# ---------------------------------------------------------------------------
-
-
 def test_all_field_info_entries_have_si_factor() -> None:
     """Every metadata entry's quantity_type must resolve via si_factor()."""
     norm = Normalization.identity()
@@ -366,11 +349,6 @@ def test_all_field_info_entries_have_si_factor() -> None:
     )
 
 
-# ---------------------------------------------------------------------------
-# Test 4 — every recipe's dependency names are themselves reachable
-# ---------------------------------------------------------------------------
-
-
 def test_all_recipe_dependencies_are_reachable() -> None:
     """Every field referenced by a compute recipe must resolve.
 
@@ -387,11 +365,6 @@ def test_all_recipe_dependencies_are_reachable() -> None:
         "or missing _FIELD_INFO entry",
         failures,
     )
-
-
-# ---------------------------------------------------------------------------
-# Test 5 — every species template's substituted dependencies resolve
-# ---------------------------------------------------------------------------
 
 
 def _template_canonical_form(prefix: str, idx: int) -> str:
@@ -451,11 +424,6 @@ def test_registered_species_scale_recipes_match_templates() -> None:
     )
 
 
-# ---------------------------------------------------------------------------
-# Test 6 — every compute alias points at a reachable target
-# ---------------------------------------------------------------------------
-
-
 def test_all_compute_aliases_resolve() -> None:
     """Every entry in COMPUTE_ALIASES must point at a name that resolves."""
     failures = sorted(
@@ -469,11 +437,6 @@ def test_all_compute_aliases_resolve() -> None:
         "in GROUP_ALIASES, not COMPUTE_ALIASES)",
         failures,
     )
-
-
-# ---------------------------------------------------------------------------
-# Test 7 — _SPECIES_INFO_PATTERNS quantity types are valid
-# ---------------------------------------------------------------------------
 
 
 def test_species_pattern_quantity_types_resolve() -> None:
@@ -491,9 +454,6 @@ def test_species_pattern_quantity_types_resolve() -> None:
     )
 
 
-# ---------------------------------------------------------------------------
-# Test 8 — every recipe's func signature matches its declared call shape
-# ---------------------------------------------------------------------------
 # The compute dispatcher (``compute._execute_recipe``) builds each call's
 # positional list and kwargs dynamically from recipe metadata: ``fields``
 # arrays first, then optional species charge/mass scalars, gamma, c, and

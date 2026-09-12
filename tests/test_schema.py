@@ -679,11 +679,6 @@ class TestProbeResolveFields:
         assert s.probes[0].resolve_fields(["B_1", "B_2"]) == ["B_1", "beta"]
 
 
-# ---------------------------------------------------------------------------
-# v1.0.x additive batch coverage
-# ---------------------------------------------------------------------------
-
-
 class TestModelTypeAdditions:
     """``vlasov`` and ``gyrokinetic`` admitted as model types."""
 
@@ -1148,11 +1143,6 @@ class TestOutputMultiFileLayout:
         """)
         with pytest.raises(ValidationError, match="partition"):
             validate_simulation_toml(doc)
-
-
-# ---------------------------------------------------------------------------
-# v1.0.x round 2 — additive batch (Vlasiator/VPIC/ARMS unblock)
-# ---------------------------------------------------------------------------
 
 
 class TestPhaseSpaceStorage:

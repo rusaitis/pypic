@@ -1628,10 +1628,6 @@ class TestMagneticFluxFunction:
         )
 
 
-# ---------------------------------------------------------------------------
-# Unit 12 — edge-case sweep across families that previous tests skipped
-# ---------------------------------------------------------------------------
-#
 # Each test below is one structural invariant ("every callable in this list
 # satisfies property P"). Failures are aggregated into a descriptive
 # message rather than fanned out across N parametrized cases — the

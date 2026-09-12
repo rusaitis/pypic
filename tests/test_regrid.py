@@ -13,10 +13,6 @@ from pypic.regrid import align_grids, common_grid, regrid
 from pypic.units import Normalization, PhysicsParams, SpeciesInfo
 from tests._helpers import make_uniform_grid
 
-# ---------------------------------------------------------------------------
-# common_grid
-# ---------------------------------------------------------------------------
-
 
 class TestCommonGrid:
     """Tests for :func:`common_grid`."""
@@ -90,11 +86,6 @@ class TestCommonGrid:
         g2 = GridInfo(dimensions=(10,), spacing=(1.0,), geometry=SPHERICAL)
         with pytest.raises(NotImplementedError, match="spherical"):
             common_grid(g1, g2)
-
-
-# ---------------------------------------------------------------------------
-# regrid
-# ---------------------------------------------------------------------------
 
 
 def _make_1d_dataset(
@@ -449,11 +440,6 @@ class TestRegrid:
         # Identical-grid shortcut must not fire when the caller asked
         # for a strict subset — otherwise B_2 would leak through.
         assert result.field_names() == ["B_1"]
-
-
-# ---------------------------------------------------------------------------
-# align_grids
-# ---------------------------------------------------------------------------
 
 
 class TestAlignGrids:

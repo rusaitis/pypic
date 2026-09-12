@@ -21,10 +21,6 @@ from pypic.dataset import FieldDataset
 from pypic.grid import GridInfo
 from pypic.units import Normalization
 
-# ---------------------------------------------------------------------------
-# FrameTransform dataclass
-# ---------------------------------------------------------------------------
-
 
 class TestFrameTransform:
     def test_identity_is_identity(self) -> None:
@@ -99,11 +95,6 @@ class TestIdentityTransform:
         assert t.target_frame == "sim"
 
 
-# ---------------------------------------------------------------------------
-# Vector rotation
-# ---------------------------------------------------------------------------
-
-
 class TestRotateVectorComponents:
     def test_identity_preserves(self) -> None:
         v1 = np.array([1.0, 2.0])
@@ -167,11 +158,6 @@ class TestRotateVectorComponents:
         assert_allclose(r2, -1.0, atol=1e-15)
 
 
-# ---------------------------------------------------------------------------
-# Pressure tensor rotation
-# ---------------------------------------------------------------------------
-
-
 class TestRotatePressureTensor:
     def test_identity_preserves(self) -> None:
         p11 = np.array([1.0])
@@ -228,11 +214,6 @@ class TestRotatePressureTensor:
         assert_allclose(rp[5], [0.6], atol=1e-14)  # P_23 → old P_23
 
 
-# ---------------------------------------------------------------------------
-# Composition
-# ---------------------------------------------------------------------------
-
-
 class TestComposeTransforms:
     def test_two_translations(self) -> None:
         a = FrameTransform("A", "B", origin=(1.0, 0.0, 0.0))
@@ -270,11 +251,6 @@ class TestComposeTransforms:
         assert_allclose(composed.scale, 1.0, atol=1e-12)
 
 
-# ---------------------------------------------------------------------------
-# Resolve transform
-# ---------------------------------------------------------------------------
-
-
 class TestResolveTransform:
     def test_same_frame_returns_identity(self) -> None:
         t = resolve_transform("sim", "sim", {})
@@ -303,11 +279,6 @@ class TestResolveTransform:
         t = FrameTransform("X", "Y")
         with pytest.raises(ValueError, match="No transform path"):
             resolve_transform("sim", "GSM", {"Y": t})
-
-
-# ---------------------------------------------------------------------------
-# Field detection
-# ---------------------------------------------------------------------------
 
 
 class TestFindVectorTriplets:
@@ -368,10 +339,6 @@ class TestFindPressureTensorGroups:
         result = find_pressure_tensor_groups(["P_11", "P_22", "P_33"])
         assert result == []
 
-
-# ---------------------------------------------------------------------------
-# FieldDataset.transform_to integration
-# ---------------------------------------------------------------------------
 
 _YZ_SWAP: FrameTransform = FrameTransform(
     "sim",

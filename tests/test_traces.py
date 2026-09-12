@@ -664,9 +664,6 @@ class TestSamplingEdgeCases:
         assert np.all(np.isnan(values))
 
 
-# --- Tracing algorithm tests ---
-
-
 @pytest.fixture
 def uniform_field_data() -> FieldDataset:
     """3D uniform B=(1,0,0) field on a 20x20x20 grid for tracing tests."""

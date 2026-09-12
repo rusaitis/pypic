@@ -75,9 +75,6 @@ def _make_mock_simulation(
     return sim
 
 
-# --- Morton encoding ---
-
-
 class TestMortonEncoding:
     """Tests for Morton Z-order curve encoding."""
 
@@ -139,9 +136,6 @@ class TestMortonEncoding:
         x = np.array([5.0, 5.0, 5.0])
         codes = morton_encode_3d(x, x, x, bits=10)
         np.testing.assert_array_equal(codes, 0)
-
-
-# --- Arrow interchange ---
 
 
 class TestArrowInterchange:
@@ -378,9 +372,6 @@ class TestArrowInterchange:
         assert rebuilt.id is None
 
 
-# --- Single-file Parquet ---
-
-
 class TestSingleFileParquet:
     """Tests for single-file Parquet write/read."""
 
@@ -492,9 +483,6 @@ class TestSingleFileParquet:
         rebuilt = particles_from_parquet(fpath)
         assert rebuilt.weight is not None
         assert np.all(np.diff(rebuilt.weight) >= 0)
-
-
-# --- Partitioned dataset ---
 
 
 class TestPartitionedDataset:
@@ -886,9 +874,6 @@ class TestPartitionedDataset:
         pcl = particles_from_dataset(root, step=999)
         assert pcl.n_particles == 0
         assert pcl.species_name == "unknown"
-
-
-# --- DuckDB ---
 
 
 class TestDuckDBQuery:

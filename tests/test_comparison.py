@@ -59,11 +59,6 @@ def _make_2d(
     )
 
 
-# ---------------------------------------------------------------------------
-# compare_fields
-# ---------------------------------------------------------------------------
-
-
 class TestCompareFields:
     """Tests for :func:`compare_fields`."""
 
@@ -221,11 +216,6 @@ class TestCompareFields:
             compare_fields(ds, ds, "B_1", method="not_a_real_method")
 
 
-# ---------------------------------------------------------------------------
-# field_comparison_report
-# ---------------------------------------------------------------------------
-
-
 class TestFieldComparisonReport:
     """Tests for :func:`field_comparison_report`."""
 
@@ -366,11 +356,6 @@ class TestFieldComparisonReport:
         ds = _make_2d(6, 6)
         with pytest.raises(ValueError, match="Unknown interpolation method"):
             field_comparison_report(ds, ds, method="not_a_real_method")
-
-
-# ---------------------------------------------------------------------------
-# field_difference_dataset
-# ---------------------------------------------------------------------------
 
 
 class TestFieldDifferenceDataset:
@@ -525,11 +510,6 @@ class TestFieldDifferenceDataset:
         ds = _make_2d(6, 6)
         with pytest.raises(ValueError, match="Unknown interpolation method"):
             field_difference_dataset(ds, ds, method="not_a_real_method")
-
-
-# ---------------------------------------------------------------------------
-# Frame alignment — auto-transform B into A's frame before comparing
-# ---------------------------------------------------------------------------
 
 
 class TestFrameAlignment:
@@ -704,11 +684,6 @@ class TestFrameAlignment:
         compare_fields(a, b, "B_1")  # must not raise
 
 
-# ---------------------------------------------------------------------------
-# Coarse-mismatch warning
-# ---------------------------------------------------------------------------
-
-
 class TestCoarseMismatchWarning:
     """Tests for the >10x spacing-ratio warning."""
 
@@ -754,11 +729,6 @@ class TestCoarseMismatchWarning:
             field_comparison_report(a, b)
         mismatches = [w for w in record if "cross-scale" in str(w.message)]
         assert len(mismatches) == 1
-
-
-# ---------------------------------------------------------------------------
-# NaN handling — regression for #1a (synthetic) and #1b (real masks)
-# ---------------------------------------------------------------------------
 
 
 class TestNaNHandling:
@@ -840,11 +810,6 @@ class TestNaNHandling:
         assert np.isnan(result)
 
 
-# ---------------------------------------------------------------------------
-# method= passthrough
-# ---------------------------------------------------------------------------
-
-
 class TestMethodPassthrough:
     """Tests for the ``method=`` kwarg threaded through the comparison API."""
 
@@ -883,11 +848,6 @@ class TestMethodPassthrough:
         )
         with pytest.raises(ValueError, match="method"):
             compare_fields(a, b, "B_1", method="not_a_real_method")
-
-
-# ---------------------------------------------------------------------------
-# Structural invariant
-# ---------------------------------------------------------------------------
 
 
 @pytest.mark.parametrize(
