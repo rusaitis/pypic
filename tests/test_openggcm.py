@@ -55,26 +55,28 @@ class TestUnitConversions:
 
     def test_velocity_to_si(self) -> None:
         v = np.array([500.0])
-        np.testing.assert_allclose(velocity_to_si(v), [500e3])
+        np.testing.assert_allclose(velocity_to_si(v), [500e3], rtol=1e-15)
 
     def test_bfield_to_si(self) -> None:
         b = np.array([10.0])
-        np.testing.assert_allclose(bfield_to_si(b), [10e-9])
+        np.testing.assert_allclose(bfield_to_si(b), [10e-9], rtol=1e-15)
 
     def test_density_to_si(self) -> None:
         n = np.array([5.0])
-        np.testing.assert_allclose(density_to_si(n), [5e6])
+        np.testing.assert_allclose(density_to_si(n), [5e6], rtol=1e-15)
 
     def test_density_to_mass_density_si(self) -> None:
         from scipy import constants
 
         n = np.array([1.0])
         expected = 1e6 * constants.m_p
-        np.testing.assert_allclose(density_to_mass_density_si(n), [expected])
+        np.testing.assert_allclose(
+            density_to_mass_density_si(n), [expected], rtol=1e-15
+        )
 
     def test_pressure_to_si(self) -> None:
         p = np.array([1000.0])
-        np.testing.assert_allclose(pressure_to_si(p), [1e-9])
+        np.testing.assert_allclose(pressure_to_si(p), [1e-9], rtol=1e-15)
 
 
 class TestFieldNameMap:

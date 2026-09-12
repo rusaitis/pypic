@@ -116,7 +116,7 @@ class TestDormandPrinceStep:
         result = dormand_prince_step(f, np.array([1.0]), 0.1)
         assert result.y_new is not None
         assert result.k_last is not None
-        np.testing.assert_allclose(result.k_last, f(result.y_new))
+        np.testing.assert_array_equal(result.k_last, f(result.y_new))
 
     def test_fsal_k0_skips_stage_zero_eval(self) -> None:
         """Passing k0 skips the stage-0 RHS call: 6 evals per step instead of 7."""
@@ -149,7 +149,7 @@ class TestDormandPrinceStep:
         with_fsal = dormand_prince_step(f, warmup.y_new, 0.1, k0=warmup.k_last)
         assert without_fsal.y_new is not None
         assert with_fsal.y_new is not None
-        np.testing.assert_allclose(with_fsal.y_new, without_fsal.y_new)
+        np.testing.assert_array_equal(with_fsal.y_new, without_fsal.y_new)
 
     def test_backward_integration_matches_analytic(self) -> None:
         """Backward integration of dy/dt=-y recovers y(0)=1 from y(1)=exp(-1).
@@ -342,9 +342,9 @@ class TestDormandPrinceStepBatched:
         assert scalar.y_new is not None
         assert scalar.err_vec is not None
         assert scalar.k_last is not None
-        np.testing.assert_allclose(batched.y_new[0], scalar.y_new)
-        np.testing.assert_allclose(batched.err_vec[0], scalar.err_vec)
-        np.testing.assert_allclose(batched.k_last[0], scalar.k_last)
+        np.testing.assert_array_equal(batched.y_new[0], scalar.y_new)
+        np.testing.assert_array_equal(batched.err_vec[0], scalar.err_vec)
+        np.testing.assert_array_equal(batched.k_last[0], scalar.k_last)
         assert int(batched.failed_stage[0]) == -1
 
     def test_n_seeds_match_per_seed_scalar_loop(self) -> None:
@@ -390,7 +390,7 @@ class TestDormandPrinceStepBatched:
         # Good seed should be untouched by the bad seed's failure.
         scalar = dormand_prince_step(lambda y: -y, np.array([1.0]), 0.1)
         assert scalar.y_new is not None
-        np.testing.assert_allclose(result.y_new[0], scalar.y_new)
+        np.testing.assert_array_equal(result.y_new[0], scalar.y_new)
 
     def test_failed_point_captures_invalid_evaluation_point(self) -> None:
         """failed_point[bad] is the point passed to the failed stage."""
@@ -402,7 +402,7 @@ class TestDormandPrinceStepBatched:
 
         y0 = np.array([[3.14, 2.71], [0.0, 0.0]])
         result = dormand_prince_step_batched(rhs, y0, 0.1)
-        np.testing.assert_allclose(result.failed_point[0], y0[0])
+        np.testing.assert_array_equal(result.failed_point[0], y0[0])
         # Good seed's failed_point stays NaN.
         assert np.all(np.isnan(result.failed_point[1]))
 
@@ -428,7 +428,7 @@ class TestDormandPrinceStepBatched:
         without_fsal = dormand_prince_step_batched(
             _all_valid_rhs(f_scalar), warmup.y_new, 0.1
         )
-        np.testing.assert_allclose(reused.y_new, without_fsal.y_new)
+        np.testing.assert_array_equal(reused.y_new, without_fsal.y_new)
 
     def test_h_shape_mismatch_raises(self) -> None:
         """h with a shape other than scalar / (N,) raises."""
@@ -483,7 +483,7 @@ class TestEmbeddedErrorNormBatched:
         norms = embedded_error_norm_batched(err, y, atol=1e-6, rtol=0.0)
         # scale = atol = 1e-6 (rtol=0); per-seed result is |err|/atol.
         expected = np.array([1.0, 3.0])
-        np.testing.assert_allclose(norms, expected)
+        np.testing.assert_array_equal(norms, expected)
 
 
 class TestIStepControllerBatched:
@@ -524,5 +524,5 @@ class TestIStepControllerBatched:
         h = np.array([1.0, 1.0, 1.0])
         err = np.zeros(3)
         h_new = i_step_controller_batched(h, err, min_step=1e-6, max_step=100.0)
-        np.testing.assert_allclose(h_new, _GROWTH_MAX)
+        np.testing.assert_array_equal(h_new, _GROWTH_MAX)
         assert np.all(np.isfinite(h_new))

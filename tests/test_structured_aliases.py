@@ -540,8 +540,8 @@ class TestSpeciesNameAliases:
         shape = (2, 2, 2)
         data = {"n_s0": np.full(shape, 1.0), "n_s1": np.full(shape, 2.0)}
         ds = make_test_dataset(data, shape=shape, species=[ELECTRONS, IONS])
-        np.testing.assert_allclose(ds["n_e"], 1.0)
-        np.testing.assert_allclose(ds["n_i"], 2.0)
+        np.testing.assert_array_equal(ds["n_e"], 1.0)
+        np.testing.assert_array_equal(ds["n_i"], 2.0)
 
     def test_species_alias_not_added_without_data(self):
         """n_alphas alias not created when n_s2 is absent."""
@@ -762,4 +762,4 @@ class TestEnergyFluxAliases:
         data = {"EF_1": np.full(shape, 3.14)}
         ds = make_test_dataset(data, shape=shape)
         result = compute_field("energy_flux_x", ds)
-        np.testing.assert_allclose(result, 3.14)
+        np.testing.assert_array_equal(result, 3.14)

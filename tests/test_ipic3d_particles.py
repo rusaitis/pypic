@@ -317,9 +317,9 @@ class TestPhdf5ParticleReader:
         # would not catch an axis swap (all three fit the same envelope),
         # so pin the exact unique-value sets per axis.
         pcl = read_phdf5_particles(FIXTURE_DIR, 0, 0, ipic3d_config)
-        np.testing.assert_allclose(np.unique(pcl.x), np.linspace(0.1, 0.9, 3))
-        np.testing.assert_allclose(np.unique(pcl.y), np.linspace(0.1, 0.9, 3))
-        np.testing.assert_allclose(np.unique(pcl.z), np.linspace(0.1, 0.9, 2))
+        np.testing.assert_array_equal(np.unique(pcl.x), np.linspace(0.1, 0.9, 3))
+        np.testing.assert_array_equal(np.unique(pcl.y), np.linspace(0.1, 0.9, 3))
+        np.testing.assert_array_equal(np.unique(pcl.z), np.linspace(0.1, 0.9, 2))
         # With a 3x3x2 lattice, each x value appears 6 times, each z value 9.
         assert np.count_nonzero(pcl.x == 0.1) == 6
         assert np.count_nonzero(pcl.z == 0.1) == 9

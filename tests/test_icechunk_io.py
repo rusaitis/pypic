@@ -39,8 +39,8 @@ class TestToZarrIcechunk:
         loaded = from_zarr(store)
 
         assert sorted(loaded.field_names()) == ["B_1", "B_2"]
-        np.testing.assert_allclose(loaded["B_1"], fds["B_1"])
-        np.testing.assert_allclose(loaded["B_2"], fds["B_2"])
+        np.testing.assert_array_equal(loaded["B_1"], fds["B_1"])
+        np.testing.assert_array_equal(loaded["B_2"], fds["B_2"])
         assert loaded.grid.dimensions == fds.grid.dimensions
         assert loaded.normalization.is_identity
 
@@ -92,8 +92,8 @@ class TestToZarrIcechunk:
         assert loaded.physics.relativistic is True
         assert loaded.frame == "GSM"
         assert "GSM" in loaded.transforms
-        np.testing.assert_allclose(loaded["B_1"], 1.0)
-        np.testing.assert_allclose(loaded["rho_m"], 2.0)
+        np.testing.assert_array_equal(loaded["B_1"], 1.0)
+        np.testing.assert_array_equal(loaded["rho_m"], 2.0)
 
     def test_returns_snapshot_id(self, tmp_path):
         fds = make_test_dataset({"B_1": np.ones((4, 3, 2))})
@@ -171,7 +171,7 @@ class TestToZarrIcechunk:
             to_zarr(bad, store, backend="icechunk", branch="nightly")
         assert is_icechunk_store(store)
         loaded = from_zarr(store, branch="main")
-        np.testing.assert_allclose(loaded["B_1"], 7.0)
+        np.testing.assert_array_equal(loaded["B_1"], 7.0)
 
     def test_run_and_simulation_toml_round_trip(self, tmp_path):
         # The icechunk write path routes through the same encode/decode
@@ -217,7 +217,7 @@ class TestFromZarrIcechunk:
         store = tmp_path / "auto.icechunk"
         to_zarr(fds, store, backend="icechunk")
         loaded = from_zarr(store)
-        np.testing.assert_allclose(loaded["B_1"], 1.0)
+        np.testing.assert_array_equal(loaded["B_1"], 1.0)
 
     def test_read_by_tag(self, tmp_path):
         fds = make_test_dataset({"B_1": np.ones((4, 3, 2))})
@@ -226,7 +226,7 @@ class TestFromZarrIcechunk:
         icechunk_create_tag(store, "v1.0")
 
         loaded = from_zarr(store, tag="v1.0")
-        np.testing.assert_allclose(loaded["B_1"], 1.0)
+        np.testing.assert_array_equal(loaded["B_1"], 1.0)
 
     def test_read_by_snapshot(self, tmp_path):
         fds = make_test_dataset({"B_1": np.ones((4, 3, 2))})
@@ -235,7 +235,7 @@ class TestFromZarrIcechunk:
         assert snap_id is not None
 
         loaded = from_zarr(store, snapshot_id=snap_id)
-        np.testing.assert_allclose(loaded["B_1"], 1.0)
+        np.testing.assert_array_equal(loaded["B_1"], 1.0)
 
     def test_read_by_branch(self, tmp_path):
         fds = make_test_dataset({"B_1": np.ones((4, 3, 2))})
@@ -243,7 +243,7 @@ class TestFromZarrIcechunk:
         to_zarr(fds, store, backend="icechunk", branch="main")
 
         loaded = from_zarr(store, branch="main")
-        np.testing.assert_allclose(loaded["B_1"], 1.0)
+        np.testing.assert_array_equal(loaded["B_1"], 1.0)
 
     def test_write_creates_non_main_branch(self, tmp_path):
         # Fresh repos only have `main`; writable_session(other) would
@@ -254,7 +254,7 @@ class TestFromZarrIcechunk:
         snap = to_zarr(fds, store, backend="icechunk", branch="analysis")
         assert snap is not None
         loaded = from_zarr(store, branch="analysis")
-        np.testing.assert_allclose(loaded["B_1"], 7.0)
+        np.testing.assert_array_equal(loaded["B_1"], 7.0)
 
     def test_multiple_refs_raises(self, tmp_path):
         fds = make_test_dataset({"B_1": np.ones((4, 3, 2))})
@@ -381,7 +381,7 @@ class TestTimeseriesIcechunk:
             to_zarr_timeseries([], store, backend="icechunk", branch="nightly")
         # Pre-existing data on main must still be readable.
         loaded = from_zarr(store, branch="main")
-        np.testing.assert_allclose(loaded["B_1"], 5.0)
+        np.testing.assert_array_equal(loaded["B_1"], 5.0)
 
     def test_timeseries_branch_created(self, tmp_path):
         grid = make_uniform_grid(4, 3, 2)

@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any
 import h5py  # type: ignore[import-untyped]
 import numpy as np
 import pytest
-from numpy.testing import assert_allclose
+from numpy.testing import assert_array_equal
 
 from pypic.containers import SimulationConfig
 from pypic.coordinates.geometry import CARTESIAN
@@ -208,12 +208,12 @@ class TestReadTimestepAutoDetect:
         assert ds.has_field("rho_m")
         assert ds["B_1"].shape == DIMS
         expected = _make_fields()
-        assert_allclose(ds["B_1"], expected["B_1"])
+        assert_array_equal(ds["B_1"], expected["B_1"])
         assert ds.grid.dimensions == DIMS
         assert ds.grid.spacing == SPACING
         assert ds.grid.origin == ORIGIN
         assert ds.has_field("Bx")
-        assert_allclose(ds["Bx"], ds["B_1"])
+        assert_array_equal(ds["Bx"], ds["B_1"])
 
     def test_aliases_metadata_and_missing_file(
         self,
@@ -552,7 +552,7 @@ class TestCustomReadRaw:
         assert ds.has_field("rho_m")
         assert ds.grid.dimensions == DIMS
         expected = _make_fields()
-        assert_allclose(ds["B_1"], expected["B_1"])
+        assert_array_equal(ds["B_1"], expected["B_1"])
 
     def test_field_map_applied_after_read_raw(
         self,
@@ -586,7 +586,7 @@ class TestCustomReadRaw:
         assert ds.has_field("B_1")
         assert ds.has_field("Bx")
         assert not ds.has_field("mag_x")
-        assert_allclose(ds["B_1"], native_data["mag_x"])
+        assert_array_equal(ds["B_1"], native_data["mag_x"])
 
     def test_missing_grid_raises(
         self,
@@ -652,7 +652,7 @@ class TestCustomReadRaw:
 
         reader = TransposedReader(grid=_sample_grid())
         ds = reader.read_timestep(tmp_path, 0)
-        assert_allclose(ds["B_1"], original)
+        assert_array_equal(ds["B_1"], original)
 
 
 class TestSelectFields:
@@ -670,7 +670,7 @@ class TestSelectFields:
         assert alias_sub.has_field("Bx")
         assert sorted(alias_sub.field_names()) == ["B_1"]
         # Values preserved
-        assert_allclose(sub["B_1"], ds["B_1"])
+        assert_array_equal(sub["B_1"], ds["B_1"])
         # Metadata preserved
         assert sub.grid.dimensions == ds.grid.dimensions
         assert sub.normalization is ds.normalization
@@ -727,7 +727,7 @@ class TestSelectiveRead:
         reader = SimpleReader()
         full = reader.read_timestep(canonical_dir, 0)
         sub = reader.read_timestep(canonical_dir, 0, fields={"B_1"})
-        assert_allclose(sub["B_1"], full["B_1"])
+        assert_array_equal(sub["B_1"], full["B_1"])
 
     def test_with_field_map(
         self,

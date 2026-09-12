@@ -696,7 +696,7 @@ class TestPlotKymograph:
         assert isinstance(ax, Axes)
         mesh = ax.collections[0]
         arr = np.asarray(mesh.get_array()).reshape(values.shape)
-        np.testing.assert_allclose(arr, values)
+        np.testing.assert_array_equal(arr, values)
         plt.close(fig)
 
     def test_symmetric(self) -> None:

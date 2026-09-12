@@ -532,7 +532,7 @@ class TestWithField:
         ds2 = ds.with_field("custom_v", data, QuantityType.VELOCITY)
         si_vals = ds2.in_si("custom_v")
         expected_factor = norm.si_factor("velocity")
-        np.testing.assert_allclose(si_vals, data * expected_factor)
+        np.testing.assert_array_equal(si_vals, data * expected_factor)
 
     def test_field_info_from_attrs(self) -> None:
         ds = _make_dataset({"B_1": np.ones((4, 3, 2))})
@@ -617,7 +617,7 @@ class TestAttrsOverrideRegistry:
         ds2 = ds.with_field("B_1", np.array([5.0, 6.0]), QuantityType.VELOCITY)
         si = ds2.in_si("B_1")
         expected = np.array([5.0, 6.0]) * norm.si_factor("velocity")
-        np.testing.assert_allclose(si, expected)
+        np.testing.assert_array_equal(si, expected)
 
 
 class TestFromArraysQuantityTypeAttr:

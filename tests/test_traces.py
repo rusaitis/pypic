@@ -273,7 +273,7 @@ class TestArcLength:
     def test_straight_line(self) -> None:
         pts = _straight_line(5)
         s = arc_length_cumulative(pts)
-        np.testing.assert_allclose(s, [0.0, 1.0, 2.0, 3.0, 4.0])
+        np.testing.assert_array_equal(s, [0.0, 1.0, 2.0, 3.0, 4.0])
 
     def test_total_equals_last_cumulative(self) -> None:
         pts = _straight_line(10)
@@ -281,7 +281,7 @@ class TestArcLength:
 
     def test_diagonal(self) -> None:
         pts = np.array([[0.0, 0.0, 0.0], [3.0, 4.0, 0.0]])
-        np.testing.assert_allclose(arc_length_total(pts), 5.0)
+        np.testing.assert_array_equal(arc_length_total(pts), 5.0)
 
     def test_circle_arc_length(self) -> None:
         n = 1000
@@ -352,7 +352,7 @@ class TestPlaneCrossings:
         pts = np.array([[-1.0, 0.0, 0.0], [1.0, 0.0, 0.0]])
         crossings = plane_crossings(pts, (1.0, 0.0, 0.0), 0.0)
         assert crossings.shape == (1, 3)
-        np.testing.assert_allclose(crossings[0], [0.0, 0.0, 0.0])
+        np.testing.assert_array_equal(crossings[0], [0.0, 0.0, 0.0])
 
     def test_no_crossing(self) -> None:
         pts = np.array([[1.0, 0.0, 0.0], [2.0, 0.0, 0.0]])
@@ -370,7 +370,7 @@ class TestPlaneCrossings:
         pts = np.array([[0.0, 0.0, -1.0], [0.0, 0.0, 1.0], [0.0, 0.0, -0.5]])
         eq = equatorial_crossings(pts)
         manual = plane_crossings(pts, (0.0, 0.0, 1.0), 0.0)
-        np.testing.assert_allclose(eq, manual)
+        np.testing.assert_array_equal(eq, manual)
 
 
 class TestResample:
@@ -392,8 +392,8 @@ class TestResample:
         _, new_scalars = resample_by_arc_length(pts, 9, scalars=scalars)
         assert "rho" in new_scalars
         assert new_scalars["rho"].shape == (9,)
-        np.testing.assert_allclose(new_scalars["rho"][0], 0.0)
-        np.testing.assert_allclose(new_scalars["rho"][-1], 4.0)
+        np.testing.assert_array_equal(new_scalars["rho"][0], 0.0)
+        np.testing.assert_array_equal(new_scalars["rho"][-1], 4.0)
 
     def test_too_few_rejects(self) -> None:
         with pytest.raises(ValueError, match="n_out must be >= 2"):
@@ -404,14 +404,14 @@ class TestSpeed:
     def test_constant_velocity(self) -> None:
         v = np.full((5, 3), [3.0, 4.0, 0.0])
         s = speed(v)
-        np.testing.assert_allclose(s, 5.0)
+        np.testing.assert_array_equal(s, 5.0)
 
 
 class TestKineticEnergy:
     def test_basic(self) -> None:
         v = np.array([[1.0, 0.0, 0.0], [0.0, 2.0, 0.0]])
         ke = kinetic_energy(v, mass=2.0)
-        np.testing.assert_allclose(ke, [1.0, 4.0])
+        np.testing.assert_array_equal(ke, [1.0, 4.0])
 
 
 class TestMirrorPoints:
@@ -497,7 +497,7 @@ class TestSampling:
         assert isinstance(data, FieldDataset)
         pts = np.array([[0.5, 0.5, 0.5], [1.5, 0.5, 0.5], [2.5, 0.5, 0.5]])
         values = sample_field(data, pts, "rho", method="nearest")
-        np.testing.assert_allclose(values, [0.5, 1.5, 2.5])
+        np.testing.assert_array_equal(values, [0.5, 1.5, 2.5])
 
     def test_outside_domain_returns_nan(self, field_dataset: object) -> None:
         from pypic.dataset import FieldDataset
@@ -532,7 +532,7 @@ class TestSampling:
         )
         fl2 = attach_scalars(fl, data, ["rho"])
         assert "rho" in fl2.scalars
-        np.testing.assert_allclose(fl2.scalars["rho"], [0.5, 1.5, 2.5])
+        np.testing.assert_array_equal(fl2.scalars["rho"], [0.5, 1.5, 2.5])
 
     def test_attach_scalars_to_particletrace(self, field_dataset: object) -> None:
         from pypic.dataset import FieldDataset
@@ -549,7 +549,7 @@ class TestSampling:
         )
         tr2 = attach_scalars_to_trace(tr, data, ["rho"])
         assert "rho" in tr2.scalars
-        np.testing.assert_allclose(tr2.scalars["rho"], [0.5, 1.5, 2.5])
+        np.testing.assert_array_equal(tr2.scalars["rho"], [0.5, 1.5, 2.5])
 
     def test_invalid_method_rejects(self, field_dataset: object) -> None:
         from pypic.dataset import FieldDataset
@@ -645,7 +645,7 @@ class TestSamplingEdgeCases:
         # Sample at y=0.5, z=0.5 (the only valid z slice)
         pts = np.array([[0.5, 0.5, 0.5], [1.5, 0.5, 0.5], [2.5, 0.5, 0.5]])
         values = sample_field(data, pts, "rho", method="nearest")
-        np.testing.assert_allclose(values, [0.5, 1.5, 2.5])
+        np.testing.assert_array_equal(values, [0.5, 1.5, 2.5])
 
     def test_single_node_axis_far_z_out_of_bounds(self) -> None:
         """Querying far outside the (single) z node returns NaN, not garbage."""
@@ -693,7 +693,7 @@ class TestVectorFieldInterpolator:
         interp = VectorFieldInterpolator.from_dataset(uniform_field_data)
         # Verify construction succeeded AND evaluates correctly at the center
         result = interp(np.array([10.0, 10.0, 10.0]))
-        np.testing.assert_allclose(result, [1.0, 0.0, 0.0])
+        np.testing.assert_array_equal(result, [1.0, 0.0, 0.0])
 
     def test_call_inside_domain(self, uniform_field_data: FieldDataset) -> None:
         from pypic.traces import VectorFieldInterpolator
@@ -702,7 +702,7 @@ class TestVectorFieldInterpolator:
         result = interp(np.array([10.0, 10.0, 10.0]))
         assert result.shape == (3,)
         assert not np.any(np.isnan(result))
-        np.testing.assert_allclose(result, [1.0, 0.0, 0.0])
+        np.testing.assert_array_equal(result, [1.0, 0.0, 0.0])
 
     def test_call_outside_domain(self, uniform_field_data: FieldDataset) -> None:
         from pypic.traces import VectorFieldInterpolator
@@ -892,7 +892,7 @@ class TestTraceFieldLinesAdaptive:
         assert len(lines) == 3
         # Seed-order preserved: each line starts at its seed.
         for i, line in enumerate(lines):
-            np.testing.assert_allclose(line.points[0], seeds[i])
+            np.testing.assert_array_equal(line.points[0], seeds[i])
 
     def test_equivalence_to_per_seed_loop(
         self, uniform_field_data: FieldDataset

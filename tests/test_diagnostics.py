@@ -319,7 +319,9 @@ class TestSpatialStatistics:
     def test_mean(self) -> None:
         from pypic.diagnostics import spatial_mean
 
-        np.testing.assert_allclose(spatial_mean(np.array([1.0, 2.0, 3.0])), 2.0)
+        np.testing.assert_allclose(
+            spatial_mean(np.array([1.0, 2.0, 3.0])), 2.0, rtol=1e-15
+        )
 
     def test_mean_with_nan(self) -> None:
         from pypic.diagnostics import spatial_mean
@@ -328,6 +330,7 @@ class TestSpatialStatistics:
             np.testing.assert_allclose(
                 spatial_mean(np.array([1.0, np.nan, 3.0])),
                 2.0,
+                rtol=1e-15,
             )
 
     def test_rms(self) -> None:
@@ -336,6 +339,7 @@ class TestSpatialStatistics:
         np.testing.assert_allclose(
             spatial_rms(np.array([3.0, 4.0])),
             np.sqrt(12.5),
+            rtol=1e-15,
         )
 
     def test_rms_with_nan(self) -> None:
@@ -345,6 +349,7 @@ class TestSpatialStatistics:
             np.testing.assert_allclose(
                 spatial_rms(np.array([3.0, np.nan, 4.0])),
                 np.sqrt(12.5),
+                rtol=1e-15,
             )
 
     def test_extrema(self) -> None:
@@ -366,7 +371,7 @@ class TestSpatialStatistics:
         from pypic.diagnostics import spatial_mean
 
         arr = np.array([[1.0, 2.0], [3.0, 4.0]])
-        np.testing.assert_allclose(spatial_mean(arr), 2.5)
+        np.testing.assert_allclose(spatial_mean(arr), 2.5, rtol=1e-15)
 
 
 def _all_reducers() -> list:

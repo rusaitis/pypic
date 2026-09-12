@@ -151,7 +151,7 @@ class TestShape:
             arrays={"B": arr},
             position_map={"B": (0.0,)},
         )
-        np.testing.assert_allclose(out["B"], np.array([1.5, 2.5, 3.5]))
+        np.testing.assert_array_equal(out["B"], np.array([1.5, 2.5, 3.5]))
 
 
 class TestValidation:

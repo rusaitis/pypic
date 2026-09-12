@@ -395,7 +395,7 @@ class TestPhysicalExtent:
             "scale = 0.25\naxis_labels = [",
         )
         cfg = load_config(_write(tmp_path, toml))
-        np.testing.assert_allclose(cfg.transforms["GSM"].scale, 0.25)
+        np.testing.assert_array_equal(cfg.transforms["GSM"].scale, 0.25)
 
     def test_explicit_scale_mismatch_warns(
         self, tmp_path: Path, caplog: pytest.LogCaptureFixture

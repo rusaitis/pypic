@@ -5,7 +5,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 import xarray as xr
-from numpy.testing import assert_allclose
+from numpy.testing import assert_allclose, assert_array_equal
 
 from pypic import open_simulation
 from pypic._aliases import _default_aliases
@@ -45,16 +45,16 @@ def sample_dataset(sample_grid):
 class TestGridInfo:
     def test_coordinate_arrays_cell_centered(self, sample_grid):
         x, y, z = sample_grid.coordinate_arrays()
-        assert_allclose(x, 0.0 + (np.arange(8) + 0.5) * 0.5)
-        assert_allclose(y, 0.0 + (np.arange(6) + 0.5) * 0.5)
-        assert_allclose(z, 0.0 + (np.arange(4) + 0.5) * 0.5)
+        assert_array_equal(x, 0.0 + (np.arange(8) + 0.5) * 0.5)
+        assert_array_equal(y, 0.0 + (np.arange(6) + 0.5) * 0.5)
+        assert_array_equal(z, 0.0 + (np.arange(4) + 0.5) * 0.5)
 
     def test_coordinate_arrays_with_offset_origin(self):
         grid = GridInfo(
             dimensions=(3,), spacing=(2.0,), origin=(10.0,), geometry=CARTESIAN
         )
         (x,) = grid.coordinate_arrays()
-        assert_allclose(x, [11.0, 13.0, 15.0])
+        assert_array_equal(x, [11.0, 13.0, 15.0])
 
     @pytest.mark.parametrize(
         ("dims", "spacing", "origin", "expected_ndim", "expected_len"),
@@ -75,7 +75,7 @@ class TestGridInfo:
         for i, c in enumerate(coords):
             assert len(c) == expected_len[i]
         if expected_ndim == 1:
-            assert_allclose(coords[0][0], origin[0] + 0.5 * spacing[0])
+            assert_array_equal(coords[0][0], origin[0] + 0.5 * spacing[0])
 
     def test_validation_length_mismatch(self):
         with pytest.raises(ValueError, match="Length mismatch"):
@@ -145,9 +145,9 @@ class TestFieldDatasetAccess:
         assert np.shares_memory(ds["B_1"], original)
 
     def test_alias_access_cartesian(self, sample_dataset, sample_fields):
-        assert_allclose(sample_dataset["Bx"], sample_fields["B_1"])
-        assert_allclose(sample_dataset["By"], sample_fields["B_2"])
-        assert_allclose(sample_dataset["Bz"], sample_fields["B_3"])
+        assert_array_equal(sample_dataset["Bx"], sample_fields["B_1"])
+        assert_array_equal(sample_dataset["By"], sample_fields["B_2"])
+        assert_array_equal(sample_dataset["Bz"], sample_fields["B_3"])
 
     def test_has_field(self, sample_dataset):
         assert sample_dataset.has_field("B_1")
@@ -247,7 +247,7 @@ class TestFieldDatasetSlicing:
         sliced = sample_dataset.isel(x=slice(2, 6))
         assert sliced.grid.dimensions == (4, 6, 4)
         expected_origin = sample_dataset.grid.origin[0] + 2 * 0.5
-        assert_allclose(sliced.grid.origin[0], expected_origin)
+        assert_array_equal(sliced.grid.origin[0], expected_origin)
 
 
 class TestAliases:
@@ -273,8 +273,8 @@ class TestAliases:
             aliases={"Bperp": "B_1", "Bx": "B_2"},
         )
         # Custom alias overrides geometry default
-        assert_allclose(ds["Bx"], sample_fields["B_2"])
-        assert_allclose(ds["Bperp"], sample_fields["B_1"])
+        assert_array_equal(ds["Bx"], sample_fields["B_2"])
+        assert_array_equal(ds["Bperp"], sample_fields["B_1"])
 
     def test_aliases_only_for_existing_fields(self, sample_grid):
         """Aliases for fields not in the dataset are silently dropped."""
@@ -295,8 +295,8 @@ class TestAliases:
         ds = FieldDataset.from_arrays(fields, sample_grid, Normalization.identity())
         assert ds.has_field("n_e")
         assert ds.has_field("n_i")
-        assert_allclose(ds["n_e"], fields["n_s0"])
-        assert_allclose(ds["n_i"], fields["n_s1"])
+        assert_array_equal(ds["n_e"], fields["n_s0"])
+        assert_array_equal(ds["n_i"], fields["n_s1"])
 
     def test_n_e_alias_inactive_without_n_s0(self, sample_grid):
         ds = FieldDataset.from_arrays(
@@ -315,8 +315,8 @@ class TestAliases:
         assert ds.has_field("ux")
         assert ds.has_field("uy")
         assert ds.has_field("uz")
-        assert_allclose(ds["ux"], fields["u_1"])
-        assert_allclose(ds["uz"], fields["u_3"])
+        assert_array_equal(ds["ux"], fields["u_1"])
+        assert_array_equal(ds["uz"], fields["u_3"])
 
 
 class TestSimulationReader:
@@ -409,7 +409,7 @@ class TestWithDerived:
             + sample_dataset["B_2"] ** 2
             + sample_dataset["B_3"] ** 2
         )
-        assert_allclose(ds["|B|"], expected)
+        assert_array_equal(ds["|B|"], expected)
 
     def test_multiple_fields(self, sample_dataset):
         ds = sample_dataset.with_derived("|B|", "e_B")
@@ -420,7 +420,7 @@ class TestWithDerived:
         """Fields already in the dataset are not recomputed."""
         ds = sample_dataset.with_derived("B_1")
         assert ds.has_field("B_1")
-        assert_allclose(ds["B_1"], sample_dataset["B_1"])
+        assert_array_equal(ds["B_1"], sample_dataset["B_1"])
 
     def test_survives_isel(self, sample_dataset):
         ds = sample_dataset.with_derived("|B|")
@@ -458,7 +458,7 @@ class TestWithDerived:
         assert ds.has_field("|B|")
         assert ds.has_field("e_B")
         # e_B = |B|^2 / 2 = 0.5
-        assert_allclose(ds["e_B"], 0.5)
+        assert_array_equal(ds["e_B"], 0.5)
 
     def test_vector_siblings(self):
         """Computing a vector component stores all sibling components."""

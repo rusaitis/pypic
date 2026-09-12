@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 import pytest
-from numpy.testing import assert_allclose
+from numpy.testing import assert_allclose, assert_array_equal
 
 from pypic.coordinates.geometry import CARTESIAN
 from pypic.coordinates.transforms import (
@@ -110,9 +110,9 @@ class TestRotateVectorComponents:
         v2 = np.array([3.0, 4.0])
         v3 = np.array([5.0, 6.0])
         r1, r2, r3 = rotate_vector_components(v1, v2, v3, np.eye(3))
-        assert_allclose(r1, v1)
-        assert_allclose(r2, v2)
-        assert_allclose(r3, v3)
+        assert_array_equal(r1, v1)
+        assert_array_equal(r2, v2)
+        assert_array_equal(r3, v3)
 
     def test_90_degree_rotation_around_z(self) -> None:
         # R_z(90°): x→y, y→-x, z→z
@@ -132,9 +132,9 @@ class TestRotateVectorComponents:
         v2 = np.array([2.0])
         v3 = np.array([3.0])
         r1, r2, r3 = rotate_vector_components(v1, v2, v3, R)
-        assert_allclose(r1, [1.0])
-        assert_allclose(r2, [3.0])
-        assert_allclose(r3, [2.0])
+        assert_array_equal(r1, [1.0])
+        assert_array_equal(r2, [3.0])
+        assert_array_equal(r3, [2.0])
 
     def test_magnitude_preserved(self) -> None:
         rng = np.random.default_rng(42)
@@ -181,12 +181,12 @@ class TestRotatePressureTensor:
         p13 = np.array([0.1])
         p23 = np.array([0.2])
         result = rotate_pressure_tensor(p11, p22, p33, p12, p13, p23, np.eye(3))
-        assert_allclose(result[0], p11)
-        assert_allclose(result[1], p22)
-        assert_allclose(result[2], p33)
-        assert_allclose(result[3], p12)
-        assert_allclose(result[4], p13)
-        assert_allclose(result[5], p23)
+        assert_array_equal(result[0], p11)
+        assert_array_equal(result[1], p22)
+        assert_array_equal(result[2], p33)
+        assert_array_equal(result[3], p12)
+        assert_array_equal(result[4], p13)
+        assert_array_equal(result[5], p23)
 
     def test_trace_invariant(self) -> None:
         rng = np.random.default_rng(99)
@@ -259,7 +259,7 @@ class TestComposeTransforms:
         a = FrameTransform("A", "B", scale=2.0)
         b = FrameTransform("B", "C", scale=3.0)
         c = compose_transforms(a, b)
-        assert_allclose(c.scale, 6.0)
+        assert_array_equal(c.scale, 6.0)
 
     def test_compose_inverse_is_identity(self) -> None:
         r = ((1.0, 0.0, 0.0), (0.0, 0.0, 1.0), (0.0, 1.0, 0.0))
@@ -284,7 +284,7 @@ class TestResolveTransform:
         t = FrameTransform("sim", "GSM", origin=(1.0, 0.0, 0.0))
         result = resolve_transform("sim", "GSM", {"GSM": t})
         assert result.target_frame == "GSM"
-        assert_allclose(result.origin, (1.0, 0.0, 0.0))
+        assert_array_equal(result.origin, (1.0, 0.0, 0.0))
 
     def test_inverse_lookup(self) -> None:
         t = FrameTransform("sim", "GSM", origin=(1.0, 0.0, 0.0))
@@ -426,9 +426,9 @@ class TestFieldDatasetTransformTo:
         ds = _make_dataset(fields, transforms={"GSM": _YZ_SWAP})
         result = ds.transform_to("GSM")
         # y↔z swap: B_1→B_1, B_2→B3_old=3, B_3→B2_old=2
-        assert_allclose(result["B_1"], 1.0)
-        assert_allclose(result["B_2"], 3.0)
-        assert_allclose(result["B_3"], 2.0)
+        assert_array_equal(result["B_1"], 1.0)
+        assert_array_equal(result["B_2"], 3.0)
+        assert_array_equal(result["B_3"], 2.0)
 
     def test_scalar_fields_unchanged(self) -> None:
         fields = {
@@ -439,7 +439,7 @@ class TestFieldDatasetTransformTo:
         }
         ds = _make_dataset(fields, transforms={"GSM": _YZ_SWAP})
         result = ds.transform_to("GSM")
-        assert_allclose(result["rho_c"], 42.0)
+        assert_array_equal(result["rho_c"], 42.0)
 
     def test_frame_label_updated(self) -> None:
         ds = _make_dataset(
@@ -492,7 +492,7 @@ class TestFieldDatasetTransformTo:
             transforms={"GSM": t},
         )
         result = ds.transform_to("GSM")
-        assert_allclose(result.grid.spacing, (2.0, 2.0, 2.0))
+        assert_array_equal(result.grid.spacing, (2.0, 2.0, 2.0))
 
     def test_per_species_vectors_rotated(self) -> None:
         fields = {
@@ -502,9 +502,9 @@ class TestFieldDatasetTransformTo:
         }
         ds = _make_dataset(fields, transforms={"GSM": _YZ_SWAP})
         result = ds.transform_to("GSM")
-        assert_allclose(result["J_s0_1"], 1.0)
-        assert_allclose(result["J_s0_2"], 3.0)
-        assert_allclose(result["J_s0_3"], 2.0)
+        assert_array_equal(result["J_s0_1"], 1.0)
+        assert_array_equal(result["J_s0_2"], 3.0)
+        assert_array_equal(result["J_s0_3"], 2.0)
 
     def test_pressure_tensor_rotated(self) -> None:
         fields = {
@@ -518,9 +518,9 @@ class TestFieldDatasetTransformTo:
         ds = _make_dataset(fields, transforms={"GSM": _YZ_SWAP})
         result = ds.transform_to("GSM")
         # y↔z swap on diagonal tensor: P_22↔P_33
-        assert_allclose(result["P_11"], 1.0)
-        assert_allclose(result["P_22"], 3.0)
-        assert_allclose(result["P_33"], 2.0)
+        assert_array_equal(result["P_11"], 1.0)
+        assert_array_equal(result["P_22"], 3.0)
+        assert_array_equal(result["P_33"], 2.0)
 
     def test_normalization_preserved(self) -> None:
         ds = _make_dataset(

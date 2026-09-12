@@ -696,8 +696,8 @@ class TestSpeciesAliases:
         shape = (2, 2, 2)
         data = {"n_s0": np.full(shape, 1.0), "n_s1": np.full(shape, 2.0)}
         ds = make_test_dataset(data, shape=shape)
-        np.testing.assert_allclose(ds["n_e"], 1.0)
-        np.testing.assert_allclose(ds["n_i"], 2.0)
+        np.testing.assert_array_equal(ds["n_e"], 1.0)
+        np.testing.assert_array_equal(ds["n_i"], 2.0)
 
     def test_s_gyro_i_uses_per_species_pressure(self):
         shape = (2, 2, 2)
@@ -748,9 +748,9 @@ class TestSpeciesAliases:
             "u_3": np.full(shape, 0.1),
         }
         ds = make_test_dataset(data, shape=shape)
-        np.testing.assert_allclose(ds["ux"], 0.5)
-        np.testing.assert_allclose(ds["uy"], 0.3)
-        np.testing.assert_allclose(ds["uz"], 0.1)
+        np.testing.assert_array_equal(ds["ux"], 0.5)
+        np.testing.assert_array_equal(ds["uy"], 0.3)
+        np.testing.assert_array_equal(ds["uz"], 0.1)
 
 
 class TestPressureTensor:

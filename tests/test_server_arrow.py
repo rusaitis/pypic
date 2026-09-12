@@ -134,8 +134,8 @@ def test_units_si_applies_normalization() -> None:
     ipc_si = field_dataset_to_arrow_ipc(ds, units="si")
     code = decode_field_dataset_ipc(ipc_code)
     si = decode_field_dataset_ipc(ipc_si)
-    np.testing.assert_allclose(code["fields"]["B_1"], 1.0)
-    np.testing.assert_allclose(si["fields"]["B_1"], norm.b_field_ref)
+    np.testing.assert_array_equal(code["fields"]["B_1"], 1.0)
+    np.testing.assert_array_equal(si["fields"]["B_1"], norm.b_field_ref)
     assert si["metadata"]["units"] == "si"
     assert code["metadata"]["units"] == "code"
 
@@ -168,7 +168,7 @@ def test_reduced_dataset_2d_round_trip(small_cartesian_3d: FieldDataset) -> None
     assert decoded["metadata"]["dims"] == ["x", "y"]
     assert decoded["metadata"]["shape"] == [4, 3]
     assert decoded["fields"]["B_1"].shape == (4, 3)
-    np.testing.assert_allclose(decoded["fields"]["B_1"], column["B_1"])
+    np.testing.assert_array_equal(decoded["fields"]["B_1"], column["B_1"])
 
 
 def test_decode_rejects_non_pypic_stream() -> None:

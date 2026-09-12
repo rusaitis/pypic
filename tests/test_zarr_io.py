@@ -304,8 +304,8 @@ class TestToZarrFromZarr:
         loaded = from_zarr(store)
 
         assert sorted(loaded.field_names()) == ["B_1", "B_2"]
-        np.testing.assert_allclose(loaded["B_1"], fds["B_1"])
-        np.testing.assert_allclose(loaded["B_2"], fds["B_2"])
+        np.testing.assert_array_equal(loaded["B_1"], fds["B_1"])
+        np.testing.assert_array_equal(loaded["B_2"], fds["B_2"])
         assert loaded.grid.dimensions == fds.grid.dimensions
         assert loaded.grid.spacing == fds.grid.spacing
         assert loaded.grid.origin == fds.grid.origin
@@ -374,8 +374,8 @@ class TestToZarrFromZarr:
         assert loaded.physics.extra["theta"] == 0.5
         assert loaded.frame == "GSM"
         assert "GSM" in loaded.transforms
-        np.testing.assert_allclose(loaded["B_1"], 1.0)
-        np.testing.assert_allclose(loaded["rho_m"], 2.0)
+        np.testing.assert_array_equal(loaded["B_1"], 1.0)
+        np.testing.assert_array_equal(loaded["rho_m"], 2.0)
 
     def test_dtype_float32_downcast(self, tmp_path):
         fds = make_test_dataset(
@@ -805,8 +805,8 @@ class TestToZarrTimeseries:
         ds = xr.open_zarr(str(store), group="fields", consolidated="auto")
         assert "time" in ds.dims
         assert ds.sizes["time"] == 3
-        np.testing.assert_allclose(ds["B_1"].sel(time=0.0).values, 1.0)
-        np.testing.assert_allclose(ds["B_1"].sel(time=2.0).values, 3.0)
+        np.testing.assert_array_equal(ds["B_1"].sel(time=0.0).values, 1.0)
+        np.testing.assert_array_equal(ds["B_1"].sel(time=2.0).values, 3.0)
 
     def test_timeseries_rejects_field_drift(self, tmp_path):
         # xarray's to_zarr(mode="a", append_dim=...) doesn't enforce

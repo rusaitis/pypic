@@ -134,7 +134,7 @@ class TestReconnectionRate:
         psi = np.full((10, 10), psi_val)
         psi_prev = np.full((10, 10), psi_prev_val)
         rate = reconnection_rate(psi, psi_prev, dt=dt, x_point=x_point)
-        np.testing.assert_allclose(rate, expected)
+        np.testing.assert_array_equal(rate, expected)
 
 
 class TestReconnectionEdgeCases:

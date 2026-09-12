@@ -13,7 +13,7 @@ from pathlib import Path
 
 import numpy as np
 import pytest
-from numpy.testing import assert_allclose
+from numpy.testing import assert_allclose, assert_array_equal
 
 from pypic.containers import TabularData
 from pypic.readers.ipic3d import (
@@ -75,9 +75,9 @@ class TestParseInpSynthetic:
         assert cfg.lx == LX
         assert cfg.ly == LY
         assert cfg.lz == LZ
-        assert_allclose(cfg.dx, DX)
-        assert_allclose(cfg.dy, DY)
-        assert_allclose(cfg.dz, DZ)
+        assert_array_equal(cfg.dx, DX)
+        assert_array_equal(cfg.dy, DY)
+        assert_array_equal(cfg.dz, DZ)
         assert cfg.periodic_x is True
         assert cfg.periodic_y is True
         assert cfg.periodic_z is True
@@ -100,16 +100,16 @@ class TestParseSettingsHdfSynthetic:
         assert cfg_hdf.nxc == cfg_inp.nxc
         assert cfg_hdf.nyc == cfg_inp.nyc
         assert cfg_hdf.nzc == cfg_inp.nzc
-        assert_allclose(cfg_hdf.lx, cfg_inp.lx)
-        assert_allclose(cfg_hdf.ly, cfg_inp.ly)
-        assert_allclose(cfg_hdf.lz, cfg_inp.lz)
+        assert_array_equal(cfg_hdf.lx, cfg_inp.lx)
+        assert_array_equal(cfg_hdf.ly, cfg_inp.ly)
+        assert_array_equal(cfg_hdf.lz, cfg_inp.lz)
         assert cfg_hdf.qom == cfg_inp.qom
         assert cfg_hdf.xlen == 2
         assert cfg_hdf.ylen == 1
         assert cfg_hdf.zlen == 1
-        assert_allclose(cfg_hdf.uth, cfg_inp.uth)
-        assert_allclose(cfg_hdf.vth, cfg_inp.vth)
-        assert_allclose(cfg_hdf.wth, cfg_inp.wth)
+        assert_array_equal(cfg_hdf.uth, cfg_inp.uth)
+        assert_array_equal(cfg_hdf.vth, cfg_inp.vth)
+        assert_array_equal(cfg_hdf.wth, cfg_inp.wth)
 
 
 class TestToSimulationConfigSynthetic:
@@ -119,7 +119,7 @@ class TestToSimulationConfigSynthetic:
 
     def test_grid_geometry(self, sim_cfg):
         assert sim_cfg.grid.dimensions == (NX, NY, NZ)
-        assert_allclose(sim_cfg.grid.origin, (-DX / 2, -DY / 2, -DZ / 2))
+        assert_array_equal(sim_cfg.grid.origin, (-DX / 2, -DY / 2, -DZ / 2))
         x, y, z = sim_cfg.grid.coordinate_arrays()
         assert_allclose(x[0], 0.0, atol=1e-14)
         assert_allclose(x[-1], LX, atol=1e-14)
@@ -135,7 +135,7 @@ class TestToSimulationConfigSynthetic:
         assert qoms == list(QOM)
         electron = sim_cfg.species[0]
         assert electron.charge == -1.0
-        assert_allclose(electron.mass, 1.0 / 64.0)
+        assert_array_equal(electron.mass, 1.0 / 64.0)
         assert sim_cfg.model_name == "iPIC3D"
         assert sim_cfg.model_type == "PIC"
 
@@ -187,12 +187,12 @@ class TestPhdf5Reader:
 
     def test_total_charge_is_sum(self, ds):
         total = ds["rho_c_s0"] + ds["rho_c_s1"]
-        assert_allclose(ds["rho_c"], total)
+        assert_array_equal(ds["rho_c"], total)
 
     def test_total_current_is_sum(self, ds):
         for comp in ("J_1", "J_2", "J_3"):
             total = ds[per_species(comp, 0)] + ds[per_species(comp, 1)]
-            assert_allclose(ds[comp], total)
+            assert_array_equal(ds[comp], total)
 
     @pytest.mark.parametrize("species", [0, 1])
     def test_diagonal_pressure_positive(self, ds, species):
@@ -222,13 +222,13 @@ class TestPhdf5Reader:
         # species 1 = ions (q=+1, m=1/|qom_1|=1).
         assert len(ds.species) == 2
         assert ds.species[0].charge == -1.0
-        assert_allclose(ds.species[0].mass, 1.0 / 64.0)
+        assert_array_equal(ds.species[0].mass, 1.0 / 64.0)
         assert ds.species[1].charge == 1.0
-        assert_allclose(ds.species[1].mass, 1.0)
+        assert_array_equal(ds.species[1].mass, 1.0)
 
     def test_grid_info(self, ds):
         assert ds.grid.dimensions == (NX, NY, NZ)
-        assert_allclose(ds.grid.spacing, (DX, DY, DZ))
+        assert_array_equal(ds.grid.spacing, (DX, DY, DZ))
 
 
 class TestShdf5Reader:
@@ -264,7 +264,7 @@ class TestShdf5Reader:
 
     def test_total_charge_is_sum(self, ds):
         total = ds["rho_c_s0"] + ds["rho_c_s1"]
-        assert_allclose(ds["rho_c"], total)
+        assert_array_equal(ds["rho_c"], total)
 
     def test_per_species_present(self, ds):
         for s in range(2):
@@ -431,12 +431,12 @@ class TestH5hutReader:
 
     def test_total_charge_is_sum(self, ds):
         total = ds["rho_c_s0"] + ds["rho_c_s1"]
-        assert_allclose(ds["rho_c"], total)
+        assert_array_equal(ds["rho_c"], total)
 
     def test_total_current_is_sum(self, ds):
         for comp in ("J_1", "J_2", "J_3"):
             total = ds[per_species(comp, 0)] + ds[per_species(comp, 1)]
-            assert_allclose(ds[comp], total)
+            assert_array_equal(ds[comp], total)
 
     def test_diagonal_pressure_positive(self, ds):
         # H5hut has no test_pressure_values_match_phdf5 for pressure (unlike
@@ -531,9 +531,9 @@ class TestConservedQuantitiesSyntheticFormatA:
         assert len(cq.total_energy) == 3
         assert len(cq.electric_energy) == 3
         assert len(cq.magnetic_energy) == 3
-        assert_allclose(cq.total_energy[0], 5.5)
-        assert_allclose(cq.total_energy[1], 5.6)
-        assert_allclose(cq.total_energy[2], 5.7)
+        assert_array_equal(cq.total_energy[0], 5.5)
+        assert_array_equal(cq.total_energy[1], 5.6)
+        assert_array_equal(cq.total_energy[2], 5.7)
 
 
 class TestConservedQuantitiesSyntheticFormatB:
@@ -556,7 +556,7 @@ class TestConservedQuantitiesSyntheticFormatB:
     def test_dedup_keeps_later_file(self, cq):
         """Cycle 10 appears in both files; file 1 value should win."""
         idx_10 = int(np.searchsorted(cq.cycle, 10))
-        assert_allclose(cq.total_energy[idx_10], 5.71)
+        assert_array_equal(cq.total_energy[idx_10], 5.71)
 
     def test_species_count(self, cq):
         assert len(cq.species_npart) == 2
@@ -612,11 +612,11 @@ class TestConservedToTabular:
 
     def test_values_match(self, tab):
         cq = load_conserved_quantities(DATA / "h5hut" / "info-conserved")
-        assert_allclose(tab["total_energy"], cq.total_energy)
-        assert_allclose(tab["electric_energy"], cq.electric_energy)
-        assert_allclose(tab["momentum"], cq.momentum)
+        assert_array_equal(tab["total_energy"], cq.total_energy)
+        assert_array_equal(tab["electric_energy"], cq.electric_energy)
+        assert_array_equal(tab["momentum"], cq.momentum)
         for s in range(len(cq.species_npart)):
-            assert_allclose(tab[f"npart_s{s}"], cq.species_npart[s])
+            assert_array_equal(tab[f"npart_s{s}"], cq.species_npart[s])
 
 
 class TestAuxiliaryErrors:
@@ -654,7 +654,7 @@ class TestSelectiveReadPhdf5:
         reader = IPic3DParallelReader(cfg)
         full = reader.read_timestep(PHDF5_DIR, 0)
         sub = reader.read_timestep(PHDF5_DIR, 0, fields={"B_1"})
-        assert_allclose(sub["B_1"], full["B_1"])
+        assert_array_equal(sub["B_1"], full["B_1"])
 
     def test_total_expands_dependencies(self):
         """Requesting rho_c reads per-species rho and computes total."""
@@ -672,7 +672,7 @@ class TestSelectiveReadPhdf5:
         reader = IPic3DParallelReader(cfg)
         full = reader.read_timestep(PHDF5_DIR, 0)
         sub = reader.read_timestep(PHDF5_DIR, 0, fields={"rho_c"})
-        assert_allclose(sub["rho_c"], full["rho_c"])
+        assert_array_equal(sub["rho_c"], full["rho_c"])
 
     def test_per_species_without_total(self):
         cfg = parse_inp(PHDF5_DIR / "synthetic.inp")
@@ -699,7 +699,7 @@ class TestSelectiveReadShdf5:
         reader = IPic3DSerialReader(cfg)
         full = reader.read_timestep(SHDF5_DIR, 0)
         sub = reader.read_timestep(SHDF5_DIR, 0, fields={"J_1"})
-        assert_allclose(sub["J_1"], full["J_1"])
+        assert_array_equal(sub["J_1"], full["J_1"])
 
 
 class TestSelectiveReadH5hut:
@@ -721,7 +721,7 @@ class TestSelectiveReadH5hut:
         reader = IPic3DH5hutReader(cfg)
         full = reader.read_timestep(H5HUT_DIR, 0)
         sub = reader.read_timestep(H5HUT_DIR, 0, fields={"rho_c"})
-        assert_allclose(sub["rho_c"], full["rho_c"])
+        assert_array_equal(sub["rho_c"], full["rho_c"])
 
     def test_em_and_moment_mix(self):
         cfg = parse_inp(H5HUT_DIR / "SyntheticFixture.inp")

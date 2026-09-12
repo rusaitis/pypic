@@ -334,7 +334,7 @@ class TestRegrid:
         result = regrid(ds, wide, fill_value=0.0)
         (x,) = wide.coordinate_arrays()
         outside = (x < 0.5) | (x > 4.5)
-        assert_allclose(result["f"][outside], 0.0)
+        assert_array_equal(result["f"][outside], 0.0)
 
     def test_spherical_raises(self) -> None:
         grid_s = GridInfo(

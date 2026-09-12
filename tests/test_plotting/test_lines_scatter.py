@@ -187,7 +187,7 @@ class TestPlotLineComparison:
         assert len(ax.lines) == 2
         y0 = ax.lines[0].get_ydata()
         y1 = ax.lines[1].get_ydata()
-        np.testing.assert_allclose(y0, y1)
+        np.testing.assert_array_equal(y0, y1)
         plt.close(fig)
 
     def test_labels(self, ds_2d: FieldDataset) -> None:
@@ -380,8 +380,8 @@ class TestPlotPowerSpectrum:
         assert ax.get_xscale() == "log"
         assert ax.get_yscale() == "log"
         xdata, ydata = ax.lines[0].get_data()
-        np.testing.assert_allclose(xdata, k)
-        np.testing.assert_allclose(ydata, power)
+        np.testing.assert_array_equal(xdata, k)
+        np.testing.assert_array_equal(ydata, power)
         plt.close(fig)
 
     def test_compensated(self) -> None:

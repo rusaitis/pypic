@@ -73,8 +73,8 @@ class TestOpenVirtual:
         fds = open_virtual(h5path)
 
         assert sorted(fds.field_names()) == ["B_1", "B_2"]
-        np.testing.assert_allclose(fds["B_1"], 1.0)
-        np.testing.assert_allclose(fds["B_2"], 0.5)
+        np.testing.assert_array_equal(fds["B_1"], 1.0)
+        np.testing.assert_array_equal(fds["B_2"], 0.5)
 
     def test_grid_metadata_preserved(self, tmp_path):
         grid = GridInfo(
@@ -226,9 +226,11 @@ class TestOpenVirtual:
 
         fds = open_virtual(h5path)
 
-        np.testing.assert_allclose(fds.xr.coords["x"].values, [0.25, 0.75, 1.25, 1.75])
-        np.testing.assert_allclose(fds.xr.coords["y"].values, [0.5, 1.5, 2.5])
-        np.testing.assert_allclose(fds.xr.coords["z"].values, [1.0, 3.0])
+        np.testing.assert_array_equal(
+            fds.xr.coords["x"].values, [0.25, 0.75, 1.25, 1.75]
+        )
+        np.testing.assert_array_equal(fds.xr.coords["y"].values, [0.5, 1.5, 2.5])
+        np.testing.assert_array_equal(fds.xr.coords["z"].values, [1.0, 3.0])
 
 
 class TestToIcechunkVirtualVersioning:
@@ -257,7 +259,7 @@ class TestToIcechunkVirtualVersioning:
         assert len(ancestry) >= 3
 
         loaded = from_zarr(output)
-        np.testing.assert_allclose(loaded["B_1"], 2.0)
+        np.testing.assert_array_equal(loaded["B_1"], 2.0)
 
     def test_new_branch_fork_from_populated_main(self, tmp_path):
         grid = make_uniform_grid(4, 3, 2)
@@ -276,8 +278,8 @@ class TestToIcechunkVirtualVersioning:
 
         loaded_main = from_zarr(output, branch="main")
         loaded_alt = from_zarr(output, branch="alt")
-        np.testing.assert_allclose(loaded_main["B_1"], 1.0)
-        np.testing.assert_allclose(loaded_alt["B_1"], 3.0)
+        np.testing.assert_array_equal(loaded_main["B_1"], 1.0)
+        np.testing.assert_array_equal(loaded_alt["B_1"], 3.0)
 
     def test_sources_in_different_directories(self, tmp_path):
         # Reviewer regression: commits from different parent dirs must
@@ -302,9 +304,9 @@ class TestToIcechunkVirtualVersioning:
 
         # Tip reads current (b); snapshot A still resolves via the
         # merged container set.
-        np.testing.assert_allclose(from_zarr(output)["B_1"], 2.0)
-        np.testing.assert_allclose(from_zarr(output, snapshot_id=snap_a)["B_1"], 1.0)
-        np.testing.assert_allclose(from_zarr(output, snapshot_id=snap_b)["B_1"], 2.0)
+        np.testing.assert_array_equal(from_zarr(output)["B_1"], 2.0)
+        np.testing.assert_array_equal(from_zarr(output, snapshot_id=snap_a)["B_1"], 1.0)
+        np.testing.assert_array_equal(from_zarr(output, snapshot_id=snap_b)["B_1"], 2.0)
 
     def test_numpy_scalar_root_attrs(self, tmp_path):
         # Reviewer regression: h5py returns scalar HDF5 attrs as

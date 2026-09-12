@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 import pytest
-from numpy.testing import assert_allclose
+from numpy.testing import assert_array_equal
 
 from pypic.containers import TabularData
 
@@ -62,7 +62,7 @@ class TestGetitem:
             name="test",
             columns={"x": np.array([1.0, 2.0, 3.0])},
         )
-        assert_allclose(tab["x"], [1.0, 2.0, 3.0])
+        assert_array_equal(tab["x"], [1.0, 2.0, 3.0])
 
     def test_missing_column_raises_keyerror(self) -> None:
         tab = TabularData(
@@ -107,14 +107,14 @@ class TestIndex:
             },
             index_column="cycle",
         )
-        assert_allclose(tab.index, [0.0, 10.0, 20.0])
+        assert_array_equal(tab.index, [0.0, 10.0, 20.0])
 
     def test_without_index_column(self) -> None:
         tab = TabularData(
             name="test",
             columns={"x": np.array([1.0, 2.0, 3.0])},
         )
-        assert_allclose(tab.index, [0.0, 1.0, 2.0])
+        assert_array_equal(tab.index, [0.0, 1.0, 2.0])
 
     def test_empty_index(self) -> None:
         tab = TabularData(name="test", columns={})

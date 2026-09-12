@@ -230,7 +230,7 @@ class TestResolveFieldValues:
 
         values = resolve_field_values(ds_2d, "|B|", None)
         expected = np.sqrt(ds_2d["B_1"] ** 2 + ds_2d["B_2"] ** 2 + ds_2d["B_3"] ** 2)
-        np.testing.assert_allclose(values, expected)
+        np.testing.assert_allclose(values, expected, rtol=1e-15)
 
     def test_with_units(self, ds_2d: FieldDataset) -> None:
         from pypic.plotting._resolve import resolve_field_values

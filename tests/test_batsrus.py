@@ -10,7 +10,7 @@ from pathlib import Path
 
 import numpy as np
 import pytest
-from numpy.testing import assert_allclose
+from numpy.testing import assert_allclose, assert_array_equal
 
 from pypic.readers.batsrus import (
     open_batsrus,
@@ -89,7 +89,7 @@ class TestFieldMap:
         var_names = ("Rho",)
         unit_names = ("normalized",)
         result = convert_fields_to_si(fields, var_names, unit_names)
-        assert_allclose(result["rho_m"], [1.0, 2.0])
+        assert_array_equal(result["rho_m"], [1.0, 2.0])
 
     def test_convert_fields_applies_factors(self) -> None:
         fields = {"B_1": np.array([5.0])}
@@ -115,8 +115,8 @@ class TestHeader:
 
     def test_header_domain_bounds(self) -> None:
         header = parse_header(IDL_DIR / "z=0_mhd_1_n00000000.h")
-        assert_allclose(header.domain_min, (XMIN, YMIN))
-        assert_allclose(header.domain_max, (XMAX, YMAX))
+        assert_array_equal(header.domain_min, (XMIN, YMIN))
+        assert_array_equal(header.domain_max, (XMAX, YMAX))
 
     def test_header_gamma_parameter(self) -> None:
         header = parse_header(IDL_DIR / "z=0_mhd_1_n00000000.h")
@@ -135,8 +135,8 @@ class TestParamIn:
 
     def test_grid_bounds(self) -> None:
         config = parse_param_in(IDL_DIR / "PARAM.in")
-        assert_allclose(config.domain_min[:2], (XMIN, YMIN))
-        assert_allclose(config.domain_max[:2], (XMAX, YMAX))
+        assert_array_equal(config.domain_min[:2], (XMIN, YMIN))
+        assert_array_equal(config.domain_max[:2], (XMAX, YMAX))
 
 
 class TestIDLUniform:
@@ -169,7 +169,7 @@ class TestIDLUniform:
     def test_grid_info(self) -> None:
         _, config = open_batsrus(IDL_DIR)
         assert config.grid.dimensions == (NX, NY)
-        assert_allclose(config.grid.spacing, (DX, DX))
+        assert_array_equal(config.grid.spacing, (DX, DX))
 
     def test_no_nan_fields(self) -> None:
         reader, _ = open_batsrus(IDL_DIR)
@@ -347,7 +347,7 @@ class TestTargetResolutionHDF5:
     def test_grid_spacing_matches_target(self) -> None:
         reader, _ = open_batsrus(AMR_DIR)
         ds = reader.read_timestep(AMR_DIR, 0, target_resolution=1.0)
-        assert_allclose(ds.grid.spacing, (1.0, 1.0))
+        assert_array_equal(ds.grid.spacing, (1.0, 1.0))
 
 
 class TestTargetResolutionIDL:
