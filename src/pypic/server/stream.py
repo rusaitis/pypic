@@ -33,6 +33,7 @@ from pypic.server.exceptions import (
     PypicError,
     UnknownStepError,
     ValidationFailedError,
+    error_routing,
 )
 from pypic.server.protocol import (
     Ack,
@@ -47,6 +48,7 @@ if TYPE_CHECKING:
 
     from pypic.dataset import FieldDataset
     from pypic.server._state import SimulationRegistry
+    from pypic.server.protocol import ErrorKind
 
 __all__ = ["register_stream"]
 
@@ -95,7 +97,8 @@ async def _handle_one(
         sim_name = req.sim or path_sim
         await _serve_subscribe(ws, sim_name, req, registry)
     except PypicError as exc:
-        await _send_error(ws, request_id, exc.kind, exc.detail)
+        kind, _status = error_routing(exc)
+        await _send_error(ws, request_id, kind, exc.detail)
     except Exception as exc:
         # Surface as a typed error frame and keep the connection alive
         # so the client can retry without reconnecting.
@@ -144,13 +147,13 @@ async def _serve_subscribe(
 async def _send_error(
     ws: WebSocket,
     request_id: str,
-    kind: str,
+    kind: ErrorKind,
     message: str,
 ) -> None:
     """Emit a typed error frame; tolerates an unparseable request_id."""
     frame = ErrorFrame(
         request_id=request_id,
-        kind=kind,  # type: ignore[arg-type]
+        kind=kind,
         message=message,
     )
     await ws.send_text(frame.model_dump_json())

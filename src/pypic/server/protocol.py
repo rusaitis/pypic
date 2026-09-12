@@ -37,6 +37,7 @@ __all__ = [
     "Ack",
     "BoxSpec",
     "ErrorFrame",
+    "ErrorKind",
     "PlaneSpec",
     "ReductionSpec",
     "SelectionSpec",
@@ -44,6 +45,20 @@ __all__ = [
     "SubscribeRequest",
     "to_reduction_kwargs",
     "to_selection",
+]
+
+
+# Closed vocabulary of error kinds on the wire. A client dispatches on
+# these, so adding one is a wire-format change;
+# `pypic.server.exceptions.error_routing` is where exception types map
+# onto them.
+type ErrorKind = Literal[
+    "validation",
+    "unknown_field",
+    "unknown_sim",
+    "unknown_step",
+    "geometry_unsupported",
+    "internal",
 ]
 
 
@@ -192,12 +207,5 @@ class ErrorFrame(_StrictModel):
 
     type: Literal["error"] = "error"
     request_id: str
-    kind: Literal[
-        "validation",
-        "unknown_field",
-        "unknown_sim",
-        "unknown_step",
-        "geometry_unsupported",
-        "internal",
-    ]
+    kind: ErrorKind
     message: str

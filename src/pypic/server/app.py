@@ -66,7 +66,7 @@ def create_app(
         raise ImportError(msg) from exc
 
     from pypic.server._state import SimulationRegistry
-    from pypic.server.exceptions import PypicError
+    from pypic.server.exceptions import PypicError, error_routing
     from pypic.server.routes import register_routes
     from pypic.server.stream import register_stream
 
@@ -92,17 +92,18 @@ def create_app(
         request: Request,
         exc: PypicError,
     ) -> JSONResponse:
-        """Route every typed pypic error to its declared HTTP status.
+        """Route every typed pypic error to its HTTP status.
 
         Body shape is ``{"kind": <wire kind>, "detail": <message>}`` —
         ``detail`` carries the message a bare
-        ``HTTPException(detail=str(exc))`` would, and ``kind`` matches
-        the WebSocket `ErrorFrame.kind` literal so clients can dispatch
+        ``HTTPException(detail=str(exc))`` would, and ``kind`` is the
+        same `ErrorKind` the WebSocket stream sends, so clients dispatch
         identically across both transports.
         """
+        kind, status_code = error_routing(exc)
         return JSONResponse(
-            status_code=exc.status_code,
-            content={"kind": exc.kind, "detail": exc.detail},
+            status_code=status_code,
+            content={"kind": kind, "detail": exc.detail},
         )
 
     app.state.registry = SimulationRegistry(root)

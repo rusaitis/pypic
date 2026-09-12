@@ -1,11 +1,13 @@
-"""Server-boundary exception hierarchy.
+"""Server-boundary exception hierarchy and error routing.
 
 Re-exports the library-raised typed exceptions from
 [`pypic.exceptions`][pypic.exceptions] (base `PypicError` plus its four
-subclasses) so HTTP/WebSocket handlers have a single import line, and
+subclasses) so HTTP/WebSocket handlers have a single import line,
 defines `ValidationFailedError` — the server wrapper for
 `pydantic.ValidationError` from request-frame parsing and
-``simulation.toml`` validation.
+``simulation.toml`` validation — and owns `error_routing`, the one
+table mapping exception type to wire kind and HTTP status. The library
+raises the types; only this boundary knows what they mean over HTTP.
 
 The library does not raise `ValidationFailedError` directly;
 the server constructs it at the boundary where pydantic errors are
@@ -16,7 +18,8 @@ error type through the same path.
 
 from __future__ import annotations
 
-from typing import ClassVar
+from types import MappingProxyType
+from typing import TYPE_CHECKING
 
 from pypic.exceptions import (
     GeometryUnsupportedError,
@@ -26,6 +29,11 @@ from pypic.exceptions import (
     UnknownStepError,
 )
 
+if TYPE_CHECKING:
+    from collections.abc import Mapping
+
+    from pypic.server.protocol import ErrorKind
+
 __all__ = [
     "GeometryUnsupportedError",
     "PypicError",
@@ -33,6 +41,7 @@ __all__ = [
     "UnknownSimulationError",
     "UnknownStepError",
     "ValidationFailedError",
+    "error_routing",
 ]
 
 
@@ -47,5 +56,31 @@ class ValidationFailedError(PypicError, ValueError):
     that need the structured error tree can still reach it.
     """
 
-    kind: ClassVar[str] = "validation"
-    status_code: ClassVar[int] = 422
+
+_ROUTING: Mapping[type[PypicError], tuple[ErrorKind, int]] = MappingProxyType(
+    {
+        PypicError: ("internal", 500),
+        UnknownSimulationError: ("unknown_sim", 404),
+        UnknownFieldError: ("unknown_field", 404),
+        UnknownStepError: ("unknown_step", 404),
+        GeometryUnsupportedError: ("geometry_unsupported", 400),
+        ValidationFailedError: ("validation", 422),
+    }
+)
+
+
+def error_routing(exc: PypicError) -> tuple[ErrorKind, int]:
+    """Return the ``(wire kind, HTTP status)`` for a raised pypic error.
+
+    Walks the MRO rather than looking the exact type up: ``ErrorKind``
+    (in [`pypic.server.protocol`][pypic.server.protocol]) is a closed
+    vocabulary, so a subclass nobody mapped must degrade to its nearest
+    mapped base instead of putting an unknown string on the wire.
+    ``PypicError`` itself maps to ``internal`` / 500, which is why the
+    walk always terminates.
+    """
+    for base in type(exc).__mro__:
+        route = _ROUTING.get(base)
+        if route is not None:
+            return route
+    return _ROUTING[PypicError]  # unreachable; mypy wants the exit

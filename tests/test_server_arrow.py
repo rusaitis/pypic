@@ -203,7 +203,9 @@ class TestUnknownFieldRouting:
         with pytest.raises(KeyError):
             field_dataset_to_arrow_ipc(small_cartesian_3d, fields=["not_a_field"])
 
-    def test_carries_server_routing_metadata(self, small_cartesian_3d) -> None:
+    def test_routes_to_the_unknown_field_wire_kind(self, small_cartesian_3d) -> None:
+        from pypic.server.exceptions import error_routing
+
         with pytest.raises(UnknownFieldError) as excinfo:
             field_dataset_to_arrow_ipc(small_cartesian_3d, fields=["not_a_field"])
-        assert (excinfo.value.kind, excinfo.value.status_code) == ("unknown_field", 404)
+        assert error_routing(excinfo.value) == ("unknown_field", 404)

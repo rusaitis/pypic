@@ -167,6 +167,11 @@ The distribution is `pypic-plasma` on PyPI; the import name is `pypic`.
 
 - `pypic.readers.ipic3d.to_toml`: unused, untested, and it emitted a document
   the schema rejects (`n_steps = 0`).
+- The `kind` and `status_code` classvars on `PypicError` and its subclasses.
+  They were HTTP/WebSocket routing metadata on library types that only the
+  server read; `pypic.server.exceptions.error_routing(exc)` now returns the
+  `(kind, status)` pair, walking the MRO so an unmapped subclass degrades to
+  its nearest mapped base instead of emitting a kind the wire format rejects.
 - The `err_prev` kwarg on `i_step_controller` and
   `i_step_controller_batched`. It was reserved for a PI upgrade, accepted and
   immediately discarded; offering a kwarg that silently does nothing is worse

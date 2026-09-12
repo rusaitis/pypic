@@ -8,12 +8,10 @@ messages.  Subclasses inherit from the appropriate standard base
 `PypicError`, so existing ``except KeyError`` and
 ``except NotImplementedError`` callers keep working unchanged.
 
-The ``kind`` and ``status_code`` classvars are server-routing
-metadata: the Starlette/FastAPI layer reads them to build
-[`pypic.server.protocol.ErrorFrame`][pypic.server.protocol.ErrorFrame] (WebSocket) and
-`fastapi.HTTPException` (HTTP) responses without a
-dispatch table.  They are inert for non-server callers — the
-classvar values impose no behavior on the library itself.
+Wire kinds and HTTP status codes are *not* here: they are server
+concerns, and
+[`pypic.server.exceptions.error_routing`][pypic.server.exceptions.error_routing]
+maps each type to its pair at the boundary that cares.
 
 The server-only
 [`pypic.server.exceptions.ValidationFailedError`][pypic.server.exceptions.ValidationFailedError]
@@ -23,8 +21,6 @@ because the wire format is its only consumer.
 """
 
 from __future__ import annotations
-
-from typing import ClassVar
 
 __all__ = [
     "GeometryUnsupportedError",
@@ -38,15 +34,8 @@ __all__ = [
 class PypicError(Exception):
     """Base for every typed pypic exception.
 
-    Subclasses set ``kind`` (matching `ErrorFrame.kind` literals
-    on the WebSocket wire format) and ``status_code`` (the HTTP status
-    a server boundary should emit).  Defaults route to the catch-all
-    ``"internal"`` / ``500`` so a raw `PypicError` raised by
-    accident is still routable.
+    Catching this catches every error pypic raises deliberately.
     """
-
-    kind: ClassVar[str] = "internal"
-    status_code: ClassVar[int] = 500
 
     @property
     def detail(self) -> str:
@@ -68,12 +57,9 @@ class UnknownSimulationError(PypicError, KeyError):
     """No simulation with the requested name exists under the registry root.
 
     Subclass of `KeyError` so callers that catch the broader type
-    still work, while letting the server route to the ``unknown_sim``
-    error kind without inspecting message strings.
+    still work, while letting the server route on type rather than
+    inspect message strings.
     """
-
-    kind: ClassVar[str] = "unknown_sim"
-    status_code: ClassVar[int] = 404
 
 
 class UnknownFieldError(PypicError, KeyError):
@@ -84,15 +70,9 @@ class UnknownFieldError(PypicError, KeyError):
     and one of the requested names matched no loaded field.
     """
 
-    kind: ClassVar[str] = "unknown_field"
-    status_code: ClassVar[int] = 404
-
 
 class UnknownStepError(PypicError, KeyError):
     """A requested timestep is not available for the simulation."""
-
-    kind: ClassVar[str] = "unknown_step"
-    status_code: ClassVar[int] = 404
 
 
 class GeometryUnsupportedError(PypicError, NotImplementedError):
@@ -102,6 +82,3 @@ class GeometryUnsupportedError(PypicError, NotImplementedError):
     derived quantities on non-Cartesian grids, spatial-axis reductions
     on non-Cartesian grids.
     """
-
-    kind: ClassVar[str] = "geometry_unsupported"
-    status_code: ClassVar[int] = 400
