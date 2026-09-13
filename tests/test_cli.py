@@ -17,7 +17,11 @@ typer = pytest.importorskip("typer")
 from typer.testing import CliRunner  # noqa: E402
 
 from pypic.cli import app  # noqa: E402
-from tests._sim_fixtures import make_sim_dir, sim_toml  # noqa: E402
+from tests._sim_fixtures import (  # noqa: E402
+    STRETCHED_GRID,
+    make_sim_dir,
+    sim_toml,
+)
 
 try:
     import matplotlib
@@ -1986,6 +1990,30 @@ class TestHelpTextIsUserFacing:
             if found:
                 leaks[" ".join(argv)] = found
         assert not leaks, f"docs-site markup leaked into --help: {leaks}"
+
+
+class TestDeckLevelRefusalReachesTheUser:
+    """A refusal pypic makes on purpose must say why.
+
+    `open_simulation` used to fold it into the "All candidate readers
+    failed" `ExceptionGroup`, whose ``str()`` is just a count, so the CLI
+    printed a headline about reader detection and none of the reason.
+    """
+
+    def test_stretched_deck_exits_nonzero(self, tmp_path) -> None:
+        d = make_sim_dir(tmp_path, grid_extra=STRETCHED_GRID)
+        result = runner.invoke(app, ["info", str(d)])
+        assert result.exit_code == 1, result.output
+
+    def test_stretched_deck_names_the_section(self, tmp_path) -> None:
+        d = make_sim_dir(tmp_path, grid_extra=STRETCHED_GRID)
+        result = runner.invoke(app, ["info", str(d)])
+        assert "grid.stretched" in result.output
+
+    def test_stretched_deck_does_not_blame_reader_detection(self, tmp_path) -> None:
+        d = make_sim_dir(tmp_path, grid_extra=STRETCHED_GRID)
+        result = runner.invoke(app, ["info", str(d)])
+        assert "All candidate readers failed" not in result.output
 
 
 class TestValidateOnTwoDimensionalGrids:

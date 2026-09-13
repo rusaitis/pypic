@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Literal
 import typer
 
 from pypic.dataset import FieldDataset
+from pypic.exceptions import PypicError
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable, Iterator, Sequence
@@ -104,6 +105,12 @@ def _open(path: Path) -> Simulation:
 
     try:
         return open_simulation(path)
+    except PypicError as exc:
+        # A deliberate refusal carries the reason; `.detail` because the
+        # KeyError-inheriting subclasses requote under str().  No PypicError
+        # subclass is an OSError, so this cannot shadow the branch below.
+        typer.echo(f"Error: {exc.detail}", err=True)
+        raise typer.Exit(1) from None
     except (FileNotFoundError, OSError, ExceptionGroup) as exc:
         typer.echo(f"Error: {exc}", err=True)
         raise typer.Exit(1) from None

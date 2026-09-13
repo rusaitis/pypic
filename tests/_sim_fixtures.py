@@ -40,7 +40,7 @@ dimensions = [4, 4, 4]
 spacing = [1.0, 1.0, 1.0]
 lower = [0.0, 0.0, 0.0]
 upper = [4.0, 4.0, 4.0]
-
+{grid_extra}
 [units]
 anchor = "si"
 
@@ -58,9 +58,27 @@ mass = 1.0
 """
 
 
-def sim_toml(*, run_name: str = "test_run", n_steps: int = 3) -> str:
-    """Render the shared ``simulation.toml`` template."""
-    return SIM_TOML_TEMPLATE.format(run_name=run_name, n_steps=n_steps)
+# A [grid.stretched] block that validates but which load_config refuses:
+# four widths summing to upper - lower = 4.0 on axis 0.  Used by the tests
+# that pin how a deck-level refusal reaches the caller.
+STRETCHED_GRID = """
+[grid.stretched.axis_widths]
+0 = [0.4, 0.8, 1.2, 1.6]
+"""
+
+
+def sim_toml(
+    *, run_name: str = "test_run", n_steps: int = 3, grid_extra: str = ""
+) -> str:
+    """Render the shared ``simulation.toml`` template.
+
+    *grid_extra* is spliced between the ``[grid]`` keys and ``[units]``,
+    for optional ``[grid.*]`` sub-tables. Empty by default, so every
+    existing caller renders exactly as it did before.
+    """
+    return SIM_TOML_TEMPLATE.format(
+        run_name=run_name, n_steps=n_steps, grid_extra=grid_extra
+    )
 
 
 def make_sim_dir(
@@ -70,12 +88,14 @@ def make_sim_dir(
     n_steps: int = 3,
     run_name: str = "test_run",
     fields: tuple[str, ...] = ("B_1", "B_2", "B_3"),
+    grid_extra: str = "",
 ) -> Path:
     """Create a synthetic sim tree under *parent* with *n_steps* HDF5 outputs."""
     d = parent / name
     d.mkdir()
     (d / "simulation.toml").write_text(
-        sim_toml(run_name=run_name, n_steps=n_steps), encoding="utf-8"
+        sim_toml(run_name=run_name, n_steps=n_steps, grid_extra=grid_extra),
+        encoding="utf-8",
     )
     rng = np.random.default_rng(42)
     shape = (4, 4, 4)

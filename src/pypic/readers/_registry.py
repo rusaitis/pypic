@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING, Any
 
 from pypic._aliases import COMPUTE_ALIASES, GROUP_ALIASES, _default_aliases
 from pypic.compute import field_dependencies
-from pypic.exceptions import UnknownFieldError
+from pypic.exceptions import PypicError, UnknownFieldError
 from pypic.readers._protocols import supports_selective_read
 
 if TYPE_CHECKING:
@@ -679,6 +679,12 @@ def open_simulation(
         If every candidate reader was tried and each one failed — the
         usual outcome for a corrupt or ambiguous directory. The group
         carries one sub-exception per candidate.
+    PypicError
+        Unwrapped, aborting the candidate loop, when a reader refuses the
+        data deliberately rather than failing to parse it — a
+        `UnsupportedGridError` on a ``[grid.stretched]`` deck, say. Such a
+        refusal comes from the shared `load_config`, so every remaining
+        candidate would raise it identically.
     """
     path = Path(path)
 
@@ -757,6 +763,12 @@ def open_simulation(
                 path,
                 probe_results=frozen_probes,
             )
+        except PypicError:
+            # A typed refusal is about the data, not this reader: every
+            # candidate resolves the same simulation.toml through the same
+            # load_config, so the next one fails identically and the message
+            # is worth more than the fallthrough.
+            raise
         except Exception as exc:  # noqa: BLE001 — try the next candidate reader;
             # everything collected here is re-raised as one ExceptionGroup below.
             log.warning("Reader %r (confidence=%.2f) failed: %s", name, confidence, exc)

@@ -83,6 +83,19 @@ The distribution is `pypic-plasma` on PyPI; the import name is `pypic`.
 
 ### Fixed
 
+- A deliberate refusal now reaches the caller of `open_simulation` as itself,
+  instead of being buried in the "All candidate readers failed"
+  `ExceptionGroup`. The probe loop caught every failure alike, so a
+  `UnsupportedGridError` on a `[grid.stretched]` deck was demoted to a log
+  line and the CLI printed only `All candidate readers failed for <path>
+  (1 sub-exception)` — a headline about reader detection, with none of the
+  reason, for a deck where every candidate resolves the same
+  `simulation.toml` through the same `load_config` and would fail
+  identically. Any `PypicError` now propagates unwrapped and stops the loop;
+  untyped failures, which are reader-specific, still fall through and group
+  as before. `pypic.server` gains the same correction for free: the refusal
+  routes as `geometry_unsupported` / 400 by MRO where the group had landed on
+  `internal` / 500.
 - `GridInfo` refuses more dimensions than its geometry has axes, instead of
   truncating. A 5-tuple constructed without complaint, `surviving_axis_names`
   silently dropped everything past the third axis, and the mismatch surfaced

@@ -10,6 +10,7 @@ import pytest
 
 from pypic.containers import SimulationConfig, TabularData
 from pypic.dataset import FieldDataset
+from pypic.exceptions import UnsupportedGridError
 from pypic.grid import GridInfo
 from pypic.readers._protocols import (
     SimulationReader,
@@ -24,6 +25,7 @@ from pypic.readers._registry import (
     unregister_reader,
 )
 from pypic.units import Normalization
+from tests._sim_fixtures import STRETCHED_GRID, make_sim_dir
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -850,6 +852,58 @@ class TestFactoryFallback:
         with pytest.raises(ExceptionGroup) as exc_info:
             open_simulation(tmp_path)
         assert len(exc_info.value.exceptions) == 2
+
+
+class TestTypedRefusalEscapesTheProbeLoop:
+    """A refusal about the *data* must not read as "try the next reader".
+
+    Every candidate resolves the same ``simulation.toml`` through the same
+    `load_config`, so one of them refusing means all of them would. Burying
+    that in an `ExceptionGroup` costs the user the reason: the group's
+    ``str()`` is only ``"... (1 sub-exception)"``.
+    """
+
+    def test_a_typed_refusal_reaches_the_caller_unwrapped(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        def refusing(path: Path, **_kw: Any) -> _Result:
+            raise UnsupportedGridError("[grid.stretched] is not readable")
+
+        register_reader("refuser", lambda _: 0.9, refusing)
+
+        with pytest.raises(UnsupportedGridError, match=r"grid\.stretched"):
+            open_simulation(tmp_path)
+
+    def test_a_typed_refusal_stops_the_candidate_loop(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        calls: list[str] = []
+
+        def refusing(path: Path, **_kw: Any) -> _Result:
+            raise UnsupportedGridError("[grid.stretched] is not readable")
+
+        def working_factory(path: Path, **_kw: Any) -> _Result:
+            calls.append("working")
+            return _mock_factory(path)
+
+        register_reader("high", lambda _: 0.9, refusing)
+        register_reader("low", lambda _: 0.5, working_factory)
+
+        with pytest.raises(UnsupportedGridError):
+            open_simulation(tmp_path)
+        assert calls == [], "a lower-confidence reader was tried after a refusal"
+
+    def test_a_stretched_deck_on_disk_refuses_by_type(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        """End-to-end, through the real `load_config` raise site."""
+        d = make_sim_dir(tmp_path, grid_extra=STRETCHED_GRID)
+
+        with pytest.raises(UnsupportedGridError, match=r"grid\.stretched"):
+            open_simulation(d)
 
 
 class TestProbeResultsOnSimulation:
