@@ -41,6 +41,11 @@ The distribution is `pypic-plasma` on PyPI; the import name is `pypic`.
   density on a $c/10$ deck was wrong by 100×. The warning names the two honest
   spellings: `reference_velocity` for a genuinely different velocity unit,
   `scaling_factor` / `scaling_description` for a dimensionless modelling choice.
+- `pypic info --json` reports all eight storage primitives plus
+  `rationalization_ratio`. It carried six, omitting `e_field_ref`,
+  `mass_ref` and `charge_ref`, so a JSON consumer could neither read the
+  ratio the text output prints nor recompute it — or any SI factor needing
+  those three.
 - `Normalization.si_factor` resolves all eight storage primitives, so
   `"mass"` and `"charge"` — and with them `SpeciesInfo.mass` — have a route to
   SI for the first time. `normalize` and `to_si` take the same eight.

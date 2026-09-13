@@ -104,6 +104,32 @@ def test_info_json_carries_the_unit_system(tmp_path):
     assert json.loads(result.output)["normalization"]["system"] == "si"
 
 
+def test_info_json_carries_every_storage_primitive(tmp_path):
+    """A JSON consumer must be able to recompute any SI factor itself."""
+    d = make_sim_dir(tmp_path, "sim")
+    result = runner.invoke(app, ["info", str(d), "--json"])
+    norm = json.loads(result.output)["normalization"]
+    expected = {
+        "length_ref",
+        "time_ref",
+        "velocity_ref",
+        "b_field_ref",
+        "e_field_ref",
+        "density_ref",
+        "mass_ref",
+        "charge_ref",
+    }
+    assert expected <= norm.keys(), f"missing: {sorted(expected - norm.keys())}"
+
+
+def test_info_json_reports_the_ratio_the_text_output_shows(tmp_path):
+    d = make_sim_dir(tmp_path, "sim")
+    as_json = runner.invoke(app, ["info", str(d), "--json"])
+    as_text = runner.invoke(app, ["info", str(d)])
+    ratio = json.loads(as_json.output)["normalization"]["rationalization_ratio"]
+    assert f"{ratio:.4g}" in as_text.output
+
+
 # -- fields ------------------------------------------------------------------
 
 

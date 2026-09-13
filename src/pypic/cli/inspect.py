@@ -107,11 +107,17 @@ def info(
         },
         "normalization": {
             "system": norm.system,
+            # All eight primitives, so a consumer can recompute any SI factor
+            # — and the ratio, which the text output shows and this did not.
             "length_ref": norm.length_ref,
             "time_ref": norm.time_ref,
             "velocity_ref": norm.velocity_ref,
             "b_field_ref": norm.b_field_ref,
+            "e_field_ref": norm.e_field_ref,
             "density_ref": norm.density_ref,
+            "mass_ref": norm.mass_ref,
+            "charge_ref": norm.charge_ref,
+            "rationalization_ratio": norm.rationalization_ratio,
         },
         "stagger": stagger.convention if stagger is not None else None,
         "species": species_dicts,
