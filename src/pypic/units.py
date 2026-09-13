@@ -499,24 +499,35 @@ class Normalization:
         )
 
     def summary(self) -> str:
-        """One-line description of the unit system and its SI anchor.
+        r"""One-line description of the unit system and its SI anchor.
 
         Shared by ``Simulation.describe()`` and ``pypic info`` so the
         two report a dataset's units identically. The undeclared case
         is spelled out rather than shown as unit references, since
         those read as SI when nothing established the anchor.
 
+        The ``si`` anchor gets the rationalization annotation too, and
+        needs it most: all eight references are 1.0, so its ratio is
+        $1/\mu_0$ and every quantity carrying a vacuum constant is wrong
+        by a power of it. Naming ``data_in_si`` there points at the fix
+        rather than only at the symptom.
+
         Examples
         --------
         >>> Normalization.undeclared().summary()
         'undeclared (code units; no [units] section)'
-        >>> Normalization.identity().summary()
-        'SI (identity)'
+        >>> Normalization.identity().summary()[:14]
+        'SI (identity) '
         """
         if self.system is None:
             return "undeclared (code units; no [units] section)"
         if self.system is UnitSystem.SI and self.is_identity:
-            return "SI (identity)"
+            return (
+                "SI (identity) [not SI-rationalized: "
+                f"B^2/(mu_0 n m v^2) = {self.rationalization_ratio:.4g}; "
+                "derived quantities assume mu_0 = 1, so declare a real anchor "
+                "with [units].data_in_si to compute on this data]"
+            )
         line = (
             f"{self.system}: l={self.length_ref:.4g} m, "
             f"v={self.velocity_ref:.4g} m/s, "

@@ -83,6 +83,15 @@ The distribution is `pypic-plasma` on PyPI; the import name is `pypic`.
 
 ### Fixed
 
+- `Normalization.summary()` — and so `pypic info` and
+  `Simulation.describe()` — reports the rationalization ratio on the `si`
+  anchor, which is the case that needed it most and the one it skipped.
+  `docs/schema.md` says the ratio is shown "whenever it is not 1" and lists
+  $1/\mu_0$ as the "data already in SI" convention, but the summary returned
+  `"SI (identity)"` before reaching the check, so the newcomer's first
+  anchor was the only one that never announced that its EM surface is off by
+  a power of $\mu_0$. The line now names the ratio and points at
+  `[units].data_in_si`, which is the fix rather than the symptom.
 - BATSRUS datasets carry their periodic axes into `GridInfo.boundary`, so the
   periodic-stencil warning below actually reaches them. `#PERIODIC` was parsed
   out of the `.h` header into a field nothing ever read, `#OUTERBOUNDARY` was

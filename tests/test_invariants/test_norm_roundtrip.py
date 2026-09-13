@@ -52,8 +52,8 @@ def test_base_quantity_round_trip(norm: Normalization, quantity: str, x: float) 
 def test_every_system_covers_every_base_quantity(
     system: str, norm: Normalization
 ) -> None:
-    """Each constructor produces a Normalization that accepts all six base
-    quantities without raising — guards against a constructor silently
+    """Each constructor produces a Normalization that accepts every storage
+    primitive without raising — guards against a constructor silently
     leaving a ``*_ref`` field unset. Uses deterministic fixed triples
     rather than Hypothesis strategies: this is an API-coverage check,
     not a property test.

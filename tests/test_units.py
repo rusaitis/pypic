@@ -291,6 +291,18 @@ class TestRationalizationRatio:
         )
         np.testing.assert_allclose(norm.rationalization_ratio, 100.0, rtol=1e-9)
 
+    def test_the_si_anchor_reports_its_ratio_like_every_other(self):
+        """schema.md promises `pypic info` shows the ratio whenever it is not 1.
+
+        The SI anchor is the row that promise most needs to cover — all
+        eight references are 1.0, so every EM quantity is off by a power of
+        mu_0 — and it was the one case the summary returned early on.
+        """
+        assert "7.958e+05" in Normalization.identity().summary()
+
+    def test_the_si_anchor_summary_names_the_way_out(self):
+        assert "data_in_si" in Normalization.identity().summary()
+
 
 class TestUnitSystemProvenance:
     """An undeclared normalization is distinguishable from declared SI."""

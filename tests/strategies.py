@@ -21,8 +21,14 @@ BASE_QUANTITIES: tuple[str, ...] = (
     "b_field",
     "e_field",
     "density",
+    "mass",
+    "charge",
 )
-"""The six base quantities ``Normalization.normalize`` accepts (units.py:20)."""
+"""The eight storage primitives ``Normalization.normalize`` accepts.
+
+Mirrors ``pypic.units._REFERENCE_ORDER``; ``mass`` and ``charge`` joined
+the other six when the SI factors became exponent vectors over all eight.
+"""
 
 COMPOUND_QUANTITIES: tuple[str, ...] = (
     "dimensionless",
