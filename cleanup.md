@@ -243,7 +243,7 @@ entirely from a fallback — documented, validated, never populated.
    Note that pointer where the raise lands, so the next reader does not
    re-derive it.
 
-2. - [ ] **Reject complex field arrays in `FieldDataset.from_arrays`.**
+2. - [x] **Reject complex field arrays in `FieldDataset.from_arrays`.**
    Complex input is accepted today and propagates into physics that assumes
    real. Measured: `compute("|B|")` on complex `B_1/B_2/B_3` returns
    `complex128` — $\sqrt{B_1^2+B_2^2+B_3^2}$ under complex arithmetic, not
@@ -256,6 +256,16 @@ entirely from a fallback — documented, validated, never populated.
    boundary. One guard, one test; the alternative (complex-aware magnitudes
    throughout `derived.py`) is a much larger change for a use case no reader
    currently produces.
+
+   **Landed one level down, in `__init__` rather than `from_arrays`.** The
+   plan named `from_arrays` because `ReaderBase._finish` routes through it, so
+   every reader is covered — but `io/zarr.py` and `io/_virtual.py` build a
+   `FieldDataset` directly, and a foreign Zarr store or a VirtualiZarr view
+   over legacy HDF5 is exactly where k-space data arrives. `__init__` is the
+   one chokepoint under all three, plus `with_field` and the slicing path;
+   same Phase 9 reasoning that put the undeclared-normalization guard in
+   `si_factor` instead of at its three callers. Cost is an
+   `np.issubdtype` per variable per construction.
 
 3. - [ ] **A domain error for grids above three dimensions.** `GridInfo`
    accepts a 5-tuple without complaint — `__post_init__` (`grid.py:61-90`)

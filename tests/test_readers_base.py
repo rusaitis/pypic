@@ -563,6 +563,47 @@ class TestFromArraysCoords:
             )
 
 
+class TestComplexArraysAreRefused:
+    """Spectral coefficients must be inverse-transformed before they land.
+
+    Complex input used to propagate into physics that assumes real:
+    ``|B|`` evaluated under complex arithmetic returns a complex number
+    that is not the magnitude, with nothing said.
+    """
+
+    def test_complex_field_raises_naming_the_field(self):
+        grid = make_uniform_grid(2)
+        with pytest.raises(ValueError, match=r"B_1"):
+            FieldDataset.from_arrays({"B_1": np.array([1 + 2j, 3 + 4j])}, grid)
+
+    def test_the_error_names_every_complex_field(self):
+        grid = make_uniform_grid(2)
+        fields = {
+            "B_1": np.array([1 + 2j, 0j]),
+            "B_2": np.zeros(2),
+            "E_1": np.array([0j, 1 + 0j]),
+        }
+        with pytest.raises(ValueError, match=r"\['B_1', 'E_1'\]") as excinfo:
+            FieldDataset.from_arrays(fields, grid)
+        assert "B_2" not in str(excinfo.value)
+
+    def test_the_error_points_at_the_reader_boundary(self):
+        grid = make_uniform_grid(2)
+        with pytest.raises(ValueError, match="inverse transform"):
+            FieldDataset.from_arrays({"B_1": np.array([1 + 2j, 0j])}, grid)
+
+    def test_real_arrays_are_unaffected(self):
+        grid = make_uniform_grid(2)
+        ds = FieldDataset.from_arrays({"B_1": np.array([1.0, 2.0])}, grid)
+        np.testing.assert_array_equal(ds["B_1"], [1.0, 2.0])
+
+    def test_integer_arrays_are_still_accepted(self):
+        """The guard rejects complex, not every non-float dtype."""
+        grid = make_uniform_grid(2)
+        ds = FieldDataset.from_arrays({"B_1": np.array([1, 2])}, grid)
+        np.testing.assert_array_equal(ds["B_1"], [1, 2])
+
+
 # (label, directory, step, whether the file or config records a time)
 _READER_FIXTURES = [
     ("ipic3d/phdf5", DATA / "ipic3d-synthetic" / "phdf5", 0, True),

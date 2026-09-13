@@ -76,6 +76,15 @@ The distribution is `pypic-plasma` on PyPI; the import name is `pypic`.
 
 ### Fixed
 
+- Complex field arrays are refused at `FieldDataset` construction instead of
+  propagating into physics that assumes real. `compute("|B|")` on complex
+  components returned `complex128` — $\sqrt{B_1^2+B_2^2+B_3^2}$ under complex
+  arithmetic, which is not $\sqrt{|B_1|^2+|B_2|^2+|B_3|^2}$ — with nothing
+  said, so a pseudo-spectral code dumping k-space, or a reader that forgot an
+  inverse transform, got numbers that looked like fields. The guard sits in
+  `__init__` rather than `from_arrays` so it also covers `from_zarr` and
+  `open_virtual`, which construct directly; the error names every complex
+  field and points at the reader boundary.
 - `in_si` / `in_units` on Poynting flux were too small by a factor of $\mu_0$
   (~$1.3\times10^{-6}$). pypic's code units are SI-rationalized, so
   `derived.poynting_flux` returns a bare $\mathbf{E}\times\mathbf{B}$ and the

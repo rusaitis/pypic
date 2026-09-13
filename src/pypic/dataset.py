@@ -45,6 +45,32 @@ if TYPE_CHECKING:
     from pypic.units import SpeciesInfo
 
 
+def _require_real_arrays(dataset: xr.Dataset) -> None:
+    r"""Raise if any variable is complex.
+
+    Every function in `pypic.derived` assumes real arrays, and the
+    failure is silent rather than loud: ``|B|`` on complex components
+    evaluates $\sqrt{B_1^2+B_2^2+B_3^2}$ under complex arithmetic, which
+    is not $\sqrt{|B_1|^2+|B_2|^2+|B_3|^2}$.  A pseudo-spectral code
+    dumping k-space then gets numbers that look like fields.
+    """
+    complex_vars = sorted(
+        str(name)
+        for name, da in dataset.data_vars.items()
+        if np.issubdtype(da.dtype, np.complexfloating)
+    )
+    if complex_vars:
+        msg = (
+            f"Complex field arrays are not supported: {complex_vars!r}. "
+            "pypic computes on real-valued fields throughout — magnitudes, "
+            "the pressure-tensor decomposition and every field-aligned "
+            "projection assume it. Spectral coefficients want an inverse "
+            "transform at the reader boundary, before the arrays become a "
+            "FieldDataset."
+        )
+        raise ValueError(msg)
+
+
 class FieldDataset:
     r"""Universal container for simulation field data.
 
@@ -114,6 +140,7 @@ class FieldDataset:
         frame: str = "simulation",
         transforms: Mapping[str, FrameTransform] | None = None,
     ) -> None:
+        _require_real_arrays(dataset)
         self._ds = dataset
         self._grid = grid
         self._normalization = normalization
