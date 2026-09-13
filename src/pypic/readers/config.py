@@ -23,6 +23,7 @@ from scipy import constants
 from pypic.containers import SimulationConfig, StaggerInfo
 from pypic.coordinates.geometry import GEOMETRY_BY_NAME, CoordinateGeometry
 from pypic.coordinates.transforms import FrameTransform
+from pypic.exceptions import UnsupportedGridError
 from pypic.grid import GridInfo
 from pypic.schema import (
     SimulationSchema,
@@ -223,6 +224,11 @@ def load_config(path: Path) -> SimulationConfig:
     pydantic.ValidationError
         If the document fails schema validation. Dotted field paths in
         the error message point to every violation.
+    UnsupportedGridError
+        If the document is valid but declares a grid pypic cannot
+        represent — today, ``[grid.stretched]``.  The two are different
+        statements: the first says the deck is wrong, this one says
+        pypic's reader is what is missing.
     """
     raw_text = Path(path).read_text(encoding="utf-8")
     schema = validate_simulation_toml(raw_text)
@@ -296,6 +302,27 @@ def _build_grid(
     bcs: BoundaryConditions | None,
     geometry: CoordinateGeometry,
 ) -> GridInfo:
+    # Refused rather than dropped: a stretched axis falsifies `spacing`,
+    # the value the loader is about to read. [grid.amr] and
+    # [[grid.refinement]] are also dropped here, but they declare extra
+    # structure beside a base grid whose spacing stays true for the
+    # arrays actually loaded — that is the line between the two.
+    if grid.stretched is not None:
+        axes = ", ".join(
+            f"{key} ({geometry.axis_names[int(key)]})"
+            for key in sorted(grid.stretched.axis_widths)
+        )
+        msg = (
+            f"[grid.stretched] declares non-uniform cell widths on axis "
+            f"{axes}, and GridInfo carries one scalar spacing per axis. "
+            f"Loading this deck would place every cell on that axis at "
+            f"origin + (i + 0.5) * spacing — wrong positions, and with them "
+            f"every derivative, integral and slice along it. The document is "
+            f"not invalid: [grid.stretched] is part of schema v2.0 and other "
+            f"tools read it — pypic's reader does not yet (TASKS Step 51). "
+            f"Remove the section if the axis is in fact uniform."
+        )
+        raise UnsupportedGridError(msg)
     dimensions = tuple(int(d) for d in grid.dimensions)
     spacing = tuple(float(s) for s in grid.spacing)
     origin = tuple(float(x) for x in grid.lower)

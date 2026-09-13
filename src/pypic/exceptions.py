@@ -29,6 +29,7 @@ __all__ = [
     "UnknownFieldError",
     "UnknownSimulationError",
     "UnknownStepError",
+    "UnsupportedGridError",
 ]
 
 
@@ -99,4 +100,23 @@ class GeometryUnsupportedError(PypicError, NotImplementedError):
     Examples: `regrid` on spherical geometry, derivative-based
     derived quantities on non-Cartesian grids, spatial-axis reductions
     on non-Cartesian grids.
+    """
+
+
+class UnsupportedGridError(GeometryUnsupportedError):
+    """The grid's *representation* is beyond what pypic's containers carry.
+
+    Distinct from the parent, which is about the coordinate system: this
+    one fires on a Cartesian grid whose cells are not uniformly spaced,
+    where naming the geometry would be actively misleading.  Raised by
+    `readers.config.load_config` on a ``[grid.stretched]`` deck, because
+    `GridInfo` holds one scalar spacing per axis.
+
+    A `NotImplementedError`, which is the distinction that matters at
+    the reader boundary: the document is *valid* under the cross-tool
+    schema and pypic simply cannot build a container from it.  A
+    `ValueError` there would tell the user their deck is wrong when it
+    is not.  Subclassing `GeometryUnsupportedError` keeps the server
+    routing (``geometry_unsupported`` / 400) and every existing
+    ``except GeometryUnsupportedError`` caller working unchanged.
     """

@@ -25,6 +25,7 @@ from pypic.exceptions import (
     UnknownFieldError,
     UnknownSimulationError,
     UnknownStepError,
+    UnsupportedGridError,
 )
 from pypic.server.exceptions import ValidationFailedError, error_routing
 from pypic.server.protocol import ErrorKind
@@ -36,6 +37,11 @@ _ROUTING_CONTRACT: tuple[tuple[type[PypicError], str, int, type[Exception]], ...
     (UnknownFieldError, "unknown_field", 404, KeyError),
     (UnknownStepError, "unknown_step", 404, KeyError),
     (GeometryUnsupportedError, "geometry_unsupported", 400, NotImplementedError),
+    # Deliberately shares its parent's kind rather than claiming a new one:
+    # a grid pypic cannot represent is the same 400 to a wire consumer, and
+    # `ErrorKind` is a closed vocabulary. Listed anyway, because inheriting
+    # a routing is a decision and this table is where decisions are made.
+    (UnsupportedGridError, "geometry_unsupported", 400, NotImplementedError),
     (UndeclaredNormalizationError, "undeclared_normalization", 400, ValueError),
     (ValidationFailedError, "validation", 422, ValueError),
 )

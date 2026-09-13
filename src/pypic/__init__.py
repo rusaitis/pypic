@@ -122,6 +122,7 @@ from pypic.exceptions import (
     UnknownFieldError,
     UnknownSimulationError,
     UnknownStepError,
+    UnsupportedGridError,
 )
 from pypic.fields import (
     FieldInfo,
@@ -254,6 +255,7 @@ __all__ = [
     "UnknownFieldError",
     "UnknownSimulationError",
     "UnknownStepError",
+    "UnsupportedGridError",
     "VectorFieldInterpolator",
     "agyrotropy",
     "alfven_mach",

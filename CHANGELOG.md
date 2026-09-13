@@ -11,6 +11,13 @@ The distribution is `pypic-plasma` on PyPI; the import name is `pypic`.
 
 ### Added
 
+- `pypic.UnsupportedGridError`: raised by `load_config` when a deck is valid
+  under the cross-tool schema but declares a grid pypic's containers cannot
+  represent — today, `[grid.stretched]`. A `NotImplementedError` (via
+  `GeometryUnsupportedError`, whose server routing and `except` clauses it
+  inherits), because "pypic does not read this" and "this document is
+  invalid" are different statements and the type is how a user tells which
+  one they got.
 - `[units].data_in_si` — the second, orthogonal axis. `anchor` says how the
   references were closed; `data_in_si` says whether the arrays on disk are
   already SI, and asks the reader to rescale them on load. These were one
@@ -168,6 +175,18 @@ The distribution is `pypic-plasma` on PyPI; the import name is `pypic`.
 
 ### Changed
 
+- `load_config` refuses a `[grid.stretched]` deck instead of dropping the
+  section. The widths validated, reached `SimulationSchema.grid.stretched`,
+  and were then discarded — so the deck loaded with one scalar spacing per
+  axis and every cell on a stretched axis at the wrong position. Measured
+  with widths `[0.5, 0.6, 0.8, 1.0, 1.3]`, coordinates came out
+  `[0.42 1.26 2.10 2.94 3.78]` against a truth of `[0.25 0.80 1.50 2.40 3.55]`,
+  making every derivative, integral and slice along it wrong by a
+  position-dependent factor, silently. Honouring the widths is TASKS Step 51;
+  until then the refusal names the section and the axes. This is the one
+  sanctioned divergence from the validator↔loader parity invariant, and
+  `tests/test_schema_parity.py` pins it by type so it deletes itself when
+  Step 51 lands.
 - **`simulation.toml` is now schema 2.0, and `[units]` is the whole break.**
   `[units].system` becomes `[units].anchor`, and the four code-type-shaped
   values collapse to three anchor forms named for how the eight SI references

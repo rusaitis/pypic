@@ -16,6 +16,17 @@ constraint tightened in the loader but not the model — or an optional
 key the model permits and the loader cannot build — turns ``pypic schema
 validate`` into a tool that green-lights files pypic then refuses to
 open.
+
+That invariant has exactly one carve-out, and it is typed rather than
+named: a whole section pypic cannot represent may be refused, provided
+it refuses as `UnsupportedGridError` and names the section.  The
+model is the *cross-tool* contract — the Rust solver and the JS viewer
+may well read a section pypic does not — while ``load_config`` is
+pypic's own reader.  "pypic does not read this" and "this document is
+invalid" are different statements, and the exception type is how a user
+tells which one they got.  ``_READER_UNSUPPORTED`` below is the list,
+and every entry is required to raise, so each one deletes itself the day
+its section becomes readable.
 """
 
 from __future__ import annotations
@@ -25,6 +36,7 @@ from pathlib import Path
 from textwrap import dedent
 
 from pypic._aliases import COMPUTE_ALIASES
+from pypic.exceptions import UnsupportedGridError
 from pypic.fields import field_info
 from pypic.readers.config import load_config
 from pypic.schema import validate_simulation_toml
@@ -236,8 +248,36 @@ _UNITS_VARIANTS: tuple[tuple[str, str], ...] = (
 )
 
 
-def _doc(units_block: str) -> str:
-    """A minimal valid v2.0 document carrying *units_block* verbatim."""
+# Documents the model accepts that pypic's reader deliberately refuses.
+#
+# The Pydantic model is the *cross-tool* contract: [grid.stretched] is
+# part of schema v2.0 because the solver may write a log-radial mesh and
+# the viewer may draw one. load_config is *pypic's* reader, and GridInfo
+# carries one scalar spacing per axis. So the parity invariant is not
+# "validates implies loads" flat — it is "validates implies loads, or is
+# refused as unimplemented, by type, with the section named".
+#
+# Each entry must raise UnsupportedGridError. When pypic learns to read
+# one (TASKS Step 51 for stretched), this test fails on the entry that
+# started loading: delete it then, and cover the document in the parity
+# fixtures instead. Do not add an entry to silence a failure — a section
+# the loader cannot build is either refused here or built there.
+_READER_UNSUPPORTED: tuple[tuple[str, str, str], ...] = (
+    (
+        "[grid.stretched] — per-axis non-uniform cell widths",
+        "[grid.stretched.axis_widths]\n0 = [0.4, 0.8, 1.2, 1.6]\n",
+        "grid.stretched",
+    ),
+)
+
+
+def _doc(units_block: str, *, grid_extra: str = "") -> str:
+    """A minimal valid v2.0 document carrying *units_block* verbatim.
+
+    *grid_extra* is spliced between the ``[grid]`` keys and ``[units]``,
+    for optional ``[grid.*]`` sub-tables.  Empty by default, so every
+    ``[units]`` fixture renders exactly as it did before.
+    """
     head = dedent(
         """
         [schema]
@@ -257,7 +297,6 @@ def _doc(units_block: str) -> str:
         spacing = [1.0, 1.0, 1.0]
         lower = [0.0, 0.0, 0.0]
         upper = [4.0, 4.0, 4.0]
-        [units]
         """
     ).strip()
     tail = dedent(
@@ -271,7 +310,7 @@ def _doc(units_block: str) -> str:
         mass = 1.0
         """
     ).strip()
-    return f"{head}\n{units_block}\n{tail}\n"
+    return f"{head}\n{grid_extra}[units]\n{units_block}\n{tail}\n"
 
 
 def test_validated_documents_load(tmp_path: Path) -> None:
@@ -302,8 +341,53 @@ def test_validated_documents_load(tmp_path: Path) -> None:
         + "\n".join(failures)
         + "\n\nEither teach readers.config to build a Normalization from "
         "what the model permits, or tighten the model so the document "
-        "never validates in the first place."
+        "never validates in the first place. A third answer exists only "
+        "for whole sections pypic cannot represent at all — those are "
+        "refused by type in _READER_UNSUPPORTED, which says 'pypic does "
+        "not read this' rather than 'this document is invalid'. It is "
+        "not an escape hatch for a [units] shape the loader mishandles."
     )
+
+
+def test_reader_unsupported_documents_are_refused_by_type(tmp_path: Path) -> None:
+    """A section pypic cannot read must refuse loudly, as NotImplementedError.
+
+    The validator and the loader answer different questions, and the
+    error type is how a user tells which one said no.  A ``ValueError``
+    here would read as "your document is wrong"; it is not wrong, it is
+    valid under the cross-tool schema and pypic simply cannot build a
+    container from it.  `UnsupportedGridError` is a
+    ``NotImplementedError`` that says exactly that.
+    """
+    failures: list[str] = []
+    for label, grid_extra, section in _READER_UNSUPPORTED:
+        text = _doc('anchor = "si"', grid_extra=grid_extra)
+        # A fixture that stopped validating proves nothing about parity.
+        validate_simulation_toml(text)
+        path = tmp_path / "unsupported.toml"
+        path.write_text(text)
+        try:
+            load_config(path)
+        except UnsupportedGridError as exc:
+            if section not in str(exc):
+                failures.append(
+                    f"  - {label}: the refusal does not name the section it "
+                    f"refused ({section!r} absent): {exc}"
+                )
+        except Exception as exc:
+            failures.append(
+                f"  - {label}: refused as {type(exc).__name__}, which tells "
+                f"the user their document is invalid. It is valid; pypic's "
+                f"reader is what is missing. Raise UnsupportedGridError."
+            )
+        else:
+            failures.append(
+                f"  - {label}: load_config accepted it. If pypic learned to "
+                f"read this section, delete the entry from "
+                f"_READER_UNSUPPORTED and cover the document in the parity "
+                f"fixtures instead."
+            )
+    assert not failures, "\n".join(failures)
 
 
 def test_underdetermined_explicit_units_are_rejected() -> None:

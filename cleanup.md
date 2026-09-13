@@ -212,7 +212,7 @@ item 1: `FieldInfo.unit_dimension` is validated on registration and `None`
 for every built-in field, so the openPMD metadata pypic advertises comes
 entirely from a fallback — documented, validated, never populated.
 
-1. - [ ] **Refuse `[grid.stretched]` at the reader boundary.** The section
+1. - [x] **Refuse `[grid.stretched]` at the reader boundary.** The section
    validates, reaches `SimulationSchema.grid.stretched`, and `_build_grid`
    (`readers/config.py:293-315`) drops it — `GridInfo` has one `spacing` float
    per axis and `coordinate_arrays()` computes `origin + (i+0.5)*dx`.
@@ -242,6 +242,45 @@ entirely from a fallback — documented, validated, never populated.
    `GridInfo.axis_coords` plus threading it through `coordinates/operators.py`.
    Note that pointer where the raise lands, so the next reader does not
    re-derive it.
+
+   **The exemption landed typed rather than named**, which is better than the
+   plan: `_READER_UNSUPPORTED` lists the section, and the test *requires* each
+   entry to raise. So the carve-out deletes itself the day Step 51 lands —
+   the opposite of a permanent skip. Worth knowing that the parity test would
+   not have failed as written: its corpus is `[units]`-only, fed through one
+   `_doc()` helper with a hardcoded uniform `[grid]`. The exemption is
+   therefore additive, and exists because the corpus is obviously meant to
+   grow.
+
+   **`UnsupportedGridError` subclasses `GeometryUnsupportedError`**, which was
+   not in the plan and is what makes it cheap. A bare `PypicError` subclass
+   would route to `internal` / 500 through `error_routing`'s MRO walk — a
+   diagnosable user error served as a server fault — so it would have needed
+   a new `ErrorKind` member, a `_ROUTING` entry and two `__all__` edits.
+   Subclassing inherits `geometry_unsupported` / 400 and every existing
+   `except GeometryUnsupportedError`, for five lines and no wire change. The
+   name still has to be its own, because "geometry unsupported" on a
+   *Cartesian* grid is a false statement.
+
+   **`tests/test_server_exceptions.py` caught it**, and correctly:
+   `test_every_pypic_error_subclass_is_routed` walks the hierarchy and fails
+   any subclass absent from the contract table, on the grounds that inheriting
+   a routing is a decision. The entry is now there asserting the inheritance.
+
+   **The rule separating this from the other dropped sections**, since a
+   reviewer will ask: a stretched axis *falsifies a value the loader reads* —
+   it says the `spacing` scalar is not the real cell width. `[grid.amr]` and
+   `[[grid.refinement]]` declare extra structure beside a base grid whose
+   spacing stays true for the arrays actually loaded. Judge the next optional
+   block by that line.
+
+   **Not fixed, and noted:** `open_simulation`'s probe loop swallows every
+   reader failure into an `ExceptionGroup` (`readers/_registry.py:760-767`),
+   so the CLI shows this refusal as a `WARNING` log line under a generic
+   "All candidate readers failed". The message survives, but the headline is
+   wrong — a deck-level refusal is not "try the next reader", since every
+   candidate hits the same `load_config` and fails identically. That is a
+   probe-loop design question, not this item's.
 
 2. - [x] **Reject complex field arrays in `FieldDataset.from_arrays`.**
    Complex input is accepted today and propagates into physics that assumes
