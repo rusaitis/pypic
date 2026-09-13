@@ -95,6 +95,33 @@ class TestGridInfo:
                 geometry=CARTESIAN,
             )
 
+    def test_more_dimensions_than_axes_is_refused(self):
+        """A 5D grid must fail here, not two calls later inside a zip().
+
+        ``surviving_axis_names`` truncates to the geometry's three axes,
+        so without this check the mismatch surfaced as
+        ``zip() argument 2 is longer than argument 1`` from
+        ``FieldDataset.from_arrays``.
+        """
+        with pytest.raises(ValueError, match="at most 3 dimensions, got 5"):
+            GridInfo(
+                dimensions=(4, 4, 4, 16, 8),
+                spacing=(1.0,) * 5,
+                origin=(0.0,) * 5,
+                geometry=CARTESIAN,
+            )
+
+    def test_the_refusal_points_at_phase_space(self):
+        with pytest.raises(ValueError, match=r"\[phase_space\]"):
+            GridInfo(dimensions=(2,) * 4, spacing=(1.0,) * 4, geometry=CARTESIAN)
+
+    @pytest.mark.parametrize("ndim", [1, 2, 3])
+    def test_up_to_three_dimensions_still_construct(self, ndim):
+        grid = GridInfo(
+            dimensions=(2,) * ndim, spacing=(1.0,) * ndim, geometry=CARTESIAN
+        )
+        assert len(grid.coordinate_arrays()) == ndim
+
     @pytest.mark.parametrize("bad_spacing", [-0.5, 0.0], ids=["negative", "zero"])
     def test_validation_negative_spacing(self, bad_spacing):
         """Zero spacing is a degenerate grid and must fail like negative does.

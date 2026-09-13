@@ -267,7 +267,7 @@ entirely from a fallback — documented, validated, never populated.
    `si_factor` instead of at its three callers. Cost is an
    `np.issubdtype` per variable per construction.
 
-3. - [ ] **A domain error for grids above three dimensions.** `GridInfo`
+3. - [x] **A domain error for grids above three dimensions.** `GridInfo`
    accepts a 5-tuple without complaint — `__post_init__` (`grid.py:61-90`)
    never compares `len(dimensions)` against the geometry's three
    `axis_names` — so `surviving_axis_names` silently truncates to three and

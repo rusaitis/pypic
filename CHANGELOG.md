@@ -76,6 +76,14 @@ The distribution is `pypic-plasma` on PyPI; the import name is `pypic`.
 
 ### Fixed
 
+- `GridInfo` refuses more dimensions than its geometry has axes, instead of
+  truncating. A 5-tuple constructed without complaint, `surviving_axis_names`
+  silently dropped everything past the third axis, and the mismatch surfaced
+  two calls later as `zip() argument 2 is longer than argument 1` from inside
+  `FieldDataset.from_arrays`. The refusal names the dimensionality and points
+  at `[phase_space]`, which carries a gyrokinetic 5D or continuum-Vlasov 6D
+  description as typed metadata even though no container holds the
+  distribution function. 1D, 2D and 3D grids are unaffected.
 - Complex field arrays are refused at `FieldDataset` construction instead of
   propagating into physics that assumes real. `compute("|B|")` on complex
   components returned `complex128` — $\sqrt{B_1^2+B_2^2+B_3^2}$ under complex

@@ -68,6 +68,20 @@ class GridInfo:
                 f"spacing({len(self.spacing)}), origin({len(self.origin)})"
             )
             raise ValueError(msg)
+        # Without this, surviving_axis_names truncates to the geometry's
+        # three axes and the mismatch surfaces two calls later, inside
+        # a zip() in FieldDataset.from_arrays.
+        max_ndim = len(self.geometry.axis_names)
+        if ndim > max_ndim:
+            msg = (
+                f"GridInfo holds at most {max_ndim} dimensions, got {ndim}. "
+                f"pypic's containers are 1D/2D/3D structured grids; a "
+                f"higher-dimensional phase space (gyrokinetic 5D, continuum "
+                f"Vlasov 6D) is described by the [phase_space] section, "
+                f"which reaches SimulationConfig.phase_space as typed "
+                f"metadata, but no container holds its distribution function."
+            )
+            raise ValueError(msg)
         for i, d in enumerate(self.dimensions):
             if d <= 0:
                 raise ValueError(f"dimensions[{i}] must be > 0, got {d}")
