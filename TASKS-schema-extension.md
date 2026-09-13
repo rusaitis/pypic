@@ -104,7 +104,7 @@ Recommended pairing of round-2 work to reader rollouts:
 | Reader trigger | Round-2 items unlocked |
 |---|---|
 | Vlasiator (Step 23) — lossless VDFs | `[velocity_mesh]`, `[phase_space]` |
-| ARMS spherical (Step 36) | `[grid.stretched]` |
+| ARMS spherical (Step 36) | `[grid.stretched]` (schema only — runtime needs Step 51) |
 | VPIC (Step 35) per-rank restart manifest | `Restart.from_files` |
 | Gkeyll, Hakim two-fluid 10-moment (full anisotropy) | `Species.gamma_eos_par` / `gamma_eos_perp` |
 | Smilei collisional / EPOCH / OSIRIS-collisional | `[[collisions]]` |
@@ -117,8 +117,10 @@ Recommended pairing of round-2 work to reader rollouts:
   Vlasiator lossless VDFs (Step 23).
 
 - [x] **Stretched / non-uniform grids.** Optional `[grid.stretched]`, sparse
-  per-axis `axis_widths` validated against the extent — unblocks ARMS
-  spherical-r (Step 36).
+  per-axis `axis_widths` validated against the extent. Unblocks ARMS
+  spherical-r (Step 36) **in the schema only**: `load_config` refuses such a
+  deck with `UnsupportedGridError` rather than mis-placing its cells, so the
+  reader still waits on TASKS Step 51.
 
 - [x] **`Restart.from_files` widening.** Optional `from_files` list,
   distinct and non-empty — unblocks the VPIC per-rank restart manifest
@@ -265,9 +267,9 @@ items are noted; neither blocks a reader currently on TASKS.md.
 | VPIC (Step 35) — basic | ✅ per-rank file layout; ✅ restart `restore`/`mode` | v1.0.x ✅ |
 | VPIC (Step 35) — full per-rank restart manifest | ✅ `Restart.from_files` | v1.0.x ✅ |
 | ARMS (Step 36) | ✅ `[grid.stretched]` (spherical-r) — **schema only**; `load_config` now refuses such a deck (`UnsupportedGridError`) rather than mis-placing its cells, so the reader is still blocked on TASKS Step 51 | v1.0.x ✅ / runtime ❌ |
-| PLUTO, Athena++ (no step yet) | `[units]` velocity anchor for the MHD form (cleanup.md Phase 10 item 10); `[grid.stretched]` runtime (Step 51) | pending |
+| PLUTO, Athena++ (no step yet) | ✅ `[units]` velocity anchor — the v2.0 `explicit` form takes `reference_length` / `reference_mass_density` / `reference_velocity`, one-to-one with `UNIT_LENGTH` / `UNIT_DENSITY` / `UNIT_VELOCITY`; `[grid.stretched]` runtime for the logarithmic grid patches (Step 51) | v2.0 ✅ / runtime ❌ |
 | Entity SRPIC (no step yet) | `[grid.stretched]` runtime for QSpherical (Step 51) | pending |
-| Entity GRPIC (no step yet) | `[coordinates].metric` block + non-orthogonal operators (Step 52) | deferred |
+| Entity GRPIC (no step yet) | `[coordinates].metric` block + non-orthogonal operators (Step 53) | deferred |
 | WarpX, PIConGPU, Smilei (openPMD reader, Phase 1) | ✅ ED-PIC vocabulary; ✅ per-component stagger; ✅ `unitDimension`; openPMD docs mapping | v1.0.x ✅; Docs |
 | FBPIC (openPMD reader, Phase 2) | above + ✅ `thetaMode` geometry | v1.0.x ✅ |
 | Smilei collisional, EPOCH, OSIRIS-collisional, PIConGPU | ✅ `[[collisions]]` | v1.0.x ✅ |
