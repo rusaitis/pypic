@@ -250,7 +250,25 @@ Divergence uses `np.gradient`, which applies second-order central
 differences in the interior and second-order one-sided (forward/backward)
 stencils at the first and last grid points. This is *not* periodic
 wrapping — periodic domains should pad ghost cells before calling
-the diagnostic functions.
+the diagnostic functions, or reduce over the interior only.
+
+The size of the difference is easy to underestimate. On an analytically
+divergence-free periodic field
+$\mathbf{B} = (\sin x \cos y,\ -\cos x \sin y,\ 0)$ over a $32^3$ box,
+interior $\max|\nabla\cdot\mathbf{B}|$ is $1.9\times10^{-15}$ — roundoff —
+while the full-grid figure is $9.5\times10^{-3}$, because 18% of cells sit
+on a boundary face. Box-wide reductions are therefore dominated by the end
+planes rather than by the physics, which bites spectral and turbulence runs
+hardest: those are periodic by construction and their headline diagnostics
+are box-wide.
+
+When `[boundary_conditions]` marks an axis `periodic`, `compute()` warns
+once for the grid-dependent quantities (`div_B`, `div_E`, `curl_B_*`,
+`vort_*`) rather than returning a silently degraded edge. The warning names
+the axes; it is not a statement that the result is unusable, only that its
+end planes are. Wrapping the stencil is a roadmap item (TASKS Step 52) —
+`np.gradient` has no periodic mode, so it means `np.roll`-based central
+differences on the flagged axes.
 
 ### Co-located stencil
 

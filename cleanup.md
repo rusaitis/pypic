@@ -324,7 +324,7 @@ entirely from a fallback — documented, validated, never populated.
    gyrokinetic run can *describe* itself today even though no container holds
    its distribution function.
 
-4. - [ ] **Periodic domains get open-boundary stencils, and pypic already
+4. - [x] **Periodic domains get open-boundary stencils, and pypic already
    knows better.** `GridInfo.boundary` records `("periodic", ...)` per axis,
    and `grep` finds it **never read by any numerical code** — only validated
    (`grid.py:79`), sliced (`:165`), and serialized (`io/metadata.py`). Every
@@ -357,6 +357,40 @@ entirely from a fallback — documented, validated, never populated.
    Step 52 — `np.gradient` has no periodic mode, so it means `np.roll`-based
    central differences on flagged axes, which is a small kernel but a real
    numerical change that wants its own convergence tests.
+
+   **Landed at `compute.py`'s `needs_grid` branch only**, beside the existing
+   non-Cartesian and 1D raises — the single seam where a `GridInfo` is still
+   in scope before the spacings flatten to floats. Not pushed into
+   `operators.py` / `diagnostics.py`: those are public, and Step 52 will need
+   `boundary` *inside* them, so adding a kwarg now would reshape one public
+   signature twice to ship one feature.
+
+   **The `pypic validate` bypass is left open, deliberately.**
+   `cli/inspect.py` calls `max_div_b(..., *ds.grid.spacing)` directly, so it
+   does not warn. A second copy of the rule in a pretty-printer is not worth
+   it, and Step 52 closes the bypass for free by teaching the operators
+   themselves. If it wants covering sooner, the honest instrument is a report
+   line next to the number, not a stderr warning.
+
+   **Why the message names axes and never the quantity.** `compute("|vort|")`
+   fans out to three `vort_i` legs, each reaching the guard. Gating on
+   `_depth == 0` would go permanently silent there — `|vort|` itself is not a
+   grid-dependent recipe, so all three legs sit at depth >= 1. Identical text
+   from one call site instead lets CPython's warning registry collapse them,
+   with no module-level state to leak between tests. Under pytest all three
+   fire (the warnings plugin forces `always`), which is what makes
+   `pytest.warns` reliable.
+
+   **The guard is only as good as the readers that populate the field**, and
+   most do not. Only three sites ever set `GridInfo.boundary`:
+   `readers/config.py` (from `[boundary_conditions]`), `readers/_simple.py`,
+   and `readers/ipic3d/_config.py`. **BATSRUS parses periodicity and drops
+   it** — `readers/batsrus/_header.py:149-150` builds `is_periodic` from
+   `#PERIODIC` and nothing downstream reads it — so the committed fixture with
+   four `periodic` `#OUTERBOUNDARY` faces loads with `boundary=None` and stays
+   silent. Convenient here (no existing test trips `filterwarnings = error`)
+   and the next instance of the same bug class: wiring it through is its own
+   commit, because it would immediately make that fixture warn.
 
 5. - [ ] **Write the four invariants down.** They belong in
    `docs/architecture.md` next to "Readers produce `FieldDataset`", as one

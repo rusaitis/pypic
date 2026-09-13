@@ -175,6 +175,17 @@ The distribution is `pypic-plasma` on PyPI; the import name is `pypic`.
 
 ### Changed
 
+- `compute()` warns when a grid-dependent quantity (`div_B`, `div_E`,
+  `curl_B_*`, `vort_*`) is asked for on an axis `[boundary_conditions]` marks
+  `periodic`. `GridInfo.boundary` was recorded, serialized, and read by no
+  numerical code, while every operator went through `np.gradient` — which has
+  no periodic mode and falls back to a one-sided stencil at each end plane.
+  On an analytically divergence-free periodic field over a $32^3$ box,
+  interior $\max|\nabla\cdot\mathbf{B}|$ is $1.9\times10^{-15}$ against a
+  full-grid $9.5\times10^{-3}$, with 18% of cells on a boundary face — so
+  box-wide reductions were reporting the stencil, not the physics. The
+  interior is unchanged and still second-order; the warning names the axes.
+  Wrapping the stencil is TASKS Step 52.
 - `load_config` refuses a `[grid.stretched]` deck instead of dropping the
   section. The widths validated, reached `SimulationSchema.grid.stretched`,
   and were then discarded — so the deck loaded with one scalar spacing per

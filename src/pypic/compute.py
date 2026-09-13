@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import difflib
 import threading
+import warnings
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Any, assert_never
 
@@ -45,6 +46,7 @@ if TYPE_CHECKING:
     from collections.abc import Callable
 
     from pypic.dataset import FieldDataset
+    from pypic.grid import GridInfo
     from pypic.types import FloatArray
     from pypic.units import Normalization
 
@@ -202,6 +204,50 @@ def _append_species_params(
             assert_never(unreachable)
 
 
+def _warn_periodic_edges(grid: GridInfo) -> None:
+    r"""Warn when an axis the operators differentiate is tagged periodic.
+
+    ``np.gradient`` has no periodic mode: it falls back to a one-sided
+    stencil at the first and last point of every axis, so on a wrapped
+    axis the two end planes are wrong at $O(h)$ while the interior sits
+    at roundoff.  Measured on an analytically divergence-free field over
+    a $32^3$ periodic box, interior $\max|\nabla\cdot\mathbf{B}|$ is
+    1.9e-15 against a full-grid 9.5e-03, with 18% of cells on a boundary
+    face.  Wrapping the stencil is TASKS Step 52; until it lands, say so.
+
+    The text names axes and never the quantity, deliberately: the three
+    ``vort_i`` legs of one ``compute("|vort|")`` then produce the same
+    ``(text, category, lineno)`` from the same call site, which CPython's
+    warning registry collapses to a single message.  Gating on
+    ``_depth == 0`` instead would go permanently silent there, since
+    ``|vort|`` itself is not a grid-dependent recipe.
+
+    The tag vocabulary is free-form by design (the schema declines to
+    constrain it), so the comparison is case-insensitive.
+    """
+    if grid.boundary is None:
+        return
+    wrapped = [
+        name
+        for name, tag in zip(grid.surviving_axis_names, grid.boundary, strict=True)
+        if tag.strip().lower() == "periodic"
+    ]
+    if not wrapped:
+        return
+    warnings.warn(
+        f"Periodic boundary on {', '.join(wrapped)}: pypic's differential "
+        f"operators do not wrap. np.gradient falls back to a one-sided "
+        f"stencil at the first and last plane of every axis, so the interior "
+        f"of this result is second-order accurate and the two end planes on "
+        f"each periodic axis are not. Box-wide reductions (max, mean, energy) "
+        f"over the full array are dominated by those planes — reduce over the "
+        f"interior instead, or pad ghost cells before computing. See "
+        f"docs/conventions.md, 'Boundary treatment for finite differences'.",
+        UserWarning,
+        stacklevel=2,
+    )
+
+
 def _execute_recipe(
     canonical: str,
     dataset: FieldDataset,
@@ -272,6 +318,7 @@ def _execute_recipe(
                 f"Dataset grid is {len(dataset.grid.spacing)}D."
             )
             raise GeometryUnsupportedError(msg)
+        _warn_periodic_edges(dataset.grid)
         args.extend(dataset.grid.spacing)
         # Value-wise inert behind the Cartesian raise; keeps the
         # FieldDataset → recipe → operator path wired.

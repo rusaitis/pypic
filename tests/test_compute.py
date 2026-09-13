@@ -12,7 +12,7 @@ from pypic.compute import (
     register_recipe,
     unregister_recipe,
 )
-from pypic.coordinates.geometry import SPHERICAL
+from pypic.coordinates.geometry import CARTESIAN, SPHERICAL
 from pypic.dataset import FieldDataset
 from pypic.exceptions import UndeclaredNormalizationError, UnknownFieldError
 from pypic.grid import GridInfo
@@ -1188,6 +1188,56 @@ class TestFieldAlignedPythagoreanIdentity:
         np.testing.assert_allclose(
             a_par**2 + a_perp_mag**2, a_sq, rtol=1e-12, atol=1e-12
         )
+
+
+class TestPeriodicBoundaryWarning:
+    """`grid.boundary` is recorded and the operators cannot act on it.
+
+    ``np.gradient`` has no periodic mode, so a wrapped axis gets a
+    one-sided stencil at each end plane. Wrapping is TASKS Step 52; the
+    warning is what keeps the degradation from being silent until then.
+    """
+
+    @staticmethod
+    def _periodic_dataset(boundary):
+        shape = (4, 4, 4)
+        grid = GridInfo(
+            dimensions=shape,
+            spacing=(1.0, 1.0, 1.0),
+            geometry=CARTESIAN,
+            boundary=boundary,
+        )
+        data = {name: np.ones(shape) for name in ("B_1", "B_2", "B_3")}
+        return FieldDataset.from_arrays(data, grid, Normalization.identity())
+
+    def test_a_periodic_axis_warns(self):
+        ds = self._periodic_dataset(("periodic", "periodic", "periodic"))
+        with pytest.warns(UserWarning, match="do not wrap"):
+            compute_field("div_B", ds)
+
+    def test_the_warning_names_only_the_periodic_axes(self):
+        ds = self._periodic_dataset(("periodic", "open", "periodic"))
+        with pytest.warns(UserWarning, match=r"Periodic boundary on x, z\b"):
+            compute_field("div_B", ds)
+
+    def test_an_open_grid_is_silent(self):
+        """Bare call — `filterwarnings = ["error"]` makes this an assertion."""
+        ds = self._periodic_dataset(("open", "open", "open"))
+        compute_field("div_B", ds)
+
+    def test_an_unrecorded_boundary_is_silent(self):
+        ds = self._periodic_dataset(None)
+        compute_field("div_B", ds)
+
+    def test_a_tag_is_matched_case_insensitively(self):
+        """The schema leaves the BC vocabulary free-form on purpose."""
+        ds = self._periodic_dataset(("Periodic", "open", "open"))
+        with pytest.warns(UserWarning, match="do not wrap"):
+            compute_field("div_B", ds)
+
+    def test_a_quantity_that_needs_no_grid_does_not_warn(self):
+        ds = self._periodic_dataset(("periodic", "periodic", "periodic"))
+        compute_field("|B|", ds)
 
 
 class TestGeometryGuard:
