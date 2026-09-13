@@ -35,7 +35,7 @@ class SimulationRegistry:
     root : Path
         Directory whose immediate subdirectories are candidate
         simulations.  A subdirectory qualifies when it contains a file
-        named ``simulation.toml`` (the v1.0 schema's canonical config
+        named ``simulation.toml`` (the v2.0 schema's canonical config
         file name).
 
     Notes

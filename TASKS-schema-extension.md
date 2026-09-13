@@ -264,7 +264,10 @@ items are noted; neither blocks a reader currently on TASKS.md.
 | Vlasiator (Step 23) — lossless VDFs | ✅ `[velocity_mesh]`; ✅ `[phase_space]` | v1.0.x ✅ |
 | VPIC (Step 35) — basic | ✅ per-rank file layout; ✅ restart `restore`/`mode` | v1.0.x ✅ |
 | VPIC (Step 35) — full per-rank restart manifest | ✅ `Restart.from_files` | v1.0.x ✅ |
-| ARMS (Step 36) | ✅ `[grid.stretched]` (spherical-r) | v1.0.x ✅ |
+| ARMS (Step 36) | ✅ `[grid.stretched]` (spherical-r) — **schema only**; the runtime drops the section, so the reader is still blocked on TASKS Step 51 | v1.0.x ✅ / runtime ❌ |
+| PLUTO, Athena++ (no step yet) | `[units]` velocity anchor for the MHD form (cleanup.md Phase 10 item 10); `[grid.stretched]` runtime (Step 51) | pending |
+| Entity SRPIC (no step yet) | `[grid.stretched]` runtime for QSpherical (Step 51) | pending |
+| Entity GRPIC (no step yet) | `[coordinates].metric` block + non-orthogonal operators (Step 52) | deferred |
 | WarpX, PIConGPU, Smilei (openPMD reader, Phase 1) | ✅ ED-PIC vocabulary; ✅ per-component stagger; ✅ `unitDimension`; openPMD docs mapping | v1.0.x ✅; Docs |
 | FBPIC (openPMD reader, Phase 2) | above + ✅ `thetaMode` geometry | v1.0.x ✅ |
 | Smilei collisional, EPOCH, OSIRIS-collisional, PIConGPU | ✅ `[[collisions]]` | v1.0.x ✅ |

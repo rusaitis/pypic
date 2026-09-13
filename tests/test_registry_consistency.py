@@ -20,6 +20,8 @@ from __future__ import annotations
 
 import inspect
 
+from scipy import constants
+
 from pypic._aliases import (
     _COMPONENT_SUFFIXES,
     COMPUTE_ALIASES,
@@ -327,6 +329,13 @@ def test_all_per_species_prefixes_resolve() -> None:
     )
 
 
+# Under identity references the SI factor collapses to whatever constant
+# relates pypic's SI-rationalized code units (mu_0 = 1) to SI. That is 1 for
+# every quantity built from the references alone, and 1/mu_0 for the one
+# quantity whose code-unit form drops a vacuum constant: S = E x B.
+_IDENTITY_FACTORS: dict[str, float] = {"poynting_flux": 1.0 / constants.mu_0}
+
+
 def test_all_field_info_entries_have_si_factor() -> None:
     """Every metadata entry's quantity_type must resolve via si_factor()."""
     norm = Normalization.identity()
@@ -338,10 +347,11 @@ def test_all_field_info_entries_have_si_factor() -> None:
         except ValueError as e:
             failures.append(f"{name!r} (quantity_type={qtype!r}): {e}")
             continue
-        if factor != 1.0:
+        expected = _IDENTITY_FACTORS.get(qtype, 1.0)
+        if factor != expected:
             failures.append(
                 f"{name!r} (quantity_type={qtype!r}): "
-                f"identity().si_factor() returned {factor}, expected 1.0"
+                f"identity().si_factor() returned {factor}, expected {expected}"
             )
     assert not failures, _format_failures(
         "_FIELD_INFO entries with broken SI conversion",

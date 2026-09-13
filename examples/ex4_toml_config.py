@@ -26,7 +26,7 @@ NX, NY, NZ = 8, 6, 4
 
 TOML_CONTENT = """\
 [schema]
-version = "1.0"
+version = "2.0"
 
 [model]
 name = "test_code"
@@ -53,8 +53,8 @@ lower = ["periodic", "periodic", "periodic"]
 upper = ["periodic", "periodic", "periodic"]
 
 [units]
-system = "PIC"
-reference_density = 1.0e18
+anchor = "from_species"
+reference_number_density = 1.0e18
 reference_mass = 9.109e-31
 reference_charge = 1.602e-19
 speed_of_light = 2.998e8

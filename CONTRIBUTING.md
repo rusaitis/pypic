@@ -170,7 +170,7 @@ first; `readers/config.py` and `docs/schema.md` follow from it. Regenerate the
 bundled JSON Schema afterwards or CI will fail on the drift check:
 
 ```sh
-uv run pypic schema export -o src/pypic/schema/simulation.schema.v1.0.json
+uv run pypic schema export -o src/pypic/schema/simulation.schema.v2.0.json
 ```
 
 ## Commits and pull requests

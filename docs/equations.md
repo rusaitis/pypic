@@ -39,15 +39,22 @@ primitive.
 | `current_density` | $q_{ref} n_{ref} v_{ref}$ | A/m$^2$ | $J$ |
 | `frequency` | $1/t_{ref}$ | rad/s | $\omega_p$, $\omega_c$ |
 | `length` | $l_{ref}$ | m | $d_e$, $d_i$, $r_i$ |
-| `poynting_flux` | $E_{ref} B_{ref}$ | W/m$^2$ | $S$ (EM flux) |
+| `poynting_flux` | $E_{ref} B_{ref} / \mu_0$ | W/m$^2$ | $S$ (EM flux) |
 | `energy_flux` | $n_{ref} m_{ref} v_{ref}^3$ | W/m$^2$ | EF, KEF, HF, EHF, $q$ |
 | `power_density` | $n_{ref} m_{ref} v_{ref}^2 / t_{ref}$ | W/m$^3$ | $J \cdot E$ |
 
 `poynting_flux` and `energy_flux` share SI units (W/m$^2$) but differ
-in normalization: EM flux scales with field references ($E_{ref} B_{ref}$),
-particle energy flux with matter references ($n_{ref} m_{ref} v_{ref}^3$). In
-code units where $\mu_0 = 1$ these are equivalent; in SI the factor of
-$\mu_0$ separates them.
+in normalization: EM flux scales with field references, particle energy
+flux with matter references ($n_{ref} m_{ref} v_{ref}^3$).
+
+The $1/\mu_0$ on `poynting_flux` is what carries $\mathbf{S}$ from
+pypic's SI-rationalized code units, where `derived.poynting_flux`
+returns a bare $\mathbf{E} \times \mathbf{B}$, back to the SI
+$\mathbf{E} \times \mathbf{B} / \mu_0$. It follows from that definition
+alone. The two factors coincide whenever the reference set satisfies
+$B_{ref}^2 = \mu_0 n_{ref} m_{ref} v_{ref}^2$ — which the built-in
+constructors do by construction — but an independently chosen
+$B_{ref}$ need not, so the field-reference form is the one implemented.
 
 ## 1. Densities and Moments
 

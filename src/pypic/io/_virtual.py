@@ -102,9 +102,9 @@ def _read_metadata_from_h5(
                 mass_ref=float(n.attrs.get("mass_ref", 1.0)),
                 charge_ref=float(n.attrs.get("charge_ref", 1.0)),
                 # A group without the attr predates it and carried eight
-                # refs someone wrote down — declared, system unknown.
+                # refs someone wrote down — the explicit anchor.
                 system=(
-                    UnitSystem.CUSTOM
+                    UnitSystem.EXPLICIT
                     if raw_system is None
                     else UnitSystem(_as_text(raw_system))
                 ),
@@ -451,7 +451,7 @@ def to_icechunk_virtual(
         # pre-existing node.  Prior snapshots stay intact in repo
         # history; only this commit's root is replaced.
         session.store.sync_clear()
-        # Write virtual refs under ``/fields`` to match the schema-v1.0
+        # Write virtual refs under ``/fields`` to match the schema-v2.0
         # Zarr layout (schema.md §4.2): field arrays live under the
         # ``/fields`` child group, pypic metadata sits flat on the root
         # group's attrs.  ``from_zarr`` enforces both.

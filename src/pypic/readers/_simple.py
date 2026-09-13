@@ -44,6 +44,7 @@ from pypic.containers import SimulationConfig
 from pypic.coordinates.geometry import CARTESIAN, GEOMETRY_BY_NAME
 from pypic.grid import GridInfo
 from pypic.readers._base import ReaderBase
+from pypic.readers._config_helpers import normalize_fields
 from pypic.readers._protocols import score_signals
 from pypic.units import Normalization
 
@@ -334,14 +335,20 @@ class SimpleReader(ReaderBase):
         if is_custom:
             if canonical_set is not None:
                 field_data = {k: v for k, v in field_data.items() if k in canonical_set}
+            config = self._resolve_config(None, filepath)
             return self._finish(
-                field_data, step=step, config=self._resolve_config(None, filepath)
+                _to_code_units(field_data, config), step=step, config=config
             )
 
         with h5py.File(filepath, "r") as f:
             config = self._resolve_config(_read_grid_attrs(f), filepath)
             file_step, time = self._snapshot(f, step)
-        return self._finish(field_data, step=file_step, time=time, config=config)
+        return self._finish(
+            _to_code_units(field_data, config),
+            step=file_step,
+            time=time,
+            config=config,
+        )
 
     def _read_raw(
         self,
@@ -699,3 +706,18 @@ def _open_reader(
         fields_group=fields_group,
     )
     return reader, auto_config
+
+
+def _to_code_units(
+    fields: dict[str, FloatArray], config: SimulationConfig | None
+) -> dict[str, FloatArray]:
+    """Rescale SI-valued arrays when the deck says they are SI.
+
+    A generic HDF5 file carries no unit convention of its own, so
+    ``[units].data_in_si`` is the only thing that can say the numbers
+    are already in SI.  Without it the arrays are taken as code units,
+    which is what every reader before this flag assumed.
+    """
+    if config is None or not config.metadata.get("data_in_si", False):
+        return fields
+    return normalize_fields(fields, config.normalization)

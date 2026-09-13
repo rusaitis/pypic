@@ -239,7 +239,7 @@ def test_bundled_data_files_resolve_from_the_package() -> None:
     """
     from importlib.resources import files
 
-    schema = files("pypic.schema") / "simulation.schema.v1.0.json"
+    schema = files("pypic.schema") / "simulation.schema.v2.0.json"
     themes = files("pypic.plotting") / "themes"
     missing = [str(p) for p in (schema, themes) if not p.is_file() and not p.is_dir()]
     assert not missing, f"bundled data missing from the package: {missing}"

@@ -36,7 +36,7 @@ ON_DISK_SCHEMA = (
 def _build_toml(**overrides: object) -> str:
     """Return a minimal valid simulation.toml; pass ``key=None`` to drop a section."""
     sections: dict[str, str] = {
-        "schema": '[schema]\nversion = "1.0"\n',
+        "schema": '[schema]\nversion = "2.0"\n',
         "model": '[model]\nname = "demo"\ntype = "PIC"\n',
         "run": '[run]\nname = "r0"\n',
         "time": (
@@ -47,7 +47,7 @@ def _build_toml(**overrides: object) -> str:
             "[grid]\ndimensions = [4, 4, 4]\nspacing = [1.0, 1.0, 1.0]\n"
             "lower = [0.0, 0.0, 0.0]\nupper = [4.0, 4.0, 4.0]\n"
         ),
-        "units": '[units]\nsystem = "SI"\n',
+        "units": '[units]\nanchor = "si"\n',
         "coordinates": '[coordinates]\ngeometry = "cartesian"\nframe = "sim"\n',
         "species": '[[species]]\nname = "electrons"\ncharge = -1.0\nmass = 1.0\n',
     }
@@ -77,19 +77,17 @@ class TestSchemaValidateCli:
     def test_section_names_survive_rich_rendering(self, tmp_path: Path) -> None:
         """Validation messages name TOML sections, and rich eats brackets.
 
-        Unescaped, ``[units.reference]`` reads as a style tag and
-        disappears, leaving a message that begins mid-sentence and
-        never says which section is at fault.
+        Unescaped, ``[units]`` reads as a style tag and disappears,
+        leaving a message that begins mid-sentence and never says
+        which section is at fault.
         """
         path = tmp_path / "underdetermined.toml"
         path.write_text(
-            _build_toml(
-                units='[units]\nsystem = "custom"\n[units.reference]\nlength = 1.0'
-            )
+            _build_toml(units='[units]\nanchor = "explicit"\nreference_length = 1.0')
         )
         runner = CliRunner()
         result = runner.invoke(schema_app, ["validate", str(path)])
-        assert "[units.reference]" in result.output, result.output
+        assert "[units]" in result.output, result.output
 
     def test_syntactically_broken_toml_exits_two(self, tmp_path: Path) -> None:
         path = tmp_path / "syntax.toml"

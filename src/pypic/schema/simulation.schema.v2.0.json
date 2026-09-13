@@ -1,5 +1,5 @@
 {
-  "$comment": "Structural schema only. Generated from pypic.schema._models.SimulationSchema via pypic.schema._export.build_schema. Cross-field invariants (range checks on ensemble member_id, time scheme/dt/cfl rules, grid axis/upper-lower/stretched-widths/stagger checks, units.reference determining-set rule for system='custom', coordinate-transform BFS resolution, driver target precedence, restart.from existence, root-level cross-references to species, bodies, drivers, and collisions) are enforced at runtime by pypic.schema.validate_simulation_toml and are not expressible in JSON Schema. The v1.0 'x-*' extension namespace is permitted wherever additionalProperties is true.",
+  "$comment": "Structural schema only. Generated from pypic.schema._models.SimulationSchema via pypic.schema._export.build_schema. Cross-field invariants (range checks on ensemble member_id, time scheme/dt/cfl rules, grid axis/upper-lower/stretched-widths/stagger checks, units.reference determining-set rule for system='custom', coordinate-transform BFS resolution, driver target precedence, restart.from existence, root-level cross-references to species, bodies, drivers, and collisions) are enforced at runtime by pypic.schema.validate_simulation_toml and are not expressible in JSON Schema. The v2.0 'x-*' extension namespace is permitted wherever additionalProperties is true.",
   "$defs": {
     "Allocation": {
       "additionalProperties": false,
@@ -652,7 +652,7 @@
     },
     "Driver": {
       "additionalProperties": true,
-      "description": "One entry in ``[[drivers]]``.\n\nDrivers have a core set of v1.0 fields plus driver-type-specific\nkeys \u2014 extra keys allowed so individual driver types (magnetogram,\nsolar_wind_timeseries, pickup_ion_source, ...) don't need a model\nper type in v1.0.\n\nAn entry describes the *external input from this run's\nperspective*. For two-way coupling (``direction = \"two_way\"``),\nthe asymmetry is in information flow, not in physics: the peer\nrun, if pypic-aware, owns its own ``simulation.toml`` with its\nown ``[[drivers]]`` entry pointing back. ``[drivers.model]`` is\nwhere the peer's identity (name, type, url, description) lives;\npure data drivers (CSV, HDF5 timeseries) can omit the sub-table\nand use ``source`` alone.",
+      "description": "One entry in ``[[drivers]]``.\n\nDrivers have a core set of v2.0 fields plus driver-type-specific\nkeys \u2014 extra keys allowed so individual driver types (magnetogram,\nsolar_wind_timeseries, pickup_ion_source, ...) don't need a model\nper type in v2.0.\n\nAn entry describes the *external input from this run's\nperspective*. For two-way coupling (``direction = \"two_way\"``),\nthe asymmetry is in information flow, not in physics: the peer\nrun, if pypic-aware, owns its own ``simulation.toml`` with its\nown ``[[drivers]]`` entry pointing back. ``[drivers.model]`` is\nwhere the peer's identity (name, type, url, description) lives;\npure data drivers (CSV, HDF5 timeseries) can omit the sub-table\nand use ``source`` alone.",
       "properties": {
         "body": {
           "anyOf": [
@@ -1097,7 +1097,7 @@
     },
     "GridStretched": {
       "additionalProperties": false,
-      "description": "``[grid.stretched]`` \u2014 non-uniform per-axis cell widths.\n\nSparse, keyed by axis index as a string (``\"0\"`` / ``\"1\"`` / ``\"2\"``).\nOnly stretched axes appear; uniform axes inherit ``Grid.spacing``.\nPer-axis cell widths must sum to ``upper[i] - lower[i]`` and the\nlist length must equal ``dimensions[i]``; both invariants are\nenforced by ``Grid._check_axis_consistency``.\n\nAdopted to describe ARMS spherical-r stretches, PLUTO log-radial\ngrids, Athena++ stretched grids, and FLASH per-block-non-uniform\nlayouts losslessly. Kept additive so uniform documents validate\nunchanged. Metric-aware operators are out of scope for v1.0.x \u2014\nconsumers that need them should guard explicitly.",
+      "description": "``[grid.stretched]`` \u2014 non-uniform per-axis cell widths.\n\nSparse, keyed by axis index as a string (``\"0\"`` / ``\"1\"`` / ``\"2\"``).\nOnly stretched axes appear; uniform axes inherit ``Grid.spacing``.\nPer-axis cell widths must sum to ``upper[i] - lower[i]`` and the\nlist length must equal ``dimensions[i]``; both invariants are\nenforced by ``Grid._check_axis_consistency``.\n\nAdopted to describe ARMS spherical-r stretches, PLUTO log-radial\ngrids, Athena++ stretched grids, and FLASH per-block-non-uniform\nlayouts losslessly. Kept additive so uniform documents validate\nunchanged. Metric-aware operators are out of scope for v2.0.x \u2014\nconsumers that need them should guard explicitly.",
       "properties": {
         "axis_widths": {
           "additionalProperties": {
@@ -3061,7 +3061,7 @@
     },
     "Time": {
       "additionalProperties": false,
-      "description": "``[time]`` \u2014 temporal integration controls.\n\nScheme-specific keys are deliberately *not* modelled as a discriminated\nunion \u2014 the vocabulary is still settling and the cost of a wrong shape\nhere is low. v1.0 enforces only the cross-field invariants that are\nunambiguous:\n\n- fixed/subcycled require ``dt > 0`` (the integration step);\n- subcycled requires ``field_substeps`` (``dt_field`` is recommended\n  but advisory, not enforced);\n- adaptive omits ``dt`` (or accepts any non-negative value as a hint);\n  the runtime derives the first step from ``cfl`` / ``dt_min`` /\n  ``dt_max`` and owns CFL bookkeeping thereafter.\n\nA future v1.1 may formalise these as a discriminated union once codes\nconverge on a common spelling.",
+      "description": "``[time]`` \u2014 temporal integration controls.\n\nScheme-specific keys are deliberately *not* modelled as a discriminated\nunion \u2014 the vocabulary is still settling and the cost of a wrong shape\nhere is low. v2.0 enforces only the cross-field invariants that are\nunambiguous:\n\n- fixed/subcycled require ``dt > 0`` (the integration step);\n- subcycled requires ``field_substeps`` (``dt_field`` is recommended\n  but advisory, not enforced);\n- adaptive omits ``dt`` (or accepts any non-negative value as a hint);\n  the runtime derives the first step from ``cfl`` / ``dt_min`` /\n  ``dt_max`` and owns CFL bookkeeping thereafter.\n\nA future v1.1 may formalise these as a discriminated union once codes\nconverge on a common spelling.",
       "properties": {
         "cfl": {
           "anyOf": [
@@ -3171,82 +3171,23 @@
       ],
       "type": "object"
     },
-    "UnitsCustom": {
+    "UnitsExplicit": {
       "additionalProperties": false,
-      "description": "``[units]`` with ``system = \"custom\"``.",
+      "description": "``[units]`` with ``anchor = \"explicit\"`` \u2014 the length unit is given.\n\nCovers MHD, PLUTO/Athena++-class codes, gyrokinetics, and any\nhand-built reference set.  Three relations close the eight\nprimitives:\n\n$$v = l/t, \\qquad E = vB, \\qquad B = v\\sqrt{\\mu_0 n m}$$\n\nThe third ties the field, velocity and density scales together, so\na deck supplies `reference_length` plus **any two** of:\n\n- a velocity \u2014 `reference_velocity` or `reference_time`\n- a density \u2014 `reference_number_density` or `reference_mass_density`\n- a field \u2014 `reference_b_field` or `reference_e_field`\n\nand the third follows.  Supplying all three is legal: the relations\nthen describe rather than derive, which is what gyrokinetic decks\nneed, where $v \\neq l/t$ by $\\rho_*$ and $B^2 \\neq \\mu_0 n m v^2$ by\n$2/\\beta$ on purpose.  `Normalization.rationalization_ratio` reports\nthe result.\n\n**Duplicate spellings of one primitive are rejected; redundant\ndistinct primitives are accepted.**  Both density keys together is\nan error, because which unit a number carries would be ambiguous.\n`reference_b_field` with `reference_velocity` is fine \u2014 those are\ntwo different quantities, and a tolerance gate could not tell a\ndeliberate $2/\\beta$ from a typo anyway.\n\n`reference_mass` defaults to the proton mass whichever density\nspelling is used.  Keying the default off the spelling would make\ntwo decks describing one plasma disagree by $m_p/m_e$ in silence,\nwhich is the trap this form exists to remove.",
       "properties": {
-        "reference": {
-          "$ref": "#/$defs/UnitsReferenceTable"
-        },
-        "scaling_description": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Scaling Description"
-        },
-        "scaling_factor": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Scaling Factor"
-        },
-        "system": {
-          "const": "custom",
+        "anchor": {
+          "const": "explicit",
           "type": "string"
-        }
-      },
-      "required": [
-        "system",
-        "reference"
-      ],
-      "type": "object"
-    },
-    "UnitsMHD": {
-      "additionalProperties": false,
-      "description": "``[units]`` with ``system = \"MHD\"``.",
-      "properties": {
+        },
+        "data_in_si": {
+          "default": false,
+          "title": "Data In Si",
+          "type": "boolean"
+        },
         "reference_b_field": {
-          "exclusiveMinimum": 0,
-          "title": "Reference B Field",
-          "type": "number"
-        },
-        "reference_density": {
-          "exclusiveMinimum": 0,
-          "title": "Reference Density",
-          "type": "number"
-        },
-        "reference_length": {
-          "exclusiveMinimum": 0,
-          "title": "Reference Length",
-          "type": "number"
-        },
-        "scaling_description": {
           "anyOf": [
             {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Scaling Description"
-        },
-        "scaling_factor": {
-          "anyOf": [
-            {
+              "exclusiveMinimum": 0,
               "type": "number"
             },
             {
@@ -3254,25 +3195,8 @@
             }
           ],
           "default": null,
-          "title": "Scaling Factor"
+          "title": "Reference B Field"
         },
-        "system": {
-          "const": "MHD",
-          "type": "string"
-        }
-      },
-      "required": [
-        "system",
-        "reference_length",
-        "reference_density",
-        "reference_b_field"
-      ],
-      "type": "object"
-    },
-    "UnitsPIC": {
-      "additionalProperties": false,
-      "description": "``[units]`` with ``system = \"PIC\"``.",
-      "properties": {
         "reference_charge": {
           "anyOf": [
             {
@@ -3286,9 +3210,22 @@
           "default": null,
           "title": "Reference Charge"
         },
-        "reference_density": {
+        "reference_e_field": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reference E Field"
+        },
+        "reference_length": {
           "exclusiveMinimum": 0,
-          "title": "Reference Density",
+          "title": "Reference Length",
           "type": "number"
         },
         "reference_mass": {
@@ -3303,6 +3240,146 @@
           ],
           "default": null,
           "title": "Reference Mass"
+        },
+        "reference_mass_density": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reference Mass Density"
+        },
+        "reference_number_density": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reference Number Density"
+        },
+        "reference_time": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reference Time"
+        },
+        "reference_velocity": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reference Velocity"
+        },
+        "scaling_description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Scaling Description"
+        },
+        "scaling_factor": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Scaling Factor"
+        },
+        "speed_of_light": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Speed Of Light"
+        }
+      },
+      "required": [
+        "anchor",
+        "reference_length"
+      ],
+      "type": "object"
+    },
+    "UnitsFromSpecies": {
+      "additionalProperties": false,
+      "description": "``[units]`` with ``anchor = \"from_species\"`` \u2014 length from microphysics.\n\nThe form for codes that resolve a kinetic scale: PIC, hybrid, and\nanything else whose grid is measured in skin depths.  The length\nunit is *derived*, $l_{ref} = c/\\omega_{ref}$, from the reference\nspecies' plasma frequency \u2014 which is what distinguishes this form\nfrom `UnitsExplicit`, where length is given.\n\nThe velocity unit defaults to *c*, the PIC convention.  Hybrid codes\nnormalize to the Alfv\u00e9n speed instead and set `reference_velocity`\nto it, which makes $B_{ref}$ the field at which $v_A$ equals that\nspeed and lands the time unit on the inverse ion cyclotron\nfrequency, via $d_i \\Omega_{ci} = v_A$.",
+      "properties": {
+        "anchor": {
+          "const": "from_species",
+          "type": "string"
+        },
+        "data_in_si": {
+          "default": false,
+          "title": "Data In Si",
+          "type": "boolean"
+        },
+        "reference_charge": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reference Charge"
+        },
+        "reference_mass": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reference Mass"
+        },
+        "reference_number_density": {
+          "exclusiveMinimum": 0,
+          "title": "Reference Number Density",
+          "type": "number"
         },
         "reference_species": {
           "default": "electrons",
@@ -3358,122 +3435,27 @@
           ],
           "default": null,
           "title": "Speed Of Light"
-        },
-        "system": {
-          "const": "PIC",
-          "type": "string"
         }
       },
       "required": [
-        "system",
-        "reference_density"
-      ],
-      "type": "object"
-    },
-    "UnitsReferenceTable": {
-      "additionalProperties": false,
-      "description": "``[units.reference]`` sub-table for ``system = \"custom\"``.\n\nKeys left out are derived from the two dimensional relations that\ntie the eight references together, $v = l / t$ and $E = v B$, so a\ndeck supplies one of each coupled pair rather than all eight.\n``mass`` and ``charge`` fall back to the electron values.\n\nWhat cannot be derived must be given: a normalization that leaves\nthe magnetic or the density anchor unknown has no SI meaning, and\nguessing one would return code units labelled as tesla.",
-      "properties": {
-        "b_field": {
-          "anyOf": [
-            {
-              "exclusiveMinimum": 0,
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "B Field"
-        },
-        "charge": {
-          "anyOf": [
-            {
-              "exclusiveMinimum": 0,
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null
-        },
-        "density": {
-          "anyOf": [
-            {
-              "exclusiveMinimum": 0,
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null
-        },
-        "e_field": {
-          "anyOf": [
-            {
-              "exclusiveMinimum": 0,
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "E Field"
-        },
-        "length": {
-          "exclusiveMinimum": 0,
-          "type": "number"
-        },
-        "mass": {
-          "anyOf": [
-            {
-              "exclusiveMinimum": 0,
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null
-        },
-        "time": {
-          "anyOf": [
-            {
-              "exclusiveMinimum": 0,
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null
-        },
-        "velocity": {
-          "anyOf": [
-            {
-              "exclusiveMinimum": 0,
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null
-        }
-      },
-      "required": [
-        "length"
+        "anchor",
+        "reference_number_density"
       ],
       "type": "object"
     },
     "UnitsSI": {
       "additionalProperties": false,
-      "description": "``[units]`` with ``system = \"SI\"`` \u2014 already SI; no refs needed.",
+      "description": "``[units]`` with ``anchor = \"si\"`` \u2014 SI data with no code-unit anchor.\n\nAll eight references are 1.0, so conversion is a no-op.  That makes\nelectromagnetic quantities unsafe: `pypic.derived` computes in\nSI-rationalized units where $\\mu_0 = 1$, and SI data has\n$\\mu_0 = 1.2566\\times10^{-6}$, so anything carrying a vacuum\nconstant is wrong by a power of it.\n\nA deck that wants its SI arrays computed on correctly declares a\nreal anchor and sets ``data_in_si`` instead.",
       "properties": {
+        "anchor": {
+          "const": "si",
+          "type": "string"
+        },
+        "data_in_si": {
+          "default": false,
+          "title": "Data In Si",
+          "type": "boolean"
+        },
         "scaling_description": {
           "anyOf": [
             {
@@ -3498,13 +3480,22 @@
           "default": null,
           "title": "Scaling Factor"
         },
-        "system": {
-          "const": "SI",
-          "type": "string"
+        "speed_of_light": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Speed Of Light"
         }
       },
       "required": [
-        "system"
+        "anchor"
       ],
       "type": "object"
     },
@@ -3525,10 +3516,10 @@
       "type": "array"
     }
   },
-  "$id": "https://pypic.dev/schemas/simulation/v1.0.json",
+  "$id": "https://pypic.dev/schemas/simulation/v2.0.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": true,
-  "description": "Root model for a pypic simulation.toml v1.0 document.\n\nRequired top-level sections per v1.0:\n    [schema], [model], [run], [time], [grid], [units],\n    [coordinates], and at least one [[species]] entry.\n\nOptional sections may be omitted entirely.\n\nExtension policy at root: unknown keys must start with ``x-`` or\n``x_``. Known optional sections that are present are strictly\nvalidated.\n\n``[schema].version`` is the single discriminator for both the\nTOML config and the on-disk vocabulary it describes; v1.x is\nadditive-only per ``schema.md`` \u00a71 *Versioning*.",
+  "description": "Root model for a pypic simulation.toml v2.0 document.\n\nRequired top-level sections per v2.0:\n    [schema], [model], [run], [time], [grid], [units],\n    [coordinates], and at least one [[species]] entry.\n\nOptional sections may be omitted entirely.\n\nExtension policy at root: unknown keys must start with ``x-`` or\n``x_``. Known optional sections that are present are strictly\nvalidated.\n\n``[schema].version`` is the single discriminator for both the\nTOML config and the on-disk vocabulary it describes; v1.x is\nadditive-only per ``schema.md`` \u00a71 *Versioning*.",
   "properties": {
     "bodies": {
       "items": {
@@ -3648,25 +3639,21 @@
     "units": {
       "discriminator": {
         "mapping": {
-          "MHD": "#/$defs/UnitsMHD",
-          "PIC": "#/$defs/UnitsPIC",
-          "SI": "#/$defs/UnitsSI",
-          "custom": "#/$defs/UnitsCustom"
+          "explicit": "#/$defs/UnitsExplicit",
+          "from_species": "#/$defs/UnitsFromSpecies",
+          "si": "#/$defs/UnitsSI"
         },
-        "propertyName": "system"
+        "propertyName": "anchor"
       },
       "oneOf": [
         {
-          "$ref": "#/$defs/UnitsPIC"
+          "$ref": "#/$defs/UnitsFromSpecies"
         },
         {
-          "$ref": "#/$defs/UnitsMHD"
+          "$ref": "#/$defs/UnitsExplicit"
         },
         {
           "$ref": "#/$defs/UnitsSI"
-        },
-        {
-          "$ref": "#/$defs/UnitsCustom"
         }
       ]
     }
@@ -3681,6 +3668,6 @@
     "coordinates",
     "species"
   ],
-  "title": "pypic simulation.toml v1.0",
+  "title": "pypic simulation.toml v2.0",
   "type": "object"
 }

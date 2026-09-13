@@ -145,7 +145,7 @@ def export_bundle(
     --------
     >>> bundle = export_bundle()
     >>> bundle["schemaVersion"]
-    '1.0'
+    '2.0'
     >>> sorted(bundle)  # doctest: +NORMALIZE_WHITESPACE
     ['computeAliases', 'fields', 'groupAliases', 'jsonSchema', 'recipes',
      'schemaVersion', 'speciesSuffixRe', 'speciesTemplates']

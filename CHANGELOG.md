@@ -11,12 +11,39 @@ The distribution is `pypic-plasma` on PyPI; the import name is `pypic`.
 
 ### Added
 
-- `pypic.UnitSystem` and `Normalization.system`: which normalization system
-  a `Normalization` came from (`PIC` / `MHD` / `SI` / `custom`), or `None`
+- `[units].data_in_si` — the second, orthogonal axis. `anchor` says how the
+  references were closed; `data_in_si` says whether the arrays on disk are
+  already SI, and asks the reader to rescale them on load. These were one
+  field before 2.0, which is why SI-emitting codes had no way to name an
+  anchor and so no way to be normalized correctly: a Vlasiator-shaped deck
+  now returns hand-checked SI for `v_A` and `e_B` where it was previously
+  wrong by $\sqrt{\mu_0}$ and $\mu_0$. Readers whose format fixes its own
+  unit convention (OpenGGCM, BATSRUS, iPIC3D) convert at their own boundary
+  and ignore it; it is for the generic path, where the deck is the only thing
+  that knows.
+- `Normalization.rationalization_ratio`: $B_{ref}^2 / (\mu_0 n_{ref} m_{ref}
+  v_{ref}^2)$, the number that says which code-unit convention a reference set
+  implies. `pypic.derived` computes in SI-rationalized units throughout, which
+  holds exactly when the ratio is 1; other values name other conventions
+  ($1/\mu_0$ for data already in SI, $(c_{SI}/c_{ref})^2$ for a reduced speed
+  of light, $2/\beta$ for gyrokinetic gyro-Bohm). Reported, not enforced — the
+  last two are deliberate physics.
+- `[units].speed_of_light` set below $c$ now warns. It scales the velocity unit
+  but not $B_{ref} = m\omega/q$, so it silently moved the ratio to
+  $(c_{SI}/c_{ref})^2$ and every EM conversion with it — magnetic energy
+  density on a $c/10$ deck was wrong by 100×. The warning names the two honest
+  spellings: `reference_velocity` for a genuinely different velocity unit,
+  `scaling_factor` / `scaling_description` for a dimensionless modelling choice.
+- `Normalization.si_factor` resolves all eight storage primitives, so
+  `"mass"` and `"charge"` — and with them `SpeciesInfo.mass` — have a route to
+  SI for the first time. `normalize` and `to_si` take the same eight.
+- `pypic.UnitSystem` and `Normalization.system`: how a `Normalization`'s
+  references were anchored (`from_species` / `explicit` / `si`), or `None`
   when no `[units]` section declared one. `Normalization.undeclared()`
   constructs that undeclared state. The value round-trips through Zarr
   stores and the Arrow wire as `attrs.normalization.system`; a store written
-  before the key existed decodes as `custom`, keeping its current meaning.
+  before the key existed decodes as `explicit`, the honest reading of a
+  reference set someone stated in full.
 - `pypic.UndeclaredNormalizationError`: raised by `Normalization.si_factor`
   (and so by `in_si`, `in_units` and `field_si_factor`) when a dimensional
   quantity is converted under an undeclared normalization. A subclass of
@@ -49,6 +76,15 @@ The distribution is `pypic-plasma` on PyPI; the import name is `pypic`.
 
 ### Fixed
 
+- `in_si` / `in_units` on Poynting flux were too small by a factor of $\mu_0$
+  (~$1.3\times10^{-6}$). pypic's code units are SI-rationalized, so
+  `derived.poynting_flux` returns a bare $\mathbf{E}\times\mathbf{B}$ and the
+  SI factor owed a $1/\mu_0$ that it did not carry. A correction, not a
+  migration: previously published numbers for `S_1` / `S_2` / `S_3` in SI or
+  display units are wrong by that factor. Code units are unaffected, as are
+  all other quantities. The test that should have caught it pinned the factor
+  as the implementation restated; it now asserts $\mathbf{E}\times\mathbf{B}/\mu_0$
+  against hand-computed SI inputs.
 - 3D field lines coloured by a compound quantity (pressure, temperature,
   energy density, ...) with `units=` set raised `Unknown quantity`: the
   pyvista path converted through `Normalization.to_si`, which resolves only
@@ -115,6 +151,57 @@ The distribution is `pypic-plasma` on PyPI; the import name is `pypic`.
 
 ### Changed
 
+- **`simulation.toml` is now schema 2.0, and `[units]` is the whole break.**
+  `[units].system` becomes `[units].anchor`, and the four code-type-shaped
+  values collapse to three anchor forms named for how the eight SI references
+  are actually closed:
+
+  | v1.0 | v2.0 |
+  |---|---|
+  | `system = "PIC"` | `anchor = "from_species"` — length derived from a species' plasma frequency |
+  | `system = "MHD"` | `anchor = "explicit"` — length given |
+  | `system = "custom"` + `[units.reference]` sub-table | `anchor = "explicit"` with flat `reference_*` keys |
+  | `system = "SI"` | `anchor = "si"` |
+
+  The `MHD` form was a strict special case of `custom` once the third
+  relation $B = v\sqrt{\mu_0 n m}$ is known, so it is gone rather than
+  renamed: `Normalization.mhd_standard` is reproduced bit-for-bit by an
+  `explicit` deck. `explicit` takes `reference_length` plus **any two** of a
+  velocity, a density and a field; the third follows. Over-supplying is legal
+  and is how gyrokinetic decks state a deliberately inconsistent set.
+
+  Three defects go with it. `reference_density` meant m⁻³ under `PIC` and
+  kg/m³ under `MHD` — one key, two units — and is now
+  `reference_number_density` / `reference_mass_density`. The same concept had
+  two spellings (`reference_length` versus the nested `[units.reference].length`)
+  and now has one. And PLUTO-class decks (`UNIT_LENGTH` / `UNIT_DENSITY` /
+  `UNIT_VELOCITY`) could not validate at all — they were rejected as
+  underdetermined for a $B_{ref}$ that the deck already implied.
+
+  `[model].type` is untouched. It was never the duplicate: the two fields
+  simply shared a vocabulary while meaning different things, so a hybrid deck
+  read as the contradiction `type = "hybrid"`, `system = "PIC"`.
+
+  On-disk stores bump with the validator. The store key stays `system` — it
+  names the Python attribute, not the TOML key — but its *values* are the new
+  vocabulary, so pre-2.0 stores are not read. Regenerate them.
+- `UnitSystem` members are `FROM_SPECIES` / `EXPLICIT` / `SI`, values
+  `"from_species"` / `"explicit"` / `"si"`. `Normalization.pic_standard`
+  stamps `FROM_SPECIES`, `mhd_standard` and the hand-built default stamp
+  `EXPLICIT`. The Python constructors themselves are unchanged.
+- `Normalization.summary()` reports the rationalization ratio when it is not
+  1, so `pypic info` says when a deck is not SI-rationalized.
+- SI conversion factors are declared as integer exponents over the eight
+  references plus an explicit power of $\mu_0$, replacing sixteen hand-written
+  lambdas. Every factor pypic needs was already a monomial in those references,
+  so this loses nothing and buys the invariant that was missing: composing the
+  exponents with each reference's own SI dimension must reproduce the openPMD
+  `unitDimension` 7-tuple registered for that quantity. The two tables encoded
+  the same physics in two notations with nothing relating them, which is how
+  the Poynting factor above stayed wrong. Recording $\mu_0$ as a power rather
+  than a bare number is what makes the check possible. Values are unchanged to
+  within 4.3e-16 relative (~2 ULP over 2000 random normalizations) — `math.prod`
+  associates in reference order where the lambdas associated as written.
 - **SI conversion now fails loud when no unit system was declared.** A reader
   that finds no `simulation.toml` used to hand back `Normalization.identity()`,
   which is indistinguishable from a declared `[units] system = "SI"`: `in_si`
@@ -197,6 +284,14 @@ The distribution is `pypic-plasma` on PyPI; the import name is `pypic`.
   `customize`. Themes still pickle and deep-copy.
 
 ### Removed
+
+- `UnitsPIC`, `UnitsMHD`, `UnitsCustom` and `UnitsReferenceTable` from
+  `pypic.schema`. Replaced by `UnitsFromSpecies` and `UnitsExplicit`; the
+  nested `[units.reference]` sub-table no longer exists.
+- `UnitSystem.PIC`, `UnitSystem.MHD` and `UnitSystem.CUSTOM`.
+- `src/pypic/schema/simulation.schema.v1.0.json`, replaced by
+  `simulation.schema.v2.0.json`. `get_schema_path()` defaults to the new
+  version; a caller pinning `get_schema_path("1.0")` gets a missing file.
 
 - `pypic.readers.ipic3d.to_toml`: unused, untested, and it emitted a document
   the schema rejects (`n_steps = 0`).

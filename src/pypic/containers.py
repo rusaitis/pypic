@@ -145,10 +145,10 @@ class SimulationConfig:
         Validated ``[coordinates.transforms]`` entries, keyed by
         target-frame name. Chains resolve breadth-first from *frame*.
     initial_conditions : InitialConditions | None
-        Validated ``[initial_conditions]`` object from the v1.0 schema,
+        Validated ``[initial_conditions]`` object from the v2.0 schema,
         or ``None`` when the section is absent.
     output : Output | None
-        Validated ``[output]`` umbrella object from the v1.0 schema, or
+        Validated ``[output]`` umbrella object from the v2.0 schema, or
         ``None`` when the section is absent.
     bodies : tuple[Body, ...]
         Validated ``[[bodies]]`` registry — planets, stars, coils.

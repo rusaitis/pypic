@@ -84,7 +84,7 @@ Its subcommands feed the cross-language codegen described in
 
 ```sh
 pypic schema validate path/to/simulation.toml
-pypic schema export -o src/pypic/schema/simulation.schema.v1.0.json
+pypic schema export -o src/pypic/schema/simulation.schema.v2.0.json
 ```
 
 ## Server

@@ -574,7 +574,7 @@ class TestSimulationTomlReachesDataset:
 
     TOML = """\
 [schema]
-version = "1.0"
+version = "2.0"
 
 [model]
 name = "BATSRUS"
@@ -596,9 +596,9 @@ lower = [-8.0, -8.0]
 upper = [8.0, 8.0]
 
 [units]
-system = "MHD"
+anchor = "explicit"
 reference_length = 6.371e6
-reference_density = 1.67e-17
+reference_mass_density = 1.67e-17
 reference_b_field = 5.0e-9
 
 [coordinates]

@@ -42,7 +42,7 @@ COMPOUND_QUANTITIES: tuple[str, ...] = (
     "power_density",
     "four_velocity",
 )
-"""Compound quantities that ``si_factor`` resolves (units.py:_COMPOUND_FACTORS)."""
+"""Compound quantities that ``si_factor`` resolves (units.py:_SI_FACTORS)."""
 
 
 def base_quantities() -> st.SearchStrategy[str]:

@@ -4,7 +4,7 @@
 # reader generates this from native iPIC3D parameters.
 
 [schema]
-version = "1.0"
+version = "2.0"
 created = 2026-04-24
 
 [model]
@@ -34,9 +34,9 @@ lower = ["periodic", "periodic", "periodic"]
 upper = ["periodic", "periodic", "periodic"]
 
 [units]
-system            = "PIC"
+anchor            = "from_species"     # length unit is the electron skin depth
 reference_species = "electrons"        # this run is electron-normalized
-reference_density = 1.0e18             # m⁻³ — a chosen anchor, not recoverable from the .inp
+reference_number_density = 1.0e18      # m⁻³ — a chosen anchor, not recoverable from the .inp
 
 [coordinates]
 geometry = "cartesian"

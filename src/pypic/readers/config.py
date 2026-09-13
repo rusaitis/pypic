@@ -1,7 +1,7 @@
 """Load simulation configuration from a TOML file.
 
 The Pydantic validator in [`pypic.schema`][pypic.schema] is the authoritative
-source of the v1.0 schema — this module is a thin translator from a
+source of the v2.0 schema — this module is a thin translator from a
 validated [`SimulationSchema`][pypic.schema.SimulationSchema] to the internal
 dataclasses ([`SimulationConfig`][pypic.containers.SimulationConfig], `GridInfo`,
 `Normalization`, `SpeciesInfo`). All shape validation
@@ -12,6 +12,8 @@ from __future__ import annotations
 
 import copy
 import logging
+import math
+import warnings
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -24,10 +26,8 @@ from pypic.coordinates.transforms import FrameTransform
 from pypic.grid import GridInfo
 from pypic.schema import (
     SimulationSchema,
-    UnitsCustom,
-    UnitsMHD,
-    UnitsPIC,
-    UnitsReferenceTable,
+    UnitsExplicit,
+    UnitsFromSpecies,
     UnitsSI,
     validate_simulation_toml,
 )
@@ -198,7 +198,7 @@ def apply_physical_extent(
 def load_config(path: Path) -> SimulationConfig:
     """Parse a ``simulation.toml`` file into a SimulationConfig.
 
-    Validates the file against the v1.0 schema
+    Validates the file against the v2.0 schema
     ([`pypic.schema`][pypic.schema]) and builds the internal `SimulationConfig`
     from the result.  The raw TOML text is captured and attached to
     ``metadata["simulation_toml"]`` so downstream FieldDataset writers
@@ -210,7 +210,7 @@ def load_config(path: Path) -> SimulationConfig:
     Parameters
     ----------
     path : Path
-        Path to a TOML file conforming to the v1.0 schema.
+        Path to a TOML file conforming to the v2.0 schema.
 
     Returns
     -------
@@ -316,45 +316,80 @@ def _build_grid(
 def _build_normalization(units: Units) -> Normalization:
     if isinstance(units, UnitsSI):
         return Normalization.identity()
-    if isinstance(units, UnitsPIC):
-        return _pic_norm(units)
-    if isinstance(units, UnitsMHD):
-        return Normalization.mhd_standard(
-            reference_length=float(units.reference_length),
-            reference_density=float(units.reference_density),
-            reference_b_field=float(units.reference_b_field),
-        )
-    if isinstance(units, UnitsCustom):
-        return _custom_norm(units.reference)
+    if isinstance(units, UnitsFromSpecies):
+        return _from_species_norm(units)
+    if isinstance(units, UnitsExplicit):
+        return _explicit_norm(units)
     raise TypeError(f"unsupported units variant: {type(units).__name__}")
 
 
-def _custom_norm(ref: UnitsReferenceTable) -> Normalization:
-    """Build a Normalization from a partially-specified reference table.
+def _explicit_norm(units: UnitsExplicit) -> Normalization:
+    r"""Close the eight references from an explicitly anchored deck.
 
-    Fills the gaps through $v = l / t$ and $E = v B$, and falls back to
-    the electron mass and elementary charge.  `UnitsReferenceTable`
-    guarantees one of each coupled pair is present, so every branch
-    below resolves.
+    `reference_length` plus any two of the velocity / density / field
+    scales; $B = v\sqrt{\mu_0 \rho_m}$ closes the third, alongside
+    $v = l/t$ and $E = vB$.  Values the deck supplies are used as given
+    — the relations fill gaps, they never adjudicate between two
+    numbers a deck states itself, so an over-supplied (gyrokinetic)
+    set arrives verbatim and `Normalization.rationalization_ratio`
+    reports what it means.
 
-    Values supplied explicitly are used as given: the relations close
-    gaps, they do not adjudicate between primitives a deck states
-    itself.  The reference table in docs/schema.md is internally
-    consistent only to the rounding of its printed digits.
+    Mass density is the form the relation actually uses.  A deck that
+    gives $\rho_m$ has it used directly rather than routed through
+    $n = \rho_m/m$ and multiplied back: that round trip is not
+    bit-exact for ~3% of double-precision mass densities.
     """
-    length = float(ref.length)
-    if ref.velocity is not None:
-        velocity = float(ref.velocity)
-    else:
-        # Guaranteed non-None by UnitsReferenceTable._check_determined.
-        velocity = length / float(ref.time)  # type: ignore[arg-type]
-    time = float(ref.time) if ref.time is not None else length / velocity
+    length = float(units.reference_length)
+    mass = (
+        float(units.reference_mass)
+        if units.reference_mass is not None
+        else constants.m_p
+    )
+    charge = (
+        float(units.reference_charge)
+        if units.reference_charge is not None
+        else constants.e
+    )
 
-    if ref.b_field is not None:
-        b_field = float(ref.b_field)
-    else:
-        b_field = float(ref.e_field) / velocity  # type: ignore[arg-type]
-    e_field = float(ref.e_field) if ref.e_field is not None else velocity * b_field
+    mass_density: float | None = None
+    if units.reference_mass_density is not None:
+        mass_density = float(units.reference_mass_density)
+    elif units.reference_number_density is not None:
+        mass_density = float(units.reference_number_density) * mass
+
+    velocity: float | None = None
+    if units.reference_velocity is not None:
+        velocity = float(units.reference_velocity)
+    elif units.reference_time is not None:
+        velocity = length / float(units.reference_time)
+
+    b_field: float | None = None
+    if units.reference_b_field is not None:
+        b_field = float(units.reference_b_field)
+    elif units.reference_e_field is not None and velocity is not None:
+        b_field = float(units.reference_e_field) / velocity
+
+    velocity, b_field, mass_density = _close_third_scale(
+        velocity,
+        b_field,
+        mass_density,
+        e_field=(
+            float(units.reference_e_field)
+            if units.reference_e_field is not None
+            else None
+        ),
+    )
+
+    time = (
+        float(units.reference_time)
+        if units.reference_time is not None
+        else length / velocity
+    )
+    e_field = (
+        float(units.reference_e_field)
+        if units.reference_e_field is not None
+        else velocity * b_field
+    )
 
     return Normalization(
         length_ref=length,
@@ -362,13 +397,45 @@ def _custom_norm(ref: UnitsReferenceTable) -> Normalization:
         velocity_ref=velocity,
         b_field_ref=b_field,
         e_field_ref=e_field,
-        density_ref=float(ref.density),  # type: ignore[arg-type]
-        mass_ref=float(ref.mass) if ref.mass is not None else constants.m_e,
-        charge_ref=float(ref.charge) if ref.charge is not None else constants.e,
+        density_ref=mass_density / mass,
+        mass_ref=mass,
+        charge_ref=charge,
     )
 
 
-def _pic_norm(units: UnitsPIC) -> Normalization:
+def _close_third_scale(
+    velocity: float | None,
+    b_field: float | None,
+    mass_density: float | None,
+    *,
+    e_field: float | None,
+) -> tuple[float, float, float]:
+    r"""Solve $B = v\sqrt{\mu_0 \rho_m}$ for whichever scale is missing.
+
+    `UnitsExplicit` guarantees at most one of the three is absent, so
+    every branch resolves.  The last case is the deck that anchors on
+    $E$ with no velocity: substituting $E = vB$ leaves
+    $v = \sqrt{E / \sqrt{\mu_0 \rho_m}}$.
+    """
+    if velocity is not None and mass_density is not None and b_field is None:
+        b_field = velocity * math.sqrt(constants.mu_0 * mass_density)
+    elif b_field is not None and mass_density is not None and velocity is None:
+        velocity = b_field / math.sqrt(constants.mu_0 * mass_density)
+    elif velocity is not None and b_field is not None and mass_density is None:
+        mass_density = b_field**2 / (constants.mu_0 * velocity**2)
+    elif mass_density is not None and velocity is None and e_field is not None:
+        velocity = math.sqrt(e_field / math.sqrt(constants.mu_0 * mass_density))
+        b_field = velocity * math.sqrt(constants.mu_0 * mass_density)
+
+    if velocity is None or b_field is None or mass_density is None:
+        raise TypeError(
+            "[units] anchor = 'explicit' reached the loader underdetermined; "
+            "UnitsExplicit._check_determined should have refused it"
+        )
+    return velocity, b_field, mass_density
+
+
+def _from_species_norm(units: UnitsFromSpecies) -> Normalization:
     species_name = units.reference_species.lower()
     defaults = _DEFAULT_SPECIES_PARAMS.get(species_name)
     default_mass, default_charge = defaults if defaults is not None else (None, None)
@@ -379,7 +446,8 @@ def _pic_norm(units: UnitsPIC) -> Normalization:
         mass = default_mass
     else:
         raise ValueError(
-            f"[units] PIC: unknown reference species {species_name!r} — "
+            f"[units] anchor = 'from_species': unknown species "
+            f"{species_name!r} — "
             f"'reference_mass' is required"
         )
 
@@ -389,7 +457,8 @@ def _pic_norm(units: UnitsPIC) -> Normalization:
         charge = default_charge
     else:
         raise ValueError(
-            f"[units] PIC: unknown reference species {species_name!r} — "
+            f"[units] anchor = 'from_species': unknown species "
+            f"{species_name!r} — "
             f"'reference_charge' is required"
         )
 
@@ -399,8 +468,41 @@ def _pic_norm(units: UnitsPIC) -> Normalization:
         if units.reference_velocity is not None
         else None
     )
-    return Normalization.pic_standard(
-        float(units.reference_density), mass, charge, c, velocity
+    norm = Normalization.pic_standard(
+        float(units.reference_number_density), mass, charge, c, velocity
+    )
+    _warn_if_not_rationalized(norm, units)
+    return norm
+
+
+def _warn_if_not_rationalized(norm: Normalization, units: UnitsFromSpecies) -> None:
+    r"""Warn when `speed_of_light` has pulled the deck off mu_0 = 1.
+
+    Scaling *c* moves the velocity unit but not $B_{ref} = m\,\omega/q$, so
+    the ratio lands on $(c_{SI}/c_{ref})^2$ and every EM conversion is wrong
+    by it.  Warn rather than raise: a deck that never asks for an EM quantity
+    is unharmed, and the two honest spellings are cheap to name.
+
+    The 1% tolerance separates a rounded *c* from a rescaled one. Decks
+    write `2.998e8`, which lands the ratio at 0.99995; the smallest
+    reduction anyone actually runs is a few percent, which lands it past
+    1.1. Nothing sits in between.
+    """
+    ratio = norm.rationalization_ratio
+    if units.speed_of_light is None or math.isclose(ratio, 1.0, rel_tol=1e-2):
+        return
+    warnings.warn(
+        f"[units] speed_of_light = {units.speed_of_light:.4g} m/s puts the "
+        f"rationalization ratio B_ref^2 / (mu_0 n_ref m_ref v_ref^2) at "
+        f"{ratio:.6g}, not 1. pypic computes in SI-rationalized code units, so "
+        f"every electromagnetic quantity (e_B, e_E, v_A, beta, Poynting flux) "
+        f"converts to SI wrong by a power of that number. Say which you meant: "
+        f"a different velocity unit is 'reference_velocity'; a dimensionless "
+        f"modelling choice (c/v_A reduced, mass ratio lowered) is "
+        f"'scaling_factor' / 'scaling_description', which do not affect "
+        f"computation.",
+        UserWarning,
+        stacklevel=2,
     )
 
 
@@ -432,7 +534,7 @@ def _build_species(sp: Species) -> SpeciesInfo:
 def _build_physics(physics: Physics | None) -> PhysicsParams:
     # PhysicsParams.c is the speed of light in *normalized* units: 1.0 by
     # construction for PIC (velocity_ref = c_SI).  `[units].speed_of_light` is
-    # an SI value already consumed by `_pic_norm`, not a code-unit override.
+    # an SI value already consumed by `_from_species_norm`, not a code-unit override.
     # Normalizations whose velocity unit is not c — MHD, custom, and PIC
     # carrying `reference_velocity` — want c_SI / velocity_ref here and
     # still get 1.0, so their relativistic branch is wrong. Untriggered in
@@ -525,4 +627,9 @@ def _build_metadata(schema: SimulationSchema) -> dict[str, Any]:
         scaling["scaling_description"] = scaling_description
     if scaling:
         metadata["scaling"] = scaling
+    # Readers whose format fixes its own unit convention (OpenGGCM, BATSRUS,
+    # iPIC3D) convert at their own boundary and never consult this. It is for
+    # the generic path, where the deck is the only thing that knows.
+    if getattr(schema.units, "data_in_si", False):
+        metadata["data_in_si"] = True
     return metadata

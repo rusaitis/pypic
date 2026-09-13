@@ -1,4 +1,4 @@
-"""Pydantic v2 validator for the pypic simulation.toml v1.0 schema.
+"""Pydantic v2 validator for the pypic simulation.toml v2.0 schema.
 
 Designed to be decoupled from pypic itself — the only imports are
 stdlib and pydantic, so this subpackage can be lifted into a
@@ -13,7 +13,7 @@ Examples
 >>> from pypic.schema import validate_simulation_toml
 >>> doc = '''
 ... [schema]
-... version = "1.0"
+... version = "2.0"
 ... [model]
 ... name = "demo"
 ... type = "PIC"
@@ -31,7 +31,7 @@ Examples
 ... lower = [0.0, 0.0, 0.0]
 ... upper = [4.0, 4.0, 4.0]
 ... [units]
-... system = "SI"
+... anchor = "si"
 ... [coordinates]
 ... geometry = "cartesian"
 ... frame = "sim"
@@ -96,10 +96,8 @@ from pypic.schema._models import (
     Species,
     Time,
     Units,
-    UnitsCustom,
-    UnitsMHD,
-    UnitsPIC,
-    UnitsReferenceTable,
+    UnitsExplicit,
+    UnitsFromSpecies,
     UnitsSI,
 )
 
@@ -151,10 +149,8 @@ __all__ = [
     "Species",
     "Time",
     "Units",
-    "UnitsCustom",
-    "UnitsMHD",
-    "UnitsPIC",
-    "UnitsReferenceTable",
+    "UnitsExplicit",
+    "UnitsFromSpecies",
     "UnitsSI",
     "ValidationError",
     "build_schema",

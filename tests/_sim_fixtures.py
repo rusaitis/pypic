@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 
 SIM_TOML_TEMPLATE = """\
 [schema]
-version = "1.0"
+version = "2.0"
 
 [model]
 name = "test_sim"
@@ -42,7 +42,7 @@ lower = [0.0, 0.0, 0.0]
 upper = [4.0, 4.0, 4.0]
 
 [units]
-system = "SI"
+anchor = "si"
 
 [coordinates]
 geometry = "cartesian"

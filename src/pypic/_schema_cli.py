@@ -3,7 +3,7 @@
 Exposes three subcommands:
 
 - ``export`` — emits the JSON Schema 2020-12 document for
-  ``simulation.toml`` v1.0 (the cross-tool contract).
+  ``simulation.toml`` v2.0 (the cross-tool contract).
 - ``validate`` — checks one or more ``simulation.toml`` files against
   the schema; reports per-file pass/fail with Pydantic error details.
 - ``diff`` — diffs two JSON Schema documents (the second defaults to
@@ -76,7 +76,7 @@ def export(
             "--include-x-extensions",
             help=(
                 "Annotate non-strict object schemas with patternProperties "
-                "for the v1.0 'x-*' extension namespace."
+                "for the v2.0 'x-*' extension namespace."
             ),
         ),
     ] = False,
@@ -143,7 +143,7 @@ def validate(
         ),
     ] = False,
 ) -> None:
-    """Validate simulation.toml file(s) against the v1.0 schema.
+    """Validate simulation.toml file(s) against the v2.0 schema.
 
     Exit codes: 0 if every file passes, 1 if any file fails Pydantic
     validation, 2 if any file is missing, unreadable, or syntactically

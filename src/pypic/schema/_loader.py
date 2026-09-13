@@ -1,4 +1,4 @@
-"""Entry points for validating simulation.toml against the v1.0 schema."""
+"""Entry points for validating simulation.toml against the v2.0 schema."""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ from pypic.schema._models import SimulationSchema
 def validate_simulation_toml(
     source: str | bytes | PathLike[str] | dict[str, Any],
 ) -> SimulationSchema:
-    """Validate a pypic v1.0 simulation.toml document.
+    """Validate a pypic v2.0 simulation.toml document.
 
     Parameters
     ----------
@@ -45,7 +45,7 @@ def validate_simulation_toml(
     --------
     >>> doc = '''
     ... [schema]
-    ... version = "1.0"
+    ... version = "2.0"
     ... [model]
     ... name = "demo"
     ... type = "PIC"
@@ -63,7 +63,7 @@ def validate_simulation_toml(
     ... lower = [0.0, 0.0, 0.0]
     ... upper = [4.0, 4.0, 4.0]
     ... [units]
-    ... system = "SI"
+    ... anchor = "si"
     ... [coordinates]
     ... geometry = "cartesian"
     ... frame = "sim"

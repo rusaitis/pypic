@@ -14,7 +14,7 @@ import math
 from dataclasses import dataclass, field
 from enum import StrEnum
 from types import MappingProxyType
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, NamedTuple
 
 import numpy as np
 from scipy import constants
@@ -22,11 +22,22 @@ from scipy import constants
 from pypic.exceptions import UndeclaredNormalizationError
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Mapping
+    from collections.abc import Mapping
 
     from pypic.types import Numeric, Vector3
 
-_QUANTITIES = frozenset({"length", "time", "velocity", "b_field", "e_field", "density"})
+# The eight storage primitives, in the order `_SIFactor.exponents` indexes.
+_REFERENCE_ORDER = (
+    "length",
+    "time",
+    "velocity",
+    "b_field",
+    "e_field",
+    "density",
+    "mass",
+    "charge",
+)
+_QUANTITIES = frozenset(_REFERENCE_ORDER)
 
 # Correct under any anchor, so exempt from the undeclared-normalization guard.
 _DIMENSIONLESS = "dimensionless"
@@ -90,23 +101,27 @@ _DISPLAY_UNITS: dict[str, float] = {
 
 
 class UnitSystem(StrEnum):
-    """Which normalization system a `Normalization` came from.
+    """How a `Normalization`'s eight references were anchored.
 
-    The vocabulary of ``[units].system`` in ``simulation.toml``
-    (Schema § 2).  `Normalization.system` is ``None`` when no
-    ``[units]`` section declared one — see
-    `Normalization.undeclared`.
+    The vocabulary of ``[units].anchor`` in ``simulation.toml``
+    (Schema § 2).  It names a *derivation*, not a code type — which
+    code produced the data is ``[model].type``, a separate field.
+    `Normalization.system` is ``None`` when no ``[units]`` section
+    declared an anchor at all; see `Normalization.undeclared`.
+
+    ``FROM_SPECIES`` derives the length unit from a reference species'
+    plasma frequency; ``EXPLICIT`` takes it as given; ``SI`` is the
+    identity anchor of data already in SI.
 
     Examples
     --------
-    >>> UnitSystem.PIC == "PIC"
+    >>> UnitSystem.FROM_SPECIES == "from_species"
     True
     """
 
-    PIC = "PIC"
-    MHD = "MHD"
-    SI = "SI"
-    CUSTOM = "custom"
+    FROM_SPECIES = "from_species"
+    EXPLICIT = "explicit"
+    SI = "si"
 
 
 @dataclass(frozen=True, slots=True)
@@ -144,7 +159,7 @@ class Normalization:
     system : UnitSystem or None
         Which normalization system these references came from, or
         ``None`` when nothing declared one. Defaults to
-        ``UnitSystem.CUSTOM``, the honest reading of eight
+        ``UnitSystem.EXPLICIT``, the honest reading of eight
         hand-supplied references. ``None`` makes every dimensional
         `si_factor` raise rather than silently return 1.0 — see
         `undeclared`.
@@ -164,7 +179,7 @@ class Normalization:
     density_ref: float
     mass_ref: float
     charge_ref: float
-    system: UnitSystem | None = UnitSystem.CUSTOM
+    system: UnitSystem | None = UnitSystem.EXPLICIT
 
     def __post_init__(self) -> None:
         for attr in (
@@ -264,7 +279,7 @@ class Normalization:
             density_ref=float(reference_density),
             mass_ref=float(reference_mass),
             charge_ref=float(reference_charge),
-            system=UnitSystem.PIC,
+            system=UnitSystem.FROM_SPECIES,
         )
 
     @classmethod
@@ -312,9 +327,10 @@ class Normalization:
         reference_length : float
             Reference length $l_0$ in meters.
         reference_density : float
-            Reference **mass** density $\rho_0$ in kg/m$^3$ — not the
-            number density in m$^{-3}$ that the identically-named
-            `[units]` key carries under ``system = "PIC"``.
+            Reference **mass** density $\rho_0$ in kg/m$^3$. The TOML
+            spelling is ``reference_mass_density``, which names its unit;
+            this parameter keeps the older name for callers that already
+            pass it positionally.
         reference_b_field : float
             Reference magnetic field $B_0$ in Tesla.
 
@@ -341,7 +357,7 @@ class Normalization:
             density_ref=float(reference_density / constants.m_p),
             mass_ref=float(constants.m_p),
             charge_ref=float(constants.e),
-            system=UnitSystem.MHD,
+            system=UnitSystem.EXPLICIT,
         )
 
     @classmethod
@@ -443,6 +459,45 @@ class Normalization:
             )
         )
 
+    @property
+    def rationalization_ratio(self) -> float:
+        r"""How far these references sit from SI-rationalized code units.
+
+        $$\frac{B_{ref}^2}{\mu_0 \, n_{ref} \, m_{ref} \, v_{ref}^2}$$
+
+        `pypic.derived` computes in SI-rationalized units throughout —
+        $e_B = B^2/2$, $\nabla\cdot\mathbf{E} = \rho_c$ — which holds
+        exactly when this ratio is 1.  Every EM quantity is wrong by a
+        power of it when it is not, so its **value names the
+        convention** rather than grading it:
+
+        ============================  ===================
+        Ratio                          Convention
+        ============================  ===================
+        1                              SI-rationalized
+        $1/\mu_0$                      data already in SI
+        $(c_{SI}/c_{ref})^2$           a reduced speed of light
+        $2/\beta$                      gyrokinetic (gyro-Bohm)
+        ============================  ===================
+
+        A diagnostic, not a gate: the last two are deliberate physics.
+
+        Examples
+        --------
+        >>> from scipy import constants
+        >>> n = Normalization.pic_electron(1e18)
+        >>> bool(np.isclose(n.rationalization_ratio, 1.0, rtol=1e-9))
+        True
+        >>> bool(np.isclose(
+        ...     Normalization.identity().rationalization_ratio,
+        ...     1.0 / constants.mu_0,
+        ... ))
+        True
+        """
+        return self.b_field_ref**2 / (
+            constants.mu_0 * self.density_ref * self.mass_ref * self.velocity_ref**2
+        )
+
     def summary(self) -> str:
         """One-line description of the unit system and its SI anchor.
 
@@ -462,11 +517,16 @@ class Normalization:
             return "undeclared (code units; no [units] section)"
         if self.system is UnitSystem.SI and self.is_identity:
             return "SI (identity)"
-        return (
+        line = (
             f"{self.system}: l={self.length_ref:.4g} m, "
             f"v={self.velocity_ref:.4g} m/s, "
             f"B={self.b_field_ref:.4g} T, n={self.density_ref:.4g} m^-3"
         )
+        # The one property of a reference set that its numbers do not show.
+        ratio = self.rationalization_ratio
+        if not math.isclose(ratio, 1.0, rel_tol=1e-2):
+            line += f" [not SI-rationalized: B^2/(mu_0 n m v^2) = {ratio:.4g}]"
+        return line
 
     def _reference_value(self, quantity: str) -> float:
         """Look up the reference value for *quantity*, or raise ValueError."""
@@ -520,14 +580,19 @@ class Normalization:
                 'ask for code units (units="code").'
             )
             raise UndeclaredNormalizationError(msg)
-        if quantity in _QUANTITIES:
-            return self._reference_value(quantity)
         try:
-            return _COMPOUND_FACTORS[quantity](self)
+            spec = _SI_FACTORS[quantity]
         except KeyError:
-            valid = sorted(_QUANTITIES | _COMPOUND_FACTORS.keys())
-            msg = f"Unknown quantity {quantity!r}. Valid: {valid}"
+            msg = f"Unknown quantity {quantity!r}. Valid: {sorted(_SI_FACTORS)}"
             raise ValueError(msg) from None
+        factor = math.prod(
+            getattr(self, f"{name}_ref") ** power
+            for name, power in zip(_REFERENCE_ORDER, spec.exponents, strict=True)
+            if power
+        )
+        if spec.mu_0_power:
+            factor *= constants.mu_0**spec.mu_0_power
+        return float(factor)
 
     def normalize(self, quantity: str, x: Numeric) -> Numeric:
         r"""Convert a physical quantity from SI to code units.
@@ -537,8 +602,9 @@ class Normalization:
         Parameters
         ----------
         quantity : str
-            Physical quantity name: ``"length"``, ``"time"``, ``"velocity"``,
-            ``"b_field"``, ``"e_field"``, or ``"density"``.
+            One of the eight storage primitives: ``"length"``, ``"time"``,
+            ``"velocity"``, ``"b_field"``, ``"e_field"``, ``"density"``,
+            ``"mass"``, ``"charge"``.
         x : Numeric
             Value in SI units.
 
@@ -562,8 +628,9 @@ class Normalization:
         Parameters
         ----------
         quantity : str
-            Physical quantity name: ``"length"``, ``"time"``, ``"velocity"``,
-            ``"b_field"``, ``"e_field"``, or ``"density"``.
+            One of the eight storage primitives: ``"length"``, ``"time"``,
+            ``"velocity"``, ``"b_field"``, ``"e_field"``, ``"density"``,
+            ``"mass"``, ``"charge"``.
         x : Numeric
             Value in code units.
 
@@ -580,30 +647,52 @@ class Normalization:
         return x * self._reference_value(quantity)
 
 
-_COMPOUND_FACTORS: dict[str, Callable[[Normalization], float]] = {
-    "dimensionless": lambda n: 1.0,
-    "pressure": lambda n: n.density_ref * n.mass_ref * n.velocity_ref**2,
-    "temperature": lambda n: n.mass_ref * n.velocity_ref**2,
-    "energy_density": lambda n: n.density_ref * n.mass_ref * n.velocity_ref**2,
-    "current_density": lambda n: n.charge_ref * n.density_ref * n.velocity_ref,
-    "frequency": lambda n: 1.0 / n.time_ref,
-    "mass_density": lambda n: n.density_ref * n.mass_ref,
-    "charge_density": lambda n: n.charge_ref * n.density_ref,
-    # E × B (EM)
-    "poynting_flux": lambda n: n.e_field_ref * n.b_field_ref,
-    # ρ v³ (particle)
-    "energy_flux": lambda n: n.density_ref * n.mass_ref * n.velocity_ref**3,
-    # Both are W/m², but normalize differently: EM flux via field refs,
-    # particle flux via matter refs. The μ₀ factor between them is unity
-    # in code units but ~10⁶ in SI.
-    "b_field_per_length": lambda n: n.b_field_ref / n.length_ref,
-    "e_field_per_length": lambda n: n.e_field_ref / n.length_ref,
-    "velocity_per_length": lambda n: n.velocity_ref / n.length_ref,
-    "specific_energy": lambda n: n.velocity_ref**2,
-    "power_density": lambda n: (
-        n.density_ref * n.mass_ref * n.velocity_ref**2 / n.time_ref
-    ),
-    "four_velocity": lambda n: n.velocity_ref,
+class _SIFactor(NamedTuple):
+    r"""How one quantity type's SI factor is built from the references.
+
+    *exponents* are integer powers of the eight primitives in
+    `_REFERENCE_ORDER`; every factor pypic needs is a monomial in them.
+    *mu_0_power* is the power of $\mu_0$ that pypic's SI-rationalized
+    code units leave out — non-zero only for `poynting_flux`, where
+    `derived.poynting_flux` returns a bare $\mathbf{E}\times\mathbf{B}$.
+
+    Recording $\mu_0$ separately rather than folding it in as a plain
+    number is what lets `tests/test_units.py` compose these against
+    each reference's own SI dimension and check the result against
+    `pypic.fields._QUANTITY_DIMENSIONS` — two tables that encode the
+    same physics and previously disagreed, unnoticed, on this entry.
+    """
+
+    exponents: tuple[int, int, int, int, int, int, int, int]
+    mu_0_power: int = 0
+
+
+#                      l   t   v   B   E   n   m   q
+_SI_FACTORS: dict[str, _SIFactor] = {
+    "dimensionless": _SIFactor((0, 0, 0, 0, 0, 0, 0, 0)),
+    "length": _SIFactor((1, 0, 0, 0, 0, 0, 0, 0)),
+    "time": _SIFactor((0, 1, 0, 0, 0, 0, 0, 0)),
+    "velocity": _SIFactor((0, 0, 1, 0, 0, 0, 0, 0)),
+    "b_field": _SIFactor((0, 0, 0, 1, 0, 0, 0, 0)),
+    "e_field": _SIFactor((0, 0, 0, 0, 1, 0, 0, 0)),
+    "density": _SIFactor((0, 0, 0, 0, 0, 1, 0, 0)),
+    "mass": _SIFactor((0, 0, 0, 0, 0, 0, 1, 0)),
+    "charge": _SIFactor((0, 0, 0, 0, 0, 0, 0, 1)),
+    "four_velocity": _SIFactor((0, 0, 1, 0, 0, 0, 0, 0)),
+    "pressure": _SIFactor((0, 0, 2, 0, 0, 1, 1, 0)),
+    "temperature": _SIFactor((0, 0, 2, 0, 0, 0, 1, 0)),
+    "energy_density": _SIFactor((0, 0, 2, 0, 0, 1, 1, 0)),
+    "specific_energy": _SIFactor((0, 0, 2, 0, 0, 0, 0, 0)),
+    "energy_flux": _SIFactor((0, 0, 3, 0, 0, 1, 1, 0)),
+    "power_density": _SIFactor((0, -1, 2, 0, 0, 1, 1, 0)),
+    "current_density": _SIFactor((0, 0, 1, 0, 0, 1, 0, 1)),
+    "mass_density": _SIFactor((0, 0, 0, 0, 0, 1, 1, 0)),
+    "charge_density": _SIFactor((0, 0, 0, 0, 0, 1, 0, 1)),
+    "frequency": _SIFactor((0, -1, 0, 0, 0, 0, 0, 0)),
+    "b_field_per_length": _SIFactor((-1, 0, 0, 1, 0, 0, 0, 0)),
+    "e_field_per_length": _SIFactor((-1, 0, 0, 0, 1, 0, 0, 0)),
+    "velocity_per_length": _SIFactor((-1, 0, 1, 0, 0, 0, 0, 0)),
+    "poynting_flux": _SIFactor((0, 0, 0, 1, 1, 0, 0, 0), mu_0_power=-1),
 }
 
 

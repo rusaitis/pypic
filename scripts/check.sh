@@ -42,7 +42,7 @@ docs()   { uv run mkdocs build --strict; }
 # Scoped to the generated artifact, not the whole schema/ directory: any
 # unrelated edit to a schema module would otherwise read as drift.
 schema() {
-  local artifact=src/pypic/schema/simulation.schema.v1.0.json
+  local artifact=src/pypic/schema/simulation.schema.v2.0.json
   uv run pypic schema export -o "$artifact"
   git diff --exit-code -- "$artifact"
 }

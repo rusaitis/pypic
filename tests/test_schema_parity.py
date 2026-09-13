@@ -161,59 +161,87 @@ def test_alias_targets_resolve() -> None:
 # model marks most reference keys optional, and the loader has to turn
 # whatever survives into eight positive SI references.
 _UNITS_VARIANTS: tuple[tuple[str, str], ...] = (
-    ("SI", 'system = "SI"'),
-    ("PIC, electron-referenced", 'system = "PIC"\nreference_density = 1.0e18'),
+    ("si", 'anchor = "si"'),
     (
-        "PIC, ion-referenced",
-        'system = "PIC"\nreference_species = "ions"\nreference_density = 1.0e6',
+        "from_species, electron-referenced",
+        'anchor = "from_species"\nreference_number_density = 1.0e18',
     ),
     (
-        "MHD",
-        'system = "MHD"\n'
+        "from_species, ion-referenced",
+        'anchor = "from_species"\n'
+        'reference_species = "ions"\n'
+        "reference_number_density = 1.0e6",
+    ),
+    (
+        "from_species, hybrid velocity anchor",
+        'anchor = "from_species"\n'
+        'reference_species = "ions"\n'
+        "reference_number_density = 1.0e6\n"
+        "reference_velocity = 1.0e5",
+    ),
+    (
+        "explicit, MHD shape — length, mass density, field",
+        'anchor = "explicit"\n'
         "reference_length = 6.371e6\n"
-        "reference_density = 1.67e-17\n"
+        "reference_mass_density = 1.67e-17\n"
         "reference_b_field = 5.0e-9",
     ),
     (
-        "custom, minimal determining set",
-        'system = "custom"\n'
-        "[units.reference]\n"
-        "length = 5.31e-3\n"
-        "time = 1.77e-11\n"
-        "b_field = 1.07e-3\n"
-        "density = 1.0e18",
+        "explicit, PLUTO shape — length, mass density, velocity",
+        'anchor = "explicit"\n'
+        "reference_length = 1.496e11\n"
+        "reference_mass_density = 1.0e-20\n"
+        "reference_velocity = 1.0e5",
     ),
     (
-        "custom, velocity and e_field instead of time and b_field",
-        'system = "custom"\n'
-        "[units.reference]\n"
-        "length = 5.31e-3\n"
-        "velocity = 2.998e8\n"
-        "e_field = 3.21e5\n"
-        "density = 1.0e18",
+        "explicit, number density and time",
+        'anchor = "explicit"\n'
+        "reference_length = 5.31e-3\n"
+        "reference_number_density = 1.0e18\n"
+        "reference_time = 1.77e-11",
     ),
     (
-        "custom, every reference given",
-        'system = "custom"\n'
-        "[units.reference]\n"
-        "length = 5.31e-3\n"
-        "time = 1.77e-11\n"
-        "velocity = 2.998e8\n"
-        "b_field = 1.07e-3\n"
-        "e_field = 3.21e5\n"
-        "density = 1.0e18\n"
-        "mass = 9.109e-31\n"
-        "charge = 1.602e-19",
+        "explicit, field and velocity with no density",
+        'anchor = "explicit"\n'
+        "reference_length = 5.31e-3\n"
+        "reference_velocity = 2.998e8\n"
+        "reference_b_field = 1.07e-3",
+    ),
+    (
+        "explicit, e_field anchor with no velocity",
+        'anchor = "explicit"\n'
+        "reference_length = 5.31e-3\n"
+        "reference_number_density = 1.0e18\n"
+        "reference_e_field = 3.21e5",
+    ),
+    (
+        "explicit, over-supplied (gyrokinetic shape)",
+        'anchor = "explicit"\n'
+        "reference_length = 1.2e-3\n"
+        "reference_time = 4.0e-6\n"
+        "reference_velocity = 3.0e5\n"
+        "reference_number_density = 1.0e19\n"
+        "reference_b_field = 2.5\n"
+        "reference_mass = 3.343e-27\n"
+        "reference_charge = 1.602e-19",
+    ),
+    (
+        "explicit, SI arrays rescaled on load",
+        'anchor = "explicit"\n'
+        "data_in_si = true\n"
+        "reference_length = 6.371e6\n"
+        "reference_mass_density = 1.67e-17\n"
+        "reference_b_field = 5.0e-9",
     ),
 )
 
 
 def _doc(units_block: str) -> str:
-    """A minimal valid v1.0 document carrying *units_block* verbatim."""
+    """A minimal valid v2.0 document carrying *units_block* verbatim."""
     head = dedent(
         """
         [schema]
-        version = "1.0"
+        version = "2.0"
         [model]
         name = "demo"
         type = "PIC"
@@ -278,21 +306,47 @@ def test_validated_documents_load(tmp_path: Path) -> None:
     )
 
 
-def test_underdetermined_custom_units_are_rejected() -> None:
-    """A custom block the loader could not build must not validate.
+def test_underdetermined_explicit_units_are_rejected() -> None:
+    """An explicit block the loader could not build must not validate.
 
     The other half of the parity above: the validator has to refuse
-    what it cannot hand on, and say which key would have closed the
+    what it cannot hand on, and say which scale would have closed the
     gap rather than failing later on a reference the deck never wrote.
     """
-    doc = _doc('system = "custom"\n[units.reference]\nlength = 5.31e-3')
+    doc = _doc('anchor = "explicit"\nreference_length = 5.31e-3')
     try:
         validate_simulation_toml(doc)
     except Exception as exc:
         message = str(exc)
     else:  # pragma: no cover - only reached when the guard regresses
         message = ""
-    for expected in ("'time' or 'velocity'", "'b_field' or 'e_field'", "'density'"):
+    for expected in ("a velocity", "a density", "a field"):
+        assert expected in message, (
+            f"expected the rejection to name {expected}, got:\n{message}"
+        )
+
+
+def test_naming_the_density_twice_is_rejected_naming_both_keys() -> None:
+    """Two density spellings leave the unit of the number ambiguous.
+
+    Redundant *distinct* primitives are legal — that is how a
+    gyrokinetic deck states a deliberately inconsistent set — but two
+    names for one primitive is a question the schema cannot answer.
+    """
+    doc = _doc(
+        'anchor = "explicit"\n'
+        "reference_length = 6.371e6\n"
+        "reference_number_density = 1.0e7\n"
+        "reference_mass_density = 1.67e-17\n"
+        "reference_b_field = 5.0e-9"
+    )
+    try:
+        validate_simulation_toml(doc)
+    except Exception as exc:
+        message = str(exc)
+    else:  # pragma: no cover - only reached when the guard regresses
+        message = ""
+    for expected in ("reference_number_density", "reference_mass_density"):
         assert expected in message, (
             f"expected the rejection to name {expected}, got:\n{message}"
         )

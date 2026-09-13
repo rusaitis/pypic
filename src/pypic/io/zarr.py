@@ -70,7 +70,7 @@ def _open_store(
     store: Any,  # noqa: ANN401  # zarr accepts str/path/store object
     source_label: str,
 ) -> tuple[xr.Dataset, dict[str, Any]]:
-    """Open a schema-v1.0 Zarr store; return (fields_dataset, root_attrs).
+    """Open a schema-v2.0 Zarr store; return (fields_dataset, root_attrs).
 
     Root group must carry the ``schema.version`` discriminator and a
     ``/fields`` child group with the field arrays.  Uses

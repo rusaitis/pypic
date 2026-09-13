@@ -75,7 +75,7 @@ def test_info_text(tmp_path):
 
 
 def test_info_names_the_declared_unit_system(tmp_path):
-    """A declared ``system = "SI"`` deck must not read as "undeclared"."""
+    """A declared ``anchor = "si"`` deck must not read as "undeclared"."""
     d = make_sim_dir(tmp_path, "sim")
     result = runner.invoke(app, ["info", str(d)])
     assert "Units:     SI (identity)" in result.output
@@ -97,7 +97,7 @@ def test_info_json(tmp_path):
 def test_info_json_carries_the_unit_system(tmp_path):
     d = make_sim_dir(tmp_path, "sim")
     result = runner.invoke(app, ["info", str(d), "--json"])
-    assert json.loads(result.output)["normalization"]["system"] == "SI"
+    assert json.loads(result.output)["normalization"]["system"] == "si"
 
 
 # -- fields ------------------------------------------------------------------
@@ -923,7 +923,7 @@ class TestPlotAnimate:
 
 _TOML_2D = """\
 [schema]
-version = "1.0"
+version = "2.0"
 
 [model]
 name = "test_2d"
@@ -946,7 +946,7 @@ lower = [0.0, 0.0]
 upper = [8.0, 6.0]
 
 [units]
-system = "SI"
+anchor = "si"
 
 [coordinates]
 geometry = "cartesian"

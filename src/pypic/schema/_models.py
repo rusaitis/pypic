@@ -1,4 +1,4 @@
-"""Pydantic v2 models for the pypic simulation.toml v1.0 schema.
+"""Pydantic v2 models for the pypic simulation.toml v2.0 schema.
 
 Zero pypic-internal imports: this module depends only on the standard
 library and pydantic. That decoupling is deliberate — the validator is
@@ -7,9 +7,9 @@ designed to be lifted into a standalone package without rewrites.
 Extension policy
 ----------------
 Unknown top-level keys are accepted only when prefixed ``x-`` or ``x_``
-(the v1.0 extension namespace for non-portable knobs). Unknown keys
+(the v2.0 extension namespace for non-portable knobs). Unknown keys
 under ``[physics.{pic,mhd,hybrid,vlasov}]`` and their ``.solver``
-sub-tables are accepted without validation (v1.0 spec: validators MUST
+sub-tables are accepted without validation (v2.0 spec: validators MUST
 accept unknown sub-tables here and MAY warn). Everywhere else,
 ``extra="forbid"`` catches typos.
 """
@@ -36,7 +36,7 @@ from pydantic import (
 # Single source of truth for the schema version. Mirrors the value the
 # validator enforces on ``[schema].version`` and pins the filename of the
 # exported JSON Schema (``simulation.schema.v{SCHEMA_VERSION}.json``).
-SCHEMA_VERSION: Final[str] = "1.0"
+SCHEMA_VERSION: Final[str] = "2.0"
 
 # Two flavours of string-typed fields:
 #
@@ -80,7 +80,7 @@ PhysicalExtentUnit = Literal[
     "m", "km", "R_E", "R_S", "R_sun", "R_M", "R_J", "AU", "d_i"
 ]
 
-# Open vocabularies (see above): aliased to ``str``, with the v1.0 canonical
+# Open vocabularies (see above): aliased to ``str``, with the v2.0 canonical
 # values listed per alias.  Cross-field rules — ``scheme = "subcycled"``
 # requires ``field_substeps``, say — still fire in the validators below;
 # the openness is on *value*, not on *semantics*.
@@ -158,11 +158,11 @@ class _StrictBase(BaseModel):
 
 
 class _ExtensibleBase(BaseModel):
-    """Accept unknown keys. Used where v1.0 reserves extension room.
+    """Accept unknown keys. Used where v2.0 reserves extension room.
 
     In the physics sub-trees and on the root, unknown keys either carry
     the ``x-`` namespace (portable across all tables) or are code-specific
-    experimental knobs that v1.0 spec explicitly permits.
+    experimental knobs that v2.0 spec explicitly permits.
     """
 
     model_config = ConfigDict(extra="allow")
@@ -263,7 +263,7 @@ class Time(_StrictBase):
 
     Scheme-specific keys are deliberately *not* modelled as a discriminated
     union — the vocabulary is still settling and the cost of a wrong shape
-    here is low. v1.0 enforces only the cross-field invariants that are
+    here is low. v2.0 enforces only the cross-field invariants that are
     unambiguous:
 
     - fixed/subcycled require ``dt > 0`` (the integration step);
@@ -345,7 +345,7 @@ class GridStretched(_StrictBase):
     Adopted to describe ARMS spherical-r stretches, PLUTO log-radial
     grids, Athena++ stretched grids, and FLASH per-block-non-uniform
     layouts losslessly. Kept additive so uniform documents validate
-    unchanged. Metric-aware operators are out of scope for v1.0.x —
+    unchanged. Metric-aware operators are out of scope for v2.0.x —
     consumers that need them should guard explicitly.
     """
 
@@ -575,92 +575,160 @@ class BoundaryConditions(BoundaryConditionsBase):
 
 
 class _UnitsBase(_StrictBase):
+    r"""Fields every ``[units]`` anchor form carries.
+
+    ``data_in_si`` says the stored arrays are in SI and asks the reader
+    to rescale them against this anchor on load.  It is the second,
+    orthogonal axis: the anchor says how the eight references were
+    closed, ``data_in_si`` says what the numbers on disk are measured
+    in.  They were one field before 2.0, which is why SI data had no way
+    to name an anchor and so no way to be normalized correctly.
+    """
+
+    speed_of_light: PositiveFloat | None = None
+    data_in_si: bool = False
     scaling_factor: float | None = None
     scaling_description: str | None = None
 
 
-class UnitsPIC(_UnitsBase):
-    """``[units]`` with ``system = "PIC"``."""
+class UnitsFromSpecies(_UnitsBase):
+    r"""``[units]`` with ``anchor = "from_species"`` — length from microphysics.
 
-    system: Literal["PIC"]
+    The form for codes that resolve a kinetic scale: PIC, hybrid, and
+    anything else whose grid is measured in skin depths.  The length
+    unit is *derived*, $l_{ref} = c/\omega_{ref}$, from the reference
+    species' plasma frequency — which is what distinguishes this form
+    from `UnitsExplicit`, where length is given.
+
+    The velocity unit defaults to *c*, the PIC convention.  Hybrid codes
+    normalize to the Alfvén speed instead and set `reference_velocity`
+    to it, which makes $B_{ref}$ the field at which $v_A$ equals that
+    speed and lands the time unit on the inverse ion cyclotron
+    frequency, via $d_i \Omega_{ci} = v_A$.
+    """
+
+    anchor: Literal["from_species"]
     reference_species: str = "electrons"
-    reference_density: PositiveFloat
+    reference_number_density: PositiveFloat
     reference_mass: PositiveFloat | None = None
     # A magnitude, matching the builtin defaults (electrons carry +e).
     # Signed input used to survive here and die downstream complaining
     # about b_field_ref, a key the deck never mentioned.
     reference_charge: PositiveFloat | None = None
-    speed_of_light: PositiveFloat | None = None
-    # Velocity unit in m/s, defaulting to the speed of light. Hybrid
-    # codes normalize to the Alfvén speed, which v1.0 could not state:
-    # setting it makes B_ref the field at which v_A equals this speed
-    # and puts the time unit on the inverse ion cyclotron frequency.
     reference_velocity: PositiveFloat | None = None
 
 
-class UnitsMHD(_UnitsBase):
-    """``[units]`` with ``system = "MHD"``."""
+class UnitsExplicit(_UnitsBase):
+    r"""``[units]`` with ``anchor = "explicit"`` — the length unit is given.
 
-    system: Literal["MHD"]
-    reference_length: PositiveFloat
-    reference_density: PositiveFloat
-    reference_b_field: PositiveFloat
+    Covers MHD, PLUTO/Athena++-class codes, gyrokinetics, and any
+    hand-built reference set.  Three relations close the eight
+    primitives:
 
+    $$v = l/t, \qquad E = vB, \qquad B = v\sqrt{\mu_0 n m}$$
 
-class UnitsSI(_UnitsBase):
-    """``[units]`` with ``system = "SI"`` — already SI; no refs needed."""
+    The third ties the field, velocity and density scales together, so
+    a deck supplies `reference_length` plus **any two** of:
 
-    system: Literal["SI"]
+    - a velocity — `reference_velocity` or `reference_time`
+    - a density — `reference_number_density` or `reference_mass_density`
+    - a field — `reference_b_field` or `reference_e_field`
 
+    and the third follows.  Supplying all three is legal: the relations
+    then describe rather than derive, which is what gyrokinetic decks
+    need, where $v \neq l/t$ by $\rho_*$ and $B^2 \neq \mu_0 n m v^2$ by
+    $2/\beta$ on purpose.  `Normalization.rationalization_ratio` reports
+    the result.
 
-class UnitsReferenceTable(_StrictBase):
-    """``[units.reference]`` sub-table for ``system = "custom"``.
+    **Duplicate spellings of one primitive are rejected; redundant
+    distinct primitives are accepted.**  Both density keys together is
+    an error, because which unit a number carries would be ambiguous.
+    `reference_b_field` with `reference_velocity` is fine — those are
+    two different quantities, and a tolerance gate could not tell a
+    deliberate $2/\beta$ from a typo anyway.
 
-    Keys left out are derived from the two dimensional relations that
-    tie the eight references together, $v = l / t$ and $E = v B$, so a
-    deck supplies one of each coupled pair rather than all eight.
-    ``mass`` and ``charge`` fall back to the electron values.
-
-    What cannot be derived must be given: a normalization that leaves
-    the magnetic or the density anchor unknown has no SI meaning, and
-    guessing one would return code units labelled as tesla.
+    `reference_mass` defaults to the proton mass whichever density
+    spelling is used.  Keying the default off the spelling would make
+    two decks describing one plasma disagree by $m_p/m_e$ in silence,
+    which is the trap this form exists to remove.
     """
 
-    length: PositiveFloat
-    time: PositiveFloat | None = None
-    velocity: PositiveFloat | None = None
-    b_field: PositiveFloat | None = None
-    e_field: PositiveFloat | None = None
-    density: PositiveFloat | None = None
-    mass: PositiveFloat | None = None
-    charge: PositiveFloat | None = None
+    anchor: Literal["explicit"]
+    reference_length: PositiveFloat
+    reference_time: PositiveFloat | None = None
+    reference_velocity: PositiveFloat | None = None
+    reference_b_field: PositiveFloat | None = None
+    reference_e_field: PositiveFloat | None = None
+    reference_number_density: PositiveFloat | None = None
+    reference_mass_density: PositiveFloat | None = None
+    reference_mass: PositiveFloat | None = None
+    reference_charge: PositiveFloat | None = None
 
     @model_validator(mode="after")
-    def _check_determined(self) -> UnitsReferenceTable:
-        missing: list[str] = []
-        if self.time is None and self.velocity is None:
-            missing.append("'time' or 'velocity' (velocity = length / time)")
-        if self.b_field is None and self.e_field is None:
-            missing.append("'b_field' or 'e_field' (e_field = velocity * b_field)")
-        if self.density is None:
-            missing.append("'density' (no relation derives it)")
-        if missing:
+    def _check_determined(self) -> UnitsExplicit:
+        if (
+            self.reference_number_density is not None
+            and self.reference_mass_density is not None
+        ):
             raise ValueError(
-                "[units.reference] is underdetermined; add " + ", ".join(missing)
+                "[units] names the density twice: 'reference_number_density' "
+                "(m^-3) and 'reference_mass_density' (kg/m^3). Give exactly "
+                "one — which unit the number carries is otherwise ambiguous."
+            )
+        scales = {
+            "a velocity ('reference_velocity' or 'reference_time')": (
+                self.reference_velocity is not None or self.reference_time is not None
+            ),
+            ("a density ('reference_number_density' or 'reference_mass_density')"): (
+                self.reference_number_density is not None
+                or self.reference_mass_density is not None
+            ),
+            "a field ('reference_b_field' or 'reference_e_field')": (
+                self.reference_b_field is not None or self.reference_e_field is not None
+            ),
+        }
+        missing = [name for name, given in scales.items() if not given]
+        if len(missing) > 1:
+            raise ValueError(
+                "[units] anchor = 'explicit' is underdetermined. With "
+                "'reference_length' given, supply any two of the three "
+                "scales; B = v*sqrt(mu_0*n*m) closes the third. Missing: "
+                + "; ".join(missing)
             )
         return self
 
 
-class UnitsCustom(_UnitsBase):
-    """``[units]`` with ``system = "custom"``."""
+class UnitsSI(_UnitsBase):
+    r"""``[units]`` with ``anchor = "si"`` — SI data with no code-unit anchor.
 
-    system: Literal["custom"]
-    reference: UnitsReferenceTable
+    All eight references are 1.0, so conversion is a no-op.  That makes
+    electromagnetic quantities unsafe: `pypic.derived` computes in
+    SI-rationalized units where $\mu_0 = 1$, and SI data has
+    $\mu_0 = 1.2566\times10^{-6}$, so anything carrying a vacuum
+    constant is wrong by a power of it.
+
+    A deck that wants its SI arrays computed on correctly declares a
+    real anchor and sets ``data_in_si`` instead.
+    """
+
+    anchor: Literal["si"]
+
+    @model_validator(mode="after")
+    def _check_no_rescale(self) -> UnitsSI:
+        if self.data_in_si:
+            raise ValueError(
+                "[units] anchor = 'si' with data_in_si = true would "
+                "normalize SI arrays against identity references, which is a "
+                "no-op. Declare the anchor to rescale against — "
+                "anchor = 'explicit' with reference_length, a density and a "
+                "field or velocity."
+            )
+        return self
 
 
 Units = Annotated[
-    UnitsPIC | UnitsMHD | UnitsSI | UnitsCustom,
-    Field(discriminator="system"),
+    UnitsFromSpecies | UnitsExplicit | UnitsSI,
+    Field(discriminator="anchor"),
 ]
 
 
@@ -910,10 +978,10 @@ class DriverModel(_ExtensibleBase):
 class Driver(_ExtensibleBase):
     """One entry in ``[[drivers]]``.
 
-    Drivers have a core set of v1.0 fields plus driver-type-specific
+    Drivers have a core set of v2.0 fields plus driver-type-specific
     keys — extra keys allowed so individual driver types (magnetogram,
     solar_wind_timeseries, pickup_ion_source, ...) don't need a model
-    per type in v1.0.
+    per type in v2.0.
 
     An entry describes the *external input from this run's
     perspective*. For two-way coupling (``direction = "two_way"``),
@@ -1466,9 +1534,9 @@ class SchemaMeta(_StrictBase):
 
 
 class SimulationSchema(_ExtensibleBase):
-    """Root model for a pypic simulation.toml v1.0 document.
+    """Root model for a pypic simulation.toml v2.0 document.
 
-    Required top-level sections per v1.0:
+    Required top-level sections per v2.0:
         [schema], [model], [run], [time], [grid], [units],
         [coordinates], and at least one [[species]] entry.
 
@@ -1505,9 +1573,12 @@ class SimulationSchema(_ExtensibleBase):
 
     @model_validator(mode="after")
     def _check_root_invariants(self) -> SimulationSchema:
-        if not self.schema_.version.startswith("1."):
+        if not self.schema_.version.startswith("2."):
             raise ValueError(
-                f"this validator implements schema v1.x; got '{self.schema_.version}'"
+                f"this validator implements schema v2.x; got "
+                f"'{self.schema_.version}'. v2.0 renamed [units].system to "
+                f"[units].anchor and replaced the PIC/MHD/SI/custom vocabulary "
+                f"with from_species/explicit/si — see docs/schema.md section 1."
             )
         n = len(self.grid.dimensions)
         if (
@@ -1549,7 +1620,7 @@ class SimulationSchema(_ExtensibleBase):
 
     def _check_physics_matches_model_type(self) -> None:
         assert self.physics is not None
-        # Only PIC/MHD/hybrid have a typed sub-table at v1.0; the new
+        # Only PIC/MHD/hybrid have a typed sub-table at v2.0; the new
         # vlasov/gyrokinetic model types route through the [physics]
         # extras namespace until typed sub-tables land in v1.1+. For
         # those, no typed-branch cross-check is possible (or needed).

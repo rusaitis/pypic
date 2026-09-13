@@ -28,7 +28,7 @@
 #   [boundary_conditions]  — per-face lower/upper tag arrays;
 #                            .field_overrides for per-field BC (E/B/particles)
 #   [units]                — normalization system + reference values;
-#                            Approach B: [units.reference] for explicit-SI overrides
+#                            anchor = from_species | explicit | si
 #   [coordinates]          — geometry, frame, physical_extent, transforms.*
 #   [coordinates.modes]    — required for geometry = "thetaMode" (FBPIC RZ-modes)
 #   [physics]              — model-agnostic flags + .{pic,mhd,hybrid} sub-tables;
@@ -101,10 +101,9 @@
 #   v1.1+ territory — ship when multiple astrophysics emitters demand it.
 #
 # Units policy:
-#   system = "PIC"     — μ₀ = ε₀ = 1, c = 1, derived from reference species
-#   system = "MHD"     — μ₀ = 1, derived from reference length/density/B
-#   system = "SI"      — already SI; all reference values = 1
-#   system = "custom"  — explicit [units.reference] block in SI
+#   anchor = "from_species" — μ₀ = ε₀ = 1; length = c/ω_p of a reference species
+#   anchor = "explicit"     — μ₀ = 1; length given, plus any two of v / n / B
+#   anchor = "si"           — already SI; all reference values = 1
 #
 # Authorship:
 #   [model].authors and [run].authors are arrays of inline tables
@@ -254,45 +253,71 @@ lower = ["periodic", "periodic", "periodic"]
 upper = ["periodic", "periodic", "periodic"]
 
 [units]
-# Approach A — named normalization. system ∈ {"PIC", "MHD", "SI"} sets a
-# reference convention; the values below derive the SI scale factors.
-# `reference_species` ∈ {"electrons" (default), "ions", "protons"} or any
+# `anchor` says how the eight SI references were closed, not which code ran
+# — that is [model].type, above. Three forms:
+#
+#   "from_species"  length is DERIVED from a species' plasma frequency,
+#                   l = c/omega_p. PIC, hybrid, anything gridded in skin depths.
+#   "explicit"      length is GIVEN. MHD, PLUTO/Athena++, gyrokinetics, or any
+#                   hand-built reference set.
+#   "si"            identity references; data already in SI, no code-unit anchor.
+#
+# `reference_species` is "electrons" (default), "ions", "protons", or any
 # declared [[species]].name. The validator allows the three builtins as a
 # fallback when no matching [[species]] entry exists, so legacy iPIC3D
 # decks that never declare a "protons" entry still validate.
-system            = "PIC"
+anchor            = "from_species"
 reference_species = "ions"             # builtin — works even without an "ions" [[species]]
-reference_density = 1.0e6              # m⁻³ (ion density)
+reference_number_density = 1.0e6       # m⁻³ (ion density)
 reference_mass    = 1.673e-27          # kg — proton mass (optional; defaults to m_e)
 reference_charge  = 1.602e-19          # C  (optional; defaults to |e|)
 speed_of_light    = 2.998e8            # m/s (optional; defaults to scipy.constants.c)
+# The velocity unit defaults to c. Hybrid codes normalize to v_A instead and
+# set reference_velocity to it, which lands the time unit on 1/Omega_ci.
+# reference_velocity = 1.0e5
 scaling_factor      = 1.0              # informational "shrink" factor (no compute effect)
 scaling_description = "real mass ratio mi/me = 1836; no artificial rescaling"
 
-# Approach B — explicit-SI reference values. Use system = "custom" when
-# the run doesn't fit a named normalization (e.g. laser-plasma where
-# length references the plasma wavelength, time the laser period). Every
-# unit conversion routes through these references. Pick A or B per run,
-# never both.
+# anchor = "explicit" — the length unit is given rather than derived. Three
+# relations close the rest:
 #
-# `length` and `density` are required. The relations v = l/t and E = vB
-# each derive one member of their pair, so give either `time` or
-# `velocity`, and either `b_field` or `e_field`. `mass` and `charge`
-# default to the electron values. Anything still undetermined is a
-# validation error rather than a silent 1.0.
+#     v = l/t        E = vB        B = v*sqrt(mu_0 * rho_m)
+#
+# The third ties the field, velocity and density scales together, so supply
+# `reference_length` plus ANY TWO of:
+#
+#   a velocity  — reference_velocity or reference_time
+#   a density   — reference_number_density (m⁻³) or reference_mass_density (kg/m³)
+#   a field     — reference_b_field or reference_e_field
+#
+# and the third follows. Naming the density twice is an error; naming two
+# DIFFERENT scales redundantly is fine, and is how gyrokinetic decks state a
+# set that is deliberately inconsistent (rho_* on v = l/t, 2/beta on the
+# rationalization ratio). `reference_mass` defaults to the proton mass and
+# `reference_charge` to |e|, whichever density spelling is used.
 #
 # [units]
-# system = "custom"
+# anchor = "explicit"
+# reference_length         = 6.96e8    # m — solar radius, REQUIRED
+# reference_mass_density   = 1.67e-13  # kg/m³ — or reference_number_density
+# reference_b_field        = 1.0e-4    # T — or reference_velocity
+# reference_time           = 1.77e-11  # s — optional third scale
+# reference_e_field        = 3.21e5    # V/m — optional, instead of b_field
+# reference_mass           = 1.673e-27 # kg — default m_p
+# reference_charge         = 1.602e-19 # C  — default |e|
+
+# anchor = "si" — the arrays are already in SI and no code-unit anchor is
+# declared. Conversion is then a no-op, which makes every electromagnetic
+# quantity unsafe: pypic computes with mu_0 = 1 and SI data does not.
+# A deck that wants its SI arrays handled correctly declares a real anchor
+# and sets data_in_si, which rescales them on load:
 #
-# [units.reference]
-# length   = 5.31e-3                   # meters       — required
-# time     = 1.77e-11                  # seconds      — or velocity
-# velocity = 2.998e8                   # m/s          — or time
-# b_field  = 1.07e-3                   # Tesla        — or e_field
-# e_field  = 3.21e5                    # V/m          — or b_field
-# density  = 1.0e18                    # m⁻³          — required
-# mass     = 9.109e-31                 # kg           — default m_e
-# charge   = 1.602e-19                 # C            — default e
+# [units]
+# anchor     = "explicit"
+# data_in_si = true
+# reference_length       = 6.371e6
+# reference_mass_density = 1.67e-17
+# reference_b_field      = 5.0e-9
 
 [coordinates]
 geometry             = "cartesian"     # "cartesian" | "spherical" | "cylindrical"
@@ -615,7 +640,7 @@ frame      = "simulation"
 # sparsity_threshold = 1.0e-15                 # density floor; blocks below drop
 
 [schema]
-version = "1.0"
+version = "2.0"
 created = 2026-04-23
 
 
@@ -778,10 +803,10 @@ created = 2026-04-23
 # upper = ["outflow",   "open", "open"]
 #
 # [units]
-# system            = "MHD"
-# reference_length  = 6.96e8             # m — solar radius (1 R_sun)
-# reference_density = 1.67e-13           # kg/m³ — coronal base (~1e8 cm⁻³)
-# reference_b_field = 1.0e-4             # T — 1 Gauss (typical active-region field)
+# anchor                 = "explicit"
+# reference_length       = 6.96e8        # m — solar radius (1 R_sun)
+# reference_mass_density = 1.67e-13      # kg/m³ — coronal base (~1e8 cm⁻³)
+# reference_b_field      = 1.0e-4        # T — 1 Gauss (typical active-region field)
 #
 # [coordinates]
 # geometry             = "spherical"
@@ -973,7 +998,7 @@ created = 2026-04-23
 # fields   = ["B_1", "B_2", "B_3", "V_1", "V_2", "V_3", "rho_m", "P", "beta"]
 #
 # [schema]
-# version = "1.0"
+# version = "2.0"
 # created = 2026-04-24
 
 
@@ -1067,9 +1092,9 @@ created = 2026-04-23
 # upper = ["outflow", "open", "open"]
 #
 # [units]
-# system            = "PIC"              # hybrid uses ion-normalized PIC units
+# anchor            = "from_species"     # hybrid: length is the ion skin depth
 # reference_species = "ions"
-# reference_density = 3.0e7              # m⁻³ (Mercury SW protons at 0.4 AU; ~10× Earth)
+# reference_number_density = 3.0e7       # m⁻³ (Mercury SW protons at 0.4 AU; ~10× Earth)
 # reference_mass    = 1.673e-27          # kg — proton mass
 # reference_charge  = 1.602e-19          # C
 #
@@ -1271,5 +1296,5 @@ created = 2026-04-23
 # fields   = ["B_1", "B_2", "B_3", "V_1", "V_2", "V_3", "P_s0"]
 #
 # [schema]
-# version = "1.0"
+# version = "2.0"
 # created = 2026-04-24

@@ -2,7 +2,7 @@
 
 Validates that ``pypic.schema._export.build_schema`` produces a stable,
 self-consistent JSON Schema 2020-12 document, that the on-disk artifact
-at ``src/pypic/schema/simulation.schema.v1.0.json`` stays in sync, and
+at ``src/pypic/schema/simulation.schema.v2.0.json`` stays in sync, and
 that the reference template in ``pypic.simulation.toml`` validates
 against it.
 """
@@ -31,7 +31,7 @@ from pypic.schema import (
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 REFERENCE_TOML = REPO_ROOT / "pypic.simulation.toml"
-ON_DISK_SCHEMA = REPO_ROOT / "src" / "pypic" / "schema" / "simulation.schema.v1.0.json"
+ON_DISK_SCHEMA = REPO_ROOT / "src" / "pypic" / "schema" / "simulation.schema.v2.0.json"
 
 
 def _json_canonicalize(value: Any) -> Any:
@@ -70,13 +70,13 @@ def test_discriminated_unions_roundtrip() -> None:
 
     units = schema["properties"]["units"]
     assert "oneOf" in units
-    assert units["discriminator"]["propertyName"] == "system"
-    expected_mapping = {"PIC", "MHD", "SI", "custom"}
+    assert units["discriminator"]["propertyName"] == "anchor"
+    expected_mapping = {"from_species", "explicit", "si"}
     assert set(units["discriminator"]["mapping"]) == expected_mapping
     for branch in units["oneOf"]:
         ref = branch["$ref"]
         target = schema["$defs"][ref.removeprefix("#/$defs/")]
-        assert target["properties"]["system"]["const"] in expected_mapping
+        assert target["properties"]["anchor"]["const"] in expected_mapping
 
     region = schema["$defs"]["OutputStream"]["properties"]["region"]["anyOf"][0]
     box_or_plane = region.get("$ref") or region.get("oneOf")
@@ -86,7 +86,7 @@ def test_discriminated_unions_roundtrip() -> None:
 def test_strict_vs_extensible_bases_serialize_consistently() -> None:
     schema = build_schema()
 
-    for strict_name in ("Run", "UnitsPIC", "Allocation"):
+    for strict_name in ("Run", "UnitsFromSpecies", "Allocation"):
         node = schema["$defs"][strict_name]
         assert node["additionalProperties"] is False, strict_name
 
@@ -111,12 +111,12 @@ def test_on_disk_artifact_matches_current_models() -> None:
     """Drift guard: regenerated schema must equal the committed file.
 
     Regenerate via:
-        uv run pypic schema export -o src/pypic/schema/simulation.schema.v1.0.json
+        uv run pypic schema export -o src/pypic/schema/simulation.schema.v2.0.json
     """
     assert ON_DISK_SCHEMA.exists(), (
         f"Expected {ON_DISK_SCHEMA} to be committed. Generate via "
         "`uv run pypic schema export -o "
-        "src/pypic/schema/simulation.schema.v1.0.json`."
+        "src/pypic/schema/simulation.schema.v2.0.json`."
     )
     on_disk = ON_DISK_SCHEMA.read_text()
     regenerated = dump_schema(build_schema(), pretty=True)

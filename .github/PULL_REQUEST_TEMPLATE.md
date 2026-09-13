@@ -13,7 +13,7 @@
 
 - [ ] Physics changes cite a source (NRL Formulary, textbook, or paper).
 - [ ] Schema changes edit `src/pypic/schema/_models.py` first, then regenerate:
-      `uv run pypic schema export -o src/pypic/schema/simulation.schema.v1.0.json`
+      `uv run pypic schema export -o src/pypic/schema/simulation.schema.v2.0.json`
       (`./scripts/check.sh schema` verifies it)
 - [ ] A fix to one reader was checked against its siblings (iPIC3D has three
       variants, BATSRUS two).

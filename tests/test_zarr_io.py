@@ -101,7 +101,7 @@ class TestSerializationHelpers:
         rebuilt = dict_to_normalization(
             normalization_to_dict(Normalization.pic_electron(1e18))
         )
-        assert rebuilt.system is UnitSystem.PIC
+        assert rebuilt.system is UnitSystem.FROM_SPECIES
 
     def test_a_dict_without_system_decodes_as_declared(self):
         """Stores written before the key existed keep their meaning."""
@@ -110,7 +110,7 @@ class TestSerializationHelpers:
             for k, v in normalization_to_dict(Normalization.identity()).items()
             if k != "system"
         }
-        assert dict_to_normalization(legacy).system is UnitSystem.CUSTOM
+        assert dict_to_normalization(legacy).system is UnitSystem.EXPLICIT
 
     def test_species_round_trip(self):
         species = (ELECTRONS, IONS)
@@ -339,7 +339,7 @@ class TestToZarrFromZarr:
         )
         store = tmp_path / "declared.zarr"
         to_zarr(fds, store)
-        assert from_zarr(store).normalization.system is UnitSystem.PIC
+        assert from_zarr(store).normalization.system is UnitSystem.FROM_SPECIES
 
     def test_round_trip_basic(self, tmp_path):
         fds = make_test_dataset(
@@ -535,7 +535,7 @@ class TestToZarrFromZarr:
         # and is the single discriminator for both vocabulary and
         # storage shape.  The on-disk path nests under ``schema`` to
         # mirror the TOML form rather than a flat ``schema_version``.
-        assert root.attrs["schema"] == {"version": "1.0"}
+        assert root.attrs["schema"] == {"version": "2.0"}
         assert "schema_version" not in root.attrs
         # Field arrays under /fields, not at the root.
         assert list(root.array_keys()) == []
@@ -557,13 +557,13 @@ class TestToZarrFromZarr:
         assert "c" not in root.attrs["physics"]
 
     def test_from_zarr_rejects_unknown_schema_version(self, tmp_path):
-        # A v2.0 store must not silently decode through the v1.0 path —
+        # A v3.0 store must not silently decode through the v2.0 path —
         # see schema.md §1 *Versioning* (single-discriminator promise).
         fds = make_test_dataset({"B_1": np.ones((4, 3, 2))})
         store = tmp_path / "future.zarr"
         to_zarr(fds, store)
         root = zarr.open_group(str(store), mode="a")
-        root.attrs["schema"] = {"version": "2.0"}
+        root.attrs["schema"] = {"version": "3.0"}
         if hasattr(zarr, "consolidate_metadata"):
             zarr.consolidate_metadata(str(store))
         with pytest.raises(ValueError, match=r"schema\.version"):
@@ -657,7 +657,7 @@ class TestRunAndSimulationTomlRoundTrip:
 
     _SAMPLE_TOML = """\
 [schema]
-version = "1.0"
+version = "2.0"
 
 [model]
 name = "TestCode"
@@ -682,7 +682,7 @@ lower = [0.0, 0.0, 0.0]
 upper = [4.0, 3.0, 2.0]
 
 [units]
-system = "SI"
+anchor = "si"
 
 [coordinates]
 geometry = "cartesian"

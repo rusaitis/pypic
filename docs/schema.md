@@ -30,18 +30,35 @@ lives at `pypic.simulation.toml` at the repo root.
 
 `[schema].version` is the single discriminator for both
 `simulation.toml` and the on-disk output stores (see §4 for the
-on-disk attr path). v1.x is **additive only**: future releases may
+on-disk attr path). v2.x is **additive only**: future releases may
 add optional sections, optional keys, canonical field names, and
 enum values, but will not rename or remove existing canonical names
-and will not move required keys. (For reference, the v0 → v1.0
-rename list: `omega_pe_over_omega_ce` → `omega_p_over_omega_c`.)
-Anything stricter — e.g., a removal or rename — bumps
-`[schema].version` to `2.0`.
+and will not move required keys. Anything stricter — e.g., a removal
+or rename — bumps `[schema].version` to `3.0`.
+
+**v1.0 → v2.0 rename list.** The whole break is `[units]`:
+
+| v1.0 | v2.0 |
+|---|---|
+| `[units].system` | `[units].anchor` |
+| `system = "PIC"` | `anchor = "from_species"` |
+| `system = "MHD"` | `anchor = "explicit"` (with `reference_mass_density`) |
+| `system = "custom"` + `[units.reference]` sub-table | `anchor = "explicit"` with flat `reference_*` keys |
+| `system = "SI"` | `anchor = "si"` |
+| `reference_density` (m⁻³ under PIC, kg/m³ under MHD) | `reference_number_density` / `reference_mass_density` |
+| `[units.reference].length`, `.time`, ... | `reference_length`, `reference_time`, ... |
+
+Nothing outside `[units]` moved, and the eight `*_ref` storage
+primitives in §4 are unchanged. The rename is not cosmetic: it is
+what let the `MHD` and `custom` forms collapse into one, and it
+removes a key whose unit depended on which variant you were in.
+(For reference, the earlier v0 → v1.0 rename list:
+`omega_pe_over_omega_ce` → `omega_p_over_omega_c`.)
 
 **`x-*` extensions are unconstrained.** Code-specific knobs under
 `x-<code>.*` (or unknown sub-tables under
 `[physics.{pic,mhd,hybrid,vlasov}]`) are accepted by the validator
-without enforcement; v1.x will not break them, but also makes no
+without enforcement; v2.x will not break them, but also makes no
 promises about their portability.
 
 **User-facing constraint: species ordering is part of the deck's
@@ -359,19 +376,25 @@ not constrained by the schema (different codes use different vocabularies:
 
 ### [units]
 
-Defines the normalization, allowing conversion between code units and SI.
-Two approaches: specify the normalization system and let the consumer
-derive reference values, or specify reference values directly.
+Defines the normalization, allowing conversion between code units and
+SI. `anchor` says **how the eight SI references were closed** — not
+which code produced the data, which is `[model].type`. The two are
+independent: a hybrid run is `type = "hybrid"` with
+`anchor = "from_species"`, and neither field repeats the other.
 
-**Approach A: named normalization (preferred for PIC/MHD)**
+Three forms, distinguished by where the length unit comes from.
+
+**`anchor = "from_species"` — length derived from microphysics**
+
+For codes that resolve a kinetic scale: PIC, hybrid, and anything
+gridded in skin depths. The length unit is *derived* from the
+reference species' plasma frequency, $l_{ref} = c/\omega_{ref}$.
 
 ```toml
 [units]
-system = "PIC"                     # "PIC" | "MHD" | "SI" | "custom"
-
-# PIC normalization: derive all reference values from a reference species.
+anchor = "from_species"
 reference_species = "electrons"    # optional: "electrons" (default) | "ions" | species name
-reference_density = 1.0e18         # m⁻³ (number density of reference species)
+reference_number_density = 1.0e18  # m⁻³ — REQUIRED (number density of the reference species)
 reference_mass = 9.109e-31         # kg (optional, default: electron mass)
 reference_charge = 1.602e-19       # C (optional, default: elementary charge, a magnitude)
 speed_of_light = 2.998e8           # m/s (optional, default scipy.constants.c)
@@ -387,17 +410,12 @@ builtins `"electrons"` / `"ions"` / `"protons"` are accepted as a
 fallback when no matching entry exists, so legacy decks parse
 without forcing a rename.
 
-**`reference_velocity`, and hybrid codes.** The `"PIC"` branch names
-an *anchor parameterization*, not a code type: it derives the eight
-storage primitives from a reference species plus a velocity unit.
-`[model].type` is where the code says it is `"PIC"`, `"hybrid"`,
-`"vlasov"` or `"gyrokinetic"`.
-
-The velocity unit defaults to `speed_of_light`, which is the PIC
-convention. Hybrid codes normalize to the Alfvén speed instead, so
-they set `reference_velocity` to it. Given $l_{ref} = c/\omega_{ref}$
-(the reference-species skin depth, unaffected by the velocity unit),
-the rest follow:
+**`reference_velocity`, and hybrid codes.** The velocity unit
+defaults to `speed_of_light`, which is the PIC convention. Hybrid
+codes normalize to the Alfvén speed instead, so they set
+`reference_velocity` to it. Given $l_{ref} = c/\omega_{ref}$ (the
+reference-species skin depth, unaffected by the velocity unit), the
+rest follow:
 
 $$t_{ref} = \frac{l_{ref}}{v_{ref}}, \quad
 B_{ref} = v_{ref}\sqrt{\mu_0 n_{ref} m_{ref}}, \quad
@@ -410,66 +428,142 @@ textbook hybrid normalization. At the default $v_{ref} = c$ the two
 expressions reduce to $1/\omega_{ref}$ and $m_{ref}\omega_{ref}/q_{ref}$,
 so decks that omit the key are unaffected.
 
+**`speed_of_light` below $c$ is a trap, and warns.** It scales the
+velocity unit but not $B_{ref}$, which drives the rationalization
+ratio below to $(c_{SI}/c_{ref})^2$ and every EM conversion with it.
+A genuinely different velocity unit is `reference_velocity`; a
+dimensionless modelling choice is `scaling_factor` /
+`scaling_description`, which do not affect computation.
+
+**`anchor = "explicit"` — length given**
+
+For MHD, PLUTO/Athena++-class codes, gyrokinetics, and any hand-built
+reference set. Three relations close the eight primitives:
+
+$$v = \frac{l}{t}, \qquad E = vB, \qquad B = v\sqrt{\mu_0 n m}$$
+
+The third ties the field, velocity and density scales together, so a
+deck supplies `reference_length` plus **any two** of the three scales,
+and the third follows:
+
+| Scale | Keys |
+|---|---|
+| velocity | `reference_velocity` or `reference_time` |
+| density | `reference_number_density` (m⁻³) or `reference_mass_density` (kg/m³) |
+| field | `reference_b_field` or `reference_e_field` |
+
 ```toml
+# MHD — length, mass density, field
 [units]
-system = "MHD"
-# MHD normalization: derive all reference values from these
-reference_length = 6.371e6         # meters (e.g., Earth radius)
-reference_density = 1.67e-17       # kg/m³ (e.g., solar wind)
-reference_b_field = 5.0e-9         # Tesla (e.g., 5 nT)
+anchor = "explicit"
+reference_length       = 6.371e6   # m (e.g. Earth radius) — REQUIRED
+reference_mass_density = 1.67e-17  # kg/m³ (e.g. solar wind)
+reference_b_field      = 5.0e-9    # T (e.g. 5 nT)
+
+# PLUTO / Athena++ — the same form anchored on velocity instead
+[units]
+anchor = "explicit"
+reference_length       = 1.496e11  # UNIT_LENGTH
+reference_mass_density = 1.0e-20   # UNIT_DENSITY
+reference_velocity     = 1.0e5     # UNIT_VELOCITY
 ```
 
-**Approach B: explicit reference values (for custom normalizations)**
+`reference_mass` defaults to the **proton mass** and
+`reference_charge` to $|e|$, whichever density spelling is used.
+Keying the default off the spelling would make two decks describing
+one plasma disagree by $m_p/m_e$ in silence.
+
+**Over-supply is legal; duplicate spellings are not.** Naming the
+density twice (`reference_number_density` *and*
+`reference_mass_density`) is a validation error, because which unit
+the number carries would be ambiguous. Naming two *different*
+primitives redundantly is accepted as given: the relations then
+describe rather than derive. That is what gyrokinetic decks need,
+where $v \neq l/t$ by $\rho_*$ and $B^2 \neq \mu_0 n m v^2$ by
+$2/\beta$ on purpose. No tolerance gate could tell a deliberate
+$2/\beta$ from a typo, so the schema does not try — it reports
+instead, via `Normalization.rationalization_ratio`.
+
+A set that leaves two of the three scales unstated is rejected at
+validation time, naming what would have closed it: a normalization
+with no SI meaning is worse than no normalization, because filling
+it with 1.0 returns code units labelled as tesla.
+
+**`anchor = "si"` — SI data with no code-unit anchor**
 
 ```toml
 [units]
-system = "custom"
-
-[units.reference]                  # all in SI, all magnitudes (unsigned)
-length = 5.31e-3                   # meters — REQUIRED
-time = 1.77e-11                    # REQUIRED unless `velocity` is given
-velocity = 2.998e8                 # REQUIRED unless `time` is given
-b_field = 1.07e-3                  # REQUIRED unless `e_field` is given
-e_field = 3.21e5                   # REQUIRED unless `b_field` is given
-density = 1.0e18                   # REQUIRED
-mass = 9.109e-31                   # optional, default: electron mass
-charge = 1.602e-19                 # optional, default: elementary charge
-# `speed_of_light` stays at top-level [units].speed_of_light
-# regardless of approach; it never appears under [units.reference].
+anchor = "si"
 ```
 
-**Determining set.** Two relations tie these together — $v = l / t$
-and $E = v B$ — so a deck supplies one of each coupled pair and the
-validator derives the other. Nothing derives `length` or `density`,
-so both are required; `mass` and `charge` fall back to the electron
-values. A table that leaves the velocity or magnetic anchor
-undetermined is rejected at validation time, naming the key that
-would have closed it: a normalization missing one of these has no SI
-meaning, and filling it with 1.0 would return code units labelled as
-tesla.
+All eight references are 1.0, so conversion is a no-op. That makes
+**electromagnetic quantities unsafe**: `pypic.derived` computes in
+SI-*rationalized* units where $\mu_0 = 1$, and SI data has
+$\mu_0 = 1.2566\times10^{-6}$, so anything carrying a vacuum constant
+is wrong by a power of it. Dimensionless quantities ($\beta$, Mach
+numbers, agyrotropy) and non-EM ones (density, pressure, temperature,
+$|V|$) are unaffected.
 
-If `system` is "SI", all data is already in SI and no conversion is needed
-(all reference values = 1.0).
+**`data_in_si` — the second, orthogonal axis**
 
-**Input vs storage naming.** TOML inputs (Approach A's
-`reference_*` keys, Approach B's bare keys under `[units.reference]`)
-are canonicalized at read time into the eight `*_ref` storage
-primitives surfaced in §4 (`length_ref`, `time_ref`, `velocity_ref`,
+A deck whose arrays are in SI and which wants them computed on
+correctly declares a real anchor and asks for the rescale:
+
+```toml
+[units]
+anchor     = "explicit"
+data_in_si = true                  # arrays on disk are SI; rescale on load
+reference_length       = 6.371e6
+reference_mass_density = 8.35e-21
+reference_b_field      = 5.0e-9
+```
+
+`anchor` says how the references were closed; `data_in_si` says what
+the numbers on disk are measured in. They were one field before 2.0,
+which is why SI data had no way to name an anchor and so no way to be
+normalized correctly. Rescaling SI data needs an anchor to rescale
+*against*, so `data_in_si` on the `si` anchor is a validation error
+rather than a silent no-op.
+
+Readers whose *format* fixes its own unit convention — OpenGGCM,
+BATSRUS, iPIC3D — convert at their own boundary and never consult the
+flag. It is for the generic path, where the deck is the only thing
+that knows.
+
+**The rationalization ratio.** $B_{ref}^2 / (\mu_0 n_{ref} m_{ref}
+v_{ref}^2)$ is 1 exactly when a reference set matches the
+SI-rationalized convention `pypic.derived` computes in. Its *value*
+names the convention rather than grading it:
+
+| Ratio | Convention |
+|---|---|
+| 1 | SI-rationalized — PIC, MHD, hybrid, and every consistent set |
+| $1/\mu_0$ | data already in SI |
+| $(c_{SI}/c_{ref})^2$ | a reduced speed of light |
+| $2/\beta$ | gyrokinetic (gyro-Bohm) |
+
+Reported, never enforced: the last two are deliberate physics.
+`pypic info` shows it whenever it is not 1.
+
+**Input vs storage naming.** The `reference_*` TOML inputs are
+canonicalized at read time into the eight `*_ref` storage primitives
+surfaced in §4 (`length_ref`, `time_ref`, `velocity_ref`,
 `b_field_ref`, `e_field_ref`, `density_ref`, `mass_ref`,
-`charge_ref`). Approach A derives the missing primitives (e.g. PIC
-inputs supply density/mass/charge plus `speed_of_light`; time and
-velocity references are derived from those); Approach B supplies
-each primitive directly. The `*_ref` form is the single name a
-non-pypic reader of the on-disk store needs to know.
+`charge_ref`). `from_species` derives the missing primitives from the
+reference species; `explicit` derives them from the three relations.
+The `*_ref` form is the single name a non-pypic reader of the on-disk
+store needs to know, and it did not change at 2.0.
 
-`system` is carried through to the store alongside the eight
-primitives (§4.2), where `null` means no `[units]` section declared
-one. The distinction matters because a missing `[units]` section and
-`system = "SI"` both leave all eight references at 1.0 while meaning
-opposite things: the first says the SI anchor is unknown, the second
-asserts the data already *is* SI. A consumer that converts to SI on a
-`null` system converts nothing and mislabels code units — pypic
-raises there rather than returning a wrong number.
+`anchor` is carried through to the store as `system` alongside the
+eight primitives (§4.2) — the store key names the Python attribute
+`Normalization.system`, and `null` there means no `[units]` section
+declared an anchor. The distinction matters because a missing
+`[units]` section and `anchor = "si"` both leave all eight references
+at 1.0 while meaning opposite things: the first says the SI anchor is
+unknown, the second asserts the data already *is* SI. A consumer that
+converts to SI on a `null` anchor converts nothing and mislabels code
+units — pypic raises there rather than returning a wrong number.
+
 
 ### [coordinates]
 
@@ -1562,7 +1656,7 @@ groups vs Zarr root attrs).
 | `[boundary_conditions]` | `/boundary_conditions/` group + optional `field_overrides/` sub-group | `attrs.boundary_conditions` |
 | `[coordinates]` (geometry, frame, axis_labels, physical_extent, modes) | `/coordinates/` group | `attrs.coordinates` |
 | `[coordinates.transforms]` | `/coordinates/transforms/<name>/` sub-groups | `attrs.coordinates.transforms` |
-| `[units]` | `/normalization/` group | `attrs.normalization` (the eight `*_ref` primitives, plus `system` and `speed_of_light`) |
+| `[units]` | `/normalization/` group | `attrs.normalization` (the eight `*_ref` primitives, plus `system` and `speed_of_light`). The store key stays `system` — it names the Python attribute `Normalization.system`, not the TOML key, which is `anchor`. |
 | `[[species]]` | `/species/{s0,s1,...}/` sub-groups | `attrs.species` (list, in declaration order) |
 | `[physics]` | `/physics/` group + model sub-groups | `attrs.physics` |
 | `[run]` (optional) | `/run/` group with attrs (writer-side contract; pypic readers do not yet round-trip it) | `attrs.run` (typed; `Run.model_dump`; round-trips end-to-end) |

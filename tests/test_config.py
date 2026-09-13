@@ -1,8 +1,9 @@
-"""Tests for ``load_config`` — the Pydantic-backed v1.0 TOML loader."""
+"""Tests for ``load_config`` — the Pydantic-backed v2.0 TOML loader."""
 
 from __future__ import annotations
 
 import logging
+import warnings
 from pathlib import Path
 from typing import Any
 
@@ -12,7 +13,7 @@ from pydantic import ValidationError
 from scipy import constants
 
 from pypic.readers.config import LENGTH_UNITS, apply_physical_extent, load_config
-from pypic.units import PhysicsParams
+from pypic.units import Normalization, PhysicsParams
 
 EXAMPLE_TOML = (
     Path(__file__).resolve().parent.parent / "examples" / "ipic3d-double-harris.toml"
@@ -29,16 +30,16 @@ def _shell(
         "[grid]\ndimensions = [2, 2, 2]\nspacing = [1.0, 1.0, 1.0]\n"
         "lower = [0.0, 0.0, 0.0]\nupper = [2.0, 2.0, 2.0]"
     ),
-    units: str = '[units]\nsystem = "SI"',
+    units: str = '[units]\nanchor = "si"',
     coordinates: str = '[coordinates]\ngeometry = "cartesian"\nframe = "sim"',
     species: str = '[[species]]\nname = "e"\ncharge = -1.0\nmass = 0.004',
     extra: str = "",
 ) -> str:
-    """Assemble a valid v1.0 TOML doc, with per-section overrides."""
+    """Assemble a valid v2.0 TOML doc, with per-section overrides."""
     return (
         "\n\n".join(
             [
-                '[schema]\nversion = "1.0"',
+                '[schema]\nversion = "2.0"',
                 model,
                 '[run]\nname = "r0"',
                 time,
@@ -147,7 +148,7 @@ class TestGrid:
 
 class TestUnits:
     def test_pic_electron_default(self, tmp_path: Path) -> None:
-        units = '[units]\nsystem = "PIC"\nreference_density = 1.0e18'
+        units = '[units]\nanchor = "from_species"\nreference_number_density = 1.0e18'
         cfg = load_config(_write(tmp_path, _shell(units=units)))
         np.testing.assert_allclose(
             cfg.normalization.velocity_ref, constants.c, rtol=1e-10
@@ -158,8 +159,8 @@ class TestUnits:
 
     def test_pic_ion_reference(self, tmp_path: Path) -> None:
         units = (
-            '[units]\nsystem = "PIC"\nreference_species = "ions"\n'
-            "reference_density = 1.0e18"
+            '[units]\nanchor = "from_species"\nreference_species = "ions"\n'
+            "reference_number_density = 1.0e18"
         )
         cfg = load_config(_write(tmp_path, _shell(units=units)))
         np.testing.assert_allclose(
@@ -168,8 +169,8 @@ class TestUnits:
 
     def test_pic_unknown_species_requires_explicit_mass(self, tmp_path: Path) -> None:
         units = (
-            '[units]\nsystem = "PIC"\nreference_species = "alpha"\n'
-            "reference_density = 1.0e18"
+            '[units]\nanchor = "from_species"\nreference_species = "alpha"\n'
+            "reference_number_density = 1.0e18"
         )
         with pytest.raises(ValidationError, match="reference_species"):
             load_config(_write(tmp_path, _shell(units=units)))
@@ -177,8 +178,8 @@ class TestUnits:
     def test_pic_unknown_species_with_explicit_mass(self, tmp_path: Path) -> None:
         species = '[[species]]\nname = "alpha"\ncharge = 2.0\nmass = 4.0'
         units = (
-            '[units]\nsystem = "PIC"\nreference_species = "alpha"\n'
-            "reference_density = 1.0e18\n"
+            '[units]\nanchor = "from_species"\nreference_species = "alpha"\n'
+            "reference_number_density = 1.0e18\n"
             "reference_mass = 6.644e-27\n"
             "reference_charge = 3.204e-19"
         )
@@ -187,8 +188,8 @@ class TestUnits:
 
     def test_mhd(self, tmp_path: Path) -> None:
         units = (
-            '[units]\nsystem = "MHD"\nreference_length = 6.371e6\n'
-            "reference_density = 1.67e-17\nreference_b_field = 5.0e-9"
+            '[units]\nanchor = "explicit"\nreference_length = 6.371e6\n'
+            "reference_mass_density = 1.67e-17\nreference_b_field = 5.0e-9"
         )
         cfg = load_config(
             _write(
@@ -205,19 +206,20 @@ class TestUnits:
         cfg = load_config(_write(tmp_path, _shell()))
         assert cfg.normalization.is_identity
 
-    def test_custom(self, tmp_path: Path) -> None:
+    def test_explicit_every_reference_given(self, tmp_path: Path) -> None:
         units = (
-            '[units]\nsystem = "custom"\n'
-            "[units.reference]\nlength = 5.31e-3\ntime = 1.77e-11\n"
-            "velocity = 2.998e8\nb_field = 1.07e-3\ne_field = 3.21e5\n"
-            "density = 1.0e18\nmass = 9.109e-31\ncharge = 1.602e-19"
+            '[units]\nanchor = "explicit"\n'
+            "reference_length = 5.31e-3\nreference_time = 1.77e-11\n"
+            "reference_velocity = 2.998e8\nreference_b_field = 1.07e-3\n"
+            "reference_e_field = 3.21e5\nreference_number_density = 1.0e18\n"
+            "reference_mass = 9.109e-31\nreference_charge = 1.602e-19"
         )
         cfg = load_config(_write(tmp_path, _shell(units=units)))
         np.testing.assert_allclose(cfg.normalization.length_ref, 5.31e-3, rtol=1e-10)
 
-    def test_custom_missing_reference_subtable(self, tmp_path: Path) -> None:
-        units = '[units]\nsystem = "custom"'
-        with pytest.raises(ValidationError, match="reference"):
+    def test_explicit_without_a_length_is_rejected(self, tmp_path: Path) -> None:
+        units = '[units]\nanchor = "explicit"\nreference_number_density = 1.0e18'
+        with pytest.raises(ValidationError, match="reference_length"):
             load_config(_write(tmp_path, _shell(units=units)))
 
     def test_omitted_references_are_derived(self, tmp_path: Path) -> None:
@@ -228,31 +230,42 @@ class TestUnits:
         same numbers, or the relations are not the ones documented.
         """
         units = (
-            '[units]\nsystem = "custom"\n'
-            "[units.reference]\nlength = 5.31e-3\ntime = 1.77e-11\n"
-            "b_field = 1.07e-3\ndensity = 1.0e18"
+            '[units]\nanchor = "explicit"\n'
+            "reference_length = 5.31e-3\nreference_time = 1.77e-11\n"
+            "reference_b_field = 1.07e-3\nreference_number_density = 1.0e18"
         )
         norm = load_config(_write(tmp_path, _shell(units=units))).normalization
         np.testing.assert_allclose(norm.velocity_ref, 5.31e-3 / 1.77e-11, rtol=1e-10)
         np.testing.assert_allclose(norm.e_field_ref, 3.21e5, rtol=1e-3)
 
-    def test_omitted_mass_and_charge_fall_back_to_electron(
+    def test_omitted_mass_and_charge_fall_back_to_the_proton(
         self, tmp_path: Path
     ) -> None:
-        units = (
-            '[units]\nsystem = "custom"\n'
-            "[units.reference]\nlength = 5.31e-3\nvelocity = 2.998e8\n"
-            "b_field = 1.07e-3\ndensity = 1.0e18"
+        """One default whichever density spelling is used.
+
+        Keying it off the spelling would make two decks describing one
+        plasma disagree by $m_p/m_e$ in silence.
+        """
+        common = (
+            '[units]\nanchor = "explicit"\n'
+            "reference_length = 5.31e-3\nreference_velocity = 2.998e8\n"
+            "reference_b_field = 1.07e-3\n"
         )
-        norm = load_config(_write(tmp_path, _shell(units=units))).normalization
-        np.testing.assert_allclose(norm.mass_ref, constants.m_e, rtol=1e-10)
-        np.testing.assert_allclose(norm.charge_ref, constants.e, rtol=1e-10)
+        for density_key in (
+            "reference_number_density = 1.0e18",
+            "reference_mass_density = 1.0e-9",
+        ):
+            norm = load_config(
+                _write(tmp_path, _shell(units=common + density_key))
+            ).normalization
+            np.testing.assert_allclose(norm.mass_ref, constants.m_p, rtol=1e-10)
+            np.testing.assert_allclose(norm.charge_ref, constants.e, rtol=1e-10)
 
     def test_reference_velocity_defaults_to_the_speed_of_light(
         self, tmp_path: Path
     ) -> None:
         """Omitting the key reproduces the PIC references exactly."""
-        pic = '[units]\nsystem = "PIC"\nreference_density = 1.0e6'
+        pic = '[units]\nanchor = "from_species"\nreference_number_density = 1.0e6'
         norm = load_config(_write(tmp_path, _shell(units=pic))).normalization
         assert norm.velocity_ref == constants.c
 
@@ -267,8 +280,8 @@ class TestUnits:
         speed as the velocity unit forces the ion cyclotron time.
         """
         units = (
-            '[units]\nsystem = "PIC"\nreference_species = "ions"\n'
-            "reference_density = 1.0e6\nreference_mass = 1.673e-27\n"
+            '[units]\nanchor = "from_species"\nreference_species = "ions"\n'
+            "reference_number_density = 1.0e6\nreference_mass = 1.673e-27\n"
             "reference_velocity = 1.0e5"
         )
         norm = load_config(_write(tmp_path, _shell(units=units))).normalization
@@ -277,6 +290,134 @@ class TestUnits:
         np.testing.assert_allclose(
             norm.velocity_ref * norm.time_ref, norm.length_ref, rtol=1e-10
         )
+
+    def test_pluto_shaped_deck_derives_the_field_from_velocity(
+        self, tmp_path: Path
+    ) -> None:
+        r"""PLUTO's own three units, which v1.0 could not express.
+
+        `UNIT_LENGTH` / `UNIT_DENSITY` / `UNIT_VELOCITY` left $B_{ref}$
+        looking absent, and the deck was rejected as underdetermined —
+        but $B$ is determined, by $B = v\sqrt{\mu_0 \rho_m}$.
+        """
+        units = (
+            '[units]\nanchor = "explicit"\n'
+            "reference_length = 1.496e11\n"
+            "reference_mass_density = 1.0e-20\n"
+            "reference_velocity = 1.0e5"
+        )
+        norm = load_config(_write(tmp_path, _shell(units=units))).normalization
+        assert norm.velocity_ref == 1.0e5
+        np.testing.assert_allclose(
+            norm.b_field_ref,
+            1.0e5 * np.sqrt(constants.mu_0 * 1.0e-20),
+            rtol=1e-12,
+        )
+
+    def test_the_mhd_shape_reproduces_mhd_standard_exactly(
+        self, tmp_path: Path
+    ) -> None:
+        """The explicit form subsumes the old MHD form with no drift.
+
+        Exact rather than approximate because the loader derives the
+        velocity from $\rho_m$ directly; routing it through
+        $n = \rho_m/m$ and back is not bit-exact for ~3% of double
+        mass densities.
+        """
+        units = (
+            '[units]\nanchor = "explicit"\n'
+            "reference_length = 6.371e6\n"
+            "reference_mass_density = 1.67e-17\n"
+            "reference_b_field = 5.0e-9"
+        )
+        norm = load_config(_write(tmp_path, _shell(units=units))).normalization
+        legacy = Normalization.mhd_standard(6.371e6, 1.67e-17, 5.0e-9)
+        drifted = {
+            name: (getattr(norm, name), getattr(legacy, name))
+            for name in (
+                "length_ref",
+                "time_ref",
+                "velocity_ref",
+                "b_field_ref",
+                "e_field_ref",
+                "density_ref",
+                "mass_ref",
+                "charge_ref",
+            )
+            if getattr(norm, name) != getattr(legacy, name)
+        }
+        assert not drifted, f"explicit form drifted from mhd_standard: {drifted}"
+
+    def test_an_over_supplied_deck_is_taken_verbatim(self, tmp_path: Path) -> None:
+        r"""Gyrokinetic decks are deliberately inconsistent, and must load.
+
+        Gyro-Bohm normalization breaks $v = l/t$ by $\rho_*$ and the
+        rationalization ratio by $2/\beta$ on purpose, so the relations
+        have to describe rather than derive once a deck states all three
+        scales itself.
+        """
+        units = (
+            '[units]\nanchor = "explicit"\n'
+            "reference_length = 1.2e-3\n"
+            "reference_time = 4.0e-6\n"
+            "reference_velocity = 3.0e5\n"
+            "reference_number_density = 1.0e19\n"
+            "reference_b_field = 2.5\n"
+            "reference_mass = 3.343e-27"
+        )
+        norm = load_config(_write(tmp_path, _shell(units=units))).normalization
+        assert norm.length_ref == 1.2e-3
+        assert norm.time_ref == 4.0e-6
+        assert norm.velocity_ref == 3.0e5
+        assert norm.b_field_ref == 2.5
+        # The set is not SI-rationalized, and says so rather than being fixed.
+        assert not np.isclose(norm.rationalization_ratio, 1.0, rtol=1e-2)
+
+    def test_reduced_speed_of_light_warns_that_it_breaks_mu_0_equals_one(
+        self, tmp_path: Path
+    ) -> None:
+        r"""Scaling *c* moves $v_{ref}$ but not $B_{ref}$, so $\mu_0 \neq 1$.
+
+        The ratio lands on $(c_{SI}/c_{ref})^2$ and every EM conversion
+        is wrong by it — silently, before this warning.
+        """
+        units = (
+            '[units]\nanchor = "from_species"\n'
+            "reference_number_density = 1.0e18\nspeed_of_light = 2.9979e7"
+        )
+        with pytest.warns(UserWarning, match="rationalization ratio"):
+            norm = load_config(_write(tmp_path, _shell(units=units))).normalization
+        np.testing.assert_allclose(norm.rationalization_ratio, 100.0, rtol=1e-4)
+
+    @pytest.mark.parametrize("written_c", ["2.998e8", "3.0e8", "2.99792458e8"])
+    def test_a_rounded_speed_of_light_is_not_a_reduced_one(
+        self, tmp_path: Path, written_c: str
+    ) -> None:
+        """Decks write *c* to a few digits; that must not read as a rescale.
+
+        The gap is wide — rounding moves the ratio by at most ~1e-3,
+        the smallest reduction anyone runs moves it past 1.1.
+        """
+        units = (
+            '[units]\nanchor = "from_species"\n'
+            f"reference_number_density = 1.0e18\nspeed_of_light = {written_c}"
+        )
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            load_config(_write(tmp_path, _shell(units=units)))
+
+    def test_reference_velocity_is_the_reduced_velocity_unit_that_stays_rational(
+        self, tmp_path: Path
+    ) -> None:
+        """The coherent knob for a non-*c* velocity unit warns about nothing."""
+        units = (
+            '[units]\nanchor = "from_species"\n'
+            "reference_number_density = 1.0e18\nreference_velocity = 2.9979e7"
+        )
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            norm = load_config(_write(tmp_path, _shell(units=units))).normalization
+        np.testing.assert_allclose(norm.rationalization_ratio, 1.0, rtol=1e-9)
 
     def test_signed_reference_charge_names_the_key_it_rejects(
         self, tmp_path: Path
@@ -288,20 +429,20 @@ class TestUnits:
         which the deck never mentions.
         """
         units = (
-            '[units]\nsystem = "PIC"\n'
-            "reference_density = 1.0e18\nreference_charge = -1.602e-19"
+            '[units]\nanchor = "from_species"\n'
+            "reference_number_density = 1.0e18\nreference_charge = -1.602e-19"
         )
         with pytest.raises(ValidationError, match="reference_charge"):
             load_config(_write(tmp_path, _shell(units=units)))
 
     def test_unknown_system(self, tmp_path: Path) -> None:
-        units = '[units]\nsystem = "CGS"'
+        units = '[units]\nanchor = "CGS"'
         with pytest.raises(ValidationError, match="CGS"):
             load_config(_write(tmp_path, _shell(units=units)))
 
     def test_scaling_metadata(self, tmp_path: Path) -> None:
         units = (
-            '[units]\nsystem = "SI"\nscaling_factor = 10.0\n'
+            '[units]\nanchor = "si"\nscaling_factor = 10.0\n'
             'scaling_description = "reduced c/v_A"'
         )
         cfg = load_config(_write(tmp_path, _shell(units=units)))
@@ -444,7 +585,7 @@ class TestValidationAggregation:
         # reports all errors in a single ValidationError (not ExceptionGroup).
         toml = _shell(
             model='[model]\nname = "t"\ntype = "not_a_type"',
-            units='[units]\nsystem = "CGS"',
+            units='[units]\nanchor = "CGS"',
             coordinates='[coordinates]\ngeometry = "toroidal"\nframe = "sim"',
         )
         with pytest.raises(ValidationError) as exc_info:
@@ -468,8 +609,8 @@ _SCALING_TOML = _shell(
         'axis_labels = ["x_GSM", "y_GSM", "z_GSM"]'
     ),
     units=(
-        '[units]\nsystem = "PIC"\nreference_species = "ions"\n'
-        "reference_density = 0.25e6"
+        '[units]\nanchor = "from_species"\nreference_species = "ions"\n'
+        "reference_number_density = 0.25e6"
     ),
     species='[[species]]\nname = "ions"\ncharge = 1.0\nmass = 1.0',
 )
@@ -607,8 +748,8 @@ class TestMergeSimulationToml:
                     "lower = [0.0, 0.0, 0.0]\nupper = [5.0, 5.0, 5.0]"
                 ),
                 units=(
-                    '[units]\nsystem = "MHD"\nreference_length = 6.371e6\n'
-                    "reference_density = 1.67e-17\nreference_b_field = 5.0e-9"
+                    '[units]\nanchor = "explicit"\nreference_length = 6.371e6\n'
+                    "reference_mass_density = 1.67e-17\nreference_b_field = 5.0e-9"
                 ),
                 coordinates=(
                     '[coordinates]\ngeometry = "cartesian"\nframe = "simulation"'
@@ -908,8 +1049,8 @@ class TestPhysicsBranches:
 
     def test_mhd_branch_into_extra(self, tmp_path: Path) -> None:
         units = (
-            '[units]\nsystem = "MHD"\nreference_length = 6.371e6\n'
-            "reference_density = 1.67e-17\nreference_b_field = 5.0e-9"
+            '[units]\nanchor = "explicit"\nreference_length = 6.371e6\n'
+            "reference_mass_density = 1.67e-17\nreference_b_field = 5.0e-9"
         )
         physics = (
             "[physics]\nrelativistic = false\n"
@@ -961,8 +1102,8 @@ class TestPhysicsBranches:
                     _shell(
                         model='[model]\nname = "t"\ntype = "MHD"',
                         units=(
-                            '[units]\nsystem = "MHD"\nreference_length = 1e6\n'
-                            "reference_density = 1.0e-15\nreference_b_field = 1e-9"
+                            '[units]\nanchor = "explicit"\nreference_length = 1e6\n'
+                            "reference_mass_density = 1.0e-15\nreference_b_field = 1e-9"
                         ),
                         extra=physics,
                     ),

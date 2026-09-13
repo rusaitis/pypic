@@ -1,4 +1,4 @@
-"""JSON Schema export for the pypic ``simulation.toml`` v1.0 schema.
+"""JSON Schema export for the pypic ``simulation.toml`` v2.0 schema.
 
 Generates a stable, post-processed JSON Schema 2020-12 document from the
 Pydantic v2 models in `pypic.schema._models`. Pydantic's raw
@@ -51,7 +51,7 @@ def build_schema(
     ----------
     include_x_extensions
         When True, annotate non-strict object schemas with
-        ``patternProperties: {"^x[-_]": {}}`` to document the v1.0
+        ``patternProperties: {"^x[-_]": {}}`` to document the v2.0
         ``x-<code>`` extension namespace. Off by default for a leaner
         document; the namespace is described in the top-level
         ``$comment`` regardless.
@@ -172,7 +172,7 @@ def _annotate_x_extensions(schema: dict[str, Any]) -> None:
     Skipped on schemas with ``additionalProperties: false`` — adding
     ``patternProperties`` there would change validation behavior, not
     just annotate. The strict bases (``_StrictBase``) reject ``x-*``
-    keys today; the v1.0 extension convention only applies to extensible
+    keys today; the v2.0 extension convention only applies to extensible
     bases (root, physics sub-tables), which serialize with
     ``additionalProperties: true``.
     """
@@ -199,7 +199,7 @@ def _stamp_metadata(schema: dict[str, Any], *, schema_version: str) -> None:
         "restart.from existence, root-level cross-references to species, "
         "bodies, drivers, and collisions) are enforced at runtime by "
         "pypic.schema.validate_simulation_toml and are not expressible "
-        "in JSON Schema. The v1.0 'x-*' extension namespace is permitted "
+        "in JSON Schema. The v2.0 'x-*' extension namespace is permitted "
         "wherever additionalProperties is true."
     )
 

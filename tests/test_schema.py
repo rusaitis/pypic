@@ -1,4 +1,4 @@
-"""Tests for ``pypic.schema`` — the v1.0 simulation.toml validator."""
+"""Tests for ``pypic.schema`` — the v2.0 simulation.toml validator."""
 
 from __future__ import annotations
 
@@ -11,8 +11,8 @@ from pydantic import ValidationError
 
 from pypic.schema import (
     SimulationSchema,
-    UnitsMHD,
-    UnitsPIC,
+    UnitsExplicit,
+    UnitsFromSpecies,
     validate_simulation_toml,
 )
 
@@ -21,12 +21,12 @@ LIVE_TEMPLATE = REPO_ROOT / "pypic.simulation.toml"
 
 
 def _minimal_doc(**overrides: str) -> str:
-    """Build a minimal valid v1.0 doc, with targeted overrides."""
+    """Build a minimal valid v2.0 doc, with targeted overrides."""
     base = (
         dedent(
             """
         [schema]
-        version = "1.0"
+        version = "2.0"
         [model]
         name = "demo"
         type = "PIC"
@@ -44,7 +44,7 @@ def _minimal_doc(**overrides: str) -> str:
         lower = [0.0, 0.0, 0.0]
         upper = [4.0, 4.0, 4.0]
         [units]
-        system = "SI"
+        anchor = "si"
         [coordinates]
         geometry = "cartesian"
         frame = "sim"
@@ -110,7 +110,7 @@ class TestLiveTemplate:
         s = validate_simulation_toml(LIVE_TEMPLATE)
         assert s.model.name == "iPIC3D"
         assert s.model.type == "PIC"
-        assert s.schema_.version == "1.0"
+        assert s.schema_.version == "2.0"
 
     def test_scenario_a_species_order(self) -> None:
         s = validate_simulation_toml(LIVE_TEMPLATE)
@@ -118,7 +118,7 @@ class TestLiveTemplate:
 
     def test_scenario_a_units_discriminated(self) -> None:
         s = validate_simulation_toml(LIVE_TEMPLATE)
-        assert isinstance(s.units, UnitsPIC)
+        assert isinstance(s.units, UnitsFromSpecies)
         assert s.units.reference_species == "ions"
 
     def test_scenario_a_pic_solver_block_present(self) -> None:
@@ -138,7 +138,7 @@ class TestScenarioBMHD:
         s = validate_simulation_toml(toml)
         assert s.model.type == "MHD"
         assert s.coordinates.geometry == "spherical"
-        assert isinstance(s.units, UnitsMHD)
+        assert isinstance(s.units, UnitsExplicit)
         assert s.time.scheme == "adaptive"
         assert s.physics is not None
         assert s.physics.mhd is not None
@@ -186,10 +186,10 @@ class TestMinimalDoc:
         doc = _minimal_doc() + "\n[x_custom]\nfoo = 1\n"
         validate_simulation_toml(doc)
 
-    def test_rejects_non_v1_schema(self) -> None:
+    def test_rejects_a_future_major_schema(self) -> None:
         doc = dedent("""
             [schema]
-            version = "2.0"
+            version = "3.0"
             [model]
             name = "d"
             type = "PIC"
@@ -206,7 +206,7 @@ class TestMinimalDoc:
             lower = [0.0,0.0,0.0]
             upper = [4.0,4.0,4.0]
             [units]
-            system = "SI"
+            anchor = "si"
             [coordinates]
             geometry = "cartesian"
             frame = "sim"
@@ -215,7 +215,7 @@ class TestMinimalDoc:
             charge = -1
             mass = 1
         """).strip()
-        with pytest.raises(ValidationError, match=r"1\.x"):
+        with pytest.raises(ValidationError, match=r"2\.x"):
             validate_simulation_toml(doc)
 
 
@@ -256,10 +256,10 @@ class TestCrossSectionInvariants:
     def test_reference_species_must_exist(self) -> None:
         doc = _minimal_doc(
             **{
-                'system = "SI"': dedent("""
-                    system = "PIC"
+                'anchor = "si"': dedent("""
+                    anchor = "from_species"
                     reference_species = "ghost_species"
-                    reference_density = 1.0e6
+                    reference_number_density = 1.0e6
                 """).strip(),
             }
         )
@@ -299,7 +299,7 @@ class TestSpecies:
     def test_missing_species_rejected(self) -> None:
         doc = dedent("""
             [schema]
-            version = "1.0"
+            version = "2.0"
             [model]
             name = "d"
             type = "PIC"
@@ -316,7 +316,7 @@ class TestSpecies:
             lower = [0.0,0.0,0.0]
             upper = [4.0,4.0,4.0]
             [units]
-            system = "SI"
+            anchor = "si"
             [coordinates]
             geometry = "cartesian"
             frame = "sim"
@@ -1779,19 +1779,20 @@ class TestReferenceSpeciesBuiltins:
         # only "electrons" as a [[species]]; "ions"/"protons" are pure
         # builtin fallback resolutions.
         doc = _minimal_doc().replace(
-            'system = "SI"',
-            f'system = "PIC"\n'
+            'anchor = "si"',
+            f'anchor = "from_species"\n'
             f'reference_species = "{builtin}"\n'
-            f"reference_density = 1.0e6",
+            f"reference_number_density = 1.0e6",
         )
         s = validate_simulation_toml(doc)
-        assert isinstance(s.units, UnitsPIC)
+        assert isinstance(s.units, UnitsFromSpecies)
         assert s.units.reference_species == builtin
 
     def test_unknown_reference_species_rejected(self) -> None:
         doc = _minimal_doc().replace(
-            'system = "SI"',
-            'system = "PIC"\nreference_species = "muons"\nreference_density = 1.0e6',
+            'anchor = "si"',
+            'anchor = "from_species"\nreference_species = "muons"\n'
+            "reference_number_density = 1.0e6",
         )
         with pytest.raises(ValidationError, match="reference_species"):
             validate_simulation_toml(doc)

@@ -5,7 +5,15 @@ import pytest
 from scipy import constants
 
 from pypic.exceptions import UndeclaredNormalizationError
-from pypic.units import Normalization, PhysicsConstants, SpeciesInfo, UnitSystem
+from pypic.fields import _QUANTITY_DIMENSIONS
+from pypic.units import (
+    _REFERENCE_ORDER,
+    _SI_FACTORS,
+    Normalization,
+    PhysicsConstants,
+    SpeciesInfo,
+    UnitSystem,
+)
 
 N_REF = 1e18
 
@@ -169,7 +177,6 @@ class TestCompoundSiFactors:
             ("frequency", lambda n: 1.0 / n.time_ref),
             ("mass_density", lambda n: n.density_ref * n.mass_ref),
             ("charge_density", lambda n: n.charge_ref * n.density_ref),
-            ("poynting_flux", lambda n: n.e_field_ref * n.b_field_ref),
         ],
     )
     def test_compound_factor(self, norm, quantity, expected_fn):
@@ -177,9 +184,112 @@ class TestCompoundSiFactors:
         expected = expected_fn(norm)
         assert result == pytest.approx(expected, rel=1e-12)
 
+    def test_poynting_flux_converts_to_the_si_cross_product(self, norm):
+        # Asserted against S = E x B / mu_0 built from SI inputs rather than
+        # against the reference product, which would restate the implementation
+        # and is how the missing mu_0 survived.
+        e_code, b_code = 0.1, 0.2
+        expected = (e_code * norm.e_field_ref) * (b_code * norm.b_field_ref)
+        expected /= constants.mu_0
+
+        s_code = e_code * b_code  # derived.poynting_flux, mu_0 = 1
+        assert s_code * norm.si_factor("poynting_flux") == pytest.approx(
+            expected, rel=1e-12
+        )
+
     def test_unknown_compound_raises(self, norm):
         with pytest.raises(ValueError, match="Unknown quantity"):
             norm.si_factor("flux_capacitance")
+
+
+# SI dimension of each storage primitive as integer powers of
+# (length, mass, time, current, temperature, amount, luminosity) — written
+# from the SI definitions rather than copied from either table, so the test
+# below is a genuine cross-check and not a restatement of one of them.
+_REFERENCE_DIMENSIONS = {
+    "length": (1, 0, 0, 0, 0, 0, 0),  # m
+    "time": (0, 0, 1, 0, 0, 0, 0),  # s
+    "velocity": (1, 0, -1, 0, 0, 0, 0),  # m/s
+    "b_field": (0, 1, -2, -1, 0, 0, 0),  # T = kg/(A s^2)
+    "e_field": (1, 1, -3, -1, 0, 0, 0),  # V/m = kg m/(A s^3)
+    "density": (-3, 0, 0, 0, 0, 0, 0),  # m^-3
+    "mass": (0, 1, 0, 0, 0, 0, 0),  # kg
+    "charge": (0, 0, 1, 1, 0, 0, 0),  # C = A s
+}
+_MU_0_DIMENSION = (1, 1, -2, -2, 0, 0, 0)  # H/m = kg m/(A^2 s^2)
+
+
+class TestSIFactorDimensions:
+    """The SI factors and the openPMD dimensions must encode one physics."""
+
+    def test_every_factor_carries_its_registered_dimension(self) -> None:
+        """Compose each factor's exponents and match `_QUANTITY_DIMENSIONS`.
+
+        These two tables say the same thing in two notations and were
+        maintained independently, with nothing relating them — which is
+        how `poynting_flux` kept a factor that disagreed with its own
+        registered W/m^2 for as long as it did.
+        """
+        mismatched = {}
+        for quantity, dimension in _QUANTITY_DIMENSIONS.items():
+            spec = _SI_FACTORS[quantity]
+            composed = [0] * 7
+            for name, power in zip(_REFERENCE_ORDER, spec.exponents, strict=True):
+                for axis, base in enumerate(_REFERENCE_DIMENSIONS[name]):
+                    composed[axis] += power * base
+            for axis, base in enumerate(_MU_0_DIMENSION):
+                composed[axis] += spec.mu_0_power * base
+            if tuple(composed) != dimension:
+                mismatched[quantity] = (tuple(composed), dimension)
+
+        assert not mismatched, (
+            "SI factor exponents disagree with the registered openPMD "
+            f"dimension (composed, registered): {mismatched}"
+        )
+
+    def test_every_field_quantity_type_has_a_dimension_and_a_factor(self) -> None:
+        """Neither table may grow an entry the other does not know."""
+        assert set(_QUANTITY_DIMENSIONS) <= _SI_FACTORS.keys()
+
+
+class TestRationalizationRatio:
+    """The ratio names the code-unit convention a reference set implies."""
+
+    @pytest.mark.parametrize(
+        ("name", "norm", "expected"),
+        [
+            ("pic_electron", Normalization.pic_electron(N_REF), 1.0),
+            (
+                "pic_standard, ion-referenced",
+                Normalization.pic_standard(1e6, constants.m_p, constants.e),
+                1.0,
+            ),
+            (
+                "pic_standard, hybrid velocity anchor",
+                Normalization.pic_standard(
+                    1e6, constants.m_p, constants.e, constants.c, 1.0e5
+                ),
+                1.0,
+            ),
+            ("mhd_standard", Normalization.mhd_standard(1e6, 1e-12, 1e-9), 1.0),
+            ("identity", Normalization.identity(), 1.0 / constants.mu_0),
+        ],
+    )
+    def test_builtin_constructors_declare_their_convention(self, name, norm, expected):
+        np.testing.assert_allclose(
+            norm.rationalization_ratio,
+            expected,
+            rtol=1e-9,
+            err_msg=f"{name} is not the convention derived.py computes in",
+        )
+
+    def test_a_reduced_speed_of_light_shows_up_as_c_ratio_squared(self):
+        # The measurable symptom of the trap: B_ref is c-independent while
+        # velocity_ref scales, so the ratio tracks (c_SI / c_ref)**2.
+        norm = Normalization.pic_standard(
+            N_REF, constants.m_e, constants.e, constants.c / 10
+        )
+        np.testing.assert_allclose(norm.rationalization_ratio, 100.0, rtol=1e-9)
 
 
 class TestUnitSystemProvenance:
@@ -189,18 +299,21 @@ class TestUnitSystemProvenance:
         built = {
             "identity": (Normalization.identity(), UnitSystem.SI),
             "undeclared": (Normalization.undeclared(), None),
-            "pic_electron": (Normalization.pic_electron(N_REF), UnitSystem.PIC),
+            "pic_electron": (
+                Normalization.pic_electron(N_REF),
+                UnitSystem.FROM_SPECIES,
+            ),
             "pic_standard": (
                 Normalization.pic_standard(N_REF, constants.m_e, constants.e),
-                UnitSystem.PIC,
+                UnitSystem.FROM_SPECIES,
             ),
             "mhd_standard": (
                 Normalization.mhd_standard(1e6, 1e-12, 1e-9),
-                UnitSystem.MHD,
+                UnitSystem.EXPLICIT,
             ),
             "eight refs by hand": (
                 Normalization(1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0),
-                UnitSystem.CUSTOM,
+                UnitSystem.EXPLICIT,
             ),
         }
         wrong = {

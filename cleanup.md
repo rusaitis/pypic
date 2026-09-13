@@ -1,16 +1,11 @@
-# Code-quality cleanup — remaining phases
+# Code-quality cleanup
 
-Checklist for the last four phases of the September 2026 code-quality audit.
-**All phases have landed.** Phases 0–4 on `main` (bug fixes, vector triplets
-from the field registry, `ReaderBase`, alias/layering consolidation, the
-`_recipes` / `_field_table` / `cli/` / `tests/test_plotting/` splits and the
-`reduce` decomposition; see `git log 499a846..4562923`); Phase 5 on
-2026-09-11; Phases 6, 7, 8 and 9 on 2026-09-12. The one item left open is
-Phase 7's CI matrix, declined with reasons rather than deferred.
+Record of the September 2026 code-quality audit. Phases 0-9 have landed;
+Phase 10 is open.
 
-Kept as a record of what each phase found, which was routinely not what its
-anchors predicted — check the premise, not just the line number. Four of
-Phase 6's proposed deletions turned out to be load-bearing; Phase 8's stale
+Kept because each phase found something other than what its anchors
+predicted — check the premise, not just the line number. Four of Phase 6's
+proposed deletions turned out to be load-bearing; Phase 8's stale
 `reference_density` anchor turned out to be Phase 9's entire finding; Phase
 9's own reproduction case needed a change the plan had ruled out.
 
@@ -29,920 +24,643 @@ Working rules for every phase:
 - Private tables import from their defining module (`pypic._recipes`,
   `pypic._field_table`); mypy strict rejects re-exported underscore names.
 
-## Phase 5 — plotting dedup
-
-Landed 2026-09-11, `git log 4562923..f3eb6b8` (11 commits). src: 15 files,
-+917 / −1104. Deviations from the text below: `resolve_norm` returns one
-`Normalize`, not a tuple; `finish_axes` leaves saving to the caller (inside
-the theme context savefig would switch to the theme's dpi/bbox) and rounds
-every plot, not only owned ones; multi-panel `ax=` takes the panels the
-function would create. Four latent bugs surfaced and were fixed first, each
-in its own `fix:` commit: theme colormaps ignored when `cmap=None`,
-`load_theme` crashing on omitted colors, quiver `units=` coloring in code
-units, and the pyvista line/trajectory divergences (see CHANGELOG).
-
-1. - [x] **`resolve_norm` in `plotting/_colormaps.py`.** Signature
-   `resolve_norm(values, *, log_scale, symlog, symmetric, vmin, vmax, linthresh)
-   -> tuple[Normalize | None, float | None, float | None]`. Its ingredients
-   (`is_positive_definite` :69, `symmetric_clim` :193, `_auto_linthresh` :294)
-   already live there. Replaces the three copies at `slices.py:178-212`,
-   `comparison.py:192-230` (note: this one takes `values_a` and a shared
-   `combined_min/max`, so the helper must accept an explicit range), and
-   `kymograph.py:125-160` (only log + symmetric today). Keep the
-   `LogNorm`/`SymLogNorm` imports local inside the helper so matplotlib stays
-   behind the extra. Test: one parametrized test over the three call sites
-   asserting the same norm class and limits for the same input.
-
-2. - [x] **`finish_axes` in `plotting/_resolve.py`.** Signature
-   `finish_axes(ax, theme, *, xlabel, ylabel, aspect, title, info, step, time,
-   badge, owned)`. Replaces the six epilogues: `slices.py:250-281`,
-   `vectors.py:428-445` and `:657-674` (these two also carry a third title form
-   at `:438` / `:667`), `scatter.py:185-195`, `kymograph.py:172-187`, and the
-   four in `lines.py` (around `:149` and `:433`; grep `set_title`). The
-   `add_badge` import stays local. `owned` decides whether `tight_layout` and
-   `maybe_save` run (only when the function created the figure).
-
-3. - [x] **`_theme_io.py` table-driven load/save.** `load_theme` (:125-297)
-   and `save_theme` (:298-426) each hand-walk every field; `save_theme` has 53
-   `lines.append` calls. Replace with one `_THEME_FIELDS: tuple[(section, key,
-   kind), ...]` driving both directions via `dataclasses.fields(PlotTheme)`,
-   where `kind` is `rgba | float | str | bool | rgba_list`. File is 481 lines;
-   expect ~250. Test: every bundled theme round-trips `load → save → load`
-   field-for-field (`tests/test_plotting/test_themes.py`). The `[webpic]`
-   block must survive untouched (webpic reads it).
-
-4. - [x] **`vectors.py` prelude.** `plot_streamlines` (:105) and `plot_quiver`
-   (:457) share plane resolution, component lookup, colour resolution and the
-   axes setup. Extract `_vector_prelude(...)` returning the resolved arrays,
-   axes and colour spec; `_resolve_plane_components` (:32) and
-   `_resolve_vector_colors` (:62) fold into it.
-
-5. - [x] **`pyvista/_lines.py`: plurals implement, singulars wrap.**
-   `add_field_line` (:75) / `add_field_lines` (:179) and `add_trajectory`
-   (:300) / `add_trajectories` (:397) are near-copies. Make the singular a
-   one-element call of the plural.
-
-6. - [x] **Additive kwargs.** `ax=` on `plot_comparison` (`comparison.py:20`),
-   `plot_cross_section` (`cross_section.py:20`), `plot_field_grid`
-   (`panels.py:21`); `vmin`/`vmax` on `plot_quiver` (`vectors.py:457`) and
-   `plot_scatter` (`scatter.py:21`); `units=` on `plot_kymograph`
-   (`kymograph.py:21`); `save=` on `plot_poincare_section` (`poincare.py:18`);
-   `add_contours` (`annotations.py`) returns the `QuadContourSet`. One test
-   per kwarg that the passed axes is drawn on / the file is written.
-
-7. - [x] **`PlotTheme.rcparams` read-only.** Wrap in `MappingProxyType` in
-   `__post_init__` like `containers.py:218`; `styles.py:219` already copies
-   before merging. Annotate as `Mapping[str, Any]`.
-
-Verify: `uv run pytest tests/test_plotting -q` (216 collected before, 260
-after; the old "143" counted functions, not parametrized cases),
-`./scripts/check.sh types`, then the full suite (2901 passed on 3.14).
-
-## Phase 6 — remaining duplication, dead weight, comments
-
-Landed 2026-09-12, `git log 9075636..a89c1f2` (12 commits). src: 24 files,
-+420 / −430. Deviations, all recorded per item below: item 4 rewrote the
-orphaned decoders' tests to pin the surviving *encoders* rather than
-deleting them (`grid_to_dict` / `physics_to_dict` are the server wire
-format and had no other coverage); item 5 took the documented
-alternative — align the detectors' gate and cross-reference them — rather
-than one shared helper, because every shape of that helper either copies
-on the scalar hot loop or leaves both callers doing the windowing; item 7
-left `schema/_models.py` alone, since those docstrings feed the generated
-JSON Schema descriptions and regenerating the artifact is a phase
-non-goal. Two stray defects surfaced and were fixed in their own commits:
-two E501s and one F401 that the `lint` gate does not report (see Phase 7
-item 1).
-
-Budget was ~18 files, ~200 added / ~420 deleted. Group commits by bullet.
-Anchors re-verified 2026-09-12 against `9075636`. Several of the
-original deletions turned out to be live code — `h_rel`,
-`passes_geometry`, the `in_si` fall-through, three of the five
-`io/metadata` decoders, and `decode_rle`. Each stays struck below with
-the reason, so a later reader does not re-propose it. Three items remove
-public surface (item 6's `err_prev`, item 6's `GEOMETRY_BY_NAME`
-annotation, item 8's `pypic.schema.cli` path) against the additive-API
-rule above — each is defensible at 0.1.x, and each wants a CHANGELOG
-line rather than a silent `refactor:`.
-
-1. - [x] **One nan-policy helper.** `diagnostics.py:34-77`
-   (`_apply_nan_policy_single`) and `:80-128` (`_apply_nan_policy`) are
-   line-for-line identical apart from mask construction
-   (`np.isnan(field)` :54 versus the joint `np.isnan(computed) |
-   np.isnan(reference)` :105, deliberate so relative norms compare one
-   point set) and return arity; both error and both warning strings
-   already match. One variadic `_apply_nan_policy(*arrays, nan_policy)`
-   over `np.logical_or.reduce` covers them. It needs `@overload` on
-   arity to stay mypy-strict clean: `l2_relative_error` (:172) and
-   `linf_error` (:221) destructure a 2-tuple, and the five single-array
-   callers (:325, :439, :531, :570, :606) grow a `(masked,) = ...`.
-   Derive the `("omit", "propagate", "raise")` tuples at
-   `diagnostics.py:47,98`, `reductions.py:59` and `comparison.py:65`
-   from `get_args(NanPolicy.__value__)` — `reductions.py:58` already
-   does exactly that for `Reduction`. Two constraints: the CLI Literal
-   at `cli/_options.py:57-60` stays hand-written (typer introspects it,
-   and `tests/test_cli.py:337` pins it to the alias), and
-   `reductions.py:41` imports `NanPolicy` only under `TYPE_CHECKING`,
-   so deriving adds a runtime `reductions → diagnostics` edge — safe
-   (no cycle, and `__init__.py:106` already imports diagnostics
-   eagerly, so `import pypic` does not grow). Keep the check at
-   `comparison.py:325-327`: its comment says it duplicates the inner
-   one deliberately, to fail before the expensive regrid.
-
-2. - [x] **`spectral.py` radial binning.** `power_spectrum_2d`
-   (:177-202) and `power_spectrum_3d` (:284-306) are token-identical
-   apart from one comment word — same `linspace(0, k_max, n_bins + 1)`
-   edges, same `digitize` and `clip`, same count-average, same
-   empty-bin NaN-then-filter, same midpoint `k_centers`, and no
-   annulus-versus-shell weighting difference (geometric weighting lives
-   in the isotropy of the k-grid sampling). Extract
-   `_radial_bin(power, k_radial, n_bins)`; the window, FFT and
-   normalization above each block legitimately differ and stay put.
-   Two corrections to the original text: there is no `bincount`
-   anywhere — both blocks use `np.add.at`, so keep it or justify the
-   `counts` dtype shift and the mandatory `minlength` separately — and
-   the Parseval tests do **not** guard this.
-   `tests/test_invariants/test_parseval_identity.py` is 1-D only, and
-   the 2-D/3-D coverage in `tests/test_spectral.py` is shape and
-   sanity, so an off-by-one in the helper's `digitize` or `k_centers`
-   would pass the suite. Land a 2-D absolute-scale or Parseval
-   assertion first, then refactor under it.
-
-3. - [x] **`derived.py` pressure decomposition.** The
-   `bhat_1**2 * p11 + ...` projection is inlined three times, but only
-   two of them are worth delegating and only two carry a perpendicular
-   companion. `agyrotropy` (:1683-1689) and `aunai_nongyrotropy`
-   (:1752-1761) reproduce `parallel_pressure` (:1486) — and, at the
-   second site, `perpendicular_pressure` (:1548) — token for token, and
-   neither touches `bhat_*` again afterwards, so delegating drops a
-   whole `_unit_vector` call at each. Delegate `p_par` only and keep
-   `p_perp = (trace_p - p_par) / 2.0` inline: `perpendicular_pressure`
-   re-calls `parallel_pressure` internally, so delegating both would
-   recompute `bhat`. `scudder_agyrotropy` (:1826-1834) stays inline —
-   it reads `bhat_1/2/3` heavily at :1836-1851, so delegating there
-   trades the dedup for a second `_unit_vector` over the full grid.
-
-   `h_rel` stays, both the function and the registry entry. The
-   original text made dropping `_recipes.py:165` conditional on nothing
-   outside tests resolving it; the condition fails. It is documented at
-   `docs/equations.md:101` with footnote `:116` and again at
-   `docs/schema.md:1090`, exported from `__init__.py:94`, aliased from
-   `_aliases.py:103`, and pinned by
-   `tests/test_registry_consistency.py:115`. That
-   `relativistic_enthalpy` (:504) is a one-line forward to
-   `enthalpy(..., c=c)` is the point of it — a named entry point for a
-   documented quantity, not duplication.
-
-4. - [x] **`io/metadata.py` and `io/zarr.py` attrs plumbing.** Three of
-   the five decoders the original text called dead are live on the
-   `from_zarr` path: `dict_to_normalization` (:116) is called from
-   `decode_pypic_attrs` at `metadata.py:615`, `dict_to_transforms`
-   (:261) at `:644`, and `transforms_to_dict` (:254) at `:793` inside
-   the encoder. Only `dict_to_grid` (:82) and `dict_to_physics` (:212)
-   are orphaned, because the v1.0 reshape replaced them with
-   `_attrs_to_grid` (:691) and `_attrs_to_physics` (:826). Delete those
-   two with their `tests/test_zarr_io.py` references; neither is
-   exported from `pypic.io` nor reachable from the docs. Keep
-   `grid_to_dict` / `normalization_to_dict` / `physics_to_dict` — all
-   three are the server wire format (`server/arrow.py:28-29,271-272`,
-   `server/routes.py:25-27,85-88`).
-
-   `_PYPIC_ROOT_ATTR_KEYS` (`zarr.py:45`) and `_strip_pypic_attrs`
-   (:59) are dead, not stale. `_open_store` returns
-   `tree["fields"].to_dataset()` (:127), whose attrs are the `/fields`
-   group's own; the section keys live on the root group and reach
-   `_ds_to_field_dataset` as the separate `root_attrs` dict. Measured
-   2026-09-12: a store carrying `boundary_conditions`, `coordinates`,
-   `grid`, `metadata`, `model`, `normalization`, `physics`, `schema`
-   and `species` on root has `[]` on `/fields` and `[]` on the returned
-   dataset. Delete both and pin the no-leak guarantee with a
-   `from_zarr(...).xr.attrs` assertion, instead of a hand-kept mirror
-   of the encoder's keys that has already drifted six keys out of date.
-
-   `zarr.py:110-123` and `decode_pypic_attrs` (`metadata.py:596-609`)
-   run the same pair of `schema.version` checks — strict equality
-   against `SCHEMA_VERSION`, not the major-component check the original
-   text described. Delegating is right, but it must keep the
-   `source_label` prefix in the message and keep failing ahead of the
-   `"fields" not in tree.children` check at :124.
-
-5. - [x] **`traces/_tracing.py` closed-loop detector.** The original
-   text put one detector in `_trace_single_direction` (:204); there is
-   none there — that path is fixed-step classical RK4, and
-   `trace_field_line` (:589) never exposes loop detection at all. The
-   two detectors are both on adaptive paths: scalar at :321-336
-   (monotone `arclen` prefix allocated :289-297, `searchsorted`-bounded
-   tail scan) and batched at :462-501 (per-seed `arclen` allocated
-   :409-416, rectangular `(M, max_n)` eligibility mask). Tolerance
-   source, arc-length cutoff, `<=` eligibility, past-only scan and
-   trigger all agree today; the one divergence is the cheap gate,
-   `j_end > 0` versus `cutoffs.max() > 0.0`, which disagree when
-   `arclen == loop_min_arclen` exactly — the scalar path tests the seed
-   point, the batched path skips the scan.
-
-   So the proposed scalar-bool `_closed_loop_hit(...)` is the wrong
-   shape: it fits only the scalar site, where it removes no
-   duplication, and routing the batched path through it needs a
-   per-seed Python loop that undoes the vectorization the comment at
-   :465-472 exists to justify. Either extract a vectorized
-   `_closed_loop_hits(points, arclens, cur_idx, *, loop_tol,
-   loop_min_arclen) -> BoolArray` that the scalar path calls with
-   `M == 1`, resolving the gate explicitly, or drop the item and leave
-   a one-line note on each detector pointing at the other. Step 44f
-   (`return_endpoints_only`) reworks this function and would rather
-   inherit one detector than two.
-
-6. - [x] **Dead code.** Two of the six original deletions here are live
-   code, one is a type change rather than dead code, and the closing
-   keep-note was right about the outcome but wrong about the reason.
-   All four stay recorded so they are not re-proposed.
-
-   *Delete* `numerics/_step_control.py` `err_prev`: params :38 and
-   :105, prose :5-6, :49-50, :66-70 and :129-132, and **two**
-   `del err_prev` — :86 and :151, the second missed the first time. No
-   caller passes it (`traces/_tracing.py:314`, :446-448) and
-   `tests/test_numerics.py:291` asserts only that it is ignored, which
-   is worse than not offering the kwarg. It takes three more edits with
-   it: that test, `docs/api/numerics.md:9-11`, and
-   `docs/references.bib:265` — removing the last `[@Gustafsson1988]`
-   citations orphans the entry and fails
-   `tests/test_bibliography.py::test_no_orphan_bib_entries`. While
-   there, fix `TASKS.md:37` and Step 44e: both describe "PI step
-   control" that the shipped elementary (I) controller does not
-   implement.
-
-   *Delete* `openggcm/_grid.py:16-18`, a comment whose constant is
-   gone; `parse_grid_file`'s docstring (:75-78) already carries the
-   same facts.
-
-   *Delete* the `fields.py:92-94` assert — `tests/test_fields.py:503-505`
-   is already the identical set equality. The `:128-130` one needs its
-   counterpart tightened first: `test_fields.py:425-429` checks one
-   direction only, so it would miss an orphan key left in
-   `_QUANTITY_DIMENSIONS` after a `QuantityType` member is renamed.
-   Both belong in `TestQuantityTypeCoverage` (`test_fields.py:319`),
-   not in `tests/test_registry_consistency.py`, which never references
-   either table.
-
-   *Type change, not dead code:* `coordinates/geometry.py:139`
-   `GEOMETRY_BY_NAME` → `MappingProxyType`. All nine callers read
-   (`io/_virtual.py:73`, `io/metadata.py:85,721`,
-   `readers/_simple.py:117`, `readers/config.py:280`,
-   `readers/batsrus/_reader.py:211,288,335`,
-   `readers/batsrus/_config.py:244`), so the swap is safe in-repo, but
-   it narrows a `coordinates.__all__` export and its annotation.
-
-   *Keep* `compute.py:253-257`. The `passes_geometry` branch is
-   value-wise inert behind the Cartesian raise, but it is not free to
-   delete: `codegen.py:53` serializes the field as `"passesGeometry"`
-   into the bundle webpic consumes, with no test pinning that key, so
-   dropping it is a cross-repo break invisible to CI, and
-   `tests/test_registry_consistency.py:538-545` validates the call
-   shape the branch produces. Deferred Step 31 is the work that makes
-   it live. Trim the comment to one line; leave branch and field.
-
-   *Keep* `dataset.py:1030`. The fall-through is the registry-resolution
-   path for fields with no `quantity_type` attr, which
-   `from_arrays(..., strict_fields=False)` produces —
-   `readers/_base.py:118`, `regrid.py:324`, `comparison.py:574` and
-   `cli/convert.py:125` all take it, and `open_virtual(...).in_si(...)`
-   resolves only through it, since VirtualiZarr hands HDF5 attrs
-   straight through. The duplication actually present is the
-   three-line factor-and-`length_axes` tail repeated at :1026-1029 and
-   :1035-1038; collapse that instead, and document the `ValueError`
-   that `field_si_factor` raises in the `Raises` section `in_si` lacks.
-
-   *Keep* `_stagger.py` and `openggcm/_wrn2.py` `decode_rle`, and add
-   no notes — both already carry one (`_stagger.py:19-20`,
-   `_wrn2.py:46-48`). `decode_rle` is not unwired:
-   `decompress_field` calls it at :158 and :164, and it is the readable
-   oracle that `decompress_field_vectorized` (:261) is cross-validated
-   against in `tests/test_openggcm_wrn2.py`. Its citation of TASKS.md
-   Steps 35/42 was wrong — those name `_stagger.py`, whose only
-   importer is `tests/test_destagger.py:8`.
-
-7. - [x] **Comments that narrate history.** Four of the five hold, at
-   slightly different lines: `readers/config.py:457-458` (a migration
-   note on a private helper; :455-456 above it describes present
-   behaviour and stays), `io/zarr.py:211-214` ("the writer used to
-   silently flatten...", which doubles as the guard's rationale — recast
-   it in the conditional rather than delete), `io/metadata.py:501-503`
-   (only the parenthetical narrates the old on-disk layout), and
-   `cli/inspect.py:363-364` (keep the guard's rationale at :361-363,
-   drop the trailing "used to raise TypeError here and take the whole
-   command down").
-   `io/_virtual.py:401` is a false positive and stays: "previously-saved
-   containers" and "earlier commits" are live icechunk repo state, not
-   pypic's own history.
-
-   The original sweep was incomplete. Same class, same treatment:
-   `plotting/_format.py:3` ("previously duplicated across..."),
-   `regrid.py:349` ("matches the historical behavior", in a *public*
-   docstring), `server/app.py:96-98` ("stays back-compat with the
-   previous ... shape"), `exceptions.py:58-59` ("the previous workaround
-   silently mangled..."). Forward references are the same rule read the
-   other way: `comparison.py:131-134` says the helper "forwards" an
-   `epoch` kwarg that `transform_to` does not have — a false claim, not
-   merely a roadmap note — plus `schema/_models.py:276,317,1402` ("a
-   future v1.1 may...").
-
-   `comparison.py:3` overclaims. `reductions.py:77` runs integrate,
-   mean, median, std and argmax on `FieldDataset`-held arrays, and its
-   own docstring (:153) points at
-   `pypic.diagnostics.l2_relative_error` as a sibling. Narrow the
-   sentence to what holds: comparison.py is the only place the pure
-   `pypic.diagnostics` norms are wrapped as a `FieldDataset`-level
-   public API.
-
-   The breadth-first claim is not a comment fix and leaves this phase.
-   `dataset.py:83-86` and `containers.py:144-146` promise BFS chain
-   resolution; `resolve_transform` (`coordinates/transforms.py:262-325`)
-   is hard-capped at two edges, tie-breaks on dict insertion order, and
-   has no cycle detection — and the same promise is repeated in
-   `docs/schema.md:493-496`, `schema/_export.py:197` and the generated
-   `simulation.schema.v1.0.json`. Correcting the docs would mean
-   regenerating the JSON Schema, which this phase's non-goals forbid,
-   and implementing BFS is feature work. Tracked as TASKS.md Step 15b.
-
-8. - [x] **Boundaries.** HTTP `kind` / `status_code` classvars leave
-   `pypic/exceptions.py` (base :48-49, then :75-76, :87-88, :94-95,
-   :106-107) for a mapping in `server/exceptions.py`, which already
-   exists and already defines the sixth carrier, `ValidationFailedError`
-   (:39-51). Only two readers, `server/app.py:103-106` and
-   `server/stream.py:97-98`, and `exceptions.py:11-17` already concedes
-   the classvars are inert for everyone else. One trap: the base
-   class's `internal` / 500 is a deliberate inherited fallback
-   (`exceptions.py:41-46`) and `ErrorFrame.kind`
-   (`server/protocol.py:195-202`) is a closed six-value Literal, so a
-   plain dict lookup would emit an invalid frame for an unmapped
-   subclass. Walk the MRO or carry a default, and add the
-   `PypicError.__subclasses__()` exhaustiveness test the suite lacks —
-   `tests/test_server_exceptions.py:35-60` is a hardcoded five-tuple
-   parametrize that a new subclass cannot fail.
-
-   `schema/cli.py` imports typer at module scope (:27) and rich lazily
-   (:326), so the "only stdlib and pydantic" promise at
-   `docs/architecture.md:75-77` and `schema/__init__.py:3-5` is false
-   as written — lifting the subpackage would carry a typer dependency.
-   It is not re-exported from `schema/__init__.py` (which is what keeps
-   `import pypic.schema` typer-free); the sub-app is mounted from
-   `cli/__init__.py:14,79`. Move it to `pypic/_schema_cli.py`,
-   mirroring `_codegen_cli.py`, which already cites the split it copies
-   (`codegen.py:10`, `_codegen_cli.py:3,45-46`). `pypic.schema.cli` is
-   an importable path today, so this is a removal — CHANGELOG line.
-
-Verify: full suite, `./scripts/check.sh docs` (moved `schema/cli.py`).
-Items 1, 2 and 4 want their guard test landed before the refactor, not
-after.
-
-## Phase 7 — tests and tooling
-
-Landed 2026-09-12. Budget was ~45 files, ~600 added / ~400 deleted, four
-config files. Item 1 landed first and guarded the rest.
-
-Three anchors were measured wrong in the text below and are corrected
-per item: the bare-`assert_allclose` count (280 by grep, 194 by parse —
-a grep reports a multi-line call as bare when its `rtol` sits on a later
-line), item 3's fixture-adoption premise (the three named files already
-import `tests/_helpers`), and item 5's `test_examples_smoke.py` premise
-(that file is `--sim-data`-gated and never reads `tests/data`). Item 1's
-lint-gate diagnosis was also wrong in an interesting way — see below.
-
-1. - [x] **pytest hardening in `pyproject.toml`.** Today only
-   `addopts = "--doctest-modules --strict-markers -ra"`. Add
-   `markers = ["slow", "integration", "fixture_data"]`, `xfail_strict = true`,
-   `filterwarnings = ["error", ...]`. Run the suite with `-W error` first and
-   list what fires; each ignore names the upstream issue. Expect 3–5.
-
-   While here, fix the **lint gate's blind spot**, measured 2026-09-12:
-   `scripts/check.sh lint` runs `ruff check src tests scripts benchmarks
-   examples` and reported "All checks passed!" on a tree where
-   `ruff check src` alone reported two E501s in `diagnostics.py` and an
-   F401 in `io/zarr.py` — all three real, all three introduced and then
-   committed during Phase 6 before `ruff format --check` caught the
-   E501s. Adding paths suppressed the findings; `--no-cache` did not
-   change it, and no nested ruff config exists under the extra
-   directories. So the gate CI trusts under-reports. Reproduce, then
-   either pin the invocation (per-path loop, or `--no-cache`) or file it
-   upstream with the ruff version from `uv.lock`. Until it is fixed,
-   `format` is the gate that actually catches long lines.
-
-   Landed. Only **two** warning sources fired under `-W error`, not the
-   3-5 expected: zarr-python's consolidated-metadata warning (71 of the
-   73, and deliberate on our side — schema.md § 4.2 makes consolidated
-   metadata part of the layout), which takes the one suite-wide ignore;
-   and pypic's own NaN-omit warning, which reaches exactly one test, the
-   one checking that `-q` routes it to logging. That test opts out
-   locally with `@pytest.mark.filterwarnings`, so an unexpected NaN
-   warning anywhere else still fails. `xfail_strict` went in (no xfail
-   exists yet; it is a guard on the first one). The three **markers did
-   not**: `--strict-markers` already fails an undeclared marker at first
-   use, which is the moment to declare it, and none of `slow` /
-   `integration` / `fixture_data` has a user — item 5's `fixture_data`
-   candidate turned out not to be one. Verified on 3.13 and 3.14: 2912
-   passed, 2 warnings, both the allowed ones.
-
-   The lint-gate diagnosis above is wrong. It is not that adding paths
-   suppresses findings — it is that ruff 0.15.5's **multi-root walk is
-   nondeterministic**. Same tree, same command, repeated: 264 files
-   walked, or 253, or 69 with `src/` dropped whole. A planted F401 in
-   `src/` was caught **1 run in 10**. `--no-cache` makes it worse, not
-   better: it pins the walk to the 69-file truncation. Some runs also
-   ignored `.gitignore` and linted `examples/*/` scratch directories.
-   Fix: give ruff a single root (`ruff check .`), which is deterministic
-   across 8 runs, catches the planted F401 8/8, and walks a strict
-   superset of the five paths — the only extra file is `pyproject.toml`.
-   mypy keeps an explicit list; it has no `.gitignore` awareness. Worth
-   reporting upstream, with this reproduction.
-
-2. - [x] **Tolerances.** 280 of 794 `assert_allclose` calls carry no
-   `rtol`/`atol`. Sweep file by file: `test_derived.py` 39,
-   `test_ipic3d_synthetic.py` 38, `test_transforms.py` 25, `test_compute.py`
-   22, `test_readers_base.py` 18, `test_traces.py` 16, `test_geometry.py` 15,
-   `test_virtual_io.py` 11, `test_icechunk_io.py` 11, `test_numerics.py` 10.
-   Byte-exact round-trips become `assert_array_equal`; the rest get an
-   explicit `rtol`. For cancelling sums scale `atol` by the sum of magnitudes
-   (the fix in `test_reduction_identities.py`, commit 7f043bc, is the model).
-   Then add a ruff-free guard: a test that greps `tests/` for bare
-   `assert_allclose(` and fails with the file list.
-
-   Landed. **194**, not 280 — the count above is grep-derived and a grep
-   calls a multi-line invocation bare when its `rtol` sits on a later
-   line. `test_derived.py`'s 39 and `test_compute.py`'s 22 were almost
-   entirely that: 0 and 5 respectively once parsed. The guard is
-   therefore AST-based too, in the new `tests/test_suite_conventions.py`,
-   and was checked against a planted multi-line bare call that a grep
-   guard would have passed.
-   183 of the 194 were never approximations — an I/O round-trip, a
-   second reader path over the same bytes, an alias resolving to the
-   same array, a signed-permutation rotation, a literal read back out of
-   a fixture — and became `assert_array_equal`. Every one passed first
-   run; no exactness claim had to be walked back. The remaining 11 got
-   `rtol=1e-15`, a tightening from numpy's 1e-7 default. No cancelling
-   sum needed the `atol` treatment the text anticipated. Two findings:
-   the iPIC3D `rho_c`-sums-over-species tests compare against an
-   identically-zero field, where a bare `assert_allclose` asserts
-   nothing at all (rtol scales the desired value); and
-   `test_numerics.py`'s Dormand-Prince docstring already promised the
-   batched and scalar kernels agree bit-for-bit while the assertion
-   claimed only "close".
-
-3. - [x] **Fixtures.** Adopt `conftest.py` `cartesian_3d` / `spherical_3d`
-   and `tests/_helpers.py` in `test_comparison.py` (58 inline `from_arrays`),
-   `test_regrid.py` (33), `test_zarr_io.py` (27), and the 24 files building
-   `GridInfo(...)` inline. Add fixtures to `conftest.py` only when a second
-   file needs the same shape.
-
-   Premise stale on the first half: `test_comparison.py`, `test_regrid.py`
-   and `test_zarr_io.py` already import `tests/_helpers`, and their
-   `from_arrays` calls are not boilerplate — each carries the analytic
-   field that test is about (`np.sin(x)`, `x + 2y + offset`), which is
-   exactly what a shared random-normal fixture would destroy.
-   `cartesian_3d` is an 8x6x4 standard-normal dataset; a comparison or
-   regrid test needs known interpolants, not noise. Nothing adopted
-   there, and no new `conftest.py` fixture earned a second caller.
-   The real residual was the `GridInfo(...)` half, measured by AST: 93
-   inline constructions, of which 58 pass `geometry`, `dt`, `boundary`
-   or `surviving_axes` and cannot be expressed by `make_uniform_grid`.
-   31 could and now do (the other 4 are inside `_helpers.py` itself,
-   where routing them through a sibling helper adds indirection for no
-   reader). Seven of the 31 also carried a function-local `from
-   pypic.grid import GridInfo` purely to build a unit grid. Net -77
-   lines, 405 tests unchanged.
-
-4. - [x] **Banners and headers.** 66 `# ---` / `# ===` banner lines across
-   8 test files (`test_arrow_parquet_io`, `test_traces`, `test_schema`,
-   `test_comparison`, `test_regrid`, `test_derived`, `test_transforms`,
-   `test_registry_consistency`): delete, use classes or module split if the
-   grouping mattered. Normalize the 8 `# Claims:` headers in
-   `tests/test_invariants/` to `# Claim:`; add a test that every module there
-   carries both `# Source:` and `# Claim:`.
-
-   Landed. 35 of the 36 banner blocks were pure restatement of the class
-   or docstring directly beneath (`# compare_fields` over
-   `class TestCompareFields`; `# Test 2 — per-species prefixes resolve
-   for both static (s0/s1) and dynamic (s5+)` over a docstring saying
-   that), and three named work batches rather than code, which CLAUDE.md
-   rules out on its own. One survivor labels a module-level data table
-   and carries a schema.md pointer found nowhere else; it keeps the text
-   and loses the rules. No grouping was load-bearing, so the class-wrap
-   escape hatch went unused: 678 tests over the eight files, before and
-   after.
-   The header half was worse than the plural-label count suggested:
-   eight *further* modules had no `# Claim:` label at all, their claim
-   sitting as unlabelled prose inside the `# Source:` block. Those are
-   split apart; two (`test_norm_roundtrip`, `test_compute_plasma_params`)
-   had no claim written anywhere and got one derived from their
-   assertions. The split also caught `test_rotation_roundtrip` promising
-   "two consequences" of orthogonality while testing three.
-
-5. - [x] **Gating.** Drop `importorskip("pydantic")` at
-   `tests/test_server_exceptions.py:95` (pydantic is core). Replace the 8
-   hand-rolled `pytest.skip(...)` in `test_examples_smoke.py:167-246` with one
-   `fixture_data` marker plus a `skipif` on missing `tests/data`. Delete
-   `tests/data/.DS_Store` and add it to `.gitignore` if not already.
-
-   The `importorskip` is gone (it had drifted to :146). The `.DS_Store`
-   half was already done: both files are untracked and `.gitignore:109`
-   already re-excludes `tests/data/.DS_Store` past the `!tests/data/**`
-   negation. Local copies deleted.
-   The `test_examples_smoke.py` premise **fails**. That module collects
-   zero tests without `--sim-data` and never reads `tests/data` — it
-   scans a user-supplied directory of real simulation output. Its eight
-   skips are per-discovered-directory dispatch ("no reader for model in
-   X", "not an MHDUCLA simulation", "no B_1 field"), which a single
-   `fixture_data` marker plus a `skipif` on a path cannot express, and
-   replacing them would lose the dispatch while gating on a directory
-   the file does not use. Left alone; this is also why no `fixture_data`
-   marker was declared in item 1.
-
-6. - [x] **Doctests for non-exempt gaps.** `dataset.py`: `transform_to`
-   (:374), `sel` (:750), `in_si` (:987), `in_units` (:1040), `isel` (:1069),
-   `where` (:1093), `reduce` (:1117). `compute.py` has 4 doctest lines over
-   18 defs; cover `compute_field`, `available_quantities`,
-   `field_dependencies`, `register_recipe`, `display_unit_factor`,
-   `field_si_factor`. `codegen.py` (4 public exports, 0 doctests) and
-   `traces/_sampling.py` (0 doctests) get one each on synthetic arrays.
-
-   Landed: 15 new Examples blocks. `register_recipe` already had one, so
-   `compute.py` got five not six. `codegen.py`'s four double as the first
-   pin on the camelCase wire keys webpic reads — Phase 6 item 6 found
-   `passesGeometry` crossing repos with no test behind it, and
-   `export_recipes`'s doctest now asserts it. `traces/_sampling.py` got
-   two (`sample_field`, `sample_fields`), both showing the
-   out-of-domain-returns-NaN behaviour that the prose only asserts.
-
-7. - [x] **Coverage.** `pytest-cov` in the dev group, `[tool.coverage.run]`
-   with `source = ["pypic"]`, `fail_under` = measured minus 2, a `cov`
-   subcommand in `scripts/check.sh`, one CI job. No upload service.
-
-   Measured 88.19%; `fail_under = 86`. Two `exclude_also` entries for
-   code that cannot execute: `if TYPE_CHECKING:` blocks, and the
-   `assert_never` guard architecture.md mandates after an exhaustive
-   enum match (reaching it means the enum grew a member, which mypy
-   rejects first). `cov` sits outside the default `check.sh` chain — it
-   re-runs the suite `test` already ran, instrumented, for ~60% more
-   wall clock — and is one CI job rather than a flag on the 3.13/3.14
-   matrix, which would buy the same number twice.
-
-8. - [x] **Pre-commit.** `.pre-commit-config.yaml` running
-   `scripts/check.sh lint` and `format` only (local hooks, no mirrors, so the
-   pinned ruff in `uv.lock` is the one that runs).
-
-   Landed as specified, plus a CONTRIBUTING.md pointer. Verified with
-   `uvx pre-commit run --all-files`; both hooks pass. `pre-commit` is
-   deliberately not a dev-group dependency — CI gates on `check.sh`
-   directly, so the hook is a local convenience, not a build input.
-
-9. - [x] **Ruff families, one commit each.** PLW, BLE, SLF (with a
-   per-file-ignores list that doubles as the seam inventory), PTH, PERF,
-   FURB, C4, PIE, RET, LOG. Known one-offs: PLW1510 at `cli/plot.py:101`
-   (`subprocess.run` without `check=`), S608 at `io/_duckdb.py:92` (the path
-   is escaped; add a same-line reason). Not PLR / TRY / EM / FBT / COM /
-   PLC0415 / ISC.
-
-   Nine of the ten enabled, in five commits rather than ten. FURB+LOG,
-   then PERF+C4+PIE+PTH together, then PLW, BLE and SLF separately. The
-   four in the middle share files — `readers/ipic3d/_conserved.py` alone
-   carries PTH123, PIE810, C401 and PERF401, two of them in one
-   function — so a commit per family would have meant staging
-   overlapping hunks, which serves bisection worse than one commit that
-   names all four. The last three each carry a distinct judgement and
-   are worth reading separately.
-   **RET is not enabled.** It finds eight things here and is wrong about
-   five: `_morton.py`'s bit-interleave and `fields.py`'s LaTeX
-   substitutions are ladders of parallel transformations where promoting
-   the last rung to a `return` makes it look special when it isn't;
-   `test_operators` names its `max(...)` `error` because that is what
-   the number means; and RET501's single finding is a `find_spec`
-   returning None as the meta-path protocol's "not mine" signal. A
-   family needing five suppressions to buy three line deletions is not
-   worth the noqa noise, so the three genuine ones landed as a hand
-   edit (`c45a2fa`) and the rule stayed off.
-   Suppressions, all reasoned: PLW0603 per-file for `plotting/styles.py`
-   (the active theme is process-wide because `use_theme()` wraps
-   matplotlib's own global rcParams); BLE001 and SLF001 per-file for
-   `tests/*` (aggregated sweeps where the exception type is the finding;
-   private attributes that are the thing under test) and SLF001 for
-   `scripts/visual/*`; and three same-line SLF001 plus three same-line
-   BLE001 in src, each naming its seam. PERF, C4, PIE, PTH, FURB and LOG
-   needed none.
-   The S608 one-off above is moot: `S` is not in the family list and
-   enabling it would report 3078 findings, 3000-odd of them S101
-   "use of assert" in the test suite. With `S` off, a `# noqa: S608`
-   would itself be flagged by RUF100. The escaping is already visible on
-   the line above (`escaped = glob_pattern.replace("'", "''")`).
-
-10. - [ ] **CI matrix (optional).** Currently 3.13 + 3.14 on ubuntu. macOS
-    adds little (dev platform); Windows would add h5py path signal if wanted.
-
-    Not done, deliberately. macOS is the development platform, so a job
-    there mostly re-runs what is already run before every push. Windows
-    would be real signal — `pathlib` is mandated everywhere precisely so
-    paths stay portable, and nothing checks that claim — but no Windows
-    support is claimed beyond the `Operating System :: OS Independent`
-    classifier, and no Windows user has reported anything. Adding a
-    platform to catch a hypothetical is the kind of speculative
-    maintenance this audit removes elsewhere. Revisit on the first
-    Windows bug report, or the first time the project claims Windows in
-    prose rather than in a classifier.
-
-Verify: full `./scripts/check.sh` after every item; the invariant is
-2854+ tests green on 3.13 and 3.14, mypy strict clean, doctests green.
-
-Verified on landing: 2930 passed / 15 skipped on both 3.13 and 3.14
-(2912 before the doctests and guards this phase added), mypy strict
-clean over 148 files, `ruff check .` and `ruff format --check .` clean,
-coverage 88.19% against a floor of 86.
-
-## Phase 8 — pickling, typing, import time
-
-Budget ~14 files, ~130 added / ~45 deleted, one new module. Independent of
-Phases 6 and 7.
-
-1. - [x] **Pickle and deepcopy** (a `fix:` commit). A frozen dataclass that
-   stores a `MappingProxyType` can be neither pickled nor deep-copied:
-   confirmed for `PhysicsParams`, `SimulationConfig`, `TabularData`,
-   `FieldLine` and `ParticleTrace`, and `FieldDataset` inherits it through
-   its `PhysicsParams`. Measured 2026-09-11, that fails stdlib `pickle` and
-   everything built on it (process pools from `concurrent.futures` or
-   `multiprocessing`, sending or returning a dataset; `joblib.dump`, which
-   `joblib.Memory` uses), plus `copy.deepcopy` and `dataclasses.asdict`.
-   cloudpickle paths already work: `joblib.Parallel` with its default loky
-   backend, and dask (inferred, not run). Stored proxies: `units.py:677`
-   (`PhysicsParams.extra`), `containers.py:102,114` (`StaggerInfo`,
-   conditional), `:218-220` (`SimulationConfig`), `:283-284`
-   (`TabularData`), `:427` (`ParticleData`), `traces/_fieldline.py:96-97`,
-   `traces/_particletrace.py:98-99`, `traces/_poincare.py:278`,
-   `ipic3d/_config.py:120`, and the proxies `openggcm/_grid.py:133-134` hands
-   to `OpenGGCMGrid` from outside.
-
-   Fix the type, not its holders. A stdlib-only leaf module (e.g.
-   `pypic/_pickling.py`) registers one reducer,
-   `copyreg.pickle(MappingProxyType, lambda m: (_mappingproxy, (dict(m),)))`,
-   where `_mappingproxy` is a named module-level function returning
-   `MappingProxyType(mapping)`: pickle cannot reference the type itself,
-   which is not importable as `builtins.mappingproxy`. `pypic/__init__.py`
-   imports the module first, for its side effect; the package init runs
-   before any submodule, so every class is covered, and the import stays
-   eager when item 3 lands. `copy.deepcopy` and the process-pool pickler
-   read the same `copyreg.dispatch_table`: in the measurement every failing
-   path above passed, round-trips compared equal and the fields stayed
-   read-only. The registration is process-wide, so after `import pypic` any
-   `mappingproxy` pickles as a snapshot instead of raising; nothing that
-   pickles today changes. Delete `PlotTheme.__getstate__` / `__setstate__`
-   (`plotting/styles.py`), which the reducer makes redundant; the theme
-   clone test keeps guarding it. Test: one aggregated invariant that every
-   class above round-trips through `pickle` and `copy.deepcopy` equal and
-   still read-only, with one `FieldDataset` sent through
-   `multiprocessing.reduction.ForkingPickler`, the pickler process pools
-   use, so no worker process is needed.
-
-2. - [x] **Typing.** `containers.py:333,410` and `dataset.py:1093` bare
-   `np.ndarray` → `IntArray` / `FloatArray` / `BoolArray` from `pypic.types`;
-   `containers.py:200,210,266` annotate `Mapping[...]` to match the
-   `MappingProxyType` substitution in `__post_init__` (`units.py` is the
-   model); `:198` `default_factory=PhysicsParams`; the four
-   `type: ignore[type-arg]` in `traces/_tracing.py:545,671,867,1075` →
-   `dict[str, Any]`; named constants for magic indices at
-   `batsrus/_hdf5.py:63-67` (`ipm[2]`, `ipm[1]`, `rpm[0]`),
-   `ipic3d/_conserved.py` column indices, `openggcm/_wrn2.py` header offsets,
-   and `ipic3d/_config.py` `reference_density`.
-
-   Landed: `Mapping` went on every proxied field in `containers.py`, not just
-   the three anchors, and mypy then pulled `FieldDataset.__init__` /
-   `from_arrays` (`metadata`, `aliases`, `transforms` — all three already
-   copy defensively) and two `io/_virtual.py` locals along with it. The
-   `reference_density` anchor was stale: no such symbol in
-   `ipic3d/_config.py`, and what sits behind that absence is now Phase 9.
-   `_conserved.py` got prefixed constants per layout
-   (`_A_` / `_B_` / `_SQ_`) because Format B's mapping is spelled out in two
-   functions and its species stride in three; `_wrn2.py` got the encoding
-   constants both the scalar and vectorized path read. No new test — item 1's
-   invariant already asserts the runtime read-only half, and `check.sh types`
-   is the static half.
-
-3. - [x] **Import time.** `import pypic` takes 0.73 s warm (best of 7 fresh
-   interpreters, 2026-09-11). The avoidable part is `scipy.interpolate`, which
-   `regrid.py:37` and `traces/_tracing.py:19` import at module scope and
-   `__init__.py` reaches through `comparison` (:6), `reconnection` (:174,
-   imports `traces`), `regrid` (:176) and `traces` (:180). Fix: export those
-   four modules' 21 names lazily through a PEP 562 `__getattr__` and
-   `__dir__` in `__init__.py`, driven by one name → module table, with the
-   real imports kept under `if TYPE_CHECKING:` so mypy and IDEs still see
-   the types. The four modules keep their module-scope imports; add the
-   lazy table to architecture.md's import rule as its second sanctioned
-   case. Stubbing all four out of `sys.modules` measured 0.52 s with
-   `scipy.interpolate` never loaded; stubbing only `comparison` and `regrid`
-   measured no saving, because `traces` loads it anyway. `codegen` stays
-   eager: `__init__.py:177` imports `pypic.schema` (pydantic) directly, and
-   deferring `codegen` measured no saving. Guard: a subprocess test that
-   `import pypic` leaves `scipy.interpolate` out of `sys.modules`, rather
-   than a wall-clock ceiling that would flake on CI. Target below 0.6 s.
-
-   Landed: 0.73 s → 0.50 s (best of 7 fresh interpreters, 2026-09-12), with
-   `scipy.interpolate` absent from `-X importtime` entirely. One flat
-   name → module table, as planned. Resolving any one name binds that
-   module's whole export set rather than the single name asked for:
-   importing `pypic.regrid` binds the submodule as `pypic.regrid`, where the
-   eager surface had the function of that name, so a one-at-a-time binding
-   would make `pypic.regrid` callable or not depending on access order. Two
-   guard tests, not one — the second pins that ordering.
-
-Verify: `./scripts/check.sh types`, the full suite, and
-`uv run python -X importtime -c "import pypic"` before and after item 3
-(`scipy.interpolate` must drop out).
-
-## Phase 9 — an unset normalization reads as SI
-
-Budget ~12 files, ~120 added / ~10 deleted. Independent of Phases 6-8, and a
-behaviour change rather than a cleanup, so it wants its own decision. Anchors
-re-measured 2026-09-12 against `db3edbc`; the original text's
-`_simple.py:222,505,682` had drifted to `:222,507,684`.
-
-**The finding.** `in_si` cannot tell "already SI" from "no normalization
-known". Phase 8 item 2 went looking for a `reference_density` constant in
-`ipic3d/_config.py`; the anchor was stale, and the reason it was stale is the
-finding. `Normalization` (`units.py:81`) carries no provenance field, so the
-fallback four readers use is indistinguishable from the identity a declared
-`system = "SI"` produces (`readers/config.py:317`). `in_si` gets
-`factor == 1.0` and returns the array unchanged (`dataset.py:1090-1098`,
-inherited by `in_units` at `:1139`), so an un-normalized run returns code
-units labelled tesla with no way for the caller to notice. Measured:
-
-```
->>> ds = FieldDataset.from_arrays({"B_1": np.full((2,2,2), 0.1)},
-...                               grid, Normalization.identity())
->>> ds.in_units("B_1", "nT")[0, 0, 0]
-100000000.0
-```
-
-0.1 code units of B reports as 10⁸ nT. For a magnetotail run that is eight
-orders of magnitude, silent. It is the one path where "normalized
-internally, converted at boundaries" can be violated without an error.
-
-**The reference density is absent, not redundant.** Every field in
-`IPic3DConfig` is code units, including the ones that read as physical:
-`c` is "speed of light in code units" (`_config.py:45`), `rho_init` is
-"initial number density per species (code units)" (`:60`), `qom` is a
-code-unit ratio at reduced mass ratio. `Normalization.pic_standard`
-(`units.py:146`) needs one absolute anchor —
-$\omega_{ref} = \sqrt{n_{ref} q_{ref}^2 / (\varepsilon_0 m_{ref})}$, from
-which `length_ref`, `time_ref`, `b_field_ref` and `e_field_ref` all follow —
-and an `.inp` fixes only the dimensionless ratios ($\omega_{pe}/\omega_{ce}$,
-$m_i/m_e$, $c/v_A$). The same double-Harris deck is a lab plasma at
-10¹⁸ m⁻³ or the magnetotail at 10⁶ m⁻³; which one it is, is the
-modeller's interpretation, not data in the file. So the identity fallback at
-`ipic3d/_config.py:482` is *correct*, `reference_density` belongs in
-`simulation.toml` exactly where the schema puts it, and no reader-side
-reconstruction is possible. Only the silence is the bug.
-
-Which makes `examples/ipic3d-double-harris.toml:39` wrong on its face —
-`reference_density = 1.0e18  # m⁻³ (reconstructed from iPIC3D qom, B0,
-rhoINIT)`. It is a chosen anchor, not a reconstruction. Item 5 fixes it.
-
-**Blast radius, measured.** Every SI path in `src/` is opt-in except the
-comparison family, which defaults to `units = "si"`:
-
-| Path | Default |
-|---|---|
-| `pypic compare` (`cli/compare.py:38`) | **`"si"` — raises unconditionally** |
-| `pypic plot-compare` (`cli/plot.py:418`, converts at `:489-493`) | **`"si"` — raises unconditionally** |
-| `compare_fields` / `field_comparison_report` / `field_difference_dataset` (`comparison.py:232,352,454` → `:193`) | **`"si"` — raises unconditionally** |
-| `pypic stats --units` (`cli/inspect.py:26,262`) | `None`, code units |
-| `pypic plot --units` (`cli/plot.py:245` → `plotting/_resolve.py:73`) | `None`, code units |
-| `pypic convert --to-si` (`cli/convert.py:158,269`) | flag off |
-| server stream (`server/protocol.py:187` → `server/arrow.py:109`) | `"code"` |
-| `normalize_fields` (`_config_helpers.py:105`, reverse SI→code) | short-circuits on `is_identity` at `:97` |
-
-`info`, `fields`, `validate`, `reduce` and `export` never convert. So three
-library entry points and two CLI commands change behaviour; everything else
-only changes when the user asked for SI and nobody had declared a scale —
-which is the case that should fail.
-
-Two internal `Normalization.identity()` constructions must keep reading as
-*declared*, or diff datasets and `--to-si` output become un-convertible
-downstream: `comparison.py:558` (result of `field_difference_dataset`) and
-`cli/convert.py:119` (result of `_to_si_dataset`). Both deliberately stamp
-identity onto data that is already SI so `in_si` is a no-op on the result.
-Item 2 exempts them for free by leaving `identity()` alone and moving only
-the reader fallbacks.
-
-1. - [x] **The provenance bit.** One field on `Normalization`,
-   `is_declared: bool = True`, defaulted so every existing construction —
-   including the eight-positional-arg form and every `identity()` in the
-   suite — keeps its meaning. Add `Normalization.undeclared()` returning the
-   same eight 1.0s with the bit clear, and switch the four reader fallbacks
-   to it: `ipic3d/_config.py:482`, `batsrus/_config.py:294`,
-   `openggcm/__init__.py:103`, `_simple.py:222,507,684`. `identity()` keeps
-   meaning "declared SI", so `system = "SI"` decks (`readers/config.py:317`),
-   the `from_arrays` default (`dataset.py:245`), the two exempt sites above
-   and all 28 `in_si`/`in_units` test call sites are untouched.
-   `merge_simulation_toml` needs no change: a TOML `[units]` section already
-   replaces the whole `normalization` field (`_config_helpers.py:73-78`).
-
-2. - [x] **The guard, in `si_factor` rather than `in_si`.** Put it at
-   `units.py:333`, not in `dataset.py`: `si_factor` is the single chokepoint
-   under `in_si` (`dataset.py:1087,1095`), `in_units` (`:1139`) and the
-   publicly exported `field_si_factor` (`compute.py:339,385`, re-exported at
-   `__init__.py:24,286`), so one condition covers a surface that would
-   otherwise need three and would still leave `field_si_factor` silent.
-
-   Raise a new `pypic.exceptions` subclass when `not is_declared` **and** the
-   quantity is dimensional. Dimensionless is exempt and that is physics, not
-   a convenience: `beta`, `M_A`, `agyrotropy` and the rest are correct under
-   an unknown anchor, `si_factor("dimensionless")` returning 1.0 is the truth
-   there, and the exemption keeps the useful half of `compare_fields`
-   working. No opt-in kwarg on `in_si` — the escape hatches already exist and
-   are better: ship a `simulation.toml`, pass `normalization=` (OpenGGCM,
-   SimpleReader), or `units="code"`. The message should name all three.
-
-3. - [x] **Round-trip the bit.** `normalization_to_dict` /
-   `dict_to_normalization` (`io/metadata.py:108-133`) serialize exactly the
-   eight `*_ref` keys, so without this `to_zarr` → `from_zarr` launders
-   undeclared into declared and reintroduces the bug one hop away. Add
-   `"declared"` to the dict and decode it as `d.get("declared", True)` so
-   every store written to date keeps its current meaning. The dict is
-   annotated `dict[str, float]` and is also the server wire format
-   (`server/arrow.py`, `server/routes.py`), so the annotation widens.
-   schema.md §4.2 gains one line next to the eight primitives; §1 makes an
-   added optional key legal in v1.x, so no version bump.
-
-4. - [x] **Stop `pypic info` asserting the lie.** `cli/inspect.py:72-73`
-   prints `"identity (SI)"` whenever `norm.is_identity`, which is exactly
-   backwards for the fallback. Three states, not two: declared SI, declared
-   non-trivial, undeclared ("code units, no `[units]` section"). The JSON
-   branch at `:114` carries the bit too.
-
-5. - [x] **Docs and the example deck.** Fix the "reconstructed from" comment
-   at `examples/ipic3d-double-harris.toml:39` to say the anchor is chosen,
-   and say once — conventions.md is the right home — that PIC code units fix
-   only dimensionless ratios, so the SI anchor is an interpretive choice the
-   deck records rather than a value any reader can recover. CHANGELOG line
-   for the behaviour change.
-
-Tests: a declared `system = "SI"` dataset still round-trips `in_si`
-unchanged; an undeclared normalization raises on `B_1` and does **not** raise
-on `beta`; `to_zarr`/`from_zarr` preserves both states; the
-`field_difference_dataset(units="si")` output is still convertible; the
-existing identity-normalization tests pass untouched.
-
-**Open decision — resolved: landed whole.** The diagnostic half alone
-would have left the 10⁸-nT arithmetic exactly as it is, and item 4 depends
-on item 1's provenance anyway.
-
-Landed 2026-09-12 in six commits. Three changes to the plan above, each
-because the sweep found something the anchors did not say:
-
-- **`system: UnitSystem | None`, not `is_declared: bool`.** Same field
-  count, but it is the `[units].system` discriminator that
-  `readers/config.py:315` was consuming and discarding, so
-  `attrs.normalization.system` on disk now means exactly what the TOML key
-  means — what a non-pypic consumer needs. `None` is the undeclared state;
-  the dataclass default is `CUSTOM`, the honest reading of eight
-  hand-supplied references. This also made item 1's reader work smaller
-  than planned: `_build_normalization` needed no change at all, because
-  every `[units]` branch already routes through a constructor that stamps
-  its own system.
-- **`from_arrays`'s omitted-argument default moved too.** The plan left it
-  as `identity()`, which would have meant its own reproduction case still
-  printed 10⁸ nT. Measured cost was one line: `tests/_helpers.py:58`
-  already passes `identity()` explicitly, so no test needed changing.
-- **Two more fallback sites than the four named.** `io/_virtual.py:283`
-  (HDF5 with no `normalization` group) and a third hand-rolled decoder at
-  `:92-103`, alongside `dict_to_normalization` and `_normalization_to_attrs`.
-
-Three things the anchors did not predict:
-
-- `plotting/pyvista/_lines.py:66` converted through `to_si`, which resolves
-  only the six base quantities in `units.py:20`. Colouring a 3D field line
-  by any compound type — pressure, temperature, energy density — raised
-  `Unknown quantity` before it could reach the plot. Routing it through
-  `si_factor` fixes that *and* closes the one path that bypassed the guard.
-- The server needed a routing row and a new `ErrorKind`. `error_routing`
-  walks the MRO, so the new subclass would have reached clients as
-  `internal` / 500 — a user error reported as a server bug. The suite's own
-  `test_every_pypic_error_subclass_is_routed` caught it, which is the
-  invariant working as designed.
-- `pypic compare` already printed a clean message (its ValueError handler
-  covers the new subclass), but `pypic stats --units` and
-  `pypic convert --to-si` dumped a traceback at the error users will now
-  hit most. Both got the CLI's usual echo-and-exit.
-
-Verified on landing: 2957 passed / 15 skipped (2933 before this phase),
-mypy strict clean over 148 files, `ruff check .` and `ruff format --check .`
-clean, `docs` and `schema` gates green — the latter proving no v1.x bump —
-coverage 88.23% against a floor of 86, `units.py` at 100%. Two manual
-checks beyond the suite: a store written with the `system` key stripped
-decodes as declared-`custom` with `in_si` unchanged, and `pypic info` on
-`tests/data/ipic3d-synthetic/phdf5` now reports
-`undeclared (code units; no [units] section)` where it used to say
-`identity (SI)`.
+## Completed
+
+### Phases 0-4 — bug fixes and structure (`git log 499a846..4562923`)
+
+- Vector triplets sourced from the field registry rather than hand-listed.
+- `ReaderBase` extracted; alias and layering consolidation.
+- Splits: `_recipes`, `_field_table`, `cli/`, `tests/test_plotting/`.
+- `reduce` decomposed.
+
+### Phase 5 — plotting dedup (2026-09-11, `4562923..f3eb6b8`, 11 commits, 15 files, +917 / −1104)
+
+- `resolve_norm` in `plotting/_colormaps.py` replaces three copies; returns
+  one `Normalize`, not the planned tuple.
+- `finish_axes` in `plotting/_resolve.py` replaces six epilogues. Leaves
+  saving to the caller — inside the theme context `savefig` would pick up the
+  theme's dpi/bbox — and rounds every plot, not only owned ones.
+- `_theme_io.py` table-driven: one `_THEME_FIELDS` table drives load and save,
+  replacing 53 hand-written `lines.append` calls. The `[webpic]` block
+  round-trips untouched.
+- `_vector_prelude` shared by `plot_streamlines` / `plot_quiver`.
+- pyvista singular line/trajectory helpers wrap the plural.
+- Additive kwargs: `ax=`, `vmin`/`vmax`, `units=`, `save=`; `add_contours`
+  returns its `QuadContourSet`. `PlotTheme.rcparams` read-only.
+- **Four latent bugs surfaced first**, each its own `fix:` commit: theme
+  colormaps ignored when `cmap=None`, `load_theme` crashing on omitted colors,
+  quiver `units=` coloring in code units, pyvista line/trajectory divergences.
+
+### Phase 6 — duplication, dead weight, comments (2026-09-12, `9075636..a89c1f2`, 12 commits, 24 files, +420 / −430)
+
+- One variadic `_apply_nan_policy`, `@overload`ed on arity.
+- `_radial_bin` shared by `power_spectrum_2d/3d` — landed *after* a 2-D
+  absolute-scale assertion, since the existing tests would not have caught a
+  `digitize` off-by-one.
+- `derived.py` delegates `p_par` in `agyrotropy` / `aunai_nongyrotropy`;
+  `scudder_agyrotropy` stays inline to avoid a second `_unit_vector` pass.
+- `io/metadata.py` attrs plumbing; tests rewritten to pin the surviving
+  *encoders* (the server wire format, otherwise uncovered).
+- Traces closed-loop detectors aligned and cross-referenced rather than
+  merged — every shared-helper shape either copied on the scalar hot loop or
+  left both callers windowing.
+- Dead code removed. `err_prev`, the `GEOMETRY_BY_NAME` annotation and the
+  `pypic.schema.cli` path each remove public surface and each carry a
+  CHANGELOG line. History-narrating comments removed; `schema/_models.py`
+  left alone, since those docstrings feed the generated JSON Schema.
+- **Five proposed deletions were live code** and stay struck with reasons so
+  nobody re-proposes them: `h_rel`, `passes_geometry`, the `in_si`
+  fall-through, three of five `io/metadata` decoders, `decode_rle`.
+
+### Phase 7 — tests and tooling (2026-09-12)
+
+- pytest hardening: `markers`, `xfail_strict = true`, `filterwarnings = ["error", ...]`.
+- **Lint gate blind spot fixed**: multi-root `ruff check` dropped `src/`
+  nondeterministically, reporting "All checks passed" over two E501s and an
+  F401. `check.sh` now uses one root.
+- Tolerances added to bare `assert_allclose` — 194 by parse, not the 280 a
+  grep reported (multi-line calls read as bare).
+- conftest fixtures adopted, 66 banner comments removed, the
+  `importorskip("pydantic")` gate dropped, doctests filled for non-exempt gaps.
+- `pytest-cov` with a coverage floor; `.pre-commit-config.yaml`; ruff families
+  PLW, BLE, SLF, one commit each.
+- CI matrix (item 10) **declined with reasons**, not deferred — the one item
+  left open.
+
+### Phase 8 — pickling, typing, import time
+
+- `pypic/_pickling.py` registers one `copyreg` reducer for `MappingProxyType`.
+  A frozen dataclass storing one could previously be neither pickled nor
+  deep-copied, which broke `pickle`, process pools, `joblib.dump`,
+  `copy.deepcopy` and `dataclasses.asdict` across ten-odd classes including
+  `FieldDataset`. Fixed the type, not its holders.
+- Bare-`Any` typing cleanups in `containers.py` / `dataset.py`.
+- `import pypic` 0.73 s → 0.50 s: PEP 562 lazy export of `comparison`,
+  `reconnection`, `regrid`, `traces`, with `scipy.interpolate` gone from
+  `-X importtime` entirely. `codegen` stays eager — deferring it measured no
+  saving, since `__init__` imports pydantic through `pypic.schema` anyway.
+- **Two guard tests, not one.** Resolving any lazy name binds that module's
+  whole export set, so `pypic.regrid` is the submodule or the function
+  depending on access order; the second test pins that.
+
+### Phase 9 — an unset normalization reads as SI (2026-09-12)
+
+- `Normalization.system: UnitSystem | None` plus `undeclared()`; the four
+  reader fallbacks switched to it. `identity()` keeps meaning "declared SI".
+- Guard placed in `si_factor` — the single chokepoint under `in_si`,
+  `in_units` and `field_si_factor` — not in `dataset.py`.
+- The bit round-trips through Zarr/HDF5 stores and the server wire; a store
+  written without the key decodes as declared-`custom`.
+- `pypic info` stopped asserting the lie; docs and
+  `examples/ipic3d-double-harris.toml` corrected — the anchor is *chosen*,
+  not reconstructed from `qom`/`B0`/`rhoINIT`.
+- **The finding**: 0.1 code units of B reported as 10⁸ nT, silently. The
+  comparison family defaults to `units = "si"`, so three library entry points
+  and two CLI commands changed behaviour; two internal `identity()` sites
+  (diff datasets, `--to-si` output) are deliberately exempt.
+- Landed: 2957 passed / 15 skipped, coverage 88.23%, `units.py` at 100%.
+
+### Follow-on — new-user contradictions (2026-09-12, separate plan)
+
+Not a cleanup phase, but Phase 10 builds on it. Closed nine contradictions a
+first-time user hits: the custom-`[units]` `0.0` sentinel, unreachable
+`compute("psi")`, missing-input errors reported as unknown names, massless
+fluid electrons, 2D differential operators (TASKS Step 50), `reference_velocity`
+for hybrid anchors. Its lasting artifact is
+**`tests/test_schema_parity.py`'s validator↔loader invariant**: whatever
+`validate_simulation_toml` accepts, `load_config` must accept. Phase 10 item 1
+is the first case where that invariant needs a documented exemption.
+
+## Phase 10 — what pypic silently assumes
+
+`FieldDataset` and `GridInfo` hard-code four assumptions that appear in no
+docstring and no test: the grid is **uniform**, the arrays are **real**, there
+are **at most three dimensions**, and **boundaries are open**. All four are
+defensible. What is not defensible is how they fail — three of the four return
+plausible wrong numbers, and the remaining one raises from inside a `zip`.
+
+This matters beyond tidiness because it is the ceiling on which codes pypic
+can ever read. Measured against `986cd68` on 2026-09-13, walking two cases
+that the schema already claims to describe: a spectral code (Fourier in
+configuration space, or Hermite-Laguerre in velocity space) and a
+region-varying fluid/kinetic model (MHD-EPIC, FLEKS, MHD-AEPIC).
+
+Two things checked out better than expected and need no work:
+
+- **`[model].type` drives zero dispatch.** Every use is display, server JSON,
+  or the one validator cross-check that `[physics.pic]` matches `type = "PIC"`.
+  So `"hybrid"` / `"vlasov"` / `"gyrokinetic"` cost nothing and break nothing.
+- **The eight references carry no `v = l/t` constraint** — `__post_init__`
+  checks positivity only. That is what makes gyro-Bohm expressible, where the
+  length unit ($\rho_i$) and time unit ($L_{ref}/c_s$) are deliberately not
+  related by the velocity unit. A stricter constructor would have locked it out.
+
+**The phase has two halves, and the second one was not planned.** Items 1-5
+are the container assumptions above. Items 6-9 are the *normalization*
+assumptions, and they turned out to share a single root cause worth stating
+plainly, because it reframes what item 7 is for:
+
+> Nothing in pypic ever checks that a `Normalization` is consistent with the
+> code-unit convention `derived.py` computes in.
+
+Every EM quantity in `derived.py` hardcodes SI-rationalized units — `e_B` is
+$B^2/2$, `e_E` is $E^2/2$, `div_E` is $\rho_c$ — which holds exactly when
+$B_{ref}^2/(\mu_0 n_{ref} m_{ref} v_{ref}^2) = 1$. That ratio is never
+computed anywhere. Both bugs below are it going unnoticed:
+
+| Item | Symptom | Ratio |
+|---|---|---|
+| 6 | `si_factor("poynting_flux")` off by $\mu_0$ | 1 (the factor itself was wrong) |
+| 7 | `speed_of_light = c/10` corrupts every EM conversion | $(c_{SI}/c_{ref})^2 = 100$ |
+| 8 | `system = "SI"` is wrong by $\mu_0$ for every EM quantity | $1/\mu_0 = 795775$ |
+
+**Eight references are enough; the taxonomy is not the problem.** Surveyed
+2026-09-13 — the three consistency relations across the code families pypic
+claims to serve:
+
+| Family | $v = l/t$ | $E = vB$ | $B^2/(\mu_0 n m v^2)$ |
+|---|---|---|---|
+| PIC, electron-normalized | 1 | 1 | 1 |
+| PIC, ion-normalized | 1 | 1 | 1 |
+| MHD, Alfvénic | 1 | 1 | 1 |
+| hybrid ($d_i$, $v_A$) | 1 | 1 | 1 |
+| gyrokinetic (gyro-Bohm) | $\rho_* = 0.0016$ | 1 | $2/\beta$ |
+| declared SI | 1 | 1 | $1/\mu_0$ |
+
+The four basic families are exactly consistent and already expressible —
+`pic_standard` with `reference_species`, `mhd_standard`, and the
+`reference_velocity` branch cover them with no new machinery. Gyrokinetics
+goes through `custom` and is *deliberately* inconsistent on two of the three:
+$\rho_*$ is the gyrokinetic ordering parameter, and the ratio is $2/\beta$
+because GK normalizes $B$ to the equilibrium field rather than to the field
+at which $v_A = v_{ref}$. Both are physics, not error — which is why the
+ratio must be a *reported diagnostic* rather than a hard gate: its **value**
+names the convention.
+
+So the answer to "do we need more `system` values" is no. What the eight
+references cannot express is the EM convention, and that is a separate axis
+from the anchor — `[model].type` is the code family, `system` is the input
+form, and neither says whether $\mu_0 = 1$.
+
+So item 9's consistency checks are not tidying after the fixes — they are the
+thing that makes this family of bug impossible rather than invisible, and they
+would have caught both. Land them even if the exponent table slips.
+
+Budget ~12 files, ~220 added / ~70 deleted. Items 1-3 are guards and are
+independent. A separate finding, recorded because it is the same shape as
+item 1: `FieldInfo.unit_dimension` is validated on registration and `None`
+for every built-in field, so the openPMD metadata pypic advertises comes
+entirely from a fallback — documented, validated, never populated.
+
+1. - [ ] **Refuse `[grid.stretched]` at the reader boundary.** The section
+   validates, reaches `SimulationSchema.grid.stretched`, and `_build_grid`
+   (`readers/config.py:293-315`) drops it — `GridInfo` has one `spacing` float
+   per axis and `coordinate_arrays()` computes `origin + (i+0.5)*dx`.
+   Measured, with `axis_widths = [0.5, 0.6, 0.8, 1.0, 1.3]`:
+
+   ```
+   GridInfo.spacing = (0.84, 1.0, 1.0)
+   coords           = [0.42 1.26 2.10 2.94 3.78]
+   truth            = [0.25 0.80 1.50 2.40 3.55]
+   ```
+
+   Every gradient, divergence, curl and integral on that axis is then wrong by
+   a position-dependent factor, silently. This is the `[units]` `0.0` sentinel
+   again, except that one raised. Raise in `_build_grid` naming the section and
+   the axes that carry widths.
+
+   **This breaks the validator↔loader parity invariant**, deliberately, and
+   the test needs a named exemption rather than a weakened assertion: the
+   Pydantic model is the *cross-tool* contract (rustpic and webpic may well
+   support stretched axes), while `load_config` is pypic's reader. Record the
+   distinction in the test's failure message — "pypic does not read this, and
+   here is why" is a different statement from "this document is invalid".
+
+   Honouring stretched axes is a TASKS item, not a cleanup one, but it is
+   smaller than it looks: `np.gradient` already accepts coordinate arrays in
+   place of a scalar spacing, so the work is an optional
+   `GridInfo.axis_coords` plus threading it through `coordinates/operators.py`.
+   Note that pointer where the raise lands, so the next reader does not
+   re-derive it.
+
+2. - [ ] **Reject complex field arrays in `FieldDataset.from_arrays`.**
+   Complex input is accepted today and propagates into physics that assumes
+   real. Measured: `compute("|B|")` on complex `B_1/B_2/B_3` returns
+   `complex128` — $\sqrt{B_1^2+B_2^2+B_3^2}$ under complex arithmetic, not
+   $\sqrt{|B_1|^2+|B_2|^2+|B_3|^2}$ — with no warning. A pseudo-spectral code
+   dumping k-space, or any reader that forgets an inverse transform, gets
+   numbers that look like fields.
+
+   Raise on non-real dtype at `dataset.py:165`, naming the field and saying
+   that spectral coefficients want an inverse transform at the reader
+   boundary. One guard, one test; the alternative (complex-aware magnitudes
+   throughout `derived.py`) is a much larger change for a use case no reader
+   currently produces.
+
+3. - [ ] **A domain error for grids above three dimensions.** `GridInfo`
+   accepts a 5-tuple without complaint — `__post_init__` (`grid.py:61-90`)
+   never compares `len(dimensions)` against the geometry's three
+   `axis_names` — so `surviving_axis_names` silently truncates to three and
+   the failure surfaces two calls later:
+
+   ```
+   File "src/pypic/dataset.py", line 253, in from_arrays
+       axis_coords = dict(zip(dim_names, coord_arrays, strict=True))
+   ValueError: zip() argument 2 is longer than argument 1
+   ```
+
+   Check in `GridInfo.__post_init__` against `len(geometry.axis_names)`,
+   naming the dimensionality and pointing at `[phase_space]` — which already
+   rides through to `SimulationConfig.phase_space` as typed metadata, so a 5D
+   gyrokinetic run can *describe* itself today even though no container holds
+   its distribution function.
+
+4. - [ ] **Periodic domains get open-boundary stencils, and pypic already
+   knows better.** `GridInfo.boundary` records `("periodic", ...)` per axis,
+   and `grep` finds it **never read by any numerical code** — only validated
+   (`grid.py:79`), sliced (`:165`), and serialized (`io/metadata.py`). Every
+   operator goes through `np.gradient`, which applies one-sided stencils at
+   the first and last grid point instead of wrapping.
+
+   Measured on an analytically divergence-free periodic field
+   $\mathbf{B} = (\sin x \cos y,\; -\cos x \sin y,\; 0)$ on a $32^3$ box:
+
+   ```
+   interior  max |div B| = 1.887e-15    (O(h^2), at roundoff)
+   full grid max |div B| = 9.546e-03    <- boundary faces
+   cells on a boundary face: 5768 of 32768 (18%)
+   ```
+
+   Thirteen orders of magnitude, across a fifth of the domain. It bites
+   spectral and turbulence codes hardest because those runs are periodic *by
+   construction*, and their headline diagnostics — $\nabla\cdot\mathbf{B}$
+   drift, vorticity statistics, spectra — are box-wide reductions where 18%
+   of cells is not a boundary detail.
+
+   `docs/conventions.md` § *Boundary treatment for finite differences* does
+   document it ("periodic domains should pad ghost cells before calling"), so
+   this is a known limitation rather than a surprise. What is new is that the
+   information needed to do better is already in the container and ignored.
+
+   Phase 10's part is the guard, matching item 1: when `grid.boundary` marks
+   an axis periodic and the operator cannot wrap, say so once rather than
+   returning a silently degraded edge. Actually wrapping the stencil is TASKS
+   Step 52 — `np.gradient` has no periodic mode, so it means `np.roll`-based
+   central differences on flagged axes, which is a small kernel but a real
+   numerical change that wants its own convergence tests.
+
+5. - [ ] **Write the four invariants down.** They belong in
+   `docs/architecture.md` next to "Readers produce `FieldDataset`", as one
+   short block: uniform structured grid, real-valued arrays, at most three
+   dimensions, open boundaries — each with the one-line reason and the escape
+   hatch. Items 1-4 make the code enforce them; this makes a contributor able
+   to find them before writing a reader that violates one.
+
+6. - [x] **Fix the Poynting SI factor** (a `fix:`, lands before item 9).
+   `si_factor("poynting_flux")` returns $E_{ref}B_{ref}$, which is wrong by
+   $\mu_0$ — results are $\sim 10^6$ too small. Measured on
+   `pic_electron(1e18)` with $E = 0.1$, $B = 0.2$ in code units:
+
+   ```
+   pypic in_si(S)  = 6.168662e+05 W/m^2
+   hand-computed   = 4.908865e+11 W/m^2
+   ratio           = 1.256637e-06   == mu_0
+   ```
+
+   The derivation: pypic's code units are SI-rationalized, so
+   `derived.poynting_flux` returns $\mathbf{E}\times\mathbf{B}$ with no
+   $\mu_0$ (checked: `magnetic_energy_density(2) == 2.0`, i.e. $B^2/2$, not
+   the Gaussian $B^2/8\pi$). Then
+   $S_{SI} = S_{code}\,E_{ref}B_{ref}/\mu_0$ — the $1/\mu_0$ is missing.
+
+   **The correct factor is `e_field_ref * b_field_ref / mu_0`.** Write it
+   that way and not as $n\,m\,v^3$: the two are equal *only* when the
+   reference set itself satisfies $B_{ref}^2 = \mu_0 n_{ref}m_{ref}v_{ref}^2$,
+   which `pic_standard` and `mhd_standard` do by construction (verified to 1
+   part in $10^{12}$) but a hand-built `custom` set need not — measured, they
+   diverge by eight orders on a custom set with an independently chosen
+   `b_field`. The $E_{ref}B_{ref}/\mu_0$ form follows from
+   $\mathbf{S} = \mathbf{E}\times\mathbf{B}$ alone and assumes nothing about
+   the relationship among references. That the two forms *coincide* for the
+   built-in constructors is a useful invariant to assert separately, not the
+   definition to implement.
+
+   The registered dimension $(0,1,-3,0)$ = W/m² has been right all along, and
+   `e_B` converts correctly today, so this is the one EM entry that drifted.
+
+   Why nothing caught it: `tests/test_units.py:172` pins the factor as
+   `lambda n: n.e_field_ref * n.b_field_ref` — the implementation restated,
+   so the test is a tautology. Replace it with a physics assertion
+   ($E\times B/\mu_0$ from hand-computed SI inputs), which is the form that
+   would have failed. The `_COMPOUND_FACTORS` comment claiming the two fluxes
+   "normalize differently" is the reasoning that produced the bug and goes
+   with it.
+
+7. - [x] **`[units].speed_of_light` below $c$ silently breaks $\mu_0 = 1$**
+   (a second `fix:`; same root as item 5, different symptom). Reduced-$c$ runs
+   are routine — semi-implicit PIC relaxing the CFL, Boris-corrected MHD — and
+   the key that looks like the place to record it is a trap.
+
+   `pic_standard` scales `length_ref` and `velocity_ref` with the supplied
+   $c$ but pins $B_{ref} = m\,\omega_{ref}/q$, which is $c$-independent. So
+   the rationalization ratio moves as $(c_{SI}/c_{ref})^2$:
+
+   ```
+   c = c_SI       ratio = 1.0        l=5.3141e-03  v=2.9979e+08  B=3.2075e-01
+   c = c_SI/10    ratio = 100.0      l=5.3141e-04  v=2.9979e+07  B=3.2075e-01
+   c = c_SI/100   ratio = 10000.0    l=5.3141e-05  v=2.9979e+06  B=3.2075e-01
+   ```
+
+   Every EM conversion is then wrong by that factor. Magnetic energy density
+   on a $c/10$ deck, measured: pypic `1.023388e+02`, true `1.023388e+04` J/m³
+   — a factor of 100, silent.
+
+   **The coherent knob already exists.** `reference_velocity` — added for
+   hybrid anchors — takes the generalized
+   $B_{ref} = v_{ref}\sqrt{\mu_0 n_{ref} m_{ref}}$ branch and holds the ratio
+   at 1:
+
+   ```
+   speed_of_light     = c/10  ->  ratio 100.0
+   reference_velocity = c/10  ->  ratio   1.0
+   ```
+
+   So the fix is not new machinery. Reject or warn when `speed_of_light`
+   drives the ratio away from 1, and say which of the two things the deck
+   meant:
+
+   - *A dimensionless modelling choice* ($c/v_A$ reduced, mass ratio
+     lowered): leave `speed_of_light` at $c$ and record it in
+     `scaling_factor` / `scaling_description`, which the schema already
+     defines as informational with **no effect on computation** — the
+     reference template's own example is `"c/v_A reduced by 10x"`.
+   - *A genuinely different velocity unit*: use `reference_velocity`.
+
+   **Why no third option.** SI *defines* $c$. A run that really solves
+   Maxwell with $c' \neq c$ is not a rescaled plasma but a different vacuum,
+   where $c'^2 = 1/(\mu_0'\epsilon_0')$ forces at least one vacuum constant
+   off its SI value. There is no unique SI mapping to pick, so the library's
+   job is to say so rather than choose one silently.
+
+   Two smaller things in the same pass: `speed_of_light` is declared on
+   `UnitsPIC` only (`_models.py:593`), so MHD decks — exactly where the Boris
+   / reduced-speed-of-light approximation lives — cannot express it at all,
+   while `docs/schema.md` says it "stays at top-level `[units].speed_of_light`
+   regardless of approach". And `PhysicsParams.c` stays 1.0 regardless
+   (`readers/config.py:432-439` already documents this), so no relativistic
+   branch can see a reduced $c$ either.
+
+8. - [x] **`system = "SI"` is unsafe for every EM quantity** — decide the
+   semantics, then warn. The most user-facing of the three, because "my data
+   is already in SI" is where a newcomer starts and `UnitsSI` is a first-class
+   schema variant.
+
+   `derived.py` computes in SI-*rationalized* units ($\mu_0 = 1$). SI data has
+   $\mu_0 = 1.2566\times10^{-6}$. The two cannot both hold, so every EM
+   quantity comes out wrong by a power of $\mu_0$. Measured on solar-wind
+   values ($B = 5$ nT, $n = 5\times10^6$ m⁻³), declared `system = "SI"`:
+
+   ```
+   v_A   pypic = 5.4675e+01 m/s     true = 4.8773e+04 m/s    ratio = sqrt(mu_0)
+   e_B   pypic = 1.2500e-17 J/m^3   true = 9.9472e-12 J/m^3  ratio = mu_0
+   ```
+
+   `docs/schema.md:451` says "If `system` is 'SI', all data is already in SI
+   and no conversion is needed (all reference values = 1.0)" — true for the
+   *conversion*, false for the *computation*, and the doc does not say so.
+   Dimensionless quantities ($\beta$, Mach numbers, agyrotropy) and non-EM
+   ones (density, pressure, temperature, $|V|$) are unaffected; the damage is
+   confined to quantities where $\mu_0$ or $\epsilon_0$ appears.
+
+   Three ways out, in increasing cost — **this one needs a decision, not a
+   default**:
+
+   - *Warn and document.* `system = "SI"` keeps meaning "conversion is a
+     no-op", and EM quantities raise or warn. Cheapest, honest, leaves the
+     user to pre-normalize.
+   - *Normalize on load.* Treat SI as an input encoding, not a code-unit
+     system: rescale to a $\mu_0 = 1$ set at the reader boundary. The
+     machinery exists — `normalize_fields` (`_config_helpers.py:97`) does
+     exactly this — but it **short-circuits on `is_identity`**, which is
+     precisely the case that needs it. Correct, and the largest change.
+   - *Carry $\mu_0$ into the EM functions.* Parameterize `derived.py` the way
+     the relativistic `c=None` kwarg already works. Most general, most
+     invasive, and only worth it if non-rationalized code units become a real
+     requirement.
+
+   Whichever is chosen, item 8's ratio check reports it as $1/\mu_0$, so the
+   diagnosis is free either way.
+
+9. - [x] **`_COMPOUND_FACTORS` as exponent vectors.** `units.py:583-607` is 16
+   lambdas, and every one is a *monomial* in the eight references.
+   `pressure` is $n\,m\,v^2$, `current_density` is $q\,n\,v$, `frequency` is
+   $t^{-1}$, `b_field_per_length` is $B/l$. Replace the lambda table with
+   eight-integer exponent tuples and derive the factor by `math.prod`. Same
+   entry count, less code, and it pays three times.
+
+   Three tables are keyed by the same `QuantityType` strings today:
+   `_QUANTITY_UNITS` (display label), `_QUANTITY_DIMENSIONS` (openPMD SI
+   7-tuple) and `_COMPOUND_FACTORS` (factor over the eight references). The
+   last two encode the *same physics in two notations*, independently
+   maintained, **with no test relating them** — which is exactly how item 5's
+   bug survived. Composing the 8-exponent vector with each reference's own SI
+   dimension reproduces `_QUANTITY_DIMENSIONS` for 21 of 22 entries today;
+   the 22nd is `poynting_flux`, and once item 6 lands it is 22 of 22 with no
+   exception. `_QUANTITY_UNITS` stays hand-written — it carries information
+   the exponents do not (`pressure` and `energy_density` have *identical*
+   exponents and differ only as "Pa" versus "J/m³", which is why the enum
+   cannot collapse).
+
+   **Two invariants, and they are the real product of this item** — see the
+   phase preamble for why they, not the table, are the point.
+
+   - *Dimension-of-factor equals registered-dimension*, for every quantity
+     type, as one aggregate test. Catches item 5.
+   - *The rationalization ratio $B_{ref}^2/(\mu_0 n_{ref} m_{ref} v_{ref}^2)$
+     is 1.* Catches item 6, and every future deck that reaches the same state
+     by another route. **Not advisory — warn on construction**, naming the
+     ratio and the two legitimate ways to express a non-$c$ velocity unit
+     (`reference_velocity`, or `scaling_factor` for a dimensionless
+     modelling choice). A set that violates it is announcing that its code
+     units are not SI-rationalized, and for such data the whole EM surface is
+     wrong, not one conversion — that is too large a failure to whisper.
+
+   Warn rather than raise: `Normalization` is constructible by hand and the
+   eight-positional-argument form is used throughout the suite, so a raise
+   would be a breaking change for data that may never touch an EM quantity.
+   The advisory-versus-fatal line sits where the phase's other guards sit —
+   refuse at the *reader* boundary (item 1), warn on a hand-built object.
+
+   **Scoping note — pypic mandates one code-unit convention, deliberately.**
+   `docs/conventions.md` § *Gaussian vs SI-Rationalized* already fixes it:
+   code units are SI-rationalized ($\mu_0 = \epsilon_0 = 1$, no $4\pi$), and
+   Gaussian codes such as iPIC3D are converted **at the reader boundary**,
+   once. Item 5 does not add that constraint; it makes the conversion agree
+   with the constraint that already exists. Supporting a user-chosen
+   $\mu_0 \neq 1$ would mean parameterizing every pure function in
+   `derived.py`, not changing a factor — and `PhysicsConstants` already
+   stores the code-unit $\mu_0 / \epsilon_0 / c$ that such a design would
+   read, while `Normalization.si_factor` cannot see it. Worth knowing the
+   seam exists; not worth opening in this phase.
+
+   The other two payoffs:
+
+   - **TASKS Step 43c falls out.** After `reduce(reduction="integrate")` along
+     $n$ axes the SI unit shifts by $n$ length factors, and today
+     `quantity_type` is preserved unchanged so `in_si()` is off by
+     `length_ref**n`. With exponents it is a vector subtraction.
+   - **New quantity types get a safe path.** `register_recipe` rejects an
+     unknown `quantity_type` eagerly, with the valid list — good behaviour,
+     keep it. But a genuinely new dimensional group (gyro-Bohm flux, say)
+     currently needs a new lambda; with exponents it is a tuple a user can
+     supply without being able to express nonsense.
+
+   Two notes for whoever lands it:
+
+   - **Not bit-identical.** `math.prod` associates left-to-right in reference
+     order, the lambdas associate as written, so multi-factor entries
+     (`pressure`, `current_density`, `energy_flux`, `power_density`) differ by
+     **at most 3 ULP, relative 4.3e-16** (measured over 2000 random
+     normalizations). Pin the equivalence test with `rtol=1e-15`, not `==`,
+     and say in the commit that the change is deliberate and sub-ULP-scale.
+   - **`FieldInfo.unit_dimension` is not the parallel table** — it is a
+     per-field *override*, and it is `None` for every built-in field.
+     `dataset.py:272` and `:938` already fall back to
+     `quantity_dimension(quantity_type)`, which is where the real table
+     lives. Leave the override alone.
+
+   Incidental fix in the same pass: `_QUANTITIES` is six names, not eight —
+   `mass` and `charge` are references with no `si_factor`, so
+   `SpeciesInfo.mass` has no route to SI. The exponent table covers all eight
+   for free.
+
+   Do **not** open `QuantityType` to arbitrary strings. Its being closed and
+   eagerly validated is what makes `in_si()` trustworthy; the exponent table
+   is the extension point, the enum stays the vocabulary.
+
+10. - [x] **Teach the explicit form the third relation** — landed as part of
+   the schema 2.0 `[units]` collapse, not as a standalone item.
+
+11. - [x] **A velocity anchor for the MHD form** — subsumed by the same
+    collapse. `UnitsMHD` no longer exists to add a key to.
+
+**What actually landed, and why it was bigger than items 10-11.** Asked
+whether the deferred `system` -> anchor-form rename was worth doing, given
+that breaking compatibility is now free (no users, 0.2 ahead). The answer
+turned out to be that the *rename* is cosmetic but the *collapse* it enables
+is not, and item 10's third relation is what enables it:
+
+- **`UnitsMHD` is a strict special case of `UnitsCustom`** once
+  $B = v\sqrt{\mu_0 n m}$ is known. Verified: `mhd_standard(L, rho, B)` is
+  reproduced **bit-exactly on all eight references** by an explicit deck. So
+  adding item 10's relation does not extend a form, it deletes one.
+- Four `[units]` variants plus a nested `[units.reference]` sub-table became
+  **three flat anchor forms** — `from_species` (length derived from a
+  species' plasma frequency), `explicit` (length given), `si`.
+- `explicit` takes `reference_length` plus **any two** of a velocity, a
+  density and a field; the third follows. That rule is the rank of the
+  relation set, not a convention, and it covers MHD, PLUTO/Athena++,
+  hand-built PIC and gyrokinetics without a fourth form.
+- **Over-supply is legal, duplicate spellings are not.** Item 11 had said the
+  `b_field` + `velocity` pair must be rejected; that is wrong, because the
+  gyrokinetic case needs exactly that pair accepted and no tolerance gate can
+  tell a deliberate $2/\beta$ from a typo. The rule that resolves both:
+  reject two names for *one* primitive (both density keys), accept redundant
+  *distinct* primitives. Recorded so nobody re-derives item 11's version.
+- Three defects died with it: `reference_density` meaning m⁻³ under `PIC` and
+  kg/m³ under `MHD`; `reference_length` versus the nested `.length` as two
+  spellings of one concept; and PLUTO-class decks being **rejected outright**
+  for a $B_{ref}$ the deck already implied.
+
+**Item 8 resolved as *normalize on load*.** `system = "SI"` was conflating
+two things — an anchor form and an input encoding — and they separate into
+`anchor` plus `data_in_si`, because rescaling SI data needs an anchor to
+rescale *against*. A Vlasiator-shaped deck now returns hand-checked SI for
+$v_A$ and $e_B$; it was wrong by $\sqrt{\mu_0}$ and $\mu_0$.
+
+**Two measurements worth keeping.** The "bit-exact" claim above holds only
+because the loader derives the velocity from $\rho_m$ directly:
+$(\rho/m_p)\cdot m_p \neq \rho$ for **3.2% of random double mass densities**,
+so routing through $n$ and back is not exact in general — the repo's own MHD
+deck round-trips by luck. And the `MHD` label never carried the information
+it looked like it carried: $v_{ref}$ equals the Alfvén speed of the reference
+state in **every** rationalized form, PIC included, so nothing was lost by
+dropping it.
+
+**What did not move: `[model].type`.** It was never the duplicate. The two
+fields simply shared a vocabulary while meaning different things, so a hybrid
+deck read as the contradiction `type = "hybrid"`, `system = "PIC"`. Once
+`[units]` stops using code-type words the collision is gone from both sides.
+
+
+12. - [ ] **Document how exotic codes actually land.** A short
+   `docs/architecture.md` addition, because the answer is counter-intuitive
+   and currently lives nowhere: **extend readers, not containers.**
+
+   - *Spectral in velocity space* (Hermite-Laguerre, gyrokinetic): the first
+     three coefficients of a Hermite hierarchy **are** `n_s0`, `V_s0_i`,
+     `P_s0_ij`. A reader that maps moments 0-2 onto canonical names inherits
+     the entire derived surface for free. The high-order tail is a different
+     kind of object and wants a different container, not a 6-D `FieldDataset`.
+   - *Region-varying fluid/kinetic*: one normalization per run is **correct**,
+     not a limitation — coupled codes must agree on units at the interface.
+     The embedded patch is a second grid, and two `FieldDataset`s plus
+     `align_grids` / `compare_fields` is already the supported answer. What is
+     genuinely missing is only a *relationship* — nothing records "same run,
+     same step, different region" — and the sharper trap is that `beta` on the
+     fluid side and `beta_s0` on the kinetic side mean different things with
+     nothing saying so.
+
+### Pressure test — four codes outside the reader matrix
+
+`TASKS-schema-extension.md` § *Reader → blocker matrix* tracks what each
+pending reader needs from the **schema vocabulary**. It says nothing about
+normalization form or the runtime container, which is what this phase is
+about, so four codes were walked against those instead (2026-09-13). Marked
+*(unverified)* where the claim comes from the code's documentation rather than
+from a file on disk — confirm before anyone builds a reader on it.
+
+| Code | Units form (v2.0) | Blocked by |
+|---|---|---|
+| **Entity** (SRPIC/GRPIC, GPU) | `from_species` — skin-depth anchored, $v_{ref} = c$ *(unverified)* | item 1: QSpherical is a log-radial stretched grid. GRPIC also needs an off-diagonal metric, which `CoordinateGeometry` cannot express at all — out of scope, not a Phase 10 item |
+| **Zeltron** (relativistic PIC) | `from_species` *(unverified)*; Gaussian CGS converts at the reader, iPIC3D precedent | nothing in this phase. QED / radiation reaction already deferred in the matrix |
+| **PLUTO** (MHD/RMHD) | ✅ `explicit` — `reference_length` / `reference_mass_density` / `reference_velocity`, one-to-one with `UNIT_LENGTH` / `UNIT_DENSITY` / `UNIT_VELOCITY` | item 1 only (logarithmic grid patches). Gaussian $4\pi$ converts at the reader |
+| **Vlasiator** (hybrid-Vlasov) | ✅ `explicit` + `data_in_si = true` | nothing in this phase. Dual FSgrid/DCCRG regridding is already TASKS Step 23 |
+
+**Resolved.** PLUTO and Vlasiator were the two mis-served codes and both are
+now expressible: PLUTO under an accurate label rather than `custom`, and
+Vlasiator's SI arrays rescaled on load instead of run through the
+$\mu_0 = 1$ EM functions unconverted. Item 1 is the only Phase 10 item still
+load-bearing for any of the four, and it is a container guard, not a
+normalization one.
+
+**One stale entry found next door.** The matrix marks `[grid.stretched]` ✅
+as unblocking ARMS (Step 36, line 267), but item 1 measures that the section
+validates and is then dropped by `load_config` — so ARMS spherical-$r$ is
+unblocked in the *schema* and silently wrong at *runtime*. Fix the ✅ when
+item 1 lands, or ARMS gets built on it.
+
+Verify: `./scripts/check.sh` in full. Items 1 and 3 touch the schema path, so
+`./scripts/check.sh schema` must stay green — none of this changes the JSON
+artifact, and if it does, the change was not additive.
+
+Items 6-8 are the phase's behaviour changes and each wants a CHANGELOG line:
+`in_si` / `in_units` on Poynting flux move by $1/\mu_0$, which is a
+correction, not a migration. Item 9 wants two tests landed *before* the
+lambdas are deleted — the exponent table reproduces every current `si_factor`
+to `rtol=1e-15` over a lopsided normalization, and dimension-of-factor equals
+`_QUANTITY_DIMENSIONS` for all 22 entries once item 6 has landed.
 
 ## Non-goals
 
-No 2D operator support (TASKS.md Step 50). No destaggering of BATSRUS or
-OpenGGCM. No new core dependencies. No plotting rewrite around option
+No N-D phase-space `FieldDataset` — it pays once and costs the whole
+container; `[phase_space]` metadata already carries the description, which is
+most of the value. No `system = "gyrokinetic"` or other new `UnitSystem`
+member; the anchor is parameterized by `reference_velocity` and the custom
+reference table, and `[model].type` already holds code identity. No complex
+arithmetic through `derived.py`. No honouring of stretched axes in this phase
+(item 1 refuses them; honouring is a TASKS item). No destaggering of BATSRUS
+or OpenGGCM. No new core dependencies. No plotting rewrite around option
 objects, no public kwarg or function renames. No schema semantics or JSON
 artifact changes. No `derived.py` or `schema/_models.py` split. No big-bang
 commits.

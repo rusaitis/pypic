@@ -157,7 +157,7 @@ a laboratory plasma at $10^{18}\,\mathrm{m^{-3}}$ or the magnetotail at
 $10^{6}\,\mathrm{m^{-3}}$, and which one it is, is the modeller's
 interpretation of their own run. No reader can reconstruct it.
 
-So `reference_density` belongs in `simulation.toml` — the deck is where
+So `reference_number_density` belongs in `simulation.toml` — the deck is where
 that interpretation gets recorded — and a reader that finds no
 `[units]` section reports the normalization as **undeclared**
 (`Normalization.undeclared()`, `system = None`) rather than guessing.

@@ -17,7 +17,7 @@ from pypic.fields import (
     unregister_field,
 )
 from pypic.selections import PlaneSelection
-from pypic.units import _COMPOUND_FACTORS, _QUANTITIES, Normalization, SpeciesInfo
+from pypic.units import _SI_FACTORS, Normalization, SpeciesInfo
 from tests._helpers import make_uniform_grid
 
 
@@ -331,11 +331,22 @@ class TestQuantityTypeCoverage:
         """
         assert {member.value for member in QuantityType} == set(_QUANTITY_DIMENSIONS)
 
-    def test_quantity_types_complete(self) -> None:
-        """Every quantity type with an SI factor must have a unit label."""
-        si_factor_types = _QUANTITIES | _COMPOUND_FACTORS.keys()
-        unit_label_types = set(_QUANTITY_UNITS)
-        assert si_factor_types == unit_label_types
+    def test_every_labelled_quantity_type_converts_to_si(self) -> None:
+        """A unit label with no SI factor would be a label pypic cannot honour."""
+        missing = sorted(set(_QUANTITY_UNITS) - _SI_FACTORS.keys())
+        assert not missing, (
+            f"_QUANTITY_UNITS entries with no _SI_FACTORS entry: {missing}"
+        )
+
+    def test_only_mass_and_charge_convert_without_being_field_tags(self) -> None:
+        """The two reference primitives no field is ever tagged with.
+
+        `si_factor` resolves all eight storage primitives so `SpeciesInfo`
+        mass and charge have a route to SI, but neither names a field
+        array, so neither carries a display label or a `QuantityType`.
+        """
+        extra = _SI_FACTORS.keys() - set(_QUANTITY_UNITS)
+        assert extra == {"mass", "charge"}
 
     def test_species_patterns_have_known_quantity_types(self) -> None:
         """Every quantity_type in _SPECIES_INFO_PATTERNS has a _QUANTITY_UNITS entry."""

@@ -8,6 +8,7 @@ import h5py  # type: ignore[import-untyped]
 import numpy as np
 import pytest
 from numpy.testing import assert_array_equal
+from scipy import constants
 
 from pypic.containers import SimulationConfig
 from pypic.coordinates.geometry import CARTESIAN
@@ -428,7 +429,7 @@ class TestOpenSimple:
         )
         toml_content = """\
 [schema]
-version = "1.0"
+version = "2.0"
 [model]
 name = "toml_sim"
 type = "MHD"
@@ -446,7 +447,7 @@ spacing = [1.0, 2.0, 3.0]
 lower = [0.0, 0.0, 0.0]
 upper = [4.0, 6.0, 6.0]
 [units]
-system = "SI"
+anchor = "si"
 [coordinates]
 geometry = "cartesian"
 frame = "sim"
@@ -475,7 +476,7 @@ mass = 1.0
 
         toml_content = """\
 [schema]
-version = "1.0"
+version = "2.0"
 [model]
 name = "remote_toml"
 type = "PIC"
@@ -493,7 +494,7 @@ spacing = [1.0, 2.0, 3.0]
 lower = [0.0, 0.0, 0.0]
 upper = [4.0, 6.0, 6.0]
 [units]
-system = "SI"
+anchor = "si"
 [coordinates]
 geometry = "cartesian"
 frame = "sim"
@@ -762,3 +763,82 @@ class TestSelectiveReadViaSimulation:
         sim = open_simple(canonical_dir)
         ds = sim.read(step=0)
         assert len(ds.field_names()) == 4
+
+
+class TestDataInSI:
+    r"""``[units].data_in_si`` rescales SI arrays against the declared anchor.
+
+    A generic HDF5 file carries no unit convention, so the deck is the
+    only thing that can say its numbers are SI. Without the flag the
+    arrays are read as code units and every quantity carrying $\mu_0$
+    comes out wrong — which is what SI-emitting codes hit before 2.0.
+    """
+
+    B_SI = 5.0e-9  # 5 nT, solar wind
+    N_SI = 5.0e6  # 5 cm^-3
+
+    def _sim_dir(self, tmp_path: Path, *, data_in_si: bool) -> Path:
+        rho = self.N_SI * constants.m_p
+        with h5py.File(tmp_path / "output_000000.h5", "w") as f:
+            g = f.create_group("fields")
+            for index, value in enumerate((self.B_SI, 0.0, 0.0), start=1):
+                g.create_dataset(f"B_{index}", data=np.full((2, 2, 2), value))
+            g.create_dataset("rho_m", data=np.full((2, 2, 2), rho))
+        (tmp_path / "simulation.toml").write_text(f"""\
+[schema]
+version = "2.0"
+[model]
+name = "si_sim"
+type = "vlasov"
+[run]
+name = "solar_wind"
+[time]
+scheme = "fixed"
+dt = 1.0
+t_start = 0.0
+t_end = 1.0
+n_steps = 1
+[grid]
+dimensions = [2, 2, 2]
+spacing = [1.0, 1.0, 1.0]
+lower = [0.0, 0.0, 0.0]
+upper = [2.0, 2.0, 2.0]
+[units]
+anchor = "explicit"
+data_in_si = {str(data_in_si).lower()}
+reference_length = 6.371e6
+reference_mass_density = 8.35e-21
+reference_b_field = 5.0e-9
+[coordinates]
+geometry = "cartesian"
+frame = "sim"
+[[species]]
+name = "protons"
+charge = 1.0
+mass = 1.0
+""")
+        return tmp_path
+
+    def test_si_arrays_reach_si_quantities_unchanged(self, tmp_path: Path) -> None:
+        """Round trip: SI in, rescale on load, SI back out."""
+        sim = open_simple(self._sim_dir(tmp_path, data_in_si=True))
+        ds = sim.read(step=0, fields=["B", "rho_m"])
+        rho = self.N_SI * constants.m_p
+        np.testing.assert_allclose(
+            float(np.mean(ds.in_si("v_A"))),
+            self.B_SI / np.sqrt(constants.mu_0 * rho),
+            rtol=1e-12,
+        )
+        np.testing.assert_allclose(
+            float(np.mean(ds.in_si("e_B"))),
+            self.B_SI**2 / (2 * constants.mu_0),
+            rtol=1e-12,
+        )
+
+    def test_without_the_flag_the_arrays_are_read_as_code_units(
+        self, tmp_path: Path
+    ) -> None:
+        """The pre-2.0 behaviour, kept as the default."""
+        sim = open_simple(self._sim_dir(tmp_path, data_in_si=False))
+        ds = sim.read(step=0, fields=["B", "rho_m"])
+        assert float(np.mean(ds["B_1"])) == self.B_SI

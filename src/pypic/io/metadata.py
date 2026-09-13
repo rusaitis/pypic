@@ -37,7 +37,7 @@ if TYPE_CHECKING:
 # Storage layout discriminator, written to the root attr ``schema.version``
 # and mirroring ``[schema].version`` from ``simulation.toml``: one version
 # governs both vocabulary and storage shape (schema.md §4.2).
-SCHEMA_VERSION = "1.0"
+SCHEMA_VERSION = "2.0"
 
 
 __all__ = [
@@ -131,10 +131,10 @@ def dict_to_normalization(d: Mapping[str, Any]) -> Normalization:
 
     A dict with no ``system`` key was written before the key existed
     and carried eight references someone wrote down, so it decodes as
-    `UnitSystem.CUSTOM` — declared, system unknown. An explicit
-    ``None`` is the undeclared state.
+    `UnitSystem.EXPLICIT` — the honest reading of a set stated in full.
+    An explicit ``None`` is the undeclared state.
     """
-    system = d.get("system", UnitSystem.CUSTOM)
+    system = d.get("system", UnitSystem.EXPLICIT)
     return Normalization(
         length_ref=float(d["length_ref"]),
         time_ref=float(d["time_ref"]),
@@ -456,7 +456,7 @@ def _encode_run(run: Any) -> dict[str, Any]:  # noqa: ANN401
 def _decode_run(d: dict[str, Any]) -> Any:  # noqa: ANN401
     """Rebuild a ``schema.Run`` from a JSON-mode dict.
 
-    Strict by default: a non-conforming ``attrs.run`` is a v1.0 schema
+    Strict by default: a non-conforming ``attrs.run`` is a v2.0 schema
     violation and surfaces as ``pydantic.ValidationError``.  Callers
     that need leniency can catch and fall back to keeping the raw dict.
     """
@@ -488,7 +488,7 @@ def read_simulation_toml(source: str | Path) -> str:
 
 
 def encode_pypic_attrs(fds: FieldDataset) -> dict[str, Any]:
-    """Assemble FieldDataset metadata into the schema-v1.0 root-group attrs dict.
+    """Assemble FieldDataset metadata into the schema-v2.0 root-group attrs dict.
 
     The returned dict is stamped as ``xr.DataTree.attrs`` (which writes
     it onto the Zarr root group's attrs) when writing. Each top-level
@@ -577,10 +577,10 @@ def decode_pypic_attrs(
 ]:
     """Unpack root-group attrs into the components needed by FieldDataset.
 
-    Expects schema-v1.0 flat keys at the top level with a
+    Expects schema-v2.0 flat keys at the top level with a
     ``schema.version`` discriminator at ``d["schema"]["version"]``.
 
-    Accepts both the v1.0 schema-mirror layout (current) and the
+    Accepts both the v2.0 schema-mirror layout (current) and the
     pre-mirror layout (one transitional shape with ``dt`` /
     ``boundary`` / ``geometry`` under ``grid``, ``frame`` /
     ``transforms`` at top level, ``c`` / ``gamma`` under ``physics``).
