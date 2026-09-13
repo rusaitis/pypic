@@ -1,7 +1,6 @@
 # Code-quality cleanup
 
-Record of the September 2026 code-quality audit. Phases 0-9 have landed;
-Phase 10 is open.
+Record of the September 2026 code-quality audit. Phases 0-10 have landed.
 
 Kept because each phase found something other than what its anchors
 predicted — check the premise, not just the line number. Four of Phase 6's
@@ -132,6 +131,31 @@ for hybrid anchors. Its lasting artifact is
 is the first case where that invariant needs a documented exemption.
 
 ## Phase 10 — what pypic silently assumes
+
+**Closed 2026-09-13.** All twelve items landed; 3017 passed / 15 skipped.
+Four surprises worth the reread, in the order they turned up:
+
+- **The `from_arrays` guard belongs one level down.** Item 2's anchor was
+  right that every *reader* routes through `from_arrays`, and wrong that this
+  covers the boundary: `io/zarr.py` and `io/_virtual.py` construct a
+  `FieldDataset` directly, and a foreign Zarr store or a VirtualiZarr view
+  over legacy HDF5 is precisely where k-space arrays arrive. `__init__`.
+- **The parity exemption should be typed, not named.** Item 1 asked for a
+  named carve-out; a list of labels to skip would have rotted. Requiring each
+  entry to *raise* makes it self-deleting — Step 51 will fail that test and
+  force its own cleanup. Also: the invariant test would not have failed as
+  written, because its corpus is `[units]`-only.
+- **A new `PypicError` subclass is not free, and the suite says so.**
+  `test_every_pypic_error_subclass_is_routed` walks the hierarchy and refuses
+  any subclass absent from the routing contract. Subclassing
+  `GeometryUnsupportedError` rather than `PypicError` was what kept
+  `UnsupportedGridError` to five lines and no wire change — a bare subclass
+  would have served a diagnosable user error as `internal` / 500.
+- **Item 4's guard fires on almost nothing, because the readers drop the
+  data.** Only three sites populate `GridInfo.boundary`; BATSRUS parses
+  `#PERIODIC` into `is_periodic` and never plumbs it through, so the repo's
+  own four-faces-periodic fixture warns not at all. The guard is correct and
+  its coverage is a reader problem — the same bug class, one layer out.
 
 `FieldDataset` and `GridInfo` hard-code four assumptions that appear in no
 docstring and no test: the grid is **uniform**, the arrays are **real**, there
@@ -392,7 +416,7 @@ entirely from a fallback — documented, validated, never populated.
    and the next instance of the same bug class: wiring it through is its own
    commit, because it would immediately make that fixture warn.
 
-5. - [ ] **Write the four invariants down.** They belong in
+5. - [x] **Write the four invariants down.** They belong in
    `docs/architecture.md` next to "Readers produce `FieldDataset`", as one
    short block: uniform structured grid, real-valued arrays, at most three
    dimensions, open boundaries — each with the one-line reason and the escape
@@ -676,7 +700,7 @@ deck read as the contradiction `type = "hybrid"`, `system = "PIC"`. Once
 `[units]` stops using code-type words the collision is gone from both sides.
 
 
-12. - [ ] **Document how exotic codes actually land.** A short
+12. - [x] **Document how exotic codes actually land.** A short
    `docs/architecture.md` addition, because the answer is counter-intuitive
    and currently lives nowhere: **extend readers, not containers.**
 

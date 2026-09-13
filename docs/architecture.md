@@ -79,6 +79,40 @@ is why its typer CLI lives outside it, at `pypic/_schema_cli.py`, the way
 changing the schema, edit `pypic/schema/_models.py` first — `readers/config.py`
 and `docs/schema.md` follow from it, never the reverse.
 
+**Four container invariants, each enforced at one place.** `FieldDataset` and
+`GridInfo` assume the grid is **uniform**, the arrays are **real**, there are
+**at most three dimensions**, and **boundaries are open**. All four are
+deliberate — they are what keeps the container a plain structured grid that
+pure NumPy functions can act on — and each fails loudly rather than returning a
+plausible wrong number:
+
+| Invariant | Refused at | If you need more |
+|---|---|---|
+| Uniform cell spacing | `readers/config.py` `_build_grid` raises `UnsupportedGridError` on `[grid.stretched]` | `from_arrays(coords=...)` carries true positions in the xarray coords; the operators still take a scalar spacing, so honouring stretched axes is TASKS Step 51 |
+| Real-valued arrays | `FieldDataset.__init__` | inverse-transform spectral coefficients at the reader boundary |
+| At most three dimensions | `GridInfo.__post_init__`, against the geometry's `axis_names` | `[phase_space]` describes a 5D gyrokinetic or 6D Vlasov run as typed metadata; no container holds the distribution function |
+| Open boundaries | `compute.py` warns on a `periodic` axis | pad ghost cells, or reduce over the interior; wrapping the stencil is TASKS Step 52 |
+
+A reader that needs to violate one is the signal to change the invariant
+deliberately, not to route around the guard.
+
+**Extend readers, not containers.** When a code looks like it needs a bigger
+`FieldDataset`, it usually needs a smarter reader. Two cases that come up:
+
+*Spectral in velocity space* (Hermite-Laguerre, gyrokinetic) — the first three
+coefficients of a Hermite hierarchy **are** `n_s0`, `V_s0_i` and `P_s0_ij`. A
+reader that maps moments 0-2 onto canonical names inherits the whole derived
+surface for free. The high-order tail is a different kind of object and wants
+its own container, not a 6-D `FieldDataset`.
+
+*Region-varying fluid/kinetic* (MHD-EPIC, FLEKS, MHD-AEPIC) — one normalization
+per run is **correct**, not a limitation: coupled codes must agree on units at
+the interface. The embedded kinetic patch is a second grid, and two
+`FieldDataset`s plus `align_grids` / `compare_fields` is the supported answer.
+What is genuinely missing is a *relationship* — nothing records "same run, same
+step, different region" — and the sharper trap is that `beta` on the fluid side
+and `beta_s0` on the kinetic side mean different things with nothing saying so.
+
 **The server is optional, not core.** `pypic.server` is a Starlette/FastAPI
 data-serving layer gated behind the `server` extra. Core library imports never
 trigger server dependencies.
