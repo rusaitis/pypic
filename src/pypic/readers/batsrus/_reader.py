@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 import logging
 from typing import TYPE_CHECKING, Any, assert_never
 
@@ -12,7 +13,11 @@ from pypic.coordinates import CARTESIAN, GEOMETRY_BY_NAME
 from pypic.grid import GridInfo
 from pypic.readers._base import ReaderBase
 from pypic.readers._config_helpers import normalize_fields
-from pypic.readers.batsrus._config import BATSRUSConfig, to_simulation_config
+from pypic.readers.batsrus._config import (
+    BATSRUSConfig,
+    boundary_tags,
+    to_simulation_config,
+)
 from pypic.readers.batsrus._field_map import (
     FIELD_NAME_MAP,
     SKIP_FIELDS,
@@ -389,6 +394,13 @@ class BATSRUSReader(ReaderBase):
         is_regridded: bool = False,
     ) -> FieldDataset:
         """Normalize SI-valued *field_data* by the run's references and wrap it."""
+        if grid.boundary is None:
+            # The one place all three read paths converge while a GridInfo is
+            # still in scope.  to_simulation_config is skipped whenever a
+            # sim_config was supplied, which open_batsrus always does.
+            tags = boundary_tags(self._config, header, len(grid.dimensions))
+            if tags is not None:
+                grid = copy.replace(grid, boundary=tags)
         if self._sim_config is None:
             self._sim_config = to_simulation_config(
                 self._config, header, grid=grid, sim_dir=path

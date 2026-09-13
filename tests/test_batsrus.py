@@ -6,6 +6,7 @@ committed under ``tests/data/batsrus-synthetic/``.
 
 from __future__ import annotations
 
+import copy
 from pathlib import Path
 
 import numpy as np
@@ -17,6 +18,7 @@ from pypic.readers.batsrus import (
     parse_header,
     parse_param_in,
 )
+from pypic.readers.batsrus._config import BATSRUSConfig, boundary_tags
 from pypic.readers.batsrus._field_map import (
     FIELD_NAME_MAP,
     SKIP_FIELDS,
@@ -137,6 +139,79 @@ class TestParamIn:
         config = parse_param_in(IDL_DIR / "PARAM.in")
         assert_array_equal(config.domain_min[:2], (XMIN, YMIN))
         assert_array_equal(config.domain_max[:2], (XMAX, YMAX))
+
+    def test_outer_boundary_faces_are_parsed(self) -> None:
+        config = parse_param_in(IDL_DIR / "PARAM.in")
+        assert config.outer_boundary == ("periodic",) * 4
+
+
+def _config_with(faces: tuple[str, ...]) -> BATSRUSConfig:
+    """A config carrying only the ``#OUTERBOUNDARY`` faces under test."""
+    return BATSRUSConfig(outer_boundary=faces)
+
+
+class TestBoundaryTags:
+    """Collapsing two periodicity sources onto one tag per axis."""
+
+    def test_faces_collapse_pairwise_onto_axes(self) -> None:
+        config = _config_with(("outflow",) * 6)
+        assert boundary_tags(config, None, 3) == ("outflow", "outflow", "outflow")
+
+    def test_an_asymmetric_face_pair_is_neither_face(self) -> None:
+        config = _config_with(("inflow", "outflow", "float", "float"))
+        assert boundary_tags(config, None, 2) == ("mixed", "float")
+
+    def test_the_run_header_outranks_the_deck(self) -> None:
+        """A deck claiming periodic must not override the run saying it isn't."""
+        config = _config_with(("periodic",) * 4)
+        header = parse_header(IDL_DIR / "z=0_mhd_1_n00000000.h")
+        not_periodic = copy.replace(header, is_periodic=(False, False))
+        assert boundary_tags(config, not_periodic, 2) == ("open", "open")
+
+    def test_a_face_count_that_does_not_match_is_dropped(self) -> None:
+        """A 3D deck describing a 2D cut has no honest mapping onto two axes."""
+        config = _config_with(("periodic",) * 6)
+        assert boundary_tags(config, None, 2) is None
+
+    def test_neither_source_leaves_the_boundary_unset(self) -> None:
+        assert boundary_tags(_config_with(()), None, 3) is None
+
+
+class TestPeriodicityReachesTheGrid:
+    """Parsed periodicity was dropped before it could reach any consumer.
+
+    `GridInfo.boundary` is what `compute()` reads to warn that the
+    differential operators do not wrap, so a reader that drops it makes the
+    guard unreachable for every dataset it produces.
+    """
+
+    def test_every_fixture_carries_its_periodic_axes(self) -> None:
+        missing = {}
+        for name in (
+            "idl-uniform",
+            "idl-amr",
+            "hdf5-uniform",
+            "hdf5-amr",
+            "out-ascii",
+            "out-binary",
+        ):
+            d = DATA_DIR / name
+            reader, _ = open_batsrus(d)
+            ds = reader.read_timestep(d, reader.available_timesteps(d)[0])
+            if ds.grid.boundary != ("periodic", "periodic"):
+                missing[name] = ds.grid.boundary
+        assert not missing, f"periodicity lost on the way to GridInfo: {missing}"
+
+    def test_the_simulation_config_grid_agrees_with_the_dataset(self) -> None:
+        reader, config = open_batsrus(IDL_DIR)
+        ds = reader.read_timestep(IDL_DIR, 0)
+        assert config.grid.boundary == ds.grid.boundary
+
+    def test_a_periodic_grid_warns_on_a_derivative(self) -> None:
+        reader, _ = open_batsrus(IDL_DIR)
+        ds = reader.read_timestep(IDL_DIR, 0)
+        with pytest.warns(UserWarning, match=r"Periodic boundary on x, y"):
+            ds.compute("div_B")
 
 
 class TestIDLUniform:

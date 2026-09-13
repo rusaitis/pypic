@@ -83,6 +83,18 @@ The distribution is `pypic-plasma` on PyPI; the import name is `pypic`.
 
 ### Fixed
 
+- BATSRUS datasets carry their periodic axes into `GridInfo.boundary`, so the
+  periodic-stencil warning below actually reaches them. `#PERIODIC` was parsed
+  out of the `.h` header into a field nothing ever read, `#OUTERBOUNDARY` was
+  not parsed at all, and every BATSRUS grid therefore loaded with
+  `boundary=None` — including all six committed fixtures, which declare four
+  periodic faces each. The two sources are combined rather than ranked
+  blindly: the run's `#PERIODIC` decides whether an axis wraps, the deck's
+  `#OUTERBOUNDARY` supplies the richer tag otherwise (`outflow`, `float`,
+  `inflow`, ...), and a deck claiming periodic against a header that says
+  otherwise resolves to `"open"`. Faces collapse two-to-one per axis because
+  `GridInfo` holds one tag per axis; an asymmetric pair becomes `"mixed"`, and
+  the lossless per-face list survives in `metadata["outer_boundary"]`.
 - A deliberate refusal now reaches the caller of `open_simulation` as itself,
   instead of being buried in the "All candidate readers failed"
   `ExceptionGroup`. The probe loop caught every failure alike, so a

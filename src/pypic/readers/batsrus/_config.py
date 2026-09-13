@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 from dataclasses import dataclass, field
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Any
@@ -39,6 +40,7 @@ class BATSRUSConfig:
     geometry: str = "cartesian"
     use_splitb: bool = False
     divb_method: str = ""
+    outer_boundary: tuple[str, ...] = ()
     metadata: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
@@ -81,6 +83,7 @@ def parse_param_in(path: Path) -> BATSRUSConfig:
     dt_fixed: float | None = None
     use_splitb = False
     divb_method = ""
+    outer_boundary: tuple[str, ...] = ()
     metadata: dict[str, Any] = {}
 
     i = 0
@@ -188,6 +191,21 @@ def parse_param_in(path: Path) -> BATSRUSConfig:
             i += 2
             continue
 
+        if line == "#OUTERBOUNDARY":
+            # Unlike every other command here the face count is variable
+            # (4 in 2D, 6 in 3D), so read to the next blank or command line.
+            faces: list[str] = []
+            j = i + 1
+            while j < len(lines) and len(faces) < 6:
+                entry = lines[j].strip()
+                if not entry or entry.startswith("#"):
+                    break
+                faces.append(_first_token(entry).lower())
+                j += 1
+            outer_boundary = tuple(faces)
+            i = j
+            continue
+
         i += 1
 
     return BATSRUSConfig(
@@ -208,6 +226,7 @@ def parse_param_in(path: Path) -> BATSRUSConfig:
         geometry="cartesian",
         use_splitb=use_splitb,
         divb_method=divb_method,
+        outer_boundary=outer_boundary,
         metadata=metadata,
     )
 
@@ -270,6 +289,11 @@ def to_simulation_config(
             origin=domain_min,
             geometry=geometry,
             dt=config.dt_fixed,
+            boundary=boundary_tags(config, header, len(dims)),
+        )
+    elif grid.boundary is None:
+        grid = copy.replace(
+            grid, boundary=boundary_tags(config, header, len(grid.dimensions))
         )
 
     extra: dict[str, Any] = {}
@@ -282,6 +306,9 @@ def to_simulation_config(
     physics = PhysicsParams(gamma=config.gamma, extra=extra)
 
     meta: dict[str, Any] = dict(config.metadata)
+    if config.outer_boundary:
+        # GridInfo holds one tag per axis; the per-face pairs only survive here.
+        meta["outer_boundary"] = list(config.outer_boundary)
     if config.start_time:
         meta["start_time"] = config.start_time
     if config.description:
@@ -303,6 +330,63 @@ def to_simulation_config(
 def _first_token(line: str) -> str:
     """Extract the first whitespace-delimited token from a PARAM.in line."""
     return line.split()[0]
+
+
+def boundary_tags(
+    config: BATSRUSConfig | None,
+    header: BATSRUSHeader | None,
+    ndim: int,
+) -> tuple[str, ...] | None:
+    """Per-axis boundary tags for `GridInfo`, or None when neither source fits.
+
+    Two sources describe the same thing at different fidelities. The ``.h``
+    header's ``#PERIODIC`` is written by the run into the same file that
+    supplies the extents, so it cannot disagree about the axis count, but it
+    only distinguishes periodic from not. ``PARAM.in``'s ``#OUTERBOUNDARY``
+    carries the richer vocabulary (``outflow``, ``float``, ``inflow``, ...)
+    and is the only source for the HDF5 and ``.out`` paths, but it is an
+    input deck: per-face, and always 3D even when the plot is a 2D slice.
+
+    So the header decides *periodic*, the deck supplies the tag otherwise,
+    and a disagreement resolves to ``"open"`` — the run is the truth, and
+    claiming periodic would raise a false warning in `pypic.compute`.
+
+    Faces collapse two-to-one per axis, since `GridInfo.boundary` holds one
+    tag per axis. An asymmetric pair (``inflow`` against ``outflow``, routine
+    in magnetosphere decks) becomes ``"mixed"`` rather than picking a side;
+    BATSRUS requires both faces periodic for a wrapped axis, so nothing
+    periodic is lost. A source whose length does not match *ndim* is dropped
+    rather than truncated — a 3D deck describing a 2D cut has no honest
+    mapping onto the surviving axes.
+    """
+    per_axis: tuple[str, ...] = ()
+    if config is not None and len(config.outer_boundary) == 2 * ndim:
+        faces = config.outer_boundary
+        per_axis = tuple(
+            faces[2 * k] if faces[2 * k] == faces[2 * k + 1] else "mixed"
+            for k in range(ndim)
+        )
+
+    periodic: tuple[bool, ...] = ()
+    if header is not None and len(header.is_periodic) == ndim:
+        periodic = header.is_periodic
+
+    if not per_axis and not periodic:
+        return None
+
+    tags: list[str] = []
+    for axis in range(ndim):
+        if periodic:
+            if periodic[axis]:
+                tags.append("periodic")
+                continue
+            # The run says this axis does not wrap; never echo a deck that
+            # claims otherwise.
+            tag = per_axis[axis] if per_axis else "open"
+            tags.append("open" if tag == "periodic" else tag)
+            continue
+        tags.append(per_axis[axis] if per_axis else "open")
+    return tuple(tags)
 
 
 def _compute_grid_dims(header: BATSRUSHeader) -> tuple[int, ...]:

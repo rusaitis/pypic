@@ -262,11 +262,12 @@ planes rather than by the physics, which bites spectral and turbulence runs
 hardest: those are periodic by construction and their headline diagnostics
 are box-wide.
 
-When `[boundary_conditions]` marks an axis `periodic`, `compute()` warns
-once for the grid-dependent quantities (`div_B`, `div_E`, `curl_B_*`,
-`vort_*`) rather than returning a silently degraded edge. The warning names
-the axes; it is not a statement that the result is unusable, only that its
-end planes are. Wrapping the stencil is a roadmap item (TASKS Step 52) —
+When an axis is marked `periodic` — by `[boundary_conditions]`, or by the
+native deck a reader parses (BATSRUS `#OUTERBOUNDARY` and the `.h`
+`#PERIODIC` block, iPIC3D `PERIODICX/Y/Z`) — `compute()` warns once for the
+grid-dependent quantities (`div_B`, `div_E`, `curl_B_*`, `vort_*`) rather
+than returning a silently degraded edge. The warning names the axes; it is
+not a statement that the result is unusable, only that its end planes are. Wrapping the stencil is a roadmap item (TASKS Step 52) —
 `np.gradient` has no periodic mode, so it means `np.roll`-based central
 differences on the flagged axes.
 
