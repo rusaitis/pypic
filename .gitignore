@@ -38,6 +38,8 @@ htmlcov/
 # Scratch / local directories
 scratch*/
 .cache/
+# Reference PDFs and papers — copyrighted, and large.
+papers/
 
 # macOS
 .DS_Store
