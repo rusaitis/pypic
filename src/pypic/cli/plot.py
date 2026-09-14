@@ -456,7 +456,7 @@ def plot_compare(
 
     from pypic.plotting._resolve import maybe_save
     from pypic.plotting.comparison import plot_comparison
-    from pypic.regrid import align_grids
+    from pypic.regridding import align_grids
 
     sim_a = _open(path_a)
     sim_b = _open(path_b)

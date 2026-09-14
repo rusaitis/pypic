@@ -10,7 +10,7 @@ and dimensionless quantities (beta, Mach numbers, entropy) need no conversion
 at all.
 
 Datasets on different grids must be aligned first; see
-[`align_grids`][pypic.regrid.align_grids] in [Regridding](regrid.md).
+[`align_grids`][pypic.regridding.align_grids] in [Regridding](regridding.md).
 
 `nan_policy` is forwarded unchanged to the underlying diagnostics, so masked
 regions from `SphereSelection`, `FieldDataset.where()`, or out-of-domain

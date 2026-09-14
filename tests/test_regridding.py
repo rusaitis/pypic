@@ -1,4 +1,4 @@
-"""Tests for :mod:`pypic.regrid`."""
+"""Tests for :mod:`pypic.regridding`."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from numpy.testing import assert_allclose, assert_array_equal
 from pypic.coordinates.geometry import SPHERICAL
 from pypic.dataset import FieldDataset
 from pypic.grid import GridInfo
-from pypic.regrid import align_grids, common_grid, regrid
+from pypic.regridding import align_grids, common_grid, regrid
 from pypic.units import Normalization, PhysicsParams, SpeciesInfo
 from tests._helpers import make_uniform_grid
 

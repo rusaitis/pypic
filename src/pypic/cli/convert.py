@@ -256,7 +256,7 @@ def convert_fields(
             fds = BoxSelection(ranges=box_ranges).apply(fds)
         if target_resolution is not None:
             from pypic.grid import GridInfo
-            from pypic.regrid import regrid
+            from pypic.regridding import regrid
 
             extents = tuple(
                 d * s

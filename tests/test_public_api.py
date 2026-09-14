@@ -181,15 +181,50 @@ def test_importing_the_schema_subpackage_pulls_only_stdlib_and_pydantic() -> Non
     assert loaded == "[]"
 
 
-def test_deferred_name_leaves_regrid_bound_to_the_function() -> None:
-    """``pypic.regrid`` is the function no matter which name is touched first.
-
-    Importing the submodule binds it as ``pypic.regrid``, where the
-    eager surface had the function of the same name — so resolving any
-    one deferred name binds its module's whole export set at once.
-    """
+def test_resolving_one_deferred_name_binds_its_whole_module() -> None:
+    """Touching a sibling name is enough to bind ``regrid`` from globals."""
     kind = _probe("import pypic; pypic.align_grids; print(type(pypic.regrid).__name__)")
     assert kind == "function"
+
+
+def test_regrid_is_the_function_whichever_import_comes_first() -> None:
+    """Importing the home module first must not shadow the function.
+
+    A submodule import binds ``pypic.<name>`` to the module, and PEP 562
+    ``__getattr__`` only runs for names that fail to resolve — so a
+    deferred name equal to its module's name resolves to whichever was
+    touched first. ``regrid()`` therefore lives in ``regridding.py``, the
+    way ``reduce()`` lives in ``reductions.py``.
+    """
+    kind = _probe(
+        "import pypic.regridding; import pypic; print(type(pypic.regrid).__name__)"
+    )
+    assert kind == "function"
+
+
+def test_no_deferred_name_collides_with_a_submodule() -> None:
+    """The structural rule behind the test above, enforced for every name.
+
+    A name in ``__all__`` may shadow a submodule only when it *is* that
+    submodule (``pypic.aliases``, ``pypic.codegen``). Anything else is the
+    ``regrid`` bug returning under a new name.
+    """
+    import importlib
+    import pkgutil
+
+    import pypic
+
+    submodules = {m.name for m in pkgutil.iter_modules(pypic.__path__)}
+    offenders = []
+    for name in set(pypic.__all__) & submodules:
+        exported = getattr(pypic, name)
+        if exported is not importlib.import_module(f"pypic.{name}"):
+            offenders.append(name)
+    assert not offenders, (
+        "these exported names are shadowed by a submodule of the same name, so "
+        "which object you get depends on import order — rename the module to a "
+        "noun, as reductions.py/regridding.py do: " + ", ".join(sorted(offenders))
+    )
 
 
 _CROSS_CHECKED_SUBMODULES = [
@@ -199,7 +234,7 @@ _CROSS_CHECKED_SUBMODULES = [
     "pypic.io",
     "pypic.reconnection",
     "pypic.reductions",
-    "pypic.regrid",
+    "pypic.regridding",
     "pypic.selections",
     "pypic.spectral",
     "pypic.traces",
@@ -279,7 +314,7 @@ _ABOVE_DATASET = (
     "pypic.dataset",
     "pypic.compute",
     "pypic.reductions",
-    "pypic.regrid",
+    "pypic.regridding",
     "pypic.comparison",
     "pypic.selections",
     "pypic.readers",

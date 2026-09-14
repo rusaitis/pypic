@@ -168,7 +168,7 @@ class Simulation:
 
     1. Open both simulations via ``open_simulation()``.
     2. Read matching timesteps from each.
-    3. Regrid to a common grid via [`align_grids`][pypic.regrid.align_grids]
+    3. Regrid to a common grid via [`align_grids`][pypic.regridding.align_grids]
        when the two runs do not already share one.
     4. Compare fields: use ``in_si()`` for cross-model comparison
        (different normalizations make code units incomparable), or

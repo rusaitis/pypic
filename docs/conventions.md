@@ -226,7 +226,7 @@ with three values:
 
 The default is `"omit"` because the routine sources of NaN in pypic
 are legitimate: `SphereSelection` and `FieldDataset.where()` mask
-regions with NaN by design, `pypic.regrid` fills out-of-domain cells
+regions with NaN by design, `pypic.regridding` fills out-of-domain cells
 with NaN by design, and cross-grid comparisons against a smaller
 dataset produce NaN boundary cells by construction. Propagating NaN
 through these would make the common case (compare two runs after

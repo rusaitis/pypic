@@ -16,4 +16,4 @@ metric-factor-aware interpolation (the $\sin\theta$ Jacobian matters near the
 poles) and are not yet available; `GeometryUnsupportedError` is raised for
 those geometries.
 
-::: pypic.regrid
+::: pypic.regridding

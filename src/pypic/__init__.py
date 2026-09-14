@@ -194,7 +194,7 @@ if TYPE_CHECKING:
         field_difference_dataset,
     )
     from pypic.reconnection import find_saddle_points, reconnection_rate, schindler_xi
-    from pypic.regrid import align_grids, common_grid, regrid
+    from pypic.regridding import align_grids, common_grid, regrid
     from pypic.traces import (
         FieldLine,
         ParticleTrace,
@@ -408,9 +408,9 @@ _LAZY_EXPORTS: Final = {
     "find_saddle_points": "reconnection",
     "reconnection_rate": "reconnection",
     "schindler_xi": "reconnection",
-    "align_grids": "regrid",
-    "common_grid": "regrid",
-    "regrid": "regrid",
+    "align_grids": "regridding",
+    "common_grid": "regridding",
+    "regrid": "regridding",
     "FieldLine": "traces",
     "ParticleTrace": "traces",
     "PoincareSection": "traces",
@@ -433,9 +433,14 @@ def __getattr__(name: str) -> Any:  # noqa: ANN401  one hook, twenty-one types
     if module_name not in _LAZY_MODULES:
         raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
     module = importlib.import_module(f"pypic.{module_name}")
-    # Bind the module's whole export set at once: importing `pypic.regrid`
-    # binds the submodule as `pypic.regrid`, and the eager surface had the
-    # function of that name there instead.
+    # Bind the module's whole export set at once, so the next sibling name
+    # resolves from globals() instead of re-entering this hook.
+    #
+    # No deferred name may equal its module's name: a submodule import binds
+    # `pypic.<name>` to the module, and this hook never runs for a name that
+    # already resolves. `regrid()` lives in `regridding.py` for that reason,
+    # the way `reduce()` lives in `reductions.py`; a parity test in
+    # tests/test_public_api.py holds the rule.
     globals().update(
         {
             n: getattr(module, n)

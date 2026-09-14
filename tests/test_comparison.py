@@ -19,7 +19,7 @@ from pypic.comparison import (
 from pypic.coordinates.transforms import FrameTransform
 from pypic.dataset import FieldDataset
 from pypic.diagnostics import l2_relative_error, linf_error
-from pypic.regrid import align_grids, common_grid
+from pypic.regridding import align_grids, common_grid
 from pypic.units import Normalization
 from tests._helpers import make_uniform_grid
 
@@ -209,7 +209,7 @@ class TestCompareFields:
         Regression: the ``regrid`` no-op shortcut used to bypass method
         validation, so ``compare_fields(ds, ds, "B_1", method="bogus")``
         silently used linear interpolation. Now the typo raises at
-        :func:`pypic.regrid.regrid` before any alignment happens.
+        :func:`pypic.regridding.regrid` before any alignment happens.
         """
         ds = _make_1d(4, 1.0, 0.0)
         with pytest.raises(ValueError, match="Unknown interpolation method"):
@@ -734,7 +734,7 @@ class TestCoarseMismatchWarning:
 class TestNaNHandling:
     """Regression tests for the two distinct NaN sources in cross-grid comparison.
 
-    1. *Synthetic NaN* — fixed by tightening :func:`pypic.regrid.common_grid`
+    1. *Synthetic NaN* — fixed by tightening :func:`pypic.regridding.common_grid`
        to inclusive sample bounds (#1a). Comparing different-resolution grids
        on the same domain must not introduce boundary NaN.
 

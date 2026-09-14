@@ -6,7 +6,7 @@ These three functions are the only place the pure
 ([`pypic.reductions`][pypic.reductions] is the other module that runs
 NumPy reductions over dataset-held arrays). The norms themselves stay
 pure (NumPy in, NumPy out); the functions here add the glue layer —
-alignment via [`pypic.regrid`][pypic.regrid], alias resolution through
+alignment via [`pypic.regridding`][pypic.regridding], alias resolution through
 both datasets, and SI conversion at the comparison boundary — then
 delegate the actual norm evaluation back to the pure helpers.
 
@@ -47,7 +47,7 @@ from pypic.diagnostics import (
     l2_relative_error,
     linf_error,
 )
-from pypic.regrid import align_grids
+from pypic.regridding import align_grids
 from pypic.units import Normalization
 
 if TYPE_CHECKING:
@@ -237,7 +237,7 @@ def compare_fields(
     r"""Compute an error norm between one field of two datasets.
 
     Aligns *a* and *b* onto their common grid via
-    [`pypic.regrid.align_grids`][pypic.regrid.align_grids],
+    [`pypic.regridding.align_grids`][pypic.regridding.align_grids],
     resolves *field* through both datasets' aliases to a shared canonical
     name, converts to SI (by default) or leaves in code units, and
     delegates to the pure diagnostic in [`pypic.diagnostics`][pypic.diagnostics].
@@ -268,7 +268,7 @@ def compare_fields(
         datasets share a normalization.
     method : str
         Interpolation method passed through to
-        [`pypic.regrid.align_grids`][pypic.regrid.align_grids] (e.g. ``"linear"``,
+        [`align_grids`][pypic.regridding.align_grids] (e.g. ``"linear"``,
         ``"nearest"``, ``"cubic"``). Default ``"linear"``.
     nan_policy : {"omit", "propagate", "raise"}
         Forwarded to the pure diagnostic. Default ``"omit"`` masks NaN
@@ -375,7 +375,7 @@ def field_comparison_report(
         Unit convention; see `compare_fields`.
     method : str
         Interpolation method passed through to
-        [`pypic.regrid.align_grids`][pypic.regrid.align_grids]. Default ``"linear"``.
+        [`align_grids`][pypic.regridding.align_grids]. Default ``"linear"``.
     nan_policy : {"omit", "propagate", "raise"}
         Forwarded to the pure diagnostics; see `compare_fields`.
     frame : str | None
@@ -462,11 +462,11 @@ def field_difference_dataset(
     species, physics, and frame metadata, so the result plugs directly
     into [`plot_field_slice`][pypic.plotting.plot_field_slice]. For the
     three-panel A | B | diff layout, run
-    [`align_grids`][pypic.regrid.align_grids] yourself and pass the pair to
+    [`align_grids`][pypic.regridding.align_grids] yourself and pass the pair to
     [`plot_comparison`][pypic.plotting.plot_comparison] — that path does not
     need this helper.
 
-    Unlike [`pypic.regrid.regrid`][pypic.regrid.regrid], which preserves *a*'s original
+    Unlike [`regrid`][pypic.regridding.regrid], which preserves *a*'s original
     metadata dict verbatim, this function **replaces** ``.metadata``
     with a fresh ``{"comparison": {"source_frames": ..., "units": ...}}``
     record — the diff is a new artifact, not a regrid of *a*, and any
@@ -496,7 +496,7 @@ def field_difference_dataset(
         Unit convention; see `compare_fields`.
     method : str
         Interpolation method passed through to
-        [`pypic.regrid.align_grids`][pypic.regrid.align_grids]. Default ``"linear"``.
+        [`align_grids`][pypic.regridding.align_grids]. Default ``"linear"``.
     frame : str | None
         Reference frame for the result; see `compare_fields`. The
         returned dataset's ``frame`` attribute reflects this choice
