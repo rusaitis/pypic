@@ -6,6 +6,7 @@ import math
 
 import numpy as np
 import pytest
+from pydantic import ValidationError
 
 zarr = pytest.importorskip("zarr")
 
@@ -700,9 +701,13 @@ mass = 1.0
         return Run.model_validate(
             {
                 "name": "round-trip-test",
+                "id": "ccmc-LR_053124_1",
                 "description": "fixture",
+                "idealized": False,
+                "epoch": "2015-03-17T00:00:00Z",
                 "doi": "10.5281/zenodo.12345678",
                 "license": "CC-BY-4.0",
+                "references": [{"doi": "10.1029/2026SW004922", "kind": "publication"}],
             }
         )
 
@@ -730,6 +735,31 @@ mass = 1.0
         assert loaded_run.doi == "10.5281/zenodo.12345678"
         assert loaded_run.license == "CC-BY-4.0"
         assert loaded_run == run
+
+    def test_run_identity_is_readable_on_disk(self, tmp_path):
+        # The papers' actual requirement: the run identifier has to be
+        # legible to a consumer that never imports pypic.
+        fds = self._fds(metadata={"run": self._make_run()})
+        store = tmp_path / "identity.zarr"
+        to_zarr(fds, store)
+        run_attrs = zarr.open_group(str(store), mode="r").attrs["run"]
+        assert run_attrs["id"] == "ccmc-LR_053124_1"
+        assert run_attrs["epoch"] == "2015-03-17T00:00:00Z"
+        assert run_attrs["references"][0]["doi"] == "10.1029/2026SW004922"
+
+    def test_malformed_run_attrs_names_the_run_block(self, tmp_path):
+        # pydantic.ValidationError subclasses ValueError, so an unordered
+        # handler reports a bad attrs.run as "no pypic metadata found".
+        fds = self._fds(metadata={"run": self._make_run()})
+        store = tmp_path / "badrun.zarr"
+        to_zarr(fds, store)
+        root = zarr.open_group(str(store), mode="r+")
+        root.attrs["run"] = {"description": "missing the required name"}
+        zarr.consolidate_metadata(str(store))
+        with pytest.raises(ValueError, match=r"attrs\.run") as excinfo:
+            from_zarr(store)
+        assert "No pypic metadata found" not in str(excinfo.value)
+        assert isinstance(excinfo.value.__cause__, ValidationError)
 
     def test_simulation_toml_round_trips_text(self, tmp_path):
         fds = self._fds(metadata={"simulation_toml": self._SAMPLE_TOML})
@@ -773,6 +803,53 @@ mass = 1.0
         fds = self._fds()
         with pytest.raises(FileNotFoundError, match=r"simulation_toml"):
             to_zarr(fds, tmp_path / "x.zarr", simulation_toml=tmp_path / "nope.toml")
+
+    def _pairs(self, runs):
+        grid = make_uniform_grid(4, 3, 2)
+        return [
+            (
+                float(t),
+                FieldDataset.from_arrays(
+                    {"B_1": np.full((4, 3, 2), float(t))},
+                    grid,
+                    Normalization.identity(),
+                    metadata=({} if run is None else {"run": run}),
+                ),
+            )
+            for t, run in enumerate(runs)
+        ]
+
+    def test_timeseries_rejects_steps_from_different_runs(self, tmp_path):
+        # Step 0's run is the one that reaches the store, so mixing runs
+        # would publish one run's provenance over the other's data.
+        from pypic.schema import Run
+
+        pairs = self._pairs([Run(name="run-a"), Run(name="run-b")])
+        with pytest.raises(ValueError, match=r"run identity"):
+            to_zarr_timeseries(pairs, tmp_path / "mixed.zarr")
+
+    def test_timeseries_allows_differing_run_detail(self, tmp_path):
+        # Restart segments of one run legitimately differ in git_sha and
+        # resource accounting; only id/name define identity.
+        from pypic.schema import Run
+
+        pairs = self._pairs(
+            [
+                Run(name="one-run", id="r1", git_sha="aaaa"),
+                Run(name="one-run", id="r1", git_sha="bbbb"),
+            ]
+        )
+        to_zarr_timeseries(pairs, tmp_path / "detail.zarr")
+        loaded = from_zarr(tmp_path / "detail.zarr")
+        assert loaded.metadata["run"].git_sha == "aaaa"
+
+    def test_timeseries_step_without_a_run_is_permissive(self, tmp_path):
+        # A step that names no run cannot contradict one.
+        from pypic.schema import Run
+
+        pairs = self._pairs([Run(name="run-a"), None])
+        to_zarr_timeseries(pairs, tmp_path / "partial.zarr")
+        assert from_zarr(tmp_path / "partial.zarr").metadata["run"].name == "run-a"
 
     def test_run_and_simulation_toml_round_trip_through_timeseries(self, tmp_path):
         from pypic.schema import Run

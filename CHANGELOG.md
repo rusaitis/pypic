@@ -11,6 +11,29 @@ The distribution is `pypic-plasma` on PyPI; the import name is `pypic`.
 
 ### Added
 
+- `[run].id`, `[run].epoch`, `[run].idealized` and `[[run.references]]` —
+  run identity and discovery metadata, following the recommendations in
+  Corti et al. (2026) and Reiss et al. (2026) on open science in heliophysics
+  modeling. `id` is the stable identifier a derived product carries back to
+  its source: `name` is a human label with no uniqueness contract, and `doi`
+  is scarce by construction because archives do not mint one per run, so
+  neither could serve as a key. `epoch` anchors code time $t = 0$ to a UTC
+  instant, which is what lets a run of a real event say *which* event — it
+  must carry a timezone, and it anchors $t = 0$ rather than `t_start` so every
+  segment of a restarted run shares one time axis. `idealized` is tri-state:
+  omitted means *unstated*, because a `false` default would make every deck
+  written before this key silently claim to describe a real event.
+  `[[run.references]]` records what was published from the run — the metadata
+  that makes an archived run findable by the science it produced rather than
+  only by its settings.
+- `Simulation.run`, a run line in `Simulation.describe()`, and the full `[run]`
+  record in `pypic info --json`. An identifier is only useful where people look.
+- HDF5 §4.1 `/run/` groups are read back into `SimulationConfig.run` by the
+  canonical-layout reader, including nested `resources` / `ensemble` records and
+  digit-named array-of-table groups (`references/0/`). A file carrying its own
+  provenance no longer needs a `simulation.toml` beside it to be attributable.
+  A malformed `/run/` is logged and declined rather than raised — a bad header
+  must not cost a reader its field data.
 - `pypic.UnsupportedGridError`: raised by `load_config` when a deck is valid
   under the cross-tool schema but declares a grid pypic's containers cannot
   represent — today, `[grid.stretched]`. A `NotImplementedError` (via
@@ -88,6 +111,24 @@ The distribution is `pypic-plasma` on PyPI; the import name is `pypic`.
 
 ### Fixed
 
+- A malformed `attrs.run` in a Zarr or Icechunk store reported as "No pypic
+  metadata found" instead of naming the run block. `pydantic.ValidationError`
+  subclasses `ValueError`, so the broad handler caught it first.
+- `to_zarr_timeseries` silently kept step 0's provenance when steps came from
+  different runs, publishing one run's record over another's data. It now
+  raises when two steps both declare a `[run]` and their `id` / `name` differ.
+  Detail differences (`git_sha`, `date`, resource accounting) are still
+  tolerated — restart segments of one run legitimately differ there.
+  **Behaviour change:** a write that previously produced a misattributed store
+  now fails; split into separate stores.
+- Documentation drift around run provenance: `docs/schema.md` claimed HDF5 had
+  writer-side `/run/` support (pypic writes no HDF5 at all — the group is an
+  external writer contract), described `run` as flowing through the per-step
+  metadata intersection (it is a reserved key, resolved at step 0), and
+  promised major-component version comparison where the code requires exact
+  equality. The exported JSON Schema carried v1.0 `[units]` vocabulary
+  (`system='custom'`) that v2.0 renamed to `anchor='explicit'`, and several
+  v2.0 models still described themselves as v1.x.
 - `Normalization.summary()` — and so `pypic info` and
   `Simulation.describe()` — reports the rationalization ratio on the `si`
   anchor, which is the case that needed it most and the one it skipped.
@@ -226,33 +267,6 @@ The distribution is `pypic-plasma` on PyPI; the import name is `pypic`.
   the documented import path; only `from pypic.regrid import ...` moves, to
   `pypic.regridding`. A parity test in `tests/test_public_api.py` now fails if
   any exported name is shadowed by a submodule of the same name.
-- `compute()` warns when a grid-dependent quantity (`div_B`, `div_E`,
-  `curl_B_*`, `vort_*`) is asked for on an axis `[boundary_conditions]` marks
-  `periodic`. `GridInfo.boundary` was recorded, serialized, and read by no
-  numerical code, while every operator went through `np.gradient` — which has
-  no periodic mode and falls back to a one-sided stencil at each end plane.
-  On an analytically divergence-free periodic field over a $32^3$ box,
-  interior $\max|\nabla\cdot\mathbf{B}|$ is $1.9\times10^{-15}$ against a
-  full-grid $9.5\times10^{-3}$, with 18% of cells on a boundary face — so
-  box-wide reductions were reporting the stencil, not the physics. The
-  interior is unchanged and still second-order; the warning names the axes.
-  Wrapping the stencil is TASKS Step 52.
-- `load_config` refuses a `[grid.stretched]` deck instead of dropping the
-  section. The widths validated, reached `SimulationSchema.grid.stretched`,
-  and were then discarded — so the deck loaded with one scalar spacing per
-  axis and every cell on a stretched axis at the wrong position. Measured
-  with widths `[0.5, 0.6, 0.8, 1.0, 1.3]`, coordinates came out
-  `[0.42 1.26 2.10 2.94 3.78]` against a truth of `[0.25 0.80 1.50 2.40 3.55]`,
-  making every derivative, integral and slice along it wrong by a
-  position-dependent factor, silently. Honouring the widths is TASKS Step 51;
-  until then the refusal names the section and the axes. This is the one
-  sanctioned divergence from the validator↔loader parity invariant, and
-  `tests/test_schema_parity.py` pins it by type so it deletes itself when
-  Step 51 lands.
-- **`simulation.toml` is now schema 2.0, and `[units]` is the whole break.**
-  `[units].system` becomes `[units].anchor`, and the four code-type-shaped
-  values collapse to three anchor forms named for how the eight SI references
-  are actually closed:
 - `compute()` warns when a grid-dependent quantity (`div_B`, `div_E`,
   `curl_B_*`, `vort_*`) is asked for on an axis `[boundary_conditions]` marks
   `periodic`. `GridInfo.boundary` was recorded, serialized, and read by no

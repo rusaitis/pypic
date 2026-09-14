@@ -77,6 +77,13 @@ def info(
     lines = [
         f"Simulation: {sim.model_name} ({sim.model_type})",
         f"  Path:      {path}",
+    ]
+    if cfg.run is not None:
+        run_label = cfg.run.name
+        if cfg.run.id is not None:
+            run_label = f"{cfg.run.id} ({cfg.run.name})"
+        lines.append(f"  Run:       {run_label}")
+    lines += [
         f"  Grid:      {dims_str} ({geom})",
         f"  Spacing:   {spacing_str}",
         f"  Origin:    {origin_str}",
@@ -98,6 +105,10 @@ def info(
         "model_name": sim.model_name,
         "model_type": sim.model_type,
         "path": str(path),
+        # Whole record, not a hand-picked subset: an archive harvesting
+        # this needs the identifier, the anchor and the publication list
+        # together, and picking favourites here ages badly.
+        "run": cfg.run.model_dump(mode="json") if cfg.run is not None else None,
         "grid": {
             "dimensions": list(grid.dimensions),
             "spacing": list(grid.spacing),

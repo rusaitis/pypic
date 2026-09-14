@@ -842,3 +842,82 @@ mass = 1.0
         sim = open_simple(self._sim_dir(tmp_path, data_in_si=False))
         ds = sim.read(step=0, fields=["B", "rho_m"])
         assert float(np.mean(ds["B_1"])) == self.B_SI
+
+
+class TestRunGroup:
+    """§4.1 ``/run/`` provenance reaches the dataset that came from the file."""
+
+    @staticmethod
+    def _write(path: Path, run: dict[str, Any], nested: bool = False) -> None:
+        _write_h5(
+            path,
+            _make_fields(),
+            grid_attrs=_grid_attrs(),
+            model="test_sim",
+            model_type="MHD",
+            step=0,
+        )
+        with h5py.File(path, "a") as f:
+            g = f.create_group("run")
+            for k, v in run.items():
+                g.attrs[k] = v
+            if nested:
+                res = g.create_group("resources")
+                res.attrs["mpi_ranks"] = 4096
+                res.attrs["cpu_type"] = "Intel Xeon Max 9480"
+                refs = g.create_group("references")
+                first = refs.create_group("0")
+                first.attrs["doi"] = "10.1029/2026SW004922"
+                first.attrs["kind"] = "publication"
+
+    def test_run_group_reaches_dataset_metadata(self, tmp_path: Path) -> None:
+        self._write(
+            tmp_path / "output_000000.h5",
+            {"name": "MMS-event-1", "id": "ccmc-LR_053124_1"},
+        )
+        ds = open_simple(tmp_path).read(step=0)
+        assert ds.metadata["run"].id == "ccmc-LR_053124_1"
+
+    def test_nested_groups_decode_to_typed_submodels(self, tmp_path: Path) -> None:
+        # resources is a record; references is an array of tables spelled
+        # as digit-named child groups.
+        self._write(tmp_path / "output_000000.h5", {"name": "r"}, nested=True)
+        run = open_simple(tmp_path).read(step=0).metadata["run"]
+        assert run.resources is not None
+        assert run.resources.mpi_ranks == 4096
+        assert run.references[0].doi == "10.1029/2026SW004922"
+
+    def test_absent_run_group_is_not_an_error(self, tmp_path: Path) -> None:
+        _write_h5(
+            tmp_path / "output_000000.h5",
+            _make_fields(),
+            grid_attrs=_grid_attrs(),
+            model="test_sim",
+            model_type="MHD",
+            step=0,
+        )
+        assert "run" not in open_simple(tmp_path).read(step=0).metadata
+
+    def test_malformed_run_group_is_declined_not_fatal(
+        self, tmp_path: Path, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        # A bad header must not cost the reader its field data.
+        self._write(tmp_path / "output_000000.h5", {"description": "no name here"})
+        with caplog.at_level("WARNING"):
+            ds = open_simple(tmp_path).read(step=0)
+        assert "run" not in ds.metadata
+        assert ds["B_1"].shape == DIMS
+        assert "failed schema validation" in caplog.text
+
+    def test_run_group_reaches_the_simulation_config(self, tmp_path: Path) -> None:
+        # The factory already opens the first file for grid/model attrs,
+        # so provenance carried by the data reaches `Simulation.run` and
+        # `pypic info`, not only the per-step dataset.
+        self._write(
+            tmp_path / "output_000000.h5",
+            {"name": "StPatricks-2015", "id": "ccmc-LR_031715_1"},
+        )
+        sim = open_simple(tmp_path)
+        assert sim.run is not None
+        assert sim.run.id == "ccmc-LR_031715_1"
+        assert "ccmc-LR_031715_1" in sim.describe()

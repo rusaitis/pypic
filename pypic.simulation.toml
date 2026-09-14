@@ -191,17 +191,36 @@ authors = [
 # and DOI — grant mandates (NSF, NASA, Horizon Europe) and archives
 # (CDAWEB, SPASE, ESA PSA) require data-level provenance.
 name        = "double_harris_demo"
+# Unique, stable identifier. `name` is a human label; this is what every
+# derived product carries back to its source, and what an archive keys on.
+# No format is enforced — archives differ.
+id          = "pypic-demo/double_harris/001"
 description = "Double Harris sheet reconnection, ion-normalized"
+# true when the run models no real time period (artificial drivers or
+# internal settings, or a 2D reduction of a 3D system). Omit to leave it
+# unstated rather than asserting the conditions are real.
+idealized   = true
 authors = [
     { name = "L. Rusaitis", orcid = "0000-0003-2904-3672", affiliation = "Independent Researcher", role = "PI" },
 ]
-date        = 2026-04-23               # TOML native date literal
+date        = 2026-04-23               # TOML native date literal (run executed)
+# epoch     = 2015-03-17T00:00:00Z     # UTC instant of code time t = 0, for
+                                       #   runs of a real event. Must carry a
+                                       #   timezone. Omitted here: this run is
+                                       #   idealized, so no real epoch exists.
 git_sha     = "ea3fdfa"                # commit of the input deck / code
 host        = "stampede3.tacc.utexas.edu"
 license     = "CC-BY-4.0"              # DATA license (SPDX identifier)
 doi         = "10.5281/zenodo.12345678"   # DATA DOI (distinct from code DOI)
 funding     = ["NSF-AGS-2024001", "NASA-80NSSC24K0123"]   # grant IDs
 # embargo   = 2027-01-01               # optional — release date for private data
+
+# Results metadata: what was published from this run. Repeatable; each
+# entry needs at least one of doi / url / citation. This is what makes an
+# archived run findable by the science it produced.
+[[run.references]]
+doi  = "10.1029/2026SW004922"
+kind = "publication"
 
 [run.resources]
 # Optional resource usage — all keys optional. Useful for reproducibility,

@@ -16,10 +16,12 @@ import logging
 from typing import TYPE_CHECKING, Any
 
 import xarray as xr
+from pydantic import ValidationError
 
 from pypic.dataset import FieldDataset
 from pypic.io._guard import ensure_zarr
 from pypic.io.metadata import (
+    SCHEMA_VERSION,
     check_schema_version,
     decode_pypic_attrs,
     encode_pypic_attrs,
@@ -51,6 +53,14 @@ def _ds_to_field_dataset(
         grid, normalization, species, physics, metadata, frame, transforms = (
             decode_pypic_attrs(root_attrs)
         )
+    except ValidationError as exc:
+        # ValidationError subclasses ValueError, so it must be caught first
+        # or a malformed attrs.run reports as missing metadata.
+        msg = (
+            f"{source_label}: attrs.run failed schema-v{SCHEMA_VERSION} "
+            f"validation: {exc}"
+        )
+        raise ValueError(msg) from exc
     except ValueError as exc:
         msg = f"No pypic metadata found in {source_label}: {exc}"
         raise ValueError(msg) from None
@@ -161,6 +171,21 @@ def _check_timeseries_fields(
     raise ValueError(msg)
 
 
+def _run_identity(fds: FieldDataset) -> tuple[str | None, str | None] | None:
+    """``(run.id, run.name)`` for a step, or None when it declares no run.
+
+    Accepts either a typed `Run` or the plain dict a decode round-trip
+    leaves behind, so a store read back and re-written compares equal to
+    the one it came from.
+    """
+    run = fds.metadata.get("run")
+    if run is None:
+        return None
+    if isinstance(run, dict):
+        return (run.get("id"), run.get("name"))
+    return (getattr(run, "id", None), getattr(run, "name", None))
+
+
 def _check_timeseries_identity(
     first_fds: FieldDataset,
     current_fds: FieldDataset,
@@ -175,8 +200,18 @@ def _check_timeseries_identity(
     different simulation than the one that produced it.  Per-step
     *metadata* differences are tolerated (intersected by the caller);
     this guard only fires for the identity-defining attrs.
+
+    Run *identity* counts too: step 0's `[run]` record is the one that
+    reaches the store, so steps from two different runs would publish one
+    run's provenance over the other's data.  Only ``id`` and ``name`` are
+    compared — restart segments of one run legitimately differ in
+    ``git_sha``, ``date`` and resource accounting — and only when both
+    steps name a run, so TOML-less workflows stay permissive.
     """
     diffs: list[str] = []
+    first_run, current_run = _run_identity(first_fds), _run_identity(current_fds)
+    if first_run is not None and current_run is not None and first_run != current_run:
+        diffs.append("run identity (run.id / run.name)")
     if first_fds.grid != current_fds.grid:
         diffs.append("grid")
     if first_fds.normalization != current_fds.normalization:

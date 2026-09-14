@@ -200,10 +200,14 @@ Identity + provenance of this specific run.
 
 ```toml
 [run]
-name = "string"                    # REQUIRED
+name = "string"                    # REQUIRED — human label, not an identifier
+id = "ccmc-LR_053124_1"            # optional — unique, stable run identifier
 description = "string"             # optional
+idealized = false                  # optional — true when the run models no
+                                   #   real time period (see below)
 authors = [ { name = "...", orcid = "...", ... } ]   # optional
-date = 2026-04-23                  # optional — TOML native date
+date = 2026-04-23                  # optional — TOML native date (run executed)
+epoch = 2015-03-17T00:00:00Z       # optional — UTC instant of code time t = 0
 git_sha = "ea3fdfa"                # optional — commit of the input deck
 host = "stampede3.tacc.utexas.edu" # optional
 license = "CC-BY-4.0"              # optional — DATA license (SPDX id)
@@ -211,6 +215,14 @@ doi = "10.5281/zenodo.12345678"    # optional — DATA DOI
 funding = ["NSF-AGS-2024001"]      # optional — grant IDs
 embargo = 2027-01-01               # optional — public-release date
 random_seed = 42                   # optional — RNG seed for reproducible setup
+
+# Results metadata (optional, repeatable): what was published from this
+# run. Each entry needs at least one of doi / url / citation.
+[[run.references]]
+doi = "10.1029/2026SW004922"
+kind = "publication"               # open string. Canonical: "publication" |
+                                   #   "preprint" | "presentation" | "poster"
+                                   #   | "dataset" | "thesis" | "report"
 
 [run.ensemble]                     # optional — ensemble-member identity
 member_id = 3                      # 1-indexed; must satisfy member_id <= total
@@ -243,8 +255,34 @@ hours    = 393216
 `attrs.run` as a JSON-mode `Run.model_dump`. Identity-stable
 across derivations — a regridded "MMS-event-1" run is still that
 run. On-disk round-trip policy lives in §4 (Zarr round-trips
-end-to-end; HDF5 has writer-side support for `/run/` but no reader
-extraction yet — ship `simulation.toml` alongside HDF5 stores).
+end-to-end; for HDF5, `/run/` is written by the external §4.1
+writers and read back by the canonical-layout reader).
+
+**`id` versus `name` versus `doi`.** `name` is a label for humans and
+carries no uniqueness contract. `id` is the stable identifier every
+derived product carries back to its source, and is what a consumer
+should key on; no format is enforced, because run-ID conventions
+differ per archive. `doi` is scarce by construction — archives do not
+mint one per run — so it is the wrong field to use as a primary key.
+
+**`epoch` anchors code time `t = 0`**, so a run of a real event can say
+which event: $\mathrm{UTC}(t) = \texttt{epoch} + t \times t_{ref}$. It
+must carry a timezone; a naive local literal is rejected, since it would
+denote a different instant for each reader. Anchoring `t = 0` rather
+than `t_start` means every segment of a restarted run declares the same
+epoch and is placed on one shared axis by its own `t`. It lives on
+`[run]` rather than `[time]` because `[time]` does not survive to the
+typed in-memory config — only `dt` reaches a `FieldDataset` — and
+because "which real period is this" is a discovery question about the
+run, not an integrator setting.
+
+**`idealized` is tri-state on purpose.** `true` means the run models no
+real time period — artificial drivers, artificial internal settings, or
+a 2D reduction of a 3D system — so deriving real-event characteristics
+from it would produce wrong metadata. `false` asserts the conditions are
+real. Omitted means *unstated*, which is what every deck written before
+this key existed actually means; a plain `false` default would make all
+of them silently claim to describe real events.
 
 ### [time]
 
@@ -1548,9 +1586,11 @@ output_{step:06d}.h5            # example name; actual pattern is set
 ├── coordinates/ (with optional modes/ for thetaMode and transforms/
 │   sub-groups), normalization/, species/{s0,s1,...}/, physics/
 │   (with optional pic/ | mhd/ | hybrid/ model sub-groups),
-├── run/                        # optional — writer-side contract;
-│                               #   current pypic readers do not yet
-│                               #   round-trip it into SimulationConfig.run
+├── run/                        # optional — nested groups for `resources`
+│                               #   and `ensemble`; arrays of tables
+│                               #   (`references`, `authors`) are digit-named
+│                               #   child groups (`references/0/`), matching
+│                               #   the `species/{s0,s1,...}/` convention
 │
 ├── time              [attr: float64]   # current snapshot time
 └── step              [attr: int]       # current snapshot step
@@ -1632,9 +1672,16 @@ one timestep is O(1). Step 1 writes the `DataTree` with
 a constant field set and constant identity attrs (`grid`,
 `normalization`, `species`, `physics`, plus `frame` and
 `transforms` from `coordinates`) across appends; mismatches
-raise. Other root attrs (`schema`, `model`, `time`,
-`boundary_conditions`, `coordinates.*` outside frame/transforms,
-`run`) flow through the per-step `metadata` intersection — keys
+raise. Run *identity* is enforced the same way: when two steps both
+declare a `[run]` and their `id` / `name` differ, the write raises,
+because only step 0's record reaches the store and the result would
+otherwise publish one run's provenance over another run's data. The
+rest of `run` is step-0 single-source-of-truth — restart segments of
+one run legitimately differ in `git_sha`, `date` and resource
+accounting, and those differences are not compared. Other root attrs
+(`schema`, `model`, `time`, `boundary_conditions`, `coordinates.*`
+outside frame/transforms) flow through the per-step `metadata`
+intersection — keys
 present in every step with identical values survive; any key
 missing from one step, or differing in value, is dropped from
 `attrs.metadata` after the final append. In single-step writes
@@ -1659,7 +1706,7 @@ groups vs Zarr root attrs).
 | `[units]` | `/normalization/` group | `attrs.normalization` (the eight `*_ref` primitives, plus `system` and `speed_of_light`). The store key stays `system` — it names the Python attribute `Normalization.system`, not the TOML key, which is `anchor`. |
 | `[[species]]` | `/species/{s0,s1,...}/` sub-groups | `attrs.species` (list, in declaration order) |
 | `[physics]` | `/physics/` group + model sub-groups | `attrs.physics` |
-| `[run]` (optional) | `/run/` group with attrs (writer-side contract; pypic readers do not yet round-trip it) | `attrs.run` (typed; `Run.model_dump`; round-trips end-to-end) |
+| `[run]` (optional) | `/run/` group with attrs, written by external §4.1 writers and read back into `SimulationConfig.run` by the canonical-layout reader | `attrs.run` (typed; `Run.model_dump`; round-trips end-to-end) |
 | Verbatim `simulation.toml` | not currently emitted by pypic and not extracted by readers | `attrs.simulation_toml` (opaque UTF-8 text; round-trips end-to-end) |
 | Coord arrays | from `/grid/` + `/coordinates/` attrs | xarray dim coords under `/fields/` (names track `grid.surviving_axis_names`) |
 | Snapshot scalars `time` / `step` | top-level scalar attrs | `time`: dim under `/fields/time` (multi-step) or `attrs.metadata.time` scalar (single-step). `step`: `attrs.metadata.step` scalar in both modes. |
@@ -1683,8 +1730,12 @@ groups vs Zarr root attrs).
   `pypic.schema.validate_simulation_toml(text)`. Same derivation
   policy as `attrs.run`.
 
-Readers reject stores whose `schema.version` major component doesn't
-match the library's expected major. Non-pypic consumers (Three.js
+Readers reject stores whose `schema.version` is not exactly the version
+this build implements (`pypic.io.metadata.check_schema_version`).
+Equality rather than a major-component comparison: v2.x is additive, so
+a store written by a future minor may carry sections this build would
+silently drop, and dropping them quietly is worse than refusing to
+open. Non-pypic consumers (Three.js
 viewer, Rust `zarrs` pipelines) read section dicts straight from
 `attrs.*` and field arrays from `/fields/<name>` — no TOML parsing
 required.

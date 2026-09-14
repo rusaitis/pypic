@@ -66,7 +66,7 @@ def check_schema_version(
     """Raise unless *attrs* carries a ``schema.version`` this build decodes.
 
     *source_label* names what was opened, so a store path reaches the
-    message. Equality, not a major-component comparison: v1.x is
+    message. Equality, not a major-component comparison: v2.x is
     additive, and a store written by a future minor may carry sections
     this build would silently drop.
     """

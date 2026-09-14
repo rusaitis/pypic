@@ -963,6 +963,29 @@ class TestForwardedSections:
         assert cfg.run.funding == ["NSF-AGS-2024001"]
         assert cfg.run.random_seed == 42
 
+    def test_run_identity_reaches_the_config(self, tmp_path: Path) -> None:
+        # readers/config.py hands the whole validated Run through, so new
+        # schema fields need no translator change — this pins that.
+        run = (
+            '[run]\nname = "harris-r2"\n'
+            'id = "ccmc-LR_053124_1"\n'
+            "idealized = false\n"
+            "epoch = 2015-03-17T00:00:00Z\n"
+            "\n[[run.references]]\n"
+            'doi = "10.1029/2026SW004922"\n'
+            'kind = "publication"\n'
+        )
+        cfg = load_config(
+            _write(
+                tmp_path, _shell(extra="").replace('[run]\nname = "r0"', run.rstrip())
+            )
+        )
+        assert cfg.run is not None
+        assert cfg.run.id == "ccmc-LR_053124_1"
+        assert cfg.run.idealized is False
+        assert cfg.run.epoch is not None
+        assert cfg.run.references[0].doi == "10.1029/2026SW004922"
+
     def test_probes_typed(self, tmp_path: Path) -> None:
         prb = (
             "[[probes]]\n"

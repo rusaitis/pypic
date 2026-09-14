@@ -22,6 +22,7 @@ if TYPE_CHECKING:
     from pypic.dataset import FieldDataset
     from pypic.grid import GridInfo
     from pypic.readers._protocols import SimulationReader
+    from pypic.schema import Run
     from pypic.units import Normalization, PhysicsParams, SpeciesInfo
 
     type CanReadFunction = Callable[[Path], float]
@@ -241,6 +242,17 @@ class Simulation:
     def path(self) -> Path:
         """Data directory."""
         return self._path
+
+    @property
+    def run(self) -> Run | None:
+        """``[run]`` provenance from the merged configuration.
+
+        Resolved once when the simulation is opened. A per-file ``/run/``
+        group is attached per dataset instead, so
+        ``sim.read(step).metadata["run"]`` is the authoritative record for
+        a given timestep when the two disagree.
+        """
+        return self._config.run
 
     @property
     def model_name(self) -> str:
@@ -582,6 +594,14 @@ class Simulation:
         lines = [
             f"Simulation: {self.model_name} ({self.model_type})",
             f"  Path:    {self._path}",
+        ]
+        run = self._config.run
+        if run is not None:
+            label = run.id or run.name
+            if run.id is not None:
+                label = f"{run.id} ({run.name})"
+            lines.append(f"  Run:     {label}")
+        lines += [
             f"  Grid:    {dims} ({geom})",
             f"  Spacing: {spacing}",
             # Without this the only way to learn the data has no SI anchor

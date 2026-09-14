@@ -45,6 +45,7 @@ from pypic.coordinates.geometry import CARTESIAN, GEOMETRY_BY_NAME
 from pypic.grid import GridInfo
 from pypic.readers._base import ReaderBase
 from pypic.readers._config_helpers import normalize_fields
+from pypic.readers._h5_meta import read_run_group
 from pypic.readers._protocols import score_signals
 from pypic.units import Normalization
 
@@ -54,6 +55,7 @@ if TYPE_CHECKING:
 
     from pypic.dataset import FieldDataset
     from pypic.readers._registry import Simulation
+    from pypic.schema import Run
     from pypic.types import FloatArray, ModelType
 
 _VALID_MODEL_TYPES: frozenset[str] = frozenset(
@@ -343,11 +345,16 @@ class SimpleReader(ReaderBase):
         with h5py.File(filepath, "r") as f:
             config = self._resolve_config(_read_grid_attrs(f), filepath)
             file_step, time = self._snapshot(f, step)
+            run = read_run_group(f)
         return self._finish(
             _to_code_units(field_data, config),
             step=file_step,
             time=time,
             config=config,
+            # The file is more specific than the directory, so a /run/
+            # group wins over a sibling simulation.toml via _finish's
+            # extra-beats-config merge.
+            extra=None if run is None else {"run": run},
         )
 
     def _read_raw(
@@ -670,11 +677,16 @@ def _open_reader(
     h5_grid: GridInfo | None = None
     model_name = "unknown"
     model_type: ModelType = "PIC"
+    h5_run: Run | None = None
 
     if first_file is not None:
         with h5py.File(first_file, "r") as f:
             h5_grid = _read_grid_attrs(f)
             model_name, model_type = _read_model_attrs(f)
+            # Free here — the file is already open — and it is what lets
+            # `pypic info` and `Simulation.run` see provenance carried by
+            # the data rather than only by a sibling simulation.toml.
+            h5_run = read_run_group(f)
 
     resolved_grid = h5_grid or grid
     if resolved_grid is None:
@@ -697,6 +709,7 @@ def _open_reader(
         model_type=model_type,
         grid=resolved_grid,
         normalization=resolved_norm,
+        run=h5_run,
         metadata={"file_pattern": file_pattern},
     )
     reader = SimpleReader(

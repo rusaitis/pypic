@@ -908,6 +908,70 @@ class TestRunEnsemble:
             validate_simulation_toml(doc)
 
 
+class TestRunIdentity:
+    """``id``, ``epoch``, ``idealized`` and ``references`` on ``[run]``."""
+
+    def test_id_is_carried_verbatim(self) -> None:
+        doc = _minimal_doc().replace(
+            'name = "r0"\n', 'name = "r0"\nid = "ccmc-LR_053124_1"\n'
+        )
+        assert validate_simulation_toml(doc).run.id == "ccmc-LR_053124_1"
+
+    def test_epoch_anchors_the_run_to_utc(self) -> None:
+        doc = _minimal_doc().replace(
+            'name = "r0"\n', 'name = "r0"\nepoch = 2015-03-17T00:00:00Z\n'
+        )
+        epoch = validate_simulation_toml(doc).run.epoch
+        assert epoch is not None
+        assert epoch.tzinfo is not None
+        assert epoch.year == 2015
+
+    def test_epoch_without_a_timezone_is_rejected(self) -> None:
+        # A naive literal means a different instant for every reader —
+        # exactly the ambiguity the field exists to remove.
+        doc = _minimal_doc().replace(
+            'name = "r0"\n', 'name = "r0"\nepoch = 2015-03-17T00:00:00\n'
+        )
+        with pytest.raises(ValidationError, match="timezone"):
+            validate_simulation_toml(doc)
+
+    def test_idealized_defaults_to_unstated_not_false(self) -> None:
+        # A bool default would make every pre-existing deck silently
+        # claim to describe a real event.
+        assert validate_simulation_toml(_minimal_doc()).run.idealized is None
+
+    def test_idealized_records_an_artificial_run(self) -> None:
+        doc = _minimal_doc().replace('name = "r0"\n', 'name = "r0"\nidealized = true\n')
+        assert validate_simulation_toml(doc).run.idealized is True
+
+    def test_references_carry_published_results(self) -> None:
+        doc = _minimal_doc() + dedent("""
+            [[run.references]]
+            doi = "10.1029/2026SW004922"
+            kind = "publication"
+            [[run.references]]
+            url = "https://example.org/talk"
+            kind = "presentation"
+        """)
+        refs = validate_simulation_toml(doc).run.references
+        assert [r.kind for r in refs] == ["publication", "presentation"]
+
+    def test_reference_naming_no_identifier_is_rejected(self) -> None:
+        doc = _minimal_doc() + dedent("""
+            [[run.references]]
+            kind = "poster"
+        """)
+        with pytest.raises(ValidationError, match=r"doi|url|citation"):
+            validate_simulation_toml(doc)
+
+    def test_deck_omitting_every_new_key_still_validates(self) -> None:
+        # The additive guarantee: v2.x may add optional keys only.
+        s = validate_simulation_toml(_minimal_doc())
+        assert s.run.id is None
+        assert s.run.epoch is None
+        assert s.run.references == []
+
+
 class TestGridAdditions:
     """``ghost_cells`` and ``[grid.amr]`` discriminator + subcycling."""
 

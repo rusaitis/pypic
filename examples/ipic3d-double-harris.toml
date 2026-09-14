@@ -14,7 +14,9 @@ description = "Double Harris sheet reconnection"
 
 [run]
 name        = "double_harris_example"
+id          = "pypic-examples/ipic3d-double-harris/001"
 description = "Reference fixture packaged with pypic"
+idealized   = true                     # a textbook setup, not a real event
 
 [time]
 scheme  = "fixed"

@@ -1,5 +1,5 @@
 {
-  "$comment": "Structural schema only. Generated from pypic.schema._models.SimulationSchema via pypic.schema._export.build_schema. Cross-field invariants (range checks on ensemble member_id, time scheme/dt/cfl rules, grid axis/upper-lower/stretched-widths/stagger checks, units.reference determining-set rule for system='custom', coordinate-transform BFS resolution, driver target precedence, restart.from existence, root-level cross-references to species, bodies, drivers, and collisions) are enforced at runtime by pypic.schema.validate_simulation_toml and are not expressible in JSON Schema. The v2.0 'x-*' extension namespace is permitted wherever additionalProperties is true.",
+  "$comment": "Structural schema only. Generated from pypic.schema._models.SimulationSchema via pypic.schema._export.build_schema. Cross-field invariants (range checks on ensemble member_id, time scheme/dt/cfl rules, grid axis/upper-lower/stretched-widths/stagger checks, units reference determining-set rule for anchor='explicit', at-least-one-identifier rule on run.references entries, coordinate-transform BFS resolution, driver target precedence, restart.from existence, root-level cross-references to species, bodies, drivers, and collisions) are enforced at runtime by pypic.schema.validate_simulation_toml and are not expressible in JSON Schema. The v2.0 'x-*' extension namespace is permitted wherever additionalProperties is true.",
   "$defs": {
     "Allocation": {
       "additionalProperties": false,
@@ -946,7 +946,7 @@
     },
     "GridAMR": {
       "additionalProperties": false,
-      "description": "``[grid.amr]`` \u2014 dynamic adaptive refinement parameters.\n\n``amr_kind`` discriminates block/patch (BoxLib / AMReX / Chombo / FLASH)\nfrom octree codes (RAMSES, MPI-AMRVAC); octree leaves are single cells\nso ``block_size`` does not apply. ``level_subcycling`` records whether\ndifferent AMR levels advance at different effective timesteps (Athena++\nand AMReX-based codes); a per-level ``dt_factor`` array would be a\nfuture v1.1 add if needed.",
+      "description": "``[grid.amr]`` \u2014 dynamic adaptive refinement parameters.\n\n``amr_kind`` discriminates block/patch (BoxLib / AMReX / Chombo / FLASH)\nfrom octree codes (RAMSES, MPI-AMRVAC); octree leaves are single cells\nso ``block_size`` does not apply. ``level_subcycling`` records whether\ndifferent AMR levels advance at different effective timesteps (Athena++\nand AMReX-based codes); a per-level ``dt_factor`` array would be a\nfuture v2.1 add if needed.",
       "properties": {
         "amr_kind": {
           "default": "block",
@@ -2234,7 +2234,7 @@
     },
     "Physics": {
       "additionalProperties": true,
-      "description": "``[physics]`` \u2014 flags whose semantics are identical across models.\n\nExtra top-level keys under ``[physics]`` are accepted to leave room\nfor v1.1+ additions (``[physics.vlasov]`` in particular).",
+      "description": "``[physics]`` \u2014 flags whose semantics are identical across models.\n\nExtra top-level keys under ``[physics]`` are accepted to leave room\nfor v2.1+ additions (``[physics.vlasov]`` in particular).",
       "properties": {
         "hybrid": {
           "anyOf": [
@@ -2547,7 +2547,7 @@
     },
     "Run": {
       "additionalProperties": false,
-      "description": "``[run]`` \u2014 identity + provenance of THIS run.",
+      "description": "``[run]`` \u2014 identity + provenance of THIS run.\n\n``id`` is the stable, globally unique identifier for the run, and is\nthe key every derived product carries back to its source. ``name``\nis a human label and carries no uniqueness contract; ``doi`` is\nscarce by design, since archives do not mint one per run. No format\nis enforced \u2014 CCMC run IDs, ULIDs and per-lab conventions all differ,\nand the schema's job here is to record an identifier, not to police\nits shape.\n\n``references`` is *results* metadata: what was published from this\nrun. Distinct from ``doi`` (this run's data) and ``[model].doi``\n(the code).\n\n``idealized`` is deliberately tri-state. ``True`` means the run does\nnot correspond to a real time period \u2014 artificial drivers, artificial\ninternal settings, or a 2D reduction of a 3D system \u2014 so harvesting\nreal-event characteristics from it would produce wrong metadata.\n``False`` asserts the conditions are real. ``None`` (the default)\nmeans unstated, which is what every deck written before this key\nexisted actually means; a plain ``bool`` default would make all of\nthem silently claim to be real events.\n\n``epoch`` anchors code time ``t = 0`` to a UTC instant, so a run of a\nreal event can say which event. It lives here rather than on\n``[time]`` because ``[time]`` does not survive to the typed\nin-memory config \u2014 only ``dt`` reaches a `FieldDataset` \u2014 whereas\n``[run]`` round-trips end to end. It is also identity: \"which real\nperiod is this\" is a search-and-discovery question, not an\nintegrator setting.",
       "properties": {
         "authors": {
           "items": {
@@ -2612,6 +2612,18 @@
           ],
           "default": null
         },
+        "epoch": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
         "funding": {
           "items": {
             "type": "string"
@@ -2634,6 +2646,28 @@
           "anyOf": [
             {
               "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "idealized": {
+          "anyOf": [
+            {
+              "type": "boolean"
             },
             {
               "type": "null"
@@ -2667,6 +2701,12 @@
           "default": null,
           "title": "Random Seed"
         },
+        "references": {
+          "items": {
+            "$ref": "#/$defs/RunReference"
+          },
+          "type": "array"
+        },
         "resources": {
           "anyOf": [
             {
@@ -2682,6 +2722,57 @@
       "required": [
         "name"
       ],
+      "type": "object"
+    },
+    "RunReference": {
+      "additionalProperties": false,
+      "description": "``[[run.references]]`` \u2014 one result published from this run.\n\nResults metadata is what makes an archived run findable by the\nscience it produced rather than only by its settings. Each entry\nneeds at least one of ``doi`` / ``url`` / ``citation`` \u2014 an entry\nnaming only a ``kind`` identifies nothing.",
+      "properties": {
+        "citation": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "doi": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "kind": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
       "type": "object"
     },
     "RunResources": {
@@ -3061,7 +3152,7 @@
     },
     "Time": {
       "additionalProperties": false,
-      "description": "``[time]`` \u2014 temporal integration controls.\n\nScheme-specific keys are deliberately *not* modelled as a discriminated\nunion \u2014 the vocabulary is still settling and the cost of a wrong shape\nhere is low. v2.0 enforces only the cross-field invariants that are\nunambiguous:\n\n- fixed/subcycled require ``dt > 0`` (the integration step);\n- subcycled requires ``field_substeps`` (``dt_field`` is recommended\n  but advisory, not enforced);\n- adaptive omits ``dt`` (or accepts any non-negative value as a hint);\n  the runtime derives the first step from ``cfl`` / ``dt_min`` /\n  ``dt_max`` and owns CFL bookkeeping thereafter.\n\nA future v1.1 may formalise these as a discriminated union once codes\nconverge on a common spelling.",
+      "description": "``[time]`` \u2014 temporal integration controls.\n\nScheme-specific keys are deliberately *not* modelled as a discriminated\nunion \u2014 the vocabulary is still settling and the cost of a wrong shape\nhere is low. v2.0 enforces only the cross-field invariants that are\nunambiguous:\n\n- fixed/subcycled require ``dt > 0`` (the integration step);\n- subcycled requires ``field_substeps`` (``dt_field`` is recommended\n  but advisory, not enforced);\n- adaptive omits ``dt`` (or accepts any non-negative value as a hint);\n  the runtime derives the first step from ``cfl`` / ``dt_min`` /\n  ``dt_max`` and owns CFL bookkeeping thereafter.\n\nA future v2.1 may formalise these as a discriminated union once codes\nconverge on a common spelling.",
       "properties": {
         "cfl": {
           "anyOf": [
@@ -3519,7 +3610,7 @@
   "$id": "https://pypic.dev/schemas/simulation/v2.0.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": true,
-  "description": "Root model for a pypic simulation.toml v2.0 document.\n\nRequired top-level sections per v2.0:\n    [schema], [model], [run], [time], [grid], [units],\n    [coordinates], and at least one [[species]] entry.\n\nOptional sections may be omitted entirely.\n\nExtension policy at root: unknown keys must start with ``x-`` or\n``x_``. Known optional sections that are present are strictly\nvalidated.\n\n``[schema].version`` is the single discriminator for both the\nTOML config and the on-disk vocabulary it describes; v1.x is\nadditive-only per ``schema.md`` \u00a71 *Versioning*.",
+  "description": "Root model for a pypic simulation.toml v2.0 document.\n\nRequired top-level sections per v2.0:\n    [schema], [model], [run], [time], [grid], [units],\n    [coordinates], and at least one [[species]] entry.\n\nOptional sections may be omitted entirely.\n\nExtension policy at root: unknown keys must start with ``x-`` or\n``x_``. Known optional sections that are present are strictly\nvalidated.\n\n``[schema].version`` is the single discriminator for both the\nTOML config and the on-disk vocabulary it describes; v2.x is\nadditive-only per ``schema.md`` \u00a71 *Versioning*.",
   "properties": {
     "bodies": {
       "items": {

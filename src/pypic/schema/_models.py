@@ -23,6 +23,7 @@ if TYPE_CHECKING:
     from collections.abc import Iterable, Mapping
 
 from pydantic import (
+    AwareDatetime,
     BaseModel,
     ConfigDict,
     Field,
@@ -43,7 +44,7 @@ SCHEMA_VERSION: Final[str] = "2.0"
 #   * **Strict** (``Literal[...]``) — bounded structural / format
 #     primitives. The vocabulary is fixed by the data model itself
 #     (Yee-mesh positions, IEEE precisions, on-disk container formats,
-#     coordinate geometries). Adding a value is a v1.x schema bump.
+#     coordinate geometries). Adding a value is a v2.x schema bump.
 #
 #   * **Open** (plain ``str`` with a documented canonical list) —
 #     numerical-method, algorithm, and closure vocabularies. Research
@@ -238,17 +239,76 @@ class Ensemble(_StrictBase):
         return self
 
 
+class RunReference(_StrictBase):
+    """``[[run.references]]`` — one result published from this run.
+
+    Results metadata is what makes an archived run findable by the
+    science it produced rather than only by its settings. Each entry
+    needs at least one of ``doi`` / ``url`` / ``citation`` — an entry
+    naming only a ``kind`` identifies nothing.
+    """
+
+    doi: str | None = None
+    url: str | None = None
+    citation: str | None = None
+    # Open string. Canonical: "publication" | "preprint" | "presentation"
+    # | "poster" | "dataset" | "thesis" | "report".
+    kind: str | None = None
+
+    @model_validator(mode="after")
+    def _check_identifiable(self) -> RunReference:
+        if self.doi is None and self.url is None and self.citation is None:
+            raise ValueError(
+                "run.references entry needs at least one of 'doi', 'url' or 'citation'"
+            )
+        return self
+
+
 class Run(_StrictBase):
-    """``[run]`` — identity + provenance of THIS run."""
+    """``[run]`` — identity + provenance of THIS run.
+
+    ``id`` is the stable, globally unique identifier for the run, and is
+    the key every derived product carries back to its source. ``name``
+    is a human label and carries no uniqueness contract; ``doi`` is
+    scarce by design, since archives do not mint one per run. No format
+    is enforced — CCMC run IDs, ULIDs and per-lab conventions all differ,
+    and the schema's job here is to record an identifier, not to police
+    its shape.
+
+    ``references`` is *results* metadata: what was published from this
+    run. Distinct from ``doi`` (this run's data) and ``[model].doi``
+    (the code).
+
+    ``idealized`` is deliberately tri-state. ``True`` means the run does
+    not correspond to a real time period — artificial drivers, artificial
+    internal settings, or a 2D reduction of a 3D system — so harvesting
+    real-event characteristics from it would produce wrong metadata.
+    ``False`` asserts the conditions are real. ``None`` (the default)
+    means unstated, which is what every deck written before this key
+    existed actually means; a plain ``bool`` default would make all of
+    them silently claim to be real events.
+
+    ``epoch`` anchors code time ``t = 0`` to a UTC instant, so a run of a
+    real event can say which event. It lives here rather than on
+    ``[time]`` because ``[time]`` does not survive to the typed
+    in-memory config — only ``dt`` reaches a `FieldDataset` — whereas
+    ``[run]`` round-trips end to end. It is also identity: "which real
+    period is this" is a search-and-discovery question, not an
+    integrator setting.
+    """
 
     name: str
+    id: str | None = None
     description: str | None = None
+    idealized: bool | None = None
     authors: list[Author] = Field(default_factory=list)
     date: _date | None = None
+    epoch: AwareDatetime | None = None
     git_sha: str | None = None
     host: str | None = None
     license: str | None = None
     doi: str | None = None
+    references: list[RunReference] = Field(default_factory=list)
     funding: list[str] = Field(default_factory=list)
     embargo: _date | None = None
     resources: RunResources | None = None
@@ -273,7 +333,7 @@ class Time(_StrictBase):
       the runtime derives the first step from ``cfl`` / ``dt_min`` /
       ``dt_max`` and owns CFL bookkeeping thereafter.
 
-    A future v1.1 may formalise these as a discriminated union once codes
+    A future v2.1 may formalise these as a discriminated union once codes
     converge on a common spelling.
     """
 
@@ -314,7 +374,7 @@ class GridAMR(_StrictBase):
     so ``block_size`` does not apply. ``level_subcycling`` records whether
     different AMR levels advance at different effective timesteps (Athena++
     and AMReX-based codes); a per-level ``dt_factor`` array would be a
-    future v1.1 add if needed.
+    future v2.1 add if needed.
     """
 
     max_level: NonNegativeInt
@@ -913,7 +973,7 @@ class Physics(_ExtensibleBase):
     """``[physics]`` — flags whose semantics are identical across models.
 
     Extra top-level keys under ``[physics]`` are accepted to leave room
-    for v1.1+ additions (``[physics.vlasov]`` in particular).
+    for v2.1+ additions (``[physics.vlasov]`` in particular).
     """
 
     relativistic: bool = False
@@ -1547,7 +1607,7 @@ class SimulationSchema(_ExtensibleBase):
     validated.
 
     ``[schema].version`` is the single discriminator for both the
-    TOML config and the on-disk vocabulary it describes; v1.x is
+    TOML config and the on-disk vocabulary it describes; v2.x is
     additive-only per ``schema.md`` §1 *Versioning*.
     """
 
@@ -1622,7 +1682,7 @@ class SimulationSchema(_ExtensibleBase):
         assert self.physics is not None
         # Only PIC/MHD/hybrid have a typed sub-table at v2.0; the new
         # vlasov/gyrokinetic model types route through the [physics]
-        # extras namespace until typed sub-tables land in v1.1+. For
+        # extras namespace until typed sub-tables land in v2.1+. For
         # those, no typed-branch cross-check is possible (or needed).
         typed_branch = {"PIC": "pic", "MHD": "mhd", "hybrid": "hybrid"}.get(
             self.model.type

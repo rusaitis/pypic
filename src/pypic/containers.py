@@ -159,9 +159,10 @@ class SimulationConfig:
     restart : Restart | None
         Validated ``[restart]`` continuation pointer, or ``None``.
     run : Run | None
-        Validated ``[run]`` provenance object — authors, DOI, license,
-        funding, embargo, ensemble, resource accounting. ``None`` only
-        when this config was assembled by hand outside the schema path.
+        Validated ``[run]`` provenance object — identifier, UTC epoch,
+        published references, authors, DOI, license, funding, embargo,
+        ensemble, resource accounting. ``None`` only when this config
+        was assembled by hand outside the schema path.
     probes : tuple[Probe, ...]
         Validated ``[[probes]]`` entries; empty when no probes declared.
     collisions : tuple[Collision, ...]
