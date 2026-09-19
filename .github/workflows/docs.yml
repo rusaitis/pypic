@@ -24,7 +24,7 @@ jobs:
       - uses: actions/checkout@v7
       # setup-uv is pinned to a full version, not a major tag: it stopped
       # publishing @vN tags at v8 to reduce supply-chain exposure.
-      - uses: astral-sh/setup-uv@v10.0.1
+      - uses: astral-sh/setup-uv@v10.1.0
         with:
           enable-cache: true
           cache-dependency-glob: "uv.lock"
